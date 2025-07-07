@@ -1,9 +1,35 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
 /* Custom CSS for AI-integrated development environment */
 @layer base {
+  :root {
+    /* Primary colors */
+    --color-primary-50: #eff6ff;
+    --color-primary-100: #dbeafe;
+    --color-primary-200: #bfdbfe;
+    --color-primary-300: #93c5fd;
+    --color-primary-400: #60a5fa;
+    --color-primary-500: #3b82f6;
+    --color-primary-600: #2563eb;
+    --color-primary-700: #1d4ed8;
+    --color-primary-800: #1e40af;
+    --color-primary-900: #1e3a8a;
+    --color-primary-950: #172554;
+    
+    /* Secondary colors */
+    --color-secondary-50: #f8fafc;
+    --color-secondary-100: #f1f5f9;
+    --color-secondary-200: #e2e8f0;
+    --color-secondary-300: #cbd5e1;
+    --color-secondary-400: #94a3b8;
+    --color-secondary-500: #64748b;
+    --color-secondary-600: #475569;
+    --color-secondary-700: #334155;
+    --color-secondary-800: #1e293b;
+    --color-secondary-900: #0f172a;
+    --color-secondary-950: #020617;
+  }
+
   html {
     font-family: 'Inter', system-ui, sans-serif;
   }
@@ -15,27 +41,27 @@
 
 @layer components {
   .btn-primary {
-    @apply bg-primary-600 hover:bg-primary-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+    @apply bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200;
   }
   
   .btn-secondary {
-    @apply bg-secondary-200 hover:bg-secondary-300 text-secondary-800 font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+    @apply bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded-lg transition-colors duration-200;
   }
   
   .card {
-    @apply bg-white rounded-lg shadow-sm border border-secondary-200 p-6;
+    @apply bg-white rounded-lg shadow-sm border border-gray-200 p-6;
   }
   
   .input-field {
-    @apply block w-full rounded-lg border-secondary-300 shadow-sm focus:border-primary-500 focus:ring-primary-500;
+    @apply block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500;
   }
   
   .nav-link {
-    @apply text-secondary-600 hover:text-primary-600 font-medium transition-colors duration-200;
+    @apply text-gray-600 hover:text-blue-600 font-medium transition-colors duration-200;
   }
   
   .nav-link-active {
-    @apply text-primary-600 font-semibold;
+    @apply text-blue-600 font-semibold;
   }
 }
 
@@ -45,7 +71,7 @@
   }
   
   .bg-gradient-primary {
-    background: linear-gradient(135deg, theme('colors.primary.600'), theme('colors.primary.700'));
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
   }
   
   .scrollbar-hide {
@@ -61,10 +87,10 @@
 /* Dark mode styles */
 @media (prefers-color-scheme: dark) {
   .card {
-    @apply bg-secondary-800 border-secondary-700;
+    @apply bg-gray-800 border-gray-700;
   }
   
   .input-field {
-    @apply bg-secondary-800 border-secondary-600 text-white;
+    @apply bg-gray-800 border-gray-600 text-white;
   }
 }
