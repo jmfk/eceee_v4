@@ -1,7 +1,7 @@
 # Multi-stage build for React frontend
 
 # Development stage
-FROM node:18-alpine as development
+FROM node:20-alpine as development
 
 # Set working directory
 WORKDIR /app
@@ -22,7 +22,7 @@ EXPOSE 3000
 CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
 
 # Build stage
-FROM node:18-alpine as build
+FROM node:20-alpine as build
 
 # Set working directory
 WORKDIR /app
