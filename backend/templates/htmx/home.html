@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block title %}HTMX Integration - ECEEE v4{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+    <!-- Hero Section -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
+        <div class="text-center space-y-4">
+            <h1 class="text-4xl font-bold text-gray-900">HTMX Integration</h1>
+            <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+                Server-side rendering with dynamic interactions. Experience the power of HTMX 
+                for creating modern web applications without heavy JavaScript frameworks.
+            </p>
+            
+            <!-- Real-time server time -->
+            <div class="mt-6">
+                <div id="server-time" 
+                     hx-get="{% url 'htmx:server_time' %}" 
+                     hx-trigger="every 1s"
+                     class="inline-block bg-blue-50 text-blue-800 px-4 py-2 rounded-lg font-mono text-sm">
+                    Server Time: {{ current_time|date:"Y-m-d H:i:s T" }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Examples Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {% for example in examples %}
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
+            <h3 class="text-xl font-semibold text-gray-900 mb-2">{{ example.title }}</h3>
+            <p class="text-gray-600 mb-4">{{ example.description }}</p>
+            <button 
+                hx-get="{% url example.endpoint %}"
+                hx-target="#demo-content"
+                hx-indicator="#global-loader"
+                class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                Try It
+            </button>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Demo Content Area -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div class="p-6 border-b border-gray-200">
+            <h2 class="text-2xl font-bold text-gray-900">Live Demo</h2>
+            <p class="text-gray-600 mt-1">Click any example above to see it in action</p>
+        </div>
+        
+        <div id="demo-content" class="p-6 min-h-[200px] flex items-center justify-center text-gray-500">
+            <div class="text-center space-y-2">
+                <svg class="w-16 h-16 mx-auto text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                </svg>
+                <p>Select an example to begin the demonstration</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Features Overview -->
+    <div class="bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg p-8 text-white">
+        <h2 class="text-3xl font-bold mb-6 text-center">HTMX Features Demonstrated</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div class="text-center">
+                <div class="w-12 h-12 bg-white bg-opacity-20 rounded-lg flex items-center justify-center mx-auto mb-3">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                    </svg>
+                </div>
+                <h3 class="font-semibold mb-2">AJAX Requests</h3>
+                <p class="text-sm opacity-90">Make HTTP requests directly from HTML</p>
+            </div>
+            
+            <div class="text-center">
+                <div class="w-12 h-12 bg-white bg-opacity-20 rounded-lg flex items-center justify-center mx-auto mb-3">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                </div>
+                <h3 class="font-semibold mb-2">Live Updates</h3>
+                <p class="text-sm opacity-90">Real-time content updates without refresh</p>
+            </div>
+            
+            <div class="text-center">
+                <div class="w-12 h-12 bg-white bg-opacity-20 rounded-lg flex items-center justify-center mx-auto mb-3">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                </div>
+                <h3 class="font-semibold mb-2">Form Handling</h3>
+                <p class="text-sm opacity-90">Enhanced forms with validation</p>
+            </div>
+            
+            <div class="text-center">
+                <div class="w-12 h-12 bg-white bg-opacity-20 rounded-lg flex items-center justify-center mx-auto mb-3">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    </svg>
+                </div>
+                <h3 class="font-semibold mb-2">Live Search</h3>
+                <p class="text-sm opacity-90">Search as you type functionality</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation -->
+    <div class="text-center">
+        <a href="{% url 'htmx:examples' %}" 
+           class="inline-flex items-center space-x-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors">
+            <span>View All Examples</span>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+            </svg>
+        </a>
+    </div>
+</div>
+{% endblock %}

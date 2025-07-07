@@ -1,0 +1,17 @@
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Install MCP PostgreSQL server
+RUN npm install -g @modelcontextprotocol/server-postgres
+
+# Create non-root user
+RUN addgroup -g 1001 -S mcp
+RUN adduser -S mcp -u 1001
+USER mcp
+
+# Expose port
+EXPOSE 3004
+
+# Start PostgreSQL MCP server
+CMD ["mcp-server-postgres", "--port", "3004"]
