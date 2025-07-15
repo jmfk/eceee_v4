@@ -1,0 +1,79 @@
+<div class="button-widget">
+    <a 
+        href="{{ config.url }}" 
+        class="widget-button btn-{{ config.style|default:'primary' }} btn-{{ config.size|default:'medium' }}"
+        {% if config.open_in_new_tab %}target="_blank" rel="noopener noreferrer"{% endif %}
+    >
+        {{ config.text }}
+    </a>
+</div>
+
+<style>
+.button-widget {
+    margin: 1rem 0;
+    text-align: center;
+}
+
+.widget-button {
+    display: inline-block;
+    text-decoration: none;
+    border-radius: 6px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 2px solid transparent;
+}
+
+.widget-button:hover {
+    text-decoration: none;
+    transform: translateY(-1px);
+}
+
+/* Button styles */
+.widget-button.btn-primary {
+    background-color: #3b82f6;
+    color: white;
+}
+
+.widget-button.btn-primary:hover {
+    background-color: #2563eb;
+    color: white;
+}
+
+.widget-button.btn-secondary {
+    background-color: #6b7280;
+    color: white;
+}
+
+.widget-button.btn-secondary:hover {
+    background-color: #4b5563;
+    color: white;
+}
+
+.widget-button.btn-outline {
+    background-color: transparent;
+    color: #3b82f6;
+    border-color: #3b82f6;
+}
+
+.widget-button.btn-outline:hover {
+    background-color: #3b82f6;
+    color: white;
+}
+
+/* Button sizes */
+.widget-button.btn-small {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+}
+
+.widget-button.btn-medium {
+    padding: 0.75rem 1.5rem;
+    font-size: 1rem;
+}
+
+.widget-button.btn-large {
+    padding: 1rem 2rem;
+    font-size: 1.125rem;
+}
+</style> 
