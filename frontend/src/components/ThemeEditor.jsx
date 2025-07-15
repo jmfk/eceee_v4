@@ -335,10 +335,11 @@ const ThemeForm = ({ theme = null, onSave, onCancel }) => {
                 {/* Basic Information */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label htmlFor="theme-name" className="block text-sm font-medium text-gray-700 mb-2">
                             Theme Name
                         </label>
                         <input
+                            id="theme-name"
                             type="text"
                             value={formData.name}
                             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -350,6 +351,7 @@ const ThemeForm = ({ theme = null, onSave, onCancel }) => {
                     <div className="flex items-center">
                         <label className="flex items-center">
                             <input
+                                id="theme-active"
                                 type="checkbox"
                                 checked={formData.is_active}
                                 onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
@@ -361,10 +363,11 @@ const ThemeForm = ({ theme = null, onSave, onCancel }) => {
                 </div>
 
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="theme-description" className="block text-sm font-medium text-gray-700 mb-2">
                         Description
                     </label>
                     <textarea
+                        id="theme-description"
                         value={formData.description}
                         onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                         rows={3}
@@ -430,6 +433,8 @@ const ThemeForm = ({ theme = null, onSave, onCancel }) => {
                                 type="button"
                                 onClick={addVariable}
                                 className="px-3 py-1 bg-purple-600 text-white text-sm rounded hover:bg-purple-700"
+                                aria-label="Add variable"
+                                title="Add variable"
                             >
                                 <Plus className="w-4 h-4" />
                             </button>
@@ -474,7 +479,7 @@ const ThemeForm = ({ theme = null, onSave, onCancel }) => {
                 {/* Custom CSS */}
                 <div>
                     <div className="flex items-center justify-between mb-2">
-                        <label className="block text-sm font-medium text-gray-700">
+                        <label htmlFor="theme-custom-css" className="block text-sm font-medium text-gray-700">
                             Custom CSS
                         </label>
                         <button
@@ -488,6 +493,7 @@ const ThemeForm = ({ theme = null, onSave, onCancel }) => {
 
                     {showCssEditor && (
                         <textarea
+                            id="theme-custom-css"
                             value={formData.custom_css}
                             onChange={(e) => setFormData({ ...formData, custom_css: e.target.value })}
                             rows={8}
@@ -656,8 +662,8 @@ const ThemeEditPanel = ({ theme, onUpdate, onCancel, showPreview, onTogglePrevie
                     <button
                         onClick={onTogglePreview}
                         className={`inline-flex items-center px-3 py-1 rounded-md text-sm transition-colors ${showPreview
-                                ? 'bg-purple-100 text-purple-700 hover:bg-purple-200'
-                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            ? 'bg-purple-100 text-purple-700 hover:bg-purple-200'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                             }`}
                     >
                         <Eye className="w-4 h-4 mr-1" />

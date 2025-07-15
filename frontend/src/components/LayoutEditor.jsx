@@ -256,10 +256,11 @@ const LayoutForm = ({ layout = null, onSave, onCancel }) => {
                 {/* Basic Information */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label htmlFor="layout-name" className="block text-sm font-medium text-gray-700 mb-2">
                             Layout Name
                         </label>
                         <input
+                            id="layout-name"
                             type="text"
                             value={formData.name}
                             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -271,6 +272,7 @@ const LayoutForm = ({ layout = null, onSave, onCancel }) => {
                     <div className="flex items-center">
                         <label className="flex items-center">
                             <input
+                                id="layout-active"
                                 type="checkbox"
                                 checked={formData.is_active}
                                 onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
@@ -282,10 +284,11 @@ const LayoutForm = ({ layout = null, onSave, onCancel }) => {
                 </div>
 
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="layout-description" className="block text-sm font-medium text-gray-700 mb-2">
                         Description
                     </label>
                     <textarea
+                        id="layout-description"
                         value={formData.description}
                         onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                         rows={3}
@@ -318,6 +321,8 @@ const LayoutForm = ({ layout = null, onSave, onCancel }) => {
                                         type="button"
                                         onClick={() => removeSlot(index)}
                                         className="text-red-600 hover:text-red-700"
+                                        aria-label={`Remove Slot ${index + 1}`}
+                                        title={`Remove Slot ${index + 1}`}
                                     >
                                         <Trash2 className="w-4 h-4" />
                                     </button>
@@ -325,10 +330,11 @@ const LayoutForm = ({ layout = null, onSave, onCancel }) => {
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                     <div>
-                                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                                        <label htmlFor={`slot-name-${index}`} className="block text-xs font-medium text-gray-700 mb-1">
                                             Slot Name (Technical)
                                         </label>
                                         <input
+                                            id={`slot-name-${index}`}
                                             type="text"
                                             value={slot.name}
                                             onChange={(e) => updateSlot(index, 'name', e.target.value)}
@@ -338,10 +344,11 @@ const LayoutForm = ({ layout = null, onSave, onCancel }) => {
                                     </div>
 
                                     <div>
-                                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                                        <label htmlFor={`slot-display-name-${index}`} className="block text-xs font-medium text-gray-700 mb-1">
                                             Display Name
                                         </label>
                                         <input
+                                            id={`slot-display-name-${index}`}
                                             type="text"
                                             value={slot.display_name || ''}
                                             onChange={(e) => updateSlot(index, 'display_name', e.target.value)}
@@ -350,10 +357,11 @@ const LayoutForm = ({ layout = null, onSave, onCancel }) => {
                                     </div>
 
                                     <div className="md:col-span-2">
-                                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                                        <label htmlFor={`slot-description-${index}`} className="block text-xs font-medium text-gray-700 mb-1">
                                             Description
                                         </label>
                                         <input
+                                            id={`slot-description-${index}`}
                                             type="text"
                                             value={slot.description || ''}
                                             onChange={(e) => updateSlot(index, 'description', e.target.value)}
@@ -362,10 +370,11 @@ const LayoutForm = ({ layout = null, onSave, onCancel }) => {
                                     </div>
 
                                     <div>
-                                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                                        <label htmlFor={`slot-css-classes-${index}`} className="block text-xs font-medium text-gray-700 mb-1">
                                             CSS Classes
                                         </label>
                                         <input
+                                            id={`slot-css-classes-${index}`}
                                             type="text"
                                             value={slot.css_classes || ''}
                                             onChange={(e) => updateSlot(index, 'css_classes', e.target.value)}
@@ -377,6 +386,7 @@ const LayoutForm = ({ layout = null, onSave, onCancel }) => {
                                     <div className="flex items-center">
                                         <label className="flex items-center">
                                             <input
+                                                id={`slot-allows-multiple-${index}`}
                                                 type="checkbox"
                                                 checked={slot.allows_multiple ?? true}
                                                 onChange={(e) => updateSlot(index, 'allows_multiple', e.target.checked)}
@@ -400,10 +410,11 @@ const LayoutForm = ({ layout = null, onSave, onCancel }) => {
 
                 {/* CSS Classes */}
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="layout-css-classes" className="block text-sm font-medium text-gray-700 mb-2">
                         Layout CSS Classes
                     </label>
                     <textarea
+                        id="layout-css-classes"
                         value={formData.css_classes}
                         onChange={(e) => setFormData({ ...formData, css_classes: e.target.value })}
                         rows={4}
@@ -487,8 +498,8 @@ const LayoutEditPanel = ({ layout, onUpdate, onCancel, showPreview, onTogglePrev
                     <button
                         onClick={onTogglePreview}
                         className={`inline-flex items-center px-3 py-1 rounded-md text-sm transition-colors ${showPreview
-                                ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                             }`}
                     >
                         <Eye className="w-4 h-4 mr-1" />

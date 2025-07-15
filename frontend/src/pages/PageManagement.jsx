@@ -63,10 +63,11 @@ const PageManagement = () => {
                             {/* Preview Controls */}
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    <label htmlFor="preview-page-select" className="block text-sm font-medium text-gray-700 mb-2">
                                         Sample Page
                                     </label>
                                     <select
+                                        id="preview-page-select"
                                         value={previewPageId || ''}
                                         onChange={(e) => setPreviewPageId(e.target.value || null)}
                                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -79,10 +80,11 @@ const PageManagement = () => {
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    <label htmlFor="preview-layout-select" className="block text-sm font-medium text-gray-700 mb-2">
                                         Layout Override
                                     </label>
                                     <select
+                                        id="preview-layout-select"
                                         value={previewLayoutId || ''}
                                         onChange={(e) => setPreviewLayoutId(e.target.value || null)}
                                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -95,10 +97,11 @@ const PageManagement = () => {
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    <label htmlFor="preview-theme-select" className="block text-sm font-medium text-gray-700 mb-2">
                                         Theme Override
                                     </label>
                                     <select
+                                        id="preview-theme-select"
                                         value={previewThemeId || ''}
                                         onChange={(e) => setPreviewThemeId(e.target.value || null)}
                                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -205,10 +208,11 @@ const InheritanceManager = () => {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {/* Page Selection */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label htmlFor="inheritance-page-select" className="block text-sm font-medium text-gray-700 mb-2">
                             Select Page to Analyze
                         </label>
                         <select
+                            id="inheritance-page-select"
                             value={selectedPageId || ''}
                             onChange={(e) => setSelectedPageId(e.target.value || null)}
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
