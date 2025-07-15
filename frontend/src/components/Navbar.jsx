@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { Menu, X, Code, Cpu } from 'lucide-react'
+import { Menu, X, Code, Cpu, Settings } from 'lucide-react'
 import { useState } from 'react'
 
 const Navbar = () => {
@@ -9,6 +9,7 @@ const Navbar = () => {
   const navigation = [
     { name: 'Home', href: '/', icon: Code },
     { name: 'About', href: '/about', icon: Cpu },
+    { name: 'Page Management', href: '/admin/pages', icon: Settings },
   ]
 
   const isActive = (path) => {
@@ -37,11 +38,10 @@ const Navbar = () => {
               <Link
                 key={item.name}
                 to={item.href}
-                className={`flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                  isActive(item.href)
-                    ? 'text-primary-600 bg-primary-50'
-                    : 'text-gray-600 hover:text-primary-600 hover:bg-gray-50'
-                }`}
+                className={`flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${isActive(item.href)
+                  ? 'text-primary-600 bg-primary-50'
+                  : 'text-gray-600 hover:text-primary-600 hover:bg-gray-50'
+                  }`}
               >
                 <item.icon className="w-4 h-4" />
                 <span>{item.name}</span>
@@ -73,11 +73,10 @@ const Navbar = () => {
                   key={item.name}
                   to={item.href}
                   onClick={() => setIsOpen(false)}
-                  className={`flex items-center space-x-2 px-3 py-2 rounded-md text-base font-medium transition-colors ${
-                    isActive(item.href)
-                      ? 'text-primary-600 bg-primary-50'
-                      : 'text-gray-600 hover:text-primary-600 hover:bg-gray-50'
-                  }`}
+                  className={`flex items-center space-x-2 px-3 py-2 rounded-md text-base font-medium transition-colors ${isActive(item.href)
+                    ? 'text-primary-600 bg-primary-50'
+                    : 'text-gray-600 hover:text-primary-600 hover:bg-gray-50'
+                    }`}
                 >
                   <item.icon className="w-5 h-5" />
                   <span>{item.name}</span>
