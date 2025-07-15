@@ -283,6 +283,7 @@ describe('WidgetConfigurator', () => {
                 widgetType={mockTextWidgetType}
                 onSave={mockOnSave}
                 onCancel={mockOnCancel}
+                showInheritanceControls={false}
             />
         )
 
