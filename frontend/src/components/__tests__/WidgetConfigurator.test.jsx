@@ -208,7 +208,8 @@ describe('WidgetConfigurator', () => {
         await user.click(saveButton)
 
         await waitFor(() => {
-            expect(screen.getByText('This field is required')).toBeInTheDocument()
+            // Look for field-specific error message
+            expect(screen.getAllByText('This field is required')).toHaveLength(1)
         })
 
         expect(mockOnSave).not.toHaveBeenCalled()
@@ -238,7 +239,7 @@ describe('WidgetConfigurator', () => {
                 expect(urlErrors).toBeInTheDocument()
             } else {
                 // Fallback to checking for any validation error
-                expect(screen.getByText('This field is required')).toBeInTheDocument()
+                expect(screen.getAllByText('This field is required').length).toBeGreaterThan(0)
             }
         })
 
