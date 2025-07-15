@@ -104,8 +104,8 @@ const WidgetConfigurator = ({
                 }
             })
             dispatch({
-                type: 'SET_CONFIG',
-                payload: { ...defaultConfig, ...config }
+                type: 'RESET_CONFIG',
+                payload: { ...defaultConfig, ...initialConfig }
             })
         }
     }, [widgetType])
