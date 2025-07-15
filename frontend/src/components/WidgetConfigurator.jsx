@@ -1,17 +1,40 @@
 import { useState, useEffect } from 'react'
-import { Save, X, AlertCircle, Info } from 'lucide-react'
+import { Save, X, AlertCircle, Info, Settings, Layers, Eye, EyeOff, Monitor } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 const WidgetConfigurator = ({
     widgetType,
     initialConfig = {},
+    initialInheritanceSettings = {},
     onSave,
     onCancel,
-    title = "Configure Widget"
+    title = "Configure Widget",
+    showInheritanceControls = true,
+    isEditing = false
 }) => {
     const [config, setConfig] = useState(initialConfig)
+    const [inheritanceSettings, setInheritanceSettings] = useState({
+        inherit_from_parent: true,
+        override_parent: false,
+        inheritance_behavior: 'inherit',
+        inheritance_conditions: {},
+        priority: 0,
+        is_visible: true,
+        max_inheritance_depth: null,
+        ...initialInheritanceSettings
+    })
     const [errors, setErrors] = useState({})
     const [isValid, setIsValid] = useState(true)
+    const [activeTab, setActiveTab] = useState('content')
+
+    // Inheritance behavior options
+    const inheritanceBehaviorOptions = [
+        { value: 'inherit', label: 'Inherit from Parent', description: 'Widget inherits normally from parent pages' },
+        { value: 'override', label: 'Override Parent Widget', description: 'This widget overrides any inherited widget in the same slot' },
+        { value: 'supplement', label: 'Add to Parent Widgets', description: 'Add this widget alongside inherited widgets' },
+        { value: 'block', label: 'Block Inheritance', description: 'Prevent inheritance of parent widgets in this slot' },
+        { value: 'conditional', label: 'Conditional Inheritance', description: 'Inherit based on specified conditions' }
+    ]
 
     // Initialize config with default values from schema
     useEffect(() => {
@@ -48,37 +71,16 @@ const WidgetConfigurator = ({
         // Validate field types and constraints
         Object.entries(schema.properties || {}).forEach(([key, property]) => {
             const value = config[key]
-
             if (value !== undefined && value !== null && value !== '') {
                 // Type validation
-                if (property.type === 'string' && typeof value !== 'string') {
-                    newErrors[key] = 'Must be a text value'
-                } else if (property.type === 'boolean' && typeof value !== 'boolean') {
-                    newErrors[key] = 'Must be true or false'
-                } else if (property.type === 'number' && (isNaN(value) || typeof +value !== 'number')) {
-                    newErrors[key] = 'Must be a number'
-                }
-
-                // Enum validation
-                if (property.enum && !property.enum.includes(value)) {
-                    newErrors[key] = `Must be one of: ${property.enum.join(', ')}`
-                }
-
-                // Pattern validation
-                if (property.pattern && typeof value === 'string') {
-                    const regex = new RegExp(property.pattern)
-                    if (!regex.test(value)) {
-                        newErrors[key] = 'Invalid format'
-                    }
-                }
-
-                // URL format validation
-                if (property.format === 'uri' && typeof value === 'string') {
-                    try {
-                        new URL(value)
-                    } catch {
-                        newErrors[key] = 'Must be a valid URL'
-                    }
+                if (property.type === 'number' && isNaN(Number(value))) {
+                    newErrors[key] = 'Must be a valid number'
+                } else if (property.minimum !== undefined && Number(value) < property.minimum) {
+                    newErrors[key] = `Must be at least ${property.minimum}`
+                } else if (property.maximum !== undefined && Number(value) > property.maximum) {
+                    newErrors[key] = `Must be at most ${property.maximum}`
+                } else if (property.pattern && !new RegExp(property.pattern).test(value)) {
+                    newErrors[key] = 'Invalid format'
                 }
             }
         })
@@ -94,13 +96,25 @@ const WidgetConfigurator = ({
         }))
     }
 
+    const handleInheritanceChange = (fieldName, value) => {
+        setInheritanceSettings(prev => ({
+            ...prev,
+            [fieldName]: value
+        }))
+    }
+
     const handleSave = () => {
         if (!isValid) {
-            toast.error('Please fix validation errors before saving')
+            toast.error('Please fix all validation errors before saving')
             return
         }
 
-        onSave(config)
+        const saveData = {
+            configuration: config,
+            ...inheritanceSettings
+        }
+
+        onSave(saveData)
     }
 
     const renderField = (fieldName, property) => {
@@ -150,13 +164,34 @@ const WidgetConfigurator = ({
                     className={baseClasses}
                 />
             )
+        } else if (property.format === 'date') {
+            inputElement = (
+                <input
+                    type="date"
+                    value={value}
+                    onChange={(e) => handleFieldChange(fieldName, e.target.value)}
+                    className={baseClasses}
+                />
+            )
+        } else if (property.format === 'datetime-local') {
+            inputElement = (
+                <input
+                    type="datetime-local"
+                    value={value}
+                    onChange={(e) => handleFieldChange(fieldName, e.target.value)}
+                    className={baseClasses}
+                />
+            )
         } else {
             inputElement = (
                 <input
-                    type={property.type === 'number' ? 'number' : 'text'}
+                    type={property.type === 'number' ? 'number' : property.type === 'integer' ? 'number' : 'text'}
                     value={value}
                     onChange={(e) => handleFieldChange(fieldName, e.target.value)}
                     placeholder={property.description}
+                    min={property.minimum}
+                    max={property.maximum}
+                    step={property.type === 'integer' ? 1 : 'any'}
                     className={baseClasses}
                 />
             )
@@ -192,6 +227,266 @@ const WidgetConfigurator = ({
         )
     }
 
+    const renderWidgetPreview = () => {
+        // Simple preview based on widget type and configuration
+        const renderPreviewContent = () => {
+            if (!widgetType) return null;
+
+            switch (widgetType.name.toLowerCase()) {
+                case 'text block':
+                    return (
+                        <div className="prose max-w-none">
+                            {config.title && <h3 className="text-lg font-semibold mb-2">{config.title}</h3>}
+                            <div className={`text-${config.alignment || 'left'} ${config.style === 'bold' ? 'font-bold' : config.style === 'italic' ? 'italic' : ''}`}>
+                                {config.content || 'Your text content will appear here...'}
+                            </div>
+                        </div>
+                    )
+                case 'image':
+                    return (
+                        <div className={`text-${config.alignment || 'center'}`}>
+                            {config.image_url ? (
+                                <img
+                                    src={config.image_url}
+                                    alt={config.alt_text || 'Preview image'}
+                                    className={`inline-block ${config.size === 'small' ? 'w-32' : config.size === 'large' ? 'w-96' : config.size === 'full' ? 'w-full' : 'w-64'}`}
+                                />
+                            ) : (
+                                <div className={`bg-gray-200 rounded-lg flex items-center justify-center ${config.size === 'small' ? 'w-32 h-24' : config.size === 'large' ? 'w-96 h-64' : config.size === 'full' ? 'w-full h-48' : 'w-64 h-48'}`}>
+                                    <span className="text-gray-500">Image Preview</span>
+                                </div>
+                            )}
+                            {config.caption && (
+                                <p className="text-sm text-gray-600 mt-2">{config.caption}</p>
+                            )}
+                        </div>
+                    )
+                case 'button':
+                    return (
+                        <div className="flex justify-center">
+                            <button
+                                className={`px-6 py-2 rounded-lg ${config.style === 'secondary' ? 'bg-gray-200 text-gray-800' :
+                                    config.style === 'outline' ? 'border-2 border-blue-600 text-blue-600 bg-transparent' :
+                                        'bg-blue-600 text-white'
+                                    } ${config.size === 'small' ? 'text-sm px-4 py-1' :
+                                        config.size === 'large' ? 'text-lg px-8 py-3' :
+                                            'text-base px-6 py-2'
+                                    }`}
+                            >
+                                {config.text || 'Button Text'}
+                            </button>
+                        </div>
+                    )
+                case 'news':
+                    return (
+                        <article className="bg-white border border-gray-200 rounded-lg p-4">
+                            {config.featured_image && (
+                                <img src={config.featured_image} alt={config.title} className="w-full h-48 object-cover rounded-lg mb-4" />
+                            )}
+                            <div className="space-y-2">
+                                <h2 className="text-xl font-bold">{config.title || 'Article Title'}</h2>
+                                {config.show_meta !== false && (
+                                    <div className="text-sm text-gray-600 flex space-x-4">
+                                        {config.author && <span>By {config.author}</span>}
+                                        {config.publication_date && <span>{new Date(config.publication_date).toLocaleDateString()}</span>}
+                                        {config.category && <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded">{config.category}</span>}
+                                    </div>
+                                )}
+                                {config.summary && (
+                                    <p className="text-gray-700 font-medium">{config.summary}</p>
+                                )}
+                                <div className="prose max-w-none" dangerouslySetInnerHTML={{ __html: config.content || 'Article content will appear here...' }} />
+                            </div>
+                        </article>
+                    )
+                case 'events':
+                    return (
+                        <div className="bg-white border border-gray-200 rounded-lg p-4">
+                            <div className="space-y-3">
+                                <h3 className="text-lg font-bold">{config.event_title || 'Event Title'}</h3>
+                                {config.description && <p className="text-gray-700">{config.description}</p>}
+                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                    {config.start_date && (
+                                        <div>
+                                            <span className="font-medium">Start:</span> {new Date(config.start_date).toLocaleString()}
+                                        </div>
+                                    )}
+                                    {config.end_date && (
+                                        <div>
+                                            <span className="font-medium">End:</span> {new Date(config.end_date).toLocaleString()}
+                                        </div>
+                                    )}
+                                    {config.location && (
+                                        <div>
+                                            <span className="font-medium">Location:</span> {config.location}
+                                        </div>
+                                    )}
+                                    {config.price && (
+                                        <div>
+                                            <span className="font-medium">Price:</span> {config.price}
+                                        </div>
+                                    )}
+                                </div>
+                                {config.registration_url && (
+                                    <button className="bg-blue-600 text-white px-4 py-2 rounded">Register</button>
+                                )}
+                            </div>
+                        </div>
+                    )
+                default:
+                    return (
+                        <div className="p-6 bg-blue-50 border border-blue-200 rounded-lg">
+                            <div className="text-center">
+                                <h3 className="text-lg font-medium text-blue-900 mb-2">{widgetType.name} Widget</h3>
+                                <p className="text-blue-700 text-sm mb-4">{widgetType.description}</p>
+                                <div className="text-xs text-blue-600">
+                                    <p>Widget preview with current configuration:</p>
+                                    <pre className="mt-2 text-left bg-blue-100 p-2 rounded overflow-x-auto">
+                                        {JSON.stringify(config, null, 2)}
+                                    </pre>
+                                </div>
+                            </div>
+                        </div>
+                    )
+            }
+        }
+
+        return (
+            <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-medium text-gray-900">Live Preview</h3>
+                    <div className="text-xs text-gray-500">
+                        Updates as you configure
+                    </div>
+                </div>
+
+                <div className="border border-gray-200 rounded-lg p-6 bg-gray-50 min-h-48">
+                    {renderPreviewContent()}
+                </div>
+
+                <div className="text-xs text-gray-600 space-y-1">
+                    <p>• This is a simplified preview of how your widget will appear</p>
+                    <p>• Actual rendering may vary based on page theme and layout</p>
+                    <p>• Use the page preview to see the final result in context</p>
+                </div>
+            </div>
+        )
+    }
+
+    const renderInheritanceControls = () => {
+        return (
+            <div className="space-y-6">
+                {/* Inheritance Behavior */}
+                <div className="space-y-3">
+                    <label className="block text-sm font-medium text-gray-700">
+                        Inheritance Behavior
+                    </label>
+                    <div className="space-y-2">
+                        {inheritanceBehaviorOptions.map(option => (
+                            <label key={option.value} className="flex items-start space-x-3 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
+                                <input
+                                    type="radio"
+                                    name="inheritance_behavior"
+                                    value={option.value}
+                                    checked={inheritanceSettings.inheritance_behavior === option.value}
+                                    onChange={(e) => handleInheritanceChange('inheritance_behavior', e.target.value)}
+                                    className="mt-1 text-blue-600 focus:ring-blue-500"
+                                />
+                                <div className="flex-1">
+                                    <div className="text-sm font-medium text-gray-900">{option.label}</div>
+                                    <div className="text-xs text-gray-500">{option.description}</div>
+                                </div>
+                            </label>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Conditional Inheritance Settings */}
+                {inheritanceSettings.inheritance_behavior === 'conditional' && (
+                    <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <h4 className="text-sm font-medium text-yellow-800 mb-2">Conditional Inheritance Settings</h4>
+                        <p className="text-xs text-yellow-700 mb-3">Define conditions for when this widget should inherit from parent pages.</p>
+                        <textarea
+                            value={JSON.stringify(inheritanceSettings.inheritance_conditions, null, 2)}
+                            onChange={(e) => {
+                                try {
+                                    const conditions = JSON.parse(e.target.value)
+                                    handleInheritanceChange('inheritance_conditions', conditions)
+                                } catch {
+                                    // Invalid JSON, keep current value
+                                }
+                            }}
+                            placeholder='{"page_type": "article", "has_parent": true}'
+                            rows={3}
+                            className="w-full px-3 py-2 border border-yellow-300 rounded-lg text-xs font-mono focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                        />
+                        <p className="text-xs text-yellow-600 mt-1">Enter valid JSON conditions</p>
+                    </div>
+                )}
+
+                {/* Widget Priority */}
+                <div className="space-y-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                        Widget Priority
+                        <span className="text-xs text-gray-500 ml-2">(Higher numbers appear first)</span>
+                    </label>
+                    <input
+                        type="number"
+                        value={inheritanceSettings.priority}
+                        onChange={(e) => handleInheritanceChange('priority', parseInt(e.target.value) || 0)}
+                        min="0"
+                        max="100"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <p className="text-xs text-gray-500">
+                        Priority 0 = normal, higher numbers show first in slot
+                    </p>
+                </div>
+
+                {/* Visibility Controls */}
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center space-x-2">
+                        {inheritanceSettings.is_visible ? (
+                            <Eye className="w-4 h-4 text-green-600" />
+                        ) : (
+                            <EyeOff className="w-4 h-4 text-gray-400" />
+                        )}
+                        <span className="text-sm font-medium text-gray-700">Widget Visibility</span>
+                    </div>
+                    <label className="flex items-center">
+                        <input
+                            type="checkbox"
+                            checked={inheritanceSettings.is_visible}
+                            onChange={(e) => handleInheritanceChange('is_visible', e.target.checked)}
+                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className="ml-2 text-sm text-gray-600">Visible</span>
+                    </label>
+                </div>
+
+                {/* Inheritance Depth Limit */}
+                <div className="space-y-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                        Inheritance Depth Limit
+                        <span className="text-xs text-gray-500 ml-2">(Leave empty for unlimited)</span>
+                    </label>
+                    <input
+                        type="number"
+                        value={inheritanceSettings.max_inheritance_depth || ''}
+                        onChange={(e) => handleInheritanceChange('max_inheritance_depth', e.target.value ? parseInt(e.target.value) : null)}
+                        min="1"
+                        max="10"
+                        placeholder="Unlimited"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <p className="text-xs text-gray-500">
+                        Maximum levels down the page hierarchy this widget can be inherited
+                    </p>
+                </div>
+            </div>
+        )
+    }
+
     if (!widgetType) {
         return (
             <div className="bg-white rounded-lg shadow p-6">
@@ -223,17 +518,77 @@ const WidgetConfigurator = ({
                 </button>
             </div>
 
-            {/* Configuration Form */}
+            {/* Tabs */}
+            <div className="border-b border-gray-200">
+                <nav className="flex space-x-8 px-4">
+                    <button
+                        onClick={() => setActiveTab('content')}
+                        className={`py-3 px-1 border-b-2 font-medium text-sm ${activeTab === 'content'
+                            ? 'border-blue-500 text-blue-600'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                            }`}
+                    >
+                        <div className="flex items-center space-x-2">
+                            <Settings className="w-4 h-4" />
+                            <span>Content</span>
+                        </div>
+                    </button>
+                    {showInheritanceControls && (
+                        <button
+                            onClick={() => setActiveTab('inheritance')}
+                            className={`py-3 px-1 border-b-2 font-medium text-sm ${activeTab === 'inheritance'
+                                ? 'border-blue-500 text-blue-600'
+                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                }`}
+                        >
+                            <div className="flex items-center space-x-2">
+                                <Layers className="w-4 h-4" />
+                                <span>Inheritance</span>
+                            </div>
+                        </button>
+                    )}
+                    <button
+                        onClick={() => setActiveTab('preview')}
+                        className={`py-3 px-1 border-b-2 font-medium text-sm ${activeTab === 'preview'
+                            ? 'border-blue-500 text-blue-600'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                            }`}
+                    >
+                        <div className="flex items-center space-x-2">
+                            <Monitor className="w-4 h-4" />
+                            <span>Preview</span>
+                        </div>
+                    </button>
+                </nav>
+            </div>
+
+            {/* Tab Content */}
             <div className="p-6">
-                {Object.keys(properties).length > 0 ? (
-                    <div className="space-y-6">
-                        {Object.entries(properties).map(([fieldName, property]) =>
-                            renderField(fieldName, property)
+                {activeTab === 'content' && (
+                    <div>
+                        {Object.keys(properties).length > 0 ? (
+                            <div className="space-y-6">
+                                {Object.entries(properties).map(([fieldName, property]) =>
+                                    renderField(fieldName, property)
+                                )}
+                            </div>
+                        ) : (
+                            <div className="text-center text-gray-500 py-8">
+                                <p>No configuration options available for this widget type.</p>
+                            </div>
                         )}
                     </div>
-                ) : (
-                    <div className="text-center text-gray-500 py-8">
-                        <p>No configuration options available for this widget type.</p>
+                )}
+
+                {activeTab === 'inheritance' && showInheritanceControls && (
+                    <div>
+                        {renderInheritanceControls()}
+                    </div>
+                )}
+
+                {activeTab === 'preview' && (
+                    <div>
+                        {renderWidgetPreview()}
                     </div>
                 )}
             </div>
@@ -250,8 +605,8 @@ const WidgetConfigurator = ({
                     onClick={handleSave}
                     disabled={!isValid}
                     className={`inline-flex items-center px-4 py-2 rounded-lg transition-colors ${isValid
-                            ? 'bg-blue-600 text-white hover:bg-blue-700'
-                            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        ? 'bg-blue-600 text-white hover:bg-blue-700'
+                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                         }`}
                 >
                     <Save className="w-4 h-4 mr-2" />
