@@ -1,41 +1,67 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import userEvent from '@testing-library/user-event'
+import axios from 'axios'
 import PageManagement from '../PageManagement'
 
-// Mock the child components
-vi.mock('@components/LayoutEditor', () => ({
-    default: () => <div data-testid="layout-editor">Layout Editor Component</div>
+// Mock axios
+vi.mock('axios')
+const mockedAxios = axios
+
+// Mock child components
+vi.mock('../../components/LayoutEditor', () => ({
+    default: () => <div data-testid="layout-editor">Layout Editor Component</div>,
 }))
 
-vi.mock('@components/ThemeEditor', () => ({
-    default: () => <div data-testid="theme-editor">Theme Editor Component</div>
+vi.mock('../../components/ThemeEditor', () => ({
+    default: () => <div data-testid="theme-editor">Theme Editor Component</div>,
 }))
 
-vi.mock('@components/PagePreview', () => ({
-    default: ({ pageId, layoutId, themeId }) => (
-        <div data-testid="page-preview">
-            Page Preview Component
-            {pageId && <span data-testid="preview-page-id">{pageId}</span>}
-            {layoutId && <span data-testid="preview-layout-id">{layoutId}</span>}
-            {themeId && <span data-testid="preview-theme-id">{themeId}</span>}
+vi.mock('../../components/SlotManager', () => ({
+    default: ({ pageId, layout }) => (
+        <div data-testid="slot-manager">
+            Slot Manager for page {pageId} with layout {layout?.name}
         </div>
-    )
+    ),
 }))
 
-const createTestQueryClient = () => {
-    return new QueryClient({
-        defaultOptions: {
-            queries: {
-                retry: false,
-            },
-        },
-    })
-}
+const mockPages = [
+    {
+        id: 1,
+        title: 'Home Page',
+        slug: 'home',
+        description: 'Welcome to our website',
+        publication_status: 'published',
+        layout: { id: 1, name: 'Home Layout' },
+        theme: { id: 1, name: 'Default Theme' },
+    },
+    {
+        id: 2,
+        title: 'About Us',
+        slug: 'about',
+        description: 'Learn more about our company',
+        publication_status: 'unpublished',
+        layout: { id: 2, name: 'Content Layout' },
+        theme: null,
+    },
+    {
+        id: 3,
+        title: 'Contact',
+        slug: 'contact',
+        description: 'Get in touch with us',
+        publication_status: 'published',
+        layout: null,
+        theme: { id: 1, name: 'Default Theme' },
+    },
+]
 
-const renderWithQueryClient = (component) => {
-    const queryClient = createTestQueryClient()
+const renderWithQueryClient = (component, queryClient = new QueryClient({
+    defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+    },
+})) => {
     return render(
         <QueryClientProvider client={queryClient}>
             {component}
@@ -46,258 +72,303 @@ const renderWithQueryClient = (component) => {
 describe('PageManagement', () => {
     beforeEach(() => {
         vi.clearAllMocks()
+        mockedAxios.get.mockResolvedValue({ data: mockPages })
     })
 
-    it('renders the page management interface', () => {
+    it('renders page management header', () => {
         renderWithQueryClient(<PageManagement />)
 
-        expect(screen.getByText('Page Management System')).toBeInTheDocument()
-        expect(screen.getByText('Phase 3: Layout and Theme System')).toBeInTheDocument()
+        expect(screen.getByText('Page Management')).toBeInTheDocument()
+        expect(screen.getByText('Manage your website pages, layouts, themes, and widgets')).toBeInTheDocument()
     })
 
-    it('displays all navigation tabs', () => {
+    it('renders all navigation tabs', () => {
         renderWithQueryClient(<PageManagement />)
 
+        expect(screen.getByText('Pages')).toBeInTheDocument()
         expect(screen.getByText('Layouts')).toBeInTheDocument()
         expect(screen.getByText('Themes')).toBeInTheDocument()
-        expect(screen.getByText('Preview')).toBeInTheDocument()
-        expect(screen.getByText('Inheritance')).toBeInTheDocument()
+        expect(screen.getByText('Widgets')).toBeInTheDocument()
     })
 
     it('shows tab descriptions', () => {
         renderWithQueryClient(<PageManagement />)
 
-        // Default tab should be layouts
-        expect(screen.getByText('Create and manage page layout templates')).toBeInTheDocument()
+        expect(screen.getByText('Manage pages and content')).toBeInTheDocument()
     })
 
-    it('switches between tabs correctly', async () => {
+    it('defaults to pages tab', () => {
+        renderWithQueryClient(<PageManagement />)
+
+        // Pages tab should be active (has different styling)
+        const pagesTab = screen.getByText('Pages').closest('button')
+        expect(pagesTab).toHaveClass('border-blue-500', 'text-blue-600')
+    })
+
+    it('switches tabs when clicked', async () => {
         const user = userEvent.setup()
         renderWithQueryClient(<PageManagement />)
 
-        // Should start with layouts tab
-        expect(screen.getByTestId('layout-editor')).toBeInTheDocument()
+        // Click on Layouts tab
+        await user.click(screen.getByText('Layouts'))
 
-        // Switch to themes tab
-        const themesTab = screen.getByText('Themes')
-        await user.click(themesTab)
+        expect(screen.getByTestId('layout-editor')).toBeInTheDocument()
+        expect(screen.getByText('Design page layouts and slots')).toBeInTheDocument()
+
+        // Click on Themes tab
+        await user.click(screen.getByText('Themes'))
 
         expect(screen.getByTestId('theme-editor')).toBeInTheDocument()
-        expect(screen.getByText('Design color schemes and styling')).toBeInTheDocument()
-
-        // Switch to preview tab
-        const previewTab = screen.getByText('Preview')
-        await user.click(previewTab)
-
-        expect(screen.getByTestId('page-preview')).toBeInTheDocument()
-        expect(screen.getByText('Preview layout and theme combinations')).toBeInTheDocument()
-
-        // Switch to inheritance tab
-        const inheritanceTab = screen.getByText('Inheritance')
-        await user.click(inheritanceTab)
-
-        expect(screen.getByText('Inheritance Management')).toBeInTheDocument()
-        expect(screen.getByText('Manage inheritance hierarchy')).toBeInTheDocument()
+        expect(screen.getByText('Customize colors and styling')).toBeInTheDocument()
     })
 
-    it('renders layout editor in layouts tab', async () => {
+    it('displays pages list with loading state', async () => {
+        // Mock delayed response
+        mockedAxios.get.mockImplementation(() =>
+            new Promise(resolve => setTimeout(() => resolve({ data: mockPages }), 100))
+        )
+
+        renderWithQueryClient(<PageManagement />)
+
+        // Should show loading skeleton
+        expect(screen.getByRole('generic')).toBeInTheDocument()
+    })
+
+    it('displays pages after loading', async () => {
+        renderWithQueryClient(<PageManagement />)
+
+        await waitFor(() => {
+            expect(screen.getByText('Home Page')).toBeInTheDocument()
+        })
+
+        expect(screen.getByText('About Us')).toBeInTheDocument()
+        expect(screen.getByText('Contact')).toBeInTheDocument()
+    })
+
+    it('shows page details when page is selected', async () => {
         const user = userEvent.setup()
         renderWithQueryClient(<PageManagement />)
 
-        // Should start with layouts tab
-        expect(screen.getByTestId('layout-editor')).toBeInTheDocument()
+        await waitFor(() => {
+            expect(screen.getByText('Home Page')).toBeInTheDocument()
+        })
+
+        // Click on Home Page
+        await user.click(screen.getByText('Home Page'))
+
+        await waitFor(() => {
+            expect(screen.getByText('Page Details')).toBeInTheDocument()
+            expect(screen.getByText('Welcome to our website')).toBeInTheDocument()
+        })
     })
 
-    it('renders theme editor in themes tab', async () => {
+    it('filters pages by search term', async () => {
         const user = userEvent.setup()
         renderWithQueryClient(<PageManagement />)
 
-        const themesTab = screen.getByText('Themes')
-        await user.click(themesTab)
+        await waitFor(() => {
+            expect(screen.getByText('Home Page')).toBeInTheDocument()
+        })
 
-        expect(screen.getByTestId('theme-editor')).toBeInTheDocument()
+        const searchInput = screen.getByPlaceholderText('Search pages...')
+        await user.type(searchInput, 'home')
+
+        expect(screen.getByText('Home Page')).toBeInTheDocument()
+        expect(screen.queryByText('About Us')).not.toBeInTheDocument()
+        expect(screen.queryByText('Contact')).not.toBeInTheDocument()
     })
 
-    it('renders preview interface in preview tab', async () => {
+    it('shows page status badges', async () => {
+        renderWithQueryClient(<PageManagement />)
+
+        await waitFor(() => {
+            expect(screen.getByText('Home Page')).toBeInTheDocument()
+        })
+
+        expect(screen.getAllByText('published')).toHaveLength(2)
+        expect(screen.getByText('unpublished')).toBeInTheDocument()
+    })
+
+    it('shows layout and theme information for pages', async () => {
+        renderWithQueryClient(<PageManagement />)
+
+        await waitFor(() => {
+            expect(screen.getByText('Home Page')).toBeInTheDocument()
+        })
+
+        expect(screen.getByText('Layout: Home Layout')).toBeInTheDocument()
+        expect(screen.getByText('Theme: Default Theme')).toBeInTheDocument()
+    })
+
+    it('shows manage widgets button for pages', async () => {
         const user = userEvent.setup()
         renderWithQueryClient(<PageManagement />)
 
-        const previewTab = screen.getByText('Preview')
-        await user.click(previewTab)
+        await waitFor(() => {
+            expect(screen.getByText('Home Page')).toBeInTheDocument()
+        })
 
-        expect(screen.getByText('Layout & Theme Preview')).toBeInTheDocument()
-        expect(screen.getByText('Test how different layout and theme combinations will look together.')).toBeInTheDocument()
-        expect(screen.getByTestId('page-preview')).toBeInTheDocument()
+        const manageWidgetsButtons = screen.getAllByTitle('Manage widgets')
+        expect(manageWidgetsButtons).toHaveLength(3) // One for each page
     })
 
-    it('handles preview form interactions', async () => {
+    it('switches to widgets tab when manage widgets is clicked', async () => {
         const user = userEvent.setup()
         renderWithQueryClient(<PageManagement />)
 
-        // Switch to preview tab
-        const previewTab = screen.getByText('Preview')
-        await user.click(previewTab)
+        await waitFor(() => {
+            expect(screen.getByText('Home Page')).toBeInTheDocument()
+        })
 
-        // Select a sample page using the proper ID
-        const pageSelect = screen.getByDisplayValue('Select a page to preview...')
-        await user.selectOptions(pageSelect, '1')
+        const manageWidgetsButtons = screen.getAllByTitle('Manage widgets')
+        await user.click(manageWidgetsButtons[0])
 
-        // Preview component should receive the pageId
-        expect(screen.getByTestId('preview-page-id')).toHaveTextContent('1')
-
-        // Select layout override
-        const layoutSelect = screen.getByDisplayValue('Use inherited layout')
-        await user.selectOptions(layoutSelect, '2')
-
-        expect(screen.getByTestId('preview-layout-id')).toHaveTextContent('2')
-
-        // Select theme override
-        const themeSelect = screen.getByDisplayValue('Use inherited theme')
-        await user.selectOptions(themeSelect, '3')
-
-        expect(screen.getByTestId('preview-theme-id')).toHaveTextContent('3')
+        expect(screen.getByText('Manage page widgets and content')).toBeInTheDocument()
+        expect(screen.getByTestId('slot-manager')).toBeInTheDocument()
     })
 
-    it('renders inheritance management interface', async () => {
+    it('shows appropriate widget management state when no page selected', async () => {
         const user = userEvent.setup()
         renderWithQueryClient(<PageManagement />)
 
-        const inheritanceTab = screen.getByText('Inheritance')
-        await user.click(inheritanceTab)
+        // Switch to widgets tab without selecting a page
+        await user.click(screen.getByText('Widgets'))
 
-        expect(screen.getByText('Inheritance Management')).toBeInTheDocument()
-        expect(screen.getByText('Visualize and manage how layouts, themes, and widgets inherit through the page hierarchy.')).toBeInTheDocument()
-        expect(screen.getByDisplayValue('Choose a page...')).toBeInTheDocument()
-        expect(screen.getByText('Quick Actions')).toBeInTheDocument()
+        expect(screen.getByText('Select a page from the Pages tab to manage its widgets')).toBeInTheDocument()
     })
 
-    it('handles inheritance page selection', async () => {
+    it('shows message when page has no layout for widget management', async () => {
         const user = userEvent.setup()
         renderWithQueryClient(<PageManagement />)
 
-        const inheritanceTab = screen.getByText('Inheritance')
-        await user.click(inheritanceTab)
+        await waitFor(() => {
+            expect(screen.getByText('Contact')).toBeInTheDocument()
+        })
 
-        const pageSelect = screen.getByDisplayValue('Choose a page...')
-        await user.selectOptions(pageSelect, '1')
+        // Select Contact page (which has no layout)
+        await user.click(screen.getByText('Contact'))
+        await user.click(screen.getByText('Widgets'))
 
-        // Should show inheritance visualization
-        expect(screen.getByText('Inheritance Chain')).toBeInTheDocument()
-        expect(screen.getByText('Layout Inheritance')).toBeInTheDocument()
-        expect(screen.getByText('Theme Inheritance')).toBeInTheDocument()
+        expect(screen.getByText('This page has no layout assigned')).toBeInTheDocument()
     })
 
-    it('enables quick action buttons when page is selected', async () => {
+    it('shows empty state when no pages found', async () => {
+        mockedAxios.get.mockResolvedValue({ data: [] })
+        renderWithQueryClient(<PageManagement />)
+
+        await waitFor(() => {
+            expect(screen.getByText('No pages found')).toBeInTheDocument()
+        })
+    })
+
+    it('shows search help when no search results', async () => {
         const user = userEvent.setup()
         renderWithQueryClient(<PageManagement />)
 
-        const inheritanceTab = screen.getByText('Inheritance')
-        await user.click(inheritanceTab)
+        await waitFor(() => {
+            expect(screen.getByText('Home Page')).toBeInTheDocument()
+        })
 
-        // Buttons should be disabled initially
-        expect(screen.getByText('View Inheritance')).toBeDisabled()
-        expect(screen.getByText('Override Layout')).toBeDisabled()
-        expect(screen.getByText('Override Theme')).toBeDisabled()
+        const searchInput = screen.getByPlaceholderText('Search pages...')
+        await user.type(searchInput, 'nonexistent')
 
-        // Select a page
-        const pageSelect = screen.getByDisplayValue('Choose a page...')
-        await user.selectOptions(pageSelect, '1')
-
-        // Buttons should now be enabled
-        expect(screen.getByText('View Inheritance')).toBeEnabled()
-        expect(screen.getByText('Override Layout')).toBeEnabled()
-        expect(screen.getByText('Override Theme')).toBeEnabled()
+        expect(screen.getByText('No pages found')).toBeInTheDocument()
+        expect(screen.getByText('Try adjusting your search terms')).toBeInTheDocument()
     })
 
-    it('displays inheritance visualization with mock data', async () => {
+    it('displays page URLs correctly', async () => {
+        renderWithQueryClient(<PageManagement />)
+
+        await waitFor(() => {
+            expect(screen.getByText('/home')).toBeInTheDocument()
+        })
+
+        expect(screen.getByText('/about')).toBeInTheDocument()
+        expect(screen.getByText('/contact')).toBeInTheDocument()
+    })
+
+    it('shows new page button', () => {
+        renderWithQueryClient(<PageManagement />)
+
+        expect(screen.getByText('New Page')).toBeInTheDocument()
+    })
+
+    it('shows preview buttons for pages', async () => {
+        renderWithQueryClient(<PageManagement />)
+
+        await waitFor(() => {
+            expect(screen.getByText('Home Page')).toBeInTheDocument()
+        })
+
+        const previewButtons = screen.getAllByTitle('Preview page')
+        expect(previewButtons).toHaveLength(3)
+    })
+
+    it('makes correct API call to fetch pages', async () => {
+        renderWithQueryClient(<PageManagement />)
+
+        await waitFor(() => {
+            expect(mockedAxios.get).toHaveBeenCalledWith('/api/webpages/api/pages/')
+        })
+    })
+
+    it('updates selected page details when different page is clicked', async () => {
         const user = userEvent.setup()
         renderWithQueryClient(<PageManagement />)
 
-        const inheritanceTab = screen.getByText('Inheritance')
-        await user.click(inheritanceTab)
+        await waitFor(() => {
+            expect(screen.getByText('Home Page')).toBeInTheDocument()
+        })
 
-        const pageSelect = screen.getByDisplayValue('Choose a page...')
-        await user.selectOptions(pageSelect, '1')
+        // Select Home Page first
+        await user.click(screen.getByText('Home Page'))
 
-        // Check that the inheritance section appears after selecting a page
-        expect(screen.getByText('Inheritance Chain')).toBeInTheDocument()
-        expect(screen.getByText('Layout Inheritance')).toBeInTheDocument()
-        expect(screen.getByText('Theme Inheritance')).toBeInTheDocument()
+        await waitFor(() => {
+            expect(screen.getByText('Welcome to our website')).toBeInTheDocument()
+        })
 
-        // Check that conflicts section is visible
-        expect(screen.getByText('✓ No Inheritance Conflicts')).toBeInTheDocument()
-        expect(screen.getByText('All inheritance relationships are properly configured.')).toBeInTheDocument()
+        // Then select About Us
+        await user.click(screen.getByText('About Us'))
+
+        await waitFor(() => {
+            expect(screen.getByText('Learn more about our company')).toBeInTheDocument()
+            expect(screen.queryByText('Welcome to our website')).not.toBeInTheDocument()
+        })
     })
 
-    it('shows tab icons correctly', () => {
-        renderWithQueryClient(<PageManagement />)
-
-        // Check that icons are rendered (they should be in the DOM)
-        const tabs = screen.getAllByRole('button')
-        expect(tabs).toHaveLength(4) // 4 tabs
-    })
-
-    it('updates tab description when switching tabs', async () => {
+    it('shows layout and theme assignment in page details', async () => {
         const user = userEvent.setup()
         renderWithQueryClient(<PageManagement />)
 
-        // Default description
-        expect(screen.getByText('Create and manage page layout templates')).toBeInTheDocument()
+        await waitFor(() => {
+            expect(screen.getByText('Home Page')).toBeInTheDocument()
+        })
 
-        // Switch to themes
-        const themesTab = screen.getByText('Themes')
-        await user.click(themesTab)
+        await user.click(screen.getByText('Home Page'))
 
-        expect(screen.getByText('Design color schemes and styling')).toBeInTheDocument()
+        await waitFor(() => {
+            expect(screen.getByText('Page Details')).toBeInTheDocument()
+        })
 
-        // Switch to preview
-        const previewTab = screen.getByText('Preview')
-        await user.click(previewTab)
-
-        expect(screen.getByText('Preview layout and theme combinations')).toBeInTheDocument()
-
-        // Switch to inheritance
-        const inheritanceTab = screen.getByText('Inheritance')
-        await user.click(inheritanceTab)
-
-        expect(screen.getByText('Manage inheritance hierarchy')).toBeInTheDocument()
+        // Check for specific detail labels
+        expect(screen.getByText('Page Title')).toBeInTheDocument()
+        expect(screen.getByText('URL Slug')).toBeInTheDocument()
+        expect(screen.getByText('Layout')).toBeInTheDocument()
+        expect(screen.getByText('Theme')).toBeInTheDocument()
     })
 
-    it('maintains state when switching between tabs', async () => {
+    it('shows no layout/theme assigned when null', async () => {
         const user = userEvent.setup()
         renderWithQueryClient(<PageManagement />)
 
-        // Switch to preview and set some values
-        const previewTab = screen.getByText('Preview')
-        await user.click(previewTab)
+        await waitFor(() => {
+            expect(screen.getByText('Contact')).toBeInTheDocument()
+        })
 
-        const pageSelect = screen.getByDisplayValue('Select a page to preview...')
-        await user.selectOptions(pageSelect, '2')
+        await user.click(screen.getByText('Contact'))
 
-        // Switch to another tab and back
-        const layoutsTab = screen.getByText('Layouts')
-        await user.click(layoutsTab)
-
-        await user.click(previewTab)
-
-        // Values should be maintained
-        expect(pageSelect.value).toBe('2')
-    })
-
-    it('clears preview selections when option is deselected', async () => {
-        const user = userEvent.setup()
-        renderWithQueryClient(<PageManagement />)
-
-        const previewTab = screen.getByText('Preview')
-        await user.click(previewTab)
-
-        const pageSelect = screen.getByDisplayValue('Select a page to preview...')
-        await user.selectOptions(pageSelect, '1')
-
-        // Clear selection
-        await user.selectOptions(pageSelect, '')
-
-        // Should not show page ID in preview
-        expect(screen.queryByTestId('preview-page-id')).not.toBeInTheDocument()
+        await waitFor(() => {
+            expect(screen.getByText('No layout assigned')).toBeInTheDocument()
+        })
     })
 }) 
