@@ -28,12 +28,13 @@ class WidgetCommand {
 }
 
 export class AddWidgetCommand extends WidgetCommand {
-    constructor(apiClient, { pageId, widgetTypeId, slotName, configuration }) {
+    constructor(apiClient, { pageId, widgetTypeId, slotName, configuration, ...inheritanceSettings }) {
         super(apiClient)
         this.pageId = pageId
         this.widgetTypeId = widgetTypeId
         this.slotName = slotName
         this.configuration = configuration
+        this.inheritanceSettings = inheritanceSettings
     }
 
     async execute() {
@@ -42,7 +43,8 @@ export class AddWidgetCommand extends WidgetCommand {
                 page: this.pageId,
                 widget_type: this.widgetTypeId,
                 slot_name: this.slotName,
-                configuration: this.configuration
+                configuration: this.configuration,
+                ...this.inheritanceSettings
             })
 
             this.handleSuccess('Widget added successfully')
@@ -54,16 +56,18 @@ export class AddWidgetCommand extends WidgetCommand {
 }
 
 export class UpdateWidgetCommand extends WidgetCommand {
-    constructor(apiClient, { widgetId, configuration }) {
+    constructor(apiClient, { widgetId, configuration, ...inheritanceSettings }) {
         super(apiClient)
         this.widgetId = widgetId
         this.configuration = configuration
+        this.inheritanceSettings = inheritanceSettings
     }
 
     async execute() {
         try {
             const response = await this.apiClient.patch(`/api/webpages/api/widgets/${this.widgetId}/`, {
-                configuration: this.configuration
+                configuration: this.configuration,
+                ...this.inheritanceSettings
             })
 
             this.handleSuccess('Widget updated successfully')

@@ -11,7 +11,11 @@ import {
     ChevronDown,
     Settings,
     Layers,
-    AlertCircle
+    AlertCircle,
+    GripVertical,
+    Hash,
+    ArrowUp,
+    ArrowDown
 } from 'lucide-react'
 import axios from 'axios'
 import toast from 'react-hot-toast'
@@ -122,11 +126,13 @@ const SlotManager = ({ pageId, layout, onWidgetChange }) => {
         setShowWidgetLibrary(false)
     }
 
-    const handleConfigureSave = (configuration) => {
+    const handleConfigureSave = (saveData) => {
+        const { configuration, ...inheritanceSettings } = saveData
         createWidgetMutation.mutate({
             widgetTypeId: configuringWidget.widgetType.id,
             slotName: configuringWidget.slotName,
-            configuration
+            configuration,
+            ...inheritanceSettings
         })
     }
 
@@ -138,10 +144,12 @@ const SlotManager = ({ pageId, layout, onWidgetChange }) => {
         })
     }
 
-    const handleEditSave = (configuration) => {
+    const handleEditSave = (saveData) => {
+        const { configuration, ...inheritanceSettings } = saveData
         updateWidgetMutation.mutate({
             widgetId: editingWidget.widget.id,
-            configuration
+            configuration,
+            ...inheritanceSettings
         })
     }
 
@@ -156,6 +164,20 @@ const SlotManager = ({ pageId, layout, onWidgetChange }) => {
         if (window.confirm('Are you sure you want to delete this widget?')) {
             deleteWidgetMutation.mutate(widget.id)
         }
+    }
+
+    const handlePriorityChange = (widget, newPriority) => {
+        updateWidgetMutation.mutate({
+            widgetId: widget.id,
+            priority: parseInt(newPriority) || 0
+        })
+    }
+
+    const handleVisibilityToggle = (widget) => {
+        updateWidgetMutation.mutate({
+            widgetId: widget.id,
+            is_visible: !widget.is_visible
+        })
     }
 
     const handleMoveWidget = (widget, direction) => {
@@ -255,20 +277,35 @@ const SlotManager = ({ pageId, layout, onWidgetChange }) => {
                                             {slotWidgets.map((widget, index) => (
                                                 <div
                                                     key={widget.id}
-                                                    className={`p-3 border rounded-lg ${widget.is_inherited
-                                                        ? 'border-orange-200 bg-orange-50'
-                                                        : 'border-gray-200 bg-white'
+                                                    className={`p-3 border rounded-lg transition-colors ${widget.is_inherited
+                                                            ? 'border-orange-200 bg-orange-50'
+                                                            : widget.is_visible === false
+                                                                ? 'border-gray-200 bg-gray-50 opacity-60'
+                                                                : 'border-gray-200 bg-white'
                                                         }`}
                                                 >
-                                                    <div className="flex items-center justify-between">
+                                                    {/* Widget Header */}
+                                                    <div className="flex items-center justify-between mb-2">
                                                         <div className="flex-1">
                                                             <div className="flex items-center space-x-2">
+                                                                <GripVertical className="w-4 h-4 text-gray-400" />
                                                                 <h5 className="font-medium text-gray-900">
                                                                     {widget.widget_type.name}
                                                                 </h5>
                                                                 {widget.is_inherited && (
                                                                     <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
                                                                         Inherited
+                                                                    </span>
+                                                                )}
+                                                                {widget.priority > 0 && (
+                                                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                                                                        <Hash className="w-3 h-3 mr-1" />
+                                                                        {widget.priority}
+                                                                    </span>
+                                                                )}
+                                                                {widget.is_visible === false && (
+                                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                                                                        Hidden
                                                                     </span>
                                                                 )}
                                                             </div>
@@ -278,6 +315,20 @@ const SlotManager = ({ pageId, layout, onWidgetChange }) => {
                                                         </div>
 
                                                         <div className="flex items-center space-x-1">
+                                                            {/* Visibility toggle */}
+                                                            {!widget.is_inherited && (
+                                                                <button
+                                                                    onClick={() => handleVisibilityToggle(widget)}
+                                                                    className={`p-1 ${widget.is_visible !== false
+                                                                        ? 'text-green-600 hover:text-green-700'
+                                                                        : 'text-gray-400 hover:text-gray-600'
+                                                                        }`}
+                                                                    title={widget.is_visible !== false ? 'Hide widget' : 'Show widget'}
+                                                                >
+                                                                    {widget.is_visible !== false ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                                                                </button>
+                                                            )}
+
                                                             {/* Move buttons */}
                                                             {!widget.is_inherited && (
                                                                 <>
@@ -287,7 +338,7 @@ const SlotManager = ({ pageId, layout, onWidgetChange }) => {
                                                                         className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-50"
                                                                         title="Move up"
                                                                     >
-                                                                        <ChevronUp className="w-4 h-4" />
+                                                                        <ArrowUp className="w-4 h-4" />
                                                                     </button>
                                                                     <button
                                                                         onClick={() => handleMoveWidget(widget, 'down')}
@@ -295,7 +346,7 @@ const SlotManager = ({ pageId, layout, onWidgetChange }) => {
                                                                         className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-50"
                                                                         title="Move down"
                                                                     >
-                                                                        <ChevronDown className="w-4 h-4" />
+                                                                        <ArrowDown className="w-4 h-4" />
                                                                     </button>
                                                                 </>
                                                             )}
@@ -321,6 +372,35 @@ const SlotManager = ({ pageId, layout, onWidgetChange }) => {
                                                             )}
                                                         </div>
                                                     </div>
+
+                                                    {/* Widget Priority Controls (for non-inherited widgets) */}
+                                                    {!widget.is_inherited && (
+                                                        <div className="flex items-center space-x-4 pt-2 border-t border-gray-100">
+                                                            <div className="flex items-center space-x-2">
+                                                                <label className="text-xs text-gray-600">Priority:</label>
+                                                                <input
+                                                                    type="number"
+                                                                    min="0"
+                                                                    max="100"
+                                                                    value={widget.priority || 0}
+                                                                    onChange={(e) => handlePriorityChange(widget, e.target.value)}
+                                                                    className="w-16 px-2 py-1 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                                                />
+                                                            </div>
+                                                            <div className="flex items-center space-x-2">
+                                                                <span className="text-xs text-gray-600">
+                                                                    Behavior: {widget.inheritance_behavior || 'inherit'}
+                                                                </span>
+                                                            </div>
+                                                            {widget.max_inheritance_depth && (
+                                                                <div className="flex items-center space-x-2">
+                                                                    <span className="text-xs text-gray-600">
+                                                                        Max depth: {widget.max_inheritance_depth}
+                                                                    </span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             ))}
                                         </div>
@@ -378,13 +458,15 @@ const SlotManager = ({ pageId, layout, onWidgetChange }) => {
             {/* Widget Configuration Modal */}
             {configuringWidget && (
                 <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-hidden">
+                    <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full mx-4 max-h-[90vh] overflow-hidden">
                         <div className="overflow-y-auto max-h-[90vh]">
                             <WidgetConfigurator
                                 widgetType={configuringWidget.widgetType}
                                 onSave={handleConfigureSave}
                                 onCancel={() => setConfiguringWidget(null)}
                                 title={`Add ${configuringWidget.widgetType.name}`}
+                                showInheritanceControls={true}
+                                isEditing={false}
                             />
                         </div>
                     </div>
@@ -394,14 +476,25 @@ const SlotManager = ({ pageId, layout, onWidgetChange }) => {
             {/* Widget Edit Modal */}
             {editingWidget && (
                 <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-hidden">
+                    <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full mx-4 max-h-[90vh] overflow-hidden">
                         <div className="overflow-y-auto max-h-[90vh]">
                             <WidgetConfigurator
                                 widgetType={editingWidget.widgetType}
                                 initialConfig={editingWidget.widget.configuration}
+                                initialInheritanceSettings={{
+                                    inherit_from_parent: editingWidget.widget.inherit_from_parent,
+                                    override_parent: editingWidget.widget.override_parent,
+                                    inheritance_behavior: editingWidget.widget.inheritance_behavior || 'inherit',
+                                    inheritance_conditions: editingWidget.widget.inheritance_conditions || {},
+                                    priority: editingWidget.widget.priority || 0,
+                                    is_visible: editingWidget.widget.is_visible !== false,
+                                    max_inheritance_depth: editingWidget.widget.max_inheritance_depth
+                                }}
                                 onSave={handleEditSave}
                                 onCancel={() => setEditingWidget(null)}
                                 title={`Edit ${editingWidget.widgetType.name}`}
+                                showInheritanceControls={true}
+                                isEditing={true}
                             />
                         </div>
                     </div>
