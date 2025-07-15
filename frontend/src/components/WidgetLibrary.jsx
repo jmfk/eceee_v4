@@ -9,13 +9,20 @@ import {
     Code,
     Plus,
     Grid3X3,
-    Filter
+    Filter,
+    Newspaper,
+    Calendar,
+    Users,
+    FileText,
+    ImageIcon
 } from 'lucide-react'
 import axios from 'axios'
+import CustomWidgetCreator from './CustomWidgetCreator'
 
 const WidgetLibrary = ({ onSelectWidget, selectedWidgetTypes = [] }) => {
     const [searchTerm, setSearchTerm] = useState('')
     const [filterCategory, setFilterCategory] = useState('all')
+    const [showCustomCreator, setShowCustomCreator] = useState(false)
 
     // Fetch available widget types
     const { data: widgetTypes, isLoading, error } = useQuery({
@@ -39,6 +46,17 @@ const WidgetLibrary = ({ onSelectWidget, selectedWidgetTypes = [] }) => {
                 return Space
             case 'html block':
                 return Code
+            // Phase 6: Extended Widget Types
+            case 'news':
+                return Newspaper
+            case 'events':
+                return Calendar
+            case 'calendar':
+                return Calendar
+            case 'forms':
+                return FileText
+            case 'gallery':
+                return ImageIcon
             default:
                 return Grid3X3
         }
@@ -93,7 +111,17 @@ const WidgetLibrary = ({ onSelectWidget, selectedWidgetTypes = [] }) => {
         <div className="bg-white rounded-lg shadow">
             {/* Header */}
             <div className="p-4 border-b border-gray-200">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Widget Library</h3>
+                <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-medium text-gray-900">Widget Library</h3>
+                    <button
+                        onClick={() => setShowCustomCreator(true)}
+                        className="flex items-center gap-2 px-3 py-2 bg-purple-600 text-white text-sm rounded-md hover:bg-purple-700 transition-colors"
+                        title="Create Custom Widget"
+                    >
+                        <Plus size={16} />
+                        Custom
+                    </button>
+                </div>
 
                 {/* Search and Filter */}
                 <div className="space-y-3">
@@ -183,6 +211,18 @@ const WidgetLibrary = ({ onSelectWidget, selectedWidgetTypes = [] }) => {
                 <div className="p-3 border-t border-gray-200 text-xs text-gray-500 text-center">
                     {filteredWidgets.length} widget{filteredWidgets.length !== 1 ? 's' : ''} available
                 </div>
+            )}
+
+            {/* Custom Widget Creator Modal */}
+            {showCustomCreator && (
+                <CustomWidgetCreator
+                    onClose={() => setShowCustomCreator(false)}
+                    onWidgetCreated={(widget) => {
+                        setShowCustomCreator(false)
+                        // Optionally auto-select the new widget
+                        onSelectWidget?.(widget)
+                    }}
+                />
             )}
         </div>
     )

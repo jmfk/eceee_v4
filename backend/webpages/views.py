@@ -107,6 +107,250 @@ class WidgetTypeViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(active_types, many=True)
         return Response(serializer.data)
 
+    @action(detail=True, methods=["post"])
+    def validate_configuration(self, request, pk=None):
+        """
+        Validate a widget configuration against this widget type's schema.
+
+        POST body should contain:
+        {
+            "configuration": { ... widget configuration data ... }
+        }
+        """
+        widget_type = self.get_object()
+        configuration = request.data.get("configuration", {})
+
+        is_valid, errors = widget_type.validate_configuration(configuration)
+
+        return Response(
+            {"is_valid": is_valid, "errors": errors, "configuration": configuration}
+        )
+
+    @action(detail=True, methods=["get"])
+    def configuration_defaults(self, request, pk=None):
+        """Get default configuration values for this widget type"""
+        widget_type = self.get_object()
+        defaults = widget_type.get_configuration_defaults()
+
+        return Response({"defaults": defaults, "schema": widget_type.json_schema})
+
+    @action(detail=True, methods=["post"])
+    def preview(self, request, pk=None):
+        """
+        Generate a preview of a widget with given configuration.
+
+        POST body should contain:
+        {
+            "configuration": { ... widget configuration data ... },
+            "context": { ... optional context data ... }
+        }
+        """
+        widget_type = self.get_object()
+        configuration = request.data.get("configuration", {})
+        context = request.data.get("context", {})
+
+        # Validate configuration first
+        is_valid, errors = widget_type.validate_configuration(configuration)
+        if not is_valid:
+            return Response(
+                {"error": "Invalid configuration", "validation_errors": errors},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Create a temporary widget instance for rendering
+        from .renderers import WidgetRendererRegistry
+        from .models import PageWidget
+
+        temp_widget = PageWidget(
+            widget_type=widget_type,
+            configuration=configuration,
+            slot_name=context.get("slot_name", "preview"),
+            sort_order=0,
+        )
+
+        try:
+            # Render the widget
+            rendered_html = WidgetRendererRegistry.render_widget(temp_widget, context)
+
+            return Response(
+                {
+                    "widget_type": widget_type.name,
+                    "configuration": configuration,
+                    "rendered_html": rendered_html,
+                    "template_name": widget_type.template_name,
+                }
+            )
+
+        except Exception as e:
+            return Response(
+                {"error": "Rendering failed", "details": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @action(detail=False, methods=["post"])
+    def create_custom(self, request):
+        """
+        Create a custom widget type with template and schema.
+
+        POST body should contain:
+        {
+            "name": "My Custom Widget",
+            "description": "Description of the widget",
+            "template_content": "<div>{{ config.title }}</div>",
+            "schema_properties": {
+                "title": {"type": "string", "title": "Title"}
+            },
+            "required_fields": ["title"]
+        }
+        """
+        name = request.data.get("name")
+        description = request.data.get("description", "")
+        template_content = request.data.get("template_content")
+        schema_properties = request.data.get("schema_properties", {})
+        required_fields = request.data.get("required_fields", [])
+
+        if not all([name, template_content]):
+            return Response(
+                {"error": "name and template_content are required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Generate template filename
+        template_name = f"webpages/widgets/custom_{name.lower().replace(' ', '_')}.html"
+
+        # Generate JSON schema
+        json_schema = {
+            "type": "object",
+            "properties": schema_properties,
+            "required": required_fields,
+        }
+
+        # Validate template content (basic validation)
+        if not self._validate_template_content(template_content):
+            return Response(
+                {"error": "Invalid template content"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            # Create the widget type
+            widget_type = WidgetType.objects.create(
+                name=name,
+                description=description,
+                json_schema=json_schema,
+                template_name=template_name,
+                created_by=request.user,
+            )
+
+            # Save template content to file
+            self._save_template_file(template_name, template_content)
+
+            serializer = self.get_serializer(widget_type)
+            return Response(
+                {
+                    "widget_type": serializer.data,
+                    "template_saved": True,
+                    "message": "Custom widget type created successfully",
+                },
+                status=status.HTTP_201_CREATED,
+            )
+
+        except Exception as e:
+            return Response(
+                {"error": "Failed to create custom widget type", "details": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @action(detail=False, methods=["post"])
+    def generate_schema(self, request):
+        """
+        Helper endpoint to generate JSON schema from form fields.
+
+        POST body should contain:
+        {
+            "fields": [
+                {
+                    "name": "title",
+                    "type": "string",
+                    "title": "Title",
+                    "required": true,
+                    "default": "Default Title"
+                }
+            ]
+        }
+        """
+        fields = request.data.get("fields", [])
+
+        properties = {}
+        required = []
+
+        for field in fields:
+            field_name = field.get("name")
+            field_type = field.get("type", "string")
+            field_title = field.get("title", field_name)
+            field_default = field.get("default")
+            field_required = field.get("required", False)
+
+            if not field_name:
+                continue
+
+            property_schema = {"type": field_type, "title": field_title}
+
+            if field_default is not None:
+                property_schema["default"] = field_default
+
+            if field.get("description"):
+                property_schema["description"] = field["description"]
+
+            if field.get("enum"):
+                property_schema["enum"] = field["enum"]
+
+            if field.get("format"):
+                property_schema["format"] = field["format"]
+
+            properties[field_name] = property_schema
+
+            if field_required:
+                required.append(field_name)
+
+        schema = {"type": "object", "properties": properties, "required": required}
+
+        return Response(
+            {
+                "schema": schema,
+                "properties_count": len(properties),
+                "required_count": len(required),
+            }
+        )
+
+    def _validate_template_content(self, content):
+        """Basic validation of Django template content"""
+        try:
+            from django.template import Template, Context
+
+            # Try to parse the template
+            template = Template(content)
+            # Try to render with dummy context
+            template.render(Context({"config": {}}))
+            return True
+        except Exception:
+            return False
+
+    def _save_template_file(self, template_name, content):
+        """Save template content to file"""
+        import os
+        from django.conf import settings
+
+        # Calculate full template path
+        template_path = os.path.join(settings.BASE_DIR, "templates", template_name)
+
+        # Create directory if it doesn't exist
+        os.makedirs(os.path.dirname(template_path), exist_ok=True)
+
+        # Write template content
+        with open(template_path, "w", encoding="utf-8") as f:
+            f.write(content)
+
 
 class WebPageViewSet(viewsets.ModelViewSet):
     """
@@ -706,3 +950,155 @@ class PageWidgetViewSet(viewsets.ModelViewSet):
 
         serializer = self.get_serializer(widget)
         return Response(serializer.data)
+
+    @action(detail=False, methods=["post"])
+    def bulk_reorder(self, request):
+        """
+        Bulk reorder widgets in a slot.
+
+        POST body should contain:
+        {
+            "page_id": 123,
+            "slot_name": "main_content",
+            "widget_orders": [
+                {"widget_id": 1, "sort_order": 0, "priority": 5},
+                {"widget_id": 2, "sort_order": 1, "priority": 0}
+            ]
+        }
+        """
+        page_id = request.data.get("page_id")
+        slot_name = request.data.get("slot_name")
+        widget_orders = request.data.get("widget_orders", [])
+
+        if not all([page_id, slot_name, widget_orders]):
+            return Response(
+                {"error": "page_id, slot_name, and widget_orders are required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            page = WebPage.objects.get(id=page_id)
+        except WebPage.DoesNotExist:
+            return Response(
+                {"error": "Page not found"}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Update widget orders
+        updated_widgets = []
+        for order_data in widget_orders:
+            widget_id = order_data.get("widget_id")
+            sort_order = order_data.get("sort_order")
+            priority = order_data.get("priority", 0)
+
+            try:
+                widget = PageWidget.objects.get(
+                    id=widget_id, page=page, slot_name=slot_name
+                )
+                widget.sort_order = sort_order
+                widget.priority = priority
+                widget.save()
+                updated_widgets.append(widget)
+            except PageWidget.DoesNotExist:
+                return Response(
+                    {"error": f"Widget {widget_id} not found in slot {slot_name}"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+        # Create version for the page
+        page.create_version(request.user, f"Reordered widgets in slot: {slot_name}")
+
+        serializer = self.get_serializer(updated_widgets, many=True)
+        return Response({"updated_widgets": serializer.data})
+
+    @action(detail=False, methods=["get"])
+    def effective_widgets(self, request):
+        """
+        Get effective widgets for a page considering inheritance rules.
+        Query params: page_id, slot_name (optional)
+        """
+        page_id = request.query_params.get("page_id")
+        slot_name = request.query_params.get("slot_name")
+
+        if not page_id:
+            return Response(
+                {"error": "page_id parameter is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            page = WebPage.objects.get(id=page_id)
+        except WebPage.DoesNotExist:
+            return Response(
+                {"error": "Page not found"}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        effective_widgets = PageWidget.get_effective_widgets_for_page(page, slot_name)
+
+        # Serialize the results
+        if slot_name:
+            # Single slot requested
+            serializer = self.get_serializer(effective_widgets, many=True)
+            return Response({"slot_name": slot_name, "widgets": serializer.data})
+        else:
+            # All slots requested
+            result = {}
+            for slot, widgets in effective_widgets.items():
+                serializer = self.get_serializer(widgets, many=True)
+                result[slot] = serializer.data
+
+            return Response({"widgets_by_slot": result})
+
+    @action(detail=True, methods=["get", "post"])
+    def preview(self, request, pk=None):
+        """
+        Preview a widget rendering.
+        GET: Preview with existing configuration
+        POST: Preview with modified configuration
+        """
+        widget = self.get_object()
+
+        if request.method == "POST":
+            # Use provided configuration for preview
+            configuration = request.data.get("configuration", widget.configuration)
+            context = request.data.get("context", {})
+        else:
+            # Use existing configuration
+            configuration = widget.configuration
+            context = {}
+
+        # Validate configuration
+        is_valid, errors = widget.widget_type.validate_configuration(configuration)
+        if not is_valid:
+            return Response(
+                {"error": "Invalid configuration", "validation_errors": errors},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Create a temporary widget for preview
+        from .renderers import WidgetRendererRegistry
+
+        temp_widget = PageWidget(
+            widget_type=widget.widget_type,
+            configuration=configuration,
+            slot_name=widget.slot_name,
+            sort_order=widget.sort_order,
+        )
+
+        try:
+            rendered_html = WidgetRendererRegistry.render_widget(temp_widget, context)
+
+            return Response(
+                {
+                    "widget_id": widget.id,
+                    "widget_type": widget.widget_type.name,
+                    "configuration": configuration,
+                    "rendered_html": rendered_html,
+                    "slot_name": widget.slot_name,
+                }
+            )
+
+        except Exception as e:
+            return Response(
+                {"error": "Rendering failed", "details": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
