@@ -17,6 +17,8 @@ import axios from 'axios'
 import toast from 'react-hot-toast'
 import WidgetLibrary from './WidgetLibrary'
 import WidgetConfigurator from './WidgetConfigurator'
+import { WidgetCommandFactory, WidgetOperations } from '../utils/widgetCommands'
+import { SlotStateFactory } from '../utils/slotState'
 
 const SlotManager = ({ pageId, layout, onWidgetChange }) => {
     const [selectedSlot, setSelectedSlot] = useState(null)
@@ -24,6 +26,10 @@ const SlotManager = ({ pageId, layout, onWidgetChange }) => {
     const [editingWidget, setEditingWidget] = useState(null)
     const [configuringWidget, setConfiguringWidget] = useState(null)
     const queryClient = useQueryClient()
+
+    // Initialize command factory and operations
+    const commandFactory = new WidgetCommandFactory(axios)
+    const widgetOperations = new WidgetOperations(commandFactory, queryClient)
 
     // Fetch page widgets including inherited ones
     const { data: pageWidgetsData, isLoading } = useQuery({
@@ -35,6 +41,9 @@ const SlotManager = ({ pageId, layout, onWidgetChange }) => {
         enabled: !!pageId
     })
 
+    // Create slot state manager
+    const slotState = SlotStateFactory.createFromQuery({ widgets: pageWidgetsData })
+
     // Fetch widget types for the library
     const { data: widgetTypes } = useQuery({
         queryKey: ['widget-types'],
@@ -44,116 +53,61 @@ const SlotManager = ({ pageId, layout, onWidgetChange }) => {
         }
     })
 
-    // Create widget mutation
+    // Simplified mutations using command objects
     const createWidgetMutation = useMutation({
         mutationFn: async ({ widgetTypeId, slotName, configuration }) => {
-            return axios.post('/api/webpages/api/widgets/', {
-                page: pageId,
-                widget_type_id: widgetTypeId,
-                slot_name: slotName,
-                configuration,
-                sort_order: getNextSortOrder(slotName)
-            })
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries(['page-widgets', pageId])
-            toast.success('Widget added successfully')
-            setShowWidgetLibrary(false)
-            setConfiguringWidget(null)
-            onWidgetChange?.()
-        },
-        onError: (error) => {
-            toast.error('Failed to add widget')
-            console.error(error)
-        }
-    })
-
-    // Update widget mutation
-    const updateWidgetMutation = useMutation({
-        mutationFn: async ({ widgetId, configuration }) => {
-            return axios.patch(`/api/webpages/api/widgets/${widgetId}/`, {
+            return widgetOperations.addWidget({
+                pageId,
+                widgetTypeId,
+                slotName,
                 configuration
             })
         },
         onSuccess: () => {
-            queryClient.invalidateQueries(['page-widgets', pageId])
-            toast.success('Widget updated successfully')
+            setShowWidgetLibrary(false)
+            setConfiguringWidget(null)
+            onWidgetChange?.()
+        }
+    })
+
+    const updateWidgetMutation = useMutation({
+        mutationFn: async ({ widgetId, configuration }) => {
+            return widgetOperations.updateWidget({
+                widgetId,
+                configuration,
+                pageId
+            })
+        },
+        onSuccess: () => {
             setEditingWidget(null)
             onWidgetChange?.()
-        },
-        onError: (error) => {
-            toast.error('Failed to update widget')
-            console.error(error)
         }
     })
 
-    // Delete widget mutation
     const deleteWidgetMutation = useMutation({
         mutationFn: async (widgetId) => {
-            return axios.delete(`/api/webpages/api/widgets/${widgetId}/`)
+            return widgetOperations.deleteWidget({
+                widgetId,
+                pageId
+            })
         },
         onSuccess: () => {
-            queryClient.invalidateQueries(['page-widgets', pageId])
-            toast.success('Widget deleted successfully')
             onWidgetChange?.()
-        },
-        onError: (error) => {
-            toast.error('Failed to delete widget')
-            console.error(error)
         }
     })
 
-    // Reorder widget mutation
     const reorderWidgetMutation = useMutation({
         mutationFn: async ({ widgetId, newSortOrder }) => {
-            return axios.post(`/api/webpages/api/widgets/${widgetId}/reorder/`, {
-                sort_order: newSortOrder
+            return widgetOperations.reorderWidget({
+                widgetId,
+                newSortOrder,
+                pageId
             })
         },
         onSuccess: () => {
-            queryClient.invalidateQueries(['page-widgets', pageId])
             onWidgetChange?.()
-        },
-        onError: (error) => {
-            toast.error('Failed to reorder widget')
-            console.error(error)
         }
     })
-
-    // Get widgets organized by slot
-    const getWidgetsBySlot = () => {
-        if (!pageWidgetsData) return {}
-
-        const widgetsBySlot = {}
-        pageWidgetsData.forEach(item => {
-            const widget = item.widget
-            const slotName = widget.slot_name
-
-            if (!widgetsBySlot[slotName]) {
-                widgetsBySlot[slotName] = []
-            }
-
-            widgetsBySlot[slotName].push({
-                ...widget,
-                inherited_from: item.inherited_from,
-                is_inherited: !!item.inherited_from
-            })
-        })
-
-        // Sort widgets by sort_order within each slot
-        Object.keys(widgetsBySlot).forEach(slot => {
-            widgetsBySlot[slot].sort((a, b) => a.sort_order - b.sort_order)
-        })
-
-        return widgetsBySlot
-    }
-
-    const getNextSortOrder = (slotName) => {
-        const widgetsBySlot = getWidgetsBySlot()
-        const slotWidgets = widgetsBySlot[slotName] || []
-        const maxOrder = Math.max(...slotWidgets.map(w => w.sort_order), -1)
-        return maxOrder + 1
-    }
 
     const handleAddWidget = (slot) => {
         setSelectedSlot(slot)
@@ -192,8 +146,10 @@ const SlotManager = ({ pageId, layout, onWidgetChange }) => {
     }
 
     const handleDeleteWidget = (widget) => {
-        if (widget.is_inherited) {
-            toast.error('Cannot delete inherited widgets. Override them instead.')
+        const validation = slotState.validateWidgetAction(widget, 'delete')
+
+        if (!validation.isValid) {
+            validation.errors.forEach(error => toast.error(error))
             return
         }
 
@@ -203,18 +159,16 @@ const SlotManager = ({ pageId, layout, onWidgetChange }) => {
     }
 
     const handleMoveWidget = (widget, direction) => {
-        const widgetsBySlot = getWidgetsBySlot()
-        const slotWidgets = widgetsBySlot[widget.slot_name] || []
-        const currentIndex = slotWidgets.findIndex(w => w.id === widget.id)
+        const validation = slotState.validateWidgetAction(widget, 'move')
 
-        if (currentIndex === -1) return
+        if (!validation.isValid) {
+            validation.errors.forEach(error => toast.error(error))
+            return
+        }
 
-        let newSortOrder
-        if (direction === 'up' && currentIndex > 0) {
-            newSortOrder = slotWidgets[currentIndex - 1].sort_order
-        } else if (direction === 'down' && currentIndex < slotWidgets.length - 1) {
-            newSortOrder = slotWidgets[currentIndex + 1].sort_order
-        } else {
+        const newSortOrder = slotState.getMoveSortOrder(widget, direction)
+
+        if (newSortOrder === null) {
             return
         }
 
@@ -236,7 +190,7 @@ const SlotManager = ({ pageId, layout, onWidgetChange }) => {
     }
 
     const slots = layout.slot_configuration?.slots || []
-    const widgetsBySlot = getWidgetsBySlot()
+    const widgetsBySlot = slotState.getWidgetsBySlot()
 
     if (isLoading) {
         return (
@@ -302,8 +256,8 @@ const SlotManager = ({ pageId, layout, onWidgetChange }) => {
                                                 <div
                                                     key={widget.id}
                                                     className={`p-3 border rounded-lg ${widget.is_inherited
-                                                            ? 'border-orange-200 bg-orange-50'
-                                                            : 'border-gray-200 bg-white'
+                                                        ? 'border-orange-200 bg-orange-50'
+                                                        : 'border-gray-200 bg-white'
                                                         }`}
                                                 >
                                                     <div className="flex items-center justify-between">
