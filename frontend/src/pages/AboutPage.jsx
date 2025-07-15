@@ -1,4 +1,4 @@
-import { ExternalLink, GitHub, Book, Zap } from 'lucide-react'
+import { ExternalLink, Book, Zap } from 'lucide-react'
 
 const AboutPage = () => {
   const technologies = [
@@ -89,14 +89,14 @@ const AboutPage = () => {
         <h2 className="text-2xl font-bold text-gray-900 mb-4">Project Overview</h2>
         <div className="prose prose-lg text-gray-600">
           <p>
-            ECEEE v4 represents a next-generation content management system (CMS) built with modern 
-            technologies and AI-assisted development workflows. The project combines the robustness 
-            of Django with the flexibility of React, all containerized for consistent development 
+            ECEEE v4 represents a next-generation content management system (CMS) built with modern
+            technologies and AI-assisted development workflows. The project combines the robustness
+            of Django with the flexibility of React, all containerized for consistent development
             and deployment experiences.
           </p>
           <p>
-            The development environment is specifically designed to leverage AI assistance through 
-            Model Context Protocol (MCP) servers, enabling intelligent code generation, automated 
+            The development environment is specifically designed to leverage AI assistance through
+            Model Context Protocol (MCP) servers, enabling intelligent code generation, automated
             testing, and enhanced developer productivity while maintaining code quality and security standards.
           </p>
         </div>
