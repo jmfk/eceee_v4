@@ -384,6 +384,59 @@ class WebPageViewSet(viewsets.ModelViewSet):
                 inheritance_data["theme_info"]["effective_theme"]
             ).data
 
+        # Serialize override options QuerySets
+        if "override_options" in inheritance_data["layout_info"]:
+            inheritance_data["layout_info"]["override_options"] = PageLayoutSerializer(
+                inheritance_data["layout_info"]["override_options"], many=True
+            ).data
+
+        if "override_options" in inheritance_data["theme_info"]:
+            inheritance_data["theme_info"]["override_options"] = PageThemeSerializer(
+                inheritance_data["theme_info"]["override_options"], many=True
+            ).data
+
+        # Serialize page references in inheritance chains
+        for chain_item in inheritance_data["layout_info"]["inheritance_chain"]:
+            if "page" in chain_item and chain_item["page"]:
+                chain_item["page"] = {
+                    "id": chain_item["page"].id,
+                    "title": chain_item["page"].title,
+                    "slug": chain_item["page"].slug,
+                }
+            if "layout" in chain_item and chain_item["layout"]:
+                chain_item["layout"] = PageLayoutSerializer(chain_item["layout"]).data
+
+        for chain_item in inheritance_data["theme_info"]["inheritance_chain"]:
+            if "page" in chain_item and chain_item["page"]:
+                chain_item["page"] = {
+                    "id": chain_item["page"].id,
+                    "title": chain_item["page"].title,
+                    "slug": chain_item["page"].slug,
+                }
+            if "theme" in chain_item and chain_item["theme"]:
+                chain_item["theme"] = PageThemeSerializer(chain_item["theme"]).data
+
+        # Serialize widget inheritance info
+        for slot_name, slot_info in inheritance_data["widgets_info"].items():
+            for widget_data in slot_info["widgets"]:
+                if "widget" in widget_data and widget_data["widget"]:
+                    widget_data["widget"] = PageWidgetSerializer(
+                        widget_data["widget"]
+                    ).data
+                if "page" in widget_data and widget_data["page"]:
+                    widget_data["page"] = {
+                        "id": widget_data["page"].id,
+                        "title": widget_data["page"].title,
+                        "slug": widget_data["page"].slug,
+                    }
+            for chain_item in slot_info["inheritance_chain"]:
+                if "page" in chain_item and chain_item["page"]:
+                    chain_item["page"] = {
+                        "id": chain_item["page"].id,
+                        "title": chain_item["page"].title,
+                        "slug": chain_item["page"].slug,
+                    }
+
         return Response(inheritance_data)
 
     @action(detail=True, methods=["post"])
