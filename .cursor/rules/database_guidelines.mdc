@@ -1,0 +1,21 @@
+---
+description: Database Guidelines
+globs:
+alwaysApply: false
+---
+
+## Database Guidelines
+
+### Schema Design
+- Use meaningful table and column names
+- Implement proper foreign key relationships
+- Add indexes for frequently queried columns
+- Use UUID for cross-service references
+- Implement soft deletes for important data
+
+### Django Models
+- Use Django's built-in validation
+- Implement custom managers for complex queries
+- Use select_related/prefetch_related for optimization
+- Add proper __str__ methods
+- Implement model-level permissions

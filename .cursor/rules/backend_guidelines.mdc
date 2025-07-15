@@ -1,0 +1,74 @@
+---
+description: Backend Development
+globs:
+alwaysApply: false
+---
+
+## Backend Development
+
+### Django Best Practices
+- Use Django REST Framework (DRF)
+- Implement proper authentication and authorization
+- Use Django's built-in validation
+- Implement proper error handling
+
+### Database Management
+- Use PostgreSQL for production
+- Use Redis for caching
+- Use Celery for background tasks
+- Use Django's built-in caching
+- Use Django's built-in session management
+
+### API Development
+- Implement proper API endpoints
+- Use DRF serializers for data validation
+- Use DRF viewsets for API logic
+- Use DRF permissions for access control
+- Use DRF filters for data filtering
+
+### Testing
+- Write unit tests for all models and views
+- Test components with React Testing Library
+- Use integration tests for API endpoints
+- Mock external services and APIs
+- Implement E2E tests for critical workflows
+- Review all test changes
+- Check for proper test coverage
+- Review all test cases
+- Review all test data
+- Review all test results
+
+### Deployment
+- Use Docker for containerization
+- Use Docker Compose for service orchestration
+
+### Security
+- Use HTTPS for all connections
+- Use CSRF protection for all forms
+- Use XSS protection for all HTML templates
+- Use SQL injection protection for all queries
+- Use authentication tokens for all API requests
+
+### Documentation
+- Write comprehensive docstrings for all functions
+- Document complex business logic inline
+- Maintain up-to-date API documentation
+- Document configuration options and environment variables
+- Keep README files current with project changes
+
+### Code Review
+- Review all code changes
+- Check for proper error handling
+- Review database schema changes
+- Review API endpoints
+- Review frontend components
+- Review backend logic
+- Review deployment configurations
+- Review security considerations
+
+### Documentation
+- Review all documentation changes
+- Check for proper documentation
+- Review all code comments
+- Review all code documentation
+- Review all code comments

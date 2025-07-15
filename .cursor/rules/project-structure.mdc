@@ -1,0 +1,28 @@
+---
+description: Project Structure
+globs:
+alwaysApply: true
+---
+
+### Project Structure
+```
+eceee_v4/
+├── backend/                 # Django application
+│   ├── config/             # Django settings
+│   ├── apps/               # Django apps
+│   ├── templates/          # HTML templates
+│   ├── static/             # Static files
+│   └── requirements.txt    # Python dependencies
+├── frontend/               # React application
+│   ├── src/               # Source code
+│   │   ├── components/    # Reusable components
+│   │   ├── pages/         # Page components
+│   │   ├── hooks/         # Custom hooks
+│   │   ├── stores/        # Zustand stores
+│   │   ├── api/           # API integration
+│   │   └── utils/         # Utility functions
+│   └── package.json       # Node.js dependencies
+├── docker/                # Docker configurations
+├── scripts/               # Development scripts
+└── docker-compose.yml     # Service orchestration
+```

@@ -1,0 +1,22 @@
+---
+description: Frontend Development
+globs:
+alwaysApply: false
+---
+
+
+## Frontend Development
+
+### React Best Practices
+- Use functional components with hooks
+- Implement proper state management with Zustand
+- Use React Query for data fetching
+- Implement proper component organization
+- Use React.memo for performance optimization
+
+### Tailwind CSS
+- Use utility-first approach
+- Implement responsive design mobile-first
+- Use CSS custom properties for themes
+- Organize classes: layout → spacing → typography → colors
+- Create reusable component styles

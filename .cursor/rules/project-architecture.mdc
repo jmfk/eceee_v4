@@ -1,0 +1,13 @@
+---
+description: Project Architecture
+globs:
+alwaysApply: true
+---
+
+## Project Architecture
+
+### Stack Overview
+- **Backend**: Django 4.2+ with DRF, PostgreSQL 15, Redis, Celery
+- **Frontend**: React 19, Vite, Tailwind CSS, Zustand, React Query
+- **Infrastructure**: Docker Compose, MCP servers
+- **AI Integration**: Cursor IDE with Claude, MCP protocol

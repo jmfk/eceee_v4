@@ -1,0 +1,12 @@
+---
+description: Error Handling
+globs:
+alwaysApply: true
+---
+
+### Error Handling
+- Return meaningful error messages
+- Use appropriate HTTP status codes
+- Implement global error handlers
+- Log errors for debugging and monitoring
+- Provide user-friendly error feedback
