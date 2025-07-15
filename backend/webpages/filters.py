@@ -166,7 +166,7 @@ class WebPageFilter(django_filters.FilterSet):
 
 
 class PageVersionFilter(django_filters.FilterSet):
-    """Advanced filtering for PageVersion queryset"""
+    """Advanced filtering for PageVersion queryset with workflow support"""
 
     # Page filters
     page = django_filters.ModelChoiceFilter(queryset=WebPage.objects.all())
@@ -187,6 +187,14 @@ class PageVersionFilter(django_filters.FilterSet):
     )
     is_current = django_filters.BooleanFilter()
 
+    # Status filters
+    status = django_filters.ChoiceFilter(choices=PageVersion.VERSION_STATUS_CHOICES)
+    status_in = django_filters.MultipleChoiceFilter(
+        field_name="status",
+        choices=PageVersion.VERSION_STATUS_CHOICES,
+        lookup_expr="in",
+    )
+
     # Date filters
     created_after = django_filters.DateTimeFilter(
         field_name="created_at", lookup_expr="gte"
@@ -198,14 +206,32 @@ class PageVersionFilter(django_filters.FilterSet):
         field_name="created_at", lookup_expr="date"
     )
 
+    # Published date filters
+    published_after = django_filters.DateTimeFilter(
+        field_name="published_at", lookup_expr="gte"
+    )
+    published_before = django_filters.DateTimeFilter(
+        field_name="published_at", lookup_expr="lte"
+    )
+    published_on_date = django_filters.DateFilter(
+        field_name="published_at", lookup_expr="date"
+    )
+    is_published = django_filters.BooleanFilter(method="filter_is_published")
+
     # User filters
     created_by = django_filters.CharFilter(
         field_name="created_by__username", lookup_expr="icontains"
+    )
+    published_by = django_filters.CharFilter(
+        field_name="published_by__username", lookup_expr="icontains"
     )
 
     # Content filters
     description = django_filters.CharFilter(lookup_expr="icontains")
     has_description = django_filters.BooleanFilter(method="filter_has_description")
+    has_change_summary = django_filters.BooleanFilter(
+        method="filter_has_change_summary"
+    )
 
     # Time range filters
     created_this_week = django_filters.BooleanFilter(method="filter_created_this_week")
@@ -213,6 +239,13 @@ class PageVersionFilter(django_filters.FilterSet):
         method="filter_created_this_month"
     )
     created_today = django_filters.BooleanFilter(method="filter_created_today")
+
+    # Workflow filters
+    drafts_only = django_filters.BooleanFilter(method="filter_drafts_only")
+    published_only = django_filters.BooleanFilter(method="filter_published_only")
+    current_versions_only = django_filters.BooleanFilter(
+        method="filter_current_versions_only"
+    )
 
     class Meta:
         model = PageVersion
@@ -255,6 +288,42 @@ class PageVersionFilter(django_filters.FilterSet):
         today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
 
         return queryset.filter(created_at__gte=today_start)
+
+    def filter_is_published(self, queryset, name, value):
+        """Filter versions that are published or not"""
+        if value:
+            return queryset.filter(status="published")
+        else:
+            return queryset.exclude(status="published")
+
+    def filter_has_change_summary(self, queryset, name, value):
+        """Filter versions that have or don't have change summaries"""
+        if value:
+            return queryset.exclude(change_summary={}).exclude(
+                change_summary__isnull=True
+            )
+        else:
+            return queryset.filter(
+                Q(change_summary={}) | Q(change_summary__isnull=True)
+            )
+
+    def filter_drafts_only(self, queryset, name, value):
+        """Filter to show only draft versions"""
+        if value:
+            return queryset.filter(status="draft")
+        return queryset
+
+    def filter_published_only(self, queryset, name, value):
+        """Filter to show only published versions"""
+        if value:
+            return queryset.filter(status="published")
+        return queryset
+
+    def filter_current_versions_only(self, queryset, name, value):
+        """Filter to show only current versions"""
+        if value:
+            return queryset.filter(is_current=True)
+        return queryset
 
 
 class PageLayoutFilter(django_filters.FilterSet):

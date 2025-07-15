@@ -8,17 +8,20 @@ import {
     Grid3X3,
     Eye,
     Plus,
-    Search
+    Search,
+    History
 } from 'lucide-react'
 import axios from 'axios'
 import LayoutEditor from '../components/LayoutEditor'
 import ThemeEditor from '../components/ThemeEditor'
 import SlotManager from '../components/SlotManager'
+import VersionManager from '../components/VersionManager'
 
 const PageManagement = () => {
     const [activeTab, setActiveTab] = useState('pages')
     const [selectedPage, setSelectedPage] = useState(null)
     const [searchTerm, setSearchTerm] = useState('')
+    const [showVersionManager, setShowVersionManager] = useState(false)
 
     // Fetch pages
     const { data: pages, isLoading: pagesLoading } = useQuery({
@@ -59,6 +62,12 @@ const PageManagement = () => {
             label: 'Widgets',
             icon: Layers,
             description: 'Manage page widgets and content'
+        },
+        {
+            id: 'versions',
+            label: 'Versions',
+            icon: Settings,
+            description: 'Page version control and history'
         }
     ]
 
@@ -148,6 +157,17 @@ const PageManagement = () => {
                                             title="Manage widgets"
                                         >
                                             <Layers className="w-4 h-4" />
+                                        </button>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                setSelectedPage(page)
+                                                setShowVersionManager(true)
+                                            }}
+                                            className="p-1 text-purple-600 hover:text-purple-700"
+                                            title="Version history"
+                                        >
+                                            <History className="w-4 h-4" />
                                         </button>
                                     </div>
                                 </div>
@@ -252,6 +272,43 @@ const PageManagement = () => {
         )
     }
 
+    const renderVersionManagement = () => {
+        if (!selectedPage) {
+            return (
+                <div className="bg-white rounded-lg shadow p-8">
+                    <div className="text-center text-gray-500">
+                        <History className="w-8 h-8 mx-auto mb-2" />
+                        <p>Select a page from the Pages tab to view its version history</p>
+                    </div>
+                </div>
+            )
+        }
+
+        return (
+            <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex items-center justify-between mb-6">
+                    <div>
+                        <h3 className="text-lg font-semibold">Version History</h3>
+                        <p className="text-sm text-gray-600">
+                            Managing versions for: <span className="font-medium">{selectedPage.title}</span>
+                        </p>
+                    </div>
+                    <button
+                        onClick={() => setShowVersionManager(true)}
+                        className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                        Open Version Manager
+                    </button>
+                </div>
+
+                <div className="text-center text-gray-500 py-8">
+                    <History className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                    <p>Click "Open Version Manager" to view and manage page versions</p>
+                </div>
+            </div>
+        )
+    }
+
     const renderTabContent = () => {
         switch (activeTab) {
             case 'pages':
@@ -262,6 +319,8 @@ const PageManagement = () => {
                 return <ThemeEditor />
             case 'widgets':
                 return renderWidgetManagement()
+            case 'versions':
+                return renderVersionManagement()
             default:
                 return null
         }
@@ -316,6 +375,14 @@ const PageManagement = () => {
                     {renderTabContent()}
                 </div>
             </div>
+
+            {/* Version Manager Modal */}
+            {showVersionManager && selectedPage && (
+                <VersionManager
+                    pageId={selectedPage.id}
+                    onClose={() => setShowVersionManager(false)}
+                />
+            )}
         </div>
     )
 }
