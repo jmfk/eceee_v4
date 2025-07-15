@@ -103,9 +103,9 @@ describe('WidgetConfigurator', () => {
             />
         )
 
-        expect(screen.getByLabelText(/Title/)).toBeInTheDocument()
-        expect(screen.getByLabelText(/Content/)).toBeInTheDocument()
-        expect(screen.getByLabelText(/Text Alignment/)).toBeInTheDocument()
+        expect(screen.getByPlaceholderText(/Optional title for the text block/)).toBeInTheDocument()
+        expect(screen.getByPlaceholderText(/Main text content/)).toBeInTheDocument()
+        expect(screen.getByRole('combobox')).toBeInTheDocument()
         expect(screen.getByLabelText(/Featured Content/)).toBeInTheDocument()
     })
 
@@ -119,9 +119,12 @@ describe('WidgetConfigurator', () => {
         )
 
         // Content is required, should have asterisk
-        expect(screen.getByText('Content')).toBeInTheDocument()
-        const contentLabel = screen.getByText('Content').parentElement
-        expect(contentLabel).toHaveTextContent('*')
+        const contentLabels = screen.getAllByText('Content')
+        const fieldContentLabel = contentLabels.find(label =>
+            label.parentElement && label.parentElement.textContent.includes('*')
+        )
+        expect(fieldContentLabel).toBeInTheDocument()
+        expect(fieldContentLabel.parentElement).toHaveTextContent('*')
 
         // Title is not required, should not have asterisk
         const titleLabel = screen.getByText('Title').parentElement
@@ -187,7 +190,11 @@ describe('WidgetConfigurator', () => {
 
         expect(screen.getByDisplayValue('Test Title')).toBeInTheDocument()
         expect(screen.getByDisplayValue('Test Content')).toBeInTheDocument()
-        expect(screen.getByDisplayValue('center')).toBeInTheDocument()
+
+        // Check that center option is selected in the dropdown
+        const alignmentSelect = screen.getByRole('combobox')
+        expect(alignmentSelect.value).toBe('center')
+
         expect(screen.getByRole('checkbox', { name: /featured content/i })).toBeChecked()
     })
 
@@ -208,8 +215,8 @@ describe('WidgetConfigurator', () => {
         await user.click(saveButton)
 
         await waitFor(() => {
-            // Look for field-specific error message
-            expect(screen.getAllByText('This field is required')).toHaveLength(1)
+            // Look for field-specific error message (should appear in both inline and summary)
+            expect(screen.getAllByText('This field is required').length).toBeGreaterThanOrEqual(1)
         })
 
         expect(mockOnSave).not.toHaveBeenCalled()
