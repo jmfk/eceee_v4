@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% load static %}
+{% load webpages_tags %}
+
+{% block title %}{{ meta_title }} - {{ block.super }}{% endblock %}
+
+{% block extra_head %}
+    <meta name="description" content="{{ meta_description }}">
+    {% if meta_keywords %}
+    <meta name="keywords" content="{{ meta_keywords }}">
+    {% endif %}
+    
+    {% if effective_theme %}
+        {% if effective_theme.css_variables %}
+            <style>
+                :root {
+                    {% for key, value in effective_theme.css_variables.items %}
+                    --{{ key }}: {{ value }};
+                    {% endfor %}
+                }
+            </style>
+        {% endif %}
+        
+        {% if effective_theme.custom_css %}
+            <style>{{ effective_theme.custom_css|safe }}</style>
+        {% endif %}
+    {% endif %}
+    
+    {% if effective_layout.css_classes %}
+        <style>{{ effective_layout.css_classes|safe }}</style>
+    {% endif %}
+{% endblock %}
+
+{% block breadcrumbs %}
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/">Home</a></li>
+            {% for crumb in breadcrumbs %}
+                {% if not forloop.last %}
+                    <li class="breadcrumb-item">
+                        <a href="{{ crumb.get_absolute_url }}">{{ crumb.title }}</a>
+                    </li>
+                {% else %}
+                    <li class="breadcrumb-item active" aria-current="page">{{ crumb.title }}</li>
+                {% endif %}
+            {% endfor %}
+        </ol>
+    </nav>
+{% endblock %}
+
+{% block content %}
+    <div class="page-content" data-page-id="{{ page.id }}">
+        <!-- Page Header -->
+        <header class="page-header mb-4">
+            <h1>{{ page.title }}</h1>
+            {% if page.description %}
+                <p class="lead">{{ page.description }}</p>
+            {% endif %}
+        </header>
+
+        <!-- Main Content Area with Layout Slots -->
+        {% if effective_layout %}
+            <div class="page-layout layout-{{ effective_layout.name|lower }}">
+                {% for slot in effective_layout.slot_configuration.slots %}
+                    <div class="layout-slot" data-slot="{{ slot.name }}">
+                        {% if slot.name in widgets_by_slot %}
+                            {% for widget_data in widgets_by_slot|lookup:slot.name %}
+                                {% include "webpages/widgets/widget_wrapper.html" with widget=widget_data.widget config=widget_data.widget.configuration inherited_from=widget_data.inherited_from is_override=widget_data.is_override %}
+                            {% endfor %}
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <!-- Default layout when no layout is specified -->
+            <div class="page-layout layout-default">
+                <div class="layout-slot" data-slot="main">
+                    {% if "main" in widgets_by_slot %}
+                        {% for widget_data in widgets_by_slot.main %}
+                            {% include "webpages/widgets/widget_wrapper.html" with widget=widget_data.widget config=widget_data.widget.configuration inherited_from=widget_data.inherited_from is_override=widget_data.is_override %}
+                        {% endfor %}
+                    {% else %}
+                        <p>No content available for this page.</p>
+                    {% endif %}
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- Child Pages Navigation -->
+        {% if children %}
+            <div class="child-pages mt-5">
+                <h3>Sub-pages</h3>
+                <div class="row">
+                    {% for child in children %}
+                        <div class="col-md-4 mb-3">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h5 class="card-title">
+                                        <a href="{{ child.get_absolute_url }}">{{ child.title }}</a>
+                                    </h5>
+                                    {% if child.description %}
+                                        <p class="card-text">{{ child.description|truncatewords:20 }}</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        {% endif %}
+    </div>
+{% endblock %}
+
+{% block extra_js %}
+    <script>
+        // Page-specific JavaScript can go here
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Page loaded: {{ page.title }}');
+            
+            // Add any interactive features for widgets
+            const widgets = document.querySelectorAll('[data-widget-id]');
+            widgets.forEach(widget => {
+                // Widget-specific initialization could go here
+            });
+        });
+    </script>
+{% endblock %} 

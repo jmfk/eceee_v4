@@ -23,6 +23,5 @@ eceee_v4/
 │   │   └── utils/         # Utility functions
 │   └── package.json       # Node.js dependencies
 ├── docker/                # Docker configurations
-├── scripts/               # Development scripts
 └── docker-compose.yml     # Service orchestration
 ```
