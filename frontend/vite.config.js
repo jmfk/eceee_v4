@@ -5,7 +5,7 @@ import path from 'path'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
-  
+
   // Path aliases for cleaner imports
   resolve: {
     alias: {
@@ -36,6 +36,11 @@ export default defineConfig({
         secure: false,
       },
       '/static': {
+        target: 'http://backend:8000',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/health': {
         target: 'http://backend:8000',
         changeOrigin: true,
         secure: false,
