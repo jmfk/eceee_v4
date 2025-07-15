@@ -52,6 +52,37 @@ ECEEE v4 is a modern content management system built with AI-assisted developmen
                     └─────────────────┘
 ```
 
+## ✨ Key Features
+
+### 🔄 Page Version Management
+- **Draft/Published Workflow**: Create drafts, review changes, and publish when ready
+- **Version History**: Complete audit trail of all page changes with user attribution
+- **Version Comparison**: Visual diff between any two versions showing field and widget changes
+- **One-Click Restoration**: Restore any previous version instantly
+- **Advanced Filtering**: Find versions by status, date ranges, users, and content
+- **Auto-Version Creation**: Automatic version snapshots on every page update
+
+### 🎨 Layout & Theme System
+- **Flexible Layouts**: Slot-based page layouts with inheritance support
+- **Dynamic Themes**: CSS variable-based themes with real-time preview
+- **Inheritance Engine**: Automatic propagation of layouts and themes down page hierarchy
+- **Conflict Detection**: Automatic detection and resolution of inheritance conflicts
+- **Multi-Device Preview**: Preview pages across desktop, tablet, and mobile
+
+### 🧩 Widget System
+- **Reusable Components**: JSON Schema-based widget definitions
+- **Drag & Drop**: Visual widget placement and arrangement
+- **Configuration UI**: Auto-generated forms based on widget schemas
+- **Widget Inheritance**: Inherit and override widgets from parent pages
+- **Widget Versioning**: Complete widget change tracking in version system
+
+### 🚀 Modern Development Experience
+- **Hot Reload**: Instant feedback during development
+- **Component Library**: Comprehensive UI component system
+- **Type Safety**: Full TypeScript support across frontend
+- **API Documentation**: Interactive API docs with OpenAPI/Swagger
+- **Database Migrations**: Zero-downtime schema evolution
+
 ## 🛠️ Technology Stack
 
 ### Backend
@@ -350,7 +381,20 @@ CSRF_COOKIE_SECURE=True
 - **ReDoc**: http://localhost:8000/api/redoc/
 - **OpenAPI Schema**: http://localhost:8000/api/schema/
 
-### Additional Resources
+### System Documentation
+
+#### Version Management
+- **API Reference**: [`backend/docs/api/version_management.md`](backend/docs/api/version_management.md) - Complete API documentation for version management endpoints
+- **User Guide**: [`frontend/docs/version_management_guide.md`](frontend/docs/version_management_guide.md) - Step-by-step user guide for the version management interface
+- **Examples**: Complete workflow examples and best practices
+
+#### Architecture & Development
+- **Project Structure**: Detailed breakdown of codebase organization
+- **Development Workflow**: Guidelines for AI-assisted development
+- **Database Schema**: Entity relationship diagrams and migration guides
+- **Component Library**: Frontend component documentation and examples
+
+### External Resources
 
 - [Django Documentation](https://docs.djangoproject.com/)
 - [React Documentation](https://react.dev/)

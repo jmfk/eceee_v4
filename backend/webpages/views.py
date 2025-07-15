@@ -19,6 +19,8 @@ from .serializers import (
     WebPageListSerializer,
     WebPageTreeSerializer,
     PageVersionSerializer,
+    PageVersionListSerializer,
+    PageVersionComparisonSerializer,
     PageLayoutSerializer,
     PageThemeSerializer,
     WidgetTypeSerializer,
@@ -163,9 +165,16 @@ class WebPageViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         serializer.save(last_modified_by=self.request.user)
-        # Create version after successful update
+        # Create draft version after successful update
         if self.request.data:
-            serializer.instance.create_version(self.request.user, "API update")
+            auto_publish = self.request.data.get("auto_publish", False)
+            description = self.request.data.get("version_description", "API update")
+            serializer.instance.create_version(
+                self.request.user,
+                description,
+                status="published" if auto_publish else "draft",
+                auto_publish=auto_publish,
+            )
 
     @action(detail=False, methods=["get"])
     def tree(self, request):
@@ -203,8 +212,10 @@ class WebPageViewSet(viewsets.ModelViewSet):
         page.last_modified_by = request.user
         page.save()
 
-        # Create version
-        page.create_version(request.user, "Published via API")
+        # Create published version
+        page.create_version(
+            request.user, "Published via API", status="published", auto_publish=True
+        )
 
         serializer = self.get_serializer(page)
         return Response(serializer.data)
@@ -488,19 +499,66 @@ class WebPageViewSet(viewsets.ModelViewSet):
             )
 
 
-class PageVersionViewSet(viewsets.ReadOnlyModelViewSet):
+class PageVersionViewSet(viewsets.ModelViewSet):
     """
-    ViewSet for page versions (read-only).
-    Versions are created automatically and can be restored.
+    ViewSet for page versions with full CRUD and workflow support.
+    Supports draft/published workflow, version comparison, and restoration.
     """
 
-    queryset = PageVersion.objects.select_related("page", "created_by").all()
+    queryset = PageVersion.objects.select_related(
+        "page", "created_by", "published_by"
+    ).all()
     serializer_class = PageVersionSerializer
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_class = PageVersionFilter
-    ordering_fields = ["version_number", "created_at"]
+    ordering_fields = ["version_number", "created_at", "published_at"]
     ordering = ["-version_number"]
+
+    def get_serializer_class(self):
+        """Use lighter serializer for list view"""
+        if self.action == "list":
+            return PageVersionListSerializer
+        return PageVersionSerializer
+
+    def perform_create(self, serializer):
+        """Set the created_by field automatically"""
+        serializer.save(created_by=self.request.user)
+
+    @action(detail=True, methods=["post"])
+    def publish(self, request, pk=None):
+        """Publish this version, making it the current live version"""
+        version = self.get_object()
+
+        try:
+            published_version = version.publish(request.user)
+            serializer = self.get_serializer(published_version)
+            return Response(
+                {
+                    "message": f"Published version {version.version_number}",
+                    "version": serializer.data,
+                }
+            )
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=["post"])
+    def create_draft(self, request, pk=None):
+        """Create a new draft version based on this published version"""
+        version = self.get_object()
+        description = request.data.get("description", "")
+
+        try:
+            draft = version.create_draft_from_published(request.user, description)
+            serializer = self.get_serializer(draft)
+            return Response(
+                {
+                    "message": f"Created draft version {draft.version_number}",
+                    "version": serializer.data,
+                }
+            )
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=True, methods=["post"])
     def restore(self, request, pk=None):
@@ -537,15 +595,13 @@ class PageVersionViewSet(viewsets.ReadOnlyModelViewSet):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
+        # Use the new comparison method
+        changes = version2.compare_with(version1)
+
         return Response(
-            {
-                "version1": PageVersionSerializer(version1).data,
-                "version2": PageVersionSerializer(version2).data,
-                "changes": {
-                    # TODO: Implement detailed diff logic
-                    "summary": "Comparison feature coming soon"
-                },
-            }
+            PageVersionComparisonSerializer(
+                {"version1": version1, "version2": version2, "changes": changes}
+            ).data
         )
 
 

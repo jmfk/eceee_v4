@@ -4,9 +4,10 @@ from django.urls import reverse
 from rest_framework.test import APITestCase, APIClient
 from rest_framework import status
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 import json
 
-from .models import WebPage, PageLayout, PageTheme, WidgetType, PageWidget
+from .models import WebPage, PageLayout, PageTheme, WidgetType, PageWidget, PageVersion
 
 
 class WidgetTypeModelTest(TestCase):
@@ -1092,3 +1093,5 @@ class SeededWidgetTypesTest(TestCase):
                 widget.template_name.startswith("webpages/widgets/"),
                 f"Widget '{widget.name}' template should be in correct directory",
             )
+
+

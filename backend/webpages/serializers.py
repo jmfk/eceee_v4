@@ -346,10 +346,11 @@ class WebPageListSerializer(serializers.ModelSerializer):
 
 
 class PageVersionSerializer(serializers.ModelSerializer):
-    """Serializer for page versions"""
+    """Serializer for page versions with enhanced workflow support"""
 
     page = WebPageTreeSerializer(read_only=True)
     created_by = UserSerializer(read_only=True)
+    published_by = UserSerializer(read_only=True)
 
     class Meta:
         model = PageVersion
@@ -358,12 +359,56 @@ class PageVersionSerializer(serializers.ModelSerializer):
             "page",
             "version_number",
             "page_data",
+            "status",
             "description",
+            "change_summary",
             "is_current",
+            "published_at",
+            "published_by",
             "created_at",
             "created_by",
         ]
-        read_only_fields = ["id", "version_number", "created_at", "created_by"]
+        read_only_fields = [
+            "id",
+            "version_number",
+            "is_current",
+            "published_at",
+            "published_by",
+            "created_at",
+            "created_by",
+        ]
+
+
+class PageVersionListSerializer(serializers.ModelSerializer):
+    """Lightweight serializer for version lists (without page_data)"""
+
+    created_by = UserSerializer(read_only=True)
+    published_by = UserSerializer(read_only=True)
+
+    class Meta:
+        model = PageVersion
+        fields = [
+            "id",
+            "version_number",
+            "status",
+            "description",
+            "is_current",
+            "published_at",
+            "published_by",
+            "created_at",
+            "created_by",
+        ]
+
+
+class PageVersionComparisonSerializer(serializers.Serializer):
+    """Serializer for version comparison results"""
+
+    version1 = PageVersionListSerializer(read_only=True)
+    version2 = PageVersionListSerializer(read_only=True)
+    changes = serializers.JSONField(read_only=True)
+
+    class Meta:
+        fields = ["version1", "version2", "changes"]
 
 
 class PageHierarchySerializer(serializers.ModelSerializer):

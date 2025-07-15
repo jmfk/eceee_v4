@@ -447,8 +447,14 @@ class WebPage(models.Model):
 class PageVersion(models.Model):
     """
     Version control system for pages. Stores complete page state snapshots.
-    Enables rollback, comparison, and change tracking.
+    Enables rollback, comparison, and change tracking with draft/published workflow.
     """
+
+    VERSION_STATUS_CHOICES = [
+        ("draft", "Draft"),
+        ("published", "Published"),
+        ("archived", "Archived"),
+    ]
 
     page = models.ForeignKey(WebPage, on_delete=models.CASCADE, related_name="versions")
     version_number = models.PositiveIntegerField()
@@ -458,12 +464,36 @@ class PageVersion(models.Model):
         help_text="Complete serialized page data including widgets"
     )
 
+    # Version workflow
+    status = models.CharField(
+        max_length=20,
+        choices=VERSION_STATUS_CHOICES,
+        default="draft",
+        help_text="Current status of this version",
+    )
+    is_current = models.BooleanField(
+        default=False, help_text="Whether this is the currently active version"
+    )
+    published_at = models.DateTimeField(
+        null=True, blank=True, help_text="When this version was published"
+    )
+    published_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="published_versions",
+        help_text="User who published this version",
+    )
+
     # Version metadata
     description = models.TextField(
         blank=True, help_text="Description of changes in this version"
     )
-    is_current = models.BooleanField(
-        default=False, help_text="Whether this is the currently active version"
+    change_summary = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Summary of specific changes made in this version",
     )
 
     # Timestamps and ownership
@@ -477,6 +507,59 @@ class PageVersion(models.Model):
     def __str__(self):
         return f"{self.page.title} v{self.version_number}"
 
+    def publish(self, user):
+        """Publish this version, making it the current live version"""
+        from django.utils import timezone
+
+        # Mark all other versions as not current
+        self.page.versions.update(is_current=False)
+
+        # Update this version
+        self.status = "published"
+        self.is_current = True
+        self.published_at = timezone.now()
+        self.published_by = user
+        self.save()
+
+        # Apply the stored page data to the page
+        self._apply_version_data()
+        self.page.last_modified_by = user
+        self.page.save()
+
+        return self
+
+    def _apply_version_data(self):
+        """Apply the stored page data to the actual page instance"""
+        page_data = self.page_data.copy()
+        widgets_data = page_data.pop("widgets", [])
+
+        # Apply page fields
+        for field, value in page_data.items():
+            if hasattr(self.page, field) and field not in [
+                "id",
+                "created_at",
+                "updated_at",
+            ]:
+                if field in ["effective_date", "expiry_date"] and value:
+                    from django.utils.dateparse import parse_datetime
+
+                    value = parse_datetime(value)
+                setattr(self.page, field, value)
+
+        # Clear existing widgets and recreate from version data
+        self.page.widgets.all().delete()
+        for widget_data in widgets_data:
+            PageWidget.objects.create(
+                page=self.page,
+                widget_type_id=widget_data["widget_type_id"],
+                slot_name=widget_data["slot_name"],
+                sort_order=widget_data["sort_order"],
+                configuration=widget_data["configuration"],
+                inherit_from_parent=widget_data["inherit_from_parent"],
+                override_parent=widget_data["override_parent"],
+                created_by=self.created_by,
+            )
+
     def restore(self, user):
         """Restore this version as the current version of the page"""
         # Create a new version from current state first
@@ -485,13 +568,78 @@ class PageVersion(models.Model):
         )
 
         # Apply the stored page data
-        page_data = self.page_data
-        for field, value in page_data.items():
-            if hasattr(self.page, field):
-                setattr(self.page, field, value)
-
+        self._apply_version_data()
         self.page.last_modified_by = user
         self.page.save()
+
+    def compare_with(self, other_version):
+        """Compare this version with another version"""
+        if not isinstance(other_version, PageVersion):
+            return None
+
+        changes = {
+            "fields_changed": [],
+            "widgets_added": [],
+            "widgets_removed": [],
+            "widgets_modified": [],
+        }
+
+        # Compare page fields
+        for field, value in self.page_data.items():
+            if field == "widgets":
+                continue
+            other_value = other_version.page_data.get(field)
+            if value != other_value:
+                changes["fields_changed"].append(
+                    {"field": field, "old_value": other_value, "new_value": value}
+                )
+
+        # Compare widgets
+        self_widgets = {
+            (w["slot_name"], w["sort_order"]): w
+            for w in self.page_data.get("widgets", [])
+        }
+        other_widgets = {
+            (w["slot_name"], w["sort_order"]): w
+            for w in other_version.page_data.get("widgets", [])
+        }
+
+        # Find added widgets
+        for key, widget in self_widgets.items():
+            if key not in other_widgets:
+                changes["widgets_added"].append(widget)
+            elif widget != other_widgets[key]:
+                changes["widgets_modified"].append(
+                    {"old": other_widgets[key], "new": widget}
+                )
+
+        # Find removed widgets
+        for key, widget in other_widgets.items():
+            if key not in self_widgets:
+                changes["widgets_removed"].append(widget)
+
+        return changes
+
+    def create_draft_from_published(self, user, description=""):
+        """Create a new draft version based on this published version"""
+        if self.status != "published":
+            raise ValueError("Can only create drafts from published versions")
+
+        # Get next version number
+        latest_version = self.page.versions.order_by("-version_number").first()
+        version_number = (latest_version.version_number + 1) if latest_version else 1
+
+        # Create new draft version
+        draft = PageVersion.objects.create(
+            page=self.page,
+            version_number=version_number,
+            page_data=self.page_data.copy(),
+            status="draft",
+            description=description or f"Draft based on version {self.version_number}",
+            created_by=user,
+        )
+
+        return draft
 
 
 class PageWidget(models.Model):
@@ -541,8 +689,10 @@ class PageWidget(models.Model):
 
 
 # Add methods to WebPage for version management
-def create_version(self, user, description=""):
+def create_version(self, user, description="", status="draft", auto_publish=False):
     """Create a new version snapshot of the current page state"""
+    from django.utils import timezone
+
     # Get the latest version number
     latest_version = self.versions.order_by("-version_number").first()
     version_number = (latest_version.version_number + 1) if latest_version else 1
@@ -564,6 +714,8 @@ def create_version(self, user, description=""):
         "meta_keywords": self.meta_keywords,
         "linked_object_type": self.linked_object_type,
         "linked_object_id": self.linked_object_id,
+        "parent_id": self.parent_id,
+        "sort_order": self.sort_order,
         # Include widgets
         "widgets": [
             {
@@ -578,21 +730,57 @@ def create_version(self, user, description=""):
         ],
     }
 
-    # Mark all previous versions as not current
-    self.versions.update(is_current=False)
+    # Prepare version fields
+    version_fields = {
+        "page": self,
+        "version_number": version_number,
+        "page_data": page_data,
+        "description": description,
+        "status": status,
+        "created_by": user,
+    }
+
+    # Handle auto-publish
+    if auto_publish or status == "published":
+        # Mark all previous versions as not current
+        self.versions.update(is_current=False)
+        version_fields.update(
+            {
+                "status": "published",
+                "is_current": True,
+                "published_at": timezone.now(),
+                "published_by": user,
+            }
+        )
 
     # Create new version
-    version = PageVersion.objects.create(
-        page=self,
-        version_number=version_number,
-        page_data=page_data,
-        description=description,
-        is_current=True,
-        created_by=user,
-    )
-
+    version = PageVersion.objects.create(**version_fields)
     return version
 
 
-# Add the method to the WebPage model
+def get_current_version(self):
+    """Get the current published version of this page"""
+    return self.versions.filter(is_current=True, status="published").first()
+
+
+def get_latest_draft(self):
+    """Get the latest draft version of this page"""
+    return self.versions.filter(status="draft").order_by("-version_number").first()
+
+
+def has_unpublished_changes(self):
+    """Check if there are draft versions newer than the current published version"""
+    current = self.get_current_version()
+    if not current:
+        return self.versions.filter(status="draft").exists()
+
+    return self.versions.filter(
+        status="draft", version_number__gt=current.version_number
+    ).exists()
+
+
+# Add the methods to the WebPage model
 WebPage.create_version = create_version
+WebPage.get_current_version = get_current_version
+WebPage.get_latest_draft = get_latest_draft
+WebPage.has_unpublished_changes = has_unpublished_changes
