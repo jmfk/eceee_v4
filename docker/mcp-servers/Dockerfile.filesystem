@@ -14,4 +14,4 @@ USER mcp
 EXPOSE 3001
 
 # Start filesystem MCP server
-CMD ["mcp-server-filesystem", "--port", "3001", "--root", "/workspace"]
+CMD ["npx", "@modelcontextprotocol/server-filesystem", "/workspace"]

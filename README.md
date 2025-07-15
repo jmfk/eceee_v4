@@ -102,7 +102,7 @@ ECEEE v4 is a modern content management system built with AI-assisted developmen
 
 - **Host**: localhost
 - **Port**: 5432
-- **Database**: ai_dev_app
+- **Database**: eceee_v4
 - **Username**: postgres
 - **Password**: postgres
 
@@ -204,13 +204,13 @@ docker-compose exec frontend npm run build
 
 ```bash
 # Access PostgreSQL shell
-docker-compose exec db psql -U postgres -d ai_dev_app
+docker-compose exec db psql -U postgres -d eceee_v4
 
 # Backup database
-docker-compose exec db pg_dump -U postgres ai_dev_app > backup.sql
+docker-compose exec db pg_dump -U postgres eceee_v4 > backup.sql
 
 # Restore database
-docker-compose exec -T db psql -U postgres ai_dev_app < backup.sql
+docker-compose exec -T db psql -U postgres eceee_v4 < backup.sql
 ```
 
 ## 🧪 Testing

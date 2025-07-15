@@ -1129,7 +1129,7 @@ This comprehensive troubleshooting guide addresses common issues that may arise 
 
 When Docker containers fail to start or exhibit connectivity issues, begin by checking Docker Desktop status and resource allocation. Verify that Docker has sufficient memory and CPU allocation for running multiple containers simultaneously. Check container logs using `docker-compose logs [service-name]` to identify specific error messages and failure points.
 
-For database connection issues, verify that the PostgreSQL container is running and healthy using `docker-compose ps` and check database credentials in environment variables. Ensure the database container has completed initialization before other services attempt to connect. Test database connectivity using `docker-compose exec db psql -U postgres -d ai_dev_app`.
+For database connection issues, verify that the PostgreSQL container is running and healthy using `docker-compose ps` and check database credentials in environment variables. Ensure the database container has completed initialization before other services attempt to connect. Test database connectivity using `docker-compose exec db psql -U postgres -d eceee_v4`.
 
 Network connectivity problems between containers often result from incorrect service names or network configuration. Verify that services reference each other using Docker Compose service names rather than localhost or IP addresses. Check that all services are connected to the same Docker network and that required ports are properly exposed.
 
