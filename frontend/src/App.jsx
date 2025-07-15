@@ -4,6 +4,7 @@ import { Toaster } from 'react-hot-toast'
 import Navbar from '@components/Navbar'
 import HomePage from '@pages/HomePage'
 import AboutPage from '@pages/AboutPage'
+import PageManagement from '@pages/PageManagement'
 import NotFoundPage from '@pages/NotFoundPage'
 
 // Create a client for React Query
@@ -27,6 +28,7 @@ function App() {
             <Routes>
               <Route path="/" element={<HomePage />} />
               <Route path="/about" element={<AboutPage />} />
+              <Route path="/admin/pages" element={<PageManagement />} />
               <Route path="*" element={<NotFoundPage />} />
             </Routes>
           </main>

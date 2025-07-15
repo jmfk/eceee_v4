@@ -241,6 +241,208 @@ class WebPage(models.Model):
         ):
             raise ValidationError("Effective date must be before expiry date.")
 
+    def get_inheritance_chain(self):
+        """Get the complete inheritance chain from root to this page"""
+        chain = []
+        current = self
+        while current:
+            chain.insert(0, current)
+            current = current.parent
+        return chain
+
+    def get_layout_inheritance_info(self):
+        """Get detailed information about layout inheritance"""
+        inheritance_info = {
+            "effective_layout": None,
+            "inherited_from": None,
+            "inheritance_chain": [],
+            "override_options": [],
+        }
+
+        # Find where the effective layout comes from
+        current = self
+        while current:
+            inheritance_info["inheritance_chain"].append(
+                {
+                    "page": current,
+                    "layout": current.layout,
+                    "is_override": current.layout is not None,
+                }
+            )
+
+            if current.layout:
+                inheritance_info["effective_layout"] = current.layout
+                inheritance_info["inherited_from"] = (
+                    current if current != self else None
+                )
+                break
+
+            current = current.parent
+
+        # Get available layouts for override
+        inheritance_info["override_options"] = PageLayout.objects.filter(is_active=True)
+
+        return inheritance_info
+
+    def get_theme_inheritance_info(self):
+        """Get detailed information about theme inheritance"""
+        inheritance_info = {
+            "effective_theme": None,
+            "inherited_from": None,
+            "inheritance_chain": [],
+            "override_options": [],
+        }
+
+        # Find where the effective theme comes from
+        current = self
+        while current:
+            inheritance_info["inheritance_chain"].append(
+                {
+                    "page": current,
+                    "theme": current.theme,
+                    "is_override": current.theme is not None,
+                }
+            )
+
+            if current.theme:
+                inheritance_info["effective_theme"] = current.theme
+                inheritance_info["inherited_from"] = (
+                    current if current != self else None
+                )
+                break
+
+            current = current.parent
+
+        # Get available themes for override
+        inheritance_info["override_options"] = PageTheme.objects.filter(is_active=True)
+
+        return inheritance_info
+
+    def get_widgets_inheritance_info(self):
+        """Get detailed information about widget inheritance for all slots"""
+        inheritance_info = {}
+
+        # Get all slots from effective layout
+        effective_layout = self.get_effective_layout()
+        if not effective_layout or not effective_layout.slot_configuration:
+            return inheritance_info
+
+        slots = effective_layout.slot_configuration.get("slots", [])
+
+        for slot in slots:
+            slot_name = slot["name"]
+            inheritance_info[slot_name] = {
+                "widgets": [],
+                "inheritance_chain": [],
+                "can_override": True,
+            }
+
+            # Collect widgets from inheritance chain
+            current = self
+            while current:
+                page_widgets = current.widgets.filter(slot_name=slot_name).order_by(
+                    "sort_order"
+                )
+
+                for widget in page_widgets:
+                    widget_info = {
+                        "widget": widget,
+                        "page": current,
+                        "inherited_from": current if current != self else None,
+                        "is_override": widget.override_parent,
+                        "allows_inheritance": widget.inherit_from_parent,
+                    }
+
+                    # If this is the original page or widget allows inheritance
+                    if current == self or widget.inherit_from_parent:
+                        # If this widget overrides, replace all previous widgets
+                        if widget.override_parent and current == self:
+                            inheritance_info[slot_name]["widgets"] = [widget_info]
+                        else:
+                            inheritance_info[slot_name]["widgets"].append(widget_info)
+
+                inheritance_info[slot_name]["inheritance_chain"].append(
+                    {
+                        "page": current,
+                        "widgets_count": page_widgets.count(),
+                        "has_overrides": page_widgets.filter(
+                            override_parent=True
+                        ).exists(),
+                    }
+                )
+
+                current = current.parent
+
+        return inheritance_info
+
+    def can_inherit_from(self, ancestor_page):
+        """Check if this page can inherit from the specified ancestor"""
+        if not ancestor_page:
+            return False
+
+        # Check if ancestor_page is actually an ancestor
+        current = self.parent
+        while current:
+            if current == ancestor_page:
+                return True
+            current = current.parent
+
+        return False
+
+    def get_inheritance_conflicts(self):
+        """Identify any inheritance conflicts or issues"""
+        conflicts = []
+
+        # Check for circular references (should be prevented by clean())
+        try:
+            self.get_inheritance_chain()
+        except Exception as e:
+            conflicts.append(
+                {
+                    "type": "circular_reference",
+                    "message": "Circular reference detected in page hierarchy",
+                }
+            )
+
+        # Check for widget inheritance conflicts
+        widgets_info = self.get_widgets_inheritance_info()
+        for slot_name, slot_info in widgets_info.items():
+            overrides = [w for w in slot_info["widgets"] if w["is_override"]]
+            if len(overrides) > 1:
+                conflicts.append(
+                    {
+                        "type": "multiple_overrides",
+                        "slot": slot_name,
+                        "message": f"Multiple widget overrides detected in slot {slot_name}",
+                    }
+                )
+
+        # Check for broken layout inheritance
+        layout_info = self.get_layout_inheritance_info()
+        if not layout_info["effective_layout"]:
+            conflicts.append(
+                {
+                    "type": "missing_layout",
+                    "message": "No layout found in inheritance chain",
+                }
+            )
+
+        return conflicts
+
+    def apply_inheritance_override(self, override_type, override_value=None):
+        """Apply an inheritance override for layout, theme, or widgets"""
+        if override_type == "layout":
+            self.layout = override_value
+        elif override_type == "theme":
+            self.theme = override_value
+        elif override_type == "clear_layout":
+            self.layout = None
+        elif override_type == "clear_theme":
+            self.theme = None
+
+        self.save()
+        return True
+
 
 class PageVersion(models.Model):
     """
