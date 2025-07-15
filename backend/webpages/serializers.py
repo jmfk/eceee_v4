@@ -139,6 +139,7 @@ class PageWidgetSerializer(serializers.ModelSerializer):
         model = PageWidget
         fields = [
             "id",
+            "page",
             "widget_type",
             "widget_type_id",
             "slot_name",

@@ -9,6 +9,58 @@ import json
 from .models import WebPage, PageLayout, PageTheme, WidgetType, PageWidget
 
 
+class WidgetTypeModelTest(TestCase):
+    """Test WidgetType model functionality"""
+
+    def setUp(self):
+        self.user = User.objects.create_superuser(
+            username="testuser", email="test@example.com", password="testpass123"
+        )
+
+    def test_widget_type_creation(self):
+        """Test creating a widget type with valid JSON schema"""
+        schema = {
+            "type": "object",
+            "properties": {"title": {"type": "string"}, "content": {"type": "string"}},
+            "required": ["content"],
+        }
+
+        widget_type = WidgetType.objects.create(
+            name="Test Widget",
+            description="A test widget",
+            json_schema=schema,
+            template_name="test_widget.html",
+            created_by=self.user,
+        )
+
+        self.assertEqual(widget_type.name, "Test Widget")
+        self.assertEqual(widget_type.json_schema, schema)
+        self.assertTrue(widget_type.is_active)
+        self.assertEqual(str(widget_type), "Test Widget")
+
+    def test_widget_type_ordering(self):
+        """Test widget types are ordered by name"""
+        widget_b = WidgetType.objects.create(
+            name="B Widget",
+            description="Widget B",
+            json_schema={"type": "object"},
+            template_name="b.html",
+            created_by=self.user,
+        )
+
+        widget_a = WidgetType.objects.create(
+            name="A Widget",
+            description="Widget A",
+            json_schema={"type": "object"},
+            template_name="a.html",
+            created_by=self.user,
+        )
+
+        widgets = list(WidgetType.objects.all())
+        self.assertEqual(widgets[0], widget_a)
+        self.assertEqual(widgets[1], widget_b)
+
+
 class PageLayoutModelTest(TestCase):
     """Test cases for PageLayout model"""
 
@@ -82,6 +134,113 @@ class PageThemeModelTest(TestCase):
         self.assertEqual(theme.css_variables["primary"], "#3b82f6")
         self.assertTrue(theme.is_active)
         self.assertEqual(str(theme), "Blue Theme")
+
+
+class PageWidgetModelTest(TestCase):
+    """Test PageWidget model functionality"""
+
+    def setUp(self):
+        self.user = User.objects.create_superuser(
+            username="testuser", email="test@example.com", password="testpass123"
+        )
+
+        self.layout = PageLayout.objects.create(
+            name="Test Layout",
+            description="A test layout",
+            slot_configuration={
+                "slots": [
+                    {"name": "header", "display_name": "Header"},
+                    {"name": "content", "display_name": "Content"},
+                ]
+            },
+            created_by=self.user,
+        )
+
+        self.page = WebPage.objects.create(
+            title="Test Page",
+            slug="test-page",
+            layout=self.layout,
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        self.widget_type = WidgetType.objects.create(
+            name="Text Block",
+            description="A text widget",
+            json_schema={
+                "type": "object",
+                "properties": {"content": {"type": "string"}},
+            },
+            template_name="text_block.html",
+            created_by=self.user,
+        )
+
+    def test_page_widget_creation(self):
+        """Test creating a page widget"""
+        widget = PageWidget.objects.create(
+            page=self.page,
+            widget_type=self.widget_type,
+            slot_name="header",
+            sort_order=0,
+            configuration={"content": "Hello World"},
+            created_by=self.user,
+        )
+
+        self.assertEqual(widget.page, self.page)
+        self.assertEqual(widget.widget_type, self.widget_type)
+        self.assertEqual(widget.slot_name, "header")
+        self.assertEqual(widget.configuration["content"], "Hello World")
+        self.assertTrue(widget.inherit_from_parent)
+        self.assertFalse(widget.override_parent)
+
+    def test_page_widget_ordering(self):
+        """Test page widgets are ordered by slot and sort_order"""
+        widget1 = PageWidget.objects.create(
+            page=self.page,
+            widget_type=self.widget_type,
+            slot_name="content",
+            sort_order=1,
+            configuration={"content": "Second"},
+            created_by=self.user,
+        )
+
+        widget2 = PageWidget.objects.create(
+            page=self.page,
+            widget_type=self.widget_type,
+            slot_name="header",
+            sort_order=0,
+            configuration={"content": "First"},
+            created_by=self.user,
+        )
+
+        widget3 = PageWidget.objects.create(
+            page=self.page,
+            widget_type=self.widget_type,
+            slot_name="content",
+            sort_order=0,
+            configuration={"content": "Third"},
+            created_by=self.user,
+        )
+
+        widgets = list(PageWidget.objects.all())
+        # Should be ordered by slot_name, then sort_order
+        self.assertEqual(widgets[0], widget3)  # content, 0
+        self.assertEqual(widgets[1], widget1)  # content, 1
+        self.assertEqual(widgets[2], widget2)  # header, 0
+
+    def test_page_widget_string_representation(self):
+        """Test PageWidget string representation"""
+        widget = PageWidget.objects.create(
+            page=self.page,
+            widget_type=self.widget_type,
+            slot_name="header",
+            sort_order=0,
+            configuration={"content": "Test"},
+            created_by=self.user,
+        )
+
+        expected = f"{self.page.title} - {self.widget_type.name} in header"
+        self.assertEqual(str(widget), expected)
 
 
 class WebPageInheritanceTest(TestCase):
@@ -221,6 +380,100 @@ class WebPageInheritanceTest(TestCase):
             self.root_page.full_clean()
 
 
+class WidgetTypeAPITest(APITestCase):
+    """Test WidgetType API endpoints"""
+
+    def setUp(self):
+        self.user = User.objects.create_superuser(
+            username="testuser", email="test@example.com", password="testpass123"
+        )
+        self.client.force_authenticate(user=self.user)
+
+        self.widget_type_data = {
+            "name": "API Test Widget",
+            "description": "Test widget via API",
+            "json_schema": {
+                "type": "object",
+                "properties": {"title": {"type": "string"}},
+            },
+            "template_name": "api_test.html",
+            "is_active": True,
+        }
+
+    def test_create_widget_type(self):
+        """Test creating a widget type via API"""
+        url = reverse("webpages:widgettype-list")
+        response = self.client.post(url, self.widget_type_data, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(WidgetType.objects.count(), 1)
+
+        widget_type = WidgetType.objects.first()
+        self.assertEqual(widget_type.name, "API Test Widget")
+        self.assertEqual(widget_type.created_by, self.user)
+
+    def test_list_widget_types(self):
+        """Test listing widget types"""
+        # Clear any existing widget types first
+        WidgetType.objects.all().delete()
+
+        WidgetType.objects.create(
+            name="Widget 1",
+            description="First widget",
+            json_schema={"type": "object"},
+            template_name="widget1.html",
+            created_by=self.user,
+        )
+
+        WidgetType.objects.create(
+            name="Widget 2",
+            description="Second widget",
+            json_schema={"type": "object"},
+            template_name="widget2.html",
+            is_active=False,
+            created_by=self.user,
+        )
+
+        url = reverse("webpages:widgettype-list")
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        # Check that we get paginated results with our 2 widgets
+        self.assertEqual(response.data["count"], 2)
+        self.assertEqual(len(response.data["results"]), 2)
+
+    def test_active_widget_types_filter(self):
+        """Test filtering active widget types"""
+        # Clear any existing widget types first
+        WidgetType.objects.all().delete()
+
+        WidgetType.objects.create(
+            name="Active Widget",
+            description="Active widget",
+            json_schema={"type": "object"},
+            template_name="active.html",
+            is_active=True,
+            created_by=self.user,
+        )
+
+        WidgetType.objects.create(
+            name="Inactive Widget",
+            description="Inactive widget",
+            json_schema={"type": "object"},
+            template_name="inactive.html",
+            is_active=False,
+            created_by=self.user,
+        )
+
+        url = reverse("webpages:widgettype-active")
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        # This endpoint should return a list directly (not paginated)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]["name"], "Active Widget")
+
+
 class PageLayoutAPITest(APITestCase):
     """Test cases for PageLayout API endpoints"""
 
@@ -261,9 +514,6 @@ class PageLayoutAPITest(APITestCase):
 
     def test_list_layouts(self):
         """Test listing layouts via API"""
-        # Get initial count
-        initial_count = PageLayout.objects.count()
-
         # Create a layout
         layout = PageLayout.objects.create(
             name="Test Layout", slot_configuration={"slots": []}, created_by=self.user
@@ -349,9 +599,6 @@ class PageThemeAPITest(APITestCase):
 
     def test_list_themes(self):
         """Test listing themes via API"""
-        # Get initial count
-        initial_count = PageTheme.objects.count()
-
         # Create a theme
         theme = PageTheme.objects.create(
             name="Test Theme",
@@ -382,6 +629,112 @@ class PageThemeAPITest(APITestCase):
         response = self.client.post(url, invalid_data, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class PageWidgetAPITest(APITestCase):
+    """Test PageWidget API endpoints"""
+
+    def setUp(self):
+        self.user = User.objects.create_superuser(
+            username="testuser", email="test@example.com", password="testpass123"
+        )
+        self.client.force_authenticate(user=self.user)
+
+        self.layout = PageLayout.objects.create(
+            name="Test Layout",
+            description="A test layout",
+            slot_configuration={
+                "slots": [
+                    {"name": "header", "display_name": "Header"},
+                    {"name": "content", "display_name": "Content"},
+                ]
+            },
+            created_by=self.user,
+        )
+
+        self.page = WebPage.objects.create(
+            title="Test Page",
+            slug="test-page",
+            layout=self.layout,
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        self.widget_type = WidgetType.objects.create(
+            name="Text Block",
+            description="A text widget",
+            json_schema={
+                "type": "object",
+                "properties": {"content": {"type": "string"}},
+            },
+            template_name="text_block.html",
+            created_by=self.user,
+        )
+
+    def test_create_page_widget(self):
+        """Test creating a page widget via API"""
+        url = reverse("webpages:pagewidget-list")
+        data = {
+            "page": self.page.id,
+            "widget_type_id": self.widget_type.id,
+            "slot_name": "header",
+            "sort_order": 0,
+            "configuration": {"content": "Hello World"},
+        }
+
+        response = self.client.post(url, data, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(PageWidget.objects.count(), 1)
+
+        widget = PageWidget.objects.first()
+        self.assertEqual(widget.page, self.page)
+        self.assertEqual(widget.configuration["content"], "Hello World")
+
+    def test_get_widgets_by_page(self):
+        """Test getting widgets for a specific page"""
+        PageWidget.objects.create(
+            page=self.page,
+            widget_type=self.widget_type,
+            slot_name="header",
+            sort_order=0,
+            configuration={"content": "Header Content"},
+            created_by=self.user,
+        )
+
+        PageWidget.objects.create(
+            page=self.page,
+            widget_type=self.widget_type,
+            slot_name="content",
+            sort_order=0,
+            configuration={"content": "Main Content"},
+            created_by=self.user,
+        )
+
+        url = reverse("webpages:pagewidget-by-page")
+        response = self.client.get(url, {"page_id": self.page.id})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["widgets"]), 2)
+
+    def test_reorder_widget(self):
+        """Test reordering widgets via API"""
+        widget = PageWidget.objects.create(
+            page=self.page,
+            widget_type=self.widget_type,
+            slot_name="header",
+            sort_order=0,
+            configuration={"content": "Test Content"},
+            created_by=self.user,
+        )
+
+        url = reverse("webpages:pagewidget-reorder", kwargs={"pk": widget.id})
+        response = self.client.post(url, {"sort_order": 5}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        widget.refresh_from_db()
+        self.assertEqual(widget.sort_order, 5)
 
 
 class WebPageAPITest(APITestCase):
@@ -621,3 +974,121 @@ class WidgetInheritanceTest(TestCase):
             w for w in main_info["widgets"] if w["widget"].id == override_widget.id
         )
         self.assertTrue(override_widget_info["is_override"])
+
+    def test_widget_inheritance_flag(self):
+        """Test widget inherit_from_parent flag"""
+        # Create inheritable widget on parent
+        parent_widget = PageWidget.objects.create(
+            page=self.parent_page,
+            widget_type=self.widget_type,
+            slot_name="sidebar",
+            sort_order=0,
+            configuration={"content": "Parent Content"},
+            inherit_from_parent=True,
+            created_by=self.user,
+        )
+
+        # Create non-inheritable widget on parent
+        non_inherit_widget = PageWidget.objects.create(
+            page=self.parent_page,
+            widget_type=self.widget_type,
+            slot_name="sidebar",
+            sort_order=1,
+            configuration={"content": "Non-inherit Content"},
+            inherit_from_parent=False,
+            created_by=self.user,
+        )
+
+        self.assertTrue(parent_widget.inherit_from_parent)
+        self.assertFalse(non_inherit_widget.inherit_from_parent)
+
+    def test_widget_override_flag(self):
+        """Test widget override_parent flag"""
+        # Create widget that overrides parent
+        override_widget = PageWidget.objects.create(
+            page=self.child_page,
+            widget_type=self.widget_type,
+            slot_name="sidebar",
+            sort_order=0,
+            configuration={"content": "Override Content"},
+            override_parent=True,
+            created_by=self.user,
+        )
+
+        self.assertTrue(override_widget.override_parent)
+
+
+class SeededWidgetTypesTest(TestCase):
+    """Test the seeded widget types from management command"""
+
+    def setUp(self):
+        from django.core.management import call_command
+
+        call_command("seed_widget_types")
+
+    def test_seeded_widget_types_exist(self):
+        """Test that basic widget types are seeded correctly"""
+        expected_widgets = ["Text Block", "Image", "Button", "Spacer", "HTML Block"]
+
+        for widget_name in expected_widgets:
+            self.assertTrue(
+                WidgetType.objects.filter(name=widget_name).exists(),
+                f"Widget type '{widget_name}' should exist",
+            )
+
+    def test_text_block_schema(self):
+        """Test Text Block widget schema is correct"""
+        text_widget = WidgetType.objects.get(name="Text Block")
+        schema = text_widget.json_schema
+
+        self.assertEqual(schema["type"], "object")
+        self.assertIn("content", schema["properties"])
+        self.assertIn("content", schema["required"])
+        self.assertEqual(schema["properties"]["content"]["type"], "string")
+
+    def test_image_widget_schema(self):
+        """Test Image widget schema is correct"""
+        image_widget = WidgetType.objects.get(name="Image")
+        schema = image_widget.json_schema
+
+        required_fields = ["image_url", "alt_text"]
+        for field in required_fields:
+            self.assertIn(field, schema["required"])
+            self.assertIn(field, schema["properties"])
+
+    def test_button_widget_schema(self):
+        """Test Button widget schema is correct"""
+        button_widget = WidgetType.objects.get(name="Button")
+        schema = button_widget.json_schema
+
+        required_fields = ["text", "url"]
+        for field in required_fields:
+            self.assertIn(field, schema["required"])
+            self.assertIn(field, schema["properties"])
+
+        # Test enum fields
+        self.assertIn("style", schema["properties"])
+        self.assertEqual(
+            schema["properties"]["style"]["enum"], ["primary", "secondary", "outline"]
+        )
+
+    def test_all_seeded_widgets_are_active(self):
+        """Test all seeded widgets are active by default"""
+        seeded_widgets = WidgetType.objects.all()
+        for widget in seeded_widgets:
+            self.assertTrue(
+                widget.is_active, f"Widget '{widget.name}' should be active"
+            )
+
+    def test_seeded_widgets_have_templates(self):
+        """Test all seeded widgets have template names assigned"""
+        seeded_widgets = WidgetType.objects.all()
+        for widget in seeded_widgets:
+            self.assertTrue(
+                widget.template_name,
+                f"Widget '{widget.name}' should have a template name",
+            )
+            self.assertTrue(
+                widget.template_name.startswith("webpages/widgets/"),
+                f"Widget '{widget.name}' template should be in correct directory",
+            )
