@@ -147,6 +147,12 @@ class PageWidgetSerializer(serializers.ModelSerializer):
             "configuration",
             "inherit_from_parent",
             "override_parent",
+            # Phase 6: Enhanced inheritance and ordering fields
+            "inheritance_behavior",
+            "inheritance_conditions",
+            "priority",
+            "is_visible",
+            "max_inheritance_depth",
             "created_at",
             "updated_at",
             "created_by",
@@ -160,8 +166,27 @@ class PageWidgetSerializer(serializers.ModelSerializer):
                 "Widget configuration must be a JSON object"
             )
 
-        # TODO: Implement JSON schema validation against widget_type.json_schema
-        # This would require jsonschema library
+        # Phase 6: Implement JSON schema validation against widget_type.json_schema
+        widget_type_id = self.initial_data.get("widget_type_id")
+        if widget_type_id:
+            try:
+                widget_type = WidgetType.objects.get(id=widget_type_id)
+                is_valid, errors = widget_type.validate_configuration(value)
+                if not is_valid:
+                    raise serializers.ValidationError(
+                        f"Configuration validation failed: {', '.join(errors)}"
+                    )
+            except WidgetType.DoesNotExist:
+                pass  # Will be caught by widget_type_id validation
+
+        return value
+
+    def validate_inheritance_behavior(self, value):
+        """Validate inheritance behavior combinations"""
+        if value not in dict(PageWidget.INHERITANCE_CHOICES):
+            raise serializers.ValidationError(
+                f"Invalid inheritance behavior. Must be one of: {[choice[0] for choice in PageWidget.INHERITANCE_CHOICES]}"
+            )
         return value
 
 
