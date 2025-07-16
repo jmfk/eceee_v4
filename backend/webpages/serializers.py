@@ -342,6 +342,8 @@ class WebPageListSerializer(serializers.ModelSerializer):
     last_modified_by = UserSerializer(read_only=True)
     is_published = serializers.SerializerMethodField()
     children_count = serializers.SerializerMethodField()
+    layout = serializers.SerializerMethodField()
+    theme = serializers.SerializerMethodField()
 
     class Meta:
         model = WebPage
@@ -361,6 +363,8 @@ class WebPageListSerializer(serializers.ModelSerializer):
             "last_modified_by",
             "is_published",
             "children_count",
+            "layout",
+            "theme",
         ]
 
     def get_is_published(self, obj):
@@ -368,6 +372,14 @@ class WebPageListSerializer(serializers.ModelSerializer):
 
     def get_children_count(self, obj):
         return obj.children.count()
+
+    def get_layout(self, obj):
+        layout = obj.get_effective_layout()
+        return PageLayoutSerializer(layout).data if layout else None
+
+    def get_theme(self, obj):
+        theme = obj.get_effective_theme()
+        return PageThemeSerializer(theme).data if theme else None
 
 
 class PageVersionSerializer(serializers.ModelSerializer):

@@ -72,7 +72,15 @@ const renderWithQueryClient = (component, queryClient = new QueryClient({
 describe('PageManagement', () => {
     beforeEach(() => {
         vi.clearAllMocks()
-        mockedAxios.get.mockResolvedValue({ data: mockPages })
+        // Mock the paginated API response structure
+        mockedAxios.get.mockResolvedValue({
+            data: {
+                count: mockPages.length,
+                next: null,
+                previous: null,
+                results: mockPages
+            }
+        })
     })
 
     it('renders page management header', () => {

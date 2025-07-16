@@ -32,7 +32,7 @@ const PageManagement = () => {
     const [publishingView, setPublishingView] = useState('dashboard') // 'dashboard', 'timeline', 'bulk'
 
     // Fetch pages
-    const { data: pages, isLoading: pagesLoading } = useQuery({
+    const { data: pagesResponse, isLoading: pagesLoading } = useQuery({
         queryKey: ['pages'],
         queryFn: async () => {
             const response = await axios.get('/api/v1/webpages/pages/')
@@ -40,11 +40,14 @@ const PageManagement = () => {
         }
     })
 
+    // Extract pages array from paginated response
+    const pages = pagesResponse?.results || []
+
     // Filter pages based on search
-    const filteredPages = pages?.filter(page =>
+    const filteredPages = pages.filter(page =>
         page.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         page.slug.toLowerCase().includes(searchTerm.toLowerCase())
-    ) || []
+    )
 
     const tabs = [
         {
