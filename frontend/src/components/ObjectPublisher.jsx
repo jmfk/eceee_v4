@@ -1,481 +1,197 @@
 /**
  * Object Publisher Component for Phase 7: Object Publishing System
  * 
- * Provides interface for selecting and linking content objects to pages,
- * managing object publishing, and displaying object content.
+ * Refactored to use custom hooks and sub-components for better maintainability.
+ * Now focuses only on orchestrating the publishing workflow.
  */
 
-import React, { useState, useEffect } from 'react';
-import {
-    Search,
-    Link,
-    Unlink,
-    RefreshCw,
-    Eye,
-    ExternalLink,
-    Filter,
-    Calendar,
-    FileText,
-    Users,
-    Newspaper,
-    CheckCircle,
-    AlertCircle,
-    X
-} from 'lucide-react';
+import React, { useState } from 'react';
+import { X } from 'lucide-react';
+
+// Custom hooks
+import useObjectPublisher from '../hooks/useObjectPublisher';
+import useObjectSearch from '../hooks/useObjectSearch';
+
+// Sub-components
+import { ObjectSelectionPanel, LinkedObjectStatus } from './object-publisher';
 
 const ObjectPublisher = ({ pageId, onObjectLinked, onObjectUnlinked }) => {
-    const [selectedObjectType, setSelectedObjectType] = useState('');
-    const [searchQuery, setSearchQuery] = useState('');
-    const [objects, setObjects] = useState([]);
-    const [filteredObjects, setFilteredObjects] = useState([]);
-    const [loading, setLoading] = useState(false);
-    const [linking, setLinking] = useState(false);
-    const [selectedObject, setSelectedObject] = useState(null);
-    const [currentPage, setCurrentPage] = useState(null);
-    const [showObjectContent, setShowObjectContent] = useState(false);
-    const [objectContent, setObjectContent] = useState(null);
+    const [message, setMessage] = useState({ type: '', text: '' });
 
-    const objectTypes = [
-        { value: '', label: 'All Types', icon: Filter },
-        { value: 'news', label: 'News Article', icon: Newspaper },
-        { value: 'event', label: 'Event', icon: Calendar },
-        { value: 'libraryitem', label: 'Library Item', icon: FileText },
-        { value: 'member', label: 'Member Profile', icon: Users }
-    ];
+    // Use custom hooks for state management
+    const {
+        selectedObjectType,
+        setSelectedObjectType,
+        objects,
+        loading,
+        linking,
+        currentPage,
+        showObjectContent,
+        setShowObjectContent,
+        objectContent,
+        setObjectContent,
+        linkObject,
+        unlinkObject,
+        syncWithObject,
+        loadObjectContent,
+    } = useObjectPublisher(pageId);
 
-    // Load current page data
-    useEffect(() => {
-        if (pageId) {
-            loadPageData();
-        }
-    }, [pageId]);
+    const {
+        searchQuery,
+        setSearchQuery,
+        filteredObjects,
+        searchStats,
+    } = useObjectSearch(objects, selectedObjectType);
 
-    // Load objects when type changes
-    useEffect(() => {
-        if (selectedObjectType) {
-            loadObjects();
-        } else {
-            setObjects([]);
-            setFilteredObjects([]);
-        }
-    }, [selectedObjectType]);
+    // Helper function to show messages
+    const showMessage = (type, text) => {
+        setMessage({ type, text });
+        setTimeout(() => setMessage({ type: '', text: '' }), 5000);
+    };
 
-    // Filter objects based on search query
-    useEffect(() => {
-        if (!searchQuery.trim()) {
-            setFilteredObjects(objects);
-        } else {
-            const filtered = objects.filter(obj =>
-                obj.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                (obj.description && obj.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
-                (obj.author && obj.author.toLowerCase().includes(searchQuery.toLowerCase())) ||
-                (obj.organizer_name && obj.organizer_name.toLowerCase().includes(searchQuery.toLowerCase()))
-            );
-            setFilteredObjects(filtered);
-        }
-    }, [searchQuery, objects]);
-
-    const loadPageData = async () => {
-        try {
-            const response = await fetch(`/api/webpages/api/pages/${pageId}/`);
-            if (response.ok) {
-                const pageData = await response.json();
-                setCurrentPage(pageData);
-
-                // If page is linked to an object, load the object content
-                if (pageData.linked_object_type && pageData.linked_object_id) {
-                    loadObjectContent();
-                }
+    // Handle object selection and linking
+    const handleObjectSelect = async (objectType, objectId) => {
+        await linkObject(
+            objectType,
+            objectId,
+            (data) => {
+                showMessage('success', `Successfully linked ${objectType} to page`);
+                onObjectLinked?.(data);
+            },
+            (error) => {
+                showMessage('error', `Failed to link object: ${error}`);
             }
-        } catch (error) {
-            console.error('Error loading page data:', error);
-        }
+        );
     };
 
-    const loadObjects = async () => {
-        setLoading(true);
-        try {
-            const endpoint = getObjectEndpoint(selectedObjectType);
-            const response = await fetch(endpoint);
-
-            if (response.ok) {
-                const data = await response.json();
-                setObjects(data.results || data);
-            } else {
-                console.error('Failed to load objects');
-                setObjects([]);
+    // Handle object unlinking
+    const handleUnlink = async () => {
+        await unlinkObject(
+            () => {
+                showMessage('success', 'Object unlinked successfully');
+                onObjectUnlinked?.();
+            },
+            (error) => {
+                showMessage('error', `Failed to unlink object: ${error}`);
             }
-        } catch (error) {
-            console.error('Error loading objects:', error);
-            setObjects([]);
-        } finally {
-            setLoading(false);
-        }
+        );
     };
 
-    const loadObjectContent = async () => {
-        if (!currentPage?.linked_object_type || !currentPage?.linked_object_id) return;
-
-        try {
-            const response = await fetch(`/api/webpages/api/pages/${pageId}/object_content/`);
-            if (response.ok) {
-                const data = await response.json();
-                setObjectContent(data.object_content);
+    // Handle page sync with object
+    const handleSync = async () => {
+        await syncWithObject(
+            () => {
+                showMessage('success', 'Page synchronized with object successfully');
+            },
+            (error) => {
+                showMessage('error', `Failed to sync with object: ${error}`);
             }
-        } catch (error) {
-            console.error('Error loading object content:', error);
-        }
+        );
     };
 
-    const getObjectEndpoint = (objectType) => {
-        const baseUrl = '/api/content/api';
-        switch (objectType) {
-            case 'news': return `${baseUrl}/news/`;
-            case 'event': return `${baseUrl}/events/`;
-            case 'libraryitem': return `${baseUrl}/library-items/`;
-            case 'member': return `${baseUrl}/members/`;
-            default: return '';
-        }
+    // Handle object preview
+    const handleObjectPreview = async (objectType, objectId) => {
+        await loadObjectContent(objectType, objectId);
     };
 
-    const linkObjectToPage = async (object) => {
-        setLinking(true);
-        try {
-            const response = await fetch(`/api/webpages/api/pages/${pageId}/link_object/`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': getCsrfToken(),
-                },
-                body: JSON.stringify({
-                    object_type: selectedObjectType,
-                    object_id: object.id
-                })
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                setCurrentPage(data.page);
-                setSelectedObject(object);
-                loadObjectContent();
-                if (onObjectLinked) {
-                    onObjectLinked(object, selectedObjectType);
-                }
-                alert('Object linked successfully!');
-            } else {
-                const error = await response.json();
-                alert(`Error: ${error.error}`);
-            }
-        } catch (error) {
-            console.error('Error linking object:', error);
-            alert('Failed to link object');
-        } finally {
-            setLinking(false);
-        }
+    // Close object preview modal
+    const closeObjectPreview = () => {
+        setShowObjectContent(false);
+        setObjectContent(null);
     };
-
-    const unlinkObject = async () => {
-        setLinking(true);
-        try {
-            const response = await fetch(`/api/webpages/api/pages/${pageId}/unlink_object/`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': getCsrfToken(),
-                }
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                setCurrentPage(data.page);
-                setSelectedObject(null);
-                setObjectContent(null);
-                if (onObjectUnlinked) {
-                    onObjectUnlinked();
-                }
-                alert('Object unlinked successfully!');
-            } else {
-                const error = await response.json();
-                alert(`Error: ${error.error}`);
-            }
-        } catch (error) {
-            console.error('Error unlinking object:', error);
-            alert('Failed to unlink object');
-        } finally {
-            setLinking(false);
-        }
-    };
-
-    const syncWithObject = async () => {
-        setLinking(true);
-        try {
-            const response = await fetch(`/api/webpages/api/pages/${pageId}/sync_with_object/`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': getCsrfToken(),
-                }
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                setCurrentPage(data.page);
-                loadObjectContent();
-                alert('Page synced with object successfully!');
-            } else {
-                const error = await response.json();
-                alert(`Error: ${error.error}`);
-            }
-        } catch (error) {
-            console.error('Error syncing with object:', error);
-            alert('Failed to sync with object');
-        } finally {
-            setLinking(false);
-        }
-    };
-
-    const getCsrfToken = () => {
-        const name = 'csrftoken';
-        let cookieValue = null;
-        if (document.cookie && document.cookie !== '') {
-            const cookies = document.cookie.split(';');
-            for (let i = 0; i < cookies.length; i++) {
-                const cookie = cookies[i].trim();
-                if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                    break;
-                }
-            }
-        }
-        return cookieValue;
-    };
-
-    const getObjectIcon = (type) => {
-        const iconMap = {
-            news: Newspaper,
-            event: Calendar,
-            libraryitem: FileText,
-            member: Users
-        };
-        return iconMap[type] || FileText;
-    };
-
-    const formatDate = (dateString) => {
-        if (!dateString) return '';
-        return new Date(dateString).toLocaleDateString();
-    };
-
-    const isObjectLinked = currentPage?.linked_object_type && currentPage?.linked_object_id;
 
     return (
         <div className="space-y-6">
             {/* Header */}
-            <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900">Object Publishing</h3>
-                {isObjectLinked && (
-                    <div className="flex items-center space-x-2">
-                        <CheckCircle className="h-5 w-5 text-green-500" />
-                        <span className="text-sm text-green-600">
-                            Linked to {currentPage.linked_object_type}
-                        </span>
-                    </div>
-                )}
+            <div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                    Object Publishing
+                </h3>
+                <p className="text-sm text-gray-600">
+                    Link existing content objects to this page for dynamic publishing.
+                </p>
             </div>
 
-            {/* Current Object Status */}
-            {isObjectLinked && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <div className="flex items-start justify-between">
-                        <div className="flex items-center space-x-3">
-                            {React.createElement(getObjectIcon(currentPage.linked_object_type), {
-                                className: "h-5 w-5 text-blue-600"
-                            })}
-                            <div>
-                                <h4 className="font-medium text-blue-900">
-                                    Currently Linked Object
-                                </h4>
-                                <p className="text-sm text-blue-700">
-                                    Type: {currentPage.linked_object_type} | ID: {currentPage.linked_object_id}
-                                </p>
-                            </div>
-                        </div>
-                        <div className="flex space-x-2">
-                            <button
-                                onClick={() => setShowObjectContent(!showObjectContent)}
-                                className="text-blue-600 hover:text-blue-800"
-                                title="View object content"
-                            >
-                                <Eye className="h-4 w-4" />
-                            </button>
-                            <button
-                                onClick={syncWithObject}
-                                disabled={linking}
-                                className="text-blue-600 hover:text-blue-800 disabled:opacity-50"
-                                title="Sync page with object"
-                            >
-                                <RefreshCw className={`h-4 w-4 ${linking ? 'animate-spin' : ''}`} />
-                            </button>
-                            <button
-                                onClick={unlinkObject}
-                                disabled={linking}
-                                className="text-red-600 hover:text-red-800 disabled:opacity-50"
-                                title="Unlink object"
-                            >
-                                <Unlink className="h-4 w-4" />
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Object Content Preview */}
-                    {showObjectContent && objectContent && (
-                        <div className="mt-4 pt-4 border-t border-blue-200">
-                            <h5 className="font-medium text-blue-900 mb-2">Object Content</h5>
-                            <div className="bg-white rounded border p-3 text-sm">
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <strong>Title:</strong> {objectContent.title}
-                                    </div>
-                                    <div>
-                                        <strong>Published:</strong> {formatDate(objectContent.published_date)}
-                                    </div>
-                                </div>
-                                {objectContent.description && (
-                                    <div className="mt-2">
-                                        <strong>Description:</strong>
-                                        <p className="text-gray-600 mt-1">{objectContent.description.substring(0, 200)}...</p>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    )}
+            {/* Status Messages */}
+            {message.text && (
+                <div className={`p-3 rounded-md ${message.type === 'success'
+                        ? 'bg-green-50 border border-green-200 text-green-800'
+                        : 'bg-red-50 border border-red-200 text-red-800'
+                    }`}>
+                    {message.text}
                 </div>
             )}
 
-            {/* Object Selection */}
-            {!isObjectLinked && (
-                <div className="space-y-4">
-                    <h4 className="font-medium text-gray-900">Link Object to Page</h4>
+            {/* Current Linked Object Status */}
+            <LinkedObjectStatus
+                currentPage={currentPage}
+                linking={linking}
+                onUnlink={handleUnlink}
+                onSync={handleSync}
+                onPreview={handleObjectPreview}
+            />
 
-                    {/* Object Type Selection */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Object Type
-                        </label>
-                        <select
-                            value={selectedObjectType}
-                            onChange={(e) => setSelectedObjectType(e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                        >
-                            {objectTypes.map(type => (
-                                <option key={type.value} value={type.value}>
-                                    {type.label}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
+            {/* Object Selection Panel */}
+            {!currentPage?.is_object_page && (
+                <ObjectSelectionPanel
+                    selectedObjectType={selectedObjectType}
+                    setSelectedObjectType={setSelectedObjectType}
+                    searchQuery={searchQuery}
+                    setSearchQuery={setSearchQuery}
+                    filteredObjects={filteredObjects}
+                    loading={loading}
+                    linking={linking}
+                    onObjectSelect={handleObjectSelect}
+                    onObjectPreview={handleObjectPreview}
+                    searchStats={searchStats}
+                />
+            )}
 
-                    {/* Search Objects */}
-                    {selectedObjectType && (
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Search Objects
-                            </label>
-                            <div className="relative">
-                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                                <input
-                                    type="text"
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    placeholder="Search by title, description, or author..."
-                                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                                />
-                            </div>
+            {/* Object Content Preview Modal */}
+            {showObjectContent && objectContent && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                    <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden">
+                        <div className="flex items-center justify-between p-4 border-b">
+                            <h3 className="text-lg font-medium">Object Preview</h3>
+                            <button
+                                onClick={closeObjectPreview}
+                                className="p-1 hover:bg-gray-100 rounded"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
                         </div>
-                    )}
+                        <div className="p-4 overflow-y-auto max-h-[calc(90vh-8rem)]">
+                            <div className="prose max-w-none">
+                                <h1>{objectContent.title}</h1>
+                                {objectContent.description && (
+                                    <p className="lead">{objectContent.description}</p>
+                                )}
+                                {objectContent.content && (
+                                    <div dangerouslySetInnerHTML={{ __html: objectContent.content }} />
+                                )}
 
-                    {/* Objects List */}
-                    {selectedObjectType && (
-                        <div className="space-y-3">
-                            <div className="flex items-center justify-between">
-                                <h5 className="font-medium text-gray-900">Available Objects</h5>
-                                <button
-                                    onClick={loadObjects}
-                                    disabled={loading}
-                                    className="text-blue-600 hover:text-blue-800 disabled:opacity-50"
-                                    title="Refresh objects"
-                                >
-                                    <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                                </button>
-                            </div>
-
-                            {loading ? (
-                                <div className="text-center py-8 text-gray-500">
-                                    Loading objects...
-                                </div>
-                            ) : filteredObjects.length > 0 ? (
-                                <div className="space-y-2 max-h-96 overflow-y-auto">
-                                    {filteredObjects.map(object => (
-                                        <div
-                                            key={object.id}
-                                            className="border border-gray-200 rounded-lg p-3 hover:bg-gray-50"
-                                        >
-                                            <div className="flex items-start justify-between">
-                                                <div className="flex-1">
-                                                    <div className="flex items-center space-x-2">
-                                                        {React.createElement(getObjectIcon(selectedObjectType), {
-                                                            className: "h-4 w-4 text-gray-500"
-                                                        })}
-                                                        <h6 className="font-medium text-gray-900">{object.title}</h6>
-                                                        {object.is_published ? (
-                                                            <CheckCircle className="h-4 w-4 text-green-500" />
-                                                        ) : (
-                                                            <AlertCircle className="h-4 w-4 text-yellow-500" />
-                                                        )}
-                                                    </div>
-                                                    {object.excerpt && (
-                                                        <p className="text-sm text-gray-600 mt-1">
-                                                            {object.excerpt.substring(0, 100)}...
-                                                        </p>
-                                                    )}
-                                                    <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
-                                                        {object.published_date && (
-                                                            <span>Published: {formatDate(object.published_date)}</span>
-                                                        )}
-                                                        {object.author && <span>By: {object.author}</span>}
-                                                        {object.organizer_name && <span>Organizer: {object.organizer_name}</span>}
-                                                        {object.member_type && <span>Type: {object.member_type}</span>}
-                                                    </div>
-                                                </div>
-                                                <div className="flex space-x-2 ml-4">
-                                                    <a
-                                                        href={object.get_absolute_url || '#'}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-gray-400 hover:text-gray-600"
-                                                        title="View object"
-                                                    >
-                                                        <ExternalLink className="h-4 w-4" />
-                                                    </a>
-                                                    <button
-                                                        onClick={() => linkObjectToPage(object)}
-                                                        disabled={linking}
-                                                        className="text-blue-600 hover:text-blue-800 disabled:opacity-50"
-                                                        title="Link to page"
-                                                    >
-                                                        <Link className="h-4 w-4" />
-                                                    </button>
-                                                </div>
-                                            </div>
+                                {/* Object-specific details */}
+                                <div className="mt-6 grid grid-cols-2 gap-4 text-sm">
+                                    <div>
+                                        <strong>Type:</strong> <span className="capitalize">{objectContent.object_type}</span>
+                                    </div>
+                                    <div>
+                                        <strong>Status:</strong> {objectContent.is_published ? 'Published' : 'Draft'}
+                                    </div>
+                                    {objectContent.author && (
+                                        <div>
+                                            <strong>Author:</strong> {objectContent.author}
                                         </div>
-                                    ))}
+                                    )}
+                                    {objectContent.published_date && (
+                                        <div>
+                                            <strong>Published:</strong> {new Date(objectContent.published_date).toLocaleDateString()}
+                                        </div>
+                                    )}
                                 </div>
-                            ) : (
-                                <div className="text-center py-8 text-gray-500">
-                                    {searchQuery ? 'No objects match your search.' : 'No objects found.'}
-                                </div>
-                            )}
+                            </div>
                         </div>
-                    )}
+                    </div>
                 </div>
             )}
         </div>
