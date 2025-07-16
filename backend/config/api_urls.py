@@ -22,14 +22,14 @@ router = DefaultRouter()
 
 urlpatterns = [
     # JWT Authentication endpoints
-    path('auth/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
-    path('auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-    path('auth/token/verify/', TokenVerifyView.as_view(), name='token_verify'),
-    
+    path("auth/token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
+    path("auth/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
+    path("auth/token/verify/", TokenVerifyView.as_view(), name="token_verify"),
     # Include router URLs
-    path('', include(router.urls)),
-    
+    path("", include(router.urls)),
     # Include app-specific API URLs as you create them:
     # path('users/', include('apps.users.urls')),
     # path('core/', include('apps.core.urls')),
+    path("webpages/", include("webpages.urls")),
+    path("content/", include("content.urls")),
 ]

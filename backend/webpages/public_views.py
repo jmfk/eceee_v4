@@ -1,8 +1,8 @@
 """
 Public views for the Web Page Publishing System
 
-Handles public display of published pages with slug-based URL resolution
-and hierarchical navigation support.
+Handles public-facing page rendering with layout/theme inheritance,
+widget rendering, and object publishing support.
 """
 
 from django.shortcuts import get_object_or_404, render
@@ -10,8 +10,11 @@ from django.http import Http404, HttpResponse, JsonResponse
 from django.views.generic import DetailView, ListView
 from django.utils import timezone
 from django.db.models import Q
-from django.template.loader import get_template
+from django.template.loader import get_template, render_to_string
 from django.template import TemplateDoesNotExist
+from django.urls import reverse
+from django.contrib.sitemaps import Sitemap
+import json
 
 from .models import WebPage, PageWidget
 from .serializers import WebPageDetailSerializer, PageHierarchySerializer
@@ -34,8 +37,8 @@ class PublishedPageMixin:
 
 class PageDetailView(PublishedPageMixin, DetailView):
     """
-    Display a single published page by its full slug path.
-    Supports hierarchical URLs like /parent/child/grandchild/
+    Public detail view for individual pages with layout/theme inheritance
+    and widget rendering. Supports object-based pages.
     """
 
     model = WebPage
@@ -43,99 +46,73 @@ class PageDetailView(PublishedPageMixin, DetailView):
     context_object_name = "page"
 
     def get_object(self, queryset=None):
-        """Get page by resolving the full slug path"""
-        if queryset is None:
-            queryset = self.get_queryset()
-
-        # Get the full path from URL
+        """Get page by slug path, supporting hierarchical URLs"""
         slug_path = self.kwargs.get("slug_path", "")
-        if not slug_path:
-            # Handle root page request
-            return get_object_or_404(queryset, slug="home", parent__isnull=True)
+        slug_parts = [part for part in slug_path.split("/") if part]
 
-        # Split the path into slugs
-        slugs = [slug for slug in slug_path.split("/") if slug]
+        if not slug_parts:
+            raise Http404("No slug path provided")
 
-        if not slugs:
-            raise Http404("Page not found")
-
-        # Navigate through the hierarchy
+        # Navigate through the hierarchy to find the page
         current_page = None
-        current_parent = None
+        parent = None
 
-        for i, slug in enumerate(slugs):
+        for slug in slug_parts:
             try:
-                if i == 0:
-                    # First level - find root page
-                    current_page = queryset.get(slug=slug, parent__isnull=True)
-                else:
-                    # Subsequent levels - find child of current parent
-                    current_page = queryset.get(slug=slug, parent=current_parent)
-
-                current_parent = current_page
-
+                current_page = WebPage.objects.select_related(
+                    "layout", "theme", "parent"
+                ).get(slug=slug, parent=parent)
+                parent = current_page
             except WebPage.DoesNotExist:
-                raise Http404(f"Page not found: {'/'.join(slugs[:i+1])}")
+                raise Http404(f"Page not found: {'/'.join(slug_parts)}")
+
+        # Check if page is published and effective
+        now = timezone.now()
+        if (
+            current_page.publication_status != "published"
+            or (current_page.effective_date and current_page.effective_date > now)
+            or (current_page.expiry_date and current_page.expiry_date <= now)
+        ):
+            raise Http404("Page not available")
 
         return current_page
 
     def get_context_data(self, **kwargs):
+        """Add layout, theme, widgets, and object content to context"""
         context = super().get_context_data(**kwargs)
         page = self.object
 
-        # Add breadcrumbs
-        context["breadcrumbs"] = page.get_breadcrumbs()
-
-        # Add navigation
-        context["children"] = page.children.filter(
-            publication_status="published"
-        ).order_by("sort_order", "title")
-
-        # Add effective layout and theme
+        # Get effective layout and theme
         context["effective_layout"] = page.get_effective_layout()
         context["effective_theme"] = page.get_effective_theme()
 
-        # Add widgets organized by slot
-        widgets_by_slot = {}
-        current = page
+        # Get widgets organized by slot
+        widgets = PageWidget.objects.filter(page=page).select_related("widget_type")
+        context["widgets_by_slot"] = {}
 
-        # Collect widgets from current page and parents (inheritance)
-        inherited_widgets = {}
-        while current:
-            for widget in current.widgets.all().order_by("sort_order"):
-                slot_name = widget.slot_name
+        for widget in widgets:
+            slot_name = widget.slot_name
+            if slot_name not in context["widgets_by_slot"]:
+                context["widgets_by_slot"][slot_name] = []
+            context["widgets_by_slot"][slot_name].append(widget)
 
-                # If this is the original page or widget allows inheritance
-                if current == page or widget.inherit_from_parent:
-                    # If slot doesn't exist yet, or this is an override
-                    if slot_name not in inherited_widgets or (
-                        current == page and widget.override_parent
-                    ):
+        # Sort widgets by order within each slot
+        for slot_widgets in context["widgets_by_slot"].values():
+            slot_widgets.sort(key=lambda w: w.order)
 
-                        if slot_name not in inherited_widgets:
-                            inherited_widgets[slot_name] = []
+        # Get breadcrumbs
+        context["breadcrumbs"] = page.get_breadcrumbs()
 
-                        # Add widget info
-                        widget_data = {
-                            "widget": widget,
-                            "inherited_from": current if current != page else None,
-                            "is_override": widget.override_parent,
-                        }
-
-                        # Insert or replace based on override
-                        if widget.override_parent:
-                            inherited_widgets[slot_name] = [widget_data]
-                        else:
-                            inherited_widgets[slot_name].append(widget_data)
-
-            current = current.parent
-
-        context["widgets_by_slot"] = inherited_widgets
-
-        # Add meta information
-        context["meta_title"] = page.meta_title or page.title
-        context["meta_description"] = page.meta_description or page.description
-        context["meta_keywords"] = page.meta_keywords
+        # If this is an object page, get object content
+        if page.is_object_page():
+            context["object_content"] = page.get_object_content()
+            context["is_object_page"] = True
+            context["linked_object"] = {
+                "type": page.linked_object_type,
+                "id": page.linked_object_id,
+            }
+        else:
+            context["is_object_page"] = False
 
         return context
 
@@ -162,7 +139,10 @@ class PageDetailView(PublishedPageMixin, DetailView):
 
 
 class PageListView(PublishedPageMixin, ListView):
-    """List view for published pages"""
+    """
+    Public list view for root pages (pages without a parent).
+    Shows only published pages that are currently effective.
+    """
 
     model = WebPage
     template_name = "webpages/page_list.html"
@@ -170,142 +150,305 @@ class PageListView(PublishedPageMixin, ListView):
     paginate_by = 20
 
     def get_queryset(self):
-        queryset = super().get_queryset()
+        """Get published root pages"""
+        now = timezone.now()
+        return (
+            WebPage.objects.filter(
+                parent__isnull=True,
+                publication_status="published",
+                effective_date__lte=now,
+            )
+            .filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
+            .select_related("layout", "theme")
+            .order_by("sort_order", "title")
+        )
 
-        # Filter by parent if specified
-        parent_slug = getattr(self, "kwargs", {}).get("parent_slug")
-        if parent_slug:
-            try:
-                parent = WebPage.objects.get(slug=parent_slug, parent__isnull=True)
-                queryset = queryset.filter(parent=parent)
-            except WebPage.DoesNotExist:
-                queryset = queryset.none()
-        else:
-            # Show only root pages
-            queryset = queryset.filter(parent__isnull=True)
 
-        return queryset.order_by("sort_order", "title")
+class ObjectDetailView(DetailView):
+    """
+    Generic view for rendering objects with their canonical URLs.
+    This view handles direct object URLs like /news/my-article/
+    """
+
+    template_name = "webpages/object_detail.html"
+    context_object_name = "object"
+    object_type = None  # Override in subclasses
+    model = None  # Override in subclasses
+
+    def get_object(self, queryset=None):
+        """Get object by slug, checking publication status"""
+        if queryset is None:
+            queryset = self.get_queryset()
+
+        slug = self.kwargs.get("slug")
+        if not slug:
+            raise Http404("No slug provided")
+
+        obj = get_object_or_404(queryset, slug=slug)
+
+        # Check if object is published
+        if hasattr(obj, "is_published") and not obj.is_published:
+            raise Http404("Object not published")
+
+        return obj
+
+    def get_context_data(self, **kwargs):
+        """Add object-specific context"""
+        context = super().get_context_data(**kwargs)
+        obj = self.object
+
+        context["object_type"] = self.object_type
+        context["canonical_url"] = obj.get_absolute_url()
+
+        # Check if this object is linked to any pages
+        linked_pages = WebPage.objects.filter(
+            linked_object_type=self.object_type,
+            linked_object_id=obj.id,
+            publication_status="published",
+        )
+        context["linked_pages"] = linked_pages
+
+        return context
+
+
+class NewsDetailView(ObjectDetailView):
+    """Detail view for News objects"""
+
+    object_type = "news"
+
+    def get_model(self):
+        from content.models import News
+
+        return News
+
+    def get_queryset(self):
+        from content.models import News
+
+        return News.objects.filter(is_published=True)
+
+
+class EventDetailView(ObjectDetailView):
+    """Detail view for Event objects"""
+
+    object_type = "event"
+
+    def get_model(self):
+        from content.models import Event
+
+        return Event
+
+    def get_queryset(self):
+        from content.models import Event
+
+        return Event.objects.filter(is_published=True)
+
+
+class LibraryItemDetailView(ObjectDetailView):
+    """Detail view for LibraryItem objects"""
+
+    object_type = "libraryitem"
+
+    def get_model(self):
+        from content.models import LibraryItem
+
+        return LibraryItem
+
+    def get_queryset(self):
+        from content.models import LibraryItem
+
+        return LibraryItem.objects.filter(is_published=True, access_level="public")
+
+
+class MemberDetailView(ObjectDetailView):
+    """Detail view for Member objects"""
+
+    object_type = "member"
+
+    def get_model(self):
+        from content.models import Member
+
+        return Member
+
+    def get_queryset(self):
+        from content.models import Member
+
+        return Member.objects.filter(is_published=True, list_in_directory=True)
 
 
 def page_sitemap_view(request):
-    """Generate XML sitemap for published pages"""
-    from django.template.loader import render_to_string
-
+    """
+    XML sitemap for published pages.
+    """
     now = timezone.now()
     pages = (
         WebPage.objects.filter(publication_status="published", effective_date__lte=now)
         .filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
+        .select_related("layout", "theme")
         .order_by("sort_order", "title")
     )
 
-    sitemap_xml = render_to_string(
-        "webpages/sitemap.xml",
-        {
-            "pages": pages,
-            "request": request,
-        },
-    )
+    xml_content = ['<?xml version="1.0" encoding="UTF-8"?>']
+    xml_content.append('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">')
 
-    return HttpResponse(sitemap_xml, content_type="application/xml")
+    for page in pages:
+        xml_content.append("  <url>")
+        xml_content.append(
+            f"    <loc>{request.build_absolute_uri(page.get_absolute_url())}</loc>"
+        )
+        xml_content.append(f"    <lastmod>{page.updated_at.date()}</lastmod>")
+        xml_content.append("    <changefreq>weekly</changefreq>")
+        xml_content.append("    <priority>0.8</priority>")
+        xml_content.append("  </url>")
+
+    xml_content.append("</urlset>")
+
+    return HttpResponse("\n".join(xml_content), content_type="application/xml")
 
 
 def page_hierarchy_api(request):
-    """JSON API for page hierarchy (public pages only)"""
+    """
+    JSON API endpoint returning the complete page hierarchy.
+    Only includes published pages.
+    """
     now = timezone.now()
     root_pages = (
         WebPage.objects.filter(
-            publication_status="published", effective_date__lte=now, parent__isnull=True
+            parent__isnull=True, publication_status="published", effective_date__lte=now
         )
         .filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
+        .select_related("parent", "layout", "theme")
+        .prefetch_related("children")
         .order_by("sort_order", "title")
     )
 
     serializer = PageHierarchySerializer(
         root_pages, many=True, context={"request": request}
     )
+
     return JsonResponse({"pages": serializer.data})
 
 
 def page_search_view(request):
-    """Search published pages"""
+    """
+    JSON API endpoint for searching published pages.
+    Supports query parameter 'q' for search term.
+    """
     query = request.GET.get("q", "").strip()
-    pages = []
+    if len(query) < 2:
+        return JsonResponse({"error": "Query too short", "results": []})
 
-    if query and len(query) >= 3:  # Minimum 3 characters
-        now = timezone.now()
-        pages = (
-            WebPage.objects.filter(
-                publication_status="published", effective_date__lte=now
-            )
-            .filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
-            .filter(
-                Q(title__icontains=query)
-                | Q(description__icontains=query)
-                | Q(meta_title__icontains=query)
-                | Q(meta_description__icontains=query)
-            )
-            .order_by("sort_order", "title")[:20]
-        )  # Limit results
-
-    if request.headers.get("Accept") == "application/json":
-        # Return JSON for AJAX requests
-        results = []
-        for page in pages:
-            results.append(
-                {
-                    "id": page.id,
-                    "title": page.title,
-                    "url": page.get_absolute_url(),
-                    "description": (
-                        page.description[:200] + "..."
-                        if len(page.description) > 200
-                        else page.description
-                    ),
-                }
-            )
-        return JsonResponse({"results": results, "query": query})
-
-    # Return HTML template
-    return render(
-        request,
-        "webpages/search_results.html",
-        {"pages": pages, "query": query, "total_results": len(pages)},
+    now = timezone.now()
+    pages = (
+        WebPage.objects.filter(
+            Q(title__icontains=query)
+            | Q(description__icontains=query)
+            | Q(meta_title__icontains=query)
+            | Q(meta_description__icontains=query),
+            publication_status="published",
+            effective_date__lte=now,
+        )
+        .filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
+        .select_related("layout", "theme")[:20]
     )
+
+    results = []
+    for page in pages:
+        results.append(
+            {
+                "id": page.id,
+                "title": page.title,
+                "description": (
+                    page.description[:200] + "..."
+                    if len(page.description) > 200
+                    else page.description
+                ),
+                "url": page.get_absolute_url(),
+                "is_object_page": page.is_object_page(),
+                "object_type": (
+                    page.linked_object_type if page.is_object_page() else None
+                ),
+            }
+        )
+
+    return JsonResponse({"query": query, "results": results})
 
 
 def render_widget(request, widget_id):
-    """Render a single widget (useful for AJAX updates)"""
+    """
+    Render a specific widget by ID.
+    Returns HTML fragment that can be used via HTMX or AJAX.
+    """
+    widget = get_object_or_404(PageWidget, id=widget_id)
+
+    # Check if the widget's page is published
+    if not widget.page.is_published():
+        raise Http404("Widget's page is not published")
+
     try:
-        widget = PageWidget.objects.select_related("widget_type", "page").get(
-            id=widget_id
+        html = render_to_string(
+            widget.widget_type.template_name,
+            {"widget": widget, "config": widget.configuration},
+            request=request,
+        )
+        return HttpResponse(html)
+    except Exception as e:
+        return HttpResponse(f"Error rendering widget: {str(e)}", status=500)
+
+
+# Object List Views
+class NewsListView(ListView):
+    """Public list view for News objects"""
+
+    template_name = "content/news_list.html"
+    context_object_name = "news_articles"
+    paginate_by = 10
+
+    def get_queryset(self):
+        from content.models import News
+
+        return News.objects.filter(is_published=True).order_by(
+            "-priority", "-published_date"
         )
 
-        # Check if page is published
-        if not widget.page.is_published():
-            raise Http404("Widget not found")
 
-        # Try to find specific template for widget type
-        template_names = [
-            f"webpages/widgets/{widget.widget_type.template_name}",
-            f"webpages/widgets/{widget.widget_type.name.lower()}.html",
-            "webpages/widgets/default.html",
-        ]
+class EventListView(ListView):
+    """Public list view for Event objects"""
 
-        context = {
-            "widget": widget,
-            "config": widget.configuration,
-            "page": widget.page,
-        }
+    template_name = "content/event_list.html"
+    context_object_name = "events"
+    paginate_by = 10
 
-        for template_name in template_names:
-            try:
-                template = get_template(template_name)
-                return HttpResponse(template.render(context, request))
-            except TemplateDoesNotExist:
-                continue
+    def get_queryset(self):
+        from content.models import Event
 
-        # Fallback to simple display
-        return HttpResponse(f"<div>Widget: {widget.widget_type.name}</div>")
+        return Event.objects.filter(is_published=True).order_by("start_date")
 
-    except PageWidget.DoesNotExist:
-        raise Http404("Widget not found")
+
+class LibraryItemListView(ListView):
+    """Public list view for LibraryItem objects"""
+
+    template_name = "content/library_list.html"
+    context_object_name = "library_items"
+    paginate_by = 20
+
+    def get_queryset(self):
+        from content.models import LibraryItem
+
+        return LibraryItem.objects.filter(
+            is_published=True, access_level="public"
+        ).order_by("-featured", "-published_date")
+
+
+class MemberListView(ListView):
+    """Public list view for Member objects"""
+
+    template_name = "content/member_list.html"
+    context_object_name = "members"
+    paginate_by = 20
+
+    def get_queryset(self):
+        from content.models import Member
+
+        return Member.objects.filter(
+            is_published=True, list_in_directory=True, is_current=True
+        ).order_by("last_name", "first_name")
