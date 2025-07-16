@@ -34,7 +34,7 @@ const PagePreview = ({
             if (layoutId) params.append('layout_id', layoutId)
             if (themeId) params.append('theme_id', themeId)
 
-            const response = await axios.get(`/api/webpages/api/pages/${pageId}/preview/?${params}`)
+            const response = await axios.get(`/api/v1/webpages/pages/${pageId}/preview/?${params}`)
             return response.data
         },
         enabled: !!pageId
@@ -44,7 +44,7 @@ const PagePreview = ({
     const { data: samplePages } = useQuery({
         queryKey: ['sample-pages'],
         queryFn: async () => {
-            const response = await axios.get('/api/webpages/api/pages/?limit=10')
+            const response = await axios.get('/api/v1/webpages/pages/?limit=10')
             return response.data
         },
         enabled: !pageId
@@ -199,8 +199,8 @@ const PagePreview = ({
                                         key={size}
                                         onClick={() => setPreviewSize(size)}
                                         className={`p-2 rounded ${previewSize === size
-                                                ? 'bg-blue-100 text-blue-700'
-                                                : 'text-gray-500 hover:text-gray-700'
+                                            ? 'bg-blue-100 text-blue-700'
+                                            : 'text-gray-500 hover:text-gray-700'
                                             }`}
                                         title={config.label}
                                     >
@@ -215,8 +215,8 @@ const PagePreview = ({
                             <button
                                 onClick={() => setShowInheritance(!showInheritance)}
                                 className={`inline-flex items-center px-3 py-1 rounded text-sm ${showInheritance
-                                        ? 'bg-green-100 text-green-700'
-                                        : 'bg-gray-100 text-gray-700'
+                                    ? 'bg-green-100 text-green-700'
+                                    : 'bg-gray-100 text-gray-700'
                                     }`}
                             >
                                 {showInheritance ? <Eye className="w-4 h-4 mr-1" /> : <EyeOff className="w-4 h-4 mr-1" />}

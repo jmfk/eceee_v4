@@ -247,7 +247,7 @@ describe('LayoutEditor', () => {
 
         await waitFor(() => {
             expect(mockedAxios.post).toHaveBeenCalledWith(
-                '/api/webpages/api/layouts/',
+                '/api/v1/webpages/layouts/',
                 expect.objectContaining({
                     name: 'Test Layout',
                     description: 'A test layout',
@@ -288,7 +288,7 @@ describe('LayoutEditor', () => {
         )
 
         await waitFor(() => {
-            expect(mockedAxios.delete).toHaveBeenCalledWith('/api/webpages/api/layouts/1/')
+            expect(mockedAxios.delete).toHaveBeenCalledWith('/api/v1/webpages/layouts/1/')
         })
     })
 

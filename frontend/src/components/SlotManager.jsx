@@ -208,7 +208,7 @@ const SlotManager = ({ pageId, layout, onWidgetChange }) => {
     const { data: pageWidgetsData, isLoading } = useQuery({
         queryKey: ['page-widgets', pageId],
         queryFn: async () => {
-            const response = await axios.get(`/api/webpages/api/widgets/by_page/?page_id=${pageId}`)
+            const response = await axios.get(`/api/v1/webpages/widgets/by_page/?page_id=${pageId}`)
             return response.data.widgets || []
         },
         enabled: !!pageId
@@ -221,7 +221,7 @@ const SlotManager = ({ pageId, layout, onWidgetChange }) => {
     const { data: widgetTypes } = useQuery({
         queryKey: ['widget-types'],
         queryFn: async () => {
-            const response = await axios.get('/api/webpages/api/widget-types/')
+            const response = await axios.get('/api/v1/webpages/widget-types/')
             return response.data.filter(widget => widget.is_active)
         }
     })

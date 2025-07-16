@@ -50,7 +50,7 @@ const CustomWidgetCreator = ({ onClose, onWidgetCreated }) => {
     // Mutation for creating custom widget
     const createWidgetMutation = useMutation({
         mutationFn: async (data) => {
-            const response = await axios.post('/api/webpages/api/widget-types/create_custom/', data)
+            const response = await axios.post('/api/v1/webpages/widget-types/create_custom/', data)
             return response.data
         },
         onSuccess: (data) => {
@@ -63,7 +63,7 @@ const CustomWidgetCreator = ({ onClose, onWidgetCreated }) => {
     // Mutation for generating schema preview
     const generateSchemaMutation = useMutation({
         mutationFn: async (fields) => {
-            const response = await axios.post('/api/webpages/api/widget-types/generate_schema/', {
+            const response = await axios.post('/api/v1/webpages/widget-types/generate_schema/', {
                 fields
             })
             return response.data
@@ -192,8 +192,8 @@ const CustomWidgetCreator = ({ onClose, onWidgetCreated }) => {
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id)}
                             className={`flex items-center gap-2 px-4 py-2 border-b-2 transition-colors ${activeTab === tab.id
-                                    ? 'border-blue-500 text-blue-600'
-                                    : 'border-transparent text-gray-600 hover:text-gray-900'
+                                ? 'border-blue-500 text-blue-600'
+                                : 'border-transparent text-gray-600 hover:text-gray-900'
                                 }`}
                         >
                             <tab.icon size={16} />

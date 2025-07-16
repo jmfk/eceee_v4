@@ -232,7 +232,7 @@ describe('SlotManager', () => {
         // Save configuration
         await user.click(screen.getByText('Save Config'))
 
-        expect(mockedAxios.post).toHaveBeenCalledWith('/api/webpages/api/widgets/', {
+        expect(mockedAxios.post).toHaveBeenCalledWith('/api/v1/webpages/widgets/', {
             page: 1,
             widget_type_id: 1,
             slot_name: 'header',
@@ -273,7 +273,7 @@ describe('SlotManager', () => {
         await user.click(editButtons[0])
         await user.click(screen.getByText('Save Config'))
 
-        expect(mockedAxios.patch).toHaveBeenCalledWith('/api/webpages/api/widgets/1/', {
+        expect(mockedAxios.patch).toHaveBeenCalledWith('/api/v1/webpages/widgets/1/', {
             configuration: { content: 'Test content' },
         })
     })
@@ -299,7 +299,7 @@ describe('SlotManager', () => {
         expect(confirmSpy).toHaveBeenCalledWith(
             'Are you sure you want to delete this widget?'
         )
-        expect(mockedAxios.delete).toHaveBeenCalledWith('/api/webpages/api/widgets/1/')
+        expect(mockedAxios.delete).toHaveBeenCalledWith('/api/v1/webpages/widgets/1/')
 
         confirmSpy.mockRestore()
     })
@@ -334,7 +334,7 @@ describe('SlotManager', () => {
         if (moveUpButtons.length > 0) {
             await user.click(moveUpButtons[0])
 
-            expect(mockedAxios.post).toHaveBeenCalledWith('/api/webpages/api/widgets/1/reorder/', {
+            expect(mockedAxios.post).toHaveBeenCalledWith('/api/v1/webpages/widgets/1/reorder/', {
                 sort_order: expect.any(Number),
             })
         }
@@ -455,8 +455,8 @@ describe('SlotManager', () => {
         )
 
         await waitFor(() => {
-            expect(mockedAxios.get).toHaveBeenCalledWith('/api/webpages/api/widgets/by_page/?page_id=1')
-            expect(mockedAxios.get).toHaveBeenCalledWith('/api/webpages/api/widget-types/')
+            expect(mockedAxios.get).toHaveBeenCalledWith('/api/v1/webpages/widgets/by_page/?page_id=1')
+            expect(mockedAxios.get).toHaveBeenCalledWith('/api/v1/webpages/widget-types/')
         })
     })
 }) 

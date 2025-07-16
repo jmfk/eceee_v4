@@ -319,7 +319,7 @@ describe('PageManagement', () => {
         renderWithQueryClient(<PageManagement />)
 
         await waitFor(() => {
-            expect(mockedAxios.get).toHaveBeenCalledWith('/api/webpages/api/pages/')
+            expect(mockedAxios.get).toHaveBeenCalledWith('/api/v1/webpages/pages/')
         })
     })
 

@@ -69,16 +69,16 @@ export class TestWidgetBuilder {
 
     setupSuccessfulApi() {
         axios.get.mockImplementation((url) => {
-            if (url.includes('/api/webpages/api/widgets/by_page/')) {
+            if (url.includes('/api/v1/webpages/widgets/by_page/')) {
                 return Promise.resolve({ data: { widgets: this.widgets } })
             }
-            if (url.includes('/api/webpages/api/widget-types/')) {
+            if (url.includes('/api/v1/webpages/widget-types/')) {
                 return Promise.resolve({ data: this.widgetTypes })
             }
-            if (url.includes('/api/webpages/api/webpages/')) {
+            if (url.includes('/api/v1/webpages/pages/')) {
                 return Promise.resolve({ data: this.pages })
             }
-            if (url.includes('/api/webpages/api/layouts/')) {
+            if (url.includes('/api/v1/webpages/layouts/')) {
                 return Promise.resolve({ data: this.layouts })
             }
             return Promise.reject(new Error('Unknown endpoint'))

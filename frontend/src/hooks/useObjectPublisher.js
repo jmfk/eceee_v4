@@ -16,14 +16,14 @@ const useObjectPublisher = (pageId) => {
     const [objectContent, setObjectContent] = useState(null);
 
     // API URLs
-    const API_BASE = 'http://localhost:8000/api';
+    const API_BASE = 'http://localhost:8000/api/v1';
 
     // Load current page data
     const loadPageData = async () => {
         if (!pageId) return;
 
         try {
-            const response = await fetch(`${API_BASE}/pages/${pageId}/`);
+            const response = await fetch(`${API_BASE}/webpages/pages/${pageId}/`);
             if (response.ok) {
                 const data = await response.json();
                 setCurrentPage(data);
@@ -59,7 +59,7 @@ const useObjectPublisher = (pageId) => {
     const linkObject = async (objectType, objectId, onSuccess, onError) => {
         setLinking(true);
         try {
-            const response = await fetch(`${API_BASE}/pages/${pageId}/link-object/`, {
+            const response = await fetch(`${API_BASE}/webpages/pages/${pageId}/link-object/`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -90,7 +90,7 @@ const useObjectPublisher = (pageId) => {
     const unlinkObject = async (onSuccess, onError) => {
         setLinking(true);
         try {
-            const response = await fetch(`${API_BASE}/pages/${pageId}/unlink-object/`, {
+            const response = await fetch(`${API_BASE}/webpages/pages/${pageId}/unlink-object/`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -116,7 +116,7 @@ const useObjectPublisher = (pageId) => {
     const syncWithObject = async (onSuccess, onError) => {
         setLinking(true);
         try {
-            const response = await fetch(`${API_BASE}/pages/${pageId}/sync-object/`, {
+            const response = await fetch(`${API_BASE}/webpages/pages/${pageId}/sync-object/`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

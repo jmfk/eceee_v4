@@ -26,7 +26,7 @@ const LayoutEditor = () => {
     const { data: layouts, isLoading } = useQuery({
         queryKey: ['layouts'],
         queryFn: async () => {
-            const response = await axios.get('/api/webpages/api/layouts/')
+            const response = await axios.get('/api/v1/webpages/layouts/')
             return response.data
         }
     })
@@ -178,9 +178,9 @@ const LayoutForm = ({ layout = null, onSave, onCancel }) => {
     const mutation = useMutation({
         mutationFn: async (data) => {
             if (layout) {
-                return axios.put(`/api/webpages/api/layouts/${layout.id}/`, data)
+                return axios.put(`/api/v1/webpages/layouts/${layout.id}/`, data)
             } else {
-                return axios.post('/api/webpages/api/layouts/', data)
+                return axios.post('/api/v1/webpages/layouts/', data)
             }
         },
         onSuccess: () => {
@@ -455,7 +455,7 @@ const LayoutEditPanel = ({ layout, onUpdate, onCancel, showPreview, onTogglePrev
 
     const deleteMutation = useMutation({
         mutationFn: async () => {
-            return axios.delete(`/api/webpages/api/layouts/${layout.id}/`)
+            return axios.delete(`/api/v1/webpages/layouts/${layout.id}/`)
         },
         onSuccess: () => {
             toast.success('Layout deleted successfully')

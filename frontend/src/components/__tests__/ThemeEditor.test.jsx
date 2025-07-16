@@ -264,7 +264,7 @@ describe('ThemeEditor', () => {
 
         await waitFor(() => {
             expect(mockedAxios.post).toHaveBeenCalledWith(
-                '/api/webpages/api/themes/',
+                '/api/v1/webpages/themes/',
                 expect.objectContaining({
                     name: 'Test Theme',
                     description: 'A test theme',
@@ -301,7 +301,7 @@ describe('ThemeEditor', () => {
         )
 
         await waitFor(() => {
-            expect(mockedAxios.delete).toHaveBeenCalledWith('/api/webpages/api/themes/1/')
+            expect(mockedAxios.delete).toHaveBeenCalledWith('/api/v1/webpages/themes/1/')
         })
     })
 

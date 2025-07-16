@@ -29,7 +29,7 @@ const PublicationStatusDashboard = () => {
     const fetchPublicationStatus = async () => {
         try {
             setLoading(true);
-            const response = await fetch('/api/webpages/publication_status/');
+            const response = await fetch('/api/v1/webpages/pages/publication_status/');
             if (!response.ok) {
                 throw new Error('Failed to fetch publication status');
             }

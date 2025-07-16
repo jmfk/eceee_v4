@@ -39,7 +39,7 @@ export class AddWidgetCommand extends WidgetCommand {
 
     async execute() {
         try {
-            const response = await this.apiClient.post('/api/webpages/api/widgets/', {
+            const response = await this.apiClient.post('/api/v1/webpages/widgets/', {
                 page: this.pageId,
                 widget_type: this.widgetTypeId,
                 slot_name: this.slotName,
@@ -65,7 +65,7 @@ export class UpdateWidgetCommand extends WidgetCommand {
 
     async execute() {
         try {
-            const response = await this.apiClient.patch(`/api/webpages/api/widgets/${this.widgetId}/`, {
+            const response = await this.apiClient.patch(`/api/v1/webpages/widgets/${this.widgetId}/`, {
                 configuration: this.configuration,
                 ...this.inheritanceSettings
             })
@@ -86,7 +86,7 @@ export class DeleteWidgetCommand extends WidgetCommand {
 
     async execute() {
         try {
-            await this.apiClient.delete(`/api/webpages/api/widgets/${this.widgetId}/`)
+            await this.apiClient.delete(`/api/v1/webpages/widgets/${this.widgetId}/`)
             this.handleSuccess('Widget deleted successfully')
             return true
         } catch (error) {
@@ -104,7 +104,7 @@ export class ReorderWidgetCommand extends WidgetCommand {
 
     async execute() {
         try {
-            const response = await this.apiClient.post(`/api/webpages/api/widgets/${this.widgetId}/reorder/`, {
+            const response = await this.apiClient.post(`/api/v1/webpages/widgets/${this.widgetId}/reorder/`, {
                 sort_order: this.newSortOrder
             })
 

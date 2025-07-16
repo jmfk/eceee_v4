@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-const API_BASE = '/api/webpages/api'
+const API_BASE = '/api/v1/webpages'
 
 /**
  * Version Management API

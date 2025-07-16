@@ -37,7 +37,7 @@ const PublicationTimeline = () => {
             const startDate = getViewStartDate();
             const endDate = getViewEndDate();
 
-            const response = await fetch(`/api/webpages/?effective_date__gte=${startDate.toISOString()}&effective_date__lte=${endDate.toISOString()}`);
+            const response = await fetch(`/api/v1/webpages/pages/?effective_date__gte=${startDate.toISOString()}&effective_date__lte=${endDate.toISOString()}`);
             if (!response.ok) {
                 throw new Error('Failed to fetch timeline data');
             }
@@ -245,8 +245,8 @@ const PublicationTimeline = () => {
                                 key={mode}
                                 onClick={() => setViewMode(mode)}
                                 className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${viewMode === mode
-                                        ? 'bg-blue-600 text-white'
-                                        : 'text-gray-600 hover:text-gray-900'
+                                    ? 'bg-blue-600 text-white'
+                                    : 'text-gray-600 hover:text-gray-900'
                                     }`}
                             >
                                 {mode.charAt(0).toUpperCase() + mode.slice(1)}
@@ -264,8 +264,8 @@ const PublicationTimeline = () => {
                             key={status}
                             onClick={() => toggleStatus(status)}
                             className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${selectedStatuses.includes(status)
-                                    ? `${getStatusColor(status)} text-white`
-                                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                ? `${getStatusColor(status)} text-white`
+                                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                                 }`}
                         >
                             {status.charAt(0).toUpperCase() + status.slice(1)}

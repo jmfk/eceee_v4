@@ -28,7 +28,7 @@ const WidgetLibrary = ({ onSelectWidget, selectedWidgetTypes = [] }) => {
     const { data: widgetTypes, isLoading, error } = useQuery({
         queryKey: ['widget-types'],
         queryFn: async () => {
-            const response = await axios.get('/api/webpages/api/widget-types/')
+            const response = await axios.get('/api/v1/webpages/widget-types/')
             return response.data.filter(widget => widget.is_active)
         }
     })

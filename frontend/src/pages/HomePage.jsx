@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
-import { 
-  Code, 
-  Database, 
-  Layers, 
-  Zap, 
-  Brain, 
+import {
+  Code,
+  Database,
+  Layers,
+  Zap,
+  Brain,
   GitBranch,
   Container,
   Monitor
@@ -21,7 +21,7 @@ const HomePage = () => {
 
   const checkApiConnection = async () => {
     try {
-      const response = await fetch('/api/health/')
+      const response = await fetch('/health/')
       if (response.ok) {
         setApiStatus('connected')
         toast.success('Backend API connection established')
@@ -117,10 +117,10 @@ const HomePage = () => {
           ECEEE v4 Development Environment
         </h1>
         <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-          AI-integrated development environment with Django, React, PostgreSQL, and comprehensive tooling 
+          AI-integrated development environment with Django, React, PostgreSQL, and comprehensive tooling
           for modern web application development.
         </p>
-        
+
         {/* API Status Indicator */}
         <div className="flex items-center justify-center space-x-2 mt-4">
           {getApiStatusIndicator()}

@@ -35,7 +35,7 @@ const PageManagement = () => {
     const { data: pages, isLoading: pagesLoading } = useQuery({
         queryKey: ['pages'],
         queryFn: async () => {
-            const response = await axios.get('/api/webpages/api/pages/')
+            const response = await axios.get('/api/v1/webpages/pages/')
             return response.data
         }
     })
@@ -406,8 +406,8 @@ const PageManagement = () => {
                                     key={tab.id}
                                     onClick={() => setPublishingView(tab.id)}
                                     className={`inline-flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${isActive
-                                            ? 'bg-blue-600 text-white'
-                                            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                                        ? 'bg-blue-600 text-white'
+                                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                                         }`}
                                 >
                                     <Icon className="w-4 h-4 mr-2" />

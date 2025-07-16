@@ -198,7 +198,7 @@ describe('WidgetLibrary', () => {
         renderWithQueryClient(<WidgetLibrary />)
 
         await waitFor(() => {
-            expect(mockedAxios.get).toHaveBeenCalledWith('/api/webpages/api/widget-types/')
+            expect(mockedAxios.get).toHaveBeenCalledWith('/api/v1/webpages/widget-types/')
         })
     })
 }) 

@@ -30,5 +30,6 @@ urlpatterns = [
     # Include app-specific API URLs as you create them:
     # path('users/', include('apps.users.urls')),
     # path('core/', include('apps.core.urls')),
+    path("webpages/", include("webpages.api_urls")),
     path("content/", include("content.urls")),
 ]

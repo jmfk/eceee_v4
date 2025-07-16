@@ -33,7 +33,7 @@ const BulkPublishingOperations = () => {
     const fetchPages = async () => {
         try {
             setLoading(true);
-            const response = await fetch('/api/webpages/');
+            const response = await fetch('/api/v1/webpages/pages/');
             if (!response.ok) {
                 throw new Error('Failed to fetch pages');
             }

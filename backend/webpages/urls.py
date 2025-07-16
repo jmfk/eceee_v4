@@ -4,16 +4,7 @@ URL routing for the Web Page Publishing System API
 Provides RESTful endpoints for managing pages, layouts, themes, widgets, and versions.
 """
 
-from django.urls import path, include
-from rest_framework.routers import DefaultRouter
-from .views import (
-    WebPageViewSet,
-    PageVersionViewSet,
-    PageLayoutViewSet,
-    PageThemeViewSet,
-    WidgetTypeViewSet,
-    PageWidgetViewSet,
-)
+from django.urls import path
 from .public_views import (
     PageDetailView,
     PageListView,
@@ -33,18 +24,7 @@ from .public_views import (
 
 app_name = "webpages"
 
-# Create router and register viewsets
-router = DefaultRouter()
-router.register(r"pages", WebPageViewSet, basename="webpage")
-router.register(r"versions", PageVersionViewSet, basename="pageversion")
-router.register(r"layouts", PageLayoutViewSet, basename="pagelayout")
-router.register(r"themes", PageThemeViewSet, basename="pagetheme")
-router.register(r"widget-types", WidgetTypeViewSet, basename="widgettype")
-router.register(r"widgets", PageWidgetViewSet, basename="pagewidget")
-
 urlpatterns = [
-    # Include all router URLs
-    path("api/", include(router.urls)),
     # Public page views (slug-based routing)
     path("", PageListView.as_view(), name="page-list"),  # Root pages list
     path("sitemap.xml", page_sitemap_view, name="sitemap"),
