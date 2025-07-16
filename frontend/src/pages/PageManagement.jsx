@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
     FileText,
     Layers,
@@ -12,9 +12,13 @@ import {
     History,
     Link,
     Calendar,
-    Clock
+    Clock,
+    Edit3,
+    Save,
+    X
 } from 'lucide-react'
 import axios from 'axios'
+import toast from 'react-hot-toast'
 import LayoutEditor from '../components/LayoutEditor'
 import ThemeEditor from '../components/ThemeEditor'
 import SlotManager from '../components/SlotManager'
@@ -30,6 +34,9 @@ const PageManagement = () => {
     const [searchTerm, setSearchTerm] = useState('')
     const [showVersionManager, setShowVersionManager] = useState(false)
     const [publishingView, setPublishingView] = useState('dashboard') // 'dashboard', 'timeline', 'bulk'
+    const [isCreating, setIsCreating] = useState(false)
+    const [isEditing, setIsEditing] = useState(false)
+    const queryClient = useQueryClient()
 
     // Fetch pages
     const { data: pagesResponse, isLoading: pagesLoading } = useQuery({
@@ -94,6 +101,38 @@ const PageManagement = () => {
         }
     ]
 
+    // Add these mutations for creating and updating pages
+    const createPageMutation = useMutation({
+        mutationFn: async (pageData) => {
+            const response = await axios.post('/api/v1/webpages/pages/', pageData)
+            return response.data
+        },
+        onSuccess: () => {
+            toast.success('Page created successfully')
+            setIsCreating(false)
+            queryClient.invalidateQueries(['pages'])
+        },
+        onError: (error) => {
+            toast.error(error.response?.data?.detail || 'Failed to create page')
+        }
+    })
+
+    const updatePageMutation = useMutation({
+        mutationFn: async ({ id, ...pageData }) => {
+            const response = await axios.patch(`/api/v1/webpages/pages/${id}/`, pageData)
+            return response.data
+        },
+        onSuccess: () => {
+            toast.success('Page updated successfully')
+            setIsEditing(false)
+            setSelectedPage(null)
+            queryClient.invalidateQueries(['pages'])
+        },
+        onError: (error) => {
+            toast.error(error.response?.data?.detail || 'Failed to update page')
+        }
+    })
+
     const renderPageManagement = () => (
         <div className="space-y-6">
             {/* Page List */}
@@ -101,7 +140,10 @@ const PageManagement = () => {
                 <div className="p-4 border-b border-gray-200">
                     <div className="flex items-center justify-between">
                         <h3 className="text-lg font-medium text-gray-900">Pages</h3>
-                        <button className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                        <button
+                            onClick={() => setIsCreating(true)}
+                            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                        >
                             <Plus className="w-4 h-4 mr-2" />
                             New Page
                         </button>
@@ -163,12 +205,24 @@ const PageManagement = () => {
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation()
-                                                // Handle page preview
+                                                // Handle page preview - could navigate to preview URL
+                                                window.open(`/pages/${page.slug}`, '_blank')
                                             }}
                                             className="p-1 text-gray-400 hover:text-gray-600"
                                             title="Preview page"
                                         >
                                             <Eye className="w-4 h-4" />
+                                        </button>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                setSelectedPage(page)
+                                                setIsEditing(true)
+                                            }}
+                                            className="p-1 text-green-600 hover:text-green-700"
+                                            title="Edit page"
+                                        >
+                                            <Edit3 className="w-4 h-4" />
                                         </button>
                                         <button
                                             onClick={(e) => {
@@ -210,8 +264,28 @@ const PageManagement = () => {
                 </div>
             </div>
 
-            {/* Selected Page Details */}
-            {selectedPage && (
+            {/* Page Create/Edit Form */}
+            {(isCreating || isEditing) && (
+                <PageForm
+                    page={isEditing ? selectedPage : null}
+                    onSave={(pageData) => {
+                        if (isEditing) {
+                            updatePageMutation.mutate({ id: selectedPage.id, ...pageData })
+                        } else {
+                            createPageMutation.mutate(pageData)
+                        }
+                    }}
+                    onCancel={() => {
+                        setIsCreating(false)
+                        setIsEditing(false)
+                        setSelectedPage(null)
+                    }}
+                    isLoading={createPageMutation.isLoading || updatePageMutation.isLoading}
+                />
+            )}
+
+            {/* Selected Page Details - only show when not creating/editing */}
+            {selectedPage && !isCreating && !isEditing && (
                 <div className="bg-white rounded-lg shadow p-6">
                     <h4 className="text-lg font-medium text-gray-900 mb-4">Page Details</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -507,6 +581,148 @@ const PageManagement = () => {
                     onClose={() => setShowVersionManager(false)}
                 />
             )}
+        </div>
+    )
+}
+
+// Add the PageForm component at the end of the file, before the export
+const PageForm = ({ page = null, onSave, onCancel, isLoading = false }) => {
+    const [formData, setFormData] = useState({
+        title: page?.title || '',
+        slug: page?.slug || '',
+        description: page?.description || '',
+        publication_status: page?.publication_status || 'draft'
+    })
+
+    const handleSubmit = (e) => {
+        e.preventDefault()
+        if (!formData.title.trim()) {
+            toast.error('Page title is required')
+            return
+        }
+        if (!formData.slug.trim()) {
+            toast.error('Page slug is required')
+            return
+        }
+        onSave(formData)
+    }
+
+    const generateSlug = (title) => {
+        return title
+            .toLowerCase()
+            .replace(/[^a-z0-9\s-]/g, '')
+            .replace(/\s+/g, '-')
+            .replace(/-+/g, '-')
+            .trim()
+    }
+
+    const handleTitleChange = (e) => {
+        const title = e.target.value
+        setFormData(prev => ({
+            ...prev,
+            title,
+            // Auto-generate slug if it's empty or matches the previous auto-generated slug
+            slug: !page && (!prev.slug || prev.slug === generateSlug(prev.title))
+                ? generateSlug(title)
+                : prev.slug
+        }))
+    }
+
+    return (
+        <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-medium text-gray-900">
+                    {page ? 'Edit Page' : 'Create New Page'}
+                </h3>
+                <button
+                    onClick={onCancel}
+                    className="text-gray-400 hover:text-gray-500"
+                >
+                    <X className="w-5 h-5" />
+                </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label htmlFor="page-title" className="block text-sm font-medium text-gray-700 mb-1">
+                            Page Title *
+                        </label>
+                        <input
+                            id="page-title"
+                            type="text"
+                            value={formData.title}
+                            onChange={handleTitleChange}
+                            placeholder="Enter page title"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            required
+                        />
+                    </div>
+
+                    <div>
+                        <label htmlFor="page-slug" className="block text-sm font-medium text-gray-700 mb-1">
+                            URL Slug *
+                        </label>
+                        <input
+                            id="page-slug"
+                            type="text"
+                            value={formData.slug}
+                            onChange={(e) => setFormData(prev => ({ ...prev, slug: e.target.value }))}
+                            placeholder="page-url-slug"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            required
+                        />
+                    </div>
+                </div>
+
+                <div>
+                    <label htmlFor="page-description" className="block text-sm font-medium text-gray-700 mb-1">
+                        Description
+                    </label>
+                    <textarea
+                        id="page-description"
+                        value={formData.description}
+                        onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                        placeholder="Enter page description"
+                        rows={3}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                </div>
+
+                <div>
+                    <label htmlFor="publication-status" className="block text-sm font-medium text-gray-700 mb-1">
+                        Publication Status
+                    </label>
+                    <select
+                        id="publication-status"
+                        value={formData.publication_status}
+                        onChange={(e) => setFormData(prev => ({ ...prev, publication_status: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                        <option value="draft">Draft</option>
+                        <option value="published">Published</option>
+                        <option value="archived">Archived</option>
+                    </select>
+                </div>
+
+                <div className="flex items-center justify-end space-x-3">
+                    <button
+                        type="button"
+                        onClick={onCancel}
+                        className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="submit"
+                        disabled={isLoading}
+                        className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                    >
+                        <Save className="w-4 h-4 mr-2" />
+                        {isLoading ? 'Saving...' : (page ? 'Update Page' : 'Create Page')}
+                    </button>
+                </div>
+            </form>
         </div>
     )
 }
