@@ -9,13 +9,15 @@ import {
     Eye,
     Plus,
     Search,
-    History
+    History,
+    Link
 } from 'lucide-react'
 import axios from 'axios'
 import LayoutEditor from '../components/LayoutEditor'
 import ThemeEditor from '../components/ThemeEditor'
 import SlotManager from '../components/SlotManager'
 import VersionManager from '../components/VersionManager'
+import ObjectPublisher from '../components/ObjectPublisher'
 
 const PageManagement = () => {
     const [activeTab, setActiveTab] = useState('pages')
@@ -68,6 +70,12 @@ const PageManagement = () => {
             label: 'Versions',
             icon: Settings,
             description: 'Page version control and history'
+        },
+        {
+            id: 'objects',
+            label: 'Object Publishing',
+            icon: Link,
+            description: 'Link objects to pages for publishing'
         }
     ]
 
@@ -309,6 +317,45 @@ const PageManagement = () => {
         )
     }
 
+    const renderObjectPublishing = () => {
+        if (!selectedPage) {
+            return (
+                <div className="p-6">
+                    <div className="text-center text-gray-500 py-12">
+                        <Link className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">No Page Selected</h3>
+                        <p>Select a page from the Pages tab to manage object publishing</p>
+                    </div>
+                </div>
+            )
+        }
+
+        return (
+            <div className="p-6">
+                <div className="mb-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                        Object Publishing for: {selectedPage.title}
+                    </h3>
+                    <p className="text-sm text-gray-600">
+                        Link content objects to this page for dynamic publishing
+                    </p>
+                </div>
+
+                <ObjectPublisher
+                    pageId={selectedPage.id}
+                    onObjectLinked={(object, objectType) => {
+                        // Refresh page data or show success message
+                        console.log('Object linked:', object, objectType)
+                    }}
+                    onObjectUnlinked={() => {
+                        // Refresh page data or show success message
+                        console.log('Object unlinked')
+                    }}
+                />
+            </div>
+        )
+    }
+
     const renderTabContent = () => {
         switch (activeTab) {
             case 'pages':
@@ -321,6 +368,8 @@ const PageManagement = () => {
                 return renderWidgetManagement()
             case 'versions':
                 return renderVersionManagement()
+            case 'objects':
+                return renderObjectPublishing()
             default:
                 return null
         }

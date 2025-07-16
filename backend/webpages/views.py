@@ -742,6 +742,184 @@ class WebPageViewSet(viewsets.ModelViewSet):
                 {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+    # Object Publishing Actions
+
+    @action(detail=False, methods=["get"])
+    def object_types(self, request):
+        """Get supported object types for publishing"""
+        object_types = WebPage.get_supported_object_types()
+        return Response({"object_types": object_types})
+
+    @action(detail=True, methods=["post"])
+    def link_object(self, request, pk=None):
+        """Link a page to an object"""
+        page = self.get_object()
+
+        object_type = request.data.get("object_type")
+        object_id = request.data.get("object_id")
+
+        if not object_type or not object_id:
+            return Response(
+                {"error": "object_type and object_id are required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            success = page.link_to_object(object_type, object_id, user=request.user)
+            if success:
+                # Create a version after successful linking
+                page.create_version(
+                    request.user, f"Linked to {object_type} object {object_id}"
+                )
+
+                serializer = self.get_serializer(page)
+                return Response(
+                    {
+                        "success": True,
+                        "message": f"Page linked to {object_type} successfully",
+                        "page": serializer.data,
+                    }
+                )
+            else:
+                return Response(
+                    {"error": "Failed to link object"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response(
+                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=True, methods=["post"])
+    def unlink_object(self, request, pk=None):
+        """Remove object link from a page"""
+        page = self.get_object()
+
+        if not page.is_object_page():
+            return Response(
+                {"error": "Page is not linked to any object"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            success = page.unlink_object(user=request.user)
+            if success:
+                # Create a version after successful unlinking
+                page.create_version(request.user, "Unlinked from object")
+
+                serializer = self.get_serializer(page)
+                return Response(
+                    {
+                        "success": True,
+                        "message": "Object unlinked successfully",
+                        "page": serializer.data,
+                    }
+                )
+            else:
+                return Response(
+                    {"error": "Failed to unlink object"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        except Exception as e:
+            return Response(
+                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=True, methods=["get"])
+    def object_content(self, request, pk=None):
+        """Get content from the linked object"""
+        page = self.get_object()
+
+        if not page.is_object_page():
+            return Response(
+                {"error": "Page is not linked to any object"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            object_content = page.get_object_content()
+            if object_content:
+                return Response(
+                    {
+                        "success": True,
+                        "object_content": object_content,
+                        "linked_object": {
+                            "type": page.linked_object_type,
+                            "id": page.linked_object_id,
+                        },
+                    }
+                )
+            else:
+                return Response(
+                    {"error": "Failed to retrieve object content"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+        except Exception as e:
+            return Response(
+                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=True, methods=["post"])
+    def sync_with_object(self, request, pk=None):
+        """Sync page metadata with the linked object"""
+        page = self.get_object()
+
+        if not page.is_object_page():
+            return Response(
+                {"error": "Page is not linked to any object"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            success = page.sync_with_object(user=request.user)
+            if success:
+                # Create a version after successful sync
+                page.create_version(request.user, "Synced with linked object")
+
+                serializer = self.get_serializer(page)
+                return Response(
+                    {
+                        "success": True,
+                        "message": "Page synced with object successfully",
+                        "page": serializer.data,
+                    }
+                )
+            else:
+                return Response(
+                    {"error": "Failed to sync with object"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        except Exception as e:
+            return Response(
+                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=False, methods=["get"])
+    def object_pages(self, request):
+        """Get all pages that are linked to objects"""
+        object_pages = self.get_queryset().exclude(
+            linked_object_type="", linked_object_id__isnull=True
+        )
+
+        # Filter by object type if specified
+        object_type = request.query_params.get("object_type")
+        if object_type:
+            object_pages = object_pages.filter(linked_object_type=object_type)
+
+        page = self.paginate_queryset(object_pages)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(object_pages, many=True)
+        return Response(serializer.data)
+
 
 class PageVersionViewSet(viewsets.ModelViewSet):
     """
