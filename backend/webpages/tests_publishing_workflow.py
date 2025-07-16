@@ -1,12 +1,14 @@
 """
-Tests for Phase 8: Publishing Workflow & Scheduling
+Tests for Phase 8: Publishing Workflow & Scheduling (Refactored)
 
 Tests cover:
 - Schedule endpoint for future publication
 - Bulk publish and bulk schedule endpoints
 - Publication status dashboard endpoint
-- Management command for automated publishing
+- Management command for automated publishing (now uses service objects)
 - Publishing logic and date validation
+- New "Tell, Don't Ask" methods on WebPage model
+- PublishingService business logic
 """
 
 from django.test import TestCase, TransactionTestCase
@@ -21,6 +23,118 @@ import json
 from io import StringIO
 
 from .models import WebPage, PageVersion, PageLayout, PageTheme
+from .publishing import PublishingService, PublicationSchedule
+
+
+class PublishingServiceTests(TestCase):
+    """Test the refactored PublishingService and value objects"""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="testuser", email="test@example.com", password="testpass123"
+        )
+        self.layout = PageLayout.objects.create(
+            name="Test Layout", slot_configuration={"slots": []}, created_by=self.user
+        )
+        self.theme = PageTheme.objects.create(
+            name="Test Theme", css_variables={}, created_by=self.user
+        )
+        self.service = PublishingService(self.user)
+
+    def test_publication_schedule_value_object(self):
+        """Test PublicationSchedule value object functionality"""
+        now = timezone.now()
+        future = now + timedelta(hours=1)
+        past = now - timedelta(hours=1)
+
+        # Test valid schedule
+        schedule = PublicationSchedule(now, future)
+        self.assertTrue(schedule.is_valid())
+        self.assertTrue(schedule.is_effective_now())
+
+        # Test invalid schedule (effective after expiry)
+        with self.assertRaises(Exception):
+            PublicationSchedule(future, now)
+
+        # Test should_be_published_at logic
+        schedule = PublicationSchedule(future, None)
+        self.assertFalse(schedule.should_be_published_at(now))
+        self.assertTrue(schedule.should_be_published_at(future + timedelta(minutes=1)))
+
+    def test_webpage_tell_dont_ask_methods(self):
+        """Test new 'Tell, Don't Ask' methods on WebPage model"""
+        page = WebPage.objects.create(
+            title="Test Page",
+            slug="test-page",
+            layout=self.layout,
+            theme=self.theme,
+            publication_status="scheduled",
+            effective_date=timezone.now() - timedelta(hours=1),
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        # Test should_be_published_now
+        self.assertTrue(page.should_be_published_now())
+
+        # Test publish method
+        self.assertTrue(page.publish(self.user, "Test publish"))
+        page.refresh_from_db()
+        self.assertEqual(page.publication_status, "published")
+
+        # Test should_be_expired_now
+        page.expiry_date = timezone.now() - timedelta(hours=1)
+        page.save()
+        self.assertTrue(page.should_be_expired_now())
+
+        # Test expire method
+        self.assertTrue(page.expire(self.user, "Test expire"))
+        page.refresh_from_db()
+        self.assertEqual(page.publication_status, "expired")
+
+    def test_publishing_service_process_scheduled_publications(self):
+        """Test service object processing scheduled publications"""
+        # Create scheduled page ready for publication
+        page = WebPage.objects.create(
+            title="Scheduled Page",
+            slug="scheduled-page",
+            layout=self.layout,
+            theme=self.theme,
+            publication_status="scheduled",
+            effective_date=timezone.now() - timedelta(minutes=30),
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        published_count, errors = self.service.process_scheduled_publications()
+
+        self.assertEqual(published_count, 1)
+        self.assertEqual(len(errors), 0)
+
+        page.refresh_from_db()
+        self.assertEqual(page.publication_status, "published")
+
+    def test_publishing_service_process_expired_pages(self):
+        """Test service object processing expired pages"""
+        # Create published page that should be expired
+        page = WebPage.objects.create(
+            title="Expired Page",
+            slug="expired-page",
+            layout=self.layout,
+            theme=self.theme,
+            publication_status="published",
+            expiry_date=timezone.now() - timedelta(minutes=30),
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        expired_count, errors = self.service.process_expired_pages()
+
+        self.assertEqual(expired_count, 1)
+        self.assertEqual(len(errors), 0)
+
+        page.refresh_from_db()
+        self.assertEqual(page.publication_status, "expired")
 
 
 class PublishingWorkflowAPITests(APITestCase):
@@ -65,7 +179,7 @@ class PublishingWorkflowAPITests(APITestCase):
         future_date = timezone.now() + timedelta(hours=2)
         expiry_date = timezone.now() + timedelta(days=7)
 
-        url = f"/api/webpages/api/pages/{self.page1.pk}/schedule/"
+        url = f"/api/v1/webpages/api/pages/{self.page1.pk}/schedule/"
         data = {
             "effective_date": future_date.isoformat(),
             "expiry_date": expiry_date.isoformat(),
@@ -89,7 +203,7 @@ class PublishingWorkflowAPITests(APITestCase):
         """Test scheduling with past date returns error"""
         past_date = timezone.now() - timedelta(hours=1)
 
-        url = f"/api/webpages/api/pages/{self.page1.pk}/schedule/"
+        url = f"/api/v1/webpages/api/pages/{self.page1.pk}/schedule/"
         data = {"effective_date": past_date.isoformat()}
 
         response = self.client.post(url, data, format="json")
@@ -102,7 +216,7 @@ class PublishingWorkflowAPITests(APITestCase):
         future_date = timezone.now() + timedelta(hours=2)
         earlier_date = timezone.now() + timedelta(hours=1)
 
-        url = f"/api/webpages/api/pages/{self.page1.pk}/schedule/"
+        url = f"/api/v1/webpages/api/pages/{self.page1.pk}/schedule/"
         data = {
             "effective_date": future_date.isoformat(),
             "expiry_date": earlier_date.isoformat(),
@@ -117,7 +231,7 @@ class PublishingWorkflowAPITests(APITestCase):
 
     def test_bulk_publish_success(self):
         """Test bulk publishing multiple pages"""
-        url = "/api/webpages/api/pages/bulk_publish/"
+        url = "/api/v1/webpages/api/pages/bulk_publish/"
         data = {"page_ids": [self.page1.pk, self.page2.pk]}
 
         response = self.client.post(url, data, format="json")
@@ -135,7 +249,7 @@ class PublishingWorkflowAPITests(APITestCase):
 
     def test_bulk_publish_empty_list_error(self):
         """Test bulk publish with empty page list returns error"""
-        url = "/api/webpages/api/pages/bulk_publish/"
+        url = "/api/v1/webpages/api/pages/bulk_publish/"
         data = {"page_ids": []}
 
         response = self.client.post(url, data, format="json")
@@ -147,7 +261,7 @@ class PublishingWorkflowAPITests(APITestCase):
         """Test bulk scheduling multiple pages"""
         future_date = timezone.now() + timedelta(hours=2)
 
-        url = "/api/webpages/api/pages/bulk_schedule/"
+        url = "/api/v1/webpages/api/pages/bulk_schedule/"
         data = {
             "page_ids": [self.page1.pk, self.page2.pk],
             "effective_date": future_date.isoformat(),
@@ -175,7 +289,7 @@ class PublishingWorkflowAPITests(APITestCase):
         self.page2.effective_date = timezone.now() + timedelta(hours=1)
         self.page2.save()
 
-        url = "/api/webpages/api/pages/publication_status/"
+        url = "/api/v1/webpages/api/pages/publication_status/"
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -227,8 +341,7 @@ class PublishingManagementCommandTests(TransactionTestCase):
 
         # Check command output
         output = out.getvalue()
-        self.assertIn("Found 1 pages ready for publication", output)
-        self.assertIn("Published successfully", output)
+        self.assertIn("Processed 1 pages: 1 published, 0 expired", output)
 
     def test_process_page_expirations(self):
         """Test processing pages that should be expired"""
@@ -255,8 +368,7 @@ class PublishingManagementCommandTests(TransactionTestCase):
 
         # Check command output
         output = out.getvalue()
-        self.assertIn("Found 1 pages that should be expired", output)
-        self.assertIn("Expired successfully", output)
+        self.assertIn("Processed 1 pages: 0 published, 1 expired", output)
 
     def test_dry_run_mode(self):
         """Test dry run mode doesn't make changes"""
@@ -285,7 +397,7 @@ class PublishingManagementCommandTests(TransactionTestCase):
         # Check command output indicates dry run
         output = out.getvalue()
         self.assertIn("DRY RUN MODE", output)
-        self.assertIn("Found 1 pages ready for publication", output)
+        self.assertIn("Would publish 1 pages", output)
 
     def test_no_changes_needed(self):
         """Test command when no pages need processing"""
@@ -432,7 +544,7 @@ class PublishingWorkflowIntegrationTests(APITestCase):
         future_date = timezone.now() + timedelta(minutes=5)
         expiry_date = timezone.now() + timedelta(hours=1)
 
-        schedule_url = f"/api/webpages/api/pages/{page.pk}/schedule/"
+        schedule_url = f"/api/v1/webpages/api/pages/{page.pk}/schedule/"
         schedule_data = {
             "effective_date": future_date.isoformat(),
             "expiry_date": expiry_date.isoformat(),
@@ -484,12 +596,12 @@ class PublishingWorkflowIntegrationTests(APITestCase):
             pages.append(page)
 
         # Check initial status
-        status_url = "/api/webpages/api/pages/publication_status/"
+        status_url = "/api/v1/webpages/api/pages/publication_status/"
         response = self.client.get(status_url)
         initial_counts = response.data["status_counts"]
 
         # Bulk publish
-        bulk_url = "/api/webpages/api/pages/bulk_publish/"
+        bulk_url = "/api/v1/webpages/api/pages/bulk_publish/"
         bulk_data = {"page_ids": [p.pk for p in pages]}
 
         response = self.client.post(bulk_url, bulk_data, format="json")
