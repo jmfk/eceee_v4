@@ -478,6 +478,236 @@ class WebPageViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(page)
         return Response(serializer.data)
 
+    @action(detail=True, methods=["post"])
+    def schedule(self, request, pk=None):
+        """Schedule a page for future publication"""
+        page = self.get_object()
+
+        effective_date = request.data.get("effective_date")
+        expiry_date = request.data.get("expiry_date")
+
+        if not effective_date:
+            return Response(
+                {"error": "effective_date is required for scheduling"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            from django.utils.dateparse import parse_datetime
+
+            effective_dt = parse_datetime(effective_date)
+            expiry_dt = parse_datetime(expiry_date) if expiry_date else None
+
+            if not effective_dt:
+                return Response(
+                    {"error": "Invalid effective_date format"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Validate dates
+            now = timezone.now()
+            if effective_dt <= now:
+                return Response(
+                    {"error": "effective_date must be in the future"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            if expiry_dt and expiry_dt <= effective_dt:
+                return Response(
+                    {"error": "expiry_date must be after effective_date"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Update page
+            page.publication_status = "scheduled"
+            page.effective_date = effective_dt
+            page.expiry_date = expiry_dt
+            page.last_modified_by = request.user
+            page.save()
+
+            # Create version
+            description = f"Scheduled for publication on {effective_dt.strftime('%Y-%m-%d %H:%M')}"
+            page.create_version(request.user, description)
+
+            serializer = self.get_serializer(page)
+            return Response(serializer.data)
+
+        except Exception as e:
+            return Response(
+                {"error": f"Scheduling failed: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+    @action(detail=False, methods=["post"])
+    def bulk_publish(self, request):
+        """Publish multiple pages immediately"""
+        page_ids = request.data.get("page_ids", [])
+
+        if not page_ids:
+            return Response(
+                {"error": "page_ids list is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            pages = WebPage.objects.filter(id__in=page_ids)
+            updated_pages = []
+
+            for page in pages:
+                page.publication_status = "published"
+                page.effective_date = timezone.now()
+                page.last_modified_by = request.user
+                page.save()
+
+                # Create version
+                page.create_version(
+                    request.user,
+                    "Bulk published via API",
+                    status="published",
+                    auto_publish=True,
+                )
+                updated_pages.append(page)
+
+            serializer = self.get_serializer(updated_pages, many=True)
+            return Response(
+                {
+                    "message": f"Successfully published {len(updated_pages)} pages",
+                    "pages": serializer.data,
+                }
+            )
+
+        except Exception as e:
+            return Response(
+                {"error": f"Bulk publish failed: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+    @action(detail=False, methods=["post"])
+    def bulk_schedule(self, request):
+        """Schedule multiple pages for future publication"""
+        page_ids = request.data.get("page_ids", [])
+        effective_date = request.data.get("effective_date")
+        expiry_date = request.data.get("expiry_date")
+
+        if not page_ids:
+            return Response(
+                {"error": "page_ids list is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not effective_date:
+            return Response(
+                {"error": "effective_date is required for scheduling"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            from django.utils.dateparse import parse_datetime
+
+            effective_dt = parse_datetime(effective_date)
+            expiry_dt = parse_datetime(expiry_date) if expiry_date else None
+
+            if not effective_dt:
+                return Response(
+                    {"error": "Invalid effective_date format"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Validate dates
+            now = timezone.now()
+            if effective_dt <= now:
+                return Response(
+                    {"error": "effective_date must be in the future"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            if expiry_dt and expiry_dt <= effective_dt:
+                return Response(
+                    {"error": "expiry_date must be after effective_date"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            pages = WebPage.objects.filter(id__in=page_ids)
+            updated_pages = []
+
+            for page in pages:
+                page.publication_status = "scheduled"
+                page.effective_date = effective_dt
+                page.expiry_date = expiry_dt
+                page.last_modified_by = request.user
+                page.save()
+
+                # Create version
+                description = f"Bulk scheduled for publication on {effective_dt.strftime('%Y-%m-%d %H:%M')}"
+                page.create_version(request.user, description)
+                updated_pages.append(page)
+
+            serializer = self.get_serializer(updated_pages, many=True)
+            return Response(
+                {
+                    "message": f"Successfully scheduled {len(updated_pages)} pages",
+                    "effective_date": effective_dt.isoformat(),
+                    "expiry_date": expiry_dt.isoformat() if expiry_dt else None,
+                    "pages": serializer.data,
+                }
+            )
+
+        except Exception as e:
+            return Response(
+                {"error": f"Bulk schedule failed: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+    @action(detail=False, methods=["get"])
+    def publication_status(self, request):
+        """Get publication status overview"""
+        now = timezone.now()
+
+        # Count pages by status
+        status_counts = {
+            "unpublished": WebPage.objects.filter(
+                publication_status="unpublished"
+            ).count(),
+            "scheduled": WebPage.objects.filter(publication_status="scheduled").count(),
+            "published": WebPage.objects.filter(
+                publication_status="published", effective_date__lte=now
+            )
+            .filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
+            .count(),
+            "expired": WebPage.objects.filter(
+                Q(publication_status="expired")
+                | Q(publication_status="published", expiry_date__lte=now)
+            ).count(),
+        }
+
+        # Get upcoming scheduled pages
+        upcoming_scheduled = WebPage.objects.filter(
+            publication_status="scheduled", effective_date__gt=now
+        ).order_by("effective_date")[:10]
+
+        # Get recently expired pages
+        recently_expired = WebPage.objects.filter(
+            Q(publication_status="expired")
+            | Q(
+                publication_status="published",
+                expiry_date__lte=now,
+                expiry_date__gte=now - timezone.timedelta(days=7),
+            )
+        ).order_by("-expiry_date")[:10]
+
+        return Response(
+            {
+                "status_counts": status_counts,
+                "upcoming_scheduled": WebPageListSerializer(
+                    upcoming_scheduled, many=True, context={"request": request}
+                ).data,
+                "recently_expired": WebPageListSerializer(
+                    recently_expired, many=True, context={"request": request}
+                ).data,
+                "total_pages": WebPage.objects.count(),
+            }
+        )
+
     @action(detail=True, methods=["get"])
     def children(self, request, pk=None):
         """Get children of a specific page"""
