@@ -490,145 +490,31 @@ class WebPage(models.Model):
         if not self.is_object_page():
             return None
 
-        # Import here to avoid circular imports
-        from django.apps import apps
-        from django.contrib.contenttypes.models import ContentType
+        from .object_publishing import ObjectPublishingService
 
-        try:
-            # Get the model class based on the linked_object_type
-            if self.linked_object_type == "news":
-                from content.models import News
-
-                return News.objects.get(pk=self.linked_object_id)
-            elif self.linked_object_type == "event":
-                from content.models import Event
-
-                return Event.objects.get(pk=self.linked_object_id)
-            elif self.linked_object_type == "libraryitem":
-                from content.models import LibraryItem
-
-                return LibraryItem.objects.get(pk=self.linked_object_id)
-            elif self.linked_object_type == "member":
-                from content.models import Member
-
-                return Member.objects.get(pk=self.linked_object_id)
-            else:
-                return None
-        except Exception:
-            return None
+        service = ObjectPublishingService(self)
+        return service.get_linked_object()
 
     def get_object_content(self):
         """Get content from the linked object for display"""
-        linked_object = self.get_linked_object()
-        if not linked_object:
-            return None
+        from .object_publishing import ObjectPublishingService
 
-        # Extract key content from the linked object
-        content_data = {
-            "object_type": self.linked_object_type,
-            "title": linked_object.title,
-            "slug": linked_object.slug,
-            "description": linked_object.description,
-            "content": getattr(linked_object, "content", ""),
-            "excerpt": getattr(linked_object, "excerpt", ""),
-            "featured_image": getattr(linked_object, "featured_image", ""),
-            "is_published": getattr(linked_object, "is_published", False),
-            "published_date": getattr(linked_object, "published_date", None),
-            "created_at": linked_object.created_at,
-            "updated_at": linked_object.updated_at,
-            "meta_title": getattr(linked_object, "meta_title", ""),
-            "meta_description": getattr(linked_object, "meta_description", ""),
-            "meta_keywords": getattr(linked_object, "meta_keywords", ""),
-        }
-
-        # Add object-specific fields
-        if self.linked_object_type == "news":
-            content_data.update(
-                {
-                    "author": getattr(linked_object, "author", ""),
-                    "priority": getattr(linked_object, "priority", "normal"),
-                    "category": getattr(linked_object, "category", None),
-                    "source": getattr(linked_object, "source", ""),
-                }
-            )
-        elif self.linked_object_type == "event":
-            content_data.update(
-                {
-                    "start_date": getattr(linked_object, "start_date", None),
-                    "end_date": getattr(linked_object, "end_date", None),
-                    "location_name": getattr(linked_object, "location_name", ""),
-                    "location_address": getattr(linked_object, "location_address", ""),
-                    "organizer_name": getattr(linked_object, "organizer_name", ""),
-                    "status": getattr(linked_object, "status", "scheduled"),
-                }
-            )
-        elif self.linked_object_type == "libraryitem":
-            content_data.update(
-                {
-                    "item_type": getattr(linked_object, "item_type", "document"),
-                    "file_url": getattr(linked_object, "file_url", ""),
-                    "file_size": getattr(linked_object, "file_size", ""),
-                    "file_format": getattr(linked_object, "file_format", ""),
-                    "access_level": getattr(linked_object, "access_level", "public"),
-                }
-            )
-        elif self.linked_object_type == "member":
-            content_data.update(
-                {
-                    "first_name": getattr(linked_object, "first_name", ""),
-                    "last_name": getattr(linked_object, "last_name", ""),
-                    "job_title": getattr(linked_object, "job_title", ""),
-                    "department": getattr(linked_object, "department", ""),
-                    "member_type": getattr(linked_object, "member_type", "staff"),
-                    "biography": getattr(linked_object, "biography", ""),
-                }
-            )
-
-        return content_data
+        service = ObjectPublishingService(self)
+        return service.get_formatted_content()
 
     def link_to_object(self, object_type, object_id, user=None):
         """Link this page to an object"""
-        # Validate that the object exists
-        temp_page = WebPage(linked_object_type=object_type, linked_object_id=object_id)
-        linked_object = temp_page.get_linked_object()
+        from .object_publishing import ObjectPublishingService
 
-        if not linked_object:
-            raise ValueError(
-                f"Object of type {object_type} with ID {object_id} not found"
-            )
-
-        # Update the page
-        self.linked_object_type = object_type
-        self.linked_object_id = object_id
-
-        # Update page metadata from object if not already set
-        if not self.title:
-            self.title = linked_object.title
-        if not self.slug:
-            self.slug = linked_object.slug
-        if not self.description:
-            self.description = linked_object.description
-        if not self.meta_title and hasattr(linked_object, "meta_title"):
-            self.meta_title = linked_object.meta_title
-        if not self.meta_description and hasattr(linked_object, "meta_description"):
-            self.meta_description = linked_object.meta_description
-
-        if user:
-            self.last_modified_by = user
-
-        self.save()
-        return True
+        service = ObjectPublishingService(self)
+        return service.link_object(object_type, object_id, user)
 
     def unlink_object(self, user=None):
         """Remove the object link from this page"""
-        self.linked_object_type = ""
-        self.linked_object_id = None
+        from .object_publishing import ObjectPublishingService
 
-        if user:
-            self.last_modified_by = user
-
-        self.save()
-        return True
+        service = ObjectPublishingService(self)
+        return service.unlink_object(user)
 
     def get_canonical_url(self):
         """Get the canonical URL for this page, considering object links"""
@@ -653,42 +539,10 @@ class WebPage(models.Model):
 
     def sync_with_object(self, user=None):
         """Sync page metadata with the linked object"""
-        if not self.is_object_page():
-            return False
+        from .object_publishing import ObjectPublishingService
 
-        linked_object = self.get_linked_object()
-        if not linked_object:
-            return False
-
-        # Update page fields from object
-        self.title = linked_object.title
-        self.description = linked_object.description
-
-        if hasattr(linked_object, "meta_title") and linked_object.meta_title:
-            self.meta_title = linked_object.meta_title
-        if (
-            hasattr(linked_object, "meta_description")
-            and linked_object.meta_description
-        ):
-            self.meta_description = linked_object.meta_description
-        if hasattr(linked_object, "meta_keywords") and linked_object.meta_keywords:
-            self.meta_keywords = linked_object.meta_keywords
-
-        # Update publication status based on object
-        if hasattr(linked_object, "is_published"):
-            if linked_object.is_published and self.publication_status == "unpublished":
-                self.publication_status = "published"
-            elif (
-                not linked_object.is_published
-                and self.publication_status == "published"
-            ):
-                self.publication_status = "unpublished"
-
-        if user:
-            self.last_modified_by = user
-
-        self.save()
-        return True
+        service = ObjectPublishingService(self)
+        return service.sync_with_object(user)
 
 
 class PageVersion(models.Model):
