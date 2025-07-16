@@ -10,7 +10,9 @@ import {
     Plus,
     Search,
     History,
-    Link
+    Link,
+    Calendar,
+    Clock
 } from 'lucide-react'
 import axios from 'axios'
 import LayoutEditor from '../components/LayoutEditor'
@@ -18,12 +20,16 @@ import ThemeEditor from '../components/ThemeEditor'
 import SlotManager from '../components/SlotManager'
 import VersionManager from '../components/VersionManager'
 import ObjectPublisher from '../components/ObjectPublisher'
+import PublicationStatusDashboard from '../components/PublicationStatusDashboard'
+import PublicationTimeline from '../components/PublicationTimeline'
+import BulkPublishingOperations from '../components/BulkPublishingOperations'
 
 const PageManagement = () => {
     const [activeTab, setActiveTab] = useState('pages')
     const [selectedPage, setSelectedPage] = useState(null)
     const [searchTerm, setSearchTerm] = useState('')
     const [showVersionManager, setShowVersionManager] = useState(false)
+    const [publishingView, setPublishingView] = useState('dashboard') // 'dashboard', 'timeline', 'bulk'
 
     // Fetch pages
     const { data: pages, isLoading: pagesLoading } = useQuery({
@@ -76,6 +82,12 @@ const PageManagement = () => {
             label: 'Object Publishing',
             icon: Link,
             description: 'Link objects to pages for publishing'
+        },
+        {
+            id: 'publishing',
+            label: 'Publishing Workflow',
+            icon: Calendar,
+            description: 'Manage publication scheduling and status'
         }
     ]
 
@@ -356,6 +368,64 @@ const PageManagement = () => {
         )
     }
 
+    const renderPublishingWorkflow = () => {
+        const publishingTabs = [
+            {
+                id: 'dashboard',
+                label: 'Status Dashboard',
+                icon: Eye,
+                component: PublicationStatusDashboard
+            },
+            {
+                id: 'timeline',
+                label: 'Publication Timeline',
+                icon: Calendar,
+                component: PublicationTimeline
+            },
+            {
+                id: 'bulk',
+                label: 'Bulk Operations',
+                icon: Clock,
+                component: BulkPublishingOperations
+            }
+        ]
+
+        const ActiveComponent = publishingTabs.find(tab => tab.id === publishingView)?.component
+
+        return (
+            <div className="space-y-6">
+                {/* Publishing Workflow Sub-tabs */}
+                <div className="bg-gray-50 border-b border-gray-200 px-6 py-3">
+                    <nav className="flex space-x-6">
+                        {publishingTabs.map((tab) => {
+                            const Icon = tab.icon
+                            const isActive = publishingView === tab.id
+
+                            return (
+                                <button
+                                    key={tab.id}
+                                    onClick={() => setPublishingView(tab.id)}
+                                    className={`inline-flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${isActive
+                                            ? 'bg-blue-600 text-white'
+                                            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                                        }`}
+                                >
+                                    <Icon className="w-4 h-4 mr-2" />
+                                    {tab.label}
+                                </button>
+                            )
+                        })}
+                    </nav>
+                </div>
+
+                {/* Publishing Workflow Content */}
+                <div className="p-6">
+                    {ActiveComponent && <ActiveComponent />}
+                </div>
+            </div>
+        )
+    }
+
     const renderTabContent = () => {
         switch (activeTab) {
             case 'pages':
@@ -370,6 +440,8 @@ const PageManagement = () => {
                 return renderVersionManagement()
             case 'objects':
                 return renderObjectPublishing()
+            case 'publishing':
+                return renderPublishingWorkflow()
             default:
                 return null
         }
