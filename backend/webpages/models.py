@@ -10,7 +10,7 @@ This module defines the core models for the hierarchical web page management sys
 - PageWidget: Widget instances on pages
 """
 
-from django.db import models
+from django.db import models, transaction
 from django.contrib.auth.models import User
 from django.utils import timezone
 from django.urls import reverse
@@ -172,13 +172,22 @@ class WebPage(models.Model):
 
     # Publishing control
     publication_status = models.CharField(
-        max_length=20, choices=PUBLICATION_STATUS_CHOICES, default="unpublished"
+        max_length=20,
+        choices=PUBLICATION_STATUS_CHOICES,
+        default="unpublished",
+        db_index=True,
     )
     effective_date = models.DateTimeField(
-        null=True, blank=True, help_text="When this page should become public"
+        null=True,
+        blank=True,
+        help_text="When this page should become public",
+        db_index=True,
     )
     expiry_date = models.DateTimeField(
-        null=True, blank=True, help_text="When this page should no longer be public"
+        null=True,
+        blank=True,
+        help_text="When this page should no longer be public",
+        db_index=True,
     )
 
     # SEO and metadata
@@ -247,6 +256,123 @@ class WebPage(models.Model):
             return False
 
         return True
+
+    def get_publication_schedule(self):
+        """Get the publication schedule for this page as a value object."""
+        from .publishing import PublicationSchedule
+
+        return PublicationSchedule(self.effective_date, self.expiry_date)
+
+    def should_be_published_now(self, now=None):
+        """
+        Tell, Don't Ask: Let the page tell us if it should be published now.
+
+        This addresses the code smell where external code was asking the page
+        about its state and then making decisions.
+        """
+        if now is None:
+            now = timezone.now()
+
+        return (
+            self.publication_status == "scheduled"
+            and self.get_publication_schedule().should_be_published_at(now)
+        )
+
+    def should_be_expired_now(self, now=None):
+        """
+        Tell, Don't Ask: Let the page tell us if it should be expired now.
+        """
+        if now is None:
+            now = timezone.now()
+
+        return (
+            self.publication_status == "published"
+            and self.get_publication_schedule().should_be_expired_at(now)
+        )
+
+    def publish(self, user, change_summary="Page published"):
+        """
+        Tell, Don't Ask: Let the page publish itself.
+
+        Returns True if publication was successful, False otherwise.
+        """
+        if self.publication_status == "published":
+            return False  # Already published
+
+        try:
+            with transaction.atomic():
+                self.publication_status = "published"
+                self.last_modified_by = user
+                self.save()
+
+                # Create version record if the method exists
+                if hasattr(self, "create_version"):
+                    self.create_version(
+                        user,
+                        change_summary,
+                        status="published",
+                        auto_publish=True,
+                    )
+
+                return True
+        except Exception:
+            return False
+
+    def expire(self, user, change_summary="Page expired"):
+        """
+        Tell, Don't Ask: Let the page expire itself.
+
+        Returns True if expiration was successful, False otherwise.
+        """
+        if self.publication_status != "published":
+            return False  # Not currently published
+
+        try:
+            with transaction.atomic():
+                self.publication_status = "expired"
+                self.last_modified_by = user
+                self.save()
+
+                # Create version record if the method exists
+                if hasattr(self, "create_version"):
+                    self.create_version(
+                        user,
+                        change_summary,
+                        status="draft",
+                    )
+
+                return True
+        except Exception:
+            return False
+
+    def schedule(self, schedule, user, change_summary="Page scheduled"):
+        """
+        Tell, Don't Ask: Let the page schedule itself with a PublicationSchedule.
+
+        Returns True if scheduling was successful, False otherwise.
+        """
+        if not schedule.is_valid():
+            return False
+
+        try:
+            with transaction.atomic():
+                self.publication_status = "scheduled"
+                self.effective_date = schedule.effective_date
+                self.expiry_date = schedule.expiry_date
+                self.last_modified_by = user
+                self.save()
+
+                # Create version record if the method exists
+                if hasattr(self, "create_version"):
+                    self.create_version(
+                        user,
+                        change_summary,
+                        status="draft",
+                    )
+
+                return True
+        except Exception:
+            return False
 
     def get_breadcrumbs(self):
         """Get list of pages from root to this page for breadcrumb navigation"""
