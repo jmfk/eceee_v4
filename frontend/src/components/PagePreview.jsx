@@ -41,7 +41,7 @@ const PagePreview = ({
     })
 
     // Fetch sample pages for preview selection
-    const { data: samplePages } = useQuery({
+    const { data: samplePagesResponse } = useQuery({
         queryKey: ['sample-pages'],
         queryFn: async () => {
             const response = await axios.get('/api/v1/webpages/pages/?limit=10')
@@ -49,6 +49,9 @@ const PagePreview = ({
         },
         enabled: !pageId
     })
+
+    // Extract sample pages array from paginated response
+    const samplePages = samplePagesResponse?.results || []
 
     const previewSizes = {
         mobile: { width: '375px', height: '667px', label: 'Mobile' },

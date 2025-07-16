@@ -25,13 +25,16 @@ const ThemeEditor = () => {
     const queryClient = useQueryClient()
 
     // Fetch themes
-    const { data: themes, isLoading } = useQuery({
+    const { data: themesResponse, isLoading } = useQuery({
         queryKey: ['themes'],
         queryFn: async () => {
             const response = await axios.get('/api/v1/webpages/themes/')
             return response.data
         }
     })
+
+    // Extract themes array from paginated response
+    const themes = themesResponse?.results || []
 
     return (
         <div className="space-y-6">

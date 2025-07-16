@@ -107,7 +107,15 @@ describe('SlotManager', () => {
                 return Promise.resolve({ data: { widgets: mockPageWidgets } })
             }
             if (url.includes('widget-types')) {
-                return Promise.resolve({ data: mockWidgetTypes })
+                // Mock paginated response for widget-types
+                return Promise.resolve({
+                    data: {
+                        count: mockWidgetTypes.length,
+                        next: null,
+                        previous: null,
+                        results: mockWidgetTypes
+                    }
+                })
             }
             return Promise.resolve({ data: [] })
         })

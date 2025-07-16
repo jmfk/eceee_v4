@@ -23,13 +23,16 @@ const LayoutEditor = () => {
     const queryClient = useQueryClient()
 
     // Fetch layouts
-    const { data: layouts, isLoading } = useQuery({
+    const { data: layoutsResponse, isLoading } = useQuery({
         queryKey: ['layouts'],
         queryFn: async () => {
             const response = await axios.get('/api/v1/webpages/layouts/')
             return response.data
         }
     })
+
+    // Extract layouts array from paginated response
+    const layouts = layoutsResponse?.results || []
 
     return (
         <div className="space-y-6">

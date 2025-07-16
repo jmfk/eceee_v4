@@ -82,8 +82,15 @@ describe('ThemeEditor', () => {
     beforeEach(() => {
         vi.clearAllMocks()
 
-        // Mock successful API responses
-        mockedAxios.get.mockResolvedValue({ data: mockThemes })
+        // Mock successful API responses with paginated structure
+        mockedAxios.get.mockResolvedValue({
+            data: {
+                count: mockThemes.length,
+                next: null,
+                previous: null,
+                results: mockThemes
+            }
+        })
         mockedAxios.post.mockResolvedValue({ data: mockThemes[0] })
         mockedAxios.put.mockResolvedValue({ data: mockThemes[0] })
         mockedAxios.delete.mockResolvedValue({ data: {} })
@@ -443,9 +450,16 @@ describe('ThemeEditor', () => {
     })
 
     it('shows loading state while fetching themes', async () => {
-        // Mock delayed response
+        // Mock delayed response with paginated structure
         mockedAxios.get.mockImplementation(() =>
-            new Promise(resolve => setTimeout(() => resolve({ data: mockThemes }), 100))
+            new Promise(resolve => setTimeout(() => resolve({
+                data: {
+                    count: mockThemes.length,
+                    next: null,
+                    previous: null,
+                    results: mockThemes
+                }
+            }), 100))
         )
 
         renderWithQueryClient(<ThemeEditor />)

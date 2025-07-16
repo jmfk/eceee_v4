@@ -218,13 +218,16 @@ const SlotManager = ({ pageId, layout, onWidgetChange }) => {
     const slotState = SlotStateFactory.createFromQuery({ widgets: pageWidgetsData })
 
     // Fetch widget types for the library
-    const { data: widgetTypes } = useQuery({
+    const { data: widgetTypesResponse } = useQuery({
         queryKey: ['widget-types'],
         queryFn: async () => {
             const response = await axios.get('/api/v1/webpages/widget-types/')
-            return response.data.filter(widget => widget.is_active)
+            return response.data
         }
     })
+
+    // Extract widget types array from paginated response and filter active ones
+    const widgetTypes = widgetTypesResponse?.results?.filter(widget => widget.is_active) || []
 
     // Simplified mutations using command objects
     const createWidgetMutation = useMutation({

@@ -52,13 +52,28 @@ const renderWithQueryClient = (component, queryClient = new QueryClient({
 describe('WidgetLibrary', () => {
     beforeEach(() => {
         vi.clearAllMocks()
-        mockedAxios.get.mockResolvedValue({ data: mockWidgetTypes })
+        // Mock the paginated API response structure
+        mockedAxios.get.mockResolvedValue({
+            data: {
+                count: mockWidgetTypes.length,
+                next: null,
+                previous: null,
+                results: mockWidgetTypes
+            }
+        })
     })
 
     it('renders widget library with loading state', async () => {
         // Mock a delayed response to test loading state
         mockedAxios.get.mockImplementation(() =>
-            new Promise(resolve => setTimeout(() => resolve({ data: mockWidgetTypes }), 100))
+            new Promise(resolve => setTimeout(() => resolve({
+                data: {
+                    count: mockWidgetTypes.length,
+                    next: null,
+                    previous: null,
+                    results: mockWidgetTypes
+                }
+            }), 100))
         )
 
         renderWithQueryClient(<WidgetLibrary />)

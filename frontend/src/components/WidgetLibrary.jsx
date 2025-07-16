@@ -25,13 +25,16 @@ const WidgetLibrary = ({ onSelectWidget, selectedWidgetTypes = [] }) => {
     const [showCustomCreator, setShowCustomCreator] = useState(false)
 
     // Fetch available widget types
-    const { data: widgetTypes, isLoading, error } = useQuery({
+    const { data: widgetTypesResponse, isLoading, error } = useQuery({
         queryKey: ['widget-types'],
         queryFn: async () => {
             const response = await axios.get('/api/v1/webpages/widget-types/')
-            return response.data.filter(widget => widget.is_active)
+            return response.data
         }
     })
+
+    // Extract widget types array from paginated response and filter active ones
+    const widgetTypes = widgetTypesResponse?.results?.filter(widget => widget.is_active) || []
 
     // Widget type icons mapping
     const getWidgetIcon = (widgetName) => {
