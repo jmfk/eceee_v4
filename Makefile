@@ -8,12 +8,15 @@ install:
 	cd frontend && npm install
 
 # Run Django backend server
+servers:
+	docker-compose up db redis -d
+
 backend:
-	cd backend && python manage.py runserver 0.0.0.0:8000
+	docker-compose up backend
 
 # Run React frontend dev server
 frontend:
-	cd frontend && npm run dev
+	docker-compose up frontend
 
 # Run Django migrations
 migrate:

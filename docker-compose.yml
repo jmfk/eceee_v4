@@ -108,18 +108,18 @@ services:
   #     - mcp_network
 
   # MCP Server for Puppeteer operations
-  mcp-puppeteer:
-    build:
-      context: ./docker/mcp-servers
-      dockerfile: Dockerfile.puppeteer
-    container_name: eceee_v4_mcp_puppeteer
-    restart: unless-stopped
-    volumes:
-      - mcp_logs:/var/log/mcp
-    environment:
-      - MCP_SERVER_NAME=puppeteer
-    networks:
-      - mcp_network
+  # mcp-puppeteer:
+  #   build:
+  #     context: ./docker/mcp-servers
+  #     dockerfile: Dockerfile.puppeteer
+  #   container_name: eceee_v4_mcp_puppeteer
+  #   restart: unless-stopped
+  #   volumes:
+  #     - mcp_logs:/var/log/mcp
+  #   environment:
+  #     - MCP_SERVER_NAME=puppeteer
+  #   networks:
+  #     - mcp_network
 
   # MCP Server for Django operations
   # mcp-django:
