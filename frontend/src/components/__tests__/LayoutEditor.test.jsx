@@ -99,8 +99,15 @@ describe('LayoutEditor', () => {
     beforeEach(() => {
         vi.clearAllMocks()
 
-        // Mock successful API responses
-        mockedAxios.get.mockResolvedValue({ data: mockLayouts })
+        // Mock successful API responses - LayoutEditor expects paginated response
+        mockedAxios.get.mockResolvedValue({
+            data: {
+                count: mockLayouts.length,
+                next: null,
+                previous: null,
+                results: mockLayouts
+            }
+        })
         mockedAxios.post.mockResolvedValue({ data: mockLayouts[0] })
         mockedAxios.put.mockResolvedValue({ data: mockLayouts[0] })
         mockedAxios.delete.mockResolvedValue({ data: {} })
@@ -343,9 +350,16 @@ describe('LayoutEditor', () => {
     })
 
     it('shows loading state while fetching layouts', async () => {
-        // Mock delayed response
+        // Mock delayed response with paginated format
         mockedAxios.get.mockImplementation(() =>
-            new Promise(resolve => setTimeout(() => resolve({ data: mockLayouts }), 100))
+            new Promise(resolve => setTimeout(() => resolve({
+                data: {
+                    count: mockLayouts.length,
+                    next: null,
+                    previous: null,
+                    results: mockLayouts
+                }
+            }), 100))
         )
 
         renderWithQueryClient(<LayoutEditor />)
