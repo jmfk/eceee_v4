@@ -133,7 +133,7 @@ class PageVersionAPISimpleTest(APITestCase):
 
     def test_list_versions_api(self):
         """Test listing versions via API"""
-        url = reverse("webpages:pageversion-list")
+        url = reverse("api:pageversion-list")
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
@@ -149,7 +149,7 @@ class PageVersionAPISimpleTest(APITestCase):
         """Test publishing a version via API"""
         # Create new draft to publish
         new_draft = self.page.create_version(self.user, "New draft to publish")
-        url = reverse("webpages:pageversion-publish", kwargs={"pk": new_draft.pk})
+        url = reverse("api:pageversion-publish", kwargs={"pk": new_draft.pk})
 
         response = self.client.post(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -161,9 +161,7 @@ class PageVersionAPISimpleTest(APITestCase):
 
     def test_create_draft_api(self):
         """Test creating draft from published via API"""
-        url = reverse(
-            "webpages:pageversion-create-draft", kwargs={"pk": self.published.pk}
-        )
+        url = reverse("api:pageversion-create-draft", kwargs={"pk": self.published.pk})
         data = {"description": "API created draft"}
 
         response = self.client.post(url, data, format="json")
@@ -177,7 +175,7 @@ class PageVersionAPISimpleTest(APITestCase):
 
     def test_compare_versions_api(self):
         """Test version comparison via API"""
-        url = reverse("webpages:pageversion-compare")
+        url = reverse("api:pageversion-compare")
         params = {"version1": self.draft.pk, "version2": self.published.pk}
 
         response = self.client.get(url, params)
@@ -190,7 +188,7 @@ class PageVersionAPISimpleTest(APITestCase):
 
     def test_restore_version_api(self):
         """Test restoring a version via API"""
-        url = reverse("webpages:pageversion-restore", kwargs={"pk": self.draft.pk})
+        url = reverse("api:pageversion-restore", kwargs={"pk": self.draft.pk})
 
         response = self.client.post(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -226,7 +224,7 @@ class PageVersionIntegrationSimpleTest(APITestCase):
         initial_count = PageVersion.objects.filter(page=self.page).count()
 
         # Update page
-        url = reverse("webpages:webpage-detail", kwargs={"pk": self.page.pk})
+        url = reverse("api:webpage-detail", kwargs={"pk": self.page.pk})
         data = {"title": "Updated Title", "version_description": "Title update"}
 
         response = self.client.patch(url, data, format="json")
@@ -247,7 +245,7 @@ class PageVersionIntegrationSimpleTest(APITestCase):
 
     def test_page_publish_action(self):
         """Test page publish action creates published version"""
-        url = reverse("webpages:webpage-publish", kwargs={"pk": self.page.pk})
+        url = reverse("api:webpage-publish", kwargs={"pk": self.page.pk})
 
         response = self.client.post(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)

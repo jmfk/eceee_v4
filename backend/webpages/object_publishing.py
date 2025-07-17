@@ -187,13 +187,13 @@ class ObjectPublishingService:
         self.page.linked_object_type = object_type
         self.page.linked_object_id = object_id
 
-        # Update page metadata from object if not already set
-        if not self.page.title:
-            self.page.title = linked_object.title
+        # Update page metadata from object (always sync core metadata when linking)
+        self.page.title = linked_object.title
+        self.page.description = linked_object.description
+
+        # Only update slug if not already set (to prevent URL changes)
         if not self.page.slug:
             self.page.slug = linked_object.slug
-        if not self.page.description:
-            self.page.description = linked_object.description
         if not self.page.meta_title and hasattr(linked_object, "meta_title"):
             self.page.meta_title = linked_object.meta_title
         if not self.page.meta_description and hasattr(

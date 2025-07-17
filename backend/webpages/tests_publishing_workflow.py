@@ -179,7 +179,7 @@ class PublishingWorkflowAPITests(APITestCase):
         future_date = timezone.now() + timedelta(hours=2)
         expiry_date = timezone.now() + timedelta(days=7)
 
-        url = f"/api/v1/webpages/api/pages/{self.page1.pk}/schedule/"
+        url = reverse("api:webpage-schedule", kwargs={"pk": self.page1.pk})
         data = {
             "effective_date": future_date.isoformat(),
             "expiry_date": expiry_date.isoformat(),
@@ -203,7 +203,7 @@ class PublishingWorkflowAPITests(APITestCase):
         """Test scheduling with past date returns error"""
         past_date = timezone.now() - timedelta(hours=1)
 
-        url = f"/api/v1/webpages/api/pages/{self.page1.pk}/schedule/"
+        url = reverse("api:webpage-schedule", kwargs={"pk": self.page1.pk})
         data = {"effective_date": past_date.isoformat()}
 
         response = self.client.post(url, data, format="json")
@@ -216,7 +216,7 @@ class PublishingWorkflowAPITests(APITestCase):
         future_date = timezone.now() + timedelta(hours=2)
         earlier_date = timezone.now() + timedelta(hours=1)
 
-        url = f"/api/v1/webpages/api/pages/{self.page1.pk}/schedule/"
+        url = reverse("api:webpage-schedule", kwargs={"pk": self.page1.pk})
         data = {
             "effective_date": future_date.isoformat(),
             "expiry_date": earlier_date.isoformat(),
@@ -231,7 +231,7 @@ class PublishingWorkflowAPITests(APITestCase):
 
     def test_bulk_publish_success(self):
         """Test bulk publishing multiple pages"""
-        url = "/api/v1/webpages/api/pages/bulk_publish/"
+        url = reverse("api:webpage-bulk-publish")
         data = {"page_ids": [self.page1.pk, self.page2.pk]}
 
         response = self.client.post(url, data, format="json")
@@ -249,7 +249,7 @@ class PublishingWorkflowAPITests(APITestCase):
 
     def test_bulk_publish_empty_list_error(self):
         """Test bulk publish with empty page list returns error"""
-        url = "/api/v1/webpages/api/pages/bulk_publish/"
+        url = reverse("api:webpage-bulk-publish")
         data = {"page_ids": []}
 
         response = self.client.post(url, data, format="json")
@@ -261,7 +261,7 @@ class PublishingWorkflowAPITests(APITestCase):
         """Test bulk scheduling multiple pages"""
         future_date = timezone.now() + timedelta(hours=2)
 
-        url = "/api/v1/webpages/api/pages/bulk_schedule/"
+        url = reverse("api:webpage-bulk-schedule")
         data = {
             "page_ids": [self.page1.pk, self.page2.pk],
             "effective_date": future_date.isoformat(),
@@ -289,7 +289,7 @@ class PublishingWorkflowAPITests(APITestCase):
         self.page2.effective_date = timezone.now() + timedelta(hours=1)
         self.page2.save()
 
-        url = "/api/v1/webpages/api/pages/publication_status/"
+        url = reverse("api:webpage-publication-status")
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -544,7 +544,7 @@ class PublishingWorkflowIntegrationTests(APITestCase):
         future_date = timezone.now() + timedelta(minutes=5)
         expiry_date = timezone.now() + timedelta(hours=1)
 
-        schedule_url = f"/api/v1/webpages/api/pages/{page.pk}/schedule/"
+        schedule_url = reverse("api:webpage-schedule", kwargs={"pk": page.pk})
         schedule_data = {
             "effective_date": future_date.isoformat(),
             "expiry_date": expiry_date.isoformat(),
@@ -596,12 +596,12 @@ class PublishingWorkflowIntegrationTests(APITestCase):
             pages.append(page)
 
         # Check initial status
-        status_url = "/api/v1/webpages/api/pages/publication_status/"
+        status_url = reverse("api:webpage-publication-status")
         response = self.client.get(status_url)
         initial_counts = response.data["status_counts"]
 
         # Bulk publish
-        bulk_url = "/api/v1/webpages/api/pages/bulk_publish/"
+        bulk_url = reverse("api:webpage-bulk-publish")
         bulk_data = {"page_ids": [p.pk for p in pages]}
 
         response = self.client.post(bulk_url, bulk_data, format="json")

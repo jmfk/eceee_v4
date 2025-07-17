@@ -69,7 +69,17 @@ class BaseContentModel(models.Model):
     def get_absolute_url(self):
         """Generate the canonical URL for this object"""
         content_type = self.__class__.__name__.lower()
-        return f"/{content_type}/{self.slug}/"
+
+        # Map model names to URL patterns
+        url_mapping = {
+            "event": "events",
+            "libraryitem": "library",
+            "member": "members",
+            "news": "news",
+        }
+
+        url_path = url_mapping.get(content_type, content_type)
+        return f"/{url_path}/{self.slug}/"
 
     def get_api_url(self):
         """Generate the API URL for this object"""
@@ -401,6 +411,11 @@ class Member(BaseContentModel):
             name_parts.append(self.middle_name)
         name_parts.append(self.last_name)
         return " ".join(name_parts)
+
+    @property
+    def full_name(self):
+        """Property alias for get_full_name()"""
+        return self.get_full_name()
 
     def get_short_name(self):
         """Return first name + last name"""

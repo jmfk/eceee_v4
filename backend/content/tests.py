@@ -413,7 +413,7 @@ class ContentAPITest(APITestCase):
 
     def test_news_list_api(self):
         """Test news list API endpoint"""
-        url = reverse("content:news-list")
+        url = reverse("api:news-list")
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -422,7 +422,7 @@ class ContentAPITest(APITestCase):
 
     def test_news_detail_api(self):
         """Test news detail API endpoint"""
-        url = reverse("content:news-detail", kwargs={"pk": self.news.pk})
+        url = reverse("api:news-detail", kwargs={"pk": self.news.pk})
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -430,7 +430,7 @@ class ContentAPITest(APITestCase):
 
     def test_search_filtering(self):
         """Test search functionality"""
-        url = reverse("content:news-list")
+        url = reverse("api:news-list")
         response = self.client.get(url, {"search": "Test"})
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -441,8 +441,8 @@ class ContentAPITest(APITestCase):
 
     def test_category_filtering(self):
         """Test category filtering"""
-        url = reverse("content:news-list")
-        response = self.client.get(url, {"category": self.category.slug})
+        url = reverse("api:news-list")
+        response = self.client.get(url, {"category": self.category.id})
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data["results"]), 1)
@@ -479,7 +479,7 @@ class WebPageObjectAPITest(APITestCase):
 
     def test_link_object_api(self):
         """Test link object API endpoint"""
-        url = reverse("webpages:webpage-link-object", kwargs={"pk": self.page.pk})
+        url = reverse("api:webpage-link-object", kwargs={"pk": self.page.pk})
         data = {"object_type": "news", "object_id": self.news.id}
 
         response = self.client.post(url, data, format="json")
@@ -494,7 +494,7 @@ class WebPageObjectAPITest(APITestCase):
         # First link an object
         self.page.link_to_object("news", self.news.id, self.user)
 
-        url = reverse("webpages:webpage-unlink-object", kwargs={"pk": self.page.pk})
+        url = reverse("api:webpage-unlink-object", kwargs={"pk": self.page.pk})
         response = self.client.post(url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -511,7 +511,7 @@ class WebPageObjectAPITest(APITestCase):
         self.page.title = "Different Title"
         self.page.save()
 
-        url = reverse("webpages:webpage-sync-object", kwargs={"pk": self.page.pk})
+        url = reverse("api:webpage-sync-with-object", kwargs={"pk": self.page.pk})
         response = self.client.post(url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)

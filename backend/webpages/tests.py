@@ -403,7 +403,7 @@ class WidgetTypeAPITest(APITestCase):
 
     def test_create_widget_type(self):
         """Test creating a widget type via API"""
-        url = reverse("webpages:widgettype-list")
+        url = reverse("api:widgettype-list")
         response = self.client.post(url, self.widget_type_data, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -435,7 +435,7 @@ class WidgetTypeAPITest(APITestCase):
             created_by=self.user,
         )
 
-        url = reverse("webpages:widgettype-list")
+        url = reverse("api:widgettype-list")
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -466,7 +466,7 @@ class WidgetTypeAPITest(APITestCase):
             created_by=self.user,
         )
 
-        url = reverse("webpages:widgettype-active")
+        url = reverse("api:widgettype-active")
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -503,7 +503,7 @@ class PageLayoutAPITest(APITestCase):
 
     def test_create_layout(self):
         """Test creating a layout via API"""
-        url = reverse("webpages:pagelayout-list")
+        url = reverse("api:pagelayout-list")
         response = self.client.post(url, self.layout_data, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -520,7 +520,7 @@ class PageLayoutAPITest(APITestCase):
             name="Test Layout", slot_configuration={"slots": []}, created_by=self.user
         )
 
-        url = reverse("webpages:pagelayout-list")
+        url = reverse("api:pagelayout-list")
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -550,7 +550,7 @@ class PageLayoutAPITest(APITestCase):
             created_by=self.user,
         )
 
-        url = reverse("webpages:pagelayout-active")
+        url = reverse("api:pagelayout-active")
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -562,7 +562,7 @@ class PageLayoutAPITest(APITestCase):
         invalid_data = self.layout_data.copy()
         invalid_data["slot_configuration"] = {"invalid": "structure"}
 
-        url = reverse("webpages:pagelayout-list")
+        url = reverse("api:pagelayout-list")
         response = self.client.post(url, invalid_data, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -588,7 +588,7 @@ class PageThemeAPITest(APITestCase):
 
     def test_create_theme(self):
         """Test creating a theme via API"""
-        url = reverse("webpages:pagetheme-list")
+        url = reverse("api:pagetheme-list")
         response = self.client.post(url, self.theme_data, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -607,7 +607,7 @@ class PageThemeAPITest(APITestCase):
             created_by=self.user,
         )
 
-        url = reverse("webpages:pagetheme-list")
+        url = reverse("api:pagetheme-list")
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -626,7 +626,7 @@ class PageThemeAPITest(APITestCase):
         invalid_data = self.theme_data.copy()
         invalid_data["css_variables"] = "invalid_format"
 
-        url = reverse("webpages:pagetheme-list")
+        url = reverse("api:pagetheme-list")
         response = self.client.post(url, invalid_data, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -674,7 +674,7 @@ class PageWidgetAPITest(APITestCase):
 
     def test_create_page_widget(self):
         """Test creating a page widget via API"""
-        url = reverse("webpages:pagewidget-list")
+        url = reverse("api:pagewidget-list")
         data = {
             "page": self.page.id,
             "widget_type_id": self.widget_type.id,
@@ -712,7 +712,7 @@ class PageWidgetAPITest(APITestCase):
             created_by=self.user,
         )
 
-        url = reverse("webpages:pagewidget-by-page")
+        url = reverse("api:pagewidget-by-page")
         response = self.client.get(url, {"page_id": self.page.id})
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -729,7 +729,7 @@ class PageWidgetAPITest(APITestCase):
             created_by=self.user,
         )
 
-        url = reverse("webpages:pagewidget-reorder", kwargs={"pk": widget.id})
+        url = reverse("api:pagewidget-reorder", kwargs={"pk": widget.id})
         response = self.client.post(url, {"sort_order": 5}, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -774,7 +774,7 @@ class WebPageAPITest(APITestCase):
 
     def test_page_preview_endpoint(self):
         """Test the page preview API endpoint"""
-        url = reverse("webpages:webpage-preview", kwargs={"pk": self.page.pk})
+        url = reverse("api:webpage-preview", kwargs={"pk": self.page.pk})
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -802,7 +802,7 @@ class WebPageAPITest(APITestCase):
             name="Alt Theme", css_variables={"primary": "#ef4444"}, created_by=self.user
         )
 
-        url = reverse("webpages:webpage-preview", kwargs={"pk": self.page.pk})
+        url = reverse("api:webpage-preview", kwargs={"pk": self.page.pk})
         response = self.client.get(
             url, {"layout_id": alt_layout.id, "theme_id": alt_theme.id}
         )
@@ -815,7 +815,7 @@ class WebPageAPITest(APITestCase):
 
     def test_inheritance_info_endpoint(self):
         """Test the inheritance info API endpoint"""
-        url = reverse("webpages:webpage-inheritance-info", kwargs={"pk": self.page.pk})
+        url = reverse("api:webpage-inheritance-info", kwargs={"pk": self.page.pk})
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -838,7 +838,7 @@ class WebPageAPITest(APITestCase):
             created_by=self.user,
         )
 
-        url = reverse("webpages:webpage-apply-override", kwargs={"pk": self.page.pk})
+        url = reverse("api:webpage-apply-override", kwargs={"pk": self.page.pk})
         response = self.client.post(
             url,
             {"override_type": "layout", "override_value": alt_layout.id},
@@ -854,7 +854,7 @@ class WebPageAPITest(APITestCase):
 
     def test_apply_clear_override(self):
         """Test clearing an override via API"""
-        url = reverse("webpages:webpage-apply-override", kwargs={"pk": self.page.pk})
+        url = reverse("api:webpage-apply-override", kwargs={"pk": self.page.pk})
         response = self.client.post(
             url, {"override_type": "clear_layout"}, format="json"
         )
@@ -1093,5 +1093,3 @@ class SeededWidgetTypesTest(TestCase):
                 widget.template_name.startswith("webpages/widgets/"),
                 f"Widget '{widget.name}' template should be in correct directory",
             )
-
-

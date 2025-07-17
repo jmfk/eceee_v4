@@ -13,12 +13,27 @@ from rest_framework_simplejwt.views import (
     TokenVerifyView,
 )
 
+app_name = "api"
+
 # Create a router for ViewSets
 router = DefaultRouter()
 
-# As you create new apps with ViewSets, register them here:
-# router.register(r'users', UserViewSet)
-# router.register(r'posts', PostViewSet)
+# Register content ViewSets
+from content.views import (
+    CategoryViewSet,
+    TagViewSet,
+    NewsViewSet,
+    EventViewSet,
+    LibraryItemViewSet,
+    MemberViewSet,
+)
+
+router.register(r"categories", CategoryViewSet)
+router.register(r"tags", TagViewSet)
+router.register(r"news", NewsViewSet)
+router.register(r"events", EventViewSet)
+router.register(r"library-items", LibraryItemViewSet)
+router.register(r"members", MemberViewSet)
 
 urlpatterns = [
     # JWT Authentication endpoints
