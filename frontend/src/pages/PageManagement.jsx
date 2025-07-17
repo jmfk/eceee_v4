@@ -15,7 +15,11 @@ import {
     Clock,
     Edit3,
     Save,
-    X
+    X,
+    Trash2,
+    Filter,
+    ChevronDown,
+    Copy
 } from 'lucide-react'
 import axios from 'axios'
 import toast from 'react-hot-toast'
@@ -36,6 +40,9 @@ const PageManagement = () => {
     const [publishingView, setPublishingView] = useState('dashboard') // 'dashboard', 'timeline', 'bulk'
     const [isCreating, setIsCreating] = useState(false)
     const [isEditing, setIsEditing] = useState(false)
+    const [statusFilter, setStatusFilter] = useState('all')
+    const [layoutFilter, setLayoutFilter] = useState('all')
+    const [showFilters, setShowFilters] = useState(false)
     const queryClient = useQueryClient()
 
     // Fetch pages
@@ -50,11 +57,28 @@ const PageManagement = () => {
     // Extract pages array from paginated response
     const pages = pagesResponse?.results || []
 
-    // Filter pages based on search
-    const filteredPages = pages.filter(page =>
-        page.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        page.slug.toLowerCase().includes(searchTerm.toLowerCase())
-    )
+    // Filter pages based on search and filters
+    const filteredPages = pages.filter(page => {
+        const matchesSearch = page.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            page.slug.toLowerCase().includes(searchTerm.toLowerCase())
+
+        const matchesStatus = statusFilter === 'all' || page.publication_status === statusFilter
+
+        const matchesLayout = layoutFilter === 'all' ||
+            (layoutFilter === 'none' && !page.layout) ||
+            (page.layout && page.layout.id.toString() === layoutFilter)
+
+        return matchesSearch && matchesStatus && matchesLayout
+    })
+
+    // Get unique layouts for filter dropdown
+    const availableLayouts = [...new Set(pages.filter(p => p.layout).map(p => p.layout))]
+        .reduce((acc, layout) => {
+            if (!acc.find(l => l.id === layout.id)) {
+                acc.push(layout)
+            }
+            return acc
+        }, [])
 
     const tabs = [
         {
@@ -133,13 +157,67 @@ const PageManagement = () => {
         }
     })
 
+    const deletePageMutation = useMutation({
+        mutationFn: async (pageId) => {
+            const response = await axios.delete(`/api/v1/webpages/pages/${pageId}/`)
+            return response.data
+        },
+        onSuccess: () => {
+            toast.success('Page deleted successfully')
+            setSelectedPage(null)
+            queryClient.invalidateQueries(['pages'])
+        },
+        onError: (error) => {
+            toast.error(error.response?.data?.detail || 'Failed to delete page')
+        }
+    })
+
+    const handleDeletePage = (page) => {
+        if (window.confirm(`Are you sure you want to delete "${page.title}"? This action cannot be undone.`)) {
+            deletePageMutation.mutate(page.id)
+        }
+    }
+
+    const duplicatePageMutation = useMutation({
+        mutationFn: async (page) => {
+            const duplicateData = {
+                title: `${page.title} (Copy)`,
+                slug: `${page.slug}-copy-${Date.now()}`,
+                description: page.description,
+                publication_status: 'draft', // Always create duplicates as drafts
+                layout: page.layout?.id || null,
+                theme: page.theme?.id || null,
+                parent: page.parent?.id || null
+            }
+            const response = await axios.post('/api/v1/webpages/pages/', duplicateData)
+            return response.data
+        },
+        onSuccess: (newPage) => {
+            toast.success(`Page duplicated successfully as "${newPage.title}"`)
+            queryClient.invalidateQueries(['pages'])
+            setSelectedPage(newPage)
+        },
+        onError: (error) => {
+            toast.error(error.response?.data?.detail || 'Failed to duplicate page')
+        }
+    })
+
+    const handleDuplicatePage = (page) => {
+        duplicatePageMutation.mutate(page)
+    }
+
     const renderPageManagement = () => (
         <div className="space-y-6">
             {/* Page List */}
             <div className="bg-white rounded-lg shadow">
                 <div className="p-4 border-b border-gray-200">
                     <div className="flex items-center justify-between">
-                        <h3 className="text-lg font-medium text-gray-900">Pages</h3>
+                        <div>
+                            <h3 className="text-lg font-medium text-gray-900">Pages</h3>
+                            <p className="text-sm text-gray-500 mt-1">
+                                {pagesLoading ? 'Loading...' : `${filteredPages.length} of ${pages.length} pages`}
+                            </p>
+                        </div>
                         <button
                             onClick={() => setIsCreating(true)}
                             className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -148,17 +226,72 @@ const PageManagement = () => {
                             New Page
                         </button>
                     </div>
-                    <div className="mt-4">
-                        <div className="relative">
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                            <input
-                                type="text"
-                                placeholder="Search pages..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            />
+                    <div className="mt-4 space-y-4">
+                        <div className="flex items-center space-x-4">
+                            <div className="flex-1 relative">
+                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                                <input
+                                    type="text"
+                                    placeholder="Search pages..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                            </div>
+                            <button
+                                onClick={() => setShowFilters(!showFilters)}
+                                className={`inline-flex items-center px-3 py-2 border rounded-lg text-sm font-medium transition-colors ${showFilters || statusFilter !== 'all' || layoutFilter !== 'all'
+                                    ? 'border-blue-500 text-blue-600 bg-blue-50'
+                                    : 'border-gray-300 text-gray-700 bg-white hover:bg-gray-50'
+                                    }`}
+                            >
+                                <Filter className="w-4 h-4 mr-2" />
+                                Filters
+                                <ChevronDown className={`w-4 h-4 ml-2 transform transition-transform ${showFilters ? 'rotate-180' : ''
+                                    }`} />
+                            </button>
                         </div>
+
+                        {showFilters && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
+                                <div>
+                                    <label htmlFor="status-filter" className="block text-sm font-medium text-gray-700 mb-1">
+                                        Publication Status
+                                    </label>
+                                    <select
+                                        id="status-filter"
+                                        value={statusFilter}
+                                        onChange={(e) => setStatusFilter(e.target.value)}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    >
+                                        <option value="all">All Statuses</option>
+                                        <option value="published">Published</option>
+                                        <option value="draft">Draft</option>
+                                        <option value="archived">Archived</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label htmlFor="layout-filter" className="block text-sm font-medium text-gray-700 mb-1">
+                                        Layout
+                                    </label>
+                                    <select
+                                        id="layout-filter"
+                                        value={layoutFilter}
+                                        onChange={(e) => setLayoutFilter(e.target.value)}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    >
+                                        <option value="all">All Layouts</option>
+                                        <option value="none">No Layout</option>
+                                        {availableLayouts.map(layout => (
+                                            <option key={layout.id} value={layout.id.toString()}>
+                                                {layout.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -246,6 +379,28 @@ const PageManagement = () => {
                                         >
                                             <History className="w-4 h-4" />
                                         </button>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                handleDuplicatePage(page)
+                                            }}
+                                            className="p-1 text-orange-600 hover:text-orange-700"
+                                            title="Duplicate page"
+                                            disabled={duplicatePageMutation.isLoading}
+                                        >
+                                            <Copy className="w-4 h-4" />
+                                        </button>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                handleDeletePage(page)
+                                            }}
+                                            className="p-1 text-red-600 hover:text-red-700"
+                                            title="Delete page"
+                                            disabled={deletePageMutation.isLoading}
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -253,11 +408,38 @@ const PageManagement = () => {
                     ) : (
                         <div className="p-8 text-center text-gray-500">
                             <FileText className="w-8 h-8 mx-auto mb-2" />
-                            <p>No pages found</p>
-                            {searchTerm && (
-                                <p className="text-sm mt-1">
-                                    Try adjusting your search terms
-                                </p>
+                            {searchTerm || statusFilter !== 'all' || layoutFilter !== 'all' ? (
+                                <div>
+                                    <p className="font-medium">No pages match your filters</p>
+                                    <p className="text-sm mt-1">
+                                        Try adjusting your search terms or filters
+                                    </p>
+                                    <button
+                                        onClick={() => {
+                                            setSearchTerm('')
+                                            setStatusFilter('all')
+                                            setLayoutFilter('all')
+                                            setShowFilters(false)
+                                        }}
+                                        className="mt-2 text-blue-600 hover:text-blue-700 text-sm font-medium"
+                                    >
+                                        Clear all filters
+                                    </button>
+                                </div>
+                            ) : (
+                                <div>
+                                    <p className="font-medium">No pages created yet</p>
+                                    <p className="text-sm mt-1">
+                                        Get started by creating your first page
+                                    </p>
+                                    <button
+                                        onClick={() => setIsCreating(true)}
+                                        className="mt-3 inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+                                    >
+                                        <Plus className="w-4 h-4 mr-2" />
+                                        Create First Page
+                                    </button>
+                                </div>
                             )}
                         </div>
                     )}
