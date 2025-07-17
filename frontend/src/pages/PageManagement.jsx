@@ -410,9 +410,9 @@ const PageManagement = () => {
                             <FileText className="w-8 h-8 mx-auto mb-2" />
                             {searchTerm || statusFilter !== 'all' || layoutFilter !== 'all' ? (
                                 <div>
-                                    <p className="font-medium">No pages match your filters</p>
+                                    <p className="font-medium">No pages found</p>
                                     <p className="text-sm mt-1">
-                                        Try adjusting your search terms or filters
+                                        Try adjusting your search terms
                                     </p>
                                     <button
                                         onClick={() => {
@@ -428,7 +428,7 @@ const PageManagement = () => {
                                 </div>
                             ) : (
                                 <div>
-                                    <p className="font-medium">No pages created yet</p>
+                                    <p className="font-medium">No pages found</p>
                                     <p className="text-sm mt-1">
                                         Get started by creating your first page
                                     </p>

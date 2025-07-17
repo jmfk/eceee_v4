@@ -182,7 +182,7 @@ describe('ThemeEditor', () => {
 
     it('applies color scheme templates', async () => {
         const user = userEvent.setup()
-        const toast = require('react-hot-toast').default
+        const mockToast = vi.mocked(await import('react-hot-toast')).default
 
         renderWithQueryClient(<ThemeEditor />)
 
@@ -195,7 +195,7 @@ describe('ThemeEditor', () => {
         // Click the template button (should be the second one in the color scheme templates)
         await user.click(blueThemeButtons[1])
 
-        expect(toast.success).toHaveBeenCalledWith('Applied Blue Theme template')
+        expect(mockToast.success).toHaveBeenCalledWith('Applied Blue Theme template')
     })
 
     it('validates required fields when creating theme', async () => {
@@ -364,7 +364,9 @@ describe('ThemeEditor', () => {
         await user.click(exportButton)
 
         expect(mockLink.click).toHaveBeenCalled()
-        expect(toast.success).toHaveBeenCalledWith('Theme exported successfully')
+
+        const mockToast = vi.mocked(await import('react-hot-toast')).default
+        expect(mockToast.success).toHaveBeenCalledWith('Theme exported successfully')
     })
 
     it('displays CSS variables correctly', async () => {

@@ -590,6 +590,8 @@ const VariableEditor = ({ originalKey, value, onUpdate, onRemove }) => {
                 type="button"
                 onClick={onRemove}
                 className="text-red-600 hover:text-red-700"
+                aria-label="remove variable"
+                title="Remove variable"
             >
                 <Trash2 className="w-4 h-4" />
             </button>
