@@ -12,6 +12,27 @@ from django.utils.safestring import mark_safe
 from .models import WebPage, PageVersion, PageLayout, PageTheme, WidgetType, PageWidget
 
 
+class HasHostnamesFilter(admin.SimpleListFilter):
+    title = "has hostnames"
+    parameter_name = "has_hostnames"
+
+    def lookups(self, request, model_admin):
+        return (
+            ("yes", "Has hostnames"),
+            ("no", "No hostnames"),
+            ("root", "Root pages only"),
+        )
+
+    def queryset(self, request, queryset):
+        if self.value() == "yes":
+            return queryset.exclude(hostnames=[])
+        elif self.value() == "no":
+            return queryset.filter(hostnames=[])
+        elif self.value() == "root":
+            return queryset.filter(parent__isnull=True)
+        return queryset
+
+
 @admin.register(PageLayout)
 class PageLayoutAdmin(admin.ModelAdmin):
     list_display = ["name", "description", "is_active", "created_at", "created_by"]
@@ -116,6 +137,7 @@ class WebPageAdmin(admin.ModelAdmin):
         "title",
         "slug",
         "parent",
+        "get_hostnames_display",
         "publication_status",
         "effective_date",
         "is_published_display",
@@ -124,11 +146,13 @@ class WebPageAdmin(admin.ModelAdmin):
     ]
     list_filter = [
         "publication_status",
+        HasHostnamesFilter,
         "created_at",
         "updated_at",
         "layout",
         "theme",
         "parent",
+        ("parent", admin.RelatedOnlyFieldListFilter),
     ]
     search_fields = ["title", "slug", "description", "meta_title"]
     prepopulated_fields = {"slug": ("title",)}
@@ -137,6 +161,8 @@ class WebPageAdmin(admin.ModelAdmin):
         "updated_at",
         "get_absolute_url",
         "get_breadcrumbs_display",
+        "get_hostnames_display",
+        "is_root_page_display",
     ]
 
     inlines = [PageWidgetInline, PageVersionInline]
@@ -145,6 +171,18 @@ class WebPageAdmin(admin.ModelAdmin):
         (
             "Basic Information",
             {"fields": ("title", "slug", "description", "parent", "sort_order")},
+        ),
+        (
+            "Multi-Site Configuration",
+            {
+                "fields": (
+                    "hostnames",
+                    "is_root_page_display",
+                    "get_hostnames_display",
+                ),
+                "description": "Hostname configuration (only available for root pages without parent)",
+                "classes": ("wide",),
+            },
         ),
         (
             "Layout & Theme",
@@ -204,6 +242,36 @@ class WebPageAdmin(admin.ModelAdmin):
 
     is_published_display.short_description = "Status"
 
+    def get_hostnames_display(self, obj):
+        """Display hostnames with styling"""
+        if not obj.is_root_page():
+            return format_html(
+                '<span style="color: gray; font-style: italic;">Child page</span>'
+            )
+
+        if not obj.hostnames:
+            return format_html('<span style="color: orange;">No hostnames</span>')
+
+        if len(obj.hostnames) <= 3:
+            hostnames_text = ", ".join(obj.hostnames)
+        else:
+            hostnames_text = (
+                f"{', '.join(obj.hostnames[:3])}... (+{len(obj.hostnames) - 3} more)"
+            )
+
+        return format_html('<span style="color: green;">🌐 {}</span>', hostnames_text)
+
+    get_hostnames_display.short_description = "Hostnames"
+
+    def is_root_page_display(self, obj):
+        """Display whether this is a root page"""
+        if obj.is_root_page():
+            return format_html('<span style="color: green;">✓ Root Page</span>')
+        else:
+            return format_html('<span style="color: gray;">Child Page</span>')
+
+    is_root_page_display.short_description = "Page Type"
+
     def get_breadcrumbs_display(self, obj):
         """Display page breadcrumbs"""
         breadcrumbs = obj.get_breadcrumbs()
@@ -236,9 +304,49 @@ class WebPageAdmin(admin.ModelAdmin):
                 "layout",
                 "theme",
                 "publication_status",
+                "hostnames",
             ]
         ):
             obj.create_version(request.user, "Admin update")
+
+    actions = ["clear_hostnames", "show_hostname_summary"]
+
+    def clear_hostnames(self, request, queryset):
+        """Clear hostnames from selected root pages"""
+        root_pages = queryset.filter(parent__isnull=True)
+        updated_count = 0
+        for page in root_pages:
+            if page.hostnames:
+                page.hostnames = []
+                page.save()
+                updated_count += 1
+
+        self.message_user(
+            request,
+            f"Cleared hostnames from {updated_count} root page(s). "
+            f"Skipped {queryset.count() - updated_count} child pages.",
+        )
+
+    clear_hostnames.short_description = "Clear hostnames from selected root pages"
+
+    def show_hostname_summary(self, request, queryset):
+        """Show hostname summary for selected pages"""
+        root_pages = queryset.filter(parent__isnull=True)
+        all_hostnames = set()
+
+        for page in root_pages:
+            if page.hostnames:
+                all_hostnames.update(page.hostnames)
+
+        if all_hostnames:
+            hostname_list = ", ".join(sorted(all_hostnames))
+            message = f"Hostnames in selected pages: {hostname_list}"
+        else:
+            message = "No hostnames found in selected root pages."
+
+        self.message_user(request, message)
+
+    show_hostname_summary.short_description = "Show hostname summary"
 
 
 @admin.register(PageVersion)

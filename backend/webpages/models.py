@@ -12,6 +12,8 @@ This module defines the core models for the hierarchical web page management sys
 
 from django.db import models, transaction
 from django.contrib.auth.models import User
+from django.contrib.postgres.fields import ArrayField
+from django.contrib.postgres.indexes import GinIndex
 from django.utils import timezone
 from django.urls import reverse
 from django.core.exceptions import ValidationError
@@ -134,6 +136,7 @@ class WebPage(models.Model):
     """
     Core page entity supporting hierarchical organization and inheritance.
     Pages can have parent-child relationships for content organization.
+    Root pages (without parent) can be associated with hostnames for multi-site support.
     """
 
     PUBLICATION_STATUS_CHOICES = [
@@ -153,6 +156,14 @@ class WebPage(models.Model):
         "self", null=True, blank=True, on_delete=models.CASCADE, related_name="children"
     )
     sort_order = models.IntegerField(default=0)
+
+    # Multi-site support for root pages
+    hostnames = ArrayField(
+        models.CharField(max_length=255),
+        default=list,
+        blank=True,
+        help_text="List of hostnames this root page serves (only for pages without parent)",
+    )
 
     # Layout and theme (with inheritance)
     layout = models.ForeignKey(
@@ -216,6 +227,10 @@ class WebPage(models.Model):
     class Meta:
         ordering = ["sort_order", "title"]
         unique_together = ["parent", "slug"]
+        indexes = [
+            models.Index(fields=["slug"], name="webpages_slug_idx"),
+            GinIndex(fields=["hostnames"], name="webpages_hostnames_gin_idx"),
+        ]
 
     def __str__(self):
         return self.title
@@ -225,6 +240,71 @@ class WebPage(models.Model):
         if self.parent:
             return f"{self.parent.get_absolute_url()}/{self.slug}/"
         return f"/{self.slug}/"
+
+    def is_root_page(self):
+        """Check if this is a root page (no parent)"""
+        return self.parent is None
+
+    def get_hostname_display(self):
+        """Get a readable display of associated hostnames"""
+        if not self.hostnames:
+            return "No hostnames"
+        return ", ".join(self.hostnames)
+
+    def add_hostname(self, hostname):
+        """Add a hostname to this root page"""
+        if not self.is_root_page():
+            raise ValidationError("Only root pages can have hostnames")
+
+        hostname = hostname.lower().strip()
+        if hostname and hostname not in self.hostnames:
+            self.hostnames.append(hostname)
+            self.save()
+        return True
+
+    def remove_hostname(self, hostname):
+        """Remove a hostname from this root page"""
+        hostname = hostname.lower().strip()
+        if hostname in self.hostnames:
+            self.hostnames.remove(hostname)
+            self.save()
+        return True
+
+    def serves_hostname(self, hostname):
+        """Check if this page serves the given hostname"""
+        if not self.is_root_page():
+            return False
+        return hostname.lower() in [h.lower() for h in self.hostnames]
+
+    @classmethod
+    def get_root_page_for_hostname(cls, hostname):
+        """Get the root page that serves the given hostname"""
+        hostname = hostname.lower().strip()
+
+        # Look for exact hostname match in array field
+        pages = cls.objects.filter(parent__isnull=True, hostnames__contains=[hostname])
+
+        if pages.exists():
+            return pages.first()
+
+        # Fallback: look for wildcard or default patterns using array overlap
+        wildcard_pages = cls.objects.filter(
+            parent__isnull=True, hostnames__overlap=["*", "default"]
+        )
+
+        if wildcard_pages.exists():
+            return wildcard_pages.first()
+
+        return None
+
+    @classmethod
+    def get_all_hostnames(cls):
+        """Get all hostnames used across all root pages"""
+        hostnames = set()
+        for page in cls.objects.filter(parent__isnull=True, hostnames__isnull=False):
+            if page.hostnames:
+                hostnames.update(page.hostnames)
+        return sorted(list(hostnames))
 
     def get_effective_layout(self):
         """Get the layout for this page, inheriting from parent if needed"""
@@ -402,6 +482,43 @@ class WebPage(models.Model):
             and self.effective_date >= self.expiry_date
         ):
             raise ValidationError("Effective date must be before expiry date.")
+
+        # Validate hostname assignment
+        if self.hostnames and self.parent is not None:
+            raise ValidationError(
+                "Only root pages (pages without a parent) can have hostnames."
+            )
+
+        # Validate hostname format
+        if self.hostnames:
+            for hostname in self.hostnames:
+                if not isinstance(hostname, str) or not hostname.strip():
+                    raise ValidationError("All hostnames must be non-empty strings.")
+
+                # Basic hostname validation
+                hostname = hostname.strip().lower()
+                if hostname not in ["*", "default"]:
+                    # Basic domain validation - could be more sophisticated
+                    import re
+
+                    if not re.match(
+                        r"^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$",
+                        hostname,
+                    ):
+                        raise ValidationError(f"Invalid hostname format: {hostname}")
+
+        # Check for hostname conflicts with other root pages
+        if self.hostnames and self.parent is None:
+            for hostname in self.hostnames:
+                conflicting_pages = WebPage.objects.filter(
+                    parent__isnull=True, hostnames__contains=[hostname]
+                ).exclude(pk=self.pk)
+
+                if conflicting_pages.exists():
+                    conflicting_page = conflicting_pages.first()
+                    raise ValidationError(
+                        f"Hostname '{hostname}' is already used by page: {conflicting_page.title}"
+                    )
 
     def get_inheritance_chain(self):
         """Get the complete inheritance chain from root to this page"""
@@ -1103,6 +1220,7 @@ def create_version(self, user, description="", status="draft", auto_publish=Fals
         "title": self.title,
         "slug": self.slug,
         "description": self.description,
+        "hostnames": self.hostnames,
         "layout_id": self.layout_id,
         "theme_id": self.theme_id,
         "publication_status": self.publication_status,

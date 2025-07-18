@@ -1093,3 +1093,410 @@ class SeededWidgetTypesTest(TestCase):
                 widget.template_name.startswith("webpages/widgets/"),
                 f"Widget '{widget.name}' template should be in correct directory",
             )
+
+
+class WebPageHostnameTest(TestCase):
+    """Test WebPage hostname functionality for multi-site support"""
+
+    def setUp(self):
+        self.user = User.objects.create_superuser(
+            username="testuser", email="test@example.com", password="testpass123"
+        )
+
+    def test_root_page_can_have_hostnames(self):
+        """Test that root pages can have hostnames"""
+        page = WebPage.objects.create(
+            title="Root Page",
+            slug="root",
+            hostnames=["example.com", "www.example.com"],
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        self.assertTrue(page.is_root_page())
+        self.assertEqual(page.hostnames, ["example.com", "www.example.com"])
+        self.assertEqual(page.get_hostname_display(), "example.com, www.example.com")
+
+    def test_child_page_cannot_have_hostnames(self):
+        """Test that child pages cannot have hostnames"""
+        root_page = WebPage.objects.create(
+            title="Root Page",
+            slug="root",
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        with self.assertRaises(ValidationError) as context:
+            child_page = WebPage(
+                title="Child Page",
+                slug="child",
+                parent=root_page,
+                hostnames=["child.example.com"],
+                created_by=self.user,
+                last_modified_by=self.user,
+            )
+            child_page.clean()
+
+        self.assertIn("Only root pages", str(context.exception))
+
+    def test_hostname_format_validation(self):
+        """Test hostname format validation"""
+        # Valid hostnames should work
+        page = WebPage(
+            title="Test Page",
+            slug="test",
+            hostnames=["example.com", "sub.example.com", "*", "default"],
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        try:
+            page.clean()  # Should not raise
+        except ValidationError:
+            self.fail("Valid hostnames should not raise ValidationError")
+
+        # Invalid hostname should fail
+        invalid_page = WebPage(
+            title="Invalid Page",
+            slug="invalid",
+            hostnames=["invalid..hostname"],
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        with self.assertRaises(ValidationError) as context:
+            invalid_page.clean()
+
+        self.assertIn("Invalid hostname format", str(context.exception))
+
+    def test_hostname_conflict_prevention(self):
+        """Test that hostname conflicts are prevented"""
+        # Create first page with hostname
+        page1 = WebPage.objects.create(
+            title="Page 1",
+            slug="page1",
+            hostnames=["example.com"],
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        # Try to create second page with same hostname
+        page2 = WebPage(
+            title="Page 2",
+            slug="page2",
+            hostnames=["example.com"],
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        with self.assertRaises(ValidationError) as context:
+            page2.clean()
+
+        self.assertIn("already used by page", str(context.exception))
+
+    def test_add_hostname_to_root_page(self):
+        """Test adding hostname to root page"""
+        page = WebPage.objects.create(
+            title="Root Page",
+            slug="root",
+            hostnames=["example.com"],
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        result = page.add_hostname("new.example.com")
+        self.assertTrue(result)
+        page.refresh_from_db()
+        self.assertIn("new.example.com", page.hostnames)
+
+        # Adding duplicate should not create duplicate
+        page.add_hostname("example.com")
+        page.refresh_from_db()
+        hostname_count = page.hostnames.count("example.com")
+        self.assertEqual(hostname_count, 1)
+
+    def test_add_hostname_to_child_page_fails(self):
+        """Test that adding hostname to child page fails"""
+        root_page = WebPage.objects.create(
+            title="Root Page",
+            slug="root",
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        child_page = WebPage.objects.create(
+            title="Child Page",
+            slug="child",
+            parent=root_page,
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        with self.assertRaises(ValidationError):
+            child_page.add_hostname("child.example.com")
+
+    def test_remove_hostname(self):
+        """Test removing hostname from page"""
+        page = WebPage.objects.create(
+            title="Root Page",
+            slug="root",
+            hostnames=["example.com", "www.example.com"],
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        result = page.remove_hostname("www.example.com")
+        self.assertTrue(result)
+        page.refresh_from_db()
+        self.assertNotIn("www.example.com", page.hostnames)
+        self.assertIn("example.com", page.hostnames)
+
+    def test_serves_hostname_method(self):
+        """Test serves_hostname method"""
+        root_page = WebPage.objects.create(
+            title="Root Page",
+            slug="root",
+            hostnames=["example.com", "www.example.com"],
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        child_page = WebPage.objects.create(
+            title="Child Page",
+            slug="child",
+            parent=root_page,
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        # Root page should serve its hostnames
+        self.assertTrue(root_page.serves_hostname("example.com"))
+        self.assertTrue(root_page.serves_hostname("www.example.com"))
+        self.assertFalse(root_page.serves_hostname("other.com"))
+
+        # Child page should not serve any hostnames
+        self.assertFalse(child_page.serves_hostname("example.com"))
+
+    def test_serves_hostname_case_insensitive(self):
+        """Test that hostname matching is case insensitive"""
+        page = WebPage.objects.create(
+            title="Root Page",
+            slug="root",
+            hostnames=["Example.Com"],
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        self.assertTrue(page.serves_hostname("example.com"))
+        self.assertTrue(page.serves_hostname("EXAMPLE.COM"))
+        self.assertTrue(page.serves_hostname("Example.Com"))
+
+    def test_get_root_page_for_hostname(self):
+        """Test get_root_page_for_hostname class method"""
+        page1 = WebPage.objects.create(
+            title="Site 1",
+            slug="site1",
+            hostnames=["site1.com", "www.site1.com"],
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        page2 = WebPage.objects.create(
+            title="Site 2",
+            slug="site2",
+            hostnames=["site2.com"],
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        # Test exact hostname matches
+        found_page1 = WebPage.get_root_page_for_hostname("site1.com")
+        self.assertEqual(found_page1.id, page1.id)
+
+        found_page2 = WebPage.get_root_page_for_hostname("site2.com")
+        self.assertEqual(found_page2.id, page2.id)
+
+        # Test non-existent hostname
+        not_found = WebPage.get_root_page_for_hostname("nonexistent.com")
+        self.assertIsNone(not_found)
+
+    def test_get_root_page_for_hostname_wildcard(self):
+        """Test wildcard hostname support"""
+        wildcard_page = WebPage.objects.create(
+            title="Wildcard Site",
+            slug="wildcard",
+            hostnames=["*"],
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        default_page = WebPage.objects.create(
+            title="Default Site",
+            slug="default",
+            hostnames=["default"],
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        # Test that wildcard matches unknown hostnames
+        found_page = WebPage.get_root_page_for_hostname("unknown.com")
+        self.assertIsNotNone(found_page)
+        self.assertIn(found_page.hostnames[0], ["*", "default"])
+
+    def test_get_all_hostnames(self):
+        """Test get_all_hostnames class method"""
+        page1 = WebPage.objects.create(
+            title="Site 1",
+            slug="site1",
+            hostnames=["site1.com", "www.site1.com"],
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        page2 = WebPage.objects.create(
+            title="Site 2",
+            slug="site2",
+            hostnames=["site2.com"],
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        all_hostnames = WebPage.get_all_hostnames()
+
+        self.assertIn("site1.com", all_hostnames)
+        self.assertIn("www.site1.com", all_hostnames)
+        self.assertIn("site2.com", all_hostnames)
+        self.assertEqual(len(set(all_hostnames)), len(all_hostnames))  # No duplicates
+
+    def test_hostname_display_method(self):
+        """Test get_hostname_display method"""
+        # Page with no hostnames
+        empty_page = WebPage.objects.create(
+            title="Empty Page",
+            slug="empty",
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+        self.assertEqual(empty_page.get_hostname_display(), "No hostnames")
+
+        # Page with hostnames
+        page_with_hostnames = WebPage.objects.create(
+            title="Page With Hostnames",
+            slug="with-hostnames",
+            hostnames=["example.com", "www.example.com"],
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+        expected = "example.com, www.example.com"
+        self.assertEqual(page_with_hostnames.get_hostname_display(), expected)
+
+    def test_hostname_validation_edge_cases(self):
+        """Test edge cases in hostname validation"""
+        # Empty string hostname should fail
+        page_empty_hostname = WebPage(
+            title="Empty Hostname",
+            slug="empty-hostname",
+            hostnames=[""],
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        with self.assertRaises(ValidationError):
+            page_empty_hostname.clean()
+
+        # Non-string hostname should fail
+        page_invalid_type = WebPage(
+            title="Invalid Type",
+            slug="invalid-type",
+            hostnames=[123],
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        with self.assertRaises(ValidationError):
+            page_invalid_type.clean()
+
+    def test_version_includes_hostnames(self):
+        """Test that page versions include hostname data"""
+        page = WebPage.objects.create(
+            title="Versioned Page",
+            slug="versioned",
+            hostnames=["version.example.com"],
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        # Create a version
+        version = page.create_version(self.user, "Initial version")
+
+        # Check that hostname data is included in version
+        page_data = version.page_data
+        self.assertIn("hostnames", page_data)
+        self.assertEqual(page_data["hostnames"], ["version.example.com"])
+
+        # Modify hostnames and create new version
+        page.hostnames = ["new.example.com", "version.example.com"]
+        page.save()
+
+        new_version = page.create_version(self.user, "Updated hostnames")
+        new_page_data = new_version.page_data
+        self.assertEqual(
+            new_page_data["hostnames"], ["new.example.com", "version.example.com"]
+        )
+
+    def test_is_root_page_method(self):
+        """Test is_root_page method"""
+        root_page = WebPage.objects.create(
+            title="Root Page",
+            slug="root",
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        child_page = WebPage.objects.create(
+            title="Child Page",
+            slug="child",
+            parent=root_page,
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        self.assertTrue(root_page.is_root_page())
+        self.assertFalse(child_page.is_root_page())
+
+    def test_hostname_operations_integration(self):
+        """Test integration of all hostname operations"""
+        # Create site with initial hostname
+        site = WebPage.objects.create(
+            title="Integration Test Site",
+            slug="integration",
+            hostnames=["initial.com"],
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        # Add additional hostnames
+        site.add_hostname("www.initial.com")
+        site.add_hostname("alt.initial.com")
+
+        # Verify all hostnames are present
+        site.refresh_from_db()
+        self.assertEqual(len(site.hostnames), 3)
+        self.assertIn("initial.com", site.hostnames)
+        self.assertIn("www.initial.com", site.hostnames)
+        self.assertIn("alt.initial.com", site.hostnames)
+
+        # Test hostname resolution
+        found = WebPage.get_root_page_for_hostname("www.initial.com")
+        self.assertEqual(found.id, site.id)
+
+        # Remove a hostname
+        site.remove_hostname("alt.initial.com")
+        site.refresh_from_db()
+        self.assertEqual(len(site.hostnames), 2)
+        self.assertNotIn("alt.initial.com", site.hostnames)
+
+        # Verify the site still serves other hostnames
+        self.assertTrue(site.serves_hostname("initial.com"))
+        self.assertTrue(site.serves_hostname("www.initial.com"))
+        self.assertFalse(site.serves_hostname("alt.initial.com"))
