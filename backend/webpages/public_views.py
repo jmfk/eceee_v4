@@ -452,3 +452,188 @@ class MemberListView(ListView):
         return Member.objects.filter(
             is_published=True, list_in_directory=True, is_current=True
         ).order_by("last_name", "first_name")
+
+
+class HostnamePageView(DetailView):
+    """
+    Hostname-aware catch-all view that resolves pages based on hostname and path.
+    Supports multi-site functionality by finding the appropriate root page for
+    the request hostname and then resolving the path within that site's hierarchy.
+    """
+
+    model = WebPage
+    template_name = "webpages/page_detail.html"
+    context_object_name = "page"
+
+    def get_object(self, queryset=None):
+        """
+        Resolve page based on hostname and path.
+
+        For requests like:
+        - example.com/ -> root page for example.com
+        - example.com/about/ -> 'about' page under example.com's root
+        - example.com/about/team/ -> 'team' page under 'about' under example.com's root
+        """
+        # Get hostname from request
+        hostname = self.request.get_host().lower()
+
+        # Get the path from the URL
+        slug_path = self.kwargs.get("slug_path", "")
+        slug_parts = (
+            [part for part in slug_path.split("/") if part] if slug_path else []
+        )
+
+        # Find the root page for this hostname
+        root_page = WebPage.get_root_page_for_hostname(hostname)
+
+        if not root_page:
+            raise Http404(f"No site configured for hostname: {hostname}")
+
+        # If no path specified, return the root page
+        if not slug_parts:
+            current_page = root_page
+        else:
+            # Navigate through the hierarchy starting from the root page
+            current_page = root_page
+
+            for slug in slug_parts:
+                try:
+                    current_page = WebPage.objects.select_related(
+                        "layout", "theme", "parent"
+                    ).get(slug=slug, parent=current_page)
+                except WebPage.DoesNotExist:
+                    raise Http404(f"Page not found: /{'/'.join(slug_parts)}/")
+
+        # Check if page is published and effective
+        if not self._is_page_accessible(current_page):
+            raise Http404("Page not available")
+
+        return current_page
+
+    def _is_page_accessible(self, page):
+        """Check if page is published and currently accessible"""
+        now = timezone.now()
+
+        if page.publication_status != "published":
+            return False
+
+        if page.effective_date and page.effective_date > now:
+            return False
+
+        if page.expiry_date and page.expiry_date <= now:
+            return False
+
+        return True
+
+    def get_context_data(self, **kwargs):
+        """Add layout, theme, widgets, hostname info, and object content to context"""
+        context = super().get_context_data(**kwargs)
+        page = self.object
+        hostname = self.request.get_host().lower()
+
+        # Add hostname and multi-site context
+        context["current_hostname"] = hostname
+        context["is_root_page"] = page.is_root_page()
+        context["site_root_page"] = self._get_site_root_page(page)
+
+        # Get effective layout and theme
+        context["effective_layout"] = page.get_effective_layout()
+        context["effective_theme"] = page.get_effective_theme()
+
+        # Get widgets organized by slot with inheritance
+        context["widgets_by_slot"] = self._get_widgets_by_slot(page)
+
+        # Get breadcrumbs
+        context["breadcrumbs"] = page.get_breadcrumbs()
+
+        # If this is an object page, get object content
+        if page.is_object_page():
+            context["object_content"] = page.get_object_content()
+            context["is_object_page"] = True
+            context["linked_object"] = {
+                "type": page.linked_object_type,
+                "id": page.linked_object_id,
+            }
+        else:
+            context["is_object_page"] = False
+
+        return context
+
+    def _get_site_root_page(self, page):
+        """Get the root page for the current site"""
+        if page.is_root_page():
+            return page
+
+        # Walk up the hierarchy to find the root
+        current = page
+        while current.parent:
+            current = current.parent
+        return current
+
+    def _get_widgets_by_slot(self, page):
+        """Get widgets organized by slot, considering inheritance"""
+        widgets_by_slot = PageWidget.get_effective_widgets_for_page(page)
+
+        # Sort widgets within each slot
+        for slot_widgets in widgets_by_slot.values():
+            slot_widgets.sort(key=lambda w: (-w.priority, w.sort_order))
+
+        return widgets_by_slot
+
+    def get_template_names(self):
+        """
+        Try to find templates in this order:
+        1. Hostname-specific layout template
+        2. Layout-specific template
+        3. Hostname-specific page template
+        4. Page-specific template
+        5. Default template
+        """
+        page = self.object
+        hostname = self.request.get_host().lower()
+        template_names = []
+
+        # Try hostname + layout specific template
+        layout = page.get_effective_layout()
+        if layout:
+            hostname_safe = hostname.replace(".", "_")
+            template_names.append(
+                f"webpages/sites/{hostname_safe}/layouts/{layout.name.lower()}.html"
+            )
+            template_names.append(f"webpages/layouts/{layout.name.lower()}.html")
+
+        # Try hostname + page specific template
+        hostname_safe = hostname.replace(".", "_")
+        template_names.append(f"webpages/sites/{hostname_safe}/pages/{page.slug}.html")
+        template_names.append(f"webpages/sites/{hostname_safe}/page_detail.html")
+
+        # Try page-specific template
+        template_names.append(f"webpages/pages/{page.slug}.html")
+
+        # Default template
+        template_names.append("webpages/page_detail.html")
+
+        return template_names
+
+
+class HostnameRootView(HostnamePageView):
+    """
+    Special view for handling requests to the domain root (/)
+    based on hostname resolution. Returns the root page for the hostname.
+    """
+
+    def get_object(self, queryset=None):
+        """Get the root page for the current hostname"""
+        hostname = self.request.get_host().lower()
+
+        # Find the root page for this hostname
+        root_page = WebPage.get_root_page_for_hostname(hostname)
+
+        if not root_page:
+            raise Http404(f"No site configured for hostname: {hostname}")
+
+        # Check if page is published and effective
+        if not self._is_page_accessible(root_page):
+            raise Http404("Root page not available")
+
+        return root_page

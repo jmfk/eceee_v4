@@ -8,6 +8,8 @@ from django.urls import path
 from .public_views import (
     PageDetailView,
     PageListView,
+    HostnamePageView,
+    HostnameRootView,
     page_sitemap_view,
     page_hierarchy_api,
     page_search_view,
@@ -25,13 +27,15 @@ from .public_views import (
 app_name = "webpages"
 
 urlpatterns = [
-    # Public page views (slug-based routing)
-    path("", PageListView.as_view(), name="page-list"),  # Root pages list
+    # Hostname-aware root page (must be first for multi-site support)
+    path("", HostnameRootView.as_view(), name="hostname-root"),
+    # Administrative and API endpoints (hostname-independent)
     path("sitemap.xml", page_sitemap_view, name="sitemap"),
     path("hierarchy.json", page_hierarchy_api, name="hierarchy-api"),
     path("search/", page_search_view, name="page-search"),
     path("widget/<int:widget_id>/", render_widget, name="render-widget"),
     # Object publishing URLs - canonical URLs for content objects
+    # These are hostname-independent and serve content directly
     path("news/", NewsListView.as_view(), name="news-list"),
     path("news/<slug:slug>/", NewsDetailView.as_view(), name="news-detail"),
     path("events/", EventListView.as_view(), name="event-list"),
@@ -42,11 +46,8 @@ urlpatterns = [
     ),
     path("members/", MemberListView.as_view(), name="member-list"),
     path("members/<slug:slug>/", MemberDetailView.as_view(), name="member-detail"),
-    # Hierarchical page routing - this must be last to catch all paths
-    path("<path:slug_path>/", PageDetailView.as_view(), name="page-detail"),
-    # Additional custom endpoints can be added here
-    # path('api/pages/export/', export_pages_view, name='export-pages'),
-    # path('api/pages/import/', import_pages_view, name='import-pages'),
+    # Hostname-aware hierarchical page routing - this MUST be last to catch all remaining paths
+    path("<path:slug_path>/", HostnamePageView.as_view(), name="hostname-page-detail"),
 ]
 
 """

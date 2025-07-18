@@ -49,10 +49,10 @@ urlpatterns = [
     # Authentication
     path("api/auth/", include("rest_framework.urls")),
     path("accounts/", include("allauth.urls")),
-    # Web Page Publishing System
-    path("webpages/", include("webpages.urls")),
     # Monitoring and metrics
     path("metrics/", include("django_prometheus.urls")),
+    # Web Page Publishing System - MUST be last for catch-all functionality
+    path("", include("webpages.urls")),
 ]
 
 # Development URLs

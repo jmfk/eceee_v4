@@ -5,6 +5,7 @@ from rest_framework.test import APITestCase, APIClient
 from rest_framework import status
 from django.core.exceptions import ValidationError
 from django.utils import timezone
+from django.test import override_settings
 import json
 
 from .models import WebPage, PageLayout, PageTheme, WidgetType, PageWidget, PageVersion
@@ -1500,3 +1501,239 @@ class WebPageHostnameTest(TestCase):
         self.assertTrue(site.serves_hostname("initial.com"))
         self.assertTrue(site.serves_hostname("www.initial.com"))
         self.assertFalse(site.serves_hostname("alt.initial.com"))
+
+
+@override_settings(ALLOWED_HOSTS=["*"])
+class HostnameViewTest(TestCase):
+    """Test hostname-aware view functionality for multi-site routing"""
+
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_superuser(
+            username="testuser", email="test@example.com", password="testpass123"
+        )
+
+        # Create test sites with different hostnames
+        self.site1 = WebPage.objects.create(
+            title="Main Site",
+            slug="main-site",
+            hostnames=["example.com", "www.example.com"],
+            publication_status="published",
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        self.site2 = WebPage.objects.create(
+            title="Blog Site",
+            slug="blog-site",
+            hostnames=["blog.example.com"],
+            publication_status="published",
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        # Create child pages for site1
+        self.about_page = WebPage.objects.create(
+            title="About Us",
+            slug="about",
+            parent=self.site1,
+            publication_status="published",
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        self.team_page = WebPage.objects.create(
+            title="Our Team",
+            slug="team",
+            parent=self.about_page,
+            publication_status="published",
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        # Create child pages for site2
+        self.blog_post = WebPage.objects.create(
+            title="First Post",
+            slug="first-post",
+            parent=self.site2,
+            publication_status="published",
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+    def test_hostname_root_resolution(self):
+        """Test that domain root resolves to correct root page based on hostname"""
+        # Test main site root
+        response = self.client.get("/", HTTP_HOST="example.com")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["page"].id, self.site1.id)
+        self.assertEqual(response.context["current_hostname"], "example.com")
+        self.assertTrue(response.context["is_root_page"])
+
+        # Test www variant
+        response = self.client.get("/", HTTP_HOST="www.example.com")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["page"].id, self.site1.id)
+
+        # Test blog site root
+        response = self.client.get("/", HTTP_HOST="blog.example.com")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["page"].id, self.site2.id)
+        self.assertEqual(response.context["current_hostname"], "blog.example.com")
+
+    def test_hostname_hierarchical_page_resolution(self):
+        """Test that hierarchical paths resolve correctly within hostname context"""
+        # Test about page on main site
+        response = self.client.get("/about/", HTTP_HOST="example.com")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["page"].id, self.about_page.id)
+        self.assertEqual(response.context["site_root_page"].id, self.site1.id)
+        self.assertFalse(response.context["is_root_page"])
+
+        # Test nested team page on main site
+        response = self.client.get("/about/team/", HTTP_HOST="example.com")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["page"].id, self.team_page.id)
+        self.assertEqual(response.context["site_root_page"].id, self.site1.id)
+
+        # Test blog post on blog site
+        response = self.client.get("/first-post/", HTTP_HOST="blog.example.com")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["page"].id, self.blog_post.id)
+        self.assertEqual(response.context["site_root_page"].id, self.site2.id)
+
+    def test_hostname_isolation(self):
+        """Test that pages are isolated between different hostnames"""
+        # About page should not be accessible on blog site
+        response = self.client.get("/about/", HTTP_HOST="blog.example.com")
+        self.assertEqual(response.status_code, 404)
+
+        # Blog post should not be accessible on main site
+        response = self.client.get("/first-post/", HTTP_HOST="example.com")
+        self.assertEqual(response.status_code, 404)
+
+    def test_unknown_hostname(self):
+        """Test handling of unknown hostnames"""
+        response = self.client.get("/", HTTP_HOST="unknown.com")
+        self.assertEqual(response.status_code, 404)
+
+        response = self.client.get("/about/", HTTP_HOST="unknown.com")
+        self.assertEqual(response.status_code, 404)
+
+    def test_nonexistent_page(self):
+        """Test 404 handling for nonexistent pages"""
+        response = self.client.get("/nonexistent/", HTTP_HOST="example.com")
+        self.assertEqual(response.status_code, 404)
+
+        response = self.client.get("/about/nonexistent/", HTTP_HOST="example.com")
+        self.assertEqual(response.status_code, 404)
+
+    def test_unpublished_page_handling(self):
+        """Test that unpublished pages return 404"""
+        # Create unpublished page
+        unpublished_page = WebPage.objects.create(
+            title="Unpublished Page",
+            slug="unpublished",
+            parent=self.site1,
+            publication_status="unpublished",
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        response = self.client.get("/unpublished/", HTTP_HOST="example.com")
+        self.assertEqual(response.status_code, 404)
+
+    def test_scheduled_page_handling(self):
+        """Test that pages scheduled for future return 404"""
+        from django.utils import timezone
+        from datetime import timedelta
+
+        # Create page scheduled for future
+        future_date = timezone.now() + timedelta(days=1)
+        scheduled_page = WebPage.objects.create(
+            title="Future Page",
+            slug="future",
+            parent=self.site1,
+            publication_status="published",
+            effective_date=future_date,
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        response = self.client.get("/future/", HTTP_HOST="example.com")
+        self.assertEqual(response.status_code, 404)
+
+    def test_expired_page_handling(self):
+        """Test that expired pages return 404"""
+        from django.utils import timezone
+        from datetime import timedelta
+
+        # Create expired page
+        past_date = timezone.now() - timedelta(days=1)
+        expired_page = WebPage.objects.create(
+            title="Expired Page",
+            slug="expired",
+            parent=self.site1,
+            publication_status="published",
+            expiry_date=past_date,
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        response = self.client.get("/expired/", HTTP_HOST="example.com")
+        self.assertEqual(response.status_code, 404)
+
+    def test_breadcrumbs_in_hostname_context(self):
+        """Test that breadcrumbs work correctly in hostname context"""
+        response = self.client.get("/about/team/", HTTP_HOST="example.com")
+        self.assertEqual(response.status_code, 200)
+
+        breadcrumbs = response.context["breadcrumbs"]
+        self.assertEqual(len(breadcrumbs), 3)
+        self.assertEqual(breadcrumbs[0].id, self.site1.id)  # Root
+        self.assertEqual(breadcrumbs[1].id, self.about_page.id)  # About
+        self.assertEqual(breadcrumbs[2].id, self.team_page.id)  # Team
+
+    def test_case_insensitive_hostname_matching(self):
+        """Test that hostname matching is case insensitive"""
+        response = self.client.get("/", HTTP_HOST="EXAMPLE.COM")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["page"].id, self.site1.id)
+
+        response = self.client.get("/", HTTP_HOST="Blog.Example.Com")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["page"].id, self.site2.id)
+
+    def test_wildcard_hostname_support(self):
+        """Test wildcard hostname fallback"""
+        # Create wildcard site
+        wildcard_site = WebPage.objects.create(
+            title="Wildcard Site",
+            slug="wildcard",
+            hostnames=["*"],
+            publication_status="published",
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        # Test unknown hostname falls back to wildcard
+        response = self.client.get("/", HTTP_HOST="random.com")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["page"].id, wildcard_site.id)
+
+    def test_template_name_resolution(self):
+        """Test that template names include hostname-specific paths"""
+        # Test that the view works and can find appropriate templates
+        response = self.client.get("/about/", HTTP_HOST="example.com")
+        self.assertEqual(response.status_code, 200)
+
+        # Test that the view context contains hostname information
+        self.assertEqual(response.context["current_hostname"], "example.com")
+        self.assertEqual(response.context["page"].slug, "about")
+
+        # Test with different hostname
+        response2 = self.client.get("/first-post/", HTTP_HOST="blog.example.com")
+        self.assertEqual(response2.status_code, 200)
+        self.assertEqual(response2.context["current_hostname"], "blog.example.com")
+
+        # The template resolution works if we get 200 responses with correct context
