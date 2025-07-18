@@ -912,6 +912,106 @@ class WebPage(models.Model):
         service = ObjectPublishingService(self)
         return service.sync_with_object(user)
 
+    def create_version(self, user, description="", status="draft", auto_publish=False):
+        """Create a new version snapshot of the current page state"""
+        from django.utils import timezone
+
+        # Get the latest version number
+        latest_version = self.versions.order_by("-version_number").first()
+        version_number = (latest_version.version_number + 1) if latest_version else 1
+
+        # Serialize current page state (excluding widgets)
+        page_data = {
+            "title": self.title,
+            "slug": self.slug,
+            "description": self.description,
+            "hostnames": self.hostnames,
+            "layout_id": self.layout_id,
+            "theme_id": self.theme_id,
+            "publication_status": self.publication_status,
+            "effective_date": (
+                self.effective_date.isoformat() if self.effective_date else None
+            ),
+            "expiry_date": self.expiry_date.isoformat() if self.expiry_date else None,
+            "meta_title": self.meta_title,
+            "meta_description": self.meta_description,
+            "meta_keywords": self.meta_keywords,
+            "linked_object_type": self.linked_object_type,
+            "linked_object_id": self.linked_object_id,
+            "parent_id": self.parent_id,
+            "sort_order": self.sort_order,
+        }
+
+        # Serialize widgets separately
+        widgets_data = [
+            {
+                "widget_type_id": w.widget_type_id,
+                "slot_name": w.slot_name,
+                "sort_order": w.sort_order,
+                "configuration": w.configuration,
+                "inherit_from_parent": w.inherit_from_parent,
+                "override_parent": w.override_parent,
+                "inheritance_behavior": w.inheritance_behavior,
+                "inheritance_conditions": w.inheritance_conditions,
+                "priority": w.priority,
+                "is_visible": w.is_visible,
+                "max_inheritance_depth": w.max_inheritance_depth,
+            }
+            for w in self.widgets.all()
+        ]
+
+        # Prepare version fields
+        version_fields = {
+            "page": self,
+            "version_number": version_number,
+            "page_data": page_data,
+            "widgets": widgets_data,
+            "description": description,
+            "status": status,
+            "created_by": user,
+        }
+
+        # Handle auto-publish
+        if auto_publish or status == "published":
+            # Mark all previous versions as not current
+            self.versions.update(is_current=False)
+            version_fields.update(
+                {
+                    "status": "published",
+                    "is_current": True,
+                    "published_at": timezone.now(),
+                    "published_by": user,
+                }
+            )
+
+        # Create new version
+        version = PageVersion.objects.create(**version_fields)
+        return version
+
+    def get_current_version(self):
+        """Get the current published version of this page"""
+        return self.versions.filter(is_current=True, status="published").first()
+
+    def get_latest_draft(self):
+        """Get the latest draft version of this page"""
+        return self.versions.filter(status="draft").order_by("-version_number").first()
+
+    def has_unpublished_changes(self):
+        """Check if there are draft versions newer than the current published version"""
+        current = self.get_current_version()
+        if not current:
+            return self.versions.filter(status="draft").exists()
+
+        return self.versions.filter(
+            status="draft", version_number__gt=current.version_number
+        ).exists()
+
+    def get_latest_published_version(self):
+        """Get the latest published version by version number"""
+        return (
+            self.versions.filter(status="published").order_by("-version_number").first()
+        )
+
 
 class PageVersion(models.Model):
     """
@@ -1118,112 +1218,3 @@ class PageVersion(models.Model):
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "created_by": self.created_by.username if self.created_by else None,
         }
-
-
-# PageWidget model has been removed - widgets are now stored in PageVersion.widgets as JSON
-
-
-# Add methods to WebPage for version management
-def create_version(self, user, description="", status="draft", auto_publish=False):
-    """Create a new version snapshot of the current page state"""
-    from django.utils import timezone
-
-    # Get the latest version number
-    latest_version = self.versions.order_by("-version_number").first()
-    version_number = (latest_version.version_number + 1) if latest_version else 1
-
-    # Serialize current page state (excluding widgets)
-    page_data = {
-        "title": self.title,
-        "slug": self.slug,
-        "description": self.description,
-        "hostnames": self.hostnames,
-        "layout_id": self.layout_id,
-        "theme_id": self.theme_id,
-        "publication_status": self.publication_status,
-        "effective_date": (
-            self.effective_date.isoformat() if self.effective_date else None
-        ),
-        "expiry_date": self.expiry_date.isoformat() if self.expiry_date else None,
-        "meta_title": self.meta_title,
-        "meta_description": self.meta_description,
-        "meta_keywords": self.meta_keywords,
-        "linked_object_type": self.linked_object_type,
-        "linked_object_id": self.linked_object_id,
-        "parent_id": self.parent_id,
-        "sort_order": self.sort_order,
-    }
-
-    # Serialize widgets separately
-    widgets_data = [
-        {
-            "widget_type_id": w.widget_type_id,
-            "slot_name": w.slot_name,
-            "sort_order": w.sort_order,
-            "configuration": w.configuration,
-            "inherit_from_parent": w.inherit_from_parent,
-            "override_parent": w.override_parent,
-            "inheritance_behavior": w.inheritance_behavior,
-            "inheritance_conditions": w.inheritance_conditions,
-            "priority": w.priority,
-            "is_visible": w.is_visible,
-            "max_inheritance_depth": w.max_inheritance_depth,
-        }
-        for w in self.widgets.all()
-    ]
-
-    # Prepare version fields
-    version_fields = {
-        "page": self,
-        "version_number": version_number,
-        "page_data": page_data,
-        "widgets": widgets_data,
-        "description": description,
-        "status": status,
-        "created_by": user,
-    }
-
-    # Handle auto-publish
-    if auto_publish or status == "published":
-        # Mark all previous versions as not current
-        self.versions.update(is_current=False)
-        version_fields.update(
-            {
-                "status": "published",
-                "is_current": True,
-                "published_at": timezone.now(),
-                "published_by": user,
-            }
-        )
-
-    # Create new version
-    version = PageVersion.objects.create(**version_fields)
-    return version
-
-
-def get_current_version(self):
-    """Get the current published version of this page"""
-    return self.versions.filter(is_current=True, status="published").first()
-
-
-def get_latest_draft(self):
-    """Get the latest draft version of this page"""
-    return self.versions.filter(status="draft").order_by("-version_number").first()
-
-
-def has_unpublished_changes(self):
-    """Check if there are draft versions newer than the current published version"""
-    current = self.get_current_version()
-    if not current:
-        return self.versions.filter(status="draft").exists()
-
-    return self.versions.filter(
-        status="draft", version_number__gt=current.version_number
-    ).exists()
-
-
-# Add the methods to the WebPage model
-WebPage.create_version = create_version
-WebPage.get_current_version = get_current_version
-WebPage.get_latest_draft = get_latest_draft
-WebPage.has_unpublished_changes = has_unpublished_changes
