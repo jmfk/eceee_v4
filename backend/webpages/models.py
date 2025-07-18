@@ -28,6 +28,11 @@ class PageLayout(models.Model):
 
     name = models.CharField(max_length=255, unique=True)
     description = models.TextField(blank=True)
+    template_name = models.CharField(
+        max_length=255,
+        help_text="Template file used to render this layout",
+        default="webpages/page_detail.html",
+    )
     slot_configuration = models.JSONField(
         help_text="JSON defining available slots and their properties"
     )
@@ -44,6 +49,21 @@ class PageLayout(models.Model):
 
     def __str__(self):
         return self.name
+
+    def to_dict(self):
+        """Convert layout to dictionary representation"""
+        return {
+            "id": self.id,
+            "name": self.name,
+            "description": self.description,
+            "template_name": self.template_name,
+            "slot_configuration": self.slot_configuration,
+            "css_classes": self.css_classes,
+            "is_active": self.is_active,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "created_by": self.created_by.username if self.created_by else None,
+        }
 
 
 class PageTheme(models.Model):
@@ -68,6 +88,20 @@ class PageTheme(models.Model):
 
     def __str__(self):
         return self.name
+
+    def to_dict(self):
+        """Convert theme to dictionary representation"""
+        return {
+            "id": self.id,
+            "name": self.name,
+            "description": self.description,
+            "css_variables": self.css_variables,
+            "custom_css": self.custom_css,
+            "is_active": self.is_active,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "created_by": self.created_by.username if self.created_by else None,
+        }
 
 
 class WidgetType(models.Model):
@@ -130,6 +164,20 @@ class WidgetType(models.Model):
                 defaults[field_name] = field_schema["default"]
 
         return defaults
+
+    def to_dict(self):
+        """Convert widget type to dictionary representation"""
+        return {
+            "id": self.id,
+            "name": self.name,
+            "description": self.description,
+            "json_schema": self.json_schema,
+            "template_name": self.template_name,
+            "is_active": self.is_active,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "created_by": self.created_by.username if self.created_by else None,
+        }
 
 
 class WebPage(models.Model):
@@ -335,7 +383,7 @@ class WebPage(models.Model):
         )
 
         if pages.exists():
-            return pages.first()
+            return pages.select_related("layout", "theme", "parent").first()
 
         # Fallback: look for wildcard or default patterns using array overlap
         wildcard_pages = cls.objects.filter(
@@ -343,7 +391,7 @@ class WebPage(models.Model):
         )
 
         if wildcard_pages.exists():
-            return wildcard_pages.first()
+            return wildcard_pages.select_related("layout", "theme", "parent").first()
 
         return None
 
@@ -1062,6 +1110,26 @@ class PageVersion(models.Model):
 
         return draft
 
+    def to_dict(self):
+        """Convert version to dictionary representation"""
+        return {
+            "id": self.id,
+            "page_id": self.page_id,
+            "page_title": self.page.title,
+            "version_number": self.version_number,
+            "page_data": self.page_data,
+            "status": self.status,
+            "is_current": self.is_current,
+            "published_at": (
+                self.published_at.isoformat() if self.published_at else None
+            ),
+            "published_by": self.published_by.username if self.published_by else None,
+            "description": self.description,
+            "change_summary": self.change_summary,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "created_by": self.created_by.username if self.created_by else None,
+        }
+
 
 class PageWidget(models.Model):
     """
@@ -1281,6 +1349,27 @@ class PageWidget(models.Model):
             return widgets_by_slot.get(slot_name, [])
 
         return dict(widgets_by_slot)
+
+    def to_dict(self):
+        """Convert widget to dictionary representation"""
+        return {
+            "id": self.id,
+            "widget_type_id": self.widget_type_id,
+            "widget_type_name": self.widget_type.name,
+            "slot_name": self.slot_name,
+            "sort_order": self.sort_order,
+            "configuration": self.configuration,
+            "inherit_from_parent": self.inherit_from_parent,
+            "override_parent": self.override_parent,
+            "inheritance_behavior": self.inheritance_behavior,
+            "inheritance_conditions": self.inheritance_conditions,
+            "priority": self.priority,
+            "is_visible": self.is_visible,
+            "max_inheritance_depth": self.max_inheritance_depth,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "created_by": self.created_by.username if self.created_by else None,
+        }
 
 
 # Add methods to WebPage for version management

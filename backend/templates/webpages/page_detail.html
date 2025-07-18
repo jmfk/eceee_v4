@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "base_eceee.html" %}
 {% load static %}
 {% load webpages_tags %}
 
@@ -57,6 +57,21 @@
                 <p class="lead">{{ page.description }}</p>
             {% endif %}
         </header>
+        <div class="page-layout layout-{{ effective_layout.name|lower }}">
+            <div>widgets: {{widgets}}</div>
+            <div>slots: {{slots}}</div>
+            <div>layout: {{layout}}</div>
+            <div>theme: {{theme}}</div>
+            <div>parent: {{parent}}</div>
+            <div>slug_parts: {{slug_parts}}</div>
+            <div>request: {{request}}</div>
+            {% for slot in slots %}
+                <div class="layout-slot" data-slot="{{ slot.name }}">
+                    {{slot}}
+                </div>
+            {% endfor %}
+        </div>
+
 
         <!-- Main Content Area with Layout Slots -->
         {% if effective_layout %}

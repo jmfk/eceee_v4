@@ -104,6 +104,8 @@ Flexible page structure and styling system with inheritance capabilities.
 **Layout System:**
 - Slot-based page structure definition
 - JSON schema for slot configuration
+- Custom template selection per layout via `template_name` field
+- Layout-specific CSS classes for enhanced styling
 - Layout inheritance down page hierarchy
 - Override capabilities for specific pages
 
@@ -144,6 +146,36 @@ Reusable, configurable page components with full versioning support.
 - Add page-specific widgets
 - Complete change tracking
 
+### 4. Template System
+
+#### Purpose
+Standardized template architecture with flexible layout rendering and theme integration.
+
+#### Key Components
+
+**Base Template Architecture:**
+- `base_eceee.html` - Primary base template with modern web standards
+- Tailwind CSS integration for utility-first styling
+- HTMX for progressive enhancement and dynamic interactions
+- Alpine.js for lightweight JavaScript functionality
+- Consistent navigation and responsive design structure
+
+**Layout Template System:**
+- Custom template selection via PageLayout `template_name` field
+- Defaults to `webpages/page_detail.html` for backward compatibility
+- Support for layout-specific template files
+- Template inheritance from base_eceee.html
+- Automatic theme and CSS variable injection
+
+**Template Features:**
+- Dynamic CSS variable injection from PageTheme
+- Custom CSS support with safe rendering
+- Layout-specific CSS classes from PageLayout
+- Breadcrumb navigation with hierarchical structure
+- SEO-optimized meta tags and structured data
+- Child page navigation and discovery
+- Widget slot rendering with inheritance tracking
+
 ## Data Models
 
 ### Core Models
@@ -178,10 +210,12 @@ PageVersion
 PageLayout
 ├── id (UUID) 
 ├── name, description
+├── template_name (CharField) - custom template file for this layout
 ├── slot_configuration (JSON)
+├── css_classes (TextField) - layout-specific CSS classes
 ├── is_active
 ├── created_by, created_at
-└── template file reference
+└── updated_at
 
 # Theme System
 PageTheme
@@ -260,6 +294,33 @@ WebPage (1) ──── (Many) WebPage (parent/child)
 **Custom Fields**: Specialized fields for JSON data and relationships
 
 ## Frontend Architecture
+
+### Template Rendering (Public Views)
+
+**Enhanced Page Rendering:**
+- Dynamic template selection based on PageLayout.template_name
+- Automatic theme CSS variable injection into page head
+- Layout-specific CSS classes for enhanced styling flexibility  
+- Breadcrumb navigation with hierarchical page structure
+- SEO-optimized meta tags (title, description, keywords)
+- Child page discovery and navigation
+- Widget inheritance visualization and tracking
+
+**Base Template Integration:**
+- Modern web standards with Tailwind CSS, HTMX, and Alpine.js
+- Progressive enhancement for dynamic interactions
+- Consistent navigation structure across all pages
+- Responsive design patterns and accessibility features
+- Performance-optimized asset loading and caching
+
+**Template Inheritance Flow:**
+```
+base_eceee.html (base template)
+    ↓ extends
+page_detail.html (default layout template)
+    ↓ or custom template via PageLayout.template_name
+custom_layout.html (layout-specific template)
+```
 
 ### Component Organization
 

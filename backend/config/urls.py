@@ -23,7 +23,7 @@ from drf_spectacular.views import (
 )
 
 # Import hostname-aware views for multi-site functionality
-from webpages.public_views import HostnameRootView, HostnamePageView
+from webpages.public_views import HostnamePageView
 
 
 def health_check(request):
@@ -58,7 +58,7 @@ urlpatterns = [
     # Monitoring and metrics
     path("metrics/", include("django_prometheus.urls")),
     # Multi-site hostname-aware routing - MUST be last for catch-all functionality
-    path("", HostnameRootView.as_view(), name="hostname-root"),
+    path("", HostnamePageView.as_view(), name="hostname-root"),
     path("<path:slug_path>/", HostnamePageView.as_view(), name="hostname-page-detail"),
 ]
 
