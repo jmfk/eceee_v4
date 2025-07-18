@@ -245,6 +245,45 @@ class WebPage(models.Model):
         """Check if this is a root page (no parent)"""
         return self.parent is None
 
+    @classmethod
+    def normalize_hostname(cls, hostname):
+        """
+        Normalize hostname by stripping protocols, paths, and cleaning format.
+
+        Examples:
+        - "http://example.com/path" -> "example.com"
+        - "https://localhost:8000" -> "localhost:8000"
+        - "www.example.com:443/" -> "www.example.com:443"
+        - "EXAMPLE.COM" -> "example.com"
+        """
+        if not hostname or not isinstance(hostname, str):
+            return ""
+
+        hostname = hostname.strip()
+
+        # Convert to lowercase for protocol detection
+        hostname_lower = hostname.lower()
+
+        # Remove protocol prefixes (case insensitive)
+        if hostname_lower.startswith("http://"):
+            hostname = hostname[7:]  # Remove 'http://'
+        elif hostname_lower.startswith("https://"):
+            hostname = hostname[8:]  # Remove 'https://'
+
+        # Remove path components (everything after first /)
+        if "/" in hostname:
+            hostname = hostname.split("/", 1)[0]
+
+        # Remove query parameters and fragments
+        for separator in ["?", "#"]:
+            if separator in hostname:
+                hostname = hostname.split(separator, 1)[0]
+
+        # Convert to lowercase and strip whitespace
+        hostname = hostname.lower().strip()
+
+        return hostname
+
     def get_hostname_display(self):
         """Get a readable display of associated hostnames"""
         if not self.hostnames:
@@ -252,21 +291,25 @@ class WebPage(models.Model):
         return ", ".join(self.hostnames)
 
     def add_hostname(self, hostname):
-        """Add a hostname to this root page"""
+        """Add a hostname to this root page with automatic normalization"""
         if not self.is_root_page():
             raise ValidationError("Only root pages can have hostnames")
 
-        hostname = hostname.lower().strip()
-        if hostname and hostname not in self.hostnames:
-            self.hostnames.append(hostname)
+        # Normalize the hostname
+        normalized_hostname = self.normalize_hostname(hostname)
+
+        if normalized_hostname and normalized_hostname not in self.hostnames:
+            self.hostnames.append(normalized_hostname)
             self.save()
         return True
 
     def remove_hostname(self, hostname):
         """Remove a hostname from this root page"""
-        hostname = hostname.lower().strip()
-        if hostname in self.hostnames:
-            self.hostnames.remove(hostname)
+        # Normalize for comparison
+        normalized_hostname = self.normalize_hostname(hostname)
+
+        if normalized_hostname in self.hostnames:
+            self.hostnames.remove(normalized_hostname)
             self.save()
         return True
 
@@ -274,15 +317,22 @@ class WebPage(models.Model):
         """Check if this page serves the given hostname"""
         if not self.is_root_page():
             return False
-        return hostname.lower() in [h.lower() for h in self.hostnames]
+
+        # Normalize for comparison
+        normalized_hostname = self.normalize_hostname(hostname)
+        return normalized_hostname in [
+            self.normalize_hostname(h) for h in self.hostnames
+        ]
 
     @classmethod
     def get_root_page_for_hostname(cls, hostname):
         """Get the root page that serves the given hostname"""
-        hostname = hostname.lower().strip()
+        normalized_hostname = cls.normalize_hostname(hostname)
 
         # Look for exact hostname match in array field
-        pages = cls.objects.filter(parent__isnull=True, hostnames__contains=[hostname])
+        pages = cls.objects.filter(
+            parent__isnull=True, hostnames__contains=[normalized_hostname]
+        )
 
         if pages.exists():
             return pages.first()
@@ -495,23 +545,50 @@ class WebPage(models.Model):
                 if not isinstance(hostname, str) or not hostname.strip():
                     raise ValidationError("All hostnames must be non-empty strings.")
 
-                # Basic hostname validation
-                hostname = hostname.strip().lower()
-                if hostname not in ["*", "default"]:
-                    # Basic domain validation - could be more sophisticated
+                # Normalize and validate hostname
+                normalized_hostname = self.normalize_hostname(hostname)
+                if not normalized_hostname:
+                    raise ValidationError(f"Invalid hostname format: {hostname}")
+
+                if normalized_hostname not in ["*", "default"]:
+                    # Hostname validation supporting domains with optional ports
                     import re
 
-                    if not re.match(
-                        r"^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$",
-                        hostname,
-                    ):
-                        raise ValidationError(f"Invalid hostname format: {hostname}")
+                    # Pattern allows domain names with optional port numbers
+                    # Examples: example.com, localhost:8000, sub.domain.com:3000
+                    hostname_pattern = (
+                        r"^"
+                        r"[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?"  # First part
+                        r"(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*"  # Domain parts
+                        r"(:[0-9]{1,5})?"  # Optional port number (1-5 digits)
+                        r"$"
+                    )
+
+                    if not re.match(hostname_pattern, normalized_hostname):
+                        raise ValidationError(
+                            f"Invalid hostname format: {hostname} (normalized: {normalized_hostname})"
+                        )
+
+                    # Validate port range if present
+                    if ":" in normalized_hostname:
+                        try:
+                            port = int(normalized_hostname.split(":")[1])
+                            if not (1 <= port <= 65535):
+                                raise ValidationError(
+                                    f"Port number must be between 1-65535: {hostname}"
+                                )
+                        except (ValueError, IndexError):
+                            raise ValidationError(
+                                f"Invalid port format in hostname: {hostname}"
+                            )
 
         # Check for hostname conflicts with other root pages
         if self.hostnames and self.parent is None:
             for hostname in self.hostnames:
+                # Use normalized hostname for conflict checking
+                normalized_hostname = self.normalize_hostname(hostname)
                 conflicting_pages = WebPage.objects.filter(
-                    parent__isnull=True, hostnames__contains=[hostname]
+                    parent__isnull=True, hostnames__contains=[normalized_hostname]
                 ).exclude(pk=self.pk)
 
                 if conflicting_pages.exists():

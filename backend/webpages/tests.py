@@ -1737,3 +1737,256 @@ class HostnameViewTest(TestCase):
         self.assertEqual(response2.context["current_hostname"], "blog.example.com")
 
         # The template resolution works if we get 200 responses with correct context
+
+
+class HostnameNormalizationTest(TestCase):
+    """Test hostname normalization functionality for development and production use"""
+
+    def setUp(self):
+        self.user = User.objects.create_superuser(
+            username="testuser", email="test@example.com", password="testpass123"
+        )
+
+    def test_normalize_hostname_basic(self):
+        """Test basic hostname normalization"""
+        # Test normal hostnames
+        self.assertEqual(WebPage.normalize_hostname("example.com"), "example.com")
+        self.assertEqual(WebPage.normalize_hostname("EXAMPLE.COM"), "example.com")
+        self.assertEqual(
+            WebPage.normalize_hostname("www.Example.Com"), "www.example.com"
+        )
+
+    def test_normalize_hostname_with_ports(self):
+        """Test hostname normalization with port numbers"""
+        self.assertEqual(WebPage.normalize_hostname("localhost:8000"), "localhost:8000")
+        self.assertEqual(
+            WebPage.normalize_hostname("example.com:3000"), "example.com:3000"
+        )
+        self.assertEqual(
+            WebPage.normalize_hostname("dev.site.com:8080"), "dev.site.com:8080"
+        )
+
+    def test_normalize_hostname_with_http_prefix(self):
+        """Test stripping HTTP/HTTPS prefixes"""
+        self.assertEqual(
+            WebPage.normalize_hostname("http://example.com"), "example.com"
+        )
+        self.assertEqual(
+            WebPage.normalize_hostname("https://example.com"), "example.com"
+        )
+        self.assertEqual(
+            WebPage.normalize_hostname("http://localhost:8000"), "localhost:8000"
+        )
+        self.assertEqual(
+            WebPage.normalize_hostname("https://dev.site.com:3000"), "dev.site.com:3000"
+        )
+
+    def test_normalize_hostname_with_paths(self):
+        """Test stripping paths and query parameters"""
+        self.assertEqual(WebPage.normalize_hostname("example.com/path"), "example.com")
+        self.assertEqual(
+            WebPage.normalize_hostname("http://example.com/admin/"), "example.com"
+        )
+        self.assertEqual(
+            WebPage.normalize_hostname("localhost:8000/path/to/page"), "localhost:8000"
+        )
+        self.assertEqual(
+            WebPage.normalize_hostname("example.com?param=value"), "example.com"
+        )
+        self.assertEqual(
+            WebPage.normalize_hostname("example.com#fragment"), "example.com"
+        )
+        self.assertEqual(
+            WebPage.normalize_hostname("example.com/path?param=value#fragment"),
+            "example.com",
+        )
+
+    def test_normalize_hostname_complex_cases(self):
+        """Test complex normalization cases"""
+        cases = [
+            (
+                "https://WWW.EXAMPLE.COM:8080/admin/pages/?tab=all#top",
+                "www.example.com:8080",
+            ),
+            ("HTTP://Dev.Site.COM:3000/", "dev.site.com:3000"),
+            ("localhost:8000/webpages/", "localhost:8000"),
+            ("  https://example.com/  ", "example.com"),
+        ]
+
+        for input_hostname, expected in cases:
+            with self.subTest(input=input_hostname):
+                self.assertEqual(WebPage.normalize_hostname(input_hostname), expected)
+
+    def test_normalize_hostname_edge_cases(self):
+        """Test edge cases for hostname normalization"""
+        self.assertEqual(WebPage.normalize_hostname(""), "")
+        self.assertEqual(WebPage.normalize_hostname(None), "")
+        self.assertEqual(WebPage.normalize_hostname("   "), "")
+        self.assertEqual(WebPage.normalize_hostname(123), "")
+
+    def test_hostname_validation_with_ports(self):
+        """Test that hostname validation accepts valid ports"""
+        page = WebPage(
+            title="Test Page",
+            slug="test",
+            hostnames=["localhost:8000", "example.com:3000", "dev.site.com:8080"],
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        try:
+            page.clean()  # Should not raise
+        except ValidationError:
+            self.fail("Valid hostnames with ports should not raise ValidationError")
+
+    def test_hostname_validation_invalid_ports(self):
+        """Test that invalid port numbers are rejected"""
+        # Port too high
+        invalid_page = WebPage(
+            title="Invalid Page",
+            slug="invalid",
+            hostnames=["example.com:99999"],
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        with self.assertRaises(ValidationError) as context:
+            invalid_page.clean()
+
+        self.assertIn("Port number must be between 1-65535", str(context.exception))
+
+        # Port of 0
+        invalid_page2 = WebPage(
+            title="Invalid Page 2",
+            slug="invalid2",
+            hostnames=["example.com:0"],
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        with self.assertRaises(ValidationError) as context:
+            invalid_page2.clean()
+
+        self.assertIn("Port number must be between 1-65535", str(context.exception))
+
+    def test_add_hostname_with_normalization(self):
+        """Test that add_hostname automatically normalizes input"""
+        page = WebPage.objects.create(
+            title="Test Page",
+            slug="test",
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        # Add various formats that should all normalize to the same thing
+        page.add_hostname("http://example.com/path")
+        page.add_hostname("HTTPS://Example.Com:8080/admin/")
+        page.add_hostname("localhost:3000")
+
+        page.refresh_from_db()
+        expected_hostnames = ["example.com", "example.com:8080", "localhost:3000"]
+        self.assertEqual(set(page.hostnames), set(expected_hostnames))
+
+    def test_serves_hostname_with_normalization(self):
+        """Test that serves_hostname works with different hostname formats"""
+        page = WebPage.objects.create(
+            title="Test Page",
+            slug="test",
+            hostnames=["example.com", "localhost:8000"],
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        # Test various formats that should match
+        self.assertTrue(page.serves_hostname("example.com"))
+        self.assertTrue(page.serves_hostname("EXAMPLE.COM"))
+        self.assertTrue(page.serves_hostname("http://example.com"))
+        self.assertTrue(page.serves_hostname("https://example.com/path"))
+
+        self.assertTrue(page.serves_hostname("localhost:8000"))
+        self.assertTrue(page.serves_hostname("http://localhost:8000"))
+        self.assertTrue(page.serves_hostname("https://localhost:8000/admin/"))
+
+        # Test non-matching hostnames
+        self.assertFalse(page.serves_hostname("other.com"))
+        self.assertFalse(page.serves_hostname("localhost:3000"))
+
+    def test_get_root_page_for_hostname_normalization(self):
+        """Test hostname resolution with normalization"""
+        page = WebPage.objects.create(
+            title="Dev Site",
+            slug="dev-site",
+            hostnames=["localhost:8000"],
+            publication_status="published",
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        # Test various input formats
+        test_cases = [
+            "localhost:8000",
+            "http://localhost:8000",
+            "https://localhost:8000/admin/",
+            "HTTP://LOCALHOST:8000/path/?param=value#fragment",
+        ]
+
+        for hostname_input in test_cases:
+            with self.subTest(hostname=hostname_input):
+                found_page = WebPage.get_root_page_for_hostname(hostname_input)
+                self.assertEqual(found_page.id, page.id)
+
+    def test_hostname_conflict_prevention_with_normalization(self):
+        """Test that hostname conflicts are detected even with different formats"""
+        # Create first page
+        page1 = WebPage.objects.create(
+            title="Page 1",
+            slug="page1",
+            hostnames=["example.com"],
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        # Try to create second page with same hostname in different format
+        page2 = WebPage(
+            title="Page 2",
+            slug="page2",
+            hostnames=["http://example.com/path"],  # Should normalize to example.com
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        with self.assertRaises(ValidationError) as context:
+            page2.clean()
+
+        self.assertIn("already used by page", str(context.exception))
+
+    def test_development_workflow_example(self):
+        """Test a realistic development workflow with various hostname formats"""
+        # Create a development site
+        dev_site = WebPage.objects.create(
+            title="Development Site",
+            slug="dev",
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        # Add hostnames as a developer might
+        dev_site.add_hostname("http://localhost:8000")
+        dev_site.add_hostname("https://dev.mysite.com:3000/")
+        dev_site.add_hostname("192.168.1.100:8080")
+
+        dev_site.refresh_from_db()
+        expected = ["localhost:8000", "dev.mysite.com:3000", "192.168.1.100:8080"]
+        self.assertEqual(set(dev_site.hostnames), set(expected))
+
+        # Test that all formats work for resolution
+        test_hostnames = [
+            "localhost:8000",
+            "http://localhost:8000/admin/",
+            "dev.mysite.com:3000",
+            "https://dev.mysite.com:3000/webpages/",
+        ]
+
+        for hostname in test_hostnames:
+            with self.subTest(hostname=hostname):
+                self.assertTrue(dev_site.serves_hostname(hostname))
