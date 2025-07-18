@@ -7,7 +7,7 @@ including hierarchical relationships and inheritance logic.
 
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import WebPage, PageVersion, PageLayout, PageTheme, WidgetType, PageWidget
+from .models import WebPage, PageVersion, PageLayout, PageTheme, WidgetType
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -127,67 +127,68 @@ class WidgetTypeSerializer(serializers.ModelSerializer):
 
         return value
 
+    # Temporarily disabled - widgets now stored in PageVersion JSON
+    # class PageWidgetSerializer(serializers.ModelSerializer):
+    #     """Serializer for page widgets"""
+    #
+    #     widget_type = WidgetTypeSerializer(read_only=True)
+    #     widget_type_id = serializers.IntegerField(write_only=True)
+    #     created_by = UserSerializer(read_only=True)
+    #
+    #     class Meta:
+    #         model = PageWidget
+    #         fields = [
+    #             "id",
+    #             "page",
+    #             "widget_type",
+    #             "widget_type_id",
+    #             "slot_name",
+    #             "sort_order",
+    #             "configuration",
+    #             "inherit_from_parent",
+    #             "override_parent",
+    #             # Phase 6: Enhanced inheritance and ordering fields
+    #             "inheritance_behavior",
+    #             "inheritance_conditions",
+    #             "priority",
+    #             "is_visible",
+    #             "max_inheritance_depth",
+    #             "created_at",
+    #             "updated_at",
+    #             "created_by",
+    #         ]
+    #         read_only_fields = ["id", "created_at", "updated_at", "created_by"]
+    #
+    #     def validate_configuration(self, value):
+    #         """Validate widget configuration against its type's schema"""
+    #         if not isinstance(value, dict):
+    #             raise serializers.ValidationError(
+    #                 "Widget configuration must be a JSON object"
+    #             )
+    #
+    #         # Phase 6: Implement JSON schema validation against widget_type.json_schema
+    #         widget_type_id = self.initial_data.get("widget_type_id")
+    #         if widget_type_id:
+    #             try:
+    #                 widget_type = WidgetType.objects.get(id=widget_type_id)
+    #                 is_valid, errors = widget_type.validate_configuration(value)
+    #                 if not is_valid:
+    #                     raise serializers.ValidationError(
+    #                         f"Configuration validation failed: {', '.join(errors)}"
+    #                     )
+    #             except WidgetType.DoesNotExist:
+    #                 pass  # Will be caught by widget_type_id validation
+    #
+    #         return value
 
-class PageWidgetSerializer(serializers.ModelSerializer):
-    """Serializer for page widgets"""
 
-    widget_type = WidgetTypeSerializer(read_only=True)
-    widget_type_id = serializers.IntegerField(write_only=True)
-    created_by = UserSerializer(read_only=True)
-
-    class Meta:
-        model = PageWidget
-        fields = [
-            "id",
-            "page",
-            "widget_type",
-            "widget_type_id",
-            "slot_name",
-            "sort_order",
-            "configuration",
-            "inherit_from_parent",
-            "override_parent",
-            # Phase 6: Enhanced inheritance and ordering fields
-            "inheritance_behavior",
-            "inheritance_conditions",
-            "priority",
-            "is_visible",
-            "max_inheritance_depth",
-            "created_at",
-            "updated_at",
-            "created_by",
-        ]
-        read_only_fields = ["id", "created_at", "updated_at", "created_by"]
-
-    def validate_configuration(self, value):
-        """Validate widget configuration against its type's schema"""
-        if not isinstance(value, dict):
-            raise serializers.ValidationError(
-                "Widget configuration must be a JSON object"
-            )
-
-        # Phase 6: Implement JSON schema validation against widget_type.json_schema
-        widget_type_id = self.initial_data.get("widget_type_id")
-        if widget_type_id:
-            try:
-                widget_type = WidgetType.objects.get(id=widget_type_id)
-                is_valid, errors = widget_type.validate_configuration(value)
-                if not is_valid:
-                    raise serializers.ValidationError(
-                        f"Configuration validation failed: {', '.join(errors)}"
-                    )
-            except WidgetType.DoesNotExist:
-                pass  # Will be caught by widget_type_id validation
-
-        return value
-
-    def validate_inheritance_behavior(self, value):
-        """Validate inheritance behavior combinations"""
-        if value not in dict(PageWidget.INHERITANCE_CHOICES):
-            raise serializers.ValidationError(
-                f"Invalid inheritance behavior. Must be one of: {[choice[0] for choice in PageWidget.INHERITANCE_CHOICES]}"
-            )
-        return value
+#     def validate_inheritance_behavior(self, value):
+#         """Validate inheritance behavior combinations"""
+#         if value not in dict(PageWidget.INHERITANCE_CHOICES):
+#             raise serializers.ValidationError(
+#                 f"Invalid inheritance behavior. Must be one of: {[choice[0] for choice in PageWidget.INHERITANCE_CHOICES]}"
+#             )
+#         return value
 
 
 class WebPageTreeSerializer(serializers.ModelSerializer):
@@ -231,7 +232,7 @@ class WebPageDetailSerializer(serializers.ModelSerializer):
         write_only=True, required=False, allow_null=True
     )
 
-    widgets = PageWidgetSerializer(many=True, read_only=True)
+    # widgets = PageWidgetSerializer(many=True, read_only=True)  # Removed - widgets now in PageVersion
 
     created_by = UserSerializer(read_only=True)
     last_modified_by = UserSerializer(read_only=True)
@@ -270,7 +271,7 @@ class WebPageDetailSerializer(serializers.ModelSerializer):
             "updated_at",
             "created_by",
             "last_modified_by",
-            "widgets",
+            # "widgets",  # Removed - widgets now in PageVersion
             "absolute_url",
             "is_published",
             "breadcrumbs",
@@ -396,6 +397,7 @@ class PageVersionSerializer(serializers.ModelSerializer):
             "page",
             "version_number",
             "page_data",
+            "widgets",
             "status",
             "description",
             "change_summary",

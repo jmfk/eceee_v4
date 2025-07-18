@@ -15,8 +15,7 @@ export class SlotState {
     getWidgetsBySlot() {
         const widgetsBySlot = {}
 
-        this.pageWidgetsData.forEach(item => {
-            const widget = item.widget
+        this.pageWidgetsData.forEach(widget => {
             const slotName = widget.slot_name
 
             if (!widgetsBySlot[slotName]) {
@@ -25,8 +24,7 @@ export class SlotState {
 
             widgetsBySlot[slotName].push({
                 ...widget,
-                inherited_from: item.inherited_from,
-                is_inherited: !!item.inherited_from
+                is_inherited: !!widget.inherited_from
             })
         })
 

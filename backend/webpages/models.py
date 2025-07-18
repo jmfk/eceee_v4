@@ -929,8 +929,11 @@ class PageVersion(models.Model):
     version_number = models.PositiveIntegerField()
 
     # Snapshot of page data at this version
-    page_data = models.JSONField(
-        help_text="Complete serialized page data including widgets"
+    page_data = models.JSONField(help_text="Serialized page data (excluding widgets)")
+
+    # Widget data for this version
+    widgets = models.JSONField(
+        default=list, help_text="Widget configuration data for this version"
     )
 
     # Version workflow
@@ -1000,7 +1003,6 @@ class PageVersion(models.Model):
     def _apply_version_data(self):
         """Apply the stored page data to the actual page instance"""
         page_data = self.page_data.copy()
-        widgets_data = page_data.pop("widgets", [])
 
         # Apply page fields
         for field, value in page_data.items():
@@ -1015,19 +1017,8 @@ class PageVersion(models.Model):
                     value = parse_datetime(value)
                 setattr(self.page, field, value)
 
-        # Clear existing widgets and recreate from version data
-        self.page.widgets.all().delete()
-        for widget_data in widgets_data:
-            PageWidget.objects.create(
-                page=self.page,
-                widget_type_id=widget_data["widget_type_id"],
-                slot_name=widget_data["slot_name"],
-                sort_order=widget_data["sort_order"],
-                configuration=widget_data["configuration"],
-                inherit_from_parent=widget_data["inherit_from_parent"],
-                override_parent=widget_data["override_parent"],
-                created_by=self.created_by,
-            )
+        # Note: Widgets are no longer stored as separate model objects
+        # They exist only in PageVersion.widgets as JSON data
 
     def restore(self, user):
         """Restore this version as the current version of the page"""
@@ -1064,13 +1055,9 @@ class PageVersion(models.Model):
                 )
 
         # Compare widgets
-        self_widgets = {
-            (w["slot_name"], w["sort_order"]): w
-            for w in self.page_data.get("widgets", [])
-        }
+        self_widgets = {(w["slot_name"], w["sort_order"]): w for w in self.widgets}
         other_widgets = {
-            (w["slot_name"], w["sort_order"]): w
-            for w in other_version.page_data.get("widgets", [])
+            (w["slot_name"], w["sort_order"]): w for w in other_version.widgets
         }
 
         # Find added widgets
@@ -1103,6 +1090,7 @@ class PageVersion(models.Model):
             page=self.page,
             version_number=version_number,
             page_data=self.page_data.copy(),
+            widgets=self.widgets.copy() if self.widgets else [],
             status="draft",
             description=description or f"Draft based on version {self.version_number}",
             created_by=user,
@@ -1118,6 +1106,7 @@ class PageVersion(models.Model):
             "page_title": self.page.title,
             "version_number": self.version_number,
             "page_data": self.page_data,
+            "widgets": self.widgets,
             "status": self.status,
             "is_current": self.is_current,
             "published_at": (
@@ -1131,245 +1120,7 @@ class PageVersion(models.Model):
         }
 
 
-class PageWidget(models.Model):
-    """
-    Widget instances placed on pages. Supports inheritance from parent pages.
-    """
-
-    page = models.ForeignKey(WebPage, on_delete=models.CASCADE, related_name="widgets")
-    widget_type = models.ForeignKey(WidgetType, on_delete=models.CASCADE)
-
-    # Widget placement
-    slot_name = models.CharField(
-        max_length=100, help_text="Layout slot where this widget is placed"
-    )
-    sort_order = models.IntegerField(default=0)
-
-    # Widget configuration
-    configuration = models.JSONField(help_text="Widget-specific configuration data")
-
-    # Phase 6: Enhanced Inheritance Controls
-    inherit_from_parent = models.BooleanField(
-        default=True, help_text="Whether child pages inherit this widget"
-    )
-    override_parent = models.BooleanField(
-        default=False, help_text="Whether this widget overrides a parent widget"
-    )
-
-    # Granular inheritance settings
-    INHERITANCE_CHOICES = [
-        ("inherit", "Inherit from Parent"),
-        ("override", "Override Parent Widget"),
-        ("supplement", "Add to Parent Widgets"),
-        ("block", "Block Inheritance"),
-        ("conditional", "Conditional Inheritance"),
-    ]
-
-    inheritance_behavior = models.CharField(
-        max_length=20,
-        choices=INHERITANCE_CHOICES,
-        default="inherit",
-        help_text="How this widget handles inheritance",
-    )
-
-    # Conditional inheritance settings
-    inheritance_conditions = models.JSONField(
-        default=dict,
-        blank=True,
-        help_text="JSON conditions for when inheritance applies",
-    )
-
-    # Widget priority for ordering when multiple widgets exist in same slot
-    priority = models.IntegerField(
-        default=0,
-        help_text="Higher priority widgets appear first (0 = normal priority)",
-    )
-
-    # Visibility controls
-    is_visible = models.BooleanField(
-        default=True, help_text="Whether this widget is visible on the page"
-    )
-
-    # Inheritance depth limit
-    max_inheritance_depth = models.IntegerField(
-        null=True,
-        blank=True,
-        help_text="Maximum depth this widget can be inherited (null = unlimited)",
-    )
-
-    # Timestamps
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    created_by = models.ForeignKey(User, on_delete=models.PROTECT)
-
-    class Meta:
-        ordering = ["slot_name", "-priority", "sort_order"]
-        unique_together = ["page", "slot_name", "sort_order"]
-
-    def __str__(self):
-        return f"{self.page.title} - {self.widget_type.name} in {self.slot_name}"
-
-    def clean(self):
-        """Validate widget configuration against schema"""
-        super().clean()
-
-        # Phase 6: Implement JSON schema validation
-        if self.widget_type and self.widget_type.json_schema and self.configuration:
-            self._validate_configuration_schema()
-
-    def _validate_configuration_schema(self):
-        """Validate widget configuration against its widget type's JSON schema"""
-        try:
-            import jsonschema
-            from jsonschema import ValidationError
-
-            # Validate the configuration against the widget type's schema
-            jsonschema.validate(
-                instance=self.configuration, schema=self.widget_type.json_schema
-            )
-
-        except ImportError:
-            # jsonschema not installed, skip validation
-            pass
-        except ValidationError as e:
-            from django.core.exceptions import ValidationError as DjangoValidationError
-
-            raise DjangoValidationError(
-                f"Widget configuration validation failed: {e.message}"
-            )
-        except Exception as e:
-            from django.core.exceptions import ValidationError as DjangoValidationError
-
-            raise DjangoValidationError(
-                f"Widget configuration validation error: {str(e)}"
-            )
-
-    def should_inherit_to_page(self, target_page):
-        """
-        Determine if this widget should be inherited by the target page
-        based on inheritance behavior and conditions.
-        """
-        if not self.inherit_from_parent:
-            return False
-
-        if self.inheritance_behavior == "block":
-            return False
-
-        # Check inheritance depth limit
-        if self.max_inheritance_depth is not None:
-            depth = self._calculate_inheritance_depth(target_page)
-            if depth > self.max_inheritance_depth:
-                return False
-
-        # Check conditional inheritance
-        if self.inheritance_behavior == "conditional" and self.inheritance_conditions:
-            return self._evaluate_inheritance_conditions(target_page)
-
-        return True
-
-    def _calculate_inheritance_depth(self, target_page):
-        """Calculate the inheritance depth from this widget's page to target page"""
-        depth = 0
-        current_page = target_page
-
-        while current_page and current_page != self.page:
-            current_page = current_page.parent
-            depth += 1
-
-        return depth
-
-    def _evaluate_inheritance_conditions(self, target_page):
-        """
-        Evaluate inheritance conditions against target page.
-        Conditions format: {
-            "page_type": "specific_type",
-            "depth_max": 3,
-            "custom_field": "value"
-        }
-        """
-        if not self.inheritance_conditions:
-            return True
-
-        for condition_key, condition_value in self.inheritance_conditions.items():
-            if condition_key == "depth_max":
-                depth = self._calculate_inheritance_depth(target_page)
-                if depth > condition_value:
-                    return False
-            elif condition_key == "page_type":
-                # This could be extended to check custom page types
-                if (
-                    hasattr(target_page, "page_type")
-                    and target_page.page_type != condition_value
-                ):
-                    return False
-            # Add more condition types as needed
-
-        return True
-
-    @classmethod
-    def get_effective_widgets_for_page(cls, page, slot_name=None):
-        """
-        Get all effective widgets for a page considering inheritance rules.
-        Returns widgets ordered by priority and sort_order.
-        """
-        from collections import defaultdict
-
-        # Collect widgets from page hierarchy
-        widgets_by_slot = defaultdict(list)
-        inheritance_chain = page.get_inheritance_chain()
-
-        for ancestor_page in inheritance_chain:
-            page_widgets = cls.objects.filter(page=ancestor_page, is_visible=True)
-
-            if slot_name:
-                page_widgets = page_widgets.filter(slot_name=slot_name)
-
-            for widget in page_widgets:
-                if widget.should_inherit_to_page(page):
-                    # Handle different inheritance behaviors
-                    if widget.inheritance_behavior == "override":
-                        # Override: clear existing widgets in this slot
-                        widgets_by_slot[widget.slot_name] = [widget]
-                    elif widget.inheritance_behavior == "supplement":
-                        # Supplement: add to existing widgets
-                        widgets_by_slot[widget.slot_name].append(widget)
-                    elif widget.inheritance_behavior == "inherit":
-                        # Normal inheritance: add if not overridden
-                        if not any(
-                            w.inheritance_behavior == "override"
-                            for w in widgets_by_slot[widget.slot_name]
-                        ):
-                            widgets_by_slot[widget.slot_name].append(widget)
-
-        # Sort widgets within each slot by priority and sort_order
-        for slot, widgets in widgets_by_slot.items():
-            widgets.sort(key=lambda w: (-w.priority, w.sort_order))
-
-        if slot_name:
-            return widgets_by_slot.get(slot_name, [])
-
-        return dict(widgets_by_slot)
-
-    def to_dict(self):
-        """Convert widget to dictionary representation"""
-        return {
-            "id": self.id,
-            "widget_type_id": self.widget_type_id,
-            "widget_type_name": self.widget_type.name,
-            "slot_name": self.slot_name,
-            "sort_order": self.sort_order,
-            "configuration": self.configuration,
-            "inherit_from_parent": self.inherit_from_parent,
-            "override_parent": self.override_parent,
-            "inheritance_behavior": self.inheritance_behavior,
-            "inheritance_conditions": self.inheritance_conditions,
-            "priority": self.priority,
-            "is_visible": self.is_visible,
-            "max_inheritance_depth": self.max_inheritance_depth,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
-            "created_by": self.created_by.username if self.created_by else None,
-        }
+# PageWidget model has been removed - widgets are now stored in PageVersion.widgets as JSON
 
 
 # Add methods to WebPage for version management
@@ -1381,7 +1132,7 @@ def create_version(self, user, description="", status="draft", auto_publish=Fals
     latest_version = self.versions.order_by("-version_number").first()
     version_number = (latest_version.version_number + 1) if latest_version else 1
 
-    # Serialize current page state
+    # Serialize current page state (excluding widgets)
     page_data = {
         "title": self.title,
         "slug": self.slug,
@@ -1401,25 +1152,32 @@ def create_version(self, user, description="", status="draft", auto_publish=Fals
         "linked_object_id": self.linked_object_id,
         "parent_id": self.parent_id,
         "sort_order": self.sort_order,
-        # Include widgets
-        "widgets": [
-            {
-                "widget_type_id": w.widget_type_id,
-                "slot_name": w.slot_name,
-                "sort_order": w.sort_order,
-                "configuration": w.configuration,
-                "inherit_from_parent": w.inherit_from_parent,
-                "override_parent": w.override_parent,
-            }
-            for w in self.widgets.all()
-        ],
     }
+
+    # Serialize widgets separately
+    widgets_data = [
+        {
+            "widget_type_id": w.widget_type_id,
+            "slot_name": w.slot_name,
+            "sort_order": w.sort_order,
+            "configuration": w.configuration,
+            "inherit_from_parent": w.inherit_from_parent,
+            "override_parent": w.override_parent,
+            "inheritance_behavior": w.inheritance_behavior,
+            "inheritance_conditions": w.inheritance_conditions,
+            "priority": w.priority,
+            "is_visible": w.is_visible,
+            "max_inheritance_depth": w.max_inheritance_depth,
+        }
+        for w in self.widgets.all()
+    ]
 
     # Prepare version fields
     version_fields = {
         "page": self,
         "version_number": version_number,
         "page_data": page_data,
+        "widgets": widgets_data,
         "description": description,
         "status": status,
         "created_by": user,

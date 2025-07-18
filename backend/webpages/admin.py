@@ -9,7 +9,7 @@ from django.contrib import admin
 from django.utils.html import format_html
 from django.urls import reverse
 from django.utils.safestring import mark_safe
-from .models import WebPage, PageVersion, PageLayout, PageTheme, WidgetType, PageWidget
+from .models import WebPage, PageVersion, PageLayout, PageTheme, WidgetType
 
 
 class HasHostnamesFilter(admin.SimpleListFilter):
@@ -108,17 +108,18 @@ class WidgetTypeAdmin(admin.ModelAdmin):
         super().save_model(request, obj, form, change)
 
 
-class PageWidgetInline(admin.TabularInline):
-    model = PageWidget
-    extra = 0
-    fields = [
-        "widget_type",
-        "slot_name",
-        "sort_order",
-        "inherit_from_parent",
-        "override_parent",
-    ]
-    readonly_fields = ["created_at", "updated_at"]
+# Removed PageWidgetInline - widgets are now stored in PageVersion JSON data
+# class PageWidgetInline(admin.TabularInline):
+#     model = PageWidget
+#     extra = 0
+#     fields = [
+#         "widget_type",
+#         "slot_name",
+#         "sort_order",
+#         "inherit_from_parent",
+#         "override_parent",
+#     ]
+#     readonly_fields = ["created_at", "updated_at"]
 
 
 class PageVersionInline(admin.TabularInline):
@@ -165,7 +166,7 @@ class WebPageAdmin(admin.ModelAdmin):
         "is_root_page_display",
     ]
 
-    inlines = [PageWidgetInline, PageVersionInline]
+    inlines = [PageVersionInline]
 
     fieldsets = (
         (
@@ -389,53 +390,54 @@ class PageVersionAdmin(admin.ModelAdmin):
     restore_version.short_description = "Restore selected versions"
 
 
-@admin.register(PageWidget)
-class PageWidgetAdmin(admin.ModelAdmin):
-    list_display = [
-        "page",
-        "widget_type",
-        "slot_name",
-        "sort_order",
-        "inherit_from_parent",
-        "override_parent",
-        "created_at",
-    ]
-    list_filter = [
-        "widget_type",
-        "slot_name",
-        "inherit_from_parent",
-        "override_parent",
-        "created_at",
-    ]
-    search_fields = ["page__title", "widget_type__name", "slot_name"]
-    readonly_fields = ["created_at", "updated_at"]
-
-    fieldsets = (
-        (
-            "Basic Information",
-            {"fields": ("page", "widget_type", "slot_name", "sort_order")},
-        ),
-        ("Configuration", {"fields": ("configuration",)}),
-        (
-            "Inheritance",
-            {
-                "fields": ("inherit_from_parent", "override_parent"),
-                "description": "Control how this widget affects child pages",
-            },
-        ),
-        (
-            "Metadata",
-            {
-                "fields": ("created_at", "updated_at", "created_by"),
-                "classes": ("collapse",),
-            },
-        ),
-    )
-
-    def save_model(self, request, obj, form, change):
-        if not change:  # Creating new object
-            obj.created_by = request.user
-        super().save_model(request, obj, form, change)
+# Removed PageWidgetAdmin - widgets are now stored in PageVersion JSON data
+# @admin.register(PageWidget)
+# class PageWidgetAdmin(admin.ModelAdmin):
+#     list_display = [
+#         "page",
+#         "widget_type",
+#         "slot_name",
+#         "sort_order",
+#         "inherit_from_parent",
+#         "override_parent",
+#         "created_at",
+#     ]
+#     list_filter = [
+#         "widget_type",
+#         "slot_name",
+#         "inherit_from_parent",
+#         "override_parent",
+#         "created_at",
+#     ]
+#     search_fields = ["page__title", "widget_type__name", "slot_name"]
+#     readonly_fields = ["created_at", "updated_at"]
+#
+#     fieldsets = (
+#         (
+#             "Basic Information",
+#             {"fields": ("page", "widget_type", "slot_name", "sort_order")},
+#         ),
+#         ("Configuration", {"fields": ("configuration",)}),
+#         (
+#             "Inheritance",
+#             {
+#                 "fields": ("inherit_from_parent", "override_parent"),
+#                 "description": "Control how this widget affects child pages",
+#             },
+#         ),
+#         (
+#             "Metadata",
+#             {
+#                 "fields": ("created_at", "updated_at", "created_by"),
+#                 "classes": ("collapse",),
+#             },
+#         ),
+#     )
+#
+#     def save_model(self, request, obj, form, change):
+#         if not change:  # Creating new object
+#             obj.created_by = request.user
+#         super().save_model(request, obj, form, change)
 
 
 # Customize admin site headers

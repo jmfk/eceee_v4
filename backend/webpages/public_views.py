@@ -17,7 +17,7 @@ from django.urls import reverse
 from django.contrib.sitemaps import Sitemap
 import json
 
-from .models import WebPage, PageWidget
+from .models import WebPage
 from .serializers import WebPageDetailSerializer, PageHierarchySerializer
 
 

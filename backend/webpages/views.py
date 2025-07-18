@@ -13,7 +13,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Q
 from django.utils import timezone
 
-from .models import WebPage, PageVersion, PageLayout, PageTheme, WidgetType, PageWidget
+from .models import WebPage, PageVersion, PageLayout, PageTheme, WidgetType
 from .serializers import (
     WebPageDetailSerializer,
     WebPageListSerializer,
@@ -24,7 +24,7 @@ from .serializers import (
     PageLayoutSerializer,
     PageThemeSerializer,
     WidgetTypeSerializer,
-    PageWidgetSerializer,
+    # PageWidgetSerializer,  # Removed - widgets now in PageVersion
     PageHierarchySerializer,
 )
 from .filters import WebPageFilter, PageVersionFilter
@@ -157,11 +157,18 @@ class WidgetTypeViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Create a temporary widget instance for rendering
+        # Create a temporary widget data structure for rendering
         from .renderers import WidgetRendererRegistry
-        from .models import PageWidget
 
-        temp_widget = PageWidget(
+        # Simple widget data structure for rendering (replaces PageWidget)
+        class TempWidget:
+            def __init__(self, widget_type, configuration, slot_name, sort_order):
+                self.widget_type = widget_type
+                self.configuration = configuration
+                self.slot_name = slot_name
+                self.sort_order = sort_order
+
+        temp_widget = TempWidget(
             widget_type=widget_type,
             configuration=configuration,
             slot_name=context.get("slot_name", "preview"),
@@ -1257,256 +1264,257 @@ class PageVersionViewSet(viewsets.ModelViewSet):
         )
 
 
-class PageWidgetViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet for managing page widgets.
-    Provides CRUD operations for widgets on pages.
-    """
-
-    queryset = PageWidget.objects.select_related(
-        "page", "widget_type", "created_by"
-    ).all()
-    serializer_class = PageWidgetSerializer
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
-    filter_backends = [DjangoFilterBackend, OrderingFilter]
-    filterset_fields = [
-        "page",
-        "widget_type",
-        "slot_name",
-        "inherit_from_parent",
-        "override_parent",
-    ]
-    ordering_fields = ["slot_name", "sort_order", "created_at"]
-    ordering = ["slot_name", "sort_order"]
-
-    def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
-        # Create version for the page
-        page = serializer.instance.page
-        page.create_version(
-            self.request.user, f"Added widget: {serializer.instance.widget_type.name}"
-        )
-
-    def perform_update(self, serializer):
-        serializer.save()
-        # Create version for the page
-        page = serializer.instance.page
-        page.create_version(
-            self.request.user, f"Updated widget: {serializer.instance.widget_type.name}"
-        )
-
-    def perform_destroy(self, instance):
-        page = instance.page
-        widget_name = instance.widget_type.name
-        instance.delete()
-        # Create version for the page
-        page.create_version(self.request.user, f"Removed widget: {widget_name}")
-
-    @action(detail=False, methods=["get"])
-    def by_page(self, request):
-        """Get widgets for a specific page including inherited widgets"""
-        page_id = request.query_params.get("page_id")
-        if not page_id:
-            return Response(
-                {"error": "page_id parameter is required"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        try:
-            page = WebPage.objects.get(id=page_id)
-        except WebPage.DoesNotExist:
-            return Response(
-                {"error": "Page not found"}, status=status.HTTP_404_NOT_FOUND
-            )
-
-        # Get widgets for this page and inherited widgets
-        widgets = []
-        current_page = page
-
-        while current_page:
-            page_widgets = current_page.widgets.all()
-            for widget in page_widgets:
-                if widget.inherit_from_parent or current_page == page:
-                    widgets.append(
-                        {
-                            "widget": PageWidgetSerializer(widget).data,
-                            "inherited_from": (
-                                current_page.id if current_page != page else None
-                            ),
-                        }
-                    )
-            current_page = current_page.parent
-
-        return Response({"widgets": widgets})
-
-    @action(detail=True, methods=["post"])
-    def reorder(self, request, pk=None):
-        """Reorder widgets within a slot"""
-        widget = self.get_object()
-        new_order = request.data.get("sort_order")
-
-        if new_order is None:
-            return Response(
-                {"error": "sort_order is required"}, status=status.HTTP_400_BAD_REQUEST
-            )
-
-        widget.sort_order = new_order
-        widget.save()
-
-        # Create version for the page
-        widget.page.create_version(request.user, "Reordered widgets")
-
-        serializer = self.get_serializer(widget)
-        return Response(serializer.data)
-
-    @action(detail=False, methods=["post"])
-    def bulk_reorder(self, request):
-        """
-        Bulk reorder widgets in a slot.
-
-        POST body should contain:
-        {
-            "page_id": 123,
-            "slot_name": "main_content",
-            "widget_orders": [
-                {"widget_id": 1, "sort_order": 0, "priority": 5},
-                {"widget_id": 2, "sort_order": 1, "priority": 0}
-            ]
-        }
-        """
-        page_id = request.data.get("page_id")
-        slot_name = request.data.get("slot_name")
-        widget_orders = request.data.get("widget_orders", [])
-
-        if not all([page_id, slot_name, widget_orders]):
-            return Response(
-                {"error": "page_id, slot_name, and widget_orders are required"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        try:
-            page = WebPage.objects.get(id=page_id)
-        except WebPage.DoesNotExist:
-            return Response(
-                {"error": "Page not found"}, status=status.HTTP_404_NOT_FOUND
-            )
-
-        # Update widget orders
-        updated_widgets = []
-        for order_data in widget_orders:
-            widget_id = order_data.get("widget_id")
-            sort_order = order_data.get("sort_order")
-            priority = order_data.get("priority", 0)
-
-            try:
-                widget = PageWidget.objects.get(
-                    id=widget_id, page=page, slot_name=slot_name
-                )
-                widget.sort_order = sort_order
-                widget.priority = priority
-                widget.save()
-                updated_widgets.append(widget)
-            except PageWidget.DoesNotExist:
-                return Response(
-                    {"error": f"Widget {widget_id} not found in slot {slot_name}"},
-                    status=status.HTTP_404_NOT_FOUND,
-                )
-
-        # Create version for the page
-        page.create_version(request.user, f"Reordered widgets in slot: {slot_name}")
-
-        serializer = self.get_serializer(updated_widgets, many=True)
-        return Response({"updated_widgets": serializer.data})
-
-    @action(detail=False, methods=["get"])
-    def effective_widgets(self, request):
-        """
-        Get effective widgets for a page considering inheritance rules.
-        Query params: page_id, slot_name (optional)
-        """
-        page_id = request.query_params.get("page_id")
-        slot_name = request.query_params.get("slot_name")
-
-        if not page_id:
-            return Response(
-                {"error": "page_id parameter is required"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        try:
-            page = WebPage.objects.get(id=page_id)
-        except WebPage.DoesNotExist:
-            return Response(
-                {"error": "Page not found"}, status=status.HTTP_404_NOT_FOUND
-            )
-
-        effective_widgets = PageWidget.get_effective_widgets_for_page(page, slot_name)
-
-        # Serialize the results
-        if slot_name:
-            # Single slot requested
-            serializer = self.get_serializer(effective_widgets, many=True)
-            return Response({"slot_name": slot_name, "widgets": serializer.data})
-        else:
-            # All slots requested
-            result = {}
-            for slot, widgets in effective_widgets.items():
-                serializer = self.get_serializer(widgets, many=True)
-                result[slot] = serializer.data
-
-            return Response({"widgets_by_slot": result})
-
-    @action(detail=True, methods=["get", "post"])
-    def preview(self, request, pk=None):
-        """
-        Preview a widget rendering.
-        GET: Preview with existing configuration
-        POST: Preview with modified configuration
-        """
-        widget = self.get_object()
-
-        if request.method == "POST":
-            # Use provided configuration for preview
-            configuration = request.data.get("configuration", widget.configuration)
-            context = request.data.get("context", {})
-        else:
-            # Use existing configuration
-            configuration = widget.configuration
-            context = {}
-
-        # Validate configuration
-        is_valid, errors = widget.widget_type.validate_configuration(configuration)
-        if not is_valid:
-            return Response(
-                {"error": "Invalid configuration", "validation_errors": errors},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        # Create a temporary widget for preview
-        from .renderers import WidgetRendererRegistry
-
-        temp_widget = PageWidget(
-            widget_type=widget.widget_type,
-            configuration=configuration,
-            slot_name=widget.slot_name,
-            sort_order=widget.sort_order,
-        )
-
-        try:
-            rendered_html = WidgetRendererRegistry.render_widget(temp_widget, context)
-
-            return Response(
-                {
-                    "widget_id": widget.id,
-                    "widget_type": widget.widget_type.name,
-                    "configuration": configuration,
-                    "rendered_html": rendered_html,
-                    "slot_name": widget.slot_name,
-                }
-            )
-
-        except Exception as e:
-            return Response(
-                {"error": "Rendering failed", "details": str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+# Temporarily disabled - will be replaced with PageVersion widget management
+# class PageWidgetViewSet(viewsets.ModelViewSet):
+#     """
+#     ViewSet for managing page widgets.
+#     Provides CRUD operations for widgets on pages.
+#     """
+#
+#     queryset = PageWidget.objects.select_related(
+#         "page", "widget_type", "created_by"
+#     ).all()
+#     serializer_class = PageWidgetSerializer
+#     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+#     filter_backends = [DjangoFilterBackend, OrderingFilter]
+#     filterset_fields = [
+#         "page",
+#         "widget_type",
+#         "slot_name",
+#         "inherit_from_parent",
+#         "override_parent",
+#     ]
+#     ordering_fields = ["slot_name", "sort_order", "created_at"]
+#     ordering = ["slot_name", "sort_order"]
+#
+#     def perform_create(self, serializer):
+#         serializer.save(created_by=self.request.user)
+#         # Create version for the page
+#         page = serializer.instance.page
+#         page.create_version(
+#             self.request.user, f"Added widget: {serializer.instance.widget_type.name}"
+#         )
+#
+#     def perform_update(self, serializer):
+#         serializer.save()
+#         # Create version for the page
+#         page = serializer.instance.page
+#         page.create_version(
+#             self.request.user, f"Updated widget: {serializer.instance.widget_type.name}"
+#         )
+#
+#     def perform_destroy(self, instance):
+#         page = instance.page
+#         widget_name = instance.widget_type.name
+#         instance.delete()
+#         # Create version for the page
+#         page.create_version(self.request.user, f"Removed widget: {widget_name}")
+#
+#     @action(detail=False, methods=["get"])
+#     def by_page(self, request):
+#         """Get widgets for a specific page including inherited widgets"""
+#         page_id = request.query_params.get("page_id")
+#         if not page_id:
+#             return Response(
+#                 {"error": "page_id parameter is required"},
+#                 status=status.HTTP_400_BAD_REQUEST,
+#             )
+#
+#         try:
+#             page = WebPage.objects.get(id=page_id)
+#         except WebPage.DoesNotExist:
+#             return Response(
+#                 {"error": "Page not found"}, status=status.HTTP_404_NOT_FOUND
+#             )
+#
+#         # Get widgets for this page and inherited widgets
+#         widgets = []
+#         current_page = page
+#
+#         while current_page:
+#             page_widgets = current_page.widgets.all()
+#             for widget in page_widgets:
+#                 if widget.inherit_from_parent or current_page == page:
+#                     widgets.append(
+#                         {
+#                             "widget": PageWidgetSerializer(widget).data,
+#                             "inherited_from": (
+#                                 current_page.id if current_page != page else None
+#                             ),
+#                         }
+#                     )
+#             current_page = current_page.parent
+#
+#         return Response({"widgets": widgets})
+#
+#     @action(detail=True, methods=["post"])
+#     def reorder(self, request, pk=None):
+#         """Reorder widgets within a slot"""
+#         widget = self.get_object()
+#         new_order = request.data.get("sort_order")
+#
+#         if new_order is None:
+#             return Response(
+#                 {"error": "sort_order is required"}, status=status.HTTP_400_BAD_REQUEST
+#             )
+#
+#         widget.sort_order = new_order
+#         widget.save()
+#
+#         # Create version for the page
+#         widget.page.create_version(request.user, "Reordered widgets")
+#
+#         serializer = self.get_serializer(widget)
+#         return Response(serializer.data)
+#
+#     @action(detail=False, methods=["post"])
+#     def bulk_reorder(self, request):
+#         """
+#         Bulk reorder widgets in a slot.
+#
+#         POST body should contain:
+#         {
+#             "page_id": 123,
+#             "slot_name": "main_content",
+#             "widget_orders": [
+#                 {"widget_id": 1, "sort_order": 0, "priority": 5},
+#                 {"widget_id": 2, "sort_order": 1, "priority": 0}
+#             ]
+#         }
+#         """
+#         page_id = request.data.get("page_id")
+#         slot_name = request.data.get("slot_name")
+#         widget_orders = request.data.get("widget_orders", [])
+#
+#         if not all([page_id, slot_name, widget_orders]):
+#             return Response(
+#                 {"error": "page_id, slot_name, and widget_orders are required"},
+#                 status=status.HTTP_400_BAD_REQUEST,
+#             )
+#
+#         try:
+#             page = WebPage.objects.get(id=page_id)
+#         except WebPage.DoesNotExist:
+#             return Response(
+#                 {"error": "Page not found"}, status=status.HTTP_404_NOT_FOUND
+#             )
+#
+#         # Update widget orders
+#         updated_widgets = []
+#         for order_data in widget_orders:
+#             widget_id = order_data.get("widget_id")
+#             sort_order = order_data.get("sort_order")
+#             priority = order_data.get("priority", 0)
+#
+#             try:
+#                 widget = PageWidget.objects.get(
+#                     id=widget_id, page=page, slot_name=slot_name
+#                 )
+#                 widget.sort_order = sort_order
+#                 widget.priority = priority
+#                 widget.save()
+#                 updated_widgets.append(widget)
+#             except PageWidget.DoesNotExist:
+#                 return Response(
+#                     {"error": f"Widget {widget_id} not found in slot {slot_name}"},
+#                     status=status.HTTP_404_NOT_FOUND,
+#                 )
+#
+#         # Create version for the page
+#         page.create_version(request.user, f"Reordered widgets in slot: {slot_name}")
+#
+#         serializer = self.get_serializer(updated_widgets, many=True)
+#         return Response({"updated_widgets": serializer.data})
+#
+#     @action(detail=False, methods=["get"])
+#     def effective_widgets(self, request):
+#         """
+#         Get effective widgets for a page considering inheritance rules.
+#         Query params: page_id, slot_name (optional)
+#         """
+#         page_id = request.query_params.get("page_id")
+#         slot_name = request.query_params.get("slot_name")
+#
+#         if not page_id:
+#             return Response(
+#                 {"error": "page_id parameter is required"},
+#                 status=status.HTTP_400_BAD_REQUEST,
+#             )
+#
+#         try:
+#             page = WebPage.objects.get(id=page_id)
+#         except WebPage.DoesNotExist:
+#             return Response(
+#                 {"error": "Page not found"}, status=status.HTTP_404_NOT_FOUND
+#             )
+#
+#         effective_widgets = PageWidget.get_effective_widgets_for_page(page, slot_name)
+#
+#         # Serialize the results
+#         if slot_name:
+#             # Single slot requested
+#             serializer = self.get_serializer(effective_widgets, many=True)
+#             return Response({"slot_name": slot_name, "widgets": serializer.data})
+#         else:
+#             # All slots requested
+#             result = {}
+#             for slot, widgets in effective_widgets.items():
+#                 serializer = self.get_serializer(widgets, many=True)
+#                 result[slot] = serializer.data
+#
+#             return Response({"widgets_by_slot": result})
+#
+#     @action(detail=True, methods=["get", "post"])
+#     def preview(self, request, pk=None):
+#         """
+#         Preview a widget rendering.
+#         GET: Preview with existing configuration
+#         POST: Preview with modified configuration
+#         """
+#         widget = self.get_object()
+#
+#         if request.method == "POST":
+#             # Use provided configuration for preview
+#             configuration = request.data.get("configuration", widget.configuration)
+#             context = request.data.get("context", {})
+#         else:
+#             # Use existing configuration
+#             configuration = widget.configuration
+#             context = {}
+#
+#         # Validate configuration
+#         is_valid, errors = widget.widget_type.validate_configuration(configuration)
+#         if not is_valid:
+#             return Response(
+#                 {"error": "Invalid configuration", "validation_errors": errors},
+#                 status=status.HTTP_400_BAD_REQUEST,
+#             )
+#
+#         # Create a temporary widget for preview
+#         from .renderers import WidgetRendererRegistry
+#
+#         temp_widget = PageWidget(
+#             widget_type=widget.widget_type,
+#             configuration=configuration,
+#             slot_name=widget.slot_name,
+#             sort_order=widget.sort_order,
+#         )
+#
+#         try:
+#             rendered_html = WidgetRendererRegistry.render_widget(temp_widget, context)
+#
+#             return Response(
+#                 {
+#                     "widget_id": widget.id,
+#                     "widget_type": widget.widget_type.name,
+#                     "configuration": configuration,
+#                     "rendered_html": rendered_html,
+#                     "slot_name": widget.slot_name,
+#                 }
+#             )
+#
+#         except Exception as e:
+#             return Response(
+#                 {"error": "Rendering failed", "details": str(e)},
+#                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+#             )

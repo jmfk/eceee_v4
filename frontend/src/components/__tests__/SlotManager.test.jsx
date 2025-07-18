@@ -55,28 +55,43 @@ const mockLayout = {
     },
 }
 
-const mockPageWidgets = [
-    {
-        widget: {
+// Mock data for the new version-based structure
+const mockCurrentVersion = {
+    id: 1,
+    page: 1,
+    version_number: 1,
+    status: 'published',
+    is_current: true,
+    widgets: [
+        {
             id: 1,
+            widget_type_id: 1,
             widget_type: { id: 1, name: 'Text Block', description: 'Text widget' },
             slot_name: 'header',
             sort_order: 0,
             configuration: { content: 'Header content' },
+            inherit_from_parent: true,
+            override_parent: false,
+            inheritance_behavior: 'inherit',
+            priority: 0,
+            is_visible: true,
         },
-        inherited_from: null,
-    },
-    {
-        widget: {
+        {
             id: 2,
+            widget_type_id: 2,
             widget_type: { id: 2, name: 'Image', description: 'Image widget' },
             slot_name: 'content',
             sort_order: 0,
             configuration: { url: 'test.jpg' },
+            inherit_from_parent: true,
+            override_parent: false,
+            inheritance_behavior: 'inherit',
+            priority: 0,
+            is_visible: true,
+            inherited_from: 5, // Inherited from page 5
         },
-        inherited_from: 5, // Inherited from page 5
-    },
-]
+    ]
+}
 
 const mockWidgetTypes = [
     { id: 1, name: 'Text Block', description: 'Text widget', is_active: true },
@@ -103,8 +118,14 @@ describe('SlotManager', () => {
     beforeEach(() => {
         vi.clearAllMocks()
         mockedAxios.get.mockImplementation((url) => {
-            if (url.includes('by_page')) {
-                return Promise.resolve({ data: { widgets: mockPageWidgets } })
+            // Handle version API calls
+            if (url.includes('/api/v1/webpages/versions/') && url.includes('is_current=true')) {
+                return Promise.resolve({
+                    data: {
+                        results: [mockCurrentVersion],
+                        count: 1
+                    }
+                })
             }
             if (url.includes('widget-types')) {
                 // Mock paginated response for widget-types
@@ -117,10 +138,10 @@ describe('SlotManager', () => {
                     }
                 })
             }
-            return Promise.resolve({ data: [] })
+            return Promise.resolve({ data: { results: [], count: 0 } })
         })
-        mockedAxios.post.mockResolvedValue({ data: {} })
-        mockedAxios.patch.mockResolvedValue({ data: {} })
+        mockedAxios.post.mockResolvedValue({ data: mockCurrentVersion })
+        mockedAxios.patch.mockResolvedValue({ data: mockCurrentVersion })
         mockedAxios.delete.mockResolvedValue({ data: {} })
     })
 
@@ -479,7 +500,7 @@ describe('SlotManager', () => {
         )
 
         await waitFor(() => {
-            expect(mockedAxios.get).toHaveBeenCalledWith('/api/v1/webpages/widgets/by_page/?page_id=1')
+            expect(mockedAxios.get).toHaveBeenCalledWith('/api/v1/webpages/versions/?page=1&is_current=true')
             expect(mockedAxios.get).toHaveBeenCalledWith('/api/v1/webpages/widget-types/')
         })
     })

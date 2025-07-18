@@ -21,7 +21,16 @@ import axios from 'axios'
 import toast from 'react-hot-toast'
 import WidgetLibrary from './WidgetLibrary'
 import WidgetConfigurator from './WidgetConfigurator'
-import { WidgetCommandFactory, WidgetOperations } from '../utils/widgetCommands'
+import {
+    getPageWidgets,
+    addWidget,
+    updateWidget,
+    deleteWidget,
+    toggleWidgetVisibility,
+    reorderWidgets,
+    getWidgetsBySlot,
+    createWidgetHelper
+} from '../api/versions'
 import { SlotStateFactory } from '../utils/slotState'
 import { widgetHelpers, createWidgetModel } from '../utils/widgetHelpers'
 
@@ -200,16 +209,12 @@ const SlotManager = ({ pageId, layout, onWidgetChange }) => {
     const [configuringWidget, setConfiguringWidget] = useState(null)
     const queryClient = useQueryClient()
 
-    // Initialize command factory and operations
-    const commandFactory = new WidgetCommandFactory(axios)
-    const widgetOperations = new WidgetOperations(commandFactory, queryClient)
-
-    // Fetch page widgets including inherited ones
+    // Fetch page widgets from current version
     const { data: pageWidgetsData, isLoading } = useQuery({
         queryKey: ['page-widgets', pageId],
         queryFn: async () => {
-            const response = await axios.get(`/api/v1/webpages/widgets/by_page/?page_id=${pageId}`)
-            return response.data.widgets || []
+            const result = await getPageWidgets(pageId)
+            return result.widgets || []
         },
         enabled: !!pageId
     })
@@ -229,59 +234,87 @@ const SlotManager = ({ pageId, layout, onWidgetChange }) => {
     // Extract widget types array from paginated response and filter active ones
     const widgetTypes = widgetTypesResponse?.results?.filter(widget => widget.is_active) || []
 
-    // Simplified mutations using command objects
+    // Widget mutations using new API
     const createWidgetMutation = useMutation({
         mutationFn: async ({ widgetTypeId, slotName, configuration }) => {
-            return widgetOperations.addWidget({
-                pageId,
-                widgetTypeId,
-                slotName,
-                configuration
+            return addWidget(pageId, {
+                widget_type_id: widgetTypeId,
+                slot_name: slotName,
+                configuration,
+                sort_order: 0,
+                inherit_from_parent: true,
+                override_parent: false,
+                inheritance_behavior: 'inherit',
+                priority: 0,
+                is_visible: true
             })
         },
         onSuccess: () => {
+            queryClient.invalidateQueries(['page-widgets', pageId])
             setShowWidgetLibrary(false)
             setConfiguringWidget(null)
             onWidgetChange?.()
+            toast.success('Widget added successfully')
+        },
+        onError: (error) => {
+            toast.error('Failed to add widget: ' + error.message)
         }
     })
 
     const updateWidgetMutation = useMutation({
         mutationFn: async ({ widgetId, configuration }) => {
-            return widgetOperations.updateWidget({
-                widgetId,
-                configuration,
-                pageId
-            })
+            return updateWidget(pageId, widgetId, { configuration })
         },
         onSuccess: () => {
+            queryClient.invalidateQueries(['page-widgets', pageId])
             setEditingWidget(null)
+            setConfiguringWidget(null)
             onWidgetChange?.()
+            toast.success('Widget updated successfully')
+        },
+        onError: (error) => {
+            toast.error('Failed to update widget: ' + error.message)
         }
     })
 
     const deleteWidgetMutation = useMutation({
         mutationFn: async (widgetId) => {
-            return widgetOperations.deleteWidget({
-                widgetId,
-                pageId
-            })
+            return deleteWidget(pageId, widgetId)
         },
         onSuccess: () => {
+            queryClient.invalidateQueries(['page-widgets', pageId])
             onWidgetChange?.()
+            toast.success('Widget deleted successfully')
+        },
+        onError: (error) => {
+            toast.error('Failed to delete widget: ' + error.message)
+        }
+    })
+
+    const toggleVisibilityMutation = useMutation({
+        mutationFn: async (widgetId) => {
+            return toggleWidgetVisibility(pageId, widgetId)
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries(['page-widgets', pageId])
+            onWidgetChange?.()
+        },
+        onError: (error) => {
+            toast.error('Failed to toggle visibility: ' + error.message)
         }
     })
 
     const reorderWidgetMutation = useMutation({
-        mutationFn: async ({ widgetId, newSortOrder }) => {
-            return widgetOperations.reorderWidget({
-                widgetId,
-                newSortOrder,
-                pageId
-            })
+        mutationFn: async ({ slotName, widgetOrders }) => {
+            return reorderWidgets(pageId, slotName, widgetOrders)
         },
         onSuccess: () => {
+            queryClient.invalidateQueries(['page-widgets', pageId])
             onWidgetChange?.()
+            toast.success('Widgets reordered successfully')
+        },
+        onError: (error) => {
+            toast.error('Failed to reorder widgets: ' + error.message)
         }
     })
 
@@ -341,15 +374,13 @@ const SlotManager = ({ pageId, layout, onWidgetChange }) => {
     const handlePriorityChange = (widget, newPriority) => {
         updateWidgetMutation.mutate({
             widgetId: widget.id,
+            configuration: widget.configuration,
             priority: parseInt(newPriority) || 0
         })
     }
 
     const handleVisibilityToggle = (widget) => {
-        updateWidgetMutation.mutate({
-            widgetId: widget.id,
-            is_visible: !widget.is_visible
-        })
+        toggleVisibilityMutation.mutate(widget.id)
     }
 
     const handleMoveWidget = (widget, direction) => {
@@ -366,9 +397,10 @@ const SlotManager = ({ pageId, layout, onWidgetChange }) => {
             return
         }
 
-        reorderWidgetMutation.mutate({
+        // Update the specific widget's sort order
+        updateWidgetMutation.mutate({
             widgetId: widget.id,
-            newSortOrder
+            sort_order: newSortOrder
         })
     }
 

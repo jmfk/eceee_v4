@@ -13,7 +13,7 @@ from .views import (
     PageLayoutViewSet,
     PageThemeViewSet,
     WidgetTypeViewSet,
-    PageWidgetViewSet,
+    # PageWidgetViewSet,  # Temporarily disabled
 )
 
 # Create router and register viewsets
@@ -23,7 +23,7 @@ router.register(r"versions", PageVersionViewSet, basename="pageversion")
 router.register(r"layouts", PageLayoutViewSet, basename="pagelayout")
 router.register(r"themes", PageThemeViewSet, basename="pagetheme")
 router.register(r"widget-types", WidgetTypeViewSet, basename="widgettype")
-router.register(r"widgets", PageWidgetViewSet, basename="pagewidget")
+# router.register(r"widgets", PageWidgetViewSet, basename="pagewidget")  # Temporarily disabled
 
 # API URLs without app_name to avoid namespace conflicts when included in main API
 urlpatterns = [
