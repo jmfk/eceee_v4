@@ -8,6 +8,7 @@ This configuration includes:
 - Development tools (debug toolbar, silk profiling)
 - Health check endpoints
 - API documentation
+- Multi-site hostname-aware routing
 """
 
 from django.contrib import admin
@@ -20,6 +21,9 @@ from drf_spectacular.views import (
     SpectacularSwaggerView,
     SpectacularRedocView,
 )
+
+# Import hostname-aware views for multi-site functionality
+from webpages.public_views import HostnameRootView, HostnamePageView
 
 
 def health_check(request):
@@ -49,10 +53,13 @@ urlpatterns = [
     # Authentication
     path("api/auth/", include("rest_framework.urls")),
     path("accounts/", include("allauth.urls")),
+    # Web Page Publishing System (admin/API functions)
+    path("webpages/", include("webpages.urls")),
     # Monitoring and metrics
     path("metrics/", include("django_prometheus.urls")),
-    # Web Page Publishing System - MUST be last for catch-all functionality
-    path("", include("webpages.urls")),
+    # Multi-site hostname-aware routing - MUST be last for catch-all functionality
+    path("", HostnameRootView.as_view(), name="hostname-root"),
+    path("<path:slug_path>/", HostnamePageView.as_view(), name="hostname-page-detail"),
 ]
 
 # Development URLs

@@ -2,14 +2,14 @@
 URL routing for the Web Page Publishing System API
 
 Provides RESTful endpoints for managing pages, layouts, themes, widgets, and versions.
+These URLs are mounted under /webpages/ for administrative and API functions.
+The actual page serving is handled by hostname-aware views in the main URL configuration.
 """
 
 from django.urls import path
 from .public_views import (
     PageDetailView,
     PageListView,
-    HostnamePageView,
-    HostnameRootView,
     page_sitemap_view,
     page_hierarchy_api,
     page_search_view,
@@ -27,9 +27,8 @@ from .public_views import (
 app_name = "webpages"
 
 urlpatterns = [
-    # Hostname-aware root page (must be first for multi-site support)
-    path("", HostnameRootView.as_view(), name="hostname-root"),
-    # Administrative and API endpoints (hostname-independent)
+    # Administrative and API endpoints
+    path("pages/", PageListView.as_view(), name="page-list"),  # Admin page list view
     path("sitemap.xml", page_sitemap_view, name="sitemap"),
     path("hierarchy.json", page_hierarchy_api, name="hierarchy-api"),
     path("search/", page_search_view, name="page-search"),
@@ -46,8 +45,8 @@ urlpatterns = [
     ),
     path("members/", MemberListView.as_view(), name="member-list"),
     path("members/<slug:slug>/", MemberDetailView.as_view(), name="member-detail"),
-    # Hostname-aware hierarchical page routing - this MUST be last to catch all remaining paths
-    path("<path:slug_path>/", HostnamePageView.as_view(), name="hostname-page-detail"),
+    # Legacy hierarchical page routing for admin/API access
+    path("page/<path:slug_path>/", PageDetailView.as_view(), name="page-detail"),
 ]
 
 """
