@@ -21,7 +21,7 @@ import {
     ChevronDown,
     Copy
 } from 'lucide-react'
-import axios from 'axios'
+import { api } from '../api/client.js'
 import toast from 'react-hot-toast'
 import LayoutEditor from '../components/LayoutEditor'
 import ThemeEditor from '../components/ThemeEditor'
@@ -49,7 +49,7 @@ const PageManagement = () => {
     const { data: pagesResponse, isLoading: pagesLoading } = useQuery({
         queryKey: ['pages'],
         queryFn: async () => {
-            const response = await axios.get('/api/v1/webpages/pages/')
+            const response = await api.get('/api/v1/webpages/pages/')
             return response.data
         }
     })
@@ -128,7 +128,7 @@ const PageManagement = () => {
     // Add these mutations for creating and updating pages
     const createPageMutation = useMutation({
         mutationFn: async (pageData) => {
-            const response = await axios.post('/api/v1/webpages/pages/', pageData)
+            const response = await api.post('/api/v1/webpages/pages/', pageData)
             return response.data
         },
         onSuccess: () => {
@@ -143,7 +143,7 @@ const PageManagement = () => {
 
     const updatePageMutation = useMutation({
         mutationFn: async ({ id, ...pageData }) => {
-            const response = await axios.patch(`/api/v1/webpages/pages/${id}/`, pageData)
+            const response = await api.patch(`/api/v1/webpages/pages/${id}/`, pageData)
             return response.data
         },
         onSuccess: () => {
@@ -159,7 +159,7 @@ const PageManagement = () => {
 
     const deletePageMutation = useMutation({
         mutationFn: async (pageId) => {
-            const response = await axios.delete(`/api/v1/webpages/pages/${pageId}/`)
+            const response = await api.delete(`/api/v1/webpages/pages/${pageId}/`)
             return response.data
         },
         onSuccess: () => {
@@ -184,12 +184,12 @@ const PageManagement = () => {
                 title: `${page.title} (Copy)`,
                 slug: `${page.slug}-copy-${Date.now()}`,
                 description: page.description,
-                publication_status: 'draft', // Always create duplicates as drafts
+                publication_status: 'unpublished', // Always create duplicates as unpublished
                 layout: page.layout?.id || null,
                 theme: page.theme?.id || null,
                 parent: page.parent?.id || null
             }
-            const response = await axios.post('/api/v1/webpages/pages/', duplicateData)
+            const response = await api.post('/api/v1/webpages/pages/', duplicateData)
             return response.data
         },
         onSuccess: (newPage) => {
@@ -265,9 +265,10 @@ const PageManagement = () => {
                                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     >
                                         <option value="all">All Statuses</option>
+                                        <option value="unpublished">Unpublished</option>
+                                        <option value="scheduled">Scheduled</option>
                                         <option value="published">Published</option>
-                                        <option value="draft">Draft</option>
-                                        <option value="archived">Archived</option>
+                                        <option value="expired">Expired</option>
                                     </select>
                                 </div>
 
@@ -773,7 +774,7 @@ const PageForm = ({ page = null, onSave, onCancel, isLoading = false }) => {
         title: page?.title || '',
         slug: page?.slug || '',
         description: page?.description || '',
-        publication_status: page?.publication_status || 'draft'
+        publication_status: page?.publication_status || 'unpublished'
     })
 
     const handleSubmit = (e) => {
@@ -881,9 +882,10 @@ const PageForm = ({ page = null, onSave, onCancel, isLoading = false }) => {
                         onChange={(e) => setFormData(prev => ({ ...prev, publication_status: e.target.value }))}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
-                        <option value="draft">Draft</option>
+                        <option value="unpublished">Unpublished</option>
+                        <option value="scheduled">Scheduled</option>
                         <option value="published">Published</option>
-                        <option value="archived">Archived</option>
+                        <option value="expired">Expired</option>
                     </select>
                 </div>
 

@@ -29,7 +29,7 @@ function App() {
             <Routes>
               <Route path="/" element={<HomePage />} />
               <Route path="/about" element={<AboutPage />} />
-              <Route path="/admin/pages" element={<PageManagement />} />
+              <Route path="/manage/pages" element={<PageManagement />} />
               <Route path="*" element={<NotFoundPage />} />
             </Routes>
           </main>
