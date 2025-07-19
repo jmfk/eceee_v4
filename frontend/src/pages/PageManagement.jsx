@@ -74,9 +74,8 @@ const PageManagement = () => {
         const matchesStatus = statusFilter === 'all' || page.publication_status === statusFilter
 
         const matchesLayout = layoutFilter === 'all' ||
-            (layoutFilter === 'none' && !page.code_layout && !page.layout) ||
-            (layoutFilter.startsWith('code:') && page.code_layout === layoutFilter.split(':')[1]) ||
-            (layoutFilter.startsWith('db:') && page.layout && page.layout.id.toString() === layoutFilter.split(':')[1])
+            (layoutFilter === 'none' && !page.code_layout) ||
+            (layoutFilter.startsWith('code:') && page.code_layout === layoutFilter.split(':')[1])
 
         return matchesSearch && matchesStatus && matchesLayout
     })
@@ -96,17 +95,6 @@ const PageManagement = () => {
                         value: `code:${layout.name}`,
                         label: `📝 ${layout.name}`,
                         type: 'code'
-                    })
-                })
-            }
-
-            // Add database layouts
-            if (allLayouts.database_layouts) {
-                allLayouts.database_layouts.forEach(layout => {
-                    options.push({
-                        value: `db:${layout.id}`,
-                        label: `🗄️ ${layout.name}`,
-                        type: 'database'
                     })
                 })
             }
@@ -352,30 +340,18 @@ const PageManagement = () => {
                                         <div className="flex items-center space-x-3">
                                             <h4 className="font-medium text-gray-900">{page.title}</h4>
                                             <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${page.publication_status === 'published'
-                                                    ? 'bg-green-100 text-green-800'
-                                                    : page.publication_status === 'scheduled'
-                                                        ? 'bg-blue-100 text-blue-800'
-                                                        : 'bg-gray-100 text-gray-800'
+                                                ? 'bg-green-100 text-green-800'
+                                                : page.publication_status === 'scheduled'
+                                                    ? 'bg-blue-100 text-blue-800'
+                                                    : 'bg-gray-100 text-gray-800'
                                                 }`}>
                                                 {page.publication_status}
                                             </span>
                                             {/* Layout type indicator */}
-                                            {layoutUtils.getPageLayoutType(page) !== 'inherited' && (
-                                                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${layoutUtils.getPageLayoutType(page) === 'code'
-                                                        ? 'bg-blue-100 text-blue-800'
-                                                        : 'bg-amber-100 text-amber-800'
-                                                    }`}>
-                                                    {layoutUtils.getPageLayoutType(page) === 'code' ? (
-                                                        <>
-                                                            <Code className="w-3 h-3 mr-1" />
-                                                            Code Layout
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <Database className="w-3 h-3 mr-1" />
-                                                            DB Layout
-                                                        </>
-                                                    )}
+                                            {layoutUtils.getPageLayoutType(page) === 'code' && (
+                                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                                    <Code className="w-3 h-3 mr-1" />
+                                                    Code Layout
                                                 </span>
                                             )}
                                         </div>

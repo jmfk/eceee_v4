@@ -240,44 +240,8 @@ const LayoutsList = ({ layouts, selectedLayout, onSelectLayout, isLoading }) => 
     )
 }
 
-// Layout Detail Panel Component (replaces LayoutEditPanel)
-const LayoutDetailPanel = ({ layout, onUpdate, onCancel, showPreview, onTogglePreview }) => {
-    const [isEditing, setIsEditing] = useState(false)
-
-    const deleteMutation = useMutation({
-        mutationFn: async () => {
-            return layoutsApi.databaseLayouts.delete(layout.id)
-        },
-        onSuccess: () => {
-            toast.success('Layout deleted successfully')
-            onCancel()
-        },
-        onError: () => {
-            toast.error('Failed to delete layout')
-        }
-    })
-
-    const handleDelete = () => {
-        if (window.confirm('Are you sure you want to delete this layout? This action cannot be undone.')) {
-            deleteMutation.mutate()
-        }
-    }
-
-    const canEdit = layoutUtils.canEditLayout(layout)
-    const canDelete = layout.type === 'database'
-
-    if (isEditing && canEdit) {
-        return (
-            <LayoutForm
-                layout={layout}
-                onSave={() => {
-                    setIsEditing(false)
-                    onUpdate()
-                }}
-                onCancel={() => setIsEditing(false)}
-            />
-        )
-    }
+// Layout Detail Panel Component (code layouts are read-only)
+const LayoutDetailPanel = ({ layout, onCancel, showPreview, onTogglePreview }) => {
 
     return (
         <div className="bg-white rounded-lg shadow">
@@ -287,21 +251,9 @@ const LayoutDetailPanel = ({ layout, onUpdate, onCancel, showPreview, onTogglePr
                     <div>
                         <div className="flex items-center space-x-3">
                             <h3 className="text-xl font-semibold text-gray-900">{layout.name}</h3>
-                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${layout.type === 'code'
-                                ? 'bg-blue-100 text-blue-800'
-                                : 'bg-amber-100 text-amber-800'
-                                }`}>
-                                {layout.type === 'code' ? (
-                                    <>
-                                        <Code className="w-4 h-4 mr-1" />
-                                        Code Layout
-                                    </>
-                                ) : (
-                                    <>
-                                        <Database className="w-4 h-4 mr-1" />
-                                        Database Layout
-                                    </>
-                                )}
+                            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                                <Code className="w-4 h-4 mr-1" />
+                                Code Layout
                             </span>
                         </div>
                         {layout.description && (
@@ -316,25 +268,7 @@ const LayoutDetailPanel = ({ layout, onUpdate, onCancel, showPreview, onTogglePr
                             <Eye className="w-4 h-4 mr-2" />
                             {showPreview ? 'Hide' : 'Show'} Preview
                         </button>
-                        {canEdit && (
-                            <button
-                                onClick={() => setIsEditing(true)}
-                                className="inline-flex items-center px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                            >
-                                <Edit3 className="w-4 h-4 mr-2" />
-                                Edit
-                            </button>
-                        )}
-                        {canDelete && (
-                            <button
-                                onClick={handleDelete}
-                                disabled={deleteMutation.isPending}
-                                className="inline-flex items-center px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
-                            >
-                                <Trash2 className="w-4 h-4 mr-2" />
-                                Delete
-                            </button>
-                        )}
+                        {/* Code layouts are read-only - no edit/delete functionality */}
                         <button
                             onClick={onCancel}
                             className="inline-flex items-center px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
@@ -348,22 +282,20 @@ const LayoutDetailPanel = ({ layout, onUpdate, onCancel, showPreview, onTogglePr
 
             {/* Content */}
             <div className="p-6">
-                {layout.type === 'code' && (
-                    <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                        <div className="flex items-start space-x-3">
-                            <Info className="w-5 h-5 text-blue-600 mt-0.5" />
-                            <div>
-                                <h4 className="text-sm font-medium text-blue-900 mb-1">
-                                    Code-Based Layout
-                                </h4>
-                                <p className="text-sm text-blue-700">
-                                    This layout is defined in application code and cannot be edited through this interface.
-                                    To modify it, update the layout class in your codebase.
-                                </p>
-                            </div>
+                <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-start space-x-3">
+                        <Info className="w-5 h-5 text-blue-600 mt-0.5" />
+                        <div>
+                            <h4 className="text-sm font-medium text-blue-900 mb-1">
+                                Code-Based Layout
+                            </h4>
+                            <p className="text-sm text-blue-700">
+                                This layout is defined in application code and cannot be edited through this interface.
+                                To modify it, update the layout class in your codebase.
+                            </p>
                         </div>
                     </div>
-                )}
+                </div>
 
                 <LayoutDetails layout={layout} showPreview={showPreview} />
             </div>
@@ -371,278 +303,7 @@ const LayoutDetailPanel = ({ layout, onUpdate, onCancel, showPreview, onTogglePr
     )
 }
 
-// Layout Form Component (for database layouts only)
-const LayoutForm = ({ layout = null, onSave, onCancel }) => {
-    const [formData, setFormData] = useState({
-        name: layout?.name || '',
-        description: layout?.description || '',
-        slot_configuration: layout?.slot_configuration || { slots: [] },
-        css_classes: layout?.css_classes || '',
-        is_active: layout?.is_active ?? true
-    })
-
-    const mutation = useMutation({
-        mutationFn: async (data) => {
-            if (layout) {
-                return layoutsApi.databaseLayouts.update(layout.id, data)
-            } else {
-                return layoutsApi.databaseLayouts.create(data)
-            }
-        },
-        onSuccess: () => {
-            toast.success(`Layout ${layout ? 'updated' : 'created'} successfully`)
-            onSave()
-        },
-        onError: (error) => {
-            toast.error(`Failed to ${layout ? 'update' : 'create'} layout`)
-            console.error(error)
-        }
-    })
-
-    const handleSubmit = (e) => {
-        e.preventDefault()
-        mutation.mutate(formData)
-    }
-
-    const addSlot = () => {
-        const newSlot = {
-            name: `slot_${formData.slot_configuration.slots.length + 1}`,
-            title: `Slot ${formData.slot_configuration.slots.length + 1}`,
-            description: '',
-            css_classes: '',
-            max_widgets: null
-        }
-        setFormData({
-            ...formData,
-            slot_configuration: {
-                ...formData.slot_configuration,
-                slots: [...formData.slot_configuration.slots, newSlot]
-            }
-        })
-    }
-
-    const updateSlot = (index, field, value) => {
-        const updatedSlots = [...formData.slot_configuration.slots]
-        updatedSlots[index] = { ...updatedSlots[index], [field]: value }
-        setFormData({
-            ...formData,
-            slot_configuration: {
-                ...formData.slot_configuration,
-                slots: updatedSlots
-            }
-        })
-    }
-
-    const removeSlot = (index) => {
-        const updatedSlots = formData.slot_configuration.slots.filter((_, i) => i !== index)
-        setFormData({
-            ...formData,
-            slot_configuration: {
-                ...formData.slot_configuration,
-                slots: updatedSlots
-            }
-        })
-    }
-
-    return (
-        <div className="bg-white rounded-lg shadow">
-            <div className="p-6 border-b border-gray-200">
-                <h3 className="text-xl font-semibold text-gray-900">
-                    {layout ? 'Edit Layout' : 'Create New Database Layout'}
-                </h3>
-                <p className="text-gray-600 mt-1">
-                    Configure layout properties and slot definitions
-                </p>
-            </div>
-
-            <form onSubmit={handleSubmit} className="p-6 space-y-6">
-                {/* Basic Information */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                        <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
-                            Layout Name *
-                        </label>
-                        <input
-                            type="text"
-                            id="name"
-                            value={formData.name}
-                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            required
-                        />
-                    </div>
-
-                    <div>
-                        <label htmlFor="css_classes" className="block text-sm font-medium text-gray-700 mb-2">
-                            CSS Classes
-                        </label>
-                        <input
-                            type="text"
-                            id="css_classes"
-                            value={formData.css_classes}
-                            onChange={(e) => setFormData({ ...formData, css_classes: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="layout-custom additional-class"
-                        />
-                    </div>
-                </div>
-
-                <div>
-                    <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
-                        Description
-                    </label>
-                    <textarea
-                        id="description"
-                        value={formData.description}
-                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                        rows={3}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="Describe the purpose and structure of this layout"
-                    />
-                </div>
-
-                <div>
-                    <label className="flex items-center">
-                        <input
-                            type="checkbox"
-                            checked={formData.is_active}
-                            onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                        />
-                        <span className="ml-2 text-sm text-gray-700">Active</span>
-                    </label>
-                </div>
-
-                {/* Slots Configuration */}
-                <div>
-                    <div className="flex items-center justify-between mb-4">
-                        <h4 className="text-lg font-medium text-gray-900">Slot Configuration</h4>
-                        <button
-                            type="button"
-                            onClick={addSlot}
-                            className="inline-flex items-center px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                        >
-                            <Plus className="w-4 h-4 mr-2" />
-                            Add Slot
-                        </button>
-                    </div>
-
-                    <div className="space-y-4">
-                        {formData.slot_configuration.slots.map((slot, index) => (
-                            <div key={index} className="p-4 border border-gray-200 rounded-lg">
-                                <div className="flex items-center justify-between mb-3">
-                                    <h5 className="font-medium text-gray-900">Slot {index + 1}</h5>
-                                    <button
-                                        type="button"
-                                        onClick={() => removeSlot(index)}
-                                        className="text-red-600 hover:text-red-800"
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                    </button>
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                                            Slot Name *
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={slot.name}
-                                            onChange={(e) => updateSlot(index, 'name', e.target.value)}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                            placeholder="header, main, sidebar"
-                                            required
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                                            Display Title
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={slot.title || ''}
-                                            onChange={(e) => updateSlot(index, 'title', e.target.value)}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                            placeholder="Header Content"
-                                        />
-                                    </div>
-
-                                    <div className="md:col-span-2">
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                                            Description
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={slot.description || ''}
-                                            onChange={(e) => updateSlot(index, 'description', e.target.value)}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                            placeholder="Area for header widgets and navigation"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                                            CSS Classes
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={slot.css_classes || ''}
-                                            onChange={(e) => updateSlot(index, 'css_classes', e.target.value)}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                            placeholder="slot-header col-span-2"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                                            Max Widgets
-                                        </label>
-                                        <input
-                                            type="number"
-                                            value={slot.max_widgets || ''}
-                                            onChange={(e) => updateSlot(index, 'max_widgets', e.target.value ? parseInt(e.target.value) : null)}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                            placeholder="Leave blank for unlimited"
-                                            min="1"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-
-                        {formData.slot_configuration.slots.length === 0 && (
-                            <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
-                                <Square className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                                <p className="text-gray-500">No slots defined. Add a slot to get started.</p>
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                {/* Form Actions */}
-                <div className="flex items-center justify-end space-x-3 pt-6 border-t border-gray-200">
-                    <button
-                        type="button"
-                        onClick={onCancel}
-                        className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        type="submit"
-                        disabled={mutation.isPending}
-                        className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-                    >
-                        <Save className="w-4 h-4 mr-2" />
-                        {mutation.isPending ? 'Saving...' : (layout ? 'Update Layout' : 'Create Layout')}
-                    </button>
-                </div>
-            </form>
-        </div>
-    )
-}
+// LayoutForm removed - code layouts cannot be created/edited through UI
 
 // Layout Details Component
 const LayoutDetails = ({ layout, showPreview }) => {

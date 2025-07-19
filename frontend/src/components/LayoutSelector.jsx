@@ -1,13 +1,12 @@
 /**
  * Layout Selector Component
  * 
- * A reusable component for selecting layouts in forms.
- * Supports both code-based and database layouts with visual indicators.
+ * A reusable component for selecting code-based layouts in forms.
  */
 
 import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { ChevronDown, Code, Database, Search, X } from 'lucide-react'
+import { ChevronDown, Code, Search, X } from 'lucide-react'
 import { layoutsApi, layoutUtils } from '../api/layouts'
 
 const LayoutSelector = ({
@@ -27,43 +26,28 @@ const LayoutSelector = ({
     const [searchTerm, setSearchTerm] = useState('')
     const [selectedLayout, setSelectedLayout] = useState(null)
 
-    // Fetch all layouts
-    const { data: allLayouts, isLoading } = useQuery({
-        queryKey: ['layouts', 'all'],
-        queryFn: () => layoutsApi.combined.listAll()
+    // Fetch code layouts
+    const { data: layoutsData, isLoading } = useQuery({
+        queryKey: ['layouts', 'code'],
+        queryFn: () => layoutsApi.codeLayouts.list()
     })
 
     // Get layout options
     const getLayoutOptions = () => {
-        if (!allLayouts) return []
+        if (!layoutsData?.results) return []
 
         const options = []
 
         // Add code layouts
-        if (allLayouts.code_layouts) {
-            allLayouts.code_layouts.forEach(layout => {
-                options.push({
-                    value: `code:${layout.name}`,
-                    label: layout.name,
-                    description: layout.description,
-                    type: 'code',
-                    layout: layout
-                })
+        layoutsData.results.forEach(layout => {
+            options.push({
+                value: layout.name,
+                label: layout.name,
+                description: layout.description,
+                type: 'code',
+                layout: layout
             })
-        }
-
-        // Add database layouts
-        if (allLayouts.database_layouts) {
-            allLayouts.database_layouts.forEach(layout => {
-                options.push({
-                    value: `db:${layout.id}`,
-                    label: layout.name,
-                    description: layout.description,
-                    type: 'database',
-                    layout: layout
-                })
-            })
-        }
+        })
 
         return options
     }
@@ -74,11 +58,8 @@ const LayoutSelector = ({
         (option.description && option.description.toLowerCase().includes(searchTerm.toLowerCase()))
     )
 
-    // Group options by type
-    const groupedOptions = groupByType ? {
-        code: filteredOptions.filter(opt => opt.type === 'code'),
-        database: filteredOptions.filter(opt => opt.type === 'database')
-    } : { all: filteredOptions }
+    // Group options (simplified for code-only layouts)
+    const groupedOptions = { code: filteredOptions }
 
     // Find selected layout
     useEffect(() => {
@@ -88,7 +69,7 @@ const LayoutSelector = ({
         } else {
             setSelectedLayout(null)
         }
-    }, [value, allLayouts])
+    }, [value, layoutsData])
 
     const handleSelect = (option) => {
         onChange(option.value)
@@ -109,22 +90,15 @@ const LayoutSelector = ({
             className="flex items-start space-x-3 p-3 hover:bg-gray-50 cursor-pointer"
         >
             <div className="flex-shrink-0 mt-0.5">
-                {option.type === 'code' ? (
-                    <Code className="w-4 h-4 text-blue-600" />
-                ) : (
-                    <Database className="w-4 h-4 text-amber-600" />
-                )}
+                <Code className="w-4 h-4 text-blue-600" />
             </div>
             <div className="flex-1 min-w-0">
                 <div className="flex items-center space-x-2">
                     <p className="text-sm font-medium text-gray-900 truncate">
                         {option.label}
                     </p>
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${option.type === 'code'
-                            ? 'bg-blue-100 text-blue-800'
-                            : 'bg-amber-100 text-amber-800'
-                        }`}>
-                        {option.type === 'code' ? 'Code' : 'Database'}
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                        Code
                     </span>
                 </div>
                 {showDescription && option.description && (
@@ -185,18 +159,14 @@ const LayoutSelector = ({
                         {selectedLayout ? (
                             <>
                                 <div className="flex-shrink-0 mr-3">
-                                    {selectedLayout.type === 'code' ? (
-                                        <Code className="w-4 h-4 text-blue-600" />
-                                    ) : (
-                                        <Database className="w-4 h-4 text-amber-600" />
-                                    )}
+                                    <Code className="w-4 h-4 text-blue-600" />
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <p className="text-sm text-gray-900 truncate">
                                         {selectedLayout.label}
                                     </p>
                                     <p className="text-xs text-gray-500 truncate">
-                                        {selectedLayout.type === 'code' ? 'Code Layout' : 'Database Layout'}
+                                        Code Layout
                                     </p>
                                 </div>
                             </>
@@ -256,11 +226,6 @@ const LayoutSelector = ({
                                             'Code Layouts',
                                             groupedOptions.code,
                                             <Code className="w-4 h-4 text-blue-600" />
-                                        )}
-                                        {renderGroup(
-                                            'Database Layouts',
-                                            groupedOptions.database,
-                                            <Database className="w-4 h-4 text-amber-600" />
                                         )}
                                     </div>
                                 ) : (
