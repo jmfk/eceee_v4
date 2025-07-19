@@ -11,97 +11,258 @@ import {
     Monitor,
     Eye,
     Move,
-    Settings
+    Settings,
+    Code,
+    Database,
+    RefreshCw,
+    CheckCircle,
+    AlertTriangle,
+    Info,
+    ArrowRight
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import axios from 'axios'
+import { layoutsApi, layoutUtils } from '../api/layouts'
+import LayoutMigrationTools from './LayoutMigrationTools'
 
 const LayoutEditor = () => {
     const [selectedLayout, setSelectedLayout] = useState(null)
     const [isCreating, setIsCreating] = useState(false)
     const [showPreview, setShowPreview] = useState(false)
+    const [activeTab, setActiveTab] = useState('all') // 'all', 'code', 'database', 'migration'
     const queryClient = useQueryClient()
 
-    // Fetch layouts
-    const { data: layoutsResponse, isLoading } = useQuery({
-        queryKey: ['layouts'],
-        queryFn: async () => {
-            const response = await axios.get('/api/v1/webpages/layouts/')
-            return response.data
+    // Fetch all layouts (both types)
+    const { data: allLayouts, isLoading } = useQuery({
+        queryKey: ['layouts', 'all'],
+        queryFn: () => layoutsApi.combined.listAll()
+    })
+
+    // Fetch code layout summary
+    const { data: codeLayoutSummary } = useQuery({
+        queryKey: ['layouts', 'code-summary'],
+        queryFn: () => layoutsApi.codeLayouts.list()
+    })
+
+    // Reload code layouts mutation
+    const reloadMutation = useMutation({
+        mutationFn: () => layoutsApi.codeLayouts.reload(),
+        onSuccess: (data) => {
+            toast.success('Code layouts reloaded successfully')
+            queryClient.invalidateQueries(['layouts'])
+        },
+        onError: () => {
+            toast.error('Failed to reload code layouts')
         }
     })
 
-    // Extract layouts array from paginated response
-    const layouts = layoutsResponse?.results || []
+    // Validate layouts mutation
+    const validateMutation = useMutation({
+        mutationFn: () => layoutsApi.codeLayouts.validate(),
+        onSuccess: () => {
+            toast.success('All layouts are valid')
+        },
+        onError: (error) => {
+            toast.error('Layout validation failed')
+        }
+    })
+
+    // Get filtered layouts based on active tab
+    const getFilteredLayouts = () => {
+        if (!allLayouts) return []
+
+        let layouts = []
+
+        if (activeTab === 'all' || activeTab === 'code') {
+            const codeLayouts = (allLayouts.code_layouts || []).map(layout => ({
+                ...layout,
+                id: `code:${layout.name}`,
+                type: 'code'
+            }))
+            layouts = [...layouts, ...codeLayouts]
+        }
+
+        if (activeTab === 'all' || activeTab === 'database') {
+            const dbLayouts = (allLayouts.database_layouts || []).map(layout => ({
+                ...layout,
+                type: 'database'
+            }))
+            layouts = [...layouts, ...dbLayouts]
+        }
+
+        return layouts.map(layoutUtils.formatLayoutForDisplay)
+    }
+
+    const filteredLayouts = getFilteredLayouts()
 
     return (
         <div className="space-y-6">
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h2 className="text-2xl font-bold text-gray-900">Layout Editor</h2>
+                    <h2 className="text-2xl font-bold text-gray-900">Layout Management</h2>
                     <p className="text-gray-600 mt-1">
-                        Create and manage page layout templates with defined slots
+                        Manage code-based and database layout templates
                     </p>
                 </div>
-                <button
-                    onClick={() => setIsCreating(true)}
-                    className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                    <Plus className="w-4 h-4 mr-2" />
-                    New Layout
-                </button>
+                <div className="flex items-center space-x-3">
+                    <button
+                        onClick={() => validateMutation.mutate()}
+                        disabled={validateMutation.isPending}
+                        className="inline-flex items-center px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                    >
+                        <CheckCircle className="w-4 h-4 mr-2" />
+                        Validate
+                    </button>
+                    <button
+                        onClick={() => reloadMutation.mutate()}
+                        disabled={reloadMutation.isPending}
+                        className="inline-flex items-center px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                    >
+                        <RefreshCw className={`w-4 h-4 mr-2 ${reloadMutation.isPending ? 'animate-spin' : ''}`} />
+                        Reload Code
+                    </button>
+                    <button
+                        onClick={() => setIsCreating(true)}
+                        className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                    >
+                        <Plus className="w-4 h-4 mr-2" />
+                        New Database Layout
+                    </button>
+                </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Layouts List */}
-                <div className="lg:col-span-1">
-                    <LayoutsList
-                        layouts={layouts}
-                        selectedLayout={selectedLayout}
-                        onSelectLayout={setSelectedLayout}
-                        isLoading={isLoading}
-                    />
-                </div>
-
-                {/* Layout Editor Panel */}
-                <div className="lg:col-span-2">
-                    {isCreating && (
-                        <LayoutForm
-                            onSave={() => {
-                                setIsCreating(false)
-                                queryClient.invalidateQueries(['layouts'])
-                            }}
-                            onCancel={() => setIsCreating(false)}
-                        />
-                    )}
-
-                    {selectedLayout && !isCreating && (
-                        <LayoutEditPanel
-                            layout={selectedLayout}
-                            onUpdate={() => {
-                                queryClient.invalidateQueries(['layouts'])
-                                setSelectedLayout(null)
-                            }}
-                            onCancel={() => setSelectedLayout(null)}
-                            showPreview={showPreview}
-                            onTogglePreview={() => setShowPreview(!showPreview)}
-                        />
-                    )}
-
-                    {!selectedLayout && !isCreating && (
-                        <div className="bg-white rounded-lg border-2 border-dashed border-gray-300 p-12 text-center">
-                            <Grid3X3 className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                            <h3 className="text-lg font-medium text-gray-900 mb-2">
-                                Select a Layout to Edit
-                            </h3>
-                            <p className="text-gray-500">
-                                Choose a layout from the list or create a new one to get started
+            {/* Summary Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <div className="flex items-center">
+                        <Code className="w-5 h-5 text-blue-600 mr-2" />
+                        <div>
+                            <p className="text-sm font-medium text-blue-900">Code Layouts</p>
+                            <p className="text-2xl font-bold text-blue-600">
+                                {codeLayoutSummary?.summary?.active_layouts || 0}
                             </p>
                         </div>
-                    )}
+                    </div>
+                </div>
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                    <div className="flex items-center">
+                        <Database className="w-5 h-5 text-amber-600 mr-2" />
+                        <div>
+                            <p className="text-sm font-medium text-amber-900">Database Layouts</p>
+                            <p className="text-2xl font-bold text-amber-600">
+                                {allLayouts?.database_layouts?.length || 0}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <div className="flex items-center">
+                        <Grid3X3 className="w-5 h-5 text-green-600 mr-2" />
+                        <div>
+                            <p className="text-sm font-medium text-green-900">Total Layouts</p>
+                            <p className="text-2xl font-bold text-green-600">
+                                {filteredLayouts.length}
+                            </p>
+                        </div>
+                    </div>
                 </div>
             </div>
+
+            {/* Layout Type Tabs */}
+            <div className="border-b border-gray-200">
+                <nav className="-mb-px flex space-x-8">
+                    {[
+                        { id: 'all', label: 'All Layouts', icon: Grid3X3 },
+                        { id: 'code', label: 'Code Layouts', icon: Code },
+                        { id: 'database', label: 'Database Layouts', icon: Database },
+                        { id: 'migration', label: 'Migration Tools', icon: ArrowRight }
+                    ].map(tab => {
+                        const Icon = tab.icon
+                        return (
+                            <button
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id)}
+                                className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center ${activeTab === tab.id
+                                    ? 'border-blue-500 text-blue-600'
+                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                    }`}
+                            >
+                                <Icon className="w-4 h-4 mr-2" />
+                                {tab.label}
+                            </button>
+                        )
+                    })}
+                </nav>
+            </div>
+
+            {/* Content Area */}
+            {activeTab === 'migration' ? (
+                <LayoutMigrationTools />
+            ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* Layouts List */}
+                    <div className="lg:col-span-1">
+                        <LayoutsList
+                            layouts={filteredLayouts}
+                            selectedLayout={selectedLayout}
+                            onSelectLayout={setSelectedLayout}
+                            isLoading={isLoading}
+                        />
+                    </div>
+
+                    {/* Layout Editor Panel */}
+                    <div className="lg:col-span-2">
+                        {isCreating && (
+                            <LayoutForm
+                                onSave={() => {
+                                    setIsCreating(false)
+                                    queryClient.invalidateQueries(['layouts'])
+                                }}
+                                onCancel={() => setIsCreating(false)}
+                            />
+                        )}
+
+                        {selectedLayout && !isCreating && (
+                            <LayoutDetailPanel
+                                layout={selectedLayout}
+                                onUpdate={() => {
+                                    queryClient.invalidateQueries(['layouts'])
+                                    setSelectedLayout(null)
+                                }}
+                                onCancel={() => setSelectedLayout(null)}
+                                showPreview={showPreview}
+                                onTogglePreview={() => setShowPreview(!showPreview)}
+                            />
+                        )}
+
+                        {!selectedLayout && !isCreating && (
+                            <div className="bg-white rounded-lg border-2 border-dashed border-gray-300 p-12 text-center">
+                                <Grid3X3 className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                                    Select a Layout to View Details
+                                </h3>
+                                <p className="text-gray-500">
+                                    Choose a layout from the list to view details, or create a new database layout
+                                </p>
+                                <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+                                    <div className="flex items-start space-x-3">
+                                        <Info className="w-5 h-5 text-blue-600 mt-0.5" />
+                                        <div className="text-left">
+                                            <h4 className="text-sm font-medium text-blue-900 mb-1">
+                                                Code vs Database Layouts
+                                            </h4>
+                                            <p className="text-sm text-blue-700">
+                                                📝 <strong>Code layouts</strong> are defined in app code and are read-only here.
+                                                🗄️ <strong>Database layouts</strong> can be created and edited through this interface.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
@@ -110,11 +271,13 @@ const LayoutEditor = () => {
 const LayoutsList = ({ layouts, selectedLayout, onSelectLayout, isLoading }) => {
     if (isLoading) {
         return (
-            <div className="bg-white rounded-lg shadow p-6">
-                <div className="animate-pulse space-y-4">
-                    {[...Array(3)].map((_, i) => (
-                        <div key={i} className="h-16 bg-gray-200 rounded"></div>
-                    ))}
+            <div className="bg-white rounded-lg shadow">
+                <div className="p-4 border-b border-gray-200">
+                    <h3 className="text-lg font-medium text-gray-900">Available Layouts</h3>
+                </div>
+                <div className="p-8 text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                    <p className="text-gray-500 mt-2">Loading layouts...</p>
                 </div>
             </div>
         )
@@ -124,8 +287,9 @@ const LayoutsList = ({ layouts, selectedLayout, onSelectLayout, isLoading }) => 
         <div className="bg-white rounded-lg shadow">
             <div className="p-4 border-b border-gray-200">
                 <h3 className="text-lg font-medium text-gray-900">Available Layouts</h3>
+                <p className="text-sm text-gray-500 mt-1">{layouts.length} layouts found</p>
             </div>
-            <div className="divide-y divide-gray-200">
+            <div className="divide-y divide-gray-200 max-h-96 overflow-y-auto">
                 {layouts?.map((layout) => (
                     <div
                         key={layout.id}
@@ -134,8 +298,26 @@ const LayoutsList = ({ layouts, selectedLayout, onSelectLayout, isLoading }) => 
                             }`}
                     >
                         <div className="flex items-center justify-between">
-                            <div>
-                                <h4 className="font-medium text-gray-900">{layout.name}</h4>
+                            <div className="flex-1">
+                                <div className="flex items-center space-x-2">
+                                    <h4 className="font-medium text-gray-900">{layout.name}</h4>
+                                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${layout.type === 'code'
+                                        ? 'bg-blue-100 text-blue-800'
+                                        : 'bg-amber-100 text-amber-800'
+                                        }`}>
+                                        {layout.type === 'code' ? (
+                                            <>
+                                                <Code className="w-3 h-3 mr-1" />
+                                                Code
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Database className="w-3 h-3 mr-1" />
+                                                Database
+                                            </>
+                                        )}
+                                    </span>
+                                </div>
                                 <p className="text-sm text-gray-500 mt-1">
                                     {layout.slot_configuration?.slots?.length || 0} slots
                                 </p>
@@ -143,24 +325,14 @@ const LayoutsList = ({ layouts, selectedLayout, onSelectLayout, isLoading }) => 
                                     <p className="text-sm text-gray-600 mt-1">{layout.description}</p>
                                 )}
                             </div>
-                            <div className="flex items-center space-x-2">
-                                {layout.is_active ? (
-                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                        Active
-                                    </span>
-                                ) : (
-                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                        Inactive
-                                    </span>
-                                )}
-                            </div>
+                            <ArrowRight className="w-4 h-4 text-gray-400" />
                         </div>
                     </div>
                 ))}
-                {layouts?.length === 0 && (
-                    <div className="p-8 text-center text-gray-500">
-                        <Grid3X3 className="w-8 h-8 mx-auto mb-2" />
-                        <p>No layouts found</p>
+                {layouts.length === 0 && (
+                    <div className="p-8 text-center">
+                        <Grid3X3 className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                        <p className="text-gray-500">No layouts found</p>
                     </div>
                 )}
             </div>
@@ -168,7 +340,138 @@ const LayoutsList = ({ layouts, selectedLayout, onSelectLayout, isLoading }) => 
     )
 }
 
-// Layout Form Component
+// Layout Detail Panel Component (replaces LayoutEditPanel)
+const LayoutDetailPanel = ({ layout, onUpdate, onCancel, showPreview, onTogglePreview }) => {
+    const [isEditing, setIsEditing] = useState(false)
+
+    const deleteMutation = useMutation({
+        mutationFn: async () => {
+            return layoutsApi.databaseLayouts.delete(layout.id)
+        },
+        onSuccess: () => {
+            toast.success('Layout deleted successfully')
+            onCancel()
+        },
+        onError: () => {
+            toast.error('Failed to delete layout')
+        }
+    })
+
+    const handleDelete = () => {
+        if (window.confirm('Are you sure you want to delete this layout? This action cannot be undone.')) {
+            deleteMutation.mutate()
+        }
+    }
+
+    const canEdit = layoutUtils.canEditLayout(layout)
+    const canDelete = layout.type === 'database'
+
+    if (isEditing && canEdit) {
+        return (
+            <LayoutForm
+                layout={layout}
+                onSave={() => {
+                    setIsEditing(false)
+                    onUpdate()
+                }}
+                onCancel={() => setIsEditing(false)}
+            />
+        )
+    }
+
+    return (
+        <div className="bg-white rounded-lg shadow">
+            {/* Header */}
+            <div className="p-6 border-b border-gray-200">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <div className="flex items-center space-x-3">
+                            <h3 className="text-xl font-semibold text-gray-900">{layout.name}</h3>
+                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${layout.type === 'code'
+                                ? 'bg-blue-100 text-blue-800'
+                                : 'bg-amber-100 text-amber-800'
+                                }`}>
+                                {layout.type === 'code' ? (
+                                    <>
+                                        <Code className="w-4 h-4 mr-1" />
+                                        Code Layout
+                                    </>
+                                ) : (
+                                    <>
+                                        <Database className="w-4 h-4 mr-1" />
+                                        Database Layout
+                                    </>
+                                )}
+                            </span>
+                        </div>
+                        {layout.description && (
+                            <p className="text-gray-600 mt-1">{layout.description}</p>
+                        )}
+                    </div>
+                    <div className="flex items-center space-x-2">
+                        <button
+                            onClick={onTogglePreview}
+                            className="inline-flex items-center px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                        >
+                            <Eye className="w-4 h-4 mr-2" />
+                            {showPreview ? 'Hide' : 'Show'} Preview
+                        </button>
+                        {canEdit && (
+                            <button
+                                onClick={() => setIsEditing(true)}
+                                className="inline-flex items-center px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                            >
+                                <Edit3 className="w-4 h-4 mr-2" />
+                                Edit
+                            </button>
+                        )}
+                        {canDelete && (
+                            <button
+                                onClick={handleDelete}
+                                disabled={deleteMutation.isPending}
+                                className="inline-flex items-center px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+                            >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Delete
+                            </button>
+                        )}
+                        <button
+                            onClick={onCancel}
+                            className="inline-flex items-center px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                        >
+                            <X className="w-4 h-4 mr-2" />
+                            Close
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-6">
+                {layout.type === 'code' && (
+                    <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                        <div className="flex items-start space-x-3">
+                            <Info className="w-5 h-5 text-blue-600 mt-0.5" />
+                            <div>
+                                <h4 className="text-sm font-medium text-blue-900 mb-1">
+                                    Code-Based Layout
+                                </h4>
+                                <p className="text-sm text-blue-700">
+                                    This layout is defined in application code and cannot be edited through this interface.
+                                    To modify it, update the layout class in your codebase.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                <LayoutDetails layout={layout} showPreview={showPreview} />
+            </div>
+        </div>
+    )
+}
+
+// Layout Form Component (for database layouts only)
 const LayoutForm = ({ layout = null, onSave, onCancel }) => {
     const [formData, setFormData] = useState({
         name: layout?.name || '',
@@ -181,9 +484,9 @@ const LayoutForm = ({ layout = null, onSave, onCancel }) => {
     const mutation = useMutation({
         mutationFn: async (data) => {
             if (layout) {
-                return axios.put(`/api/v1/webpages/layouts/${layout.id}/`, data)
+                return layoutsApi.databaseLayouts.update(layout.id, data)
             } else {
-                return axios.post('/api/v1/webpages/layouts/', data)
+                return layoutsApi.databaseLayouts.create(data)
             }
         },
         onSuccess: () => {
@@ -204,10 +507,10 @@ const LayoutForm = ({ layout = null, onSave, onCancel }) => {
     const addSlot = () => {
         const newSlot = {
             name: `slot_${formData.slot_configuration.slots.length + 1}`,
-            display_name: `Slot ${formData.slot_configuration.slots.length + 1}`,
+            title: `Slot ${formData.slot_configuration.slots.length + 1}`,
             description: '',
             css_classes: '',
-            allows_multiple: true
+            max_widgets: null
         }
         setFormData({
             ...formData,
@@ -243,28 +546,25 @@ const LayoutForm = ({ layout = null, onSave, onCancel }) => {
 
     return (
         <div className="bg-white rounded-lg shadow">
-            <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-                <h3 className="text-lg font-medium text-gray-900">
-                    {layout ? 'Edit Layout' : 'Create New Layout'}
+            <div className="p-6 border-b border-gray-200">
+                <h3 className="text-xl font-semibold text-gray-900">
+                    {layout ? 'Edit Layout' : 'Create New Database Layout'}
                 </h3>
-                <button
-                    onClick={onCancel}
-                    className="text-gray-400 hover:text-gray-500"
-                >
-                    <X className="w-5 h-5" />
-                </button>
+                <p className="text-gray-600 mt-1">
+                    Configure layout properties and slot definitions
+                </p>
             </div>
 
             <form onSubmit={handleSubmit} className="p-6 space-y-6">
                 {/* Basic Information */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                        <label htmlFor="layout-name" className="block text-sm font-medium text-gray-700 mb-2">
-                            Layout Name
+                        <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
+                            Layout Name *
                         </label>
                         <input
-                            id="layout-name"
                             type="text"
+                            id="name"
                             value={formData.name}
                             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -272,45 +572,57 @@ const LayoutForm = ({ layout = null, onSave, onCancel }) => {
                         />
                     </div>
 
-                    <div className="flex items-center">
-                        <label className="flex items-center">
-                            <input
-                                id="layout-active"
-                                type="checkbox"
-                                checked={formData.is_active}
-                                onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                            />
-                            <span className="ml-2 text-sm text-gray-700">Active</span>
+                    <div>
+                        <label htmlFor="css_classes" className="block text-sm font-medium text-gray-700 mb-2">
+                            CSS Classes
                         </label>
+                        <input
+                            type="text"
+                            id="css_classes"
+                            value={formData.css_classes}
+                            onChange={(e) => setFormData({ ...formData, css_classes: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="layout-custom additional-class"
+                        />
                     </div>
                 </div>
 
                 <div>
-                    <label htmlFor="layout-description" className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
                         Description
                     </label>
                     <textarea
-                        id="layout-description"
+                        id="description"
                         value={formData.description}
                         onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                         rows={3}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Describe the purpose and structure of this layout"
                     />
+                </div>
+
+                <div>
+                    <label className="flex items-center">
+                        <input
+                            type="checkbox"
+                            checked={formData.is_active}
+                            onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className="ml-2 text-sm text-gray-700">Active</span>
+                    </label>
                 </div>
 
                 {/* Slots Configuration */}
                 <div>
                     <div className="flex items-center justify-between mb-4">
-                        <label className="block text-sm font-medium text-gray-700">
-                            Layout Slots
-                        </label>
+                        <h4 className="text-lg font-medium text-gray-900">Slot Configuration</h4>
                         <button
                             type="button"
                             onClick={addSlot}
-                            className="inline-flex items-center px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700"
+                            className="inline-flex items-center px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                         >
-                            <Plus className="w-4 h-4 mr-1" />
+                            <Plus className="w-4 h-4 mr-2" />
                             Add Slot
                         </button>
                     </div>
@@ -319,118 +631,98 @@ const LayoutForm = ({ layout = null, onSave, onCancel }) => {
                         {formData.slot_configuration.slots.map((slot, index) => (
                             <div key={index} className="p-4 border border-gray-200 rounded-lg">
                                 <div className="flex items-center justify-between mb-3">
-                                    <h4 className="font-medium text-gray-900">Slot {index + 1}</h4>
+                                    <h5 className="font-medium text-gray-900">Slot {index + 1}</h5>
                                     <button
                                         type="button"
                                         onClick={() => removeSlot(index)}
-                                        className="text-red-600 hover:text-red-700"
-                                        aria-label={`Remove Slot ${index + 1}`}
-                                        title={`Remove Slot ${index + 1}`}
+                                        className="text-red-600 hover:text-red-800"
                                     >
                                         <Trash2 className="w-4 h-4" />
                                     </button>
                                 </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
-                                        <label htmlFor={`slot-name-${index}`} className="block text-xs font-medium text-gray-700 mb-1">
-                                            Slot Name (Technical)
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Slot Name *
                                         </label>
                                         <input
-                                            id={`slot-name-${index}`}
                                             type="text"
                                             value={slot.name}
                                             onChange={(e) => updateSlot(index, 'name', e.target.value)}
-                                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            placeholder="header, main, sidebar"
                                             required
                                         />
                                     </div>
 
                                     <div>
-                                        <label htmlFor={`slot-display-name-${index}`} className="block text-xs font-medium text-gray-700 mb-1">
-                                            Display Name
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Display Title
                                         </label>
                                         <input
-                                            id={`slot-display-name-${index}`}
                                             type="text"
-                                            value={slot.display_name || ''}
-                                            onChange={(e) => updateSlot(index, 'display_name', e.target.value)}
-                                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                            value={slot.title || ''}
+                                            onChange={(e) => updateSlot(index, 'title', e.target.value)}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            placeholder="Header Content"
                                         />
                                     </div>
 
                                     <div className="md:col-span-2">
-                                        <label htmlFor={`slot-description-${index}`} className="block text-xs font-medium text-gray-700 mb-1">
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
                                             Description
                                         </label>
                                         <input
-                                            id={`slot-description-${index}`}
                                             type="text"
                                             value={slot.description || ''}
                                             onChange={(e) => updateSlot(index, 'description', e.target.value)}
-                                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            placeholder="Area for header widgets and navigation"
                                         />
                                     </div>
 
                                     <div>
-                                        <label htmlFor={`slot-css-classes-${index}`} className="block text-xs font-medium text-gray-700 mb-1">
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
                                             CSS Classes
                                         </label>
                                         <input
-                                            id={`slot-css-classes-${index}`}
                                             type="text"
                                             value={slot.css_classes || ''}
                                             onChange={(e) => updateSlot(index, 'css_classes', e.target.value)}
-                                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                            placeholder="col-span-2 bg-gray-50"
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            placeholder="slot-header col-span-2"
                                         />
                                     </div>
 
-                                    <div className="flex items-center">
-                                        <label className="flex items-center">
-                                            <input
-                                                id={`slot-allows-multiple-${index}`}
-                                                type="checkbox"
-                                                checked={slot.allows_multiple ?? true}
-                                                onChange={(e) => updateSlot(index, 'allows_multiple', e.target.checked)}
-                                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                            />
-                                            <span className="ml-2 text-xs text-gray-700">Allow Multiple Widgets</span>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Max Widgets
                                         </label>
+                                        <input
+                                            type="number"
+                                            value={slot.max_widgets || ''}
+                                            onChange={(e) => updateSlot(index, 'max_widgets', e.target.value ? parseInt(e.target.value) : null)}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            placeholder="Leave blank for unlimited"
+                                            min="1"
+                                        />
                                     </div>
                                 </div>
                             </div>
                         ))}
 
                         {formData.slot_configuration.slots.length === 0 && (
-                            <div className="text-center py-8 text-gray-500">
-                                <Square className="w-8 h-8 mx-auto mb-2" />
-                                <p>No slots defined. Add slots to create your layout structure.</p>
+                            <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
+                                <Square className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                                <p className="text-gray-500">No slots defined. Add a slot to get started.</p>
                             </div>
                         )}
                     </div>
                 </div>
 
-                {/* CSS Classes */}
-                <div>
-                    <label htmlFor="layout-css-classes" className="block text-sm font-medium text-gray-700 mb-2">
-                        Layout CSS Classes
-                    </label>
-                    <textarea
-                        id="layout-css-classes"
-                        value={formData.css_classes}
-                        onChange={(e) => setFormData({ ...formData, css_classes: e.target.value })}
-                        rows={4}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
-                        placeholder=".layout-example { display: grid; grid-template-columns: 1fr 2fr; gap: 20px; }"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                        Custom CSS classes for this layout. Will be included in the page head.
-                    </p>
-                </div>
-
-                {/* Actions */}
-                <div className="flex items-center justify-end space-x-3 pt-4 border-t border-gray-200">
+                {/* Form Actions */}
+                <div className="flex items-center justify-end space-x-3 pt-6 border-t border-gray-200">
                     <button
                         type="button"
                         onClick={onCancel}
@@ -452,198 +744,73 @@ const LayoutForm = ({ layout = null, onSave, onCancel }) => {
     )
 }
 
-// Layout Edit Panel Component  
-const LayoutEditPanel = ({ layout, onUpdate, onCancel, showPreview, onTogglePreview }) => {
-    const [isEditing, setIsEditing] = useState(false)
-
-    const deleteMutation = useMutation({
-        mutationFn: async () => {
-            return axios.delete(`/api/v1/webpages/layouts/${layout.id}/`)
-        },
-        onSuccess: () => {
-            toast.success('Layout deleted successfully')
-            onCancel()
-        },
-        onError: () => {
-            toast.error('Failed to delete layout')
-        }
-    })
-
-    const handleDelete = () => {
-        if (window.confirm('Are you sure you want to delete this layout? This action cannot be undone.')) {
-            deleteMutation.mutate()
-        }
-    }
-
-    if (isEditing) {
-        return (
-            <LayoutForm
-                layout={layout}
-                onSave={() => {
-                    setIsEditing(false)
-                    onUpdate()
-                }}
-                onCancel={() => setIsEditing(false)}
-            />
-        )
-    }
-
+// Layout Details Component
+const LayoutDetails = ({ layout, showPreview }) => {
     return (
-        <div className="bg-white rounded-lg shadow">
-            <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+        <div className="space-y-6">
+            {/* Basic Info */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                    <h3 className="text-lg font-medium text-gray-900">{layout.name}</h3>
-                    <p className="text-sm text-gray-500 mt-1">
-                        {layout.slot_configuration?.slots?.length || 0} slots defined
+                    <h4 className="text-sm font-medium text-gray-900 mb-2">Template</h4>
+                    <p className="text-sm text-gray-600 bg-gray-50 p-2 rounded">
+                        {layout.template_name || 'webpages/page_detail.html'}
                     </p>
                 </div>
-                <div className="flex items-center space-x-2">
-                    <button
-                        onClick={onTogglePreview}
-                        className={`inline-flex items-center px-3 py-1 rounded-md text-sm transition-colors ${showPreview
-                            ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                            }`}
-                    >
-                        <Eye className="w-4 h-4 mr-1" />
-                        {showPreview ? 'Hide Preview' : 'Show Preview'}
-                    </button>
-                    <button
-                        onClick={() => setIsEditing(true)}
-                        className="inline-flex items-center px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
-                    >
-                        <Edit3 className="w-4 h-4 mr-1" />
-                        Edit
-                    </button>
-                    <button
-                        onClick={handleDelete}
-                        className="inline-flex items-center px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm"
-                    >
-                        <Trash2 className="w-4 h-4 mr-1" />
-                        Delete
-                    </button>
+                <div>
+                    <h4 className="text-sm font-medium text-gray-900 mb-2">CSS Classes</h4>
+                    <p className="text-sm text-gray-600 bg-gray-50 p-2 rounded">
+                        {layout.css_classes || 'None'}
+                    </p>
                 </div>
             </div>
 
-            <div className="p-6">
-                {showPreview && (
-                    <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-                        <h4 className="font-medium text-gray-900 mb-3">Layout Preview</h4>
-                        <LayoutPreview layout={layout} />
-                    </div>
-                )}
-
-                <div className="space-y-6">
-                    {/* Basic Information */}
-                    <div>
-                        <h4 className="font-medium text-gray-900 mb-3">Layout Information</h4>
-                        <dl className="space-y-2">
-                            <div>
-                                <dt className="text-sm font-medium text-gray-500">Name</dt>
-                                <dd className="text-sm text-gray-900">{layout.name}</dd>
+            {/* Slots */}
+            <div>
+                <h4 className="text-lg font-medium text-gray-900 mb-4">Slots Configuration</h4>
+                <div className="space-y-3">
+                    {layout.slot_configuration?.slots?.map((slot, index) => (
+                        <div key={index} className="border border-gray-200 rounded-lg p-4">
+                            <div className="flex items-center justify-between mb-2">
+                                <h5 className="font-medium text-gray-900">{slot.name}</h5>
+                                <span className="text-xs text-gray-500">
+                                    {slot.max_widgets ? `Max: ${slot.max_widgets}` : 'Unlimited'}
+                                </span>
                             </div>
-                            {layout.description && (
-                                <div>
-                                    <dt className="text-sm font-medium text-gray-500">Description</dt>
-                                    <dd className="text-sm text-gray-900">{layout.description}</dd>
-                                </div>
+                            {slot.title && (
+                                <p className="text-sm text-gray-700 mb-1">
+                                    <strong>Title:</strong> {slot.title}
+                                </p>
                             )}
-                            <div>
-                                <dt className="text-sm font-medium text-gray-500">Status</dt>
-                                <dd className="text-sm">
-                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${layout.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                                        }`}>
-                                        {layout.is_active ? 'Active' : 'Inactive'}
-                                    </span>
-                                </dd>
-                            </div>
-                            <div>
-                                <dt className="text-sm font-medium text-gray-500">Created</dt>
-                                <dd className="text-sm text-gray-900">
-                                    {new Date(layout.created_at).toLocaleDateString()} by {layout.created_by?.username}
-                                </dd>
-                            </div>
-                        </dl>
-                    </div>
-
-                    {/* Slots */}
-                    <div>
-                        <h4 className="font-medium text-gray-900 mb-3">Defined Slots</h4>
-                        {layout.slot_configuration?.slots?.length > 0 ? (
-                            <div className="space-y-3">
-                                {layout.slot_configuration.slots.map((slot, index) => (
-                                    <div key={index} className="p-3 border border-gray-200 rounded-lg">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <span className="font-medium text-gray-900">{slot.display_name || slot.name}</span>
-                                            <code className="text-xs bg-gray-100 px-2 py-1 rounded">{slot.name}</code>
-                                        </div>
-                                        {slot.description && (
-                                            <p className="text-sm text-gray-600 mb-2">{slot.description}</p>
-                                        )}
-                                        <div className="flex items-center space-x-4 text-xs text-gray-500">
-                                            {slot.css_classes && (
-                                                <span>CSS: <code>{slot.css_classes}</code></span>
-                                            )}
-                                            <span>
-                                                {slot.allows_multiple ? 'Multiple widgets allowed' : 'Single widget only'}
-                                            </span>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <p className="text-gray-500 text-sm">No slots defined for this layout.</p>
-                        )}
-                    </div>
-
-                    {/* CSS Classes */}
-                    {layout.css_classes && (
-                        <div>
-                            <h4 className="font-medium text-gray-900 mb-3">Custom CSS</h4>
-                            <pre className="text-xs bg-gray-100 p-3 rounded-lg overflow-x-auto">
-                                <code>{layout.css_classes}</code>
-                            </pre>
+                            {slot.description && (
+                                <p className="text-sm text-gray-600 mb-1">{slot.description}</p>
+                            )}
+                            {slot.css_classes && (
+                                <p className="text-xs text-gray-500">
+                                    CSS: <code className="bg-gray-100 px-1 rounded">{slot.css_classes}</code>
+                                </p>
+                            )}
                         </div>
-                    )}
+                    )) || (
+                            <p className="text-gray-500 text-center py-4">No slots configured</p>
+                        )}
                 </div>
             </div>
-        </div>
-    )
-}
 
-// Layout Preview Component
-const LayoutPreview = ({ layout }) => {
-    const slots = layout.slot_configuration?.slots || []
-
-    return (
-        <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 bg-white">
-            <div className="text-xs text-gray-500 mb-2">Layout: {layout.name}</div>
-            <div className="space-y-2">
-                {slots.map((slot, index) => (
-                    <div
-                        key={index}
-                        className={`border border-gray-200 rounded p-3 bg-gray-50 ${slot.css_classes || ''}`}
-                    >
-                        <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium text-gray-700">
-                                {slot.display_name || slot.name}
-                            </span>
-                            <span className="text-xs text-gray-500">
-                                {slot.allows_multiple ? 'Multi' : 'Single'}
-                            </span>
+            {/* Preview */}
+            {showPreview && (
+                <div>
+                    <h4 className="text-lg font-medium text-gray-900 mb-4">Layout Preview</h4>
+                    <div className="border border-gray-300 rounded-lg p-4 bg-gray-50">
+                        <div className="text-center text-gray-500">
+                            <Monitor className="w-8 h-8 mx-auto mb-2" />
+                            <p>Layout preview visualization would be implemented here</p>
+                            <p className="text-sm mt-1">
+                                This could show a visual representation of the slot arrangement
+                            </p>
                         </div>
-                        {slot.description && (
-                            <div className="text-xs text-gray-500 mt-1">{slot.description}</div>
-                        )}
                     </div>
-                ))}
-                {slots.length === 0 && (
-                    <div className="text-center py-4 text-gray-400">
-                        <Square className="w-6 h-6 mx-auto mb-1" />
-                        <div className="text-xs">No slots defined</div>
-                    </div>
-                )}
-            </div>
+                </div>
+            )}
         </div>
     )
 }

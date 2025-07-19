@@ -19,9 +19,12 @@ import {
     Trash2,
     Filter,
     ChevronDown,
-    Copy
+    Copy,
+    Code,
+    Database
 } from 'lucide-react'
 import { api } from '../api/client.js'
+import { layoutsApi, layoutUtils } from '../api/layouts'
 import toast from 'react-hot-toast'
 import LayoutEditor from '../components/LayoutEditor'
 import ThemeEditor from '../components/ThemeEditor'
@@ -54,6 +57,12 @@ const PageManagement = () => {
         }
     })
 
+    // Fetch all layouts for filtering
+    const { data: allLayouts } = useQuery({
+        queryKey: ['layouts', 'all'],
+        queryFn: () => layoutsApi.combined.listAll()
+    })
+
     // Extract pages array from paginated response
     const pages = pagesResponse?.results || []
 
@@ -65,20 +74,48 @@ const PageManagement = () => {
         const matchesStatus = statusFilter === 'all' || page.publication_status === statusFilter
 
         const matchesLayout = layoutFilter === 'all' ||
-            (layoutFilter === 'none' && !page.layout) ||
-            (page.layout && page.layout.id.toString() === layoutFilter)
+            (layoutFilter === 'none' && !page.code_layout && !page.layout) ||
+            (layoutFilter.startsWith('code:') && page.code_layout === layoutFilter.split(':')[1]) ||
+            (layoutFilter.startsWith('db:') && page.layout && page.layout.id.toString() === layoutFilter.split(':')[1])
 
         return matchesSearch && matchesStatus && matchesLayout
     })
 
-    // Get unique layouts for filter dropdown
-    const availableLayouts = [...new Set(pages.filter(p => p.layout).map(p => p.layout))]
-        .reduce((acc, layout) => {
-            if (!acc.find(l => l.id === layout.id)) {
-                acc.push(layout)
+    // Get available layouts for filter dropdown
+    const getAvailableLayoutsForFilter = () => {
+        const options = [
+            { value: 'all', label: 'All Layouts', type: 'system' },
+            { value: 'none', label: 'No Layout', type: 'system' }
+        ]
+
+        if (allLayouts) {
+            // Add code layouts
+            if (allLayouts.code_layouts) {
+                allLayouts.code_layouts.forEach(layout => {
+                    options.push({
+                        value: `code:${layout.name}`,
+                        label: `📝 ${layout.name}`,
+                        type: 'code'
+                    })
+                })
             }
-            return acc
-        }, [])
+
+            // Add database layouts
+            if (allLayouts.database_layouts) {
+                allLayouts.database_layouts.forEach(layout => {
+                    options.push({
+                        value: `db:${layout.id}`,
+                        label: `🗄️ ${layout.name}`,
+                        type: 'database'
+                    })
+                })
+            }
+        }
+
+        return options
+    }
+
+    const availableLayoutOptions = getAvailableLayoutsForFilter()
 
     const tabs = [
         {
@@ -256,7 +293,7 @@ const PageManagement = () => {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
                                 <div>
                                     <label htmlFor="status-filter" className="block text-sm font-medium text-gray-700 mb-1">
-                                        Publication Status
+                                        Status
                                     </label>
                                     <select
                                         id="status-filter"
@@ -282,11 +319,9 @@ const PageManagement = () => {
                                         onChange={(e) => setLayoutFilter(e.target.value)}
                                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     >
-                                        <option value="all">All Layouts</option>
-                                        <option value="none">No Layout</option>
-                                        {availableLayouts.map(layout => (
-                                            <option key={layout.id} value={layout.id.toString()}>
-                                                {layout.name}
+                                        {availableLayoutOptions.map(option => (
+                                            <option key={option.value} value={option.value}>
+                                                {option.label}
                                             </option>
                                         ))}
                                     </select>
@@ -313,27 +348,43 @@ const PageManagement = () => {
                                 className={`p-4 cursor-pointer hover:bg-gray-50 transition-colors ${selectedPage?.id === page.id ? 'bg-blue-50 border-r-4 border-blue-500' : ''}`}
                             >
                                 <div className="flex items-center justify-between">
-                                    <div>
-                                        <h4 className="font-medium text-gray-900">{page.title}</h4>
-                                        <p className="text-sm text-gray-500 mt-1">/{page.slug}</p>
-                                        <div className="flex items-center space-x-4 mt-2">
-                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${page.publication_status === 'published'
-                                                ? 'bg-green-100 text-green-800'
-                                                : 'bg-gray-100 text-gray-800'
+                                    <div className="flex-1">
+                                        <div className="flex items-center space-x-3">
+                                            <h4 className="font-medium text-gray-900">{page.title}</h4>
+                                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${page.publication_status === 'published'
+                                                    ? 'bg-green-100 text-green-800'
+                                                    : page.publication_status === 'scheduled'
+                                                        ? 'bg-blue-100 text-blue-800'
+                                                        : 'bg-gray-100 text-gray-800'
                                                 }`}>
                                                 {page.publication_status}
                                             </span>
-                                            {page.layout && (
-                                                <span className="text-xs text-gray-500">
-                                                    Layout: {page.layout.name}
-                                                </span>
-                                            )}
-                                            {page.theme && (
-                                                <span className="text-xs text-gray-500">
-                                                    Theme: {page.theme.name}
+                                            {/* Layout type indicator */}
+                                            {layoutUtils.getPageLayoutType(page) !== 'inherited' && (
+                                                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${layoutUtils.getPageLayoutType(page) === 'code'
+                                                        ? 'bg-blue-100 text-blue-800'
+                                                        : 'bg-amber-100 text-amber-800'
+                                                    }`}>
+                                                    {layoutUtils.getPageLayoutType(page) === 'code' ? (
+                                                        <>
+                                                            <Code className="w-3 h-3 mr-1" />
+                                                            Code Layout
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Database className="w-3 h-3 mr-1" />
+                                                            DB Layout
+                                                        </>
+                                                    )}
                                                 </span>
                                             )}
                                         </div>
+                                        <p className="text-sm text-gray-500 mt-1">
+                                            /{page.slug}/ • Layout: {layoutUtils.getEffectiveLayoutName(page)}
+                                        </p>
+                                        {page.description && (
+                                            <p className="text-sm text-gray-600 mt-1">{page.description}</p>
+                                        )}
                                     </div>
                                     <div className="flex items-center space-x-2">
                                         <button
@@ -489,7 +540,7 @@ const PageManagement = () => {
                                 Layout
                             </label>
                             <p className="text-sm text-gray-900">
-                                {selectedPage.layout?.name || 'No layout assigned'}
+                                {layoutUtils.getEffectiveLayoutName(selectedPage)}
                             </p>
                         </div>
                         <div>
