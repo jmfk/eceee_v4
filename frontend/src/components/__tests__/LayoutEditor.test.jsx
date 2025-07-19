@@ -139,10 +139,10 @@ describe('LayoutEditor', () => {
         renderWithQueryClient(<LayoutEditor />)
 
         await waitFor(() => {
-            expect(screen.getByText('Two Column Layout')).toBeInTheDocument()
+            expect(screen.getByText('two_column')).toBeInTheDocument()
         })
 
-        const layoutItem = screen.getByText('Two Column Layout').closest('div')
+        const layoutItem = screen.getByText('two_column').closest('div')
         await user.click(layoutItem)
 
         expect(screen.getByText('Edit')).toBeInTheDocument()
@@ -255,10 +255,10 @@ describe('LayoutEditor', () => {
 
         // Select a layout
         await waitFor(() => {
-            expect(screen.getByText('Two Column Layout')).toBeInTheDocument()
+            expect(screen.getByText('two_column')).toBeInTheDocument()
         })
 
-        const layoutItem = screen.getByText('Two Column Layout').closest('div')
+        const layoutItem = screen.getByText('two_column').closest('div')
         await user.click(layoutItem)
 
         // Click delete
@@ -280,10 +280,10 @@ describe('LayoutEditor', () => {
 
         // Select a layout
         await waitFor(() => {
-            expect(screen.getByText('Two Column Layout')).toBeInTheDocument()
+            expect(screen.getByText('two_column')).toBeInTheDocument()
         })
 
-        const layoutItem = screen.getByText('Two Column Layout').closest('div')
+        const layoutItem = screen.getByText('two_column').closest('div')
         await user.click(layoutItem)
 
         // Show preview
@@ -291,7 +291,7 @@ describe('LayoutEditor', () => {
         await user.click(previewButton)
 
         expect(screen.getByText('Layout Preview')).toBeInTheDocument()
-        expect(screen.getByText('Layout: Two Column Layout')).toBeInTheDocument()
+        expect(screen.getByText('Layout: two_column')).toBeInTheDocument()
     })
 
     it('displays slot configuration correctly', async () => {
@@ -299,10 +299,10 @@ describe('LayoutEditor', () => {
 
         // Select a layout
         await waitFor(() => {
-            expect(screen.getByText('Two Column Layout')).toBeInTheDocument()
+            expect(screen.getByText('two_column')).toBeInTheDocument()
         })
 
-        const layoutItem = screen.getByText('Two Column Layout').closest('div')
+        const layoutItem = screen.getByText('two_column').closest('div')
         await userEvent.setup().click(layoutItem)
 
         // Check slot details
@@ -321,7 +321,7 @@ describe('LayoutEditor', () => {
         renderWithQueryClient(<LayoutEditor />)
 
         // Component should still render without crashing
-        expect(screen.getByText('Layout Editor')).toBeInTheDocument()
+        expect(screen.getByText('Code Layout Management')).toBeInTheDocument()
     })
 
     it('shows loading state while fetching layouts', async () => {
@@ -329,10 +329,10 @@ describe('LayoutEditor', () => {
         mockedAxios.get.mockImplementation(() =>
             new Promise(resolve => setTimeout(() => resolve({
                 data: {
-                    count: mockLayouts.length,
+                    count: mockLayoutsData.results.length,
                     next: null,
                     previous: null,
-                    results: mockLayouts
+                    results: mockLayoutsData.results
                 }
             }), 100))
         )
@@ -340,10 +340,10 @@ describe('LayoutEditor', () => {
         renderWithQueryClient(<LayoutEditor />)
 
         // Should show loading animation
-        expect(screen.getByText('Select a Layout to Edit')).toBeInTheDocument()
+        expect(screen.getByText('Select a Layout to View Details')).toBeInTheDocument()
 
         await waitFor(() => {
-            expect(screen.getByText('Two Column Layout')).toBeInTheDocument()
+            expect(screen.getByText('two_column')).toBeInTheDocument()
         }, { timeout: 200 })
     })
 }) 

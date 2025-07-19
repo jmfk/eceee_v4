@@ -345,9 +345,10 @@ describe('WidgetConfigurator', () => {
             />
         )
 
-        expect(screen.getByDisplayValue('Initial content')).toBeInTheDocument()
-        expect(screen.getByDisplayValue('center')).toBeInTheDocument()
-        expect(screen.getByDisplayValue('emphasized')).toBeInTheDocument()
+        // Check that form fields are rendered and have the expected values
+        expect(screen.getByRole('textbox', { name: /content/i })).toHaveValue('Initial content')
+        expect(screen.getByRole('combobox', { name: /alignment/i })).toHaveValue('center')
+        expect(screen.getByRole('combobox', { name: /style/i })).toHaveValue('emphasized')
     })
 
     it('calls onCancel when cancel button is clicked', async () => {
@@ -415,8 +416,8 @@ describe('WidgetConfigurator', () => {
 
         await waitFor(() => {
             // Default values should be applied
-            expect(screen.getByDisplayValue('left')).toBeInTheDocument() // alignment default
-            expect(screen.getByDisplayValue('normal')).toBeInTheDocument() // style default
+            expect(screen.getByRole('combobox', { name: /alignment/i })).toHaveValue('left') // alignment default
+            expect(screen.getByRole('combobox', { name: /style/i })).toHaveValue('normal') // style default
         })
     })
 }) 

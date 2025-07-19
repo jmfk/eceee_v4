@@ -110,7 +110,7 @@ const WidgetConfigurator = ({
                 payload: mergedConfig
             })
         }
-    }, [widgetType?.name]) // Use widget name as dependency to ensure it runs when widget changes
+    }, [widgetType]) // Only depend on widgetType to avoid infinite loops
 
     // Validate configuration against schema
     const validateConfig = useCallback(() => {
