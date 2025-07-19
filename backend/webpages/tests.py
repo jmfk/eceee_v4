@@ -8,7 +8,7 @@ from django.utils import timezone
 from django.test import override_settings
 import json
 
-from .models import WebPage, PageLayout, PageTheme, WidgetType, PageWidget, PageVersion
+from .models import WebPage, PageTheme, WidgetType, PageWidget, PageVersion
 
 
 class WidgetTypeModelTest(TestCase):
@@ -63,45 +63,7 @@ class WidgetTypeModelTest(TestCase):
         self.assertEqual(widgets[1], widget_b)
 
 
-class PageLayoutModelTest(TestCase):
-    """Test cases for PageLayout model"""
-
-    def setUp(self):
-        self.user = User.objects.create_user(
-            username="testuser", email="test@example.com", password="testpass123"
-        )
-
-    def test_layout_creation(self):
-        """Test creating a layout with slot configuration"""
-        layout = PageLayout.objects.create(
-            name="Test Layout",
-            description="A test layout",
-            slot_configuration={
-                "slots": [
-                    {
-                        "name": "header",
-                        "display_name": "Header Section",
-                        "description": "Main header area",
-                        "css_classes": "header-slot",
-                        "allows_multiple": False,
-                    },
-                    {
-                        "name": "content",
-                        "display_name": "Main Content",
-                        "description": "Primary content area",
-                        "css_classes": "content-slot",
-                        "allows_multiple": True,
-                    },
-                ]
-            },
-            css_classes=".test-layout { display: grid; }",
-            created_by=self.user,
-        )
-
-        self.assertEqual(layout.name, "Test Layout")
-        self.assertEqual(len(layout.slot_configuration["slots"]), 2)
-        self.assertTrue(layout.is_active)
-        self.assertEqual(str(layout), "Test Layout")
+# PageLayoutModelTest removed - now using code-based layouts only
 
 
 class PageThemeModelTest(TestCase):
@@ -146,22 +108,10 @@ class PageWidgetModelTest(TestCase):
             username="testuser", email="test@example.com", password="testpass123"
         )
 
-        self.layout = PageLayout.objects.create(
-            name="Test Layout",
-            description="A test layout",
-            slot_configuration={
-                "slots": [
-                    {"name": "header", "display_name": "Header"},
-                    {"name": "content", "display_name": "Content"},
-                ]
-            },
-            created_by=self.user,
-        )
-
         self.page = WebPage.objects.create(
             title="Test Page",
             slug="test-page",
-            layout=self.layout,
+            code_layout="single_column",  # Using code-based layout
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -253,13 +203,7 @@ class WebPageInheritanceTest(TestCase):
             username="testuser", email="test@example.com", password="testpass123"
         )
 
-        # Create layout and theme
-        self.layout = PageLayout.objects.create(
-            name="Two Column Layout",
-            slot_configuration={"slots": [{"name": "main"}, {"name": "sidebar"}]},
-            created_by=self.user,
-        )
-
+        # Create theme
         self.theme = PageTheme.objects.create(
             name="Default Theme",
             css_variables={"primary": "#3b82f6"},
@@ -270,7 +214,7 @@ class WebPageInheritanceTest(TestCase):
         self.root_page = WebPage.objects.create(
             title="Root Page",
             slug="root",
-            layout=self.layout,
+            code_layout="two_column",  # Using code-based layout
             theme=self.theme,
             publication_status="published",
             created_by=self.user,
@@ -296,26 +240,30 @@ class WebPageInheritanceTest(TestCase):
         )
 
     def test_layout_inheritance(self):
-        """Test that pages inherit layout from parent"""
+        """Test that pages inherit code layout from parent"""
         # Services page should inherit layout from root
-        self.assertEqual(self.services_page.get_effective_layout(), self.layout)
+        effective_layout = self.services_page.get_effective_layout()
+        self.assertIsNotNone(effective_layout)
+        self.assertEqual(effective_layout.name, "two_column")
 
         # Web dev page should inherit layout from root (through services)
-        self.assertEqual(self.webdev_page.get_effective_layout(), self.layout)
+        effective_layout = self.webdev_page.get_effective_layout()
+        self.assertIsNotNone(effective_layout)
+        self.assertEqual(effective_layout.name, "two_column")
 
-        # Test override
-        new_layout = PageLayout.objects.create(
-            name="Single Column",
-            slot_configuration={"slots": [{"name": "main"}]},
-            created_by=self.user,
-        )
-        self.services_page.layout = new_layout
+        # Test override with different code layout
+        self.services_page.code_layout = "single_column"
         self.services_page.save()
 
         # Services should now use new layout
-        self.assertEqual(self.services_page.get_effective_layout(), new_layout)
+        effective_layout = self.services_page.get_effective_layout()
+        self.assertIsNotNone(effective_layout)
+        self.assertEqual(effective_layout.name, "single_column")
+
         # Web dev should inherit new layout from services
-        self.assertEqual(self.webdev_page.get_effective_layout(), new_layout)
+        effective_layout = self.webdev_page.get_effective_layout()
+        self.assertIsNotNone(effective_layout)
+        self.assertEqual(effective_layout.name, "single_column")
 
     def test_theme_inheritance(self):
         """Test that pages inherit theme from parent"""
@@ -335,10 +283,12 @@ class WebPageInheritanceTest(TestCase):
         self.assertEqual(chain[2], self.webdev_page)
 
     def test_layout_inheritance_info(self):
-        """Test getting detailed layout inheritance information"""
+        """Test getting detailed code layout inheritance information"""
         info = self.webdev_page.get_layout_inheritance_info()
 
-        self.assertEqual(info["effective_layout"], self.layout)
+        self.assertIsNotNone(info["effective_layout"])
+        self.assertEqual(info["effective_layout_dict"]["name"], "two_column")
+        self.assertEqual(info["layout_type"], "code")
         self.assertEqual(info["inherited_from"], self.root_page)
         self.assertEqual(len(info["inheritance_chain"]), 3)
 
@@ -358,17 +308,11 @@ class WebPageInheritanceTest(TestCase):
         self.assertEqual(len(conflicts), 0)
 
     def test_apply_inheritance_override(self):
-        """Test applying inheritance overrides"""
-        new_layout = PageLayout.objects.create(
-            name="Override Layout",
-            slot_configuration={"slots": [{"name": "main"}]},
-            created_by=self.user,
-        )
-
-        # Apply layout override
-        success = self.webdev_page.apply_inheritance_override("layout", new_layout)
+        """Test applying code layout inheritance overrides"""
+        # Apply layout override with code layout name
+        success = self.webdev_page.apply_inheritance_override("layout", "single_column")
         self.assertTrue(success)
-        self.assertEqual(self.webdev_page.layout, new_layout)
+        self.assertEqual(self.webdev_page.code_layout, "single_column")
 
         # Clear layout override
         success = self.webdev_page.apply_inheritance_override("clear_layout")
@@ -476,97 +420,7 @@ class WidgetTypeAPITest(APITestCase):
         self.assertEqual(response.data[0]["name"], "Active Widget")
 
 
-class PageLayoutAPITest(APITestCase):
-    """Test cases for PageLayout API endpoints"""
-
-    def setUp(self):
-        self.user = User.objects.create_user(
-            username="testuser", email="test@example.com", password="testpass123"
-        )
-        self.client = APIClient()
-        self.client.force_authenticate(user=self.user)
-
-        self.layout_data = {
-            "name": "Test Layout",
-            "description": "A test layout",
-            "slot_configuration": {
-                "slots": [
-                    {
-                        "name": "header",
-                        "display_name": "Header",
-                        "description": "Header area",
-                    }
-                ]
-            },
-            "css_classes": ".test { color: red; }",
-            "is_active": True,
-        }
-
-    def test_create_layout(self):
-        """Test creating a layout via API"""
-        url = reverse("api:pagelayout-list")
-        response = self.client.post(url, self.layout_data, format="json")
-
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(PageLayout.objects.count(), 1)
-
-        layout = PageLayout.objects.first()
-        self.assertEqual(layout.name, "Test Layout")
-        self.assertEqual(layout.created_by, self.user)
-
-    def test_list_layouts(self):
-        """Test listing layouts via API"""
-        # Create a layout
-        layout = PageLayout.objects.create(
-            name="Test Layout", slot_configuration={"slots": []}, created_by=self.user
-        )
-
-        url = reverse("api:pagelayout-list")
-        response = self.client.get(url)
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-
-        # Debug response structure - API returns paginated results
-        self.assertIn("results", response.data)
-        self.assertIsInstance(response.data["results"], list)
-        self.assertGreaterEqual(len(response.data["results"]), 1)
-
-        # Check that our layout is in the response
-        layout_names = [item["name"] for item in response.data["results"]]
-        self.assertIn("Test Layout", layout_names)
-
-    def test_get_active_layouts(self):
-        """Test getting only active layouts"""
-        # Create active and inactive layouts
-        PageLayout.objects.create(
-            name="Active Layout",
-            slot_configuration={"slots": []},
-            is_active=True,
-            created_by=self.user,
-        )
-        PageLayout.objects.create(
-            name="Inactive Layout",
-            slot_configuration={"slots": []},
-            is_active=False,
-            created_by=self.user,
-        )
-
-        url = reverse("api:pagelayout-active")
-        response = self.client.get(url)
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
-        self.assertEqual(response.data[0]["name"], "Active Layout")
-
-    def test_slot_configuration_validation(self):
-        """Test slot configuration validation"""
-        invalid_data = self.layout_data.copy()
-        invalid_data["slot_configuration"] = {"invalid": "structure"}
-
-        url = reverse("api:pagelayout-list")
-        response = self.client.post(url, invalid_data, format="json")
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+# PageLayoutAPITest removed - now using code-based layouts only
 
 
 class PageThemeAPITest(APITestCase):
@@ -642,22 +496,10 @@ class PageWidgetAPITest(APITestCase):
         )
         self.client.force_authenticate(user=self.user)
 
-        self.layout = PageLayout.objects.create(
-            name="Test Layout",
-            description="A test layout",
-            slot_configuration={
-                "slots": [
-                    {"name": "header", "display_name": "Header"},
-                    {"name": "content", "display_name": "Content"},
-                ]
-            },
-            created_by=self.user,
-        )
-
         self.page = WebPage.objects.create(
             title="Test Page",
             slug="test-page",
-            layout=self.layout,
+            code_layout="single_column",  # Using code-based layout
             created_by=self.user,
             last_modified_by=self.user,
         )

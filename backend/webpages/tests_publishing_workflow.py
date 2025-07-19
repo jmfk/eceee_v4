@@ -22,7 +22,7 @@ from datetime import timedelta
 import json
 from io import StringIO
 
-from .models import WebPage, PageVersion, PageLayout, PageTheme
+from .models import WebPage, PageVersion, PageTheme
 from .publishing import PublishingService, PublicationSchedule
 
 
@@ -32,9 +32,6 @@ class PublishingServiceTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
             username="testuser", email="test@example.com", password="testpass123"
-        )
-        self.layout = PageLayout.objects.create(
-            name="Test Layout", slot_configuration={"slots": []}, created_by=self.user
         )
         self.theme = PageTheme.objects.create(
             name="Test Theme", css_variables={}, created_by=self.user
@@ -66,7 +63,7 @@ class PublishingServiceTests(TestCase):
         page = WebPage.objects.create(
             title="Test Page",
             slug="test-page",
-            layout=self.layout,
+            code_layout="single_column",  # Using code-based layout
             theme=self.theme,
             publication_status="scheduled",
             effective_date=timezone.now() - timedelta(hours=1),
@@ -98,7 +95,7 @@ class PublishingServiceTests(TestCase):
         page = WebPage.objects.create(
             title="Scheduled Page",
             slug="scheduled-page",
-            layout=self.layout,
+            code_layout="single_column",  # Using code-based layout
             theme=self.theme,
             publication_status="scheduled",
             effective_date=timezone.now() - timedelta(minutes=30),
@@ -120,7 +117,7 @@ class PublishingServiceTests(TestCase):
         page = WebPage.objects.create(
             title="Expired Page",
             slug="expired-page",
-            layout=self.layout,
+            code_layout="single_column",  # Using code-based layout
             theme=self.theme,
             publication_status="published",
             expiry_date=timezone.now() - timedelta(minutes=30),
@@ -144,9 +141,6 @@ class PublishingWorkflowAPITests(APITestCase):
         self.user = User.objects.create_user(
             username="testuser", email="test@example.com", password="testpass123"
         )
-        self.layout = PageLayout.objects.create(
-            name="Test Layout", slot_configuration={"slots": []}, created_by=self.user
-        )
         self.theme = PageTheme.objects.create(
             name="Test Theme", css_variables={}, created_by=self.user
         )
@@ -155,7 +149,7 @@ class PublishingWorkflowAPITests(APITestCase):
         self.page1 = WebPage.objects.create(
             title="Test Page 1",
             slug="test-page-1",
-            layout=self.layout,
+            code_layout="single_column",  # Using code-based layout
             theme=self.theme,
             publication_status="unpublished",
             created_by=self.user,
@@ -165,7 +159,7 @@ class PublishingWorkflowAPITests(APITestCase):
         self.page2 = WebPage.objects.create(
             title="Test Page 2",
             slug="test-page-2",
-            layout=self.layout,
+            code_layout="single_column",  # Using code-based layout
             theme=self.theme,
             publication_status="unpublished",
             created_by=self.user,
@@ -313,9 +307,6 @@ class PublishingManagementCommandTests(TransactionTestCase):
         self.user = User.objects.create_user(
             username="testuser", email="test@example.com", password="testpass123"
         )
-        self.layout = PageLayout.objects.create(
-            name="Test Layout", slot_configuration={"slots": []}, created_by=self.user
-        )
 
     def test_process_scheduled_publications(self):
         """Test processing pages scheduled for publication"""
@@ -324,7 +315,7 @@ class PublishingManagementCommandTests(TransactionTestCase):
         page = WebPage.objects.create(
             title="Scheduled Page",
             slug="scheduled-page",
-            layout=self.layout,
+            code_layout="single_column",  # Using code-based layout
             publication_status="scheduled",
             effective_date=past_date,
             created_by=self.user,
@@ -350,7 +341,7 @@ class PublishingManagementCommandTests(TransactionTestCase):
         page = WebPage.objects.create(
             title="Expired Page",
             slug="expired-page",
-            layout=self.layout,
+            code_layout="single_column",  # Using code-based layout
             publication_status="published",
             effective_date=timezone.now() - timedelta(days=1),
             expiry_date=past_date,
@@ -377,7 +368,7 @@ class PublishingManagementCommandTests(TransactionTestCase):
         page = WebPage.objects.create(
             title="Scheduled Page",
             slug="scheduled-page",
-            layout=self.layout,
+            code_layout="single_column",  # Using code-based layout
             publication_status="scheduled",
             effective_date=past_date,
             created_by=self.user,
@@ -405,7 +396,7 @@ class PublishingManagementCommandTests(TransactionTestCase):
         WebPage.objects.create(
             title="Normal Page",
             slug="normal-page",
-            layout=self.layout,
+            code_layout="single_column",  # Using code-based layout
             publication_status="unpublished",
             created_by=self.user,
             last_modified_by=self.user,
@@ -427,16 +418,13 @@ class PublishingLogicTests(TestCase):
         self.user = User.objects.create_user(
             username="testuser", email="test@example.com", password="testpass123"
         )
-        self.layout = PageLayout.objects.create(
-            name="Test Layout", slot_configuration={"slots": []}, created_by=self.user
-        )
 
     def test_is_published_method_unpublished(self):
         """Test is_published method with unpublished page"""
         page = WebPage.objects.create(
             title="Unpublished Page",
             slug="unpublished",
-            layout=self.layout,
+            code_layout="single_column",  # Using code-based layout
             publication_status="unpublished",
             created_by=self.user,
             last_modified_by=self.user,
@@ -449,7 +437,7 @@ class PublishingLogicTests(TestCase):
         page = WebPage.objects.create(
             title="Published Page",
             slug="published",
-            layout=self.layout,
+            code_layout="single_column",  # Using code-based layout
             publication_status="published",
             effective_date=timezone.now() - timedelta(hours=1),
             created_by=self.user,
@@ -463,7 +451,7 @@ class PublishingLogicTests(TestCase):
         page = WebPage.objects.create(
             title="Future Page",
             slug="future",
-            layout=self.layout,
+            code_layout="single_column",  # Using code-based layout
             publication_status="published",
             effective_date=timezone.now() + timedelta(hours=1),
             created_by=self.user,
@@ -477,7 +465,7 @@ class PublishingLogicTests(TestCase):
         page = WebPage.objects.create(
             title="Expired Page",
             slug="expired",
-            layout=self.layout,
+            code_layout="single_column",  # Using code-based layout
             publication_status="published",
             effective_date=timezone.now() - timedelta(days=2),
             expiry_date=timezone.now() - timedelta(hours=1),
@@ -492,7 +480,7 @@ class PublishingLogicTests(TestCase):
         page = WebPage.objects.create(
             title="Test Page",
             slug="test",
-            layout=self.layout,
+            code_layout="single_column",  # Using code-based layout
             publication_status="unpublished",
             created_by=self.user,
             last_modified_by=self.user,
@@ -521,9 +509,6 @@ class PublishingWorkflowIntegrationTests(APITestCase):
         self.user = User.objects.create_user(
             username="testuser", email="test@example.com", password="testpass123"
         )
-        self.layout = PageLayout.objects.create(
-            name="Test Layout", slot_configuration={"slots": []}, created_by=self.user
-        )
         self.client.force_authenticate(user=self.user)
 
     def test_complete_publishing_workflow(self):
@@ -532,7 +517,7 @@ class PublishingWorkflowIntegrationTests(APITestCase):
         page = WebPage.objects.create(
             title="Workflow Test Page",
             slug="workflow-test",
-            layout=self.layout,
+            code_layout="single_column",  # Using code-based layout
             publication_status="unpublished",
             created_by=self.user,
             last_modified_by=self.user,
@@ -588,7 +573,7 @@ class PublishingWorkflowIntegrationTests(APITestCase):
             page = WebPage.objects.create(
                 title=f"Bulk Test Page {i}",
                 slug=f"bulk-test-{i}",
-                layout=self.layout,
+                code_layout="single_column",  # Using code-based layout
                 publication_status="unpublished",
                 created_by=self.user,
                 last_modified_by=self.user,

@@ -5,7 +5,7 @@ from rest_framework.test import APITestCase, APIClient
 from rest_framework import status
 from django.utils import timezone
 
-from .models import WebPage, PageLayout, PageTheme, WidgetType, PageWidget, PageVersion
+from .models import WebPage, PageTheme, WidgetType, PageWidget, PageVersion
 
 
 class PageVersionCoreTest(TestCase):
@@ -19,16 +19,10 @@ class PageVersionCoreTest(TestCase):
             username="testuser2", email="test2@example.com", password="testpass123"
         )
 
-        self.layout = PageLayout.objects.create(
-            name="Test Layout",
-            slot_configuration={"slots": [{"name": "main"}]},
-            created_by=self.user,
-        )
-
         self.page = WebPage.objects.create(
             title="Test Page",
             slug="test-page",
-            layout=self.layout,
+            code_layout="single_column",  # Using code-based layout
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -111,16 +105,10 @@ class PageVersionAPISimpleTest(APITestCase):
         self.client = APIClient()
         self.client.force_authenticate(user=self.user)
 
-        self.layout = PageLayout.objects.create(
-            name="Test Layout",
-            slot_configuration={"slots": [{"name": "main"}]},
-            created_by=self.user,
-        )
-
         self.page = WebPage.objects.create(
             title="Test Page",
             slug="test-page",
-            layout=self.layout,
+            code_layout="single_column",  # Using code-based layout
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -205,16 +193,10 @@ class PageVersionIntegrationSimpleTest(APITestCase):
         self.client = APIClient()
         self.client.force_authenticate(user=self.user)
 
-        self.layout = PageLayout.objects.create(
-            name="Test Layout",
-            slot_configuration={"slots": [{"name": "main"}]},
-            created_by=self.user,
-        )
-
         self.page = WebPage.objects.create(
             title="Test Page",
             slug="test-page",
-            layout=self.layout,
+            code_layout="single_column",  # Using code-based layout
             created_by=self.user,
             last_modified_by=self.user,
         )
