@@ -102,9 +102,10 @@ Flexible page structure and styling system with inheritance capabilities.
 #### Key Components
 
 **Layout System:**
+- Code-based layout definitions as Python classes
 - Slot-based page structure definition
-- JSON schema for slot configuration
-- Custom template selection per layout via `template_name` field
+- Automatic layout discovery from Django apps
+- Custom template selection per layout
 - Layout-specific CSS classes for enhanced styling
 - Layout inheritance down page hierarchy
 - Override capabilities for specific pages
@@ -186,7 +187,7 @@ WebPage
 ├── id (UUID)
 ├── title, slug, description
 ├── parent (self-referential hierarchy)
-├── layout (FK to PageLayout)
+├── code_layout (CharField) - references code-based layout by name
 ├── theme (FK to PageTheme)
 ├── publication_status
 ├── effective_date, expiry_date
@@ -206,16 +207,13 @@ PageVersion
 ├── published_at, published_by
 └── change_summary (JSON)
 
-# Layout System
-PageLayout
-├── id (UUID) 
-├── name, description
-├── template_name (CharField) - custom template file for this layout
-├── slot_configuration (JSON)
-├── css_classes (TextField) - layout-specific CSS classes
-├── is_active
-├── created_by, created_at
-└── updated_at
+# Layout System (Code-Based)
+# Layouts are defined as Python classes in application code:
+# - Automatic discovery from Django apps
+# - Slot configuration defined in class attributes  
+# - Template and CSS class specifications
+# - Version controlled with application code
+# - No database storage required
 
 # Theme System
 PageTheme
@@ -251,11 +249,11 @@ PageWidget
 
 ```
 WebPage (1) ──── (Many) PageVersion
-WebPage (Many) ──── (1) PageLayout  
 WebPage (Many) ──── (1) PageTheme
 WebPage (1) ──── (Many) PageWidget
 PageWidget (Many) ──── (1) WidgetType
 WebPage (1) ──── (Many) WebPage (parent/child)
+# Note: Layout relationships are code-based, not database foreign keys
 ```
 
 ## API Architecture
@@ -298,7 +296,7 @@ WebPage (1) ──── (Many) WebPage (parent/child)
 ### Template Rendering (Public Views)
 
 **Enhanced Page Rendering:**
-- Dynamic template selection based on PageLayout.template_name
+- Dynamic template selection based on code layout template_name
 - Automatic theme CSS variable injection into page head
 - Layout-specific CSS classes for enhanced styling flexibility  
 - Breadcrumb navigation with hierarchical page structure
@@ -318,7 +316,7 @@ WebPage (1) ──── (Many) WebPage (parent/child)
 base_eceee.html (base template)
     ↓ extends
 page_detail.html (default layout template)
-    ↓ or custom template via PageLayout.template_name
+    ↓ or custom template via code layout template_name
 custom_layout.html (layout-specific template)
 ```
 

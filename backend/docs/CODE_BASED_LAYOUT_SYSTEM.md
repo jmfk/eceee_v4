@@ -1,17 +1,17 @@
 # Code-Based Layout System
 
-The eceee_v4 project now features a powerful code-based layout system that allows third-party Django apps to register layout classes directly in code, replacing the need for database-defined layouts.
+The eceee_v4 project features a powerful code-based layout system that allows third-party Django apps to register layout classes directly in code.
 
 ## Overview
 
-The new layout system provides:
+The layout system provides:
 
 - **Code-based layout registration** - Define layouts as Python classes
 - **Automatic discovery** - Layouts are automatically discovered from Django apps
 - **Third-party app support** - Any Django app can provide layouts
-- **Backward compatibility** - Existing database layouts continue to work
-- **Unified API** - Both layout types work through the same interfaces
+- **Unified API** - All layouts work through consistent interfaces
 - **Dynamic behavior** - Layouts can have conditional availability and custom logic
+- **Version control friendly** - Layouts are defined in code and versioned with your application
 
 ## Architecture
 
@@ -20,8 +20,8 @@ The new layout system provides:
 1. **`BaseLayout`** - Abstract base class for all code-based layouts
 2. **`LayoutRegistry`** - Global registry that manages layout classes
 3. **`autodiscover_layouts()`** - Automatic discovery system for Django apps
-4. **Extended models** - WebPage model supports both layout types
-5. **Management commands** - Tools for migration and management
+4. **WebPage model** - Uses `code_layout` field to reference layout names
+5. **Management commands** - Tools for layout management and validation
 
 ### File Structure
 
@@ -30,9 +30,9 @@ backend/webpages/
 ├── layout_registry.py          # Base classes and registry
 ├── layout_autodiscovery.py     # Discovery and validation
 ├── layouts.py                  # Example layout implementations
-├── models.py                   # Updated WebPage model
+├── models.py                   # WebPage model with code_layout field
 ├── views.py                    # API endpoints for layouts
-├── serializers.py              # Updated serializers
+├── serializers.py              # Layout serializers
 ├── management/commands/
 │   └── manage_layouts.py       # Management command
 └── apps.py                     # Auto-discovery integration
@@ -157,78 +157,69 @@ Create the corresponding template file:
 {% endblock %}
 ```
 
-## Migration from Database Layouts
+## Layout Management
 
 ### Using Management Command
 
 ```bash
-# List all layouts
+# List all available layouts
 python manage.py manage_layouts list
 
-# Export database layouts to code
-python manage.py manage_layouts export --output-file my_layouts.py
+# Validate layout configurations
+python manage.py manage_layouts validate
 
-# Convert pages from database to code layouts
-python manage.py manage_layouts convert-pages \
-    --from-layout "Two Column" \
-    --to-layout "two_column" \
-    --dry-run
+# Show detailed layout information
+python manage.py manage_layouts info --layout single_column
 
-# Apply the conversion
-python manage.py manage_layouts convert-pages \
-    --from-layout "Two Column" \
-    --to-layout "two_column"
+# Reload layouts from code
+python manage.py manage_layouts reload
 ```
-
-### Manual Migration Process
-
-1. **Export existing layouts**: Use the management command to generate code templates
-2. **Create layout classes**: Implement the exported layouts as code
-3. **Test layouts**: Verify layouts work correctly
-4. **Convert pages**: Use management command to switch pages to code layouts
-5. **Remove database layouts**: Clean up old database entries (optional)
 
 ## API Usage
 
 ### REST Endpoints
 
-#### Code Layouts
-- `GET /api/webpages/code-layouts/` - List all code layouts
-- `GET /api/webpages/code-layouts/{name}/` - Get specific layout
-- `GET /api/webpages/code-layouts/choices/` - Get layout choices
-- `POST /api/webpages/code-layouts/reload/` - Reload layouts (admin)
-- `GET /api/webpages/code-layouts/validate/` - Validate layouts (admin)
-
-#### Combined Layouts
-- `GET /api/webpages/layouts/all_layouts/` - Get both database and code layouts
+#### Layout Management
+- `GET /api/webpages/code-layouts/` - List all available layouts
+- `GET /api/webpages/code-layouts/{name}/` - Get specific layout details
+- `GET /api/webpages/code-layouts/choices/` - Get layout choices for forms
+- `POST /api/webpages/code-layouts/reload/` - Reload layouts from code (admin)
+- `GET /api/webpages/code-layouts/validate/` - Validate layout configurations (admin)
+- `GET /api/webpages/layouts/all_layouts/` - Get all layouts with summary information
 
 ### Page Serialization
 
-The `WebPageDetailSerializer` now includes:
+The `WebPageDetailSerializer` includes:
 
 ```json
 {
   "id": 1,
   "title": "My Page",
   "code_layout": "single_column",
-  "layout": null,
   "effective_layout": {
     "name": "single_column",
-    "description": "Single column layout...",
+    "description": "Single column layout with main content area",
     "type": "code",
-    "slot_configuration": {...}
+    "slot_configuration": {
+      "slots": [
+        {
+          "name": "main",
+          "display_name": "Main Content",
+          "description": "Primary content area",
+          "css_classes": "main-content",
+          "allows_multiple": true
+        }
+      ]
+    }
   },
   "layout_type": "code",
   "layout_inheritance_info": {
-    "effective_layout": {...},
+    "effective_layout_dict": {...},
     "layout_type": "code",
     "inheritance_chain": [...],
-    "override_options": {
-      "database_layouts": [...],
-      "code_layouts": [...]
-    }
+    "inherited_from": null
   },
-  "available_code_layouts": [...]
+  "available_code_layouts": ["single_column", "two_column", "three_column"]
 }
 ```
 
@@ -237,29 +228,20 @@ The `WebPageDetailSerializer` now includes:
 ### manage_layouts command
 
 ```bash
-# Show summary
+# Show layout summary
 python manage.py manage_layouts summary
 
-# List layouts
-python manage.py manage_layouts list [--type code|database|all] [--active-only]
+# List all available layouts
+python manage.py manage_layouts list [--active-only]
 
-# Validate layouts
+# Validate layout configurations
 python manage.py manage_layouts validate
 
-# Reload code layouts
+# Reload layouts from code
 python manage.py manage_layouts reload
 
-# Export database layouts
-python manage.py manage_layouts export [--output-file filename.py]
-
-# Migrate specific layout
-python manage.py manage_layouts migrate [--layout-id ID] [--dry-run]
-
-# Convert pages
-python manage.py manage_layouts convert-pages \
-    --from-layout "db_layout_name" \
-    --to-layout "code_layout_name" \
-    [--dry-run]
+# Get detailed layout information
+python manage.py manage_layouts info --layout layout_name
 ```
 
 ## Template Integration
@@ -317,8 +299,7 @@ LAYOUT_VALIDATION_ON_STARTUP = True
 - **Hot reloading** - Development environments can reload layouts
 
 ### For Site Administrators
-- **Backward compatibility** - Existing layouts continue working
-- **Migration tools** - Comprehensive migration utilities
+- **Management tools** - Comprehensive layout management utilities
 - **API access** - Full REST API for layout management
 - **Monitoring** - Validation and health checking tools
 
@@ -341,7 +322,7 @@ See `backend/webpages/layouts.py` for complete examples including:
 4. **Templates**: Create corresponding template files
 5. **CSS Classes**: Use consistent CSS class naming
 6. **Testing**: Test layout registration and rendering
-7. **Backwards Compatibility**: Consider migration paths for existing sites
+7. **Version Control**: Keep layouts organized and well-documented in code
 
 ## Troubleshooting
 

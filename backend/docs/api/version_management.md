@@ -134,10 +134,7 @@ Retrieves detailed information about a specific version.
         "id": 1,
         "title": "Homepage",
         "slug": "homepage",
-        "layout": {
-            "id": 1,
-            "name": "Main Layout"
-        },
+        "code_layout": "main_layout",
         "theme": {
             "id": 1,
             "name": "Default Theme"
