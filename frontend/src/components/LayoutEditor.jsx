@@ -9,7 +9,9 @@ import {
     RefreshCw,
     CheckCircle,
     Info,
-    ArrowRight
+    ArrowRight,
+    X,
+    Database
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { layoutsApi, layoutUtils } from '../api/layouts'
