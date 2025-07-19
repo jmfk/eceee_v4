@@ -133,7 +133,9 @@ describe('WidgetConfigurator', () => {
 
         await waitFor(() => {
             expect(screen.getByText('Configure Widget')).toBeInTheDocument()
-            expect(screen.getByText('Text Block')).toBeInTheDocument()
+            expect(screen.getByText((content, element) => {
+                return content.includes('Configuring:') && content.includes('Text Block')
+            })).toBeInTheDocument()
         })
 
         // Should render form fields based on schema
@@ -228,7 +230,7 @@ describe('WidgetConfigurator', () => {
 
         // Should show validation error
         await waitFor(() => {
-            expect(screen.getByText(/please fix all validation errors/i)).toBeInTheDocument()
+            expect(screen.getByText(/please fix the following errors/i)).toBeInTheDocument()
         })
     })
 
@@ -247,8 +249,8 @@ describe('WidgetConfigurator', () => {
 
         const saveButton = screen.getByRole('button', { name: /save configuration/i })
 
-        // Button should be enabled since form validation happens on save click
-        expect(saveButton).toBeEnabled()
+        // Button should be disabled since form is invalid (missing required content field)
+        expect(saveButton).toBeDisabled()
     })
 
     it('enables save button when form is valid', async () => {
@@ -292,7 +294,7 @@ describe('WidgetConfigurator', () => {
         await user.click(saveButton)
 
         await waitFor(() => {
-            expect(screen.getByText(/please fix all validation errors/i)).toBeInTheDocument()
+            expect(screen.getByText(/please fix the following errors/i)).toBeInTheDocument()
         })
     })
 

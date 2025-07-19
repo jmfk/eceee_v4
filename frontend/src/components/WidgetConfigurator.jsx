@@ -1,4 +1,4 @@
-import { useState, useEffect, useReducer } from 'react'
+import { useState, useEffect, useReducer, useRef, useCallback } from 'react'
 import { Save, X, AlertCircle, Info, Settings, Layers, Eye, EyeOff, Monitor } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -94,7 +94,7 @@ const WidgetConfigurator = ({
         { value: 'conditional', label: 'Conditional Inheritance', description: 'Inherit based on specified conditions' }
     ]
 
-    // Initialize config with default values from schema
+    // Initialize config with default values from schema when widgetType changes
     useEffect(() => {
         if (widgetType?.configuration_schema?.properties) {
             const defaultConfig = {}
@@ -103,19 +103,17 @@ const WidgetConfigurator = ({
                     defaultConfig[key] = property.default
                 }
             })
+            // Merge defaults with initial config, giving priority to initial config values
+            const mergedConfig = { ...defaultConfig, ...initialConfig }
             dispatch({
                 type: 'RESET_CONFIG',
-                payload: { ...defaultConfig, ...initialConfig }
+                payload: mergedConfig
             })
         }
-    }, [widgetType])
+    }, [widgetType?.name]) // Use widget name as dependency to ensure it runs when widget changes
 
     // Validate configuration against schema
-    useEffect(() => {
-        validateConfig()
-    }, [config, widgetType])
-
-    const validateConfig = () => {
+    const validateConfig = useCallback(() => {
         if (!widgetType?.configuration_schema) return
 
         const newErrors = {}
@@ -186,7 +184,12 @@ const WidgetConfigurator = ({
 
         dispatch({ type: 'SET_ERRORS', payload: newErrors })
         dispatch({ type: 'SET_IS_VALID', payload: Object.keys(newErrors).length === 0 })
-    }
+    }, [config, widgetType])
+
+    // Run validation when config or widgetType changes
+    useEffect(() => {
+        validateConfig()
+    }, [validateConfig])
 
     const handleFieldChange = (fieldName, value) => {
         dispatch({
@@ -223,9 +226,12 @@ const WidgetConfigurator = ({
     }
 
     const renderField = (fieldName, property) => {
-        const value = config[fieldName] || ''
+        // Use default value from schema if config value is undefined
+        const value = config[fieldName] !== undefined ? config[fieldName] : (property.default !== undefined ? property.default : '')
         const hasError = errors[fieldName]
         const isRequired = widgetType?.configuration_schema?.required?.includes(fieldName)
+        const fieldId = `widget-field-${fieldName}`
+        const fieldLabel = property.title || fieldName.charAt(0).toUpperCase() + fieldName.slice(1).replace(/_/g, ' ')
 
         const baseClasses = `w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${hasError ? 'border-red-300 focus:border-red-500' : 'border-gray-300 focus:border-transparent'
             }`
@@ -236,22 +242,26 @@ const WidgetConfigurator = ({
             inputElement = (
                 <label className="flex items-center space-x-2">
                     <input
+                        id={fieldId}
                         type="checkbox"
                         checked={value === true}
                         onChange={(e) => handleFieldChange(fieldName, e.target.checked)}
                         className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        aria-label={fieldLabel}
                     />
-                    <span className="text-sm text-gray-700">{property.title || fieldName.charAt(0).toUpperCase() + fieldName.slice(1).replace(/_/g, ' ')}</span>
+                    <span className="text-sm text-gray-700">{fieldLabel}</span>
                 </label>
             )
         } else if (property.enum) {
             inputElement = (
                 <select
+                    id={fieldId}
                     value={value}
                     onChange={(e) => handleFieldChange(fieldName, e.target.value)}
                     className={baseClasses}
+                    aria-label={fieldLabel}
                 >
-                    <option value="">Select {property.title || fieldName.charAt(0).toUpperCase() + fieldName.slice(1).replace(/_/g, ' ')}</option>
+                    <option value="">Select {fieldLabel}</option>
                     {property.enum.map(option => (
                         <option key={option} value={option}>
                             {option.charAt(0).toUpperCase() + option.slice(1)}
@@ -262,34 +272,41 @@ const WidgetConfigurator = ({
         } else if (property.format === 'textarea') {
             inputElement = (
                 <textarea
+                    id={fieldId}
                     value={value}
                     onChange={(e) => handleFieldChange(fieldName, e.target.value)}
                     placeholder={property.description}
                     rows={4}
                     className={baseClasses}
+                    aria-label={fieldLabel}
                 />
             )
         } else if (property.format === 'date') {
             inputElement = (
                 <input
+                    id={fieldId}
                     type="date"
                     value={value}
                     onChange={(e) => handleFieldChange(fieldName, e.target.value)}
                     className={baseClasses}
+                    aria-label={fieldLabel}
                 />
             )
         } else if (property.format === 'datetime-local') {
             inputElement = (
                 <input
+                    id={fieldId}
                     type="datetime-local"
                     value={value}
                     onChange={(e) => handleFieldChange(fieldName, e.target.value)}
                     className={baseClasses}
+                    aria-label={fieldLabel}
                 />
             )
         } else {
             inputElement = (
                 <input
+                    id={fieldId}
                     type={property.type === 'number' ? 'number' : property.type === 'integer' ? 'number' : 'text'}
                     value={value}
                     onChange={(e) => handleFieldChange(fieldName, e.target.value)}
@@ -298,6 +315,7 @@ const WidgetConfigurator = ({
                     max={property.maximum}
                     step={property.type === 'integer' ? 1 : 'any'}
                     className={baseClasses}
+                    aria-label={fieldLabel}
                 />
             )
         }
@@ -305,9 +323,9 @@ const WidgetConfigurator = ({
         return (
             <div key={fieldName} className="space-y-2">
                 {property.type !== 'boolean' && (
-                    <label className="block">
+                    <label htmlFor={fieldId} className="block">
                         <span className="text-sm font-medium text-gray-700">
-                            {property.title || fieldName.charAt(0).toUpperCase() + fieldName.slice(1).replace(/_/g, ' ')}
+                            {fieldLabel}
                             {isRequired && <span className="text-red-500 ml-1">*</span>}
                         </span>
                     </label>
