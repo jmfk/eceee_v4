@@ -7,7 +7,7 @@ including hierarchical relationships and inheritance logic.
 
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import WebPage, PageVersion, PageLayout, PageTheme, WidgetType
+from .models import WebPage, PageVersion, PageTheme, WidgetType
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -19,50 +19,7 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = ["id"]
 
 
-class PageLayoutSerializer(serializers.ModelSerializer):
-    """Serializer for page layouts"""
-
-    created_by = UserSerializer(read_only=True)
-
-    class Meta:
-        model = PageLayout
-        fields = [
-            "id",
-            "name",
-            "description",
-            "slot_configuration",
-            "css_classes",
-            "is_active",
-            "created_at",
-            "updated_at",
-            "created_by",
-        ]
-        read_only_fields = ["id", "created_at", "updated_at", "created_by"]
-
-    def validate_slot_configuration(self, value):
-        """Validate that slot_configuration is a valid JSON structure"""
-        if not isinstance(value, dict):
-            raise serializers.ValidationError(
-                "Slot configuration must be a JSON object"
-            )
-
-        # Validate that slots are defined
-        if "slots" not in value:
-            raise serializers.ValidationError(
-                "Slot configuration must contain a 'slots' key"
-            )
-
-        if not isinstance(value["slots"], list):
-            raise serializers.ValidationError("Slots must be a list")
-
-        # Validate each slot
-        for slot in value["slots"]:
-            if not isinstance(slot, dict):
-                raise serializers.ValidationError("Each slot must be an object")
-            if "name" not in slot:
-                raise serializers.ValidationError("Each slot must have a 'name' field")
-
-        return value
+# PageLayoutSerializer removed - now using code-based layouts only
 
 
 class PageThemeSerializer(serializers.ModelSerializer):
@@ -222,10 +179,7 @@ class WebPageDetailSerializer(serializers.ModelSerializer):
         write_only=True, required=False, allow_null=True
     )
 
-    layout = PageLayoutSerializer(read_only=True)
-    layout_id = serializers.IntegerField(
-        write_only=True, required=False, allow_null=True
-    )
+    # layout field removed - now using code-based layouts only
 
     theme = PageThemeSerializer(read_only=True)
     theme_id = serializers.IntegerField(
@@ -258,9 +212,7 @@ class WebPageDetailSerializer(serializers.ModelSerializer):
             "parent",
             "parent_id",
             "sort_order",
-            "layout",
-            "layout_id",
-            "code_layout",  # New field for code-based layouts
+            "code_layout",
             "theme",
             "theme_id",
             "publication_status",
@@ -332,11 +284,6 @@ class WebPageDetailSerializer(serializers.ModelSerializer):
                     "page_id": page.id,
                     "page_title": page.title,
                     "code_layout": chain_item["code_layout"],
-                    "database_layout": (
-                        PageLayoutSerializer(chain_item["database_layout"]).data
-                        if chain_item["database_layout"]
-                        else None
-                    ),
                     "is_override": chain_item["is_override"],
                 }
             )
@@ -354,9 +301,6 @@ class WebPageDetailSerializer(serializers.ModelSerializer):
             ),
             "inheritance_chain": serialized_chain,
             "override_options": {
-                "database_layouts": PageLayoutSerializer(
-                    inheritance_info["override_options"]["database_layouts"], many=True
-                ).data,
                 "code_layouts": [
                     layout.to_dict()
                     for layout in inheritance_info["override_options"]["code_layouts"]
@@ -453,7 +397,7 @@ class WebPageListSerializer(serializers.ModelSerializer):
 
     def get_layout(self, obj):
         layout = obj.get_effective_layout()
-        return PageLayoutSerializer(layout).data if layout else None
+        return layout.to_dict() if layout else None
 
     def get_theme(self, obj):
         theme = obj.get_effective_theme()

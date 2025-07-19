@@ -8,7 +8,7 @@ hierarchical filtering, date ranges, and publication status filtering.
 import django_filters
 from django.db.models import Q
 from django.utils import timezone
-from .models import WebPage, PageVersion, PageLayout, PageTheme, WidgetType
+from .models import WebPage, PageVersion, PageTheme, WidgetType
 
 
 class WebPageFilter(django_filters.FilterSet):
@@ -38,11 +38,8 @@ class WebPageFilter(django_filters.FilterSet):
     expires_between = django_filters.DateFromToRangeFilter(field_name="expiry_date")
     active_on_date = django_filters.DateFilter(method="filter_active_on_date")
 
-    # Layout and theme filters
-    layout = django_filters.ModelChoiceFilter(queryset=PageLayout.objects.all())
-    layout_isnull = django_filters.BooleanFilter(
-        field_name="layout", lookup_expr="isnull"
-    )
+    # Layout and theme filters (layout removed - now using code-based layouts)
+    code_layout = django_filters.CharFilter(lookup_expr="icontains")
     theme = django_filters.ModelChoiceFilter(queryset=PageTheme.objects.all())
     theme_isnull = django_filters.BooleanFilter(
         field_name="theme", lookup_expr="isnull"
@@ -326,43 +323,7 @@ class PageVersionFilter(django_filters.FilterSet):
         return queryset
 
 
-class PageLayoutFilter(django_filters.FilterSet):
-    """Filtering for PageLayout queryset"""
-
-    name = django_filters.CharFilter(lookup_expr="icontains")
-    description = django_filters.CharFilter(lookup_expr="icontains")
-    is_active = django_filters.BooleanFilter()
-    created_by = django_filters.CharFilter(
-        field_name="created_by__username", lookup_expr="icontains"
-    )
-
-    # Date filters
-    created_after = django_filters.DateTimeFilter(
-        field_name="created_at", lookup_expr="gte"
-    )
-    created_before = django_filters.DateTimeFilter(
-        field_name="created_at", lookup_expr="lte"
-    )
-
-    # Usage filters
-    in_use = django_filters.BooleanFilter(method="filter_in_use")
-    page_count = django_filters.NumberFilter(method="filter_page_count")
-
-    class Meta:
-        model = PageLayout
-        fields = []
-
-    def filter_in_use(self, queryset, name, value):
-        """Filter layouts that are or aren't in use by pages"""
-        if value:
-            return queryset.filter(webpage__isnull=False).distinct()
-        else:
-            return queryset.filter(webpage__isnull=True)
-
-    def filter_page_count(self, queryset, name, value):
-        """Filter layouts by number of pages using them"""
-        # This would require annotation with Count
-        return queryset
+# PageLayoutFilter removed - now using code-based layouts only
 
 
 class PageThemeFilter(django_filters.FilterSet):

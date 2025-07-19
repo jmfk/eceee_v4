@@ -2,12 +2,13 @@
 Web Page Publishing System Models
 
 This module defines the core models for the hierarchical web page management system:
-- WebPage: Core page entity with hierarchy support
+- WebPage: Core page entity with hierarchy support and code-based layouts
 - PageVersion: Version control for pages
-- PageLayout: Layout templates with slot definitions
 - PageTheme: Theme configurations for styling
 - WidgetType: Available widget types with schemas
 - PageWidget: Widget instances on pages
+
+Note: Layout templates are now defined as code-based classes, not database models.
 """
 
 from django.db import models, transaction
@@ -20,54 +21,7 @@ from django.core.exceptions import ValidationError
 import json
 
 
-class PageLayout(models.Model):
-    """
-    Layout templates that define the structure and slots available on pages.
-    Layouts can be inherited through the page hierarchy.
-
-    NOTE: This model is being phased out in favor of code-based layouts.
-    It remains for backward compatibility with existing database layouts.
-    """
-
-    name = models.CharField(max_length=255, unique=True)
-    description = models.TextField(blank=True)
-    template_name = models.CharField(
-        max_length=255,
-        help_text="Template file used to render this layout",
-        default="webpages/page_detail.html",
-    )
-    slot_configuration = models.JSONField(
-        help_text="JSON defining available slots and their properties"
-    )
-    css_classes = models.TextField(
-        blank=True, help_text="CSS classes to apply to pages using this layout"
-    )
-    is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    created_by = models.ForeignKey(User, on_delete=models.PROTECT)
-
-    class Meta:
-        ordering = ["name"]
-
-    def __str__(self):
-        return self.name
-
-    def to_dict(self):
-        """Convert layout to dictionary representation"""
-        return {
-            "id": self.id,
-            "name": self.name,
-            "description": self.description,
-            "template_name": self.template_name,
-            "slot_configuration": self.slot_configuration,
-            "css_classes": self.css_classes,
-            "is_active": self.is_active,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
-            "created_by": self.created_by.username if self.created_by else None,
-            "type": "database",  # Distinguish from code-based layouts
-        }
+# PageLayout model removed - now using code-based layouts only
 
 
 class PageTheme(models.Model):
@@ -218,20 +172,11 @@ class WebPage(models.Model):
     )
 
     # Layout and theme (with inheritance)
-    # Database-based layout (legacy)
-    layout = models.ForeignKey(
-        PageLayout,
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL,
-        help_text="Database layout (legacy). Leave blank to inherit from parent or use code_layout",
-    )
-
-    # Code-based layout (new system)
+    # Code-based layout
     code_layout = models.CharField(
         max_length=255,
         blank=True,
-        help_text="Name of code-based layout class. Takes precedence over database layout. Leave blank to inherit from parent",
+        help_text="Name of code-based layout class. Leave blank to inherit from parent",
     )
 
     theme = models.ForeignKey(
@@ -419,32 +364,27 @@ class WebPage(models.Model):
 
     def get_effective_layout(self):
         """
-        Get the layout for this page, supporting both code-based and database layouts.
-        Code-based layouts take precedence over database layouts.
+        Get the code-based layout for this page.
         Inherits from parent if no layout is specified.
 
         Returns:
-            Either a BaseLayout instance (for code layouts) or PageLayout instance (for database layouts)
+            BaseLayout instance for code layouts, or None
         """
         # Import here to avoid circular imports
         from .layout_registry import layout_registry
 
-        # Check for code-based layout first (takes precedence)
+        # Check for code-based layout
         if self.code_layout:
             code_layout_instance = layout_registry.get_layout(self.code_layout)
             if code_layout_instance:
                 return code_layout_instance
-            # If code layout is specified but not found, log warning and fall back
+            # If code layout is specified but not found, log warning
             import logging
 
             logger = logging.getLogger(__name__)
             logger.warning(
-                f"Code layout '{self.code_layout}' not found for page '{self.title}'. Falling back to database layout."
+                f"Code layout '{self.code_layout}' not found for page '{self.title}'."
             )
-
-        # Fall back to database layout
-        if self.layout:
-            return self.layout
 
         # Inherit from parent
         if self.parent:
@@ -464,14 +404,12 @@ class WebPage(models.Model):
         return None
 
     def get_layout_type(self):
-        """Get the type of layout being used: 'code', 'database', or 'inherited'"""
+        """Get the type of layout being used: 'code' or 'inherited'"""
         if self.code_layout:
             from .layout_registry import layout_registry
 
             if layout_registry.is_registered(self.code_layout):
                 return "code"
-        if self.layout:
-            return "database"
         if self.parent:
             return "inherited"
         return None
@@ -719,7 +657,7 @@ class WebPage(models.Model):
         return chain
 
     def get_layout_inheritance_info(self):
-        """Get detailed information about layout inheritance including code-based layouts"""
+        """Get detailed information about code-based layout inheritance"""
         from .layout_registry import layout_registry
 
         inheritance_info = {
@@ -729,7 +667,6 @@ class WebPage(models.Model):
             "inherited_from": None,
             "inheritance_chain": [],
             "override_options": {
-                "database_layouts": [],
                 "code_layouts": [],
             },
         }
@@ -741,13 +678,12 @@ class WebPage(models.Model):
             page_layout_info = {
                 "page": current,
                 "code_layout": current.code_layout,
-                "database_layout": current.layout,
-                "is_override": current.code_layout or current.layout is not None,
+                "is_override": bool(current.code_layout),
             }
 
             inheritance_info["inheritance_chain"].append(page_layout_info)
 
-            # Determine effective layout (code takes precedence)
+            # Determine effective layout (code-based only)
             effective_layout = None
             layout_type = None
 
@@ -756,10 +692,6 @@ class WebPage(models.Model):
                 if code_layout_instance:
                     effective_layout = code_layout_instance
                     layout_type = "code"
-
-            if not effective_layout and current.layout:
-                effective_layout = current.layout
-                layout_type = "database"
 
             if effective_layout:
                 inheritance_info["effective_layout"] = effective_layout
@@ -776,10 +708,7 @@ class WebPage(models.Model):
 
             current = current.parent
 
-        # Get available layouts for override
-        inheritance_info["override_options"]["database_layouts"] = (
-            PageLayout.objects.filter(is_active=True)
-        )
+        # Get available code layouts for override
         inheritance_info["override_options"]["code_layouts"] = (
             layout_registry.list_layouts(active_only=True)
         )

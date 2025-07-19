@@ -1,45 +1,26 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-    Plus,
-    Edit3,
-    Trash2,
-    Save,
-    X,
     Grid3X3,
-    Square,
     Monitor,
     Eye,
-    Move,
     Settings,
     Code,
-    Database,
     RefreshCw,
     CheckCircle,
-    AlertTriangle,
-    Info,
-    ArrowRight
+    Info
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { layoutsApi, layoutUtils } from '../api/layouts'
-import LayoutMigrationTools from './LayoutMigrationTools'
 
 const LayoutEditor = () => {
     const [selectedLayout, setSelectedLayout] = useState(null)
-    const [isCreating, setIsCreating] = useState(false)
     const [showPreview, setShowPreview] = useState(false)
-    const [activeTab, setActiveTab] = useState('all') // 'all', 'code', 'database', 'migration'
     const queryClient = useQueryClient()
 
-    // Fetch all layouts (both types)
-    const { data: allLayouts, isLoading } = useQuery({
-        queryKey: ['layouts', 'all'],
-        queryFn: () => layoutsApi.combined.listAll()
-    })
-
-    // Fetch code layout summary
-    const { data: codeLayoutSummary } = useQuery({
-        queryKey: ['layouts', 'code-summary'],
+    // Fetch code layouts
+    const { data: layoutsData, isLoading } = useQuery({
+        queryKey: ['layouts', 'code'],
         queryFn: () => layoutsApi.codeLayouts.list()
     })
 
@@ -66,42 +47,21 @@ const LayoutEditor = () => {
         }
     })
 
-    // Get filtered layouts based on active tab
-    const getFilteredLayouts = () => {
-        if (!allLayouts) return []
-
-        let layouts = []
-
-        if (activeTab === 'all' || activeTab === 'code') {
-            const codeLayouts = (allLayouts.code_layouts || []).map(layout => ({
-                ...layout,
-                id: `code:${layout.name}`,
-                type: 'code'
-            }))
-            layouts = [...layouts, ...codeLayouts]
-        }
-
-        if (activeTab === 'all' || activeTab === 'database') {
-            const dbLayouts = (allLayouts.database_layouts || []).map(layout => ({
-                ...layout,
-                type: 'database'
-            }))
-            layouts = [...layouts, ...dbLayouts]
-        }
-
-        return layouts.map(layoutUtils.formatLayoutForDisplay)
-    }
-
-    const filteredLayouts = getFilteredLayouts()
+    // Get code layouts
+    const layouts = (layoutsData?.results || []).map(layout => ({
+        ...layout,
+        id: layout.name,
+        type: 'code'
+    })).map(layoutUtils.formatLayoutForDisplay)
 
     return (
         <div className="space-y-6">
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h2 className="text-2xl font-bold text-gray-900">Layout Management</h2>
+                    <h2 className="text-2xl font-bold text-gray-900">Code Layout Management</h2>
                     <p className="text-gray-600 mt-1">
-                        Manage code-based and database layout templates
+                        View and manage code-based layout templates
                     </p>
                 </div>
                 <div className="flex items-center space-x-3">
@@ -119,150 +79,90 @@ const LayoutEditor = () => {
                         className="inline-flex items-center px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
                     >
                         <RefreshCw className={`w-4 h-4 mr-2 ${reloadMutation.isPending ? 'animate-spin' : ''}`} />
-                        Reload Code
-                    </button>
-                    <button
-                        onClick={() => setIsCreating(true)}
-                        className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-                    >
-                        <Plus className="w-4 h-4 mr-2" />
-                        New Database Layout
+                        Reload
                     </button>
                 </div>
             </div>
 
-            {/* Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Summary Card */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                     <div className="flex items-center">
                         <Code className="w-5 h-5 text-blue-600 mr-2" />
                         <div>
-                            <p className="text-sm font-medium text-blue-900">Code Layouts</p>
+                            <p className="text-sm font-medium text-blue-900">Available Layouts</p>
                             <p className="text-2xl font-bold text-blue-600">
-                                {codeLayoutSummary?.summary?.active_layouts || 0}
-                            </p>
-                        </div>
-                    </div>
-                </div>
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                    <div className="flex items-center">
-                        <Database className="w-5 h-5 text-amber-600 mr-2" />
-                        <div>
-                            <p className="text-sm font-medium text-amber-900">Database Layouts</p>
-                            <p className="text-2xl font-bold text-amber-600">
-                                {allLayouts?.database_layouts?.length || 0}
+                                {layoutsData?.summary?.active_layouts || layouts.length}
                             </p>
                         </div>
                     </div>
                 </div>
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                     <div className="flex items-center">
-                        <Grid3X3 className="w-5 h-5 text-green-600 mr-2" />
+                        <Settings className="w-5 h-5 text-green-600 mr-2" />
                         <div>
-                            <p className="text-sm font-medium text-green-900">Total Layouts</p>
-                            <p className="text-2xl font-bold text-green-600">
-                                {filteredLayouts.length}
+                            <p className="text-sm font-medium text-green-900">Status</p>
+                            <p className="text-sm font-medium text-green-600">
+                                Code-based layouts only
                             </p>
                         </div>
                     </div>
                 </div>
             </div>
 
-            {/* Layout Type Tabs */}
-            <div className="border-b border-gray-200">
-                <nav className="-mb-px flex space-x-8">
-                    {[
-                        { id: 'all', label: 'All Layouts', icon: Grid3X3 },
-                        { id: 'code', label: 'Code Layouts', icon: Code },
-                        { id: 'database', label: 'Database Layouts', icon: Database },
-                        { id: 'migration', label: 'Migration Tools', icon: ArrowRight }
-                    ].map(tab => {
-                        const Icon = tab.icon
-                        return (
-                            <button
-                                key={tab.id}
-                                onClick={() => setActiveTab(tab.id)}
-                                className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center ${activeTab === tab.id
-                                    ? 'border-blue-500 text-blue-600'
-                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                    }`}
-                            >
-                                <Icon className="w-4 h-4 mr-2" />
-                                {tab.label}
-                            </button>
-                        )
-                    })}
-                </nav>
+            {/* Layout listing header */}
+            <div className="border-b border-gray-200 pb-2">
+                <h3 className="text-lg font-medium text-gray-900">Available Code Layouts</h3>
+                <p className="text-sm text-gray-600">Code-based layout templates defined in your application</p>
             </div>
 
             {/* Content Area */}
-            {activeTab === 'migration' ? (
-                <LayoutMigrationTools />
-            ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* Layouts List */}
-                    <div className="lg:col-span-1">
-                        <LayoutsList
-                            layouts={filteredLayouts}
-                            selectedLayout={selectedLayout}
-                            onSelectLayout={setSelectedLayout}
-                            isLoading={isLoading}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Layouts List */}
+                <div className="lg:col-span-1">
+                    <LayoutsList
+                        layouts={layouts}
+                        selectedLayout={selectedLayout}
+                        onSelectLayout={setSelectedLayout}
+                        isLoading={isLoading}
+                    />
+                </div>
+
+                {/* Layout Detail Panel */}
+                <div className="lg:col-span-2">
+                    {selectedLayout ? (
+                        <LayoutDetailPanel
+                            layout={selectedLayout}
+                            onCancel={() => setSelectedLayout(null)}
+                            showPreview={showPreview}
+                            onTogglePreview={() => setShowPreview(!showPreview)}
                         />
-                    </div>
-
-                    {/* Layout Editor Panel */}
-                    <div className="lg:col-span-2">
-                        {isCreating && (
-                            <LayoutForm
-                                onSave={() => {
-                                    setIsCreating(false)
-                                    queryClient.invalidateQueries(['layouts'])
-                                }}
-                                onCancel={() => setIsCreating(false)}
-                            />
-                        )}
-
-                        {selectedLayout && !isCreating && (
-                            <LayoutDetailPanel
-                                layout={selectedLayout}
-                                onUpdate={() => {
-                                    queryClient.invalidateQueries(['layouts'])
-                                    setSelectedLayout(null)
-                                }}
-                                onCancel={() => setSelectedLayout(null)}
-                                showPreview={showPreview}
-                                onTogglePreview={() => setShowPreview(!showPreview)}
-                            />
-                        )}
-
-                        {!selectedLayout && !isCreating && (
-                            <div className="bg-white rounded-lg border-2 border-dashed border-gray-300 p-12 text-center">
-                                <Grid3X3 className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                                <h3 className="text-lg font-medium text-gray-900 mb-2">
-                                    Select a Layout to View Details
-                                </h3>
-                                <p className="text-gray-500">
-                                    Choose a layout from the list to view details, or create a new database layout
-                                </p>
-                                <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-                                    <div className="flex items-start space-x-3">
-                                        <Info className="w-5 h-5 text-blue-600 mt-0.5" />
-                                        <div className="text-left">
-                                            <h4 className="text-sm font-medium text-blue-900 mb-1">
-                                                Code vs Database Layouts
-                                            </h4>
-                                            <p className="text-sm text-blue-700">
-                                                📝 <strong>Code layouts</strong> are defined in app code and are read-only here.
-                                                🗄️ <strong>Database layouts</strong> can be created and edited through this interface.
-                                            </p>
-                                        </div>
+                    ) : (
+                        <div className="bg-white rounded-lg border-2 border-dashed border-gray-300 p-12 text-center">
+                            <Grid3X3 className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                            <h3 className="text-lg font-medium text-gray-900 mb-2">
+                                Select a Layout to View Details
+                            </h3>
+                            <p className="text-gray-500">
+                                Choose a code layout from the list to view its configuration
+                            </p>
+                            <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+                                <div className="flex items-start space-x-3">
+                                    <Info className="w-5 h-5 text-blue-600 mt-0.5" />
+                                    <div className="text-left">
+                                        <h4 className="text-sm font-medium text-blue-900 mb-1">
+                                            Code-Based Layouts
+                                        </h4>
+                                        <p className="text-sm text-blue-700">
+                                            📝 <strong>Code layouts</strong> are defined in application code and provide better version control, IDE support, and easier distribution.
+                                        </p>
                                     </div>
                                 </div>
                             </div>
-                        )}
-                    </div>
+                        </div>
+                    )}
                 </div>
-            )}
+            </div>
         </div>
     )
 }

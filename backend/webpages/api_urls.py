@@ -10,7 +10,6 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     WebPageViewSet,
     PageVersionViewSet,
-    PageLayoutViewSet,
     CodeLayoutViewSet,
     PageThemeViewSet,
     WidgetTypeViewSet,
@@ -21,7 +20,7 @@ from .views import (
 router = DefaultRouter()
 router.register(r"pages", WebPageViewSet, basename="webpage")
 router.register(r"versions", PageVersionViewSet, basename="pageversion")
-router.register(r"layouts", PageLayoutViewSet, basename="pagelayout")
+# router.register(r"layouts", PageLayoutViewSet, basename="pagelayout")  # Removed - using code layouts only
 router.register(r"code-layouts", CodeLayoutViewSet, basename="codelayout")
 router.register(r"themes", PageThemeViewSet, basename="pagetheme")
 router.register(r"widget-types", WidgetTypeViewSet, basename="widgettype")

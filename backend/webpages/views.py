@@ -13,7 +13,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Q
 from django.utils import timezone
 
-from .models import WebPage, PageVersion, PageLayout, PageTheme, WidgetType
+from .models import WebPage, PageVersion, PageTheme, WidgetType
 from .serializers import (
     WebPageDetailSerializer,
     WebPageListSerializer,
@@ -21,7 +21,7 @@ from .serializers import (
     PageVersionSerializer,
     PageVersionListSerializer,
     PageVersionComparisonSerializer,
-    PageLayoutSerializer,
+    # PageLayoutSerializer removed - now using code-based layouts only
     PageThemeSerializer,
     WidgetTypeSerializer,
     # PageWidgetSerializer,  # Removed - widgets now in PageVersion
@@ -122,42 +122,10 @@ class CodeLayoutViewSet(viewsets.ViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-
-class PageLayoutViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet for managing database-based page layouts.
-    Provides CRUD operations for layout templates.
-
-    NOTE: This is for legacy database layouts. New layouts should use code-based system.
-    """
-
-    queryset = PageLayout.objects.all()
-    serializer_class = PageLayoutSerializer
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
-    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_fields = ["is_active", "created_by"]
-    search_fields = ["name", "description"]
-    ordering_fields = ["name", "created_at", "updated_at"]
-    ordering = ["name"]
-
-    def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
-
-    @action(detail=False, methods=["get"])
-    def active(self, request):
-        """Get only active database layouts"""
-        active_layouts = self.queryset.filter(is_active=True)
-        serializer = self.get_serializer(active_layouts, many=True)
-        return Response(serializer.data)
-
     @action(detail=False, methods=["get"])
     def all_layouts(self, request):
-        """Get both database and code-based layouts in unified format"""
+        """Get all code-based layouts (for backward compatibility)"""
         from .layout_registry import layout_registry
-
-        # Get database layouts
-        database_layouts = self.queryset.filter(is_active=True)
-        db_data = [layout.to_dict() for layout in database_layouts]
 
         # Get code layouts
         code_layouts = layout_registry.list_layouts(active_only=True)
@@ -165,11 +133,13 @@ class PageLayoutViewSet(viewsets.ModelViewSet):
 
         return Response(
             {
-                "database_layouts": db_data,
                 "code_layouts": code_data,
-                "all_layouts": db_data + code_data,
+                "all_layouts": code_data,  # For backward compatibility
             }
         )
+
+
+# PageLayoutViewSet removed - now using code-based layouts only
 
 
 class PageThemeViewSet(viewsets.ModelViewSet):
@@ -892,24 +862,24 @@ class WebPageViewSet(viewsets.ModelViewSet):
             "widgets_by_slot": {},
         }
 
-        # Determine effective layout
+        # Determine effective layout (code-based only)
         if layout_id:
-            try:
-                preview_layout = PageLayout.objects.get(id=layout_id)
-                preview_data["effective_layout"] = PageLayoutSerializer(
-                    preview_layout
-                ).data
-            except PageLayout.DoesNotExist:
+            # layout_id is now expected to be a code layout name
+            from .layout_registry import layout_registry
+
+            preview_layout = layout_registry.get_layout(layout_id)
+            if preview_layout:
+                preview_data["effective_layout"] = preview_layout.to_dict()
+            else:
+                # Fall back to page's effective layout
+                effective_layout = page.get_effective_layout()
                 preview_data["effective_layout"] = (
-                    PageLayoutSerializer(page.get_effective_layout()).data
-                    if page.get_effective_layout()
-                    else None
+                    effective_layout.to_dict() if effective_layout else None
                 )
         else:
+            effective_layout = page.get_effective_layout()
             preview_data["effective_layout"] = (
-                PageLayoutSerializer(page.get_effective_layout()).data
-                if page.get_effective_layout()
-                else None
+                effective_layout.to_dict() if effective_layout else None
             )
 
         # Determine effective theme
@@ -997,20 +967,22 @@ class WebPageViewSet(viewsets.ModelViewSet):
 
         # Serialize complex objects
         if inheritance_data["layout_info"]["effective_layout"]:
-            inheritance_data["layout_info"]["effective_layout"] = PageLayoutSerializer(
-                inheritance_data["layout_info"]["effective_layout"]
-            ).data
+            effective_layout = inheritance_data["layout_info"]["effective_layout"]
+            inheritance_data["layout_info"]["effective_layout"] = (
+                effective_layout.to_dict()
+                if hasattr(effective_layout, "to_dict")
+                else None
+            )
 
         if inheritance_data["theme_info"]["effective_theme"]:
             inheritance_data["theme_info"]["effective_theme"] = PageThemeSerializer(
                 inheritance_data["theme_info"]["effective_theme"]
             ).data
 
-        # Serialize override options QuerySets
+        # Serialize override options
         if "override_options" in inheritance_data["layout_info"]:
-            inheritance_data["layout_info"]["override_options"] = PageLayoutSerializer(
-                inheritance_data["layout_info"]["override_options"], many=True
-            ).data
+            # Code layouts only - already in correct format from model
+            pass
 
         if "override_options" in inheritance_data["theme_info"]:
             inheritance_data["theme_info"]["override_options"] = PageThemeSerializer(
@@ -1025,8 +997,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
                     "title": chain_item["page"].title,
                     "slug": chain_item["page"].slug,
                 }
-            if "layout" in chain_item and chain_item["layout"]:
-                chain_item["layout"] = PageLayoutSerializer(chain_item["layout"]).data
+            # Layout serialization removed - using code layouts only
 
         for chain_item in inheritance_data["theme_info"]["inheritance_chain"]:
             if "page" in chain_item and chain_item["page"]:
@@ -1078,7 +1049,13 @@ class WebPageViewSet(viewsets.ModelViewSet):
         try:
             # Convert override_value to model instance if needed
             if override_type == "layout" and override_value:
-                override_value = PageLayout.objects.get(id=override_value)
+                # For code layouts, override_value is the layout name, not an ID
+                # We'll validate it exists but keep it as string for code_layout field
+                from .layout_registry import layout_registry
+
+                if not layout_registry.is_registered(override_value):
+                    raise ValueError(f"Code layout '{override_value}' not found")
+                # Keep override_value as string for code_layout field
             elif override_type == "theme" and override_value:
                 override_value = PageTheme.objects.get(id=override_value)
 
@@ -1100,7 +1077,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-        except (PageLayout.DoesNotExist, PageTheme.DoesNotExist):
+        except (PageTheme.DoesNotExist, ValueError):
             return Response(
                 {"error": "Invalid override value"}, status=status.HTTP_404_NOT_FOUND
             )

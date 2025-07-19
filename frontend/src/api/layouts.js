@@ -45,50 +45,13 @@ export const layoutsApi = {
         }
     },
 
-    // Database layouts (legacy)
-    databaseLayouts: {
-        // Get all database layouts
-        list: async () => {
-            const response = await axios.get(`${API_BASE}/layouts/`)
-            return response.data
-        },
+    // Database layouts removed - now using code-based layouts only
 
-        // Get specific database layout
-        get: async (id) => {
-            const response = await axios.get(`${API_BASE}/layouts/${id}/`)
-            return response.data
-        },
-
-        // Create database layout
-        create: async (data) => {
-            const response = await axios.post(`${API_BASE}/layouts/`, data)
-            return response.data
-        },
-
-        // Update database layout
-        update: async (id, data) => {
-            const response = await axios.put(`${API_BASE}/layouts/${id}/`, data)
-            return response.data
-        },
-
-        // Delete database layout
-        delete: async (id) => {
-            const response = await axios.delete(`${API_BASE}/layouts/${id}/`)
-            return response.data
-        },
-
-        // Get active database layouts only
-        active: async () => {
-            const response = await axios.get(`${API_BASE}/layouts/active/`)
-            return response.data
-        }
-    },
-
-    // Combined layout operations
+    // Layout operations (code-based only)
     combined: {
-        // Get all layouts (both types)
+        // Get all code layouts
         listAll: async () => {
-            const response = await axios.get(`${API_BASE}/layouts/all_layouts/`)
+            const response = await axios.get(`${API_BASE}/code-layouts/all_layouts/`)
             return response.data
         },
 
@@ -102,21 +65,9 @@ export const layoutsApi = {
             if (allLayouts.code_layouts) {
                 allLayouts.code_layouts.forEach(layout => {
                     options.push({
-                        value: `code:${layout.name}`,
-                        label: `${layout.name} (Code)`,
+                        value: layout.name,
+                        label: layout.name,
                         type: 'code',
-                        layout: layout
-                    })
-                })
-            }
-
-            // Add database layouts
-            if (allLayouts.database_layouts) {
-                allLayouts.database_layouts.forEach(layout => {
-                    options.push({
-                        value: `db:${layout.id}`,
-                        label: `${layout.name} (Database)`,
-                        type: 'database',
                         layout: layout
                     })
                 })
@@ -126,18 +77,12 @@ export const layoutsApi = {
         }
     },
 
-    // Page operations with layout support
+    // Page operations with code layout support
     pages: {
-        // Update page layout (supports both types)
-        updateLayout: async (pageId, layoutData) => {
-            const data = {}
-
-            if (layoutData.type === 'code') {
-                data.code_layout = layoutData.name
-                data.layout_id = null  // Clear database layout
-            } else if (layoutData.type === 'database') {
-                data.layout_id = layoutData.id
-                data.code_layout = ''  // Clear code layout
+        // Update page layout (code-based only)
+        updateLayout: async (pageId, layoutName) => {
+            const data = {
+                code_layout: layoutName || ''
             }
 
             const response = await axios.patch(`${API_BASE}/pages/${pageId}/`, data)
@@ -151,7 +96,6 @@ export const layoutUtils = {
     // Determine layout type from a page object
     getPageLayoutType: (page) => {
         if (page.code_layout) return 'code'
-        if (page.layout) return 'database'
         return 'inherited'
     },
 
@@ -163,35 +107,32 @@ export const layoutUtils = {
         return 'No layout'
     },
 
-    // Check if layout can be edited
+    // Check if layout can be edited (code layouts are read-only)
     canEditLayout: (layout) => {
-        return layout.type === 'database'
+        return false  // Code layouts cannot be edited through UI
     },
 
     // Format layout for display
     formatLayoutForDisplay: (layout) => {
-        const typeIndicator = layout.type === 'code' ? '📝' : '🗄️'
-        const typeLabel = layout.type === 'code' ? 'Code' : 'Database'
-
         return {
             ...layout,
-            displayName: `${typeIndicator} ${layout.name}`,
-            typeLabel,
-            canEdit: layout.type === 'database',
-            canDelete: layout.type === 'database'
+            displayName: `📝 ${layout.name}`,
+            typeLabel: 'Code',
+            canEdit: false,
+            canDelete: false,
+            type: 'code'
         }
     },
 
-    // Parse layout selection value
+    // Parse layout selection value (simplified for code layouts)
     parseLayoutSelection: (value) => {
         if (!value) return null
 
-        const [type, identifier] = value.split(':')
         return {
-            type,
-            identifier,
-            isCode: type === 'code',
-            isDatabase: type === 'db'
+            type: 'code',
+            identifier: value,
+            isCode: true,
+            isDatabase: false
         }
     }
 } 

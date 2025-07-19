@@ -9,7 +9,7 @@ from django.contrib import admin
 from django.utils.html import format_html
 from django.urls import reverse
 from django.utils.safestring import mark_safe
-from .models import WebPage, PageVersion, PageLayout, PageTheme, WidgetType
+from .models import WebPage, PageVersion, PageTheme, WidgetType
 
 
 class HasHostnamesFilter(admin.SimpleListFilter):
@@ -33,29 +33,7 @@ class HasHostnamesFilter(admin.SimpleListFilter):
         return queryset
 
 
-@admin.register(PageLayout)
-class PageLayoutAdmin(admin.ModelAdmin):
-    list_display = ["name", "description", "is_active", "created_at", "created_by"]
-    list_filter = ["is_active", "created_at"]
-    search_fields = ["name", "description"]
-    readonly_fields = ["created_at", "updated_at"]
-
-    fieldsets = (
-        ("Basic Information", {"fields": ("name", "description", "is_active")}),
-        ("Layout Configuration", {"fields": ("slot_configuration", "css_classes")}),
-        (
-            "Metadata",
-            {
-                "fields": ("created_at", "updated_at", "created_by"),
-                "classes": ("collapse",),
-            },
-        ),
-    )
-
-    def save_model(self, request, obj, form, change):
-        if not change:  # Creating new object
-            obj.created_by = request.user
-        super().save_model(request, obj, form, change)
+# PageLayoutAdmin removed - now using code-based layouts only
 
 
 @admin.register(PageTheme)
@@ -150,7 +128,6 @@ class WebPageAdmin(admin.ModelAdmin):
         HasHostnamesFilter,
         "created_at",
         "updated_at",
-        "layout",
         "theme",
         "parent",
         ("parent", admin.RelatedOnlyFieldListFilter),
@@ -188,8 +165,8 @@ class WebPageAdmin(admin.ModelAdmin):
         (
             "Layout & Theme",
             {
-                "fields": ("layout", "theme"),
-                "description": "Leave blank to inherit from parent page",
+                "fields": ("code_layout", "theme"),
+                "description": "Specify code layout name or leave blank to inherit from parent page",
             },
         ),
         (
@@ -302,7 +279,7 @@ class WebPageAdmin(admin.ModelAdmin):
             for field in [
                 "title",
                 "description",
-                "layout",
+                "code_layout",
                 "theme",
                 "publication_status",
                 "hostnames",
