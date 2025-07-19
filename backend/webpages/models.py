@@ -741,37 +741,61 @@ class WebPage(models.Model):
                 "can_override": True,
             }
 
-            # Collect widgets from inheritance chain
+            # Collect widgets from inheritance chain using PageVersion data
             current = self
             while current:
-                page_widgets = current.widgets.filter(slot_name=slot_name).order_by(
-                    "sort_order"
-                )
+                # Get current version for this page
+                current_version = current.get_current_version()
+                page_widgets = []
+                has_overrides = False
 
-                for widget in page_widgets:
-                    widget_info = {
-                        "widget": widget,
-                        "page": current,
-                        "inherited_from": current if current != self else None,
-                        "is_override": widget.override_parent,
-                        "allows_inheritance": widget.inherit_from_parent,
-                    }
+                if current_version and current_version.widgets:
+                    # Filter widgets for this slot from JSON data
+                    widgets_data = current_version.widgets
+                    page_widgets = [
+                        w for w in widgets_data if w.get("slot_name") == slot_name
+                    ]
+                    # Sort by sort_order
+                    page_widgets = sorted(
+                        page_widgets, key=lambda w: w.get("sort_order", 0)
+                    )
 
-                    # If this is the original page or widget allows inheritance
-                    if current == self or widget.inherit_from_parent:
-                        # If this widget overrides, replace all previous widgets
-                        if widget.override_parent and current == self:
-                            inheritance_info[slot_name]["widgets"] = [widget_info]
-                        else:
-                            inheritance_info[slot_name]["widgets"].append(widget_info)
+                    for widget_data in page_widgets:
+                        widget_info = {
+                            "widget": widget_data,  # JSON data instead of model instance
+                            "page": current,
+                            "inherited_from": current if current != self else None,
+                            "is_override": widget_data.get("override_parent", False),
+                            "allows_inheritance": widget_data.get(
+                                "inherit_from_parent", False
+                            ),
+                        }
+
+                        # If this is the original page or widget allows inheritance
+                        if current == self or widget_data.get(
+                            "inherit_from_parent", False
+                        ):
+                            # If this widget overrides, replace all previous widgets
+                            if (
+                                widget_data.get("override_parent", False)
+                                and current == self
+                            ):
+                                inheritance_info[slot_name]["widgets"] = [widget_info]
+                            else:
+                                inheritance_info[slot_name]["widgets"].append(
+                                    widget_info
+                                )
+
+                    # Check for overrides in this page's widgets
+                    has_overrides = any(
+                        w.get("override_parent", False) for w in page_widgets
+                    )
 
                 inheritance_info[slot_name]["inheritance_chain"].append(
                     {
                         "page": current,
-                        "widgets_count": page_widgets.count(),
-                        "has_overrides": page_widgets.filter(
-                            override_parent=True
-                        ).exists(),
+                        "widgets_count": len(page_widgets),
+                        "has_overrides": has_overrides,
                     }
                 )
 
@@ -942,23 +966,13 @@ class WebPage(models.Model):
             "sort_order": self.sort_order,
         }
 
-        # Serialize widgets separately
-        widgets_data = [
-            {
-                "widget_type_id": w.widget_type_id,
-                "slot_name": w.slot_name,
-                "sort_order": w.sort_order,
-                "configuration": w.configuration,
-                "inherit_from_parent": w.inherit_from_parent,
-                "override_parent": w.override_parent,
-                "inheritance_behavior": w.inheritance_behavior,
-                "inheritance_conditions": w.inheritance_conditions,
-                "priority": w.priority,
-                "is_visible": w.is_visible,
-                "max_inheritance_depth": w.max_inheritance_depth,
-            }
-            for w in self.widgets.all()
-        ]
+        # Get widgets from current version (if exists) or start with empty list
+        current_version = self.get_current_version()
+        widgets_data = []
+        if current_version and current_version.widgets:
+            # Copy widgets from current version
+            widgets_data = current_version.widgets.copy()
+        # If no current version exists, widgets_data remains an empty list
 
         # Prepare version fields
         version_fields = {

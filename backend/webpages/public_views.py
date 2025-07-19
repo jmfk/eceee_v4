@@ -32,7 +32,6 @@ class PublishedPageMixin:
             )
             .filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
             .select_related("parent", "layout", "theme")
-            .prefetch_related("widgets__widget_type")
         )
 
 

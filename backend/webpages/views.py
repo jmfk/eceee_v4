@@ -369,7 +369,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
         WebPage.objects.select_related(
             "parent", "layout", "theme", "created_by", "last_modified_by"
         )
-        .prefetch_related("children", "widgets__widget_type")
+        .prefetch_related("children")
         .all()
     )
 
@@ -816,31 +816,45 @@ class WebPageViewSet(viewsets.ModelViewSet):
                 else None
             )
 
-        # Get widgets organized by slot (same logic as PageDetailView)
+        # Get widgets organized by slot from current version
         inherited_widgets = {}
         current = page
 
         while current:
-            for widget in current.widgets.all().order_by("sort_order"):
-                slot_name = widget.slot_name
+            # Get current version for this page
+            current_version = current.get_current_version()
+            if current_version and current_version.widgets:
+                # Process widgets from PageVersion JSON data
+                widgets_data = current_version.widgets
+                # Sort by sort_order (widgets are now JSON objects, not model instances)
+                widgets_data = sorted(
+                    widgets_data, key=lambda w: w.get("sort_order", 0)
+                )
 
-                if current == page or widget.inherit_from_parent:
-                    if slot_name not in inherited_widgets or (
-                        current == page and widget.override_parent
-                    ):
-                        if slot_name not in inherited_widgets:
-                            inherited_widgets[slot_name] = []
+                for widget_data in widgets_data:
+                    slot_name = widget_data.get("slot_name")
+                    inherit_from_parent = widget_data.get("inherit_from_parent", False)
+                    override_parent = widget_data.get("override_parent", False)
 
-                        widget_data = {
-                            "widget": PageWidgetSerializer(widget).data,
-                            "inherited_from": current.id if current != page else None,
-                            "is_override": widget.override_parent,
-                        }
+                    if current == page or inherit_from_parent:
+                        if slot_name not in inherited_widgets or (
+                            current == page and override_parent
+                        ):
+                            if slot_name not in inherited_widgets:
+                                inherited_widgets[slot_name] = []
 
-                        if widget.override_parent:
-                            inherited_widgets[slot_name] = [widget_data]
-                        else:
-                            inherited_widgets[slot_name].append(widget_data)
+                            widget_response = {
+                                "widget": widget_data,  # Use JSON data directly
+                                "inherited_from": (
+                                    current.id if current != page else None
+                                ),
+                                "is_override": override_parent,
+                            }
+
+                            if override_parent:
+                                inherited_widgets[slot_name] = [widget_response]
+                            else:
+                                inherited_widgets[slot_name].append(widget_response)
 
             current = current.parent
 
