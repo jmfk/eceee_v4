@@ -8,7 +8,7 @@ hierarchical filtering, date ranges, and publication status filtering.
 import django_filters
 from django.db.models import Q
 from django.utils import timezone
-from .models import WebPage, PageVersion, PageTheme, WidgetType
+from .models import WebPage, PageVersion, PageTheme
 
 
 class WebPageFilter(django_filters.FilterSet):
@@ -359,35 +359,4 @@ class PageThemeFilter(django_filters.FilterSet):
             return queryset.filter(webpage__isnull=True)
 
 
-class WidgetTypeFilter(django_filters.FilterSet):
-    """Filtering for WidgetType queryset"""
-
-    name = django_filters.CharFilter(lookup_expr="icontains")
-    description = django_filters.CharFilter(lookup_expr="icontains")
-    template_name = django_filters.CharFilter(lookup_expr="icontains")
-    is_active = django_filters.BooleanFilter()
-    created_by = django_filters.CharFilter(
-        field_name="created_by__username", lookup_expr="icontains"
-    )
-
-    # Date filters
-    created_after = django_filters.DateTimeFilter(
-        field_name="created_at", lookup_expr="gte"
-    )
-    created_before = django_filters.DateTimeFilter(
-        field_name="created_at", lookup_expr="lte"
-    )
-
-    # Usage filters
-    in_use = django_filters.BooleanFilter(method="filter_in_use")
-
-    class Meta:
-        model = WidgetType
-        fields = []
-
-    def filter_in_use(self, queryset, name, value):
-        """Filter widget types that are or aren't in use by page widgets"""
-        if value:
-            return queryset.filter(pagewidget__isnull=False).distinct()
-        else:
-            return queryset.filter(pagewidget__isnull=True)
+# WidgetTypeFilter removed - widget types are now code-based

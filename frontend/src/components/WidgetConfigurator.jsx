@@ -96,9 +96,9 @@ const WidgetConfigurator = ({
 
     // Initialize config with default values from schema
     useEffect(() => {
-        if (widgetType?.json_schema?.properties) {
+        if (widgetType?.configuration_schema?.properties) {
             const defaultConfig = {}
-            Object.entries(widgetType.json_schema.properties).forEach(([key, property]) => {
+            Object.entries(widgetType.configuration_schema.properties).forEach(([key, property]) => {
                 if (property.default !== undefined) {
                     defaultConfig[key] = property.default
                 }
@@ -116,10 +116,10 @@ const WidgetConfigurator = ({
     }, [config, widgetType])
 
     const validateConfig = () => {
-        if (!widgetType?.json_schema) return
+        if (!widgetType?.configuration_schema) return
 
         const newErrors = {}
-        const schema = widgetType.json_schema
+        const schema = widgetType.configuration_schema
         const required = schema.required || []
 
         // Check required fields
@@ -130,19 +130,57 @@ const WidgetConfigurator = ({
         })
 
         // Validate field types and constraints
-        Object.entries(schema.properties || {}).forEach(([key, property]) => {
-            const value = config[key]
-            if (value !== undefined && value !== null && value !== '') {
-                // Type validation
-                if (property.type === 'number' && isNaN(Number(value))) {
-                    newErrors[key] = 'Must be a valid number'
-                } else if (property.minimum !== undefined && Number(value) < property.minimum) {
-                    newErrors[key] = `Must be at least ${property.minimum}`
-                } else if (property.maximum !== undefined && Number(value) > property.maximum) {
-                    newErrors[key] = `Must be at most ${property.maximum}`
-                } else if (property.pattern && !new RegExp(property.pattern).test(value)) {
-                    newErrors[key] = 'Invalid format'
-                }
+        Object.entries(schema.properties || {}).forEach(([fieldName, property]) => {
+            const value = config[fieldName]
+            if (value === undefined || value === null) return
+
+            // Type validation
+            switch (property.type) {
+                case 'string':
+                    if (typeof value !== 'string') {
+                        newErrors[fieldName] = 'Must be a string'
+                    } else {
+                        // String constraints
+                        if (property.minLength && value.length < property.minLength) {
+                            newErrors[fieldName] = `Must be at least ${property.minLength} characters`
+                        }
+                        if (property.maxLength && value.length > property.maxLength) {
+                            newErrors[fieldName] = `Must be no more than ${property.maxLength} characters`
+                        }
+                        if (property.pattern) {
+                            const regex = new RegExp(property.pattern)
+                            if (!regex.test(value)) {
+                                newErrors[fieldName] = 'Invalid format'
+                            }
+                        }
+                        if (property.enum && !property.enum.includes(value)) {
+                            newErrors[fieldName] = `Must be one of: ${property.enum.join(', ')}`
+                        }
+                    }
+                    break
+                case 'number':
+                case 'integer':
+                    if (typeof value !== 'number' || (property.type === 'integer' && !Number.isInteger(value))) {
+                        newErrors[fieldName] = `Must be ${property.type === 'integer' ? 'an integer' : 'a number'}`
+                    } else {
+                        if (property.minimum !== undefined && value < property.minimum) {
+                            newErrors[fieldName] = `Must be at least ${property.minimum}`
+                        }
+                        if (property.maximum !== undefined && value > property.maximum) {
+                            newErrors[fieldName] = `Must be no more than ${property.maximum}`
+                        }
+                    }
+                    break
+                case 'boolean':
+                    if (typeof value !== 'boolean') {
+                        newErrors[fieldName] = 'Must be true or false'
+                    }
+                    break
+                case 'array':
+                    if (!Array.isArray(value)) {
+                        newErrors[fieldName] = 'Must be an array'
+                    }
+                    break
             }
         })
 
@@ -187,7 +225,7 @@ const WidgetConfigurator = ({
     const renderField = (fieldName, property) => {
         const value = config[fieldName] || ''
         const hasError = errors[fieldName]
-        const isRequired = widgetType?.json_schema?.required?.includes(fieldName)
+        const isRequired = widgetType?.configuration_schema?.required?.includes(fieldName)
 
         const baseClasses = `w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${hasError ? 'border-red-300 focus:border-red-500' : 'border-gray-300 focus:border-transparent'
             }`
@@ -203,7 +241,7 @@ const WidgetConfigurator = ({
                         onChange={(e) => handleFieldChange(fieldName, e.target.checked)}
                         className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                     />
-                    <span className="text-sm text-gray-700">{property.title}</span>
+                    <span className="text-sm text-gray-700">{property.title || fieldName.charAt(0).toUpperCase() + fieldName.slice(1).replace(/_/g, ' ')}</span>
                 </label>
             )
         } else if (property.enum) {
@@ -213,7 +251,7 @@ const WidgetConfigurator = ({
                     onChange={(e) => handleFieldChange(fieldName, e.target.value)}
                     className={baseClasses}
                 >
-                    <option value="">Select {property.title}</option>
+                    <option value="">Select {property.title || fieldName.charAt(0).toUpperCase() + fieldName.slice(1).replace(/_/g, ' ')}</option>
                     {property.enum.map(option => (
                         <option key={option} value={option}>
                             {option.charAt(0).toUpperCase() + option.slice(1)}
@@ -269,7 +307,7 @@ const WidgetConfigurator = ({
                 {property.type !== 'boolean' && (
                     <label className="block">
                         <span className="text-sm font-medium text-gray-700">
-                            {property.title}
+                            {property.title || fieldName.charAt(0).toUpperCase() + fieldName.slice(1).replace(/_/g, ' ')}
                             {isRequired && <span className="text-red-500 ml-1">*</span>}
                         </span>
                     </label>
@@ -564,7 +602,7 @@ const WidgetConfigurator = ({
         )
     }
 
-    const schema = widgetType.json_schema
+    const schema = widgetType.configuration_schema
     const properties = schema?.properties || {}
 
     return (

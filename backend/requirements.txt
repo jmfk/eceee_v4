@@ -17,6 +17,7 @@ drf-spectacular>=0.26.0
 
 # JSON Schema validation
 jsonschema>=4.21.1
+pydantic>=2.5.0
 
 # HTMX integration
 django-htmx>=1.16.0

@@ -28,10 +28,10 @@ class WidgetCommand {
 }
 
 export class AddWidgetCommand extends WidgetCommand {
-    constructor(apiClient, { pageId, widgetTypeId, slotName, configuration, ...inheritanceSettings }) {
+    constructor(apiClient, { pageId, widgetTypeName, slotName, configuration, ...inheritanceSettings }) {
         super(apiClient)
         this.pageId = pageId
-        this.widgetTypeId = widgetTypeId
+        this.widgetTypeName = widgetTypeName
         this.slotName = slotName
         this.configuration = configuration
         this.inheritanceSettings = inheritanceSettings
@@ -41,7 +41,7 @@ export class AddWidgetCommand extends WidgetCommand {
         try {
             const response = await this.apiClient.post('/api/v1/webpages/widgets/', {
                 page: this.pageId,
-                widget_type: this.widgetTypeId,
+                widget_type: this.widgetTypeName,
                 slot_name: this.slotName,
                 configuration: this.configuration,
                 ...this.inheritanceSettings
@@ -53,27 +53,48 @@ export class AddWidgetCommand extends WidgetCommand {
             this.handleError(error, 'Failed to add widget')
         }
     }
+
+    async undo() {
+        // Implementation would require storing the created widget ID
+        // This is typically handled by the calling component
+        throw new Error('Undo not implemented for AddWidgetCommand')
+    }
 }
 
 export class UpdateWidgetCommand extends WidgetCommand {
-    constructor(apiClient, { widgetId, configuration, ...inheritanceSettings }) {
+    constructor(apiClient, { widgetId, updates }) {
         super(apiClient)
         this.widgetId = widgetId
-        this.configuration = configuration
-        this.inheritanceSettings = inheritanceSettings
+        this.updates = updates
+        this.previousState = null
     }
 
     async execute() {
         try {
-            const response = await this.apiClient.patch(`/api/v1/webpages/widgets/${this.widgetId}/`, {
-                configuration: this.configuration,
-                ...this.inheritanceSettings
-            })
+            // Store previous state for undo
+            const currentWidget = await this.apiClient.get(`/api/v1/webpages/widgets/${this.widgetId}/`)
+            this.previousState = currentWidget.data
+
+            const response = await this.apiClient.patch(`/api/v1/webpages/widgets/${this.widgetId}/`, this.updates)
 
             this.handleSuccess('Widget updated successfully')
             return response.data
         } catch (error) {
             this.handleError(error, 'Failed to update widget')
+        }
+    }
+
+    async undo() {
+        if (!this.previousState) {
+            throw new Error('No previous state available for undo')
+        }
+
+        try {
+            const response = await this.apiClient.patch(`/api/v1/webpages/widgets/${this.widgetId}/`, this.previousState)
+            this.handleSuccess('Widget update undone')
+            return response.data
+        } catch (error) {
+            this.handleError(error, 'Failed to undo widget update')
         }
     }
 }
@@ -82,15 +103,38 @@ export class DeleteWidgetCommand extends WidgetCommand {
     constructor(apiClient, { widgetId }) {
         super(apiClient)
         this.widgetId = widgetId
+        this.deletedWidget = null
     }
 
     async execute() {
         try {
+            // Store widget data for potential undo
+            const widget = await this.apiClient.get(`/api/v1/webpages/widgets/${this.widgetId}/`)
+            this.deletedWidget = widget.data
+
             await this.apiClient.delete(`/api/v1/webpages/widgets/${this.widgetId}/`)
+
             this.handleSuccess('Widget deleted successfully')
-            return true
+            return { deleted: true, widgetId: this.widgetId }
         } catch (error) {
             this.handleError(error, 'Failed to delete widget')
+        }
+    }
+
+    async undo() {
+        if (!this.deletedWidget) {
+            throw new Error('No deleted widget data available for undo')
+        }
+
+        try {
+            // Recreate the widget
+            const { id, created_at, updated_at, ...widgetData } = this.deletedWidget
+            const response = await this.apiClient.post('/api/v1/webpages/widgets/', widgetData)
+
+            this.handleSuccess('Widget deletion undone')
+            return response.data
+        } catch (error) {
+            this.handleError(error, 'Failed to undo widget deletion')
         }
     }
 }

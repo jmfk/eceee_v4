@@ -117,32 +117,86 @@ describe('SlotManager', () => {
 
     beforeEach(() => {
         vi.clearAllMocks()
+
+        // Mock axios responses for new code-based widget system
         mockedAxios.get.mockImplementation((url) => {
-            // Handle version API calls
-            if (url.includes('/api/v1/webpages/versions/') && url.includes('is_current=true')) {
-                return Promise.resolve({
-                    data: {
-                        results: [mockCurrentVersion],
-                        count: 1
-                    }
-                })
-            }
             if (url.includes('widget-types')) {
-                // Mock paginated response for widget-types
+                // Return direct array instead of paginated response for new API
+                return Promise.resolve({
+                    data: [
+                        {
+                            name: "Text Block",
+                            description: "A simple text content widget",
+                            template_name: "webpages/widgets/text_block.html",
+                            is_active: true,
+                            configuration_schema: {
+                                type: "object",
+                                properties: {
+                                    content: { type: "string", description: "Text content" },
+                                    alignment: {
+                                        type: "string",
+                                        enum: ["left", "center", "right"],
+                                        default: "left"
+                                    }
+                                },
+                                required: ["content"]
+                            }
+                        },
+                        {
+                            name: "Image",
+                            description: "Display an image with optional caption",
+                            template_name: "webpages/widgets/image.html",
+                            is_active: true,
+                            configuration_schema: {
+                                type: "object",
+                                properties: {
+                                    image_url: { type: "string", description: "Image URL" },
+                                    alt_text: { type: "string", description: "Alt text" }
+                                },
+                                required: ["image_url", "alt_text"]
+                            }
+                        }
+                    ]
+                })
+            }
+
+            if (url.includes('page-widgets')) {
                 return Promise.resolve({
                     data: {
-                        count: mockWidgetTypes.length,
-                        next: null,
-                        previous: null,
-                        results: mockWidgetTypes
+                        widgets: [
+                            {
+                                id: 1,
+                                widget_type: "Text Block",
+                                slot_name: "main",
+                                sort_order: 0,
+                                configuration: {
+                                    content: "Sample text content",
+                                    alignment: "left"
+                                },
+                                is_visible: true
+                            },
+                            {
+                                id: 2,
+                                widget_type: "Image",
+                                slot_name: "sidebar",
+                                sort_order: 0,
+                                configuration: {
+                                    image_url: "https://example.com/image.jpg",
+                                    alt_text: "Sample image"
+                                },
+                                is_visible: true
+                            }
+                        ]
                     }
                 })
             }
-            return Promise.resolve({ data: { results: [], count: 0 } })
+
+            return Promise.reject(new Error(`Unmocked URL: ${url}`))
         })
-        mockedAxios.post.mockResolvedValue({ data: mockCurrentVersion })
-        mockedAxios.patch.mockResolvedValue({ data: mockCurrentVersion })
-        mockedAxios.delete.mockResolvedValue({ data: {} })
+
+        mockedAxios.post.mockResolvedValue({ data: { success: true } })
+        mockedAxios.patch.mockResolvedValue({ data: { success: true } })
+        mockedAxios.delete.mockResolvedValue({ data: { success: true } })
     })
 
     it('renders layout information', async () => {

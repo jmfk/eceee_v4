@@ -17,24 +17,20 @@ import {
     ImageIcon
 } from 'lucide-react'
 import axios from 'axios'
-import CustomWidgetCreator from './CustomWidgetCreator'
 
 const WidgetLibrary = ({ onSelectWidget, selectedWidgetTypes = [] }) => {
     const [searchTerm, setSearchTerm] = useState('')
     const [filterCategory, setFilterCategory] = useState('all')
-    const [showCustomCreator, setShowCustomCreator] = useState(false)
 
-    // Fetch available widget types
-    const { data: widgetTypesResponse, isLoading, error } = useQuery({
+    // Fetch available widget types - now returns direct array instead of paginated results
+    const { data: widgetTypes, isLoading, error } = useQuery({
         queryKey: ['widget-types'],
         queryFn: async () => {
             const response = await axios.get('/api/v1/webpages/widget-types/')
-            return response.data
+            // New API returns direct array, filter active ones
+            return response.data?.filter(widget => widget.is_active) || []
         }
     })
-
-    // Extract widget types array from paginated response and filter active ones
-    const widgetTypes = widgetTypesResponse?.results?.filter(widget => widget.is_active) || []
 
     // Widget type icons mapping
     const getWidgetIcon = (widgetName) => {
@@ -70,163 +66,161 @@ const WidgetLibrary = ({ onSelectWidget, selectedWidgetTypes = [] }) => {
         const matchesSearch = widget.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             widget.description.toLowerCase().includes(searchTerm.toLowerCase())
 
-        const matchesFilter = filterCategory === 'all' ||
-            widget.name.toLowerCase().includes(filterCategory)
+        const matchesCategory = filterCategory === 'all' ||
+            getCategoryForWidget(widget.name) === filterCategory
 
-        return matchesSearch && matchesFilter
+        return matchesSearch && matchesCategory
     }) || []
 
-    const categories = [
-        { value: 'all', label: 'All Widgets' },
-        { value: 'text', label: 'Text' },
-        { value: 'image', label: 'Media' },
-        { value: 'button', label: 'Interactive' },
-        { value: 'spacer', label: 'Layout' },
-        { value: 'html', label: 'Advanced' }
-    ]
+    // Get category for widget (for filtering)
+    const getCategoryForWidget = (widgetName) => {
+        const name = widgetName.toLowerCase()
+        if (['text block', 'html block'].includes(name)) return 'content'
+        if (['image', 'gallery'].includes(name)) return 'media'
+        if (['button', 'forms'].includes(name)) return 'interactive'
+        if (['news', 'events', 'calendar'].includes(name)) return 'dynamic'
+        if (['spacer'].includes(name)) return 'layout'
+        return 'other'
+    }
+
+    // Get unique categories for filter
+    const categories = ['all', ...new Set(widgetTypes?.map(w => getCategoryForWidget(w.name)) || [])]
 
     if (isLoading) {
         return (
-            <div className="bg-white rounded-lg shadow p-6">
-                <div className="animate-pulse space-y-4">
-                    <div className="h-6 bg-gray-200 rounded w-1/3"></div>
-                    <div className="space-y-3">
-                        {[...Array(5)].map((_, i) => (
-                            <div key={i} className="h-16 bg-gray-200 rounded"></div>
-                        ))}
-                    </div>
-                </div>
+            <div className="flex justify-center items-center p-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                <span className="ml-2 text-gray-600">Loading widget types...</span>
             </div>
         )
     }
 
     if (error) {
         return (
-            <div className="bg-white rounded-lg shadow p-6">
-                <div className="text-center text-red-600">
-                    <p>Error loading widget types: {error.message}</p>
-                </div>
+            <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                <h3 className="text-red-800 font-medium">Error Loading Widget Types</h3>
+                <p className="text-red-600 text-sm mt-1">{error.message}</p>
             </div>
         )
     }
 
     return (
-        <div className="bg-white rounded-lg shadow">
-            {/* Header */}
-            <div className="p-4 border-b border-gray-200">
-                <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-medium text-gray-900">Widget Library</h3>
-                    <button
-                        onClick={() => setShowCustomCreator(true)}
-                        className="flex items-center gap-2 px-3 py-2 bg-purple-600 text-white text-sm rounded-md hover:bg-purple-700 transition-colors"
-                        title="Create Custom Widget"
-                    >
-                        <Plus size={16} />
-                        Custom
-                    </button>
+        <div className="space-y-4">
+            {/* Search and Filter Controls */}
+            <div className="space-y-3">
+                <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                    <input
+                        type="text"
+                        placeholder="Search widget types..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
                 </div>
 
-                {/* Search and Filter */}
-                <div className="space-y-3">
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                        <input
-                            type="text"
-                            placeholder="Search widgets..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        />
-                    </div>
-
-                    <div className="relative">
-                        <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                        <select
-                            value={filterCategory}
-                            onChange={(e) => setFilterCategory(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none"
-                        >
-                            {categories.map(category => (
-                                <option key={category.value} value={category.value}>
-                                    {category.label}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
+                <div className="flex items-center space-x-2">
+                    <Filter className="h-4 w-4 text-gray-500" />
+                    <select
+                        value={filterCategory}
+                        onChange={(e) => setFilterCategory(e.target.value)}
+                        className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                        {categories.map(category => (
+                            <option key={category} value={category}>
+                                {category.charAt(0).toUpperCase() + category.slice(1)}
+                            </option>
+                        ))}
+                    </select>
                 </div>
             </div>
 
-            {/* Widget List */}
-            <div className="max-h-96 overflow-y-auto">
-                {filteredWidgets.length > 0 ? (
-                    <div className="divide-y divide-gray-200">
-                        {filteredWidgets.map((widget) => {
-                            const IconComponent = getWidgetIcon(widget.name)
-                            const isSelected = selectedWidgetTypes.includes(widget.id)
+            {/* Widget Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-96 overflow-y-auto">
+                {filteredWidgets.map((widgetType) => {
+                    const IconComponent = getWidgetIcon(widgetType.name)
+                    const isSelected = selectedWidgetTypes.some(selected => selected.name === widgetType.name)
 
-                            return (
-                                <div
-                                    key={widget.id}
-                                    onClick={() => onSelectWidget && onSelectWidget(widget)}
-                                    className={`p-4 cursor-pointer hover:bg-gray-50 transition-colors ${isSelected ? 'bg-blue-50 border-r-4 border-blue-500' : ''
-                                        }`}
-                                >
-                                    <div className="flex items-start space-x-3">
-                                        <div className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center ${isSelected ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600'
-                                            }`}>
-                                            <IconComponent className="w-5 h-5" />
-                                        </div>
-
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center justify-between">
-                                                <h4 className={`font-medium truncate ${isSelected ? 'text-blue-900' : 'text-gray-900'
-                                                    }`}>
-                                                    {widget.name}
-                                                </h4>
-                                                {onSelectWidget && (
-                                                    <Plus className="w-4 h-4 text-gray-400 ml-2 flex-shrink-0" />
-                                                )}
-                                            </div>
-                                            <p className="text-sm text-gray-500 mt-1 line-clamp-2">
-                                                {widget.description}
-                                            </p>
-                                        </div>
+                    return (
+                        <button
+                            key={widgetType.name}
+                            onClick={() => onSelectWidget(widgetType)}
+                            disabled={isSelected}
+                            className={`
+                                p-4 border rounded-lg text-left transition-all
+                                ${isSelected
+                                    ? 'border-green-300 bg-green-50 cursor-not-allowed'
+                                    : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50 cursor-pointer'
+                                }
+                            `}
+                        >
+                            <div className="flex items-start space-x-3">
+                                <div className={`
+                                    p-2 rounded-lg
+                                    ${isSelected ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-600'}
+                                `}>
+                                    <IconComponent className="h-5 w-5" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <h3 className={`
+                                        font-medium text-sm
+                                        ${isSelected ? 'text-green-800' : 'text-gray-900'}
+                                    `}>
+                                        {widgetType.name}
+                                        {isSelected && (
+                                            <span className="ml-2 text-xs text-green-600">(Selected)</span>
+                                        )}
+                                    </h3>
+                                    <p className={`
+                                        text-xs mt-1 line-clamp-2
+                                        ${isSelected ? 'text-green-600' : 'text-gray-500'}
+                                    `}>
+                                        {widgetType.description}
+                                    </p>
+                                    <div className="mt-2">
+                                        <span className={`
+                                            inline-block px-2 py-1 text-xs rounded-full
+                                            ${isSelected
+                                                ? 'bg-green-100 text-green-700'
+                                                : 'bg-gray-100 text-gray-600'
+                                            }
+                                        `}>
+                                            {getCategoryForWidget(widgetType.name)}
+                                        </span>
                                     </div>
                                 </div>
-                            )
-                        })}
-                    </div>
-                ) : (
-                    <div className="p-8 text-center text-gray-500">
-                        <Grid3X3 className="w-8 h-8 mx-auto mb-2" />
-                        <p>No widgets found</p>
-                        {searchTerm && (
-                            <p className="text-sm mt-1">
-                                Try adjusting your search terms or filters
-                            </p>
-                        )}
-                    </div>
-                )}
+                            </div>
+                        </button>
+                    )
+                })}
             </div>
 
-            {/* Footer */}
-            {filteredWidgets.length > 0 && (
-                <div className="p-3 border-t border-gray-200 text-xs text-gray-500 text-center">
-                    {filteredWidgets.length} widget{filteredWidgets.length !== 1 ? 's' : ''} available
+            {filteredWidgets.length === 0 && (
+                <div className="text-center py-8">
+                    <Grid3X3 className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                    <h3 className="text-gray-500 font-medium">No widget types found</h3>
+                    <p className="text-gray-400 text-sm mt-1">
+                        {searchTerm || filterCategory !== 'all'
+                            ? 'Try adjusting your search or filter criteria'
+                            : 'No widget types are available'
+                        }
+                    </p>
                 </div>
             )}
 
-            {/* Custom Widget Creator Modal */}
-            {showCustomCreator && (
-                <CustomWidgetCreator
-                    onClose={() => setShowCustomCreator(false)}
-                    onWidgetCreated={(widget) => {
-                        setShowCustomCreator(false)
-                        // Optionally auto-select the new widget
-                        onSelectWidget?.(widget)
-                    }}
-                />
-            )}
+            {/* Info about code-based widgets */}
+            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-start space-x-2">
+                    <Code className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                    <div>
+                        <p className="text-blue-800 text-sm font-medium">Code-Based Widget Types</p>
+                        <p className="text-blue-600 text-xs mt-1">
+                            Widget types are now defined in code for better maintainability and type safety.
+                            Custom widgets can be added by developers through the codebase.
+                        </p>
+                    </div>
+                </div>
+            </div>
         </div>
     )
 }

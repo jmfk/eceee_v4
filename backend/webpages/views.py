@@ -13,7 +13,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Q
 from django.utils import timezone
 
-from .models import WebPage, PageVersion, PageTheme, WidgetType
+from .models import WebPage, PageVersion, PageTheme
 from .serializers import (
     WebPageDetailSerializer,
     WebPageListSerializer,
@@ -23,7 +23,7 @@ from .serializers import (
     PageVersionComparisonSerializer,
     # PageLayoutSerializer removed - now using code-based layouts only
     PageThemeSerializer,
-    WidgetTypeSerializer,
+    # WidgetTypeSerializer removed - widget types are now code-based
     # PageWidgetSerializer,  # Removed - widgets now in PageVersion
     PageHierarchySerializer,
 )
@@ -168,44 +168,88 @@ class PageThemeViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
 
-class WidgetTypeViewSet(viewsets.ModelViewSet):
+class WidgetTypeViewSet(viewsets.ViewSet):
     """
-    ViewSet for managing widget types.
-    Provides CRUD operations for widget type definitions.
+    ViewSet for code-based widget types.
+    Provides read-only access to widget type definitions and configuration utilities.
     """
 
-    queryset = WidgetType.objects.all()
-    serializer_class = WidgetTypeSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
-    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_fields = ["is_active", "created_by"]
-    search_fields = ["name", "description", "template_name"]
-    ordering_fields = ["name", "created_at", "updated_at"]
-    ordering = ["name"]
 
-    def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+    def list(self, request):
+        """List all registered widget types"""
+        from .widget_registry import widget_type_registry
+
+        # Get active parameter from query string
+        active_only = request.query_params.get("active", "true").lower() == "true"
+
+        widget_types = widget_type_registry.to_dict(active_only=active_only)
+
+        # Apply search filter if provided
+        search = request.query_params.get("search")
+        if search:
+            search_lower = search.lower()
+            widget_types = [
+                wt
+                for wt in widget_types
+                if search_lower in wt["name"].lower()
+                or search_lower in wt["description"].lower()
+            ]
+
+        # Apply ordering
+        ordering = request.query_params.get("ordering", "name")
+        if ordering.startswith("-"):
+            reverse_order = True
+            ordering = ordering[1:]
+        else:
+            reverse_order = False
+
+        if ordering in ["name", "description"]:
+            widget_types.sort(key=lambda x: x.get(ordering, ""), reverse=reverse_order)
+
+        return Response(widget_types)
+
+    def retrieve(self, request, pk=None):
+        """Get a specific widget type by name"""
+        from .widget_registry import widget_type_registry
+
+        widget_type = widget_type_registry.get_widget_type(pk)
+        if not widget_type:
+            return Response(
+                {"error": f"Widget type '{pk}' not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        return Response(widget_type.to_dict())
 
     @action(detail=False, methods=["get"])
     def active(self, request):
         """Get only active widget types"""
-        active_types = self.queryset.filter(is_active=True)
-        serializer = self.get_serializer(active_types, many=True)
-        return Response(serializer.data)
+        from .widget_registry import widget_type_registry
+
+        active_types = widget_type_registry.to_dict(active_only=True)
+        return Response(active_types)
 
     @action(detail=True, methods=["post"])
     def validate_configuration(self, request, pk=None):
         """
-        Validate a widget configuration against this widget type's schema.
+        Validate a widget configuration against this widget type's pydantic model.
 
         POST body should contain:
         {
             "configuration": { ... widget configuration data ... }
         }
         """
-        widget_type = self.get_object()
-        configuration = request.data.get("configuration", {})
+        from .widget_registry import widget_type_registry
 
+        widget_type = widget_type_registry.get_widget_type(pk)
+        if not widget_type:
+            return Response(
+                {"error": f"Widget type '{pk}' not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        configuration = request.data.get("configuration", {})
         is_valid, errors = widget_type.validate_configuration(configuration)
 
         return Response(
@@ -215,234 +259,34 @@ class WidgetTypeViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["get"])
     def configuration_defaults(self, request, pk=None):
         """Get default configuration values for this widget type"""
-        widget_type = self.get_object()
+        from .widget_registry import widget_type_registry
+
+        widget_type = widget_type_registry.get_widget_type(pk)
+        if not widget_type:
+            return Response(
+                {"error": f"Widget type '{pk}' not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
         defaults = widget_type.get_configuration_defaults()
+        schema = widget_type.configuration_model.model_json_schema()
 
-        return Response({"defaults": defaults, "schema": widget_type.json_schema})
+        return Response({"defaults": defaults, "schema": schema})
 
-    @action(detail=True, methods=["post"])
-    def preview(self, request, pk=None):
-        """
-        Generate a preview of a widget with given configuration.
+    @action(detail=True, methods=["get"])
+    def schema(self, request, pk=None):
+        """Get the JSON schema for this widget type's configuration"""
+        from .widget_registry import widget_type_registry
 
-        POST body should contain:
-        {
-            "configuration": { ... widget configuration data ... },
-            "context": { ... optional context data ... }
-        }
-        """
-        widget_type = self.get_object()
-        configuration = request.data.get("configuration", {})
-        context = request.data.get("context", {})
-
-        # Validate configuration first
-        is_valid, errors = widget_type.validate_configuration(configuration)
-        if not is_valid:
+        widget_type = widget_type_registry.get_widget_type(pk)
+        if not widget_type:
             return Response(
-                {"error": "Invalid configuration", "validation_errors": errors},
-                status=status.HTTP_400_BAD_REQUEST,
+                {"error": f"Widget type '{pk}' not found"},
+                status=status.HTTP_404_NOT_FOUND,
             )
 
-        # Create a temporary widget data structure for rendering
-        from .renderers import WidgetRendererRegistry
-
-        # Simple widget data structure for rendering (replaces PageWidget)
-        class TempWidget:
-            def __init__(self, widget_type, configuration, slot_name, sort_order):
-                self.widget_type = widget_type
-                self.configuration = configuration
-                self.slot_name = slot_name
-                self.sort_order = sort_order
-
-        temp_widget = TempWidget(
-            widget_type=widget_type,
-            configuration=configuration,
-            slot_name=context.get("slot_name", "preview"),
-            sort_order=0,
-        )
-
-        try:
-            # Render the widget
-            rendered_html = WidgetRendererRegistry.render_widget(temp_widget, context)
-
-            return Response(
-                {
-                    "widget_type": widget_type.name,
-                    "configuration": configuration,
-                    "rendered_html": rendered_html,
-                    "template_name": widget_type.template_name,
-                }
-            )
-
-        except Exception as e:
-            return Response(
-                {"error": "Rendering failed", "details": str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-
-    @action(detail=False, methods=["post"])
-    def create_custom(self, request):
-        """
-        Create a custom widget type with template and schema.
-
-        POST body should contain:
-        {
-            "name": "My Custom Widget",
-            "description": "Description of the widget",
-            "template_content": "<div>{{ config.title }}</div>",
-            "schema_properties": {
-                "title": {"type": "string", "title": "Title"}
-            },
-            "required_fields": ["title"]
-        }
-        """
-        name = request.data.get("name")
-        description = request.data.get("description", "")
-        template_content = request.data.get("template_content")
-        schema_properties = request.data.get("schema_properties", {})
-        required_fields = request.data.get("required_fields", [])
-
-        if not all([name, template_content]):
-            return Response(
-                {"error": "name and template_content are required"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        # Generate template filename
-        template_name = f"webpages/widgets/custom_{name.lower().replace(' ', '_')}.html"
-
-        # Generate JSON schema
-        json_schema = {
-            "type": "object",
-            "properties": schema_properties,
-            "required": required_fields,
-        }
-
-        # Validate template content (basic validation)
-        if not self._validate_template_content(template_content):
-            return Response(
-                {"error": "Invalid template content"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        try:
-            # Create the widget type
-            widget_type = WidgetType.objects.create(
-                name=name,
-                description=description,
-                json_schema=json_schema,
-                template_name=template_name,
-                created_by=request.user,
-            )
-
-            # Save template content to file
-            self._save_template_file(template_name, template_content)
-
-            serializer = self.get_serializer(widget_type)
-            return Response(
-                {
-                    "widget_type": serializer.data,
-                    "template_saved": True,
-                    "message": "Custom widget type created successfully",
-                },
-                status=status.HTTP_201_CREATED,
-            )
-
-        except Exception as e:
-            return Response(
-                {"error": "Failed to create custom widget type", "details": str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-
-    @action(detail=False, methods=["post"])
-    def generate_schema(self, request):
-        """
-        Helper endpoint to generate JSON schema from form fields.
-
-        POST body should contain:
-        {
-            "fields": [
-                {
-                    "name": "title",
-                    "type": "string",
-                    "title": "Title",
-                    "required": true,
-                    "default": "Default Title"
-                }
-            ]
-        }
-        """
-        fields = request.data.get("fields", [])
-
-        properties = {}
-        required = []
-
-        for field in fields:
-            field_name = field.get("name")
-            field_type = field.get("type", "string")
-            field_title = field.get("title", field_name)
-            field_default = field.get("default")
-            field_required = field.get("required", False)
-
-            if not field_name:
-                continue
-
-            property_schema = {"type": field_type, "title": field_title}
-
-            if field_default is not None:
-                property_schema["default"] = field_default
-
-            if field.get("description"):
-                property_schema["description"] = field["description"]
-
-            if field.get("enum"):
-                property_schema["enum"] = field["enum"]
-
-            if field.get("format"):
-                property_schema["format"] = field["format"]
-
-            properties[field_name] = property_schema
-
-            if field_required:
-                required.append(field_name)
-
-        schema = {"type": "object", "properties": properties, "required": required}
-
-        return Response(
-            {
-                "schema": schema,
-                "properties_count": len(properties),
-                "required_count": len(required),
-            }
-        )
-
-    def _validate_template_content(self, content):
-        """Basic validation of Django template content"""
-        try:
-            from django.template import Template, Context
-
-            # Try to parse the template
-            template = Template(content)
-            # Try to render with dummy context
-            template.render(Context({"config": {}}))
-            return True
-        except Exception:
-            return False
-
-    def _save_template_file(self, template_name, content):
-        """Save template content to file"""
-        import os
-        from django.conf import settings
-
-        # Calculate full template path
-        template_path = os.path.join(settings.BASE_DIR, "templates", template_name)
-
-        # Create directory if it doesn't exist
-        os.makedirs(os.path.dirname(template_path), exist_ok=True)
-
-        # Write template content
-        with open(template_path, "w", encoding="utf-8") as f:
-            f.write(content)
+        schema = widget_type.configuration_model.model_json_schema()
+        return Response({"widget_type": widget_type.name, "schema": schema})
 
 
 class WebPageViewSet(viewsets.ModelViewSet):

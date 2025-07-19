@@ -1,219 +1,222 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import axios from 'axios'
 import WidgetLibrary from '../WidgetLibrary'
 
 // Mock axios
-vi.mock('axios')
+jest.mock('axios')
 const mockedAxios = axios
 
-// Mock data
-const mockWidgetTypes = [
-    {
-        id: 1,
-        name: 'Text Block',
-        description: 'Rich text content block with title and formatting options',
-        is_active: true,
-    },
-    {
-        id: 2,
-        name: 'Image',
-        description: 'Image display with caption and sizing options',
-        is_active: true,
-    },
-    {
-        id: 3,
-        name: 'Button',
-        description: 'Call-to-action button with customizable text and link',
-        is_active: true,
-    },
-    {
-        id: 4,
-        name: 'Spacer',
-        description: 'Vertical spacing element for layout control',
-        is_active: false,
-    },
-]
-
-const renderWithQueryClient = (component, queryClient = new QueryClient({
-    defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-    },
-})) => {
-    return render(
-        <QueryClientProvider client={queryClient}>
-            {component}
-        </QueryClientProvider>
-    )
-}
-
 describe('WidgetLibrary', () => {
+    let queryClient
+
     beforeEach(() => {
-        vi.clearAllMocks()
-        // Mock the paginated API response structure
+        queryClient = new QueryClient({
+            defaultOptions: {
+                queries: {
+                    retry: false,
+                },
+            },
+        })
+
+        // Setup mock axios responses for new API structure
         mockedAxios.get.mockResolvedValue({
-            data: {
-                count: mockWidgetTypes.length,
-                next: null,
-                previous: null,
-                results: mockWidgetTypes
-            }
+            data: [
+                {
+                    name: "Text Block",
+                    description: "A simple text content widget",
+                    template_name: "webpages/widgets/text_block.html",
+                    is_active: true,
+                    configuration_schema: {
+                        type: "object",
+                        properties: {
+                            content: { type: "string", description: "Text content" },
+                            alignment: {
+                                type: "string",
+                                enum: ["left", "center", "right"],
+                                default: "left"
+                            }
+                        },
+                        required: ["content"]
+                    }
+                },
+                {
+                    name: "Image",
+                    description: "Display an image with optional caption",
+                    template_name: "webpages/widgets/image.html",
+                    is_active: true,
+                    configuration_schema: {
+                        type: "object",
+                        properties: {
+                            image_url: { type: "string", description: "Image URL" },
+                            alt_text: { type: "string", description: "Alt text" }
+                        },
+                        required: ["image_url", "alt_text"]
+                    }
+                },
+                {
+                    name: "Button",
+                    description: "Interactive button widget",
+                    template_name: "webpages/widgets/button.html",
+                    is_active: false, // This should be filtered out
+                    configuration_schema: {
+                        type: "object",
+                        properties: {
+                            text: { type: "string", description: "Button text" },
+                            url: { type: "string", description: "Target URL" }
+                        },
+                        required: ["text", "url"]
+                    }
+                }
+            ]
         })
     })
 
-    it('renders widget library with loading state', async () => {
-        // Mock a delayed response to test loading state
-        mockedAxios.get.mockImplementation(() =>
-            new Promise(resolve => setTimeout(() => resolve({
-                data: {
-                    count: mockWidgetTypes.length,
-                    next: null,
-                    previous: null,
-                    results: mockWidgetTypes
-                }
-            }), 100))
+    afterEach(() => {
+        jest.clearAllMocks()
+    })
+
+    const renderWithQueryClient = (component) => {
+        return render(
+            <QueryClientProvider client={queryClient}>
+                {component}
+            </QueryClientProvider>
         )
+    }
 
-        renderWithQueryClient(<WidgetLibrary />)
+    it('renders loading state initially', async () => {
+        // Make the API call hang to test loading state
+        mockedAxios.get.mockImplementation(() => new Promise(() => { }))
 
-        // During loading, it should show skeleton animation
-        const loadingContainer = document.querySelector('.animate-pulse')
-        expect(loadingContainer).toBeInTheDocument()
+        renderWithQueryClient(<WidgetLibrary onSelectWidget={jest.fn()} />)
+
+        expect(screen.getByText('Loading widget types...')).toBeInTheDocument()
     })
 
     it('renders widget types after loading', async () => {
-        renderWithQueryClient(<WidgetLibrary />)
+        renderWithQueryClient(<WidgetLibrary onSelectWidget={jest.fn()} />)
 
         await waitFor(() => {
             expect(screen.getByText('Text Block')).toBeInTheDocument()
+            expect(screen.getByText('Image')).toBeInTheDocument()
         })
 
-        expect(screen.getByText('Image')).toBeInTheDocument()
-        expect(screen.getByText('Button')).toBeInTheDocument()
-        // Inactive widget should still be shown (filtered out in component)
-        expect(screen.queryByText('Spacer')).not.toBeInTheDocument()
+        // Should filter out inactive widgets
+        expect(screen.queryByText('Button')).not.toBeInTheDocument()
+    })
+
+    it('makes correct API call', async () => {
+        renderWithQueryClient(<WidgetLibrary onSelectWidget={jest.fn()} />)
+
+        await waitFor(() => {
+            expect(mockedAxios.get).toHaveBeenCalledWith('/api/v1/webpages/widget-types/')
+        })
     })
 
     it('filters widgets by search term', async () => {
-        renderWithQueryClient(<WidgetLibrary />)
+        renderWithQueryClient(<WidgetLibrary onSelectWidget={jest.fn()} />)
 
         await waitFor(() => {
             expect(screen.getByText('Text Block')).toBeInTheDocument()
         })
 
-        const searchInput = screen.getByPlaceholderText('Search widgets...')
-        fireEvent.change(searchInput, { target: { value: 'Block' } })
+        const searchInput = screen.getByPlaceholderText('Search widget types...')
+        fireEvent.change(searchInput, { target: { value: 'image' } })
 
-        expect(screen.getByText('Text Block')).toBeInTheDocument()
-        expect(screen.queryByText('Image')).not.toBeInTheDocument()
-        expect(screen.queryByText('Button')).not.toBeInTheDocument()
+        await waitFor(() => {
+            expect(screen.queryByText('Text Block')).not.toBeInTheDocument()
+            expect(screen.getByText('Image')).toBeInTheDocument()
+        })
     })
 
     it('filters widgets by category', async () => {
-        renderWithQueryClient(<WidgetLibrary />)
+        renderWithQueryClient(<WidgetLibrary onSelectWidget={jest.fn()} />)
 
         await waitFor(() => {
             expect(screen.getByText('Text Block')).toBeInTheDocument()
+            expect(screen.getByText('Image')).toBeInTheDocument()
         })
 
-        const categorySelect = screen.getByDisplayValue('All Widgets')
-        fireEvent.change(categorySelect, { target: { value: 'text' } })
+        const categorySelect = screen.getByDisplayValue('All')
+        fireEvent.change(categorySelect, { target: { value: 'media' } })
 
-        expect(screen.getByText('Text Block')).toBeInTheDocument()
-        expect(screen.queryByText('Image')).not.toBeInTheDocument()
-        expect(screen.queryByText('Button')).not.toBeInTheDocument()
+        await waitFor(() => {
+            expect(screen.queryByText('Text Block')).not.toBeInTheDocument()
+            expect(screen.getByText('Image')).toBeInTheDocument()
+        })
     })
 
     it('calls onSelectWidget when widget is clicked', async () => {
-        const mockOnSelectWidget = vi.fn()
+        const mockOnSelectWidget = jest.fn()
         renderWithQueryClient(<WidgetLibrary onSelectWidget={mockOnSelectWidget} />)
 
         await waitFor(() => {
             expect(screen.getByText('Text Block')).toBeInTheDocument()
         })
 
-        const textBlockWidget = screen.getByText('Text Block').closest('div[role="button"], div[tabindex], div[onClick]') ||
-            screen.getByText('Text Block').parentElement
-
-        fireEvent.click(textBlockWidget)
+        const textBlockButton = screen.getByRole('button', { name: /Text Block/ })
+        fireEvent.click(textBlockButton)
 
         expect(mockOnSelectWidget).toHaveBeenCalledWith(
             expect.objectContaining({
-                id: 1,
-                name: 'Text Block',
+                name: "Text Block",
+                description: "A simple text content widget"
             })
         )
     })
 
-    it('shows selected widgets with different styling', async () => {
+    it('shows selected widgets as disabled', async () => {
+        const selectedWidgetTypes = [{ name: "Text Block" }]
+
         renderWithQueryClient(
-            <WidgetLibrary selectedWidgetTypes={[1]} />
+            <WidgetLibrary
+                onSelectWidget={jest.fn()}
+                selectedWidgetTypes={selectedWidgetTypes}
+            />
         )
 
         await waitFor(() => {
             expect(screen.getByText('Text Block')).toBeInTheDocument()
         })
 
-        // Find the widget container div that should have the selected styling
-        const textBlockWidget = screen.getByText('Text Block').closest('[class*="bg-blue-50"]')
-        expect(textBlockWidget).toBeInTheDocument()
-        expect(textBlockWidget).toHaveClass('bg-blue-50')
+        const textBlockButton = screen.getByRole('button', { name: /Text Block/ })
+        expect(textBlockButton).toBeDisabled()
+        expect(screen.getByText('(Selected)')).toBeInTheDocument()
     })
 
-    it('handles API error gracefully', async () => {
+    it('displays error state when API call fails', async () => {
         mockedAxios.get.mockRejectedValue(new Error('API Error'))
 
-        renderWithQueryClient(<WidgetLibrary />)
+        renderWithQueryClient(<WidgetLibrary onSelectWidget={jest.fn()} />)
 
         await waitFor(() => {
-            expect(screen.getByText(/Error loading widget types/)).toBeInTheDocument()
+            expect(screen.getByText('Error Loading Widget Types')).toBeInTheDocument()
+            expect(screen.getByText('API Error')).toBeInTheDocument()
         })
     })
 
-    it('shows no widgets message when search returns no results', async () => {
-        renderWithQueryClient(<WidgetLibrary />)
+    it('shows empty state when no widgets match filter', async () => {
+        renderWithQueryClient(<WidgetLibrary onSelectWidget={jest.fn()} />)
 
         await waitFor(() => {
             expect(screen.getByText('Text Block')).toBeInTheDocument()
         })
 
-        const searchInput = screen.getByPlaceholderText('Search widgets...')
-        fireEvent.change(searchInput, { target: { value: 'nonexistent' } })
-
-        expect(screen.getByText('No widgets found')).toBeInTheDocument()
-        expect(screen.getByText('Try adjusting your search terms or filters')).toBeInTheDocument()
-    })
-
-    it('shows widget count in footer', async () => {
-        renderWithQueryClient(<WidgetLibrary />)
+        const searchInput = screen.getByPlaceholderText('Search widget types...')
+        fireEvent.change(searchInput, { target: { value: 'nonexistent widget' } })
 
         await waitFor(() => {
-            expect(screen.getByText('Text Block')).toBeInTheDocument()
+            expect(screen.getByText('No widget types found')).toBeInTheDocument()
+            expect(screen.getByText('Try adjusting your search or filter criteria')).toBeInTheDocument()
         })
-
-        // Should show count of active widgets (3 out of 4 are active)
-        expect(screen.getByText('3 widgets available')).toBeInTheDocument()
     })
 
-    it('displays appropriate icons for different widget types', async () => {
-        renderWithQueryClient(<WidgetLibrary />)
+    it('displays code-based widgets info banner', async () => {
+        renderWithQueryClient(<WidgetLibrary onSelectWidget={jest.fn()} />)
 
         await waitFor(() => {
-            expect(screen.getByText('Text Block')).toBeInTheDocument()
-        })
-
-        // Check that icons are rendered (lucide-react SVG elements should be present)
-        const svgElements = document.querySelectorAll('svg')
-        expect(svgElements.length).toBeGreaterThan(0)
-    })
-
-    it('makes correct API call to fetch widget types', async () => {
-        renderWithQueryClient(<WidgetLibrary />)
-
-        await waitFor(() => {
-            expect(mockedAxios.get).toHaveBeenCalledWith('/api/v1/webpages/widget-types/')
+            expect(screen.getByText('Code-Based Widget Types')).toBeInTheDocument()
+            expect(screen.getByText(/Widget types are now defined in code/)).toBeInTheDocument()
         })
     })
 }) 

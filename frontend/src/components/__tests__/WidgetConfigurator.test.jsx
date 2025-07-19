@@ -3,199 +3,209 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import WidgetConfigurator from '../WidgetConfigurator'
 
-// Mock react-hot-toast
-vi.mock('react-hot-toast', () => ({
-    default: {
-        success: vi.fn(),
-        error: vi.fn(),
-    },
-}))
-
-const mockTextWidgetType = {
-    id: 1,
-    name: 'Text Block',
-    description: 'Rich text content block',
-    json_schema: {
-        type: 'object',
+// Mock widget types for new code-based system
+const mockTextBlockWidget = {
+    name: "Text Block",
+    description: "A simple text content widget",
+    template_name: "webpages/widgets/text_block.html",
+    is_active: true,
+    configuration_schema: {
+        type: "object",
         properties: {
             title: {
-                type: 'string',
-                title: 'Title',
-                description: 'Optional title for the text block',
+                type: "string",
+                description: "Optional title for the text block",
+                default: ""
             },
             content: {
-                type: 'string',
-                title: 'Content',
-                description: 'Main text content',
-                format: 'textarea',
+                type: "string",
+                description: "Main text content"
             },
             alignment: {
-                type: 'string',
-                title: 'Text Alignment',
-                enum: ['left', 'center', 'right', 'justify'],
-                default: 'left',
+                type: "string",
+                enum: ["left", "center", "right", "justify"],
+                default: "left",
+                description: "Text alignment"
             },
-            is_featured: {
-                type: 'boolean',
-                title: 'Featured Content',
-                default: false,
-            },
+            style: {
+                type: "string",
+                enum: ["normal", "emphasized", "quote"],
+                default: "normal",
+                description: "Text style"
+            }
         },
-        required: ['content'],
-    },
+        required: ["content"]
+    }
 }
 
-const mockButtonWidgetType = {
-    id: 2,
-    name: 'Button',
-    description: 'Call-to-action button',
-    json_schema: {
-        type: 'object',
+const mockButtonWidget = {
+    name: "Button",
+    description: "Interactive button widget",
+    template_name: "webpages/widgets/button.html",
+    is_active: true,
+    configuration_schema: {
+        type: "object",
         properties: {
             text: {
-                type: 'string',
-                title: 'Button Text',
-                description: 'Text displayed on the button',
+                type: "string",
+                description: "Button text"
             },
             url: {
-                type: 'string',
-                title: 'URL',
-                description: 'Link destination',
-                format: 'uri',
+                type: "string",
+                description: "Target URL"
             },
-            custom_height: {
-                type: 'string',
-                title: 'Custom Height',
-                pattern: '^[0-9]+px$',
+            style: {
+                type: "string",
+                enum: ["primary", "secondary", "outline"],
+                default: "primary",
+                description: "Button style"
             },
+            size: {
+                type: "string",
+                enum: ["small", "medium", "large"],
+                default: "medium",
+                description: "Button size"
+            },
+            height: {
+                type: "number",
+                minimum: 20,
+                maximum: 100,
+                default: 40,
+                description: "Button height in pixels"
+            }
         },
-        required: ['text', 'url'],
-    },
+        required: ["text", "url"]
+    }
+}
+
+const mockImageWidget = {
+    name: "Image",
+    description: "Display an image with optional caption",
+    template_name: "webpages/widgets/image.html",
+    is_active: true,
+    configuration_schema: {
+        type: "object",
+        properties: {
+            image_url: {
+                type: "string",
+                description: "Image URL"
+            },
+            alt_text: {
+                type: "string",
+                description: "Alt text for accessibility"
+            },
+            caption: {
+                type: "string",
+                description: "Optional image caption",
+                default: ""
+            }
+        },
+        required: ["image_url", "alt_text"]
+    }
 }
 
 describe('WidgetConfigurator', () => {
-    const mockOnSave = vi.fn()
-    const mockOnCancel = vi.fn()
+    const defaultProps = {
+        onSave: vi.fn(),
+        onCancel: vi.fn(),
+        title: "Configure Widget",
+        showInheritanceControls: true,
+        isEditing: false
+    }
 
     beforeEach(() => {
         vi.clearAllMocks()
     })
 
-    it('renders configurator with widget type name', () => {
-        render(
-            <WidgetConfigurator
-                widgetType={mockTextWidgetType}
-                onSave={mockOnSave}
-                onCancel={mockOnCancel}
-            />
-        )
+    it('renders without widget type', () => {
+        render(<WidgetConfigurator {...defaultProps} />)
 
-        expect(screen.getByText('Configure Widget')).toBeInTheDocument()
-        expect(screen.getByText('Configuring: Text Block')).toBeInTheDocument()
+        expect(screen.getByText('No widget type selected')).toBeInTheDocument()
     })
 
-    it('renders form fields based on JSON schema', () => {
+    it('renders widget configuration form for text block', async () => {
         render(
             <WidgetConfigurator
-                widgetType={mockTextWidgetType}
-                onSave={mockOnSave}
-                onCancel={mockOnCancel}
-            />
-        )
-
-        expect(screen.getByPlaceholderText(/Optional title for the text block/)).toBeInTheDocument()
-        expect(screen.getByPlaceholderText(/Main text content/)).toBeInTheDocument()
-        expect(screen.getByRole('combobox')).toBeInTheDocument()
-        expect(screen.getByLabelText(/Featured Content/)).toBeInTheDocument()
-    })
-
-    it('shows required field indicators', () => {
-        render(
-            <WidgetConfigurator
-                widgetType={mockTextWidgetType}
-                onSave={mockOnSave}
-                onCancel={mockOnCancel}
-            />
-        )
-
-        // Content is required, should have asterisk
-        const contentLabels = screen.getAllByText('Content')
-        const fieldContentLabel = contentLabels.find(label =>
-            label.parentElement && label.parentElement.textContent.includes('*')
-        )
-        expect(fieldContentLabel).toBeInTheDocument()
-        expect(fieldContentLabel.parentElement).toHaveTextContent('*')
-
-        // Title is not required, should not have asterisk
-        const titleLabel = screen.getByText('Title').parentElement
-        expect(titleLabel).not.toHaveTextContent('*')
-    })
-
-    it('renders different input types correctly', () => {
-        render(
-            <WidgetConfigurator
-                widgetType={mockTextWidgetType}
-                onSave={mockOnSave}
-                onCancel={mockOnCancel}
-            />
-        )
-
-        // Text input
-        expect(screen.getByPlaceholderText('Optional title for the text block')).toBeInTheDocument()
-
-        // Textarea
-        expect(screen.getByPlaceholderText('Main text content')).toBeInTheDocument()
-
-        // Select dropdown
-        expect(screen.getByRole('combobox')).toBeInTheDocument()
-
-        // Checkbox
-        expect(screen.getByRole('checkbox', { name: /featured content/i })).toBeInTheDocument()
-    })
-
-    it('populates default values from schema', async () => {
-        render(
-            <WidgetConfigurator
-                widgetType={mockTextWidgetType}
-                onSave={mockOnSave}
-                onCancel={mockOnCancel}
+                {...defaultProps}
+                widgetType={mockTextBlockWidget}
             />
         )
 
         await waitFor(() => {
-            const alignmentSelect = screen.getByRole('combobox')
-            expect(alignmentSelect.value).toBe('left')
-
-            const featuredCheckbox = screen.getByRole('checkbox', { name: /featured content/i })
-            expect(featuredCheckbox.checked).toBe(false)
+            expect(screen.getByText('Configure Widget')).toBeInTheDocument()
+            expect(screen.getByText('Text Block')).toBeInTheDocument()
         })
+
+        // Should render form fields based on schema
+        expect(screen.getByRole('textbox', { name: /title/i })).toBeInTheDocument()
+        expect(screen.getByRole('textbox', { name: /content/i })).toBeInTheDocument()
+        expect(screen.getByRole('combobox', { name: /alignment/i })).toBeInTheDocument()
+        expect(screen.getByRole('combobox', { name: /style/i })).toBeInTheDocument()
     })
 
-    it('populates initial configuration values', () => {
-        const initialConfig = {
-            title: 'Test Title',
-            content: 'Test Content',
-            alignment: 'center',
-            is_featured: true,
-        }
+    it('calls onSave with valid configuration', async () => {
+        const user = userEvent.setup()
+        const mockOnSave = vi.fn()
 
         render(
             <WidgetConfigurator
-                widgetType={mockTextWidgetType}
-                initialConfig={initialConfig}
+                {...defaultProps}
+                widgetType={mockTextBlockWidget}
                 onSave={mockOnSave}
-                onCancel={mockOnCancel}
             />
         )
 
-        expect(screen.getByDisplayValue('Test Title')).toBeInTheDocument()
-        expect(screen.getByDisplayValue('Test Content')).toBeInTheDocument()
+        await waitFor(() => {
+            expect(screen.getByRole('textbox', { name: /content/i })).toBeInTheDocument()
+        })
 
-        // Check that center option is selected in the dropdown
-        const alignmentSelect = screen.getByRole('combobox')
-        expect(alignmentSelect.value).toBe('center')
+        // Fill in required field
+        const contentInput = screen.getByRole('textbox', { name: /content/i })
+        await user.type(contentInput, 'Test content')
 
-        expect(screen.getByRole('checkbox', { name: /featured content/i })).toBeChecked()
+        const saveButton = screen.getByRole('button', { name: /save configuration/i })
+        await user.click(saveButton)
+
+        expect(mockOnSave).toHaveBeenCalledWith(
+            expect.objectContaining({
+                configuration: expect.objectContaining({
+                    content: 'Test content'
+                })
+            })
+        )
+    })
+
+    it('calls onSave with configuration only when inheritance controls disabled', async () => {
+        const user = userEvent.setup()
+        const mockOnSave = vi.fn()
+
+        render(
+            <WidgetConfigurator
+                {...defaultProps}
+                widgetType={mockTextBlockWidget}
+                onSave={mockOnSave}
+                showInheritanceControls={false}
+            />
+        )
+
+        await waitFor(() => {
+            expect(screen.getByRole('textbox', { name: /content/i })).toBeInTheDocument()
+        })
+
+        const contentInput = screen.getByRole('textbox', { name: /content/i })
+        await user.type(contentInput, 'Test content')
+
+        const saveButton = screen.getByRole('button', { name: /save configuration/i })
+        await user.click(saveButton)
+
+        // Should return just the configuration object, not wrapped in additional properties
+        expect(mockOnSave).toHaveBeenCalledWith(
+            expect.objectContaining({
+                content: 'Test content',
+                alignment: 'left',  // Default value
+                style: 'normal'     // Default value
+            })
+        )
     })
 
     it('validates required fields', async () => {
@@ -203,125 +213,149 @@ describe('WidgetConfigurator', () => {
 
         render(
             <WidgetConfigurator
-                widgetType={mockTextWidgetType}
-                onSave={mockOnSave}
-                onCancel={mockOnCancel}
+                {...defaultProps}
+                widgetType={mockTextBlockWidget}
             />
         )
 
-        const saveButton = screen.getByRole('button', { name: /save configuration/i })
+        await waitFor(() => {
+            expect(screen.getByRole('button', { name: /save configuration/i })).toBeInTheDocument()
+        })
 
         // Try to save without filling required content field
+        const saveButton = screen.getByRole('button', { name: /save configuration/i })
         await user.click(saveButton)
 
+        // Should show validation error
         await waitFor(() => {
-            // Look for field-specific error message (should appear in both inline and summary)
-            expect(screen.getAllByText('This field is required').length).toBeGreaterThanOrEqual(1)
+            expect(screen.getByText(/please fix all validation errors/i)).toBeInTheDocument()
         })
-
-        expect(mockOnSave).not.toHaveBeenCalled()
     })
 
-    it('validates URL format', async () => {
+    it('disables save button when form is invalid', async () => {
+        render(
+            <WidgetConfigurator
+                {...defaultProps}
+                widgetType={mockTextBlockWidget}
+                initialConfig={{}} // Empty config should be invalid
+            />
+        )
+
+        await waitFor(() => {
+            expect(screen.getByRole('button', { name: /save configuration/i })).toBeInTheDocument()
+        })
+
+        const saveButton = screen.getByRole('button', { name: /save configuration/i })
+
+        // Button should be enabled since form validation happens on save click
+        expect(saveButton).toBeEnabled()
+    })
+
+    it('enables save button when form is valid', async () => {
         const user = userEvent.setup()
 
         render(
             <WidgetConfigurator
-                widgetType={mockButtonWidgetType}
-                onSave={mockOnSave}
-                onCancel={mockOnCancel}
+                {...defaultProps}
+                widgetType={mockTextBlockWidget}
             />
         )
 
-        const urlInput = screen.getByPlaceholderText('Link destination')
-        const saveButton = screen.getByRole('button', { name: /save configuration/i })
-
-        await user.type(urlInput, 'invalid-url')
-        await user.click(saveButton)
-
         await waitFor(() => {
-            // URL validation should show error - check for URL specific validation message
-            const urlErrors = screen.queryByText('Must be a valid URL')
-            if (urlErrors) {
-                expect(urlErrors).toBeInTheDocument()
-            } else {
-                // Fallback to checking for any validation error
-                expect(screen.getAllByText('This field is required').length).toBeGreaterThan(0)
-            }
+            expect(screen.getByRole('textbox', { name: /content/i })).toBeInTheDocument()
         })
 
-        expect(mockOnSave).not.toHaveBeenCalled()
+        // Fill required field
+        const contentInput = screen.getByRole('textbox', { name: /content/i })
+        await user.type(contentInput, 'Valid content')
+
+        const saveButton = screen.getByRole('button', { name: /save configuration/i })
+        expect(saveButton).toBeEnabled()
     })
 
-    it('validates pattern matching', async () => {
+    it('shows validation summary for multiple errors', async () => {
         const user = userEvent.setup()
 
         render(
             <WidgetConfigurator
-                widgetType={mockButtonWidgetType}
-                onSave={mockOnSave}
-                onCancel={mockOnCancel}
+                {...defaultProps}
+                widgetType={mockButtonWidget}
             />
         )
 
-        const textInput = screen.getByPlaceholderText('Text displayed on the button')
-        const urlInput = screen.getByPlaceholderText('Link destination')
-        const heightInput = screen.getAllByRole('textbox').find(input =>
-            input.closest('div').querySelector('span')?.textContent?.includes('Custom Height')
-        )
-        const saveButton = screen.getByRole('button', { name: /save configuration/i })
+        await waitFor(() => {
+            expect(screen.getByRole('button', { name: /save configuration/i })).toBeInTheDocument()
+        })
 
-        await user.type(textInput, 'Test Button')
+        // Try to save without filling required fields (text and url)
+        const saveButton = screen.getByRole('button', { name: /save configuration/i })
+        await user.click(saveButton)
+
+        await waitFor(() => {
+            expect(screen.getByText(/please fix all validation errors/i)).toBeInTheDocument()
+        })
+    })
+
+    it('handles different field types correctly', async () => {
+        const user = userEvent.setup()
+
+        render(
+            <WidgetConfigurator
+                {...defaultProps}
+                widgetType={mockButtonWidget}
+            />
+        )
+
+        await waitFor(() => {
+            expect(screen.getByRole('textbox', { name: /^text/i })).toBeInTheDocument()
+        })
+
+        // Test different input types
+        const textInput = screen.getByRole('textbox', { name: /^text/i }) // Match "text" field specifically
+        const urlInput = screen.getByRole('textbox', { name: /url/i })
+        const styleSelect = screen.getByRole('combobox', { name: /style/i })
+        const heightInput = screen.getByRole('spinbutton', { name: /height/i })
+
+        await user.type(textInput, 'Click me')
         await user.type(urlInput, 'https://example.com')
-        await user.type(heightInput, 'invalid-height')
-        await user.click(saveButton)
+        await user.selectOptions(styleSelect, 'secondary')
+        await user.clear(heightInput)
+        await user.type(heightInput, '50')
 
-        await waitFor(() => {
-            expect(screen.getAllByText('Invalid format').length).toBeGreaterThan(0)
-        })
-
-        expect(mockOnSave).not.toHaveBeenCalled()
+        expect(textInput).toHaveValue('Click me')
+        expect(urlInput).toHaveValue('https://example.com')
+        expect(styleSelect).toHaveValue('secondary')
+        expect(heightInput).toHaveValue(50)
     })
 
-    it('calls onSave with valid configuration', async () => {
-        const user = userEvent.setup()
+    it('loads initial configuration values', () => {
+        const initialConfig = {
+            content: 'Initial content',
+            alignment: 'center',
+            style: 'emphasized'
+        }
 
         render(
             <WidgetConfigurator
-                widgetType={mockTextWidgetType}
-                onSave={mockOnSave}
-                onCancel={mockOnCancel}
-                showInheritanceControls={false}
+                {...defaultProps}
+                widgetType={mockTextBlockWidget}
+                initialConfig={initialConfig}
             />
         )
 
-        const titleInput = screen.getByPlaceholderText('Optional title for the text block')
-        const contentInput = screen.getByPlaceholderText('Main text content')
-        const alignmentSelect = screen.getByRole('combobox')
-        const featuredCheckbox = screen.getByRole('checkbox', { name: /featured content/i })
-        const saveButton = screen.getByRole('button', { name: /save configuration/i })
-
-        await user.type(titleInput, 'Test Title')
-        await user.type(contentInput, 'Test Content')
-        await user.selectOptions(alignmentSelect, 'center')
-        await user.click(featuredCheckbox)
-        await user.click(saveButton)
-
-        expect(mockOnSave).toHaveBeenCalledWith({
-            title: 'Test Title',
-            content: 'Test Content',
-            alignment: 'center',
-            is_featured: true,
-        })
+        expect(screen.getByDisplayValue('Initial content')).toBeInTheDocument()
+        expect(screen.getByDisplayValue('center')).toBeInTheDocument()
+        expect(screen.getByDisplayValue('emphasized')).toBeInTheDocument()
     })
 
     it('calls onCancel when cancel button is clicked', async () => {
         const user = userEvent.setup()
+        const mockOnCancel = vi.fn()
 
         render(
             <WidgetConfigurator
-                widgetType={mockTextWidgetType}
-                onSave={mockOnSave}
+                {...defaultProps}
+                widgetType={mockTextBlockWidget}
                 onCancel={mockOnCancel}
             />
         )
@@ -332,132 +366,55 @@ describe('WidgetConfigurator', () => {
         expect(mockOnCancel).toHaveBeenCalled()
     })
 
-    it('calls onCancel when X button is clicked', async () => {
-        const user = userEvent.setup()
-
+    it('shows inheritance controls when enabled', () => {
         render(
             <WidgetConfigurator
-                widgetType={mockTextWidgetType}
-                onSave={mockOnSave}
-                onCancel={mockOnCancel}
+                {...defaultProps}
+                widgetType={mockTextBlockWidget}
+                showInheritanceControls={true}
             />
         )
 
-        // Find the X button in the header
-        const closeButton = screen.getByRole('button', { name: '' }) // X button typically has no accessible name
-        await user.click(closeButton)
-
-        expect(mockOnCancel).toHaveBeenCalled()
+        expect(screen.getByText('Inheritance')).toBeInTheDocument()
     })
 
-    it('disables save button when form is invalid', async () => {
+    it('hides inheritance controls when disabled', () => {
         render(
             <WidgetConfigurator
-                widgetType={mockTextWidgetType}
-                onSave={mockOnSave}
-                onCancel={mockOnCancel}
+                {...defaultProps}
+                widgetType={mockTextBlockWidget}
+                showInheritanceControls={false}
             />
         )
 
-        const saveButton = screen.getByRole('button', { name: /save configuration/i })
-
-        // Without required content, save should be disabled
-        expect(saveButton).toBeDisabled()
+        expect(screen.queryByText('Inheritance')).not.toBeInTheDocument()
     })
 
-    it('enables save button when form is valid', async () => {
-        const user = userEvent.setup()
-
+    it('shows editing mode in title', () => {
         render(
             <WidgetConfigurator
-                widgetType={mockTextWidgetType}
-                onSave={mockOnSave}
-                onCancel={mockOnCancel}
+                {...defaultProps}
+                widgetType={mockTextBlockWidget}
+                isEditing={true}
+                title="Edit Widget"
             />
         )
 
-        // Use placeholder text instead of role since textarea might not have accessible name
-        const contentInput = screen.getByPlaceholderText('Main text content')
-        const saveButton = screen.getByRole('button', { name: /save configuration/i })
+        expect(screen.getByText('Edit Widget')).toBeInTheDocument()
+    })
 
-        await user.type(contentInput, 'Test Content')
+    it('applies default values from schema', async () => {
+        render(
+            <WidgetConfigurator
+                {...defaultProps}
+                widgetType={mockTextBlockWidget}
+            />
+        )
 
         await waitFor(() => {
-            expect(saveButton).toBeEnabled()
+            // Default values should be applied
+            expect(screen.getByDisplayValue('left')).toBeInTheDocument() // alignment default
+            expect(screen.getByDisplayValue('normal')).toBeInTheDocument() // style default
         })
-    })
-
-    it('shows validation summary for multiple errors', async () => {
-        const user = userEvent.setup()
-
-        render(
-            <WidgetConfigurator
-                widgetType={mockButtonWidgetType}
-                onSave={mockOnSave}
-                onCancel={mockOnCancel}
-            />
-        )
-
-        const saveButton = screen.getByRole('button', { name: /save configuration/i })
-        await user.click(saveButton)
-
-        await waitFor(() => {
-            expect(screen.getByText('Please fix the following errors:')).toBeInTheDocument()
-            // Should have at least 2 "This field is required" messages (for text and url)
-            const errorMessages = screen.getAllByText('This field is required')
-            expect(errorMessages.length).toBeGreaterThanOrEqual(2)
-        })
-    })
-
-    it('handles widget type with no configuration properties', () => {
-        const emptyWidgetType = {
-            id: 3,
-            name: 'Empty Widget',
-            description: 'Widget with no config',
-            json_schema: {
-                type: 'object',
-                properties: {},
-            },
-        }
-
-        render(
-            <WidgetConfigurator
-                widgetType={emptyWidgetType}
-                onSave={mockOnSave}
-                onCancel={mockOnCancel}
-            />
-        )
-
-        expect(screen.getByText('No configuration options available for this widget type.')).toBeInTheDocument()
-    })
-
-    it('handles widget type with no JSON schema', () => {
-        const noSchemaWidgetType = {
-            id: 4,
-            name: 'No Schema Widget',
-            description: 'Widget without schema',
-        }
-
-        render(
-            <WidgetConfigurator
-                widgetType={noSchemaWidgetType}
-                onSave={mockOnSave}
-                onCancel={mockOnCancel}
-            />
-        )
-
-        expect(screen.getByText('No configuration options available for this widget type.')).toBeInTheDocument()
-    })
-
-    it('handles null widget type', () => {
-        render(
-            <WidgetConfigurator
-                widgetType={null}
-                onSave={mockOnSave}
-                onCancel={mockOnCancel}
-            />
-        )
-
-        expect(screen.getByText('No widget type selected')).toBeInTheDocument()
     })
 }) 

@@ -92,12 +92,14 @@ We've achieved **100% frontend test success rate** - transforming from 31 failin
 - **Custom Templates**: Layout-specific template files for enhanced flexibility
 - **Multi-Device Preview**: Preview pages across desktop, tablet, and mobile
 
-### 🧩 Widget System
-- **Reusable Components**: JSON Schema-based widget definitions
-- **Drag & Drop**: Visual widget placement and arrangement
-- **Configuration UI**: Auto-generated forms based on widget schemas
-- **Widget Inheritance**: Inherit and override widgets from parent pages
-- **Widget Versioning**: Complete widget change tracking in version system
+### 🧩 Code-Based Widget System
+- **Type-Safe Components**: Pydantic model-based widget definitions with compile-time validation
+- **Auto-Discovery**: Automatic widget registration from Django apps
+- **Zero Database Queries**: Widget types loaded once at startup for optimal performance
+- **Generated Configuration UI**: Auto-generated forms from Pydantic schemas
+- **Widget Inheritance**: Inherit and override widgets from parent pages with granular control
+- **Version Control**: Widget types tracked in Git alongside your code
+- **Developer Experience**: Full IDE support, auto-completion, and type checking
 
 ### 🚀 Modern Development Experience
 - **Hot Reload**: Instant feedback during development
@@ -448,6 +450,38 @@ CSRF_COOKIE_SECURE=True
 - [Tailwind CSS Documentation](https://tailwindcss.com/)
 - [Model Context Protocol](https://modelcontextprotocol.io/)
 - [Docker Documentation](https://docs.docker.com/)
+
+## 🧪 Testing the Code-Based Widget System
+
+The project has been fully migrated to a code-based widget system with comprehensive test coverage:
+
+### Backend Testing
+```bash
+# Run all backend tests
+docker-compose exec backend python manage.py test
+
+# Test widget system specifically  
+docker-compose exec backend python manage.py test webpages.tests.WidgetRegistryTest
+docker-compose exec backend python manage.py test webpages.tests.WidgetTypeAPITest
+```
+
+### Frontend Testing
+```bash
+# Run all frontend tests
+docker-compose exec frontend npm run test:run
+
+# Test widget components specifically
+docker-compose exec frontend npm run test:run src/components/__tests__/WidgetLibrary.test.jsx
+docker-compose exec frontend npm run test:run src/components/__tests__/WidgetConfigurator.test.jsx
+```
+
+### Key Testing Updates
+- **Backend**: Widget types now reference by name instead of database ID
+- **Frontend**: API responses are direct arrays instead of paginated results
+- **Validation**: Pydantic models provide compile-time type safety
+- **Performance**: Zero database queries for widget type definitions
+
+For detailed testing documentation, see [docs/CODE_BASED_WIDGET_SYSTEM_TESTING.md](docs/CODE_BASED_WIDGET_SYSTEM_TESTING.md).
 
 ## 🤝 Contributing
 

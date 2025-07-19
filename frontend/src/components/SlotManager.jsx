@@ -222,23 +222,21 @@ const SlotManager = ({ pageId, layout, onWidgetChange }) => {
     // Create slot state manager
     const slotState = SlotStateFactory.createFromQuery({ widgets: pageWidgetsData })
 
-    // Fetch widget types for the library
-    const { data: widgetTypesResponse } = useQuery({
+    // Fetch widget types for the library - now returns direct array
+    const { data: widgetTypes } = useQuery({
         queryKey: ['widget-types'],
         queryFn: async () => {
             const response = await axios.get('/api/v1/webpages/widget-types/')
-            return response.data
+            // New API returns direct array, filter active ones
+            return response.data?.filter(widget => widget.is_active) || []
         }
     })
 
-    // Extract widget types array from paginated response and filter active ones
-    const widgetTypes = widgetTypesResponse?.results?.filter(widget => widget.is_active) || []
-
     // Widget mutations using new API
     const createWidgetMutation = useMutation({
-        mutationFn: async ({ widgetTypeId, slotName, configuration }) => {
+        mutationFn: async ({ widgetTypeName, slotName, configuration }) => {
             return addWidget(pageId, {
-                widget_type_id: widgetTypeId,
+                widget_type_id: widgetTypeName,
                 slot_name: slotName,
                 configuration,
                 sort_order: 0,
@@ -334,7 +332,7 @@ const SlotManager = ({ pageId, layout, onWidgetChange }) => {
     const handleConfigureSave = (saveData) => {
         const { configuration, ...inheritanceSettings } = saveData
         createWidgetMutation.mutate({
-            widgetTypeId: configuringWidget.widgetType.id,
+            widgetTypeName: configuringWidget.widgetType.name, // Use name instead of ID
             slotName: configuringWidget.slotName,
             configuration,
             ...inheritanceSettings
@@ -342,7 +340,7 @@ const SlotManager = ({ pageId, layout, onWidgetChange }) => {
     }
 
     const handleEditWidget = (widget) => {
-        const widgetType = widgetTypes?.find(wt => wt.id === widget.widget_type.id)
+        const widgetType = widgetTypes?.find(wt => wt.name === widget.widget_type)
         setEditingWidget({
             widget,
             widgetType

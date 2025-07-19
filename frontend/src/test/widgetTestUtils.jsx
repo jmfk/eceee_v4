@@ -321,4 +321,102 @@ export function setupWidgetMocks() {
             error: vi.fn(),
         },
     }))
+}
+
+export const mockWidgetTypes = [
+    {
+        name: "Text Block",
+        description: "A simple text content widget",
+        template_name: "webpages/widgets/text_block.html",
+        is_active: true,
+        configuration_schema: {
+            type: "object",
+            properties: {
+                content: { type: "string", description: "Text content" },
+                alignment: {
+                    type: "string",
+                    enum: ["left", "center", "right"],
+                    default: "left",
+                    description: "Text alignment"
+                }
+            },
+            required: ["content"]
+        }
+    },
+    {
+        name: "Image",
+        description: "Display an image with optional caption",
+        template_name: "webpages/widgets/image.html",
+        is_active: true,
+        configuration_schema: {
+            type: "object",
+            properties: {
+                image_url: { type: "string", description: "Image URL" },
+                alt_text: { type: "string", description: "Alt text for accessibility" },
+                caption: { type: "string", description: "Optional image caption" }
+            },
+            required: ["image_url", "alt_text"]
+        }
+    },
+    {
+        name: "Button",
+        description: "Interactive button widget",
+        template_name: "webpages/widgets/button.html",
+        is_active: true,
+        configuration_schema: {
+            type: "object",
+            properties: {
+                text: { type: "string", description: "Button text" },
+                url: { type: "string", description: "Target URL" },
+                style: {
+                    type: "string",
+                    enum: ["primary", "secondary", "outline"],
+                    default: "primary",
+                    description: "Button style"
+                },
+                size: {
+                    type: "string",
+                    enum: ["small", "medium", "large"],
+                    default: "medium",
+                    description: "Button size"
+                }
+            },
+            required: ["text", "url"]
+        }
+    }
+]
+
+export const setupMockAxios = () => {
+    mockedAxios.get.mockImplementation((url) => {
+        if (url.includes('/api/v1/webpages/widget-types/')) {
+            // Return direct array instead of paginated response for new API
+            return Promise.resolve({
+                data: mockWidgetTypes
+            })
+        }
+
+        if (url.includes('/api/v1/webpages/pages/')) {
+            return Promise.resolve({
+                data: {
+                    results: [mockPage],
+                    count: 1
+                }
+            })
+        }
+
+        if (url.includes('/api/v1/webpages/widgets/')) {
+            return Promise.resolve({
+                data: {
+                    widgets: mockWidgets
+                }
+            })
+        }
+
+        // Default fallback
+        return Promise.reject(new Error(`Unmocked URL: ${url}`))
+    })
+
+    mockedAxios.post.mockResolvedValue({ data: { success: true } })
+    mockedAxios.patch.mockResolvedValue({ data: { success: true } })
+    mockedAxios.delete.mockResolvedValue({ data: { success: true } })
 } 

@@ -5,7 +5,7 @@ This module defines the core models for the hierarchical web page management sys
 - WebPage: Core page entity with hierarchy support and code-based layouts
 - PageVersion: Version control for pages
 - PageTheme: Theme configurations for styling
-- WidgetType: Available widget types with schemas
+- Widget types are now code-based (see widgets.py)
 - PageWidget: Widget instances on pages
 
 Note: Layout templates are now defined as code-based classes, not database models.
@@ -55,82 +55,6 @@ class PageTheme(models.Model):
             "description": self.description,
             "css_variables": self.css_variables,
             "custom_css": self.custom_css,
-            "is_active": self.is_active,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
-            "created_by": self.created_by.username if self.created_by else None,
-        }
-
-
-class WidgetType(models.Model):
-    """
-    Defines available widget types with their JSON schemas for validation.
-    Widget types determine what fields are available for content input.
-    """
-
-    name = models.CharField(max_length=255, unique=True)
-    description = models.TextField()
-    json_schema = models.JSONField(
-        help_text="JSON schema defining the widget's configuration fields"
-    )
-    template_name = models.CharField(
-        max_length=255, help_text="Template file used to render this widget type"
-    )
-    is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    created_by = models.ForeignKey(User, on_delete=models.PROTECT)
-
-    class Meta:
-        ordering = ["name"]
-
-    def __str__(self):
-        return self.name
-
-    def validate_configuration(self, configuration):
-        """
-        Validate a configuration dictionary against this widget type's schema.
-        Returns (is_valid, errors) tuple.
-        """
-        try:
-            import jsonschema
-            from jsonschema import ValidationError
-
-            if not self.json_schema:
-                return True, []
-
-            jsonschema.validate(instance=configuration, schema=self.json_schema)
-            return True, []
-
-        except ImportError:
-            # jsonschema not installed, skip validation
-            return True, ["JSON Schema validation library not available"]
-        except ValidationError as e:
-            return False, [e.message]
-        except Exception as e:
-            return False, [f"Validation error: {str(e)}"]
-
-    def get_configuration_defaults(self):
-        """Extract default values from the JSON schema"""
-        defaults = {}
-
-        if not self.json_schema or "properties" not in self.json_schema:
-            return defaults
-
-        for field_name, field_schema in self.json_schema.get("properties", {}).items():
-            if "default" in field_schema:
-                defaults[field_name] = field_schema["default"]
-
-        return defaults
-
-    def to_dict(self):
-        """Convert widget type to dictionary representation"""
-        return {
-            "id": self.id,
-            "name": self.name,
-            "description": self.description,
-            "json_schema": self.json_schema,
-            "template_name": self.template_name,
             "is_active": self.is_active,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
@@ -977,8 +901,8 @@ class WebPage(models.Model):
             "slug": self.slug,
             "description": self.description,
             "hostnames": self.hostnames,
-            "layout_id": self.layout_id,
-            "theme_id": self.theme_id,
+            "layout": self.code_layout,
+            "theme_id": self.theme.id if self.theme else None,
             "publication_status": self.publication_status,
             "effective_date": (
                 self.effective_date.isoformat() if self.effective_date else None

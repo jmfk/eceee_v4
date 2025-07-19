@@ -9,7 +9,7 @@ from django.contrib import admin
 from django.utils.html import format_html
 from django.urls import reverse
 from django.utils.safestring import mark_safe
-from .models import WebPage, PageVersion, PageTheme, WidgetType
+from .models import WebPage, PageVersion, PageTheme
 
 
 class HasHostnamesFilter(admin.SimpleListFilter):
@@ -61,29 +61,7 @@ class PageThemeAdmin(admin.ModelAdmin):
         super().save_model(request, obj, form, change)
 
 
-@admin.register(WidgetType)
-class WidgetTypeAdmin(admin.ModelAdmin):
-    list_display = ["name", "description", "template_name", "is_active", "created_at"]
-    list_filter = ["is_active", "created_at"]
-    search_fields = ["name", "description", "template_name"]
-    readonly_fields = ["created_at", "updated_at"]
-
-    fieldsets = (
-        ("Basic Information", {"fields": ("name", "description", "is_active")}),
-        ("Widget Configuration", {"fields": ("json_schema", "template_name")}),
-        (
-            "Metadata",
-            {
-                "fields": ("created_at", "updated_at", "created_by"),
-                "classes": ("collapse",),
-            },
-        ),
-    )
-
-    def save_model(self, request, obj, form, change):
-        if not change:  # Creating new object
-            obj.created_by = request.user
-        super().save_model(request, obj, form, change)
+# WidgetType admin removed - widget types are now code-based
 
 
 # Removed PageWidgetInline - widgets are now stored in PageVersion JSON data

@@ -125,27 +125,31 @@ Flexible page structure and styling system with inheritance capabilities.
 ### 3. Widget System
 
 #### Purpose
-Reusable, configurable page components with full versioning support.
+Reusable, configurable page components with full versioning support and code-based type definitions.
 
 #### Key Components
 
-**Widget Types:**
-- JSON Schema-based widget definitions
-- Auto-generated configuration forms
-- Template-based rendering
-- Validation and type checking
+**Code-Based Widget Types:**
+- Pydantic model-based configuration validation
+- Auto-generated JSON schemas from Pydantic models
+- Template-based rendering with Django templates
+- Type safety and compile-time validation
+- Automatic discovery from Django apps
+- No database queries for widget type definitions
 
 **Widget Management:**
-- Drag-and-drop placement
-- Slot-based organization
-- Sort order management
-- Configuration persistence
+- Drag-and-drop placement via frontend interface
+- Slot-based organization within page layouts
+- Sort order management with intuitive controls
+- Configuration persistence in JSON format
+- Real-time configuration validation
 
 **Widget Inheritance:**
-- Inherit widgets from parent pages
-- Override inherited widgets
-- Add page-specific widgets
-- Complete change tracking
+- Inherit widgets from parent pages automatically
+- Override inherited widgets with local configurations
+- Add page-specific widgets independently
+- Complete change tracking and version history
+- Granular inheritance control per widget
 
 ### 4. Template System
 
@@ -225,21 +229,21 @@ PageTheme
 └── created_by, created_at
 
 # Widget System
-WidgetType
-├── id (UUID)
-├── name, description
-├── json_schema (widget configuration)
-├── template_name
-├── is_active
-└── created_by, created_at
+# Code-Based Widget Types (No Database Model)
+# Defined in Python classes with:
+# - name, description (class attributes)
+# - configuration_model (Pydantic model)
+# - template_name (Django template path)
+# - JSON schema (auto-generated from Pydantic)
+# - Automatic discovery and registration
 
 PageWidget
 ├── id (UUID)
 ├── page (FK to WebPage)
-├── widget_type (FK to WidgetType)
+├── widget_type_name (CharField, references code-based widget)
 ├── slot_name
 ├── sort_order
-├── configuration (JSON)
+├── configuration (JSON, validated by Pydantic)
 ├── inherit_from_parent (boolean)
 ├── override_parent (boolean)
 └── created_by, created_at
@@ -251,9 +255,9 @@ PageWidget
 WebPage (1) ──── (Many) PageVersion
 WebPage (Many) ──── (1) PageTheme
 WebPage (1) ──── (Many) PageWidget
-PageWidget (Many) ──── (1) WidgetType
 WebPage (1) ──── (Many) WebPage (parent/child)
-# Note: Layout relationships are code-based, not database foreign keys
+# Note: Layout and Widget Type relationships are code-based, not database foreign keys
+# PageWidget.widget_type_name references code-based widget classes by name
 ```
 
 ## API Architecture
@@ -265,10 +269,10 @@ WebPage (1) ──── (Many) WebPage (parent/child)
 **Resource Endpoints:**
 - `/pages/` - Page CRUD operations
 - `/versions/` - Version management
-- `/layouts/` - Layout management  
+- `/layouts/` - Layout management (code-based layouts)
 - `/themes/` - Theme management
-- `/widgets/` - Widget management
-- `/widget-types/` - Widget type definitions
+- `/widgets/` - Widget instance management
+- `/widget-types/` - Widget type definitions (code-based, read-only)
 
 **Action Endpoints:**
 - `/pages/{id}/publish/` - Publish page
@@ -328,7 +332,9 @@ src/
 │   ├── LayoutEditor.jsx     # Layout management interface
 │   ├── ThemeEditor.jsx      # Theme management interface  
 │   ├── VersionManager.jsx   # Version control interface
-│   ├── WidgetLibrary.jsx    # Widget selection and config
+│   ├── WidgetLibrary.jsx    # Code-based widget selection interface
+│   ├── WidgetConfigurator.jsx  # Pydantic-schema-based widget configuration
+│   ├── CustomWidgetCreator.jsx # Developer guide for code-based widgets
 │   ├── PagePreview.jsx      # Page preview with inheritance
 │   └── page-management/     # Page management components
 │       ├── PageFilters.jsx     # Search and filtering UI
