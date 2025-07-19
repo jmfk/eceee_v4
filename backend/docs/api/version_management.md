@@ -363,8 +363,11 @@ The versioning system integrates seamlessly with the WebPage model through helpe
 ### WebPage Helper Methods
 
 ```python
-# Get current published version
+# Get current published version (marked as is_current=True)
 current_version = page.get_current_version()
+
+# Get latest published version by version number
+latest_published = page.get_latest_published_version()
 
 # Get latest draft version
 latest_draft = page.get_latest_draft()
@@ -380,6 +383,14 @@ version = page.create_version(
     auto_publish=False  # Set to True to publish immediately
 )
 ```
+
+#### Version Retrieval Methods Explained
+
+- **`get_current_version()`**: Returns the published version marked as `is_current=True` (the currently active live version)
+- **`get_latest_published_version()`**: Returns the published version with the highest version number (most recently published)
+- **`get_latest_draft()`**: Returns the draft version with the highest version number (most recent draft)
+
+**Note**: `get_current_version()` and `get_latest_published_version()` may return different versions if multiple published versions exist and an older one is marked as current.
 
 ### Automatic Version Creation
 
@@ -464,6 +475,15 @@ version = page.create_version(
     description="Major content update",
     auto_publish=True
 )
+
+# Get different types of versions
+current = page.get_current_version()  # Currently active published version
+latest_published = page.get_latest_published_version()  # Most recent published version
+latest_draft = page.get_latest_draft()  # Most recent draft
+
+# Check for unpublished changes
+if page.has_unpublished_changes():
+    print("Page has draft versions newer than published")
 
 # Compare versions
 v1 = PageVersion.objects.get(id=1)
