@@ -8,7 +8,7 @@ from django.utils import timezone
 from django.test import override_settings
 import json
 
-from .models import WebPage, PageTheme, WidgetType, PageWidget, PageVersion
+from .models import WebPage, PageTheme, WidgetType, PageVersion
 
 
 class WidgetTypeModelTest(TestCase):
@@ -317,7 +317,7 @@ class WebPageInheritanceTest(TestCase):
         # Clear layout override
         success = self.webdev_page.apply_inheritance_override("clear_layout")
         self.assertTrue(success)
-        self.assertIsNone(self.webdev_page.layout)
+        self.assertEqual(self.webdev_page.code_layout, "")
 
     def test_circular_reference_prevention(self):
         """Test that circular references are prevented"""

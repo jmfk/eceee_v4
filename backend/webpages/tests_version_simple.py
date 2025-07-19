@@ -5,7 +5,7 @@ from rest_framework.test import APITestCase, APIClient
 from rest_framework import status
 from django.utils import timezone
 
-from .models import WebPage, PageTheme, WidgetType, PageWidget, PageVersion
+from .models import WebPage, PageTheme, WidgetType, PageVersion
 
 
 class PageVersionCoreTest(TestCase):

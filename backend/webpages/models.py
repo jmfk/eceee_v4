@@ -887,11 +887,11 @@ class WebPage(models.Model):
     def apply_inheritance_override(self, override_type, override_value=None):
         """Apply an inheritance override for layout, theme, or widgets"""
         if override_type == "layout":
-            self.layout = override_value
+            self.code_layout = override_value
         elif override_type == "theme":
             self.theme = override_value
         elif override_type == "clear_layout":
-            self.layout = None
+            self.code_layout = ""
         elif override_type == "clear_theme":
             self.theme = None
 

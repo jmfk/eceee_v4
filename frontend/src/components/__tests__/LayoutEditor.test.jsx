@@ -26,55 +26,39 @@ vi.mock('react-hot-toast', () => ({
 // Type the mocked axios
 const mockedAxios = vi.mocked(axios)
 
-const mockLayouts = [
-    {
-        id: 1,
-        name: 'Two Column Layout',
-        description: 'A layout with two columns',
-        slot_configuration: {
-            slots: [
-                {
-                    name: 'main',
-                    display_name: 'Main Content',
-                    description: 'Primary content area',
-                    css_classes: 'col-span-2',
-                    allows_multiple: true
-                },
-                {
-                    name: 'sidebar',
-                    display_name: 'Sidebar',
-                    description: 'Secondary content area',
-                    css_classes: 'col-span-1',
-                    allows_multiple: false
-                }
-            ]
-        },
-        css_classes: '.two-column { display: grid; grid-template-columns: 2fr 1fr; }',
-        is_active: true,
-        created_at: '2024-01-01T00:00:00Z',
-        created_by: { username: 'testuser' }
-    },
-    {
-        id: 2,
-        name: 'Single Column Layout',
-        description: 'A simple single column layout',
-        slot_configuration: {
-            slots: [
-                {
-                    name: 'content',
-                    display_name: 'Content',
-                    description: 'Main content',
-                    css_classes: '',
-                    allows_multiple: true
-                }
-            ]
-        },
-        css_classes: '.single-column { max-width: 800px; margin: 0 auto; }',
-        is_active: true,
-        created_at: '2024-01-01T00:00:00Z',
-        created_by: { username: 'testuser' }
+const mockLayoutsData = {
+    results: [
+        {
+            name: 'two_column',
+            description: 'A layout with two columns',
+            type: 'code',
+            slot_configuration: {
+                slots: [
+                    {
+                        name: 'main',
+                        display_name: 'Main Content',
+                        description: 'Primary content area',
+                        css_classes: 'col-span-2',
+                        allows_multiple: true
+                    },
+                    {
+                        name: 'sidebar',
+                        display_name: 'Sidebar',
+                        description: 'Secondary content area',
+                        css_classes: 'col-span-1',
+                        allows_multiple: false
+                    }
+                ]
+            },
+            template_name: 'layouts/two_column.html',
+            created_at: '2024-01-01T00:00:00Z'
+        }
+    ],
+    summary: {
+        active_layouts: 1,
+        total_layouts: 1
     }
-]
+}
 
 const createTestQueryClient = () => {
     return new QueryClient({
@@ -99,17 +83,10 @@ describe('LayoutEditor', () => {
     beforeEach(() => {
         vi.clearAllMocks()
 
-        // Mock successful API responses - LayoutEditor expects paginated response
-        mockedAxios.get.mockResolvedValue({
-            data: {
-                count: mockLayouts.length,
-                next: null,
-                previous: null,
-                results: mockLayouts
-            }
-        })
-        mockedAxios.post.mockResolvedValue({ data: mockLayouts[0] })
-        mockedAxios.put.mockResolvedValue({ data: mockLayouts[0] })
+        // Mock successful API responses - LayoutEditor expects code layouts response
+        mockedAxios.get.mockResolvedValue({ data: mockLayoutsData })
+        mockedAxios.post.mockResolvedValue({ data: {} })
+        mockedAxios.put.mockResolvedValue({ data: {} })
         mockedAxios.delete.mockResolvedValue({ data: {} })
     })
 
@@ -130,10 +107,8 @@ describe('LayoutEditor', () => {
         renderWithQueryClient(<LayoutEditor />)
 
         await waitFor(() => {
-            expect(screen.getByText('Two Column Layout')).toBeInTheDocument()
-            expect(screen.getByText('Single Column Layout')).toBeInTheDocument()
+            expect(screen.getByText('two_column')).toBeInTheDocument()
             expect(screen.getByText('2 slots')).toBeInTheDocument()
-            expect(screen.getByText('1 slots')).toBeInTheDocument()
         })
     })
 
