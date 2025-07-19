@@ -21,6 +21,7 @@ from drf_spectacular.views import (
     SpectacularSwaggerView,
     SpectacularRedocView,
 )
+from django.views.decorators.csrf import ensure_csrf_cookie
 
 # Import hostname-aware views for multi-site functionality
 from webpages.public_views import HostnamePageView
@@ -31,6 +32,15 @@ def health_check(request):
     return JsonResponse(
         {"status": "healthy", "service": "eceee-v4-backend", "version": "1.0.0"}
     )
+
+
+# CSRF token endpoint for React frontend
+@ensure_csrf_cookie
+def csrf_token_view(request):
+    """
+    Endpoint to provide CSRF token for React frontend
+    """
+    return JsonResponse({"csrfToken": request.META.get("CSRF_COOKIE")})
 
 
 urlpatterns = [
@@ -57,6 +67,8 @@ urlpatterns = [
     path("webpages/", include("webpages.urls")),
     # Monitoring and metrics
     path("metrics/", include("django_prometheus.urls")),
+    # CSRF token endpoint for frontend
+    path("csrf-token/", csrf_token_view, name="csrf-token"),
     # Multi-site hostname-aware routing - MUST be last for catch-all functionality
     path("", HostnamePageView.as_view(), name="hostname-root"),
     path("<path:slug_path>/", HostnamePageView.as_view(), name="hostname-page-detail"),

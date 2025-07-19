@@ -8,6 +8,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { api } from '../api/client.js';
 import { CheckCircle, AlertTriangle } from 'lucide-react';
 import SearchAndFilter from './bulk-publishing/SearchAndFilter';
 import BulkOperationControls from './bulk-publishing/BulkOperationControls';
@@ -33,11 +34,8 @@ const BulkPublishingOperations = () => {
     const fetchPages = async () => {
         try {
             setLoading(true);
-            const response = await fetch('/api/v1/webpages/pages/');
-            if (!response.ok) {
-                throw new Error('Failed to fetch pages');
-            }
-            const data = await response.json();
+            const response = await api.get('/api/v1/webpages/pages/');
+            const data = response.data;
             setPages(data.results || data);
         } catch (err) {
             setError(err.message);
@@ -98,21 +96,8 @@ const BulkPublishingOperations = () => {
                 })
             };
 
-            const response = await fetch(endpoint, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || ''
-                },
-                body: JSON.stringify(requestData)
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Operation failed');
-            }
-
-            const result = await response.json();
+            const response = await api.post(endpoint, requestData);
+            const result = response.data;
             setSuccess(result.message);
             setSelectedPages(new Set());
 

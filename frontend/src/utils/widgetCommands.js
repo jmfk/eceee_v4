@@ -1,4 +1,4 @@
-import axios from 'axios'
+import { api } from '../api/client.js'
 import toast from 'react-hot-toast'
 
 /**
@@ -7,7 +7,7 @@ import toast from 'react-hot-toast'
  */
 
 class WidgetCommand {
-    constructor(apiClient = axios) {
+    constructor(apiClient = api) {
         this.apiClient = apiClient
     }
 

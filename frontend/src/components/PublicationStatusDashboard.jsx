@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { api } from '../api/client.js';
 import {
     Calendar,
     Clock,
@@ -29,11 +30,8 @@ const PublicationStatusDashboard = () => {
     const fetchPublicationStatus = async () => {
         try {
             setLoading(true);
-            const response = await fetch('/api/v1/webpages/pages/publication_status/');
-            if (!response.ok) {
-                throw new Error('Failed to fetch publication status');
-            }
-            const data = await response.json();
+            const response = await api.get('/api/v1/webpages/pages/publication_status/');
+            const data = response.data;
             setStatusData(data);
         } catch (err) {
             setError(err.message);

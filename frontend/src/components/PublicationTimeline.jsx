@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { api } from '../api/client.js';
 import {
     Calendar,
     Clock,
@@ -37,11 +38,8 @@ const PublicationTimeline = () => {
             const startDate = getViewStartDate();
             const endDate = getViewEndDate();
 
-            const response = await fetch(`/api/v1/webpages/pages/?effective_date__gte=${startDate.toISOString()}&effective_date__lte=${endDate.toISOString()}`);
-            if (!response.ok) {
-                throw new Error('Failed to fetch timeline data');
-            }
-            const data = await response.json();
+            const response = await api.get(`/api/v1/webpages/pages/?effective_date__gte=${startDate.toISOString()}&effective_date__lte=${endDate.toISOString()}`);
+            const data = response.data;
             setTimelineData(data.results || data);
         } catch (err) {
             setError(err.message);

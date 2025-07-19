@@ -4,6 +4,7 @@
  */
 
 import { useState, useEffect } from 'react';
+import { api } from '../api/client.js';
 
 const useObjectPublisher = (pageId) => {
     const [selectedObjectType, setSelectedObjectType] = useState('');
@@ -15,19 +16,13 @@ const useObjectPublisher = (pageId) => {
     const [showObjectContent, setShowObjectContent] = useState(false);
     const [objectContent, setObjectContent] = useState(null);
 
-    // API URLs
-    const API_BASE = 'http://localhost:8000/api/v1';
-
     // Load current page data
     const loadPageData = async () => {
         if (!pageId) return;
 
         try {
-            const response = await fetch(`${API_BASE}/webpages/pages/${pageId}/`);
-            if (response.ok) {
-                const data = await response.json();
-                setCurrentPage(data);
-            }
+            const response = await api.get(`/api/v1/webpages/pages/${pageId}/`);
+            setCurrentPage(response.data);
         } catch (error) {
             console.error('Error loading page data:', error);
         }
@@ -37,16 +32,14 @@ const useObjectPublisher = (pageId) => {
     const loadObjects = async (objectType = '') => {
         setLoading(true);
         try {
-            let url = `${API_BASE}/content/all/`;
+            let url = `/api/v1/content/all/`;
             if (objectType) {
-                url = `${API_BASE}/content/${objectType}/`;
+                url = `/api/v1/content/${objectType}/`;
             }
 
-            const response = await fetch(url);
-            if (response.ok) {
-                const data = await response.json();
-                setObjects(data.results || data);
-            }
+            const response = await api.get(url);
+            const data = response.data;
+            setObjects(data.results || data);
         } catch (error) {
             console.error('Error loading objects:', error);
             setObjects([]);
@@ -59,25 +52,14 @@ const useObjectPublisher = (pageId) => {
     const linkObject = async (objectType, objectId, onSuccess, onError) => {
         setLinking(true);
         try {
-            const response = await fetch(`${API_BASE}/webpages/pages/${pageId}/link-object/`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    object_type: objectType,
-                    object_id: objectId
-                }),
+            const response = await api.post(`/api/v1/webpages/pages/${pageId}/link-object/`, {
+                object_type: objectType,
+                object_id: objectId
             });
 
-            if (response.ok) {
-                const data = await response.json();
-                await loadPageData(); // Reload page data
-                onSuccess?.(data);
-            } else {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to link object');
-            }
+            const data = response.data;
+            await loadPageData(); // Reload page data
+            onSuccess?.(data);
         } catch (error) {
             console.error('Error linking object:', error);
             onError?.(error.message);
@@ -90,20 +72,10 @@ const useObjectPublisher = (pageId) => {
     const unlinkObject = async (onSuccess, onError) => {
         setLinking(true);
         try {
-            const response = await fetch(`${API_BASE}/webpages/pages/${pageId}/unlink-object/`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-            });
+            const response = await api.post(`/api/v1/webpages/pages/${pageId}/unlink-object/`);
 
-            if (response.ok) {
-                await loadPageData(); // Reload page data
-                onSuccess?.();
-            } else {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to unlink object');
-            }
+            await loadPageData(); // Reload page data
+            onSuccess?.();
         } catch (error) {
             console.error('Error unlinking object:', error);
             onError?.(error.message);
@@ -116,20 +88,10 @@ const useObjectPublisher = (pageId) => {
     const syncWithObject = async (onSuccess, onError) => {
         setLinking(true);
         try {
-            const response = await fetch(`${API_BASE}/webpages/pages/${pageId}/sync-object/`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-            });
+            const response = await api.post(`/api/v1/webpages/pages/${pageId}/sync-object/`);
 
-            if (response.ok) {
-                await loadPageData(); // Reload page data
-                onSuccess?.();
-            } else {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to sync with object');
-            }
+            await loadPageData(); // Reload page data
+            onSuccess?.();
         } catch (error) {
             console.error('Error syncing with object:', error);
             onError?.(error.message);
@@ -141,12 +103,10 @@ const useObjectPublisher = (pageId) => {
     // Load object content for preview
     const loadObjectContent = async (objectType, objectId) => {
         try {
-            const response = await fetch(`${API_BASE}/content/${objectType}/${objectId}/`);
-            if (response.ok) {
-                const data = await response.json();
-                setObjectContent(data);
-                setShowObjectContent(true);
-            }
+            const response = await api.get(`/api/v1/content/${objectType}/${objectId}/`);
+            const data = response.data;
+            setObjectContent(data);
+            setShowObjectContent(true);
         } catch (error) {
             console.error('Error loading object content:', error);
         }

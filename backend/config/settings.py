@@ -179,6 +179,11 @@ CSRF_TRUSTED_ORIGINS = config(
     "CORS_ALLOWED_ORIGINS", default="http://localhost:3000,http://127.0.0.1:3000"
 ).split(",")
 
+# CSRF Cookie settings for React frontend
+CSRF_COOKIE_HTTPONLY = False  # Allow JavaScript access to CSRF cookie
+CSRF_COOKIE_SAMESITE = "Lax"
+CSRF_USE_SESSIONS = False  # Use cookies instead of sessions for CSRF tokens
+
 # Django REST Framework Configuration
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
