@@ -11,6 +11,7 @@ from .views import (
     WebPageViewSet,
     PageVersionViewSet,
     PageLayoutViewSet,
+    CodeLayoutViewSet,
     PageThemeViewSet,
     WidgetTypeViewSet,
     # PageWidgetViewSet,  # Temporarily disabled
@@ -21,6 +22,7 @@ router = DefaultRouter()
 router.register(r"pages", WebPageViewSet, basename="webpage")
 router.register(r"versions", PageVersionViewSet, basename="pageversion")
 router.register(r"layouts", PageLayoutViewSet, basename="pagelayout")
+router.register(r"code-layouts", CodeLayoutViewSet, basename="codelayout")
 router.register(r"themes", PageThemeViewSet, basename="pagetheme")
 router.register(r"widget-types", WidgetTypeViewSet, basename="widgettype")
 # router.register(r"widgets", PageWidgetViewSet, basename="pagewidget")  # Temporarily disabled

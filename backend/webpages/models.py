@@ -24,6 +24,9 @@ class PageLayout(models.Model):
     """
     Layout templates that define the structure and slots available on pages.
     Layouts can be inherited through the page hierarchy.
+
+    NOTE: This model is being phased out in favor of code-based layouts.
+    It remains for backward compatibility with existing database layouts.
     """
 
     name = models.CharField(max_length=255, unique=True)
@@ -63,6 +66,7 @@ class PageLayout(models.Model):
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "created_by": self.created_by.username if self.created_by else None,
+            "type": "database",  # Distinguish from code-based layouts
         }
 
 
@@ -214,13 +218,22 @@ class WebPage(models.Model):
     )
 
     # Layout and theme (with inheritance)
+    # Database-based layout (legacy)
     layout = models.ForeignKey(
         PageLayout,
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
-        help_text="Leave blank to inherit from parent",
+        help_text="Database layout (legacy). Leave blank to inherit from parent or use code_layout",
     )
+
+    # Code-based layout (new system)
+    code_layout = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Name of code-based layout class. Takes precedence over database layout. Leave blank to inherit from parent",
+    )
+
     theme = models.ForeignKey(
         PageTheme,
         null=True,
@@ -405,11 +418,62 @@ class WebPage(models.Model):
         return sorted(list(hostnames))
 
     def get_effective_layout(self):
-        """Get the layout for this page, inheriting from parent if needed"""
+        """
+        Get the layout for this page, supporting both code-based and database layouts.
+        Code-based layouts take precedence over database layouts.
+        Inherits from parent if no layout is specified.
+
+        Returns:
+            Either a BaseLayout instance (for code layouts) or PageLayout instance (for database layouts)
+        """
+        # Import here to avoid circular imports
+        from .layout_registry import layout_registry
+
+        # Check for code-based layout first (takes precedence)
+        if self.code_layout:
+            code_layout_instance = layout_registry.get_layout(self.code_layout)
+            if code_layout_instance:
+                return code_layout_instance
+            # If code layout is specified but not found, log warning and fall back
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.warning(
+                f"Code layout '{self.code_layout}' not found for page '{self.title}'. Falling back to database layout."
+            )
+
+        # Fall back to database layout
         if self.layout:
             return self.layout
-        elif self.parent:
+
+        # Inherit from parent
+        if self.parent:
             return self.parent.get_effective_layout()
+
+        return None
+
+    def get_effective_layout_dict(self):
+        """
+        Get the effective layout as a dictionary representation.
+        This provides a unified interface for both code and database layouts.
+        """
+        effective_layout = self.get_effective_layout()
+        if effective_layout:
+            if hasattr(effective_layout, "to_dict"):  # Both types have this method
+                return effective_layout.to_dict()
+        return None
+
+    def get_layout_type(self):
+        """Get the type of layout being used: 'code', 'database', or 'inherited'"""
+        if self.code_layout:
+            from .layout_registry import layout_registry
+
+            if layout_registry.is_registered(self.code_layout):
+                return "code"
+        if self.layout:
+            return "database"
+        if self.parent:
+            return "inherited"
         return None
 
     def get_effective_theme(self):
@@ -655,27 +719,56 @@ class WebPage(models.Model):
         return chain
 
     def get_layout_inheritance_info(self):
-        """Get detailed information about layout inheritance"""
+        """Get detailed information about layout inheritance including code-based layouts"""
+        from .layout_registry import layout_registry
+
         inheritance_info = {
             "effective_layout": None,
+            "effective_layout_dict": None,
+            "layout_type": None,
             "inherited_from": None,
             "inheritance_chain": [],
-            "override_options": [],
+            "override_options": {
+                "database_layouts": [],
+                "code_layouts": [],
+            },
         }
 
         # Find where the effective layout comes from
         current = self
         while current:
-            inheritance_info["inheritance_chain"].append(
-                {
-                    "page": current,
-                    "layout": current.layout,
-                    "is_override": current.layout is not None,
-                }
-            )
+            # Check what layout this page has
+            page_layout_info = {
+                "page": current,
+                "code_layout": current.code_layout,
+                "database_layout": current.layout,
+                "is_override": current.code_layout or current.layout is not None,
+            }
 
-            if current.layout:
-                inheritance_info["effective_layout"] = current.layout
+            inheritance_info["inheritance_chain"].append(page_layout_info)
+
+            # Determine effective layout (code takes precedence)
+            effective_layout = None
+            layout_type = None
+
+            if current.code_layout:
+                code_layout_instance = layout_registry.get_layout(current.code_layout)
+                if code_layout_instance:
+                    effective_layout = code_layout_instance
+                    layout_type = "code"
+
+            if not effective_layout and current.layout:
+                effective_layout = current.layout
+                layout_type = "database"
+
+            if effective_layout:
+                inheritance_info["effective_layout"] = effective_layout
+                inheritance_info["effective_layout_dict"] = (
+                    effective_layout.to_dict()
+                    if hasattr(effective_layout, "to_dict")
+                    else None
+                )
+                inheritance_info["layout_type"] = layout_type
                 inheritance_info["inherited_from"] = (
                     current if current != self else None
                 )
@@ -684,7 +777,12 @@ class WebPage(models.Model):
             current = current.parent
 
         # Get available layouts for override
-        inheritance_info["override_options"] = PageLayout.objects.filter(is_active=True)
+        inheritance_info["override_options"]["database_layouts"] = (
+            PageLayout.objects.filter(is_active=True)
+        )
+        inheritance_info["override_options"]["code_layouts"] = (
+            layout_registry.list_layouts(active_only=True)
+        )
 
         return inheritance_info
 

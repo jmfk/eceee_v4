@@ -243,6 +243,9 @@ class WebPageDetailSerializer(serializers.ModelSerializer):
     breadcrumbs = serializers.SerializerMethodField()
     effective_layout = serializers.SerializerMethodField()
     effective_theme = serializers.SerializerMethodField()
+    layout_type = serializers.SerializerMethodField()
+    layout_inheritance_info = serializers.SerializerMethodField()
+    available_code_layouts = serializers.SerializerMethodField()
     children_count = serializers.SerializerMethodField()
 
     class Meta:
@@ -257,6 +260,7 @@ class WebPageDetailSerializer(serializers.ModelSerializer):
             "sort_order",
             "layout",
             "layout_id",
+            "code_layout",  # New field for code-based layouts
             "theme",
             "theme_id",
             "publication_status",
@@ -277,6 +281,9 @@ class WebPageDetailSerializer(serializers.ModelSerializer):
             "breadcrumbs",
             "effective_layout",
             "effective_theme",
+            "layout_type",
+            "layout_inheritance_info",
+            "available_code_layouts",
             "children_count",
         ]
         read_only_fields = [
@@ -301,15 +308,85 @@ class WebPageDetailSerializer(serializers.ModelSerializer):
         ]
 
     def get_effective_layout(self, obj):
-        layout = obj.get_effective_layout()
-        return PageLayoutSerializer(layout).data if layout else None
+        """Get the effective layout as a unified dictionary regardless of type"""
+        return obj.get_effective_layout_dict()
 
     def get_effective_theme(self, obj):
         theme = obj.get_effective_theme()
         return PageThemeSerializer(theme).data if theme else None
 
+    def get_layout_type(self, obj):
+        """Get the type of layout: 'code', 'database', 'inherited', or None"""
+        return obj.get_layout_type()
+
+    def get_layout_inheritance_info(self, obj):
+        """Get detailed layout inheritance information"""
+        inheritance_info = obj.get_layout_inheritance_info()
+
+        # Serialize the inheritance chain for API consumption
+        serialized_chain = []
+        for chain_item in inheritance_info["inheritance_chain"]:
+            page = chain_item["page"]
+            serialized_chain.append(
+                {
+                    "page_id": page.id,
+                    "page_title": page.title,
+                    "code_layout": chain_item["code_layout"],
+                    "database_layout": (
+                        PageLayoutSerializer(chain_item["database_layout"]).data
+                        if chain_item["database_layout"]
+                        else None
+                    ),
+                    "is_override": chain_item["is_override"],
+                }
+            )
+
+        return {
+            "effective_layout": inheritance_info["effective_layout_dict"],
+            "layout_type": inheritance_info["layout_type"],
+            "inherited_from": (
+                {
+                    "id": inheritance_info["inherited_from"].id,
+                    "title": inheritance_info["inherited_from"].title,
+                }
+                if inheritance_info["inherited_from"]
+                else None
+            ),
+            "inheritance_chain": serialized_chain,
+            "override_options": {
+                "database_layouts": PageLayoutSerializer(
+                    inheritance_info["override_options"]["database_layouts"], many=True
+                ).data,
+                "code_layouts": [
+                    layout.to_dict()
+                    for layout in inheritance_info["override_options"]["code_layouts"]
+                ],
+            },
+        }
+
+    def get_available_code_layouts(self, obj):
+        """Get available code-based layouts for selection"""
+        from .layout_registry import layout_registry
+
+        return [
+            layout.to_dict()
+            for layout in layout_registry.list_layouts(active_only=True)
+        ]
+
     def get_children_count(self, obj):
         return obj.children.count()
+
+    def validate_code_layout(self, value):
+        """Validate that the code layout exists if specified"""
+        if value:
+            from .layout_registry import layout_registry
+
+            if not layout_registry.is_registered(value):
+                raise serializers.ValidationError(
+                    f"Code layout '{value}' is not registered. "
+                    f"Available layouts: {', '.join(layout_registry.get_layout_choices())}"
+                )
+        return value
 
     def validate(self, data):
         """Validate the entire page data"""

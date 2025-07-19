@@ -30,10 +30,105 @@ from .serializers import (
 from .filters import WebPageFilter, PageVersionFilter
 
 
+class CodeLayoutViewSet(viewsets.ViewSet):
+    """
+    ViewSet for managing code-based layouts.
+    Provides read-only access to registered layout classes.
+    """
+
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+
+    def list(self, request):
+        """Get all registered code-based layouts"""
+        from .layout_registry import layout_registry
+        from .layout_autodiscovery import get_layout_summary
+
+        active_only = request.query_params.get("active_only", "true").lower() == "true"
+        layouts = layout_registry.list_layouts(active_only=active_only)
+
+        layout_data = [layout.to_dict() for layout in layouts]
+
+        return Response(
+            {
+                "results": layout_data,
+                "summary": get_layout_summary(),
+            }
+        )
+
+    def retrieve(self, request, pk=None):
+        """Get a specific code-based layout by name"""
+        from .layout_registry import layout_registry
+
+        layout = layout_registry.get_layout(pk)
+        if not layout:
+            return Response(
+                {"error": f"Layout '{pk}' not found"}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        return Response(layout.to_dict())
+
+    @action(detail=False, methods=["get"])
+    def choices(self, request):
+        """Get layout choices for forms/dropdowns"""
+        from .layout_registry import layout_registry
+
+        active_only = request.query_params.get("active_only", "true").lower() == "true"
+        choices = layout_registry.get_layout_choices(active_only=active_only)
+
+        return Response(choices)
+
+    @action(detail=False, methods=["post"])
+    def reload(self, request):
+        """Reload all layouts (admin/dev use)"""
+        if not request.user.is_staff:
+            return Response(
+                {"error": "Only staff can reload layouts"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        from .layout_autodiscovery import reload_layouts, get_layout_summary
+
+        try:
+            reload_layouts()
+            return Response(
+                {
+                    "message": "Layouts reloaded successfully",
+                    "summary": get_layout_summary(),
+                }
+            )
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to reload layouts: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @action(detail=False, methods=["get"])
+    def validate(self, request):
+        """Validate all registered layouts (admin/dev use)"""
+        if not request.user.is_staff:
+            return Response(
+                {"error": "Only staff can validate layouts"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        from .layout_autodiscovery import validate_layout_configuration
+
+        try:
+            validate_layout_configuration()
+            return Response({"message": "All layouts are valid"})
+        except Exception as e:
+            return Response(
+                {"error": f"Layout validation failed: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+
 class PageLayoutViewSet(viewsets.ModelViewSet):
     """
-    ViewSet for managing page layouts.
+    ViewSet for managing database-based page layouts.
     Provides CRUD operations for layout templates.
+
+    NOTE: This is for legacy database layouts. New layouts should use code-based system.
     """
 
     queryset = PageLayout.objects.all()
@@ -50,10 +145,31 @@ class PageLayoutViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["get"])
     def active(self, request):
-        """Get only active layouts"""
+        """Get only active database layouts"""
         active_layouts = self.queryset.filter(is_active=True)
         serializer = self.get_serializer(active_layouts, many=True)
         return Response(serializer.data)
+
+    @action(detail=False, methods=["get"])
+    def all_layouts(self, request):
+        """Get both database and code-based layouts in unified format"""
+        from .layout_registry import layout_registry
+
+        # Get database layouts
+        database_layouts = self.queryset.filter(is_active=True)
+        db_data = [layout.to_dict() for layout in database_layouts]
+
+        # Get code layouts
+        code_layouts = layout_registry.list_layouts(active_only=True)
+        code_data = [layout.to_dict() for layout in code_layouts]
+
+        return Response(
+            {
+                "database_layouts": db_data,
+                "code_layouts": code_data,
+                "all_layouts": db_data + code_data,
+            }
+        )
 
 
 class PageThemeViewSet(viewsets.ModelViewSet):
