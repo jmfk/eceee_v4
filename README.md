@@ -83,12 +83,13 @@ We've achieved **100% frontend test success rate** - transforming from 31 failin
 - **Auto-Version Creation**: Automatic version snapshots on every page update
 
 ### 🎨 Layout & Theme System
-- **Flexible Layouts**: Slot-based page layouts with custom template selection
+- **Code-Based Layouts**: Python class-based layouts with automatic discovery
+- **Slot Architecture**: Slot-based page layouts with custom template selection
 - **Dynamic Themes**: CSS variable-based themes with real-time preview
 - **Template Architecture**: Modern base template with Tailwind CSS, HTMX, and Alpine.js
 - **Inheritance Engine**: Automatic propagation of layouts and themes down page hierarchy
+- **Version Control**: Layouts tracked in Git with the codebase
 - **Custom Templates**: Layout-specific template files for enhanced flexibility
-- **Conflict Detection**: Automatic detection and resolution of inheritance conflicts
 - **Multi-Device Preview**: Preview pages across desktop, tablet, and mobile
 
 ### 🧩 Widget System
