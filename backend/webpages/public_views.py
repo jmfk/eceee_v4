@@ -492,8 +492,11 @@ class HostnamePageView(View):
             raise Http404(f"No site configured for hostname: {hostname}")
 
         # If no path specified, return the root page
-        widgets = root_page.widgets.all()
+        content = root_page.get_latest_published_version()
+        widgets = content.widgets
+        page_data = content.page_data
         print("widgets", widgets)
+
         context = {
             "root_page": root_page,
             "current_page": root_page,
@@ -503,6 +506,13 @@ class HostnamePageView(View):
             "parent": root_page.parent,
             "slug_parts": slug_parts,
             "request": request,
+            "widgets": widgets,
+            "page_data": page_data,
+            "version_number": content.version_number,
+            "status": content.status,
+            "is_current": content.is_current,
+            "published_at": content.published_at,
+            "published_by": content.published_by,
         }
 
         if not slug_parts:
@@ -541,9 +551,17 @@ class HostnamePageView(View):
                     current_page = WebPage.objects.select_related(
                         "layout", "theme", "parent"
                     ).get(slug=slug, parent=current_page)
-                    widgets = current_page.widgets.all()
+                    content = current_page.get_latest_published_version()
+                    widgets = content.widgets
+                    page_data = content.page_data
                     context["current_page"] = current_page
                     context["widgets"] = widgets
+                    context["page_data"] = page_data
+                    context["version_number"] = content.version_number
+                    context["status"] = content.status
+                    context["is_current"] = content.is_current
+                    context["published_at"] = content.published_at
+                    context["published_by"] = content.published_by
                     context["layout"] = current_page.layout
                     context["theme"] = current_page.theme
                     context["parent"] = current_page.parent
