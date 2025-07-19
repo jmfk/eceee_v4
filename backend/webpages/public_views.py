@@ -31,7 +31,7 @@ class PublishedPageMixin:
                 publication_status="published", effective_date__lte=now
             )
             .filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
-            .select_related("parent", "layout", "theme")
+            .select_related("parent", "theme")
         )
 
 
@@ -159,7 +159,7 @@ class PageListView(PublishedPageMixin, ListView):
                 effective_date__lte=now,
             )
             .filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
-            .select_related("layout", "theme")
+            .select_related("theme")
             .order_by("sort_order", "title")
         )
 
@@ -283,7 +283,7 @@ def page_sitemap_view(request):
     pages = (
         WebPage.objects.filter(publication_status="published", effective_date__lte=now)
         .filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
-        .select_related("layout", "theme")
+        .select_related("theme")
         .order_by("sort_order", "title")
     )
 
@@ -316,7 +316,7 @@ def page_hierarchy_api(request):
             parent__isnull=True, publication_status="published", effective_date__lte=now
         )
         .filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
-        .select_related("parent", "layout", "theme")
+        .select_related("parent", "theme")
         .prefetch_related("children")
         .order_by("sort_order", "title")
     )
@@ -348,7 +348,7 @@ def page_search_view(request):
             effective_date__lte=now,
         )
         .filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
-        .select_related("layout", "theme")[:20]
+        .select_related("theme")[:20]
     )
 
     results = []

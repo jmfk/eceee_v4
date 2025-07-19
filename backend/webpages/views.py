@@ -453,7 +453,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
 
     queryset = (
         WebPage.objects.select_related(
-            "parent", "layout", "theme", "created_by", "last_modified_by"
+            "parent", "theme", "created_by", "last_modified_by"
         )
         .prefetch_related("children")
         .all()

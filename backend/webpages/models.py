@@ -341,7 +341,7 @@ class WebPage(models.Model):
         )
 
         if pages.exists():
-            return pages.select_related("layout", "theme", "parent").first()
+            return pages.select_related("theme", "parent").first()
 
         # Fallback: look for wildcard or default patterns using array overlap
         wildcard_pages = cls.objects.filter(
@@ -349,7 +349,7 @@ class WebPage(models.Model):
         )
 
         if wildcard_pages.exists():
-            return wildcard_pages.select_related("layout", "theme", "parent").first()
+            return wildcard_pages.select_related("theme", "parent").first()
 
         return None
 
