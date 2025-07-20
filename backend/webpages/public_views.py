@@ -500,7 +500,7 @@ class HostnamePageView(View):
             "root_page": root_page,
             "current_page": root_page,
             "widgets": widgets,
-            "layout": root_page.layout,
+            "layout": root_page.get_effective_layout(),
             "theme": root_page.theme,
             "parent": root_page.parent,
             "slug_parts": slug_parts,
@@ -548,7 +548,7 @@ class HostnamePageView(View):
             for slug in slug_parts:
                 try:
                     current_page = WebPage.objects.select_related(
-                        "layout", "theme", "parent"
+                        "theme", "parent"
                     ).get(slug=slug, parent=current_page)
                     content = current_page.get_latest_published_version()
                     widgets = content.widgets
@@ -561,7 +561,7 @@ class HostnamePageView(View):
                     context["is_current"] = content.is_current
                     context["published_at"] = content.published_at
                     context["published_by"] = content.published_by
-                    context["layout"] = current_page.layout
+                    context["layout"] = current_page.get_effective_layout()
                     context["theme"] = current_page.theme
                     context["parent"] = current_page.parent
                 except WebPage.DoesNotExist:
@@ -571,18 +571,22 @@ class HostnamePageView(View):
         if not self._is_page_accessible(current_page):
             raise Http404("Page not available")
 
-        print("current_page.layout", current_page.layout)
+        effective_layout = current_page.get_effective_layout()
+        print("current_page effective_layout", effective_layout)
         template_name = (
-            current_page.layout.template_name
-            if current_page.layout
+            effective_layout.template_name
+            if effective_layout
             else "webpages/page_detail.html"
         )
 
         # widgets = context["widgets"].all()
         # context["widgets"] = current_page.widgets
-        # context["layout"] = current_page.layout
-        print("slots", current_page.layout.slot_configuration)
-        context["slots"] = current_page.layout.slot_configuration["slots"]
+        # context["layout"] = current_page.get_effective_layout()
+        if effective_layout:
+            print("slots", effective_layout.slot_configuration)
+            context["slots"] = effective_layout.slot_configuration["slots"]
+        else:
+            context["slots"] = []
 
         return render(request, template_name, context)
 
