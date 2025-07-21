@@ -34,10 +34,9 @@ import ObjectPublisher from '../components/ObjectPublisher'
 import PublicationStatusDashboard from '../components/PublicationStatusDashboard'
 import PublicationTimeline from '../components/PublicationTimeline'
 import BulkPublishingOperations from '../components/BulkPublishingOperations'
-import TreePageManager from '../components/TreePageManager'
 
-const PageManagement = () => {
-    const [activeTab, setActiveTab] = useState('tree')
+const SettingsManager = () => {
+    const [activeTab, setActiveTab] = useState('layouts')
     const [selectedPage, setSelectedPage] = useState(null)
     const [searchTerm, setSearchTerm] = useState('')
     const [showVersionManager, setShowVersionManager] = useState(false)
@@ -107,19 +106,6 @@ const PageManagement = () => {
     const availableLayoutOptions = getAvailableLayoutsForFilter()
 
     const tabs = [
-
-        {
-            id: 'tree',
-            label: 'Page Tree',
-            icon: Database,
-            description: 'Hierarchical page management with drag & drop'
-        },
-        {
-            id: 'pages',
-            label: 'Pages',
-            icon: FileText,
-            description: 'Manage pages and content'
-        },
         {
             id: 'layouts',
             label: 'Layouts',
@@ -239,315 +225,7 @@ const PageManagement = () => {
         duplicatePageMutation.mutate(page)
     }
 
-    const renderPageManagement = () => (
-        <div className="space-y-6">
-            {/* Page List */}
-            <div className="bg-white rounded-lg shadow">
-                <div className="p-4 border-b border-gray-200">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <h3 className="text-lg font-medium text-gray-900">Pages</h3>
-                            <p className="text-sm text-gray-500 mt-1">
-                                {pagesLoading ? 'Loading...' : `${filteredPages.length} of ${pages.length} pages`}
-                            </p>
-                        </div>
-                        <button
-                            onClick={() => setIsCreating(true)}
-                            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                        >
-                            <Plus className="w-4 h-4 mr-2" />
-                            New Page
-                        </button>
-                    </div>
-                    <div className="mt-4 space-y-4">
-                        <div className="flex items-center space-x-4">
-                            <div className="flex-1 relative">
-                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                                <input
-                                    type="text"
-                                    placeholder="Search pages..."
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
-                            </div>
-                            <button
-                                onClick={() => setShowFilters(!showFilters)}
-                                className={`inline-flex items-center px-3 py-2 border rounded-lg text-sm font-medium transition-colors ${showFilters || statusFilter !== 'all' || layoutFilter !== 'all'
-                                    ? 'border-blue-500 text-blue-600 bg-blue-50'
-                                    : 'border-gray-300 text-gray-700 bg-white hover:bg-gray-50'
-                                    }`}
-                            >
-                                <Filter className="w-4 h-4 mr-2" />
-                                Filters
-                                <ChevronDown className={`w-4 h-4 ml-2 transform transition-transform ${showFilters ? 'rotate-180' : ''
-                                    }`} />
-                            </button>
-                        </div>
 
-                        {showFilters && (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
-                                <div>
-                                    <label htmlFor="status-filter" className="block text-sm font-medium text-gray-700 mb-1">
-                                        Status
-                                    </label>
-                                    <select
-                                        id="status-filter"
-                                        value={statusFilter}
-                                        onChange={(e) => setStatusFilter(e.target.value)}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    >
-                                        <option value="all">All Statuses</option>
-                                        <option value="unpublished">Unpublished</option>
-                                        <option value="scheduled">Scheduled</option>
-                                        <option value="published">Published</option>
-                                        <option value="expired">Expired</option>
-                                    </select>
-                                </div>
-
-                                <div>
-                                    <label htmlFor="layout-filter" className="block text-sm font-medium text-gray-700 mb-1">
-                                        Layout
-                                    </label>
-                                    <select
-                                        id="layout-filter"
-                                        value={layoutFilter}
-                                        onChange={(e) => setLayoutFilter(e.target.value)}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    >
-                                        {availableLayoutOptions.map(option => (
-                                            <option key={option.value} value={option.value}>
-                                                {option.label}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                <div className="divide-y divide-gray-200 max-h-96 overflow-y-auto">
-                    {pagesLoading ? (
-                        <div className="p-8 text-center text-gray-500">
-                            <div className="animate-pulse space-y-4">
-                                {[...Array(3)].map((_, i) => (
-                                    <div key={i} className="h-16 bg-gray-200 rounded"></div>
-                                ))}
-                            </div>
-                        </div>
-                    ) : filteredPages.length > 0 ? (
-                        filteredPages.map((page) => (
-                            <div
-                                key={page.id}
-                                onClick={() => setSelectedPage(page)}
-                                className={`p-4 cursor-pointer hover:bg-gray-50 transition-colors ${selectedPage?.id === page.id ? 'bg-blue-50 border-r-4 border-blue-500' : ''}`}
-                            >
-                                <div className="flex items-center justify-between">
-                                    <div className="flex-1">
-                                        <div className="flex items-center space-x-3">
-                                            <h4 className="font-medium text-gray-900">{page.title}</h4>
-                                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${page.publication_status === 'published'
-                                                ? 'bg-green-100 text-green-800'
-                                                : page.publication_status === 'scheduled'
-                                                    ? 'bg-blue-100 text-blue-800'
-                                                    : 'bg-gray-100 text-gray-800'
-                                                }`}>
-                                                {page.publication_status}
-                                            </span>
-                                            {/* Layout type indicator */}
-                                            {layoutUtils.getPageLayoutType(page) === 'code' && (
-                                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                                    <Code className="w-3 h-3 mr-1" />
-                                                    Code Layout
-                                                </span>
-                                            )}
-                                        </div>
-                                        <p className="text-sm text-gray-500 mt-1">
-                                            /{page.slug}/ • Layout: {layoutUtils.getEffectiveLayoutName(page)}
-                                        </p>
-                                        {page.description && (
-                                            <p className="text-sm text-gray-600 mt-1">{page.description}</p>
-                                        )}
-                                    </div>
-                                    <div className="flex items-center space-x-2">
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation()
-                                                // Handle page preview - could navigate to preview URL
-                                                window.open(`/pages/${page.slug}`, '_blank')
-                                            }}
-                                            className="p-1 text-gray-400 hover:text-gray-600"
-                                            title="Preview page"
-                                        >
-                                            <Eye className="w-4 h-4" />
-                                        </button>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation()
-                                                setSelectedPage(page)
-                                                setIsEditing(true)
-                                            }}
-                                            className="p-1 text-green-600 hover:text-green-700"
-                                            title="Edit page"
-                                        >
-                                            <Edit3 className="w-4 h-4" />
-                                        </button>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation()
-                                                setSelectedPage(page)
-                                                setActiveTab('widgets')
-                                            }}
-                                            className="p-1 text-blue-600 hover:text-blue-700"
-                                            title="Manage widgets"
-                                        >
-                                            <Layers className="w-4 h-4" />
-                                        </button>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation()
-                                                setSelectedPage(page)
-                                                setShowVersionManager(true)
-                                            }}
-                                            className="p-1 text-purple-600 hover:text-purple-700"
-                                            title="Version history"
-                                        >
-                                            <History className="w-4 h-4" />
-                                        </button>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation()
-                                                handleDuplicatePage(page)
-                                            }}
-                                            className="p-1 text-orange-600 hover:text-orange-700"
-                                            title="Duplicate page"
-                                            disabled={duplicatePageMutation.isLoading}
-                                        >
-                                            <Copy className="w-4 h-4" />
-                                        </button>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation()
-                                                handleDeletePage(page)
-                                            }}
-                                            className="p-1 text-red-600 hover:text-red-700"
-                                            title="Delete page"
-                                            disabled={deletePageMutation.isLoading}
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        ))
-                    ) : (
-                        <div className="p-8 text-center text-gray-500">
-                            <FileText className="w-8 h-8 mx-auto mb-2" />
-                            {searchTerm || statusFilter !== 'all' || layoutFilter !== 'all' ? (
-                                <div>
-                                    <p className="font-medium">No pages found</p>
-                                    <p className="text-sm mt-1">
-                                        Try adjusting your search terms
-                                    </p>
-                                    <button
-                                        onClick={() => {
-                                            setSearchTerm('')
-                                            setStatusFilter('all')
-                                            setLayoutFilter('all')
-                                            setShowFilters(false)
-                                        }}
-                                        className="mt-2 text-blue-600 hover:text-blue-700 text-sm font-medium"
-                                    >
-                                        Clear all filters
-                                    </button>
-                                </div>
-                            ) : (
-                                <div>
-                                    <p className="font-medium">No pages found</p>
-                                    <p className="text-sm mt-1">
-                                        Get started by creating your first page
-                                    </p>
-                                    <button
-                                        onClick={() => setIsCreating(true)}
-                                        className="mt-3 inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
-                                    >
-                                        <Plus className="w-4 h-4 mr-2" />
-                                        Create First Page
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            {/* Page Create/Edit Form */}
-            {(isCreating || isEditing) && (
-                <PageForm
-                    page={isEditing ? selectedPage : null}
-                    onSave={(pageData) => {
-                        if (isEditing) {
-                            updatePageMutation.mutate({ id: selectedPage.id, ...pageData })
-                        } else {
-                            createPageMutation.mutate(pageData)
-                        }
-                    }}
-                    onCancel={() => {
-                        setIsCreating(false)
-                        setIsEditing(false)
-                        setSelectedPage(null)
-                    }}
-                    isLoading={createPageMutation.isLoading || updatePageMutation.isLoading}
-                />
-            )}
-
-            {/* Selected Page Details - only show when not creating/editing */}
-            {selectedPage && !isCreating && !isEditing && (
-                <div className="bg-white rounded-lg shadow p-6">
-                    <h4 className="text-lg font-medium text-gray-900 mb-4">Page Details</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Page Title
-                            </label>
-                            <p className="text-sm text-gray-900">{selectedPage.title}</p>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                URL Slug
-                            </label>
-                            <p className="text-sm text-gray-900">/{selectedPage.slug}</p>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Layout
-                            </label>
-                            <p className="text-sm text-gray-900">
-                                {layoutUtils.getEffectiveLayoutName(selectedPage)}
-                            </p>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Theme
-                            </label>
-                            <p className="text-sm text-gray-900">
-                                {selectedPage.theme?.name || 'No theme assigned'}
-                            </p>
-                        </div>
-                    </div>
-                    {selectedPage.description && (
-                        <div className="mt-4">
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Description
-                            </label>
-                            <p className="text-sm text-gray-900">{selectedPage.description}</p>
-                        </div>
-                    )}
-                </div>
-            )}
-        </div>
-    )
 
     const renderWidgetManagement = () => {
         if (!selectedPage) {
@@ -723,21 +401,6 @@ const PageManagement = () => {
 
     const renderTabContent = () => {
         switch (activeTab) {
-            case 'pages':
-                return renderPageManagement()
-            case 'tree':
-                return (
-                    <TreePageManager
-                        onEditPage={(page) => {
-                            setSelectedPage(page)
-                            if (page) {
-                                setActiveTab('widgets') // Switch to widgets tab for editing
-                            } else {
-                                setIsCreating(true) // Open create page form
-                            }
-                        }}
-                    />
-                )
             case 'layouts':
                 return <LayoutEditor />
             case 'themes':
@@ -759,7 +422,7 @@ const PageManagement = () => {
         <div className="space-y-6">
             {/* Header */}
             <div className="bg-white rounded-lg shadow p-6">
-                <h1 className="text-2xl font-bold text-gray-900">Page Management</h1>
+                <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
                 <p className="text-gray-600 mt-2">
                     Manage your website pages, layouts, themes, and widgets
                 </p>
@@ -959,4 +622,4 @@ const PageForm = ({ page = null, onSave, onCancel, isLoading = false }) => {
     )
 }
 
-export default PageManagement 
+export default SettingsManager 

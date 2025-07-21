@@ -5,7 +5,7 @@ import { X } from 'lucide-react'
 import Navbar from '@components/Navbar'
 import HomePage from '@pages/HomePage'
 import AboutPage from '@pages/AboutPage'
-import PageManagement from '@pages/PageManagement'
+import SettingsManager from '@pages/SettingsManager'
 import TreePageManager from '@components/TreePageManager'
 import NotFoundPage from '@pages/NotFoundPage'
 
@@ -31,7 +31,7 @@ function App() {
               <Route path="/" element={<HomePage />} />
               <Route path="/about" element={<AboutPage />} />
               <Route path="/pages" element={<TreePageManager />} />
-              <Route path="/settings" element={<PageManagement />} />
+              <Route path="/settings" element={<SettingsManager />} />
               <Route path="*" element={<NotFoundPage />} />
             </Routes>
           </main>
