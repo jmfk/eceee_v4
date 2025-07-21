@@ -8,7 +8,6 @@ import {
     Expand,
     Minimize2,
     Scissors,
-    Copy,
     FolderPlus,
     AlertCircle,
     Loader2
@@ -31,7 +30,6 @@ const TreePageManager = ({ onEditPage }) => {
     const [showFilters, setShowFilters] = useState(false)
     const [statusFilter, setStatusFilter] = useState('all')
     const [cutPageId, setCutPageId] = useState(null)
-    const [copiedPageId, setCopiedPageId] = useState(null)
     const [expandedPages, setExpandedPages] = useState(new Set())
 
     const queryClient = useQueryClient()
@@ -194,16 +192,10 @@ const TreePageManager = ({ onEditPage }) => {
     // Cut/Copy/Paste handlers
     const handleCut = useCallback((pageId) => {
         setCutPageId(pageId)
-        setCopiedPageId(null)
-    }, [])
-
-    const handleCopy = useCallback((pageId) => {
-        setCopiedPageId(pageId)
-        setCutPageId(null)
     }, [])
 
     const handlePaste = useCallback(async (targetPageId, pasteMode = 'child') => {
-        const sourcePageId = cutPageId || copiedPageId
+        const sourcePageId = cutPageId
         if (!sourcePageId) return
 
         if (cutPageId) {
@@ -346,15 +338,8 @@ const TreePageManager = ({ onEditPage }) => {
                 console.error('Failed to move page')
                 // Error handling (revert) is done in the mutation's onError
             }
-        } else if (copiedPageId) {
-            // Copy operation (would need to be implemented)
-            toast('Copy functionality not yet implemented', {
-                icon: 'ℹ️',
-                duration: 3000
-            })
-            setCopiedPageId(null)
         }
-    }, [cutPageId, copiedPageId, pages, movePageMutation, removePageFromTree, addPageToTree])
+    }, [cutPageId, pages, movePageMutation, removePageFromTree, addPageToTree])
 
     // Delete handler with optimistic update
     const handleDelete = useCallback(async (pageId) => {
@@ -397,7 +382,6 @@ const TreePageManager = ({ onEditPage }) => {
     // Clear clipboard
     const clearClipboard = () => {
         setCutPageId(null)
-        setCopiedPageId(null)
         console.log('Clipboard cleared')
     }
 
@@ -501,13 +485,13 @@ const TreePageManager = ({ onEditPage }) => {
                 )}
 
                 {/* Clipboard status */}
-                {(cutPageId || copiedPageId) && (
+                {cutPageId && (
                     <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg space-y-2">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2 text-sm text-blue-800">
-                                {cutPageId ? <Scissors className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                                <Scissors className="w-4 h-4" />
                                 <span>
-                                    Page {cutPageId ? 'cut' : 'copied'} to clipboard
+                                    Page cut to clipboard
                                 </span>
                             </div>
                             <Tooltip text="Clear clipboard" position="top">
@@ -574,11 +558,9 @@ const TreePageManager = ({ onEditPage }) => {
                                 onLoadChildren={loadChildren}
                                 onEdit={handleEdit}
                                 onCut={handleCut}
-                                onCopy={handleCopy}
                                 onPaste={handlePaste}
                                 onDelete={handleDelete}
                                 cutPageId={cutPageId}
-                                copiedPageId={copiedPageId}
                             />
                         ))}
                     </div>
@@ -593,7 +575,7 @@ const TreePageManager = ({ onEditPage }) => {
                         {searchTerm && ' (filtered)'}
                     </span>
                     <div className="flex items-center gap-4">
-                        <span>Cut/Copy to move pages</span>
+                        <span>Cut to move pages</span>
                         <Tooltip text="Create page" position="top">
                             <button
                                 onClick={() => onEditPage?.(null)}

@@ -7,7 +7,6 @@ import {
     Folder,
     FolderOpen,
     Edit,
-    Copy,
     Scissors,
     Trash2,
     Globe,
@@ -29,11 +28,9 @@ const PageTreeNode = ({
     onLoadChildren,
     onEdit,
     onCut,
-    onCopy,
     onPaste,
     onDelete,
-    cutPageId,
-    copiedPageId
+    cutPageId
 }) => {
     const [isExpanded, setIsExpanded] = useState(page.isExpanded || false)
     const [isLoading, setIsLoading] = useState(false)
@@ -42,9 +39,8 @@ const PageTreeNode = ({
     // Check if page has children
     const hasChildren = pageTreeUtils.hasChildren(page)
 
-    // Check if page is cut/copied
+    // Check if page is cut
     const isCut = cutPageId === page.id
-    const isCopied = copiedPageId === page.id
 
     // Animation state for page movement
     const [isAnimating, setIsAnimating] = useState(false)
@@ -91,11 +87,6 @@ const PageTreeNode = ({
         toast.success('Page cut to clipboard')
     }
 
-    const handleCopy = () => {
-        onCopy?.(page.id)
-        toast.success('Page copied to clipboard')
-    }
-
     const handleDelete = () => {
         if (confirm(`Are you sure you want to delete "${page.title}"? This action cannot be undone.`)) {
             onDelete?.(page.id)
@@ -133,7 +124,6 @@ const PageTreeNode = ({
                 className={`
                     flex items-center px-2 py-1 hover:bg-gray-50 group relative
                     ${isCut ? 'opacity-60 bg-orange-50' : ''}
-                    ${isCopied ? 'bg-blue-50' : ''}
                     ${level > 0 ? 'border-l border-gray-200' : ''}
                     ${isAnimating ? 'transition-all duration-500 ease-in-out' : ''}
                     ${animationDirection === 'up' ? 'transform -translate-y-8' : ''}
@@ -227,15 +217,6 @@ const PageTreeNode = ({
                         </button>
                     </Tooltip>
 
-                    <Tooltip text="Copy" position="top">
-                        <button
-                            onClick={handleCopy}
-                            className="p-1 rounded hover:bg-gray-200 text-gray-500 hover:text-blue-600 transition-colors"
-                        >
-                            <Copy className="w-3 h-3" />
-                        </button>
-                    </Tooltip>
-
                     <Tooltip text="Cut" position="top">
                         <button
                             onClick={handleCut}
@@ -245,7 +226,7 @@ const PageTreeNode = ({
                         </button>
                     </Tooltip>
 
-                    {(cutPageId || copiedPageId) && (
+                    {cutPageId && (
                         <>
                             <Tooltip text="Paste above" position="top">
                                 <button
@@ -298,11 +279,9 @@ const PageTreeNode = ({
                             onLoadChildren={onLoadChildren}
                             onEdit={onEdit}
                             onCut={onCut}
-                            onCopy={onCopy}
                             onPaste={onPaste}
                             onDelete={onDelete}
                             cutPageId={cutPageId}
-                            copiedPageId={copiedPageId}
                         />
                     ))}
                 </div>
