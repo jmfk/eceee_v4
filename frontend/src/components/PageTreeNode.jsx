@@ -41,6 +41,8 @@ const PageTreeNode = ({
     const [isExpanded, setIsExpanded] = useState(page.isExpanded || false)
     const [isLoading, setIsLoading] = useState(false)
     const [showHostnameModal, setShowHostnameModal] = useState(false)
+    const [isEditingTitle, setIsEditingTitle] = useState(false)
+    const [editingTitle, setEditingTitle] = useState('')
     const queryClient = useQueryClient()
 
     // Sync local expansion state with page prop changes
@@ -119,6 +121,40 @@ const PageTreeNode = ({
         }
     }
 
+    // Title editing handlers
+    const handleTitleClick = () => {
+        setIsEditingTitle(true)
+        setEditingTitle(page.title)
+    }
+
+    const handleTitleSave = () => {
+        const trimmedTitle = editingTitle.trim()
+        if (!trimmedTitle) {
+            toast.error('Title cannot be empty')
+            return
+        }
+        if (trimmedTitle === page.title) {
+            setIsEditingTitle(false)
+            return
+        }
+        updateTitleMutation.mutate({ title: trimmedTitle })
+    }
+
+    const handleTitleCancel = () => {
+        setIsEditingTitle(false)
+        setEditingTitle('')
+    }
+
+    const handleTitleKeyDown = (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault()
+            handleTitleSave()
+        } else if (e.key === 'Escape') {
+            e.preventDefault()
+            handleTitleCancel()
+        }
+    }
+
     // Update page hostnames mutation
     const updateHostnamesMutation = useMutation({
         mutationFn: async (hostnamesData) => {
@@ -132,6 +168,23 @@ const PageTreeNode = ({
         },
         onError: (error) => {
             toast.error(error.response?.data?.detail || 'Failed to update hostnames')
+        }
+    })
+
+    // Update page title mutation
+    const updateTitleMutation = useMutation({
+        mutationFn: async (titleData) => {
+            const response = await api.patch(`/api/v1/webpages/pages/${page.id}/`, titleData)
+            return response.data
+        },
+        onSuccess: () => {
+            toast.success('Title updated successfully')
+            setIsEditingTitle(false)
+            queryClient.invalidateQueries(['pages'])
+        },
+        onError: (error) => {
+            toast.error(error.response?.data?.detail || 'Failed to update title')
+            setEditingTitle(page.title) // Reset to original title on error
         }
     })
 
@@ -207,9 +260,43 @@ const PageTreeNode = ({
 
                     {/* Page info */}
                     <div className="flex-1 min-w-0 flex items-center gap-2">
-                        <span className="truncate font-medium text-sm">
-                            {page.title}
-                        </span>
+                        {isEditingTitle ? (
+                            <div className="flex items-center gap-1">
+                                <input
+                                    type="text"
+                                    value={editingTitle}
+                                    onChange={(e) => setEditingTitle(e.target.value)}
+                                    onKeyDown={handleTitleKeyDown}
+                                    className="truncate font-medium text-sm bg-white border border-blue-300 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-0 flex-1"
+                                    autoFocus
+                                    disabled={updateTitleMutation.isPending}
+                                />
+                                <button
+                                    onClick={handleTitleSave}
+                                    disabled={updateTitleMutation.isPending}
+                                    className="p-0.5 rounded hover:bg-green-100 text-green-600 transition-colors disabled:opacity-50"
+                                    title="Save (Enter)"
+                                >
+                                    <Save className="w-3 h-3" />
+                                </button>
+                                <button
+                                    onClick={handleTitleCancel}
+                                    disabled={updateTitleMutation.isPending}
+                                    className="p-0.5 rounded hover:bg-red-100 text-red-600 transition-colors disabled:opacity-50"
+                                    title="Cancel (Escape)"
+                                >
+                                    <X className="w-3 h-3" />
+                                </button>
+                            </div>
+                        ) : (
+                            <span
+                                className="truncate font-medium text-sm cursor-pointer hover:text-blue-600 hover:underline transition-colors"
+                                onClick={handleTitleClick}
+                                title="Click to edit title"
+                            >
+                                {page.title}
+                            </span>
+                        )}
                         {isRootPageCheck ? (
                             <button
                                 onClick={handleHostnameClick}
