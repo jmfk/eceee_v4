@@ -6,6 +6,7 @@ import Navbar from '@components/Navbar'
 import HomePage from '@pages/HomePage'
 import AboutPage from '@pages/AboutPage'
 import PageManagement from '@pages/PageManagement'
+import TreePageManager from '@components/TreePageManager'
 import NotFoundPage from '@pages/NotFoundPage'
 
 // Create a client for React Query
@@ -29,7 +30,8 @@ function App() {
             <Routes>
               <Route path="/" element={<HomePage />} />
               <Route path="/about" element={<AboutPage />} />
-              <Route path="/manage/pages" element={<PageManagement />} />
+              <Route path="/pages" element={<TreePageManager />} />
+              <Route path="/settings" element={<PageManagement />} />
               <Route path="*" element={<NotFoundPage />} />
             </Routes>
           </main>

@@ -9,7 +9,8 @@ const Navbar = () => {
   const navigation = [
     { name: 'Home', href: '/', icon: Code },
     { name: 'About', href: '/about', icon: Cpu },
-    { name: 'Page Management', href: '/manage/pages', icon: Settings },
+    { name: 'Pages', href: '/pages', icon: Settings },
+    { name: 'Settings', href: '/settings', icon: Settings },
   ]
 
   const isActive = (path) => {
