@@ -163,6 +163,25 @@ const TreePageManager = ({ onEditPage }) => {
         }
     }, [rootPagesData])
 
+    // Helper function to optimistically update tree structure
+    const updatePageInTree = useCallback((pages, pageId, updater) => {
+        const updateRecursive = (pageList) => {
+            return pageList.map(page => {
+                if (page.id === pageId) {
+                    return updater(page)
+                }
+                if (page.children && page.children.length > 0) {
+                    return {
+                        ...page,
+                        children: updateRecursive(page.children)
+                    }
+                }
+                return page
+            }).filter(Boolean) // Remove null/undefined pages
+        }
+        return updateRecursive(pages)
+    }, [])
+
     // Helper function to refresh child pages for a specific parent
     const refreshChildPages = useCallback(async (parentId) => {
         try {
@@ -184,25 +203,6 @@ const TreePageManager = ({ onEditPage }) => {
             console.error(`Failed to refresh child pages for parent ${parentId}:`, error)
         }
     }, [updatePageInTree, queryClient])
-
-    // Helper function to optimistically update tree structure
-    const updatePageInTree = useCallback((pages, pageId, updater) => {
-        const updateRecursive = (pageList) => {
-            return pageList.map(page => {
-                if (page.id === pageId) {
-                    return updater(page)
-                }
-                if (page.children && page.children.length > 0) {
-                    return {
-                        ...page,
-                        children: updateRecursive(page.children)
-                    }
-                }
-                return page
-            }).filter(Boolean) // Remove null/undefined pages
-        }
-        return updateRecursive(pages)
-    }, [])
 
     // Helper function to remove a page from tree
     const removePageFromTree = useCallback((pages, pageId) => {
