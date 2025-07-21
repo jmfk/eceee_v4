@@ -20,7 +20,6 @@ import { getPageChildren, movePage, deletePage } from '../api/pages'
 import { pageTreeUtils } from '../api/pages'
 import toast from 'react-hot-toast'
 import Tooltip from './Tooltip'
-import DropZone from './DropZone'
 
 const PageTreeNode = ({
     page,
@@ -34,20 +33,10 @@ const PageTreeNode = ({
     onPaste,
     onDelete,
     cutPageId,
-    copiedPageId,
-    onDragStart,
-    onDragEnd,
-    onDragOver,
-    onDrop,
-    isDragOver,
-    canDrop,
-    isDragging,
-    draggedPageId,
-    hoveredPageId
+    copiedPageId
 }) => {
     const [isExpanded, setIsExpanded] = useState(page.isExpanded || false)
     const [isLoading, setIsLoading] = useState(false)
-    const [isNodeDragging, setIsNodeDragging] = useState(false)
     const queryClient = useQueryClient()
 
     // Check if page has children
@@ -56,14 +45,6 @@ const PageTreeNode = ({
     // Check if page is cut/copied
     const isCut = cutPageId === page.id
     const isCopied = copiedPageId === page.id
-
-    // Derived drag states
-    const isBeingDragged = draggedPageId === page.id
-    const isHovered = hoveredPageId === page.id && isDragging && !isBeingDragged
-
-    // Individual dropzone hover states
-    const [hoveredDropzone, setHoveredDropzone] = useState(null) // 'before', 'inside', 'after', or null
-    const [dragOverZone, setDragOverZone] = useState(null) // Track which zone of main node is being dragged over
 
     // Animation state for page movement
     const [isAnimating, setIsAnimating] = useState(false)
@@ -74,9 +55,9 @@ const PageTreeNode = ({
     const hasHostnames = page.hostnames && page.hostnames.length > 0
     const needsHostnameWarning = isTopLevel && !hasHostnames
 
-    // Expand/collapse toggle (disabled during drag operations)
+    // Expand/collapse toggle
     const handleToggleExpand = async () => {
-        if (!hasChildren || isDragging) return
+        if (!hasChildren) return
 
         if (!isExpanded && !page.childrenLoaded) {
             setIsLoading(true)
@@ -98,115 +79,6 @@ const PageTreeNode = ({
         } else {
             onCollapse?.(page.id)
         }
-    }
-
-    // Drag and drop handlers
-    const handleDragStart = (e) => {
-        setIsNodeDragging(true)
-        e.dataTransfer.setData('text/plain', page.id.toString())
-        e.dataTransfer.effectAllowed = 'move'
-        onDragStart?.(page)
-    }
-
-    const handleDragEnd = () => {
-        setIsNodeDragging(false)
-        setDragOverZone(null) // Clear zone state when drag ends
-        onDragEnd?.()
-    }
-
-    const handleDragOver = (e) => {
-        e.preventDefault()
-        e.dataTransfer.dropEffect = 'move'
-
-        // Track which zone of the node is being dragged over for visual feedback
-        if (isDragging && !isBeingDragged) {
-            const rect = e.currentTarget.getBoundingClientRect()
-            const mouseY = e.clientY - rect.top
-            const elementHeight = rect.height
-
-            const topZone = elementHeight * 0.25
-            const bottomZone = elementHeight * 0.75
-
-            let zone = 'inside'
-            if (mouseY < topZone) {
-                zone = 'before'
-            } else if (mouseY > bottomZone) {
-                zone = 'after'
-            } else if (hasChildren) {
-                zone = 'inside'
-            } else {
-                zone = 'after'
-            }
-
-            setDragOverZone(zone)
-        }
-
-        onDragOver?.(page)
-    }
-
-    const handleDragLeave = (e) => {
-        // Clear zone state when drag leaves the element
-        if (!e.currentTarget.contains(e.relatedTarget)) {
-            setDragOverZone(null)
-        }
-    }
-
-    const handleDrop = (e) => {
-        e.preventDefault()
-        e.stopPropagation()
-
-        const draggedPageId = parseInt(e.dataTransfer.getData('text/plain'))
-        if (draggedPageId && draggedPageId !== page.id) {
-            // Smart position detection based on mouse coordinates
-            const rect = e.currentTarget.getBoundingClientRect()
-            const mouseY = e.clientY - rect.top
-            const elementHeight = rect.height
-
-            let position = 'child' // default fallback
-
-            // Divide the element into zones for position detection
-            const topZone = elementHeight * 0.25  // Top 25% = before
-            const bottomZone = elementHeight * 0.75  // Bottom 25% = after
-
-            if (mouseY < topZone) {
-                position = 'before'
-            } else if (mouseY > bottomZone) {
-                position = 'after'
-            } else if (hasChildren) {
-                // Middle zone - if page has children, default to 'inside', otherwise 'before'
-                position = 'inside'
-            } else {
-                // If no children, prefer 'after' for middle drops
-                position = 'after'
-            }
-
-            console.log(`Smart drop detection: mouseY=${mouseY}, height=${elementHeight}, position=${position}`)
-            setDragOverZone(null) // Clear zone state after drop
-            onDrop?.(draggedPageId, page.id, e, position)
-        }
-    }
-
-    // DropZone drop handler
-    const handleDropZoneDrop = (e, position) => {
-        e.preventDefault()
-        e.stopPropagation()
-
-        const draggedPageId = parseInt(e.dataTransfer.getData('text/plain'))
-        if (draggedPageId && draggedPageId !== page.id) {
-            // Handle different drop positions
-            onDrop?.(draggedPageId, page.id, e, position)
-        }
-    }
-
-    // DropZone hover handlers
-    const handleDropZoneMouseEnter = (position) => {
-        if (isDragging) {
-            setHoveredDropzone(position)
-        }
-    }
-
-    const handleDropZoneMouseLeave = () => {
-        setHoveredDropzone(null)
     }
 
     // Context menu or button handlers
@@ -256,65 +128,30 @@ const PageTreeNode = ({
 
     return (
         <div className="select-none">
-            {/* Drop zone before */}
-            <DropZone
-                position="before"
-                isVisible={isHovered || hoveredDropzone === 'before'}
-                isHovered={hoveredDropzone === 'before'}
-                onDrop={handleDropZoneDrop}
-                level={level}
-                targetPageTitle={page.title}
-                onMouseEnter={() => handleDropZoneMouseEnter('before')}
-                onMouseLeave={handleDropZoneMouseLeave}
-                isDragging={isDragging}
-            />
-
             {/* Main node */}
             <div
                 className={`
-                    flex items-center px-2 py-1 hover:bg-gray-50 cursor-pointer group relative
-                    ${isBeingDragged ? 'opacity-50' : ''}
+                    flex items-center px-2 py-1 hover:bg-gray-50 group relative
                     ${isCut ? 'opacity-60 bg-orange-50' : ''}
                     ${isCopied ? 'bg-blue-50' : ''}
-                    ${isDragOver && canDrop ? 'bg-green-100 border-l-4 border-green-500' : ''}
                     ${level > 0 ? 'border-l border-gray-200' : ''}
                     ${isAnimating ? 'transition-all duration-500 ease-in-out' : ''}
                     ${animationDirection === 'up' ? 'transform -translate-y-8' : ''}
                     ${animationDirection === 'down' ? 'transform translate-y-8' : ''}
                     ${animationDirection === 'left' ? 'transform -translate-x-8' : ''}
                     ${animationDirection === 'right' ? 'transform translate-x-8' : ''}
-                    ${dragOverZone === 'before' ? 'border-t-4 border-blue-400 bg-blue-50' : ''}
-                    ${dragOverZone === 'after' ? 'border-b-4 border-blue-400 bg-blue-50' : ''}
-                    ${dragOverZone === 'inside' ? 'bg-blue-50 border-2 border-blue-300 border-dashed' : ''}
                 `}
                 style={{ paddingLeft: `${level * 24 + 8}px` }}
-                draggable={true}
-                onDragStart={handleDragStart}
-                onDragEnd={handleDragEnd}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
             >
-                {/* Visual zone indicator overlay during drag */}
-                {dragOverZone && isDragging && !isBeingDragged && (
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <div className="bg-blue-600 text-white text-xs px-2 py-1 rounded-md font-medium shadow-md">
-                            {dragOverZone === 'before' && 'Drop before'}
-                            {dragOverZone === 'after' && 'Drop after'}
-                            {dragOverZone === 'inside' && 'Drop inside'}
-                        </div>
-                    </div>
-                )}
-
                 {/* Expand/collapse button */}
                 <button
                     onClick={handleToggleExpand}
                     className={`
                             mr-1 p-1 rounded transition-all duration-200 hover:shadow-sm
                             ${!hasChildren ? 'invisible' : ''}
-                            ${isDragging ? 'cursor-not-allowed bg-gray-100 text-gray-400' : 'hover:bg-gray-200'}
+                            hover:bg-gray-200
                         `}
-                    disabled={isLoading || isDragging}
+                    disabled={isLoading}
                 >
                     {isLoading ? (
                         <Loader2 className="w-3 h-3 animate-spin text-gray-400" />
@@ -327,46 +164,49 @@ const PageTreeNode = ({
                     ) : null}
                 </button>
 
-                {/* Page icon */}
-                <div className="mr-2">
-                    <div className="cursor-help">
-                        {getFolderIcon()}
-                    </div>
-                </div>
-
-                {/* Page info */}
+                {/* Page content area */}
                 <div className="flex-1 min-w-0 flex items-center gap-2">
-                    <span className="truncate font-medium text-sm">
-                        {page.title}
-                    </span>
-                    <span className="text-xs text-gray-500 truncate">
-                        /{page.slug}
-                    </span>
-                    <Tooltip
-                        text={
-                            page.publication_status === 'published' ?
-                                `Published` :
-                                page.publication_status === 'scheduled' ?
-                                    `Scheduled` :
-                                    page.publication_status === 'unpublished' ?
-                                        `Unpublished` :
-                                        `Draft`
-                        }
-                        position="top"
-                    >
-                        <div className="cursor-help">
-                            {getStatusIcon()}
+                    {/* Page icon */}
+                    <div className="mr-2">
+                        <div>
+                            {getFolderIcon()}
                         </div>
-                    </Tooltip>
+                    </div>
 
-                    {/* Hostname warning for top-level pages */}
-                    {needsHostnameWarning && (
-                        <Tooltip text="Missing hostname - This top-level page needs at least one hostname" position="top">
-                            <div className="cursor-help ml-1">
-                                <AlertTriangle className="w-3 h-3 text-amber-500" />
+                    {/* Page info */}
+                    <div className="flex-1 min-w-0 flex items-center gap-2">
+                        <span className="truncate font-medium text-sm">
+                            {page.title}
+                        </span>
+                        <span className="text-xs text-gray-500 truncate">
+                            /{page.slug}
+                        </span>
+                        <Tooltip
+                            text={
+                                page.publication_status === 'published' ?
+                                    `Published` :
+                                    page.publication_status === 'scheduled' ?
+                                        `Scheduled` :
+                                        page.publication_status === 'unpublished' ?
+                                            `Unpublished` :
+                                            `Draft`
+                            }
+                            position="top"
+                        >
+                            <div className="cursor-help">
+                                {getStatusIcon()}
                             </div>
                         </Tooltip>
-                    )}
+
+                        {/* Hostname warning for top-level pages */}
+                        {needsHostnameWarning && (
+                            <Tooltip text="Missing hostname - This top-level page needs at least one hostname" position="top">
+                                <div className="cursor-help ml-1">
+                                    <AlertTriangle className="w-3 h-3 text-amber-500" />
+                                </div>
+                            </Tooltip>
+                        )}
+                    </div>
                 </div>
 
                 {/* Children count */}
@@ -445,21 +285,6 @@ const PageTreeNode = ({
                 </div>
             </div>
 
-            {/* Drop zone inside (for folders) - indented to show it's inside the page */}
-            {hasChildren && (
-                <DropZone
-                    position="inside"
-                    isVisible={isHovered || hoveredDropzone === 'inside'}
-                    isHovered={hoveredDropzone === 'inside'}
-                    onDrop={handleDropZoneDrop}
-                    level={level + 1}
-                    targetPageTitle={page.title}
-                    onMouseEnter={() => handleDropZoneMouseEnter('inside')}
-                    onMouseLeave={handleDropZoneMouseLeave}
-                    isDragging={isDragging}
-                />
-            )}
-
             {/* Children */}
             {isExpanded && page.children && page.children.length > 0 && (
                 <div className="ml-4">
@@ -478,32 +303,10 @@ const PageTreeNode = ({
                             onDelete={onDelete}
                             cutPageId={cutPageId}
                             copiedPageId={copiedPageId}
-                            onDragStart={onDragStart}
-                            onDragEnd={onDragEnd}
-                            onDragOver={onDragOver}
-                            onDrop={onDrop}
-                            isDragOver={isDragOver}
-                            canDrop={canDrop}
-                            isDragging={isDragging}
-                            draggedPageId={draggedPageId}
-                            hoveredPageId={hoveredPageId}
                         />
                     ))}
                 </div>
             )}
-
-            {/* Drop zone after - appears after the page and all its children */}
-            <DropZone
-                position="after"
-                isVisible={isHovered || hoveredDropzone === 'after'}
-                isHovered={hoveredDropzone === 'after'}
-                onDrop={handleDropZoneDrop}
-                level={level}
-                targetPageTitle={page.title}
-                onMouseEnter={() => handleDropZoneMouseEnter('after')}
-                onMouseLeave={handleDropZoneMouseLeave}
-                isDragging={isDragging}
-            />
         </div>
     )
 }

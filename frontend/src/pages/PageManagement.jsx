@@ -34,9 +34,10 @@ import ObjectPublisher from '../components/ObjectPublisher'
 import PublicationStatusDashboard from '../components/PublicationStatusDashboard'
 import PublicationTimeline from '../components/PublicationTimeline'
 import BulkPublishingOperations from '../components/BulkPublishingOperations'
+import TreePageManager from '../components/TreePageManager'
 
 const PageManagement = () => {
-    const [activeTab, setActiveTab] = useState('pages')
+    const [activeTab, setActiveTab] = useState('tree')
     const [selectedPage, setSelectedPage] = useState(null)
     const [searchTerm, setSearchTerm] = useState('')
     const [showVersionManager, setShowVersionManager] = useState(false)
@@ -106,6 +107,13 @@ const PageManagement = () => {
     const availableLayoutOptions = getAvailableLayoutsForFilter()
 
     const tabs = [
+
+        {
+            id: 'tree',
+            label: 'Page Tree',
+            icon: Database,
+            description: 'Hierarchical page management with drag & drop'
+        },
         {
             id: 'pages',
             label: 'Pages',
@@ -717,6 +725,19 @@ const PageManagement = () => {
         switch (activeTab) {
             case 'pages':
                 return renderPageManagement()
+            case 'tree':
+                return (
+                    <TreePageManager
+                        onEditPage={(page) => {
+                            setSelectedPage(page)
+                            if (page) {
+                                setActiveTab('widgets') // Switch to widgets tab for editing
+                            } else {
+                                setIsCreating(true) // Open create page form
+                            }
+                        }}
+                    />
+                )
             case 'layouts':
                 return <LayoutEditor />
             case 'themes':
