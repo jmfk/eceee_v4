@@ -13,7 +13,8 @@ import {
     Clock,
     AlertCircle,
     AlertTriangle,
-    Loader2
+    Loader2,
+    Plus
 } from 'lucide-react'
 import { getPageChildren, movePage, deletePage } from '../api/pages'
 import { pageTreeUtils } from '../api/pages'
@@ -30,6 +31,7 @@ const PageTreeNode = ({
     onCut,
     onPaste,
     onDelete,
+    onAddPageBelow,
     cutPageId
 }) => {
     const [isExpanded, setIsExpanded] = useState(page.isExpanded || false)
@@ -91,6 +93,10 @@ const PageTreeNode = ({
         if (confirm(`Are you sure you want to delete "${page.title}"? This action cannot be undone.`)) {
             onDelete?.(page.id)
         }
+    }
+
+    const handleAddPageBelow = () => {
+        onAddPageBelow?.(page)
     }
 
     // Status icon based on publication status
@@ -226,6 +232,15 @@ const PageTreeNode = ({
                         </button>
                     </Tooltip>
 
+                    <Tooltip text="Add child page" position="top">
+                        <button
+                            onClick={handleAddPageBelow}
+                            className="p-1 rounded hover:bg-green-100 text-gray-500 hover:text-green-600 transition-colors"
+                        >
+                            <Plus className="w-3 h-3" />
+                        </button>
+                    </Tooltip>
+
                     {cutPageId && (
                         <>
                             <Tooltip text="Paste above" position="top">
@@ -281,6 +296,7 @@ const PageTreeNode = ({
                             onCut={onCut}
                             onPaste={onPaste}
                             onDelete={onDelete}
+                            onAddPageBelow={onAddPageBelow}
                             cutPageId={cutPageId}
                         />
                     ))}

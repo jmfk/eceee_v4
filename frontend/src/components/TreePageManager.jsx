@@ -10,7 +10,9 @@ import {
     Scissors,
     FolderPlus,
     AlertCircle,
-    Loader2
+    Loader2,
+    X,
+    Save
 } from 'lucide-react'
 import {
     getRootPages,
@@ -19,6 +21,7 @@ import {
     deletePage,
     pageTreeUtils
 } from '../api/pages'
+import { api } from '../api/client.js'
 import PageTreeNode from './PageTreeNode'
 import toast from 'react-hot-toast'
 import Tooltip from './Tooltip'
@@ -31,8 +34,48 @@ const TreePageManager = ({ onEditPage }) => {
     const [statusFilter, setStatusFilter] = useState('all')
     const [cutPageId, setCutPageId] = useState(null)
     const [expandedPages, setExpandedPages] = useState(new Set())
+    const [showCreateModal, setShowCreateModal] = useState(false)
+    const [showRootPageModal, setShowRootPageModal] = useState(false)
+    const [positioningParams, setPositioningParams] = useState(null)
 
     const queryClient = useQueryClient()
+
+    // Create page mutation
+    const createPageMutation = useMutation({
+        mutationFn: async (pageData) => {
+            const response = await api.post('/api/v1/webpages/pages/', pageData)
+            return response.data
+        },
+        onSuccess: (newPage) => {
+            toast.success('Page created successfully')
+            // If we created a child page, make sure the parent is expanded
+            if (positioningParams?.parentId) {
+                setExpandedPages(prev => new Set([...prev, positioningParams.parentId]))
+            }
+            setShowCreateModal(false)
+            setPositioningParams(null)
+            queryClient.invalidateQueries(['pages', 'root'])
+        },
+        onError: (error) => {
+            toast.error(error.response?.data?.detail || 'Failed to create page')
+        }
+    })
+
+    // Create root page mutation
+    const createRootPageMutation = useMutation({
+        mutationFn: async (pageData) => {
+            const response = await api.post('/api/v1/webpages/pages/', pageData)
+            return response.data
+        },
+        onSuccess: (newPage) => {
+            toast.success('Root page created successfully')
+            setShowRootPageModal(false)
+            queryClient.invalidateQueries(['pages', 'root'])
+        },
+        onError: (error) => {
+            toast.error(error.response?.data?.detail || 'Failed to create root page')
+        }
+    })
 
     // Fetch root pages
     const {
@@ -370,8 +413,52 @@ const TreePageManager = ({ onEditPage }) => {
 
     // Edit handler
     const handleEdit = useCallback((page) => {
-        onEditPage?.(page)
+        if (onEditPage) {
+            onEditPage(page)
+        } else {
+            // Handle editing internally if no onEditPage prop provided
+            // For now, just show a message - you could implement inline editing here
+            toast('Page editing functionality needs to be implemented', {
+                icon: 'ℹ️',
+                duration: 3000
+            })
+        }
     }, [onEditPage])
+
+    // Add child page handler
+    const handleAddPageBelow = useCallback((targetPage) => {
+        if (onEditPage) {
+            // Call onEditPage with special params to indicate creating a child page
+            onEditPage(null, {
+                parentPage: targetPage,
+                parentId: targetPage.id,
+                suggestedSortOrder: 0 // First child or will be calculated by backend
+            })
+        } else {
+            // Handle page creation internally
+            setPositioningParams({
+                parentPage: targetPage,
+                parentId: targetPage.id,
+                suggestedSortOrder: 0 // First child or will be calculated by backend
+            })
+            setShowCreateModal(true)
+        }
+    }, [onEditPage])
+
+    // Handle create new page (for first page or global create)
+    const handleCreateNewPage = useCallback(() => {
+        if (onEditPage) {
+            onEditPage(null)
+        } else {
+            setPositioningParams(null)
+            setShowCreateModal(true)
+        }
+    }, [onEditPage])
+
+    // Handle create root page
+    const handleCreateRootPage = useCallback(() => {
+        setShowRootPageModal(true)
+    }, [])
 
     // Expand/collapse all
     const expandAll = () => {
@@ -414,6 +501,15 @@ const TreePageManager = ({ onEditPage }) => {
                 <div className="flex items-center justify-between">
                     <h2 className="text-lg font-semibold text-gray-900">Page Tree Manager</h2>
                     <div className="flex items-center gap-2">
+                        <Tooltip text="Add root page" position="top">
+                            <button
+                                data-testid="add-root-page-button"
+                                onClick={handleCreateRootPage}
+                                className="p-2 text-gray-500 hover:text-purple-600 hover:bg-purple-50 rounded transition-colors"
+                            >
+                                <Plus className="w-4 h-4" />
+                            </button>
+                        </Tooltip>
                         <Tooltip text="Expand all" position="top">
                             <button
                                 data-testid="expand-all-button"
@@ -506,8 +602,18 @@ const TreePageManager = ({ onEditPage }) => {
                             </div>
                         </Tooltip>
                         <p>No pages found</p>
-                        {searchTerm && (
+                        {searchTerm ? (
                             <p className="text-sm mt-2">Try adjusting your search or filters</p>
+                        ) : (
+                            <div className="mt-4">
+                                <button
+                                    onClick={handleCreateNewPage}
+                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                                >
+                                    <Plus className="w-4 h-4 inline mr-2" />
+                                    Create First Page
+                                </button>
+                            </div>
                         )}
                     </div>
                 ) : (
@@ -524,6 +630,7 @@ const TreePageManager = ({ onEditPage }) => {
                                 onCut={handleCut}
                                 onPaste={handlePaste}
                                 onDelete={handleDelete}
+                                onAddPageBelow={handleAddPageBelow}
                                 cutPageId={cutPageId}
                             />
                         ))}
@@ -539,18 +646,360 @@ const TreePageManager = ({ onEditPage }) => {
                         {searchTerm && ' (filtered)'}
                     </span>
                     <div className="flex items-center gap-4">
-                        <span>Cut to move pages</span>
-                        <Tooltip text="Create page" position="top">
-                            <button
-                                onClick={() => onEditPage?.(null)}
-                                className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors hover:shadow-md"
-                            >
-                                <Plus className="w-3 h-3 inline mr-1" />
-                                New Page
-                            </button>
-                        </Tooltip>
+                        <span>Cut to move pages • Use + (purple) to add root pages • Use + (green) on pages to add child pages</span>
                     </div>
                 </div>
+            </div>
+
+            {/* Page Creation Modal */}
+            {showCreateModal && (
+                <PageCreationModal
+                    positioningParams={positioningParams}
+                    onSave={(pageData) => {
+                        // Add positioning params to page data if available
+                        const finalPageData = { ...pageData }
+                        if (positioningParams) {
+                            finalPageData.parent_id = positioningParams.parentId
+                            finalPageData.sort_order = positioningParams.suggestedSortOrder
+                        }
+                        createPageMutation.mutate(finalPageData)
+                    }}
+                    onCancel={() => {
+                        setShowCreateModal(false)
+                        setPositioningParams(null)
+                    }}
+                    isLoading={createPageMutation.isPending}
+                />
+            )}
+
+            {/* Root Page Creation Modal */}
+            {showRootPageModal && (
+                <RootPageCreationModal
+                    onSave={(pageData) => {
+                        createRootPageMutation.mutate(pageData)
+                    }}
+                    onCancel={() => {
+                        setShowRootPageModal(false)
+                    }}
+                    isLoading={createRootPageMutation.isPending}
+                />
+            )}
+        </div>
+    )
+}
+
+// Simple page creation modal component
+const PageCreationModal = ({ positioningParams, onSave, onCancel, isLoading }) => {
+    const [formData, setFormData] = useState({
+        title: '',
+        slug: '',
+        description: '',
+        publication_status: 'unpublished'
+    })
+
+    const generateSlug = (title) => {
+        return title
+            .toLowerCase()
+            .replace(/[^a-z0-9\s-]/g, '')
+            .replace(/\s+/g, '-')
+            .replace(/-+/g, '-')
+            .trim()
+    }
+
+    const handleTitleChange = (e) => {
+        const title = e.target.value
+        setFormData(prev => ({
+            ...prev,
+            title,
+            // Auto-generate slug if it's empty or matches the previous auto-generated slug
+            slug: (!prev.slug || prev.slug === generateSlug(prev.title))
+                ? generateSlug(title)
+                : prev.slug
+        }))
+    }
+
+    const handleSubmit = (e) => {
+        e.preventDefault()
+        if (!formData.title.trim()) {
+            toast.error('Page title is required')
+            return
+        }
+        if (!formData.slug.trim()) {
+            toast.error('Page slug is required')
+            return
+        }
+        onSave(formData)
+    }
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
+                <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-lg font-medium text-gray-900">
+                        {positioningParams ?
+                            `Add Child Page to "${positioningParams.parentPage.title}"` :
+                            'Create New Page'
+                        }
+                    </h3>
+                    <button
+                        onClick={onCancel}
+                        className="text-gray-400 hover:text-gray-500"
+                    >
+                        <X className="w-5 h-5" />
+                    </button>
+                </div>
+
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                        <label htmlFor="page-title" className="block text-sm font-medium text-gray-700 mb-1">
+                            Page Title *
+                        </label>
+                        <input
+                            id="page-title"
+                            type="text"
+                            value={formData.title}
+                            onChange={handleTitleChange}
+                            placeholder="Enter page title"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            required
+                        />
+                    </div>
+
+                    <div>
+                        <label htmlFor="page-slug" className="block text-sm font-medium text-gray-700 mb-1">
+                            URL Slug *
+                        </label>
+                        <input
+                            id="page-slug"
+                            type="text"
+                            value={formData.slug}
+                            onChange={(e) => setFormData(prev => ({ ...prev, slug: e.target.value }))}
+                            placeholder="page-url-slug"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            required
+                        />
+                    </div>
+
+                    <div>
+                        <label htmlFor="page-description" className="block text-sm font-medium text-gray-700 mb-1">
+                            Description
+                        </label>
+                        <textarea
+                            id="page-description"
+                            value={formData.description}
+                            onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                            placeholder="Enter page description"
+                            rows={3}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                    </div>
+
+                    <div>
+                        <label htmlFor="publication-status" className="block text-sm font-medium text-gray-700 mb-1">
+                            Publication Status
+                        </label>
+                        <select
+                            id="publication-status"
+                            value={formData.publication_status}
+                            onChange={(e) => setFormData(prev => ({ ...prev, publication_status: e.target.value }))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                            <option value="unpublished">Unpublished</option>
+                            <option value="scheduled">Scheduled</option>
+                            <option value="published">Published</option>
+                            <option value="expired">Expired</option>
+                        </select>
+                    </div>
+
+                    {positioningParams && (
+                        <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                            <p className="text-sm text-blue-800">
+                                This page will be created as a child page under "{positioningParams.parentPage.title}".
+                            </p>
+                        </div>
+                    )}
+
+                    <div className="flex items-center justify-end space-x-3 pt-4">
+                        <button
+                            type="button"
+                            onClick={onCancel}
+                            className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={isLoading}
+                            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                        >
+                            <Save className="w-4 h-4 mr-2" />
+                            {isLoading ? 'Creating...' : 'Create Page'}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    )
+}
+
+// Root page creation modal component with hosts field
+const RootPageCreationModal = ({ onSave, onCancel, isLoading }) => {
+    const [formData, setFormData] = useState({
+        title: '',
+        description: '',
+        hostnames: '',
+        publication_status: 'unpublished'
+    })
+
+    const generateSlug = (title) => {
+        return title
+            .toLowerCase()
+            .replace(/[^a-z0-9\s-]/g, '')
+            .replace(/\s+/g, '-')
+            .replace(/-+/g, '-')
+            .trim()
+    }
+
+    const handleSubmit = (e) => {
+        e.preventDefault()
+        if (!formData.title.trim()) {
+            toast.error('Page title is required')
+            return
+        }
+        if (!formData.hostnames.trim()) {
+            toast.error('At least one hostname is required for root pages')
+            return
+        }
+
+        // Auto-generate slug from title
+        const slug = generateSlug(formData.title)
+
+        // Parse hostnames from comma-separated string
+        const hostnamesArray = formData.hostnames
+            .split(',')
+            .map(h => h.trim())
+            .filter(h => h.length > 0)
+
+        const pageData = {
+            title: formData.title,
+            slug: slug,
+            description: formData.description,
+            publication_status: formData.publication_status,
+            hostnames: hostnamesArray,
+            parent_id: null // Root pages have no parent
+        }
+
+        onSave(pageData)
+    }
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
+                <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-lg font-medium text-gray-900">
+                        Create Root Page
+                    </h3>
+                    <button
+                        onClick={onCancel}
+                        className="text-gray-400 hover:text-gray-500"
+                    >
+                        <X className="w-5 h-5" />
+                    </button>
+                </div>
+
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                        <label htmlFor="root-page-title" className="block text-sm font-medium text-gray-700 mb-1">
+                            Page Title *
+                        </label>
+                        <input
+                            id="root-page-title"
+                            type="text"
+                            value={formData.title}
+                            onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                            placeholder="Enter page title"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            required
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                            URL slug will be automatically generated from the title
+                        </p>
+                    </div>
+
+                    <div>
+                        <label htmlFor="root-page-hostnames" className="block text-sm font-medium text-gray-700 mb-1">
+                            Hostnames *
+                        </label>
+                        <input
+                            id="root-page-hostnames"
+                            type="text"
+                            value={formData.hostnames}
+                            onChange={(e) => setFormData(prev => ({ ...prev, hostnames: e.target.value }))}
+                            placeholder="example.com, www.example.com"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            required
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                            Enter hostnames separated by commas. Root pages need at least one hostname.
+                        </p>
+                    </div>
+
+                    <div>
+                        <label htmlFor="root-page-description" className="block text-sm font-medium text-gray-700 mb-1">
+                            Description
+                        </label>
+                        <textarea
+                            id="root-page-description"
+                            value={formData.description}
+                            onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                            placeholder="Enter page description"
+                            rows={3}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        />
+                    </div>
+
+                    <div>
+                        <label htmlFor="root-publication-status" className="block text-sm font-medium text-gray-700 mb-1">
+                            Publication Status
+                        </label>
+                        <select
+                            id="root-publication-status"
+                            value={formData.publication_status}
+                            onChange={(e) => setFormData(prev => ({ ...prev, publication_status: e.target.value }))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        >
+                            <option value="unpublished">Unpublished</option>
+                            <option value="scheduled">Scheduled</option>
+                            <option value="published">Published</option>
+                            <option value="expired">Expired</option>
+                        </select>
+                    </div>
+
+                    <div className="bg-purple-50 border border-purple-200 rounded-md p-3">
+                        <p className="text-sm text-purple-800">
+                            Root pages are top-level pages that can be accessed directly via hostnames.
+                            They serve as entry points to your site.
+                        </p>
+                    </div>
+
+                    <div className="flex items-center justify-end space-x-3 pt-4">
+                        <button
+                            type="button"
+                            onClick={onCancel}
+                            className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={isLoading}
+                            className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50"
+                        >
+                            <Save className="w-4 h-4 mr-2" />
+                            {isLoading ? 'Creating...' : 'Create Root Page'}
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     )
