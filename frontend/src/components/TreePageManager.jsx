@@ -163,6 +163,28 @@ const TreePageManager = ({ onEditPage }) => {
         }
     }, [rootPagesData])
 
+    // Helper function to refresh child pages for a specific parent
+    const refreshChildPages = useCallback(async (parentId) => {
+        try {
+            const childrenData = await getPageChildren(parentId)
+            const children = childrenData.results.map(child => pageTreeUtils.formatPageForTree(child))
+
+            // Update the parent page with refreshed children
+            setPages(prevPages => {
+                return updatePageInTree(prevPages, parentId, (page) => ({
+                    ...page,
+                    children: children,
+                    childrenLoaded: true
+                }))
+            })
+
+            // Update the cached data
+            queryClient.setQueryData(['page-children', parentId], childrenData)
+        } catch (error) {
+            console.error(`Failed to refresh child pages for parent ${parentId}:`, error)
+        }
+    }, [updatePageInTree, queryClient])
+
     // Helper function to optimistically update tree structure
     const updatePageInTree = useCallback((pages, pageId, updater) => {
         const updateRecursive = (pageList) => {
@@ -251,11 +273,14 @@ const TreePageManager = ({ onEditPage }) => {
             })
 
             setExpandedPages(prev => new Set([...prev, pageId]))
+
+            // Cache the children data in React Query for invalidation
+            queryClient.setQueryData(['page-children', pageId], childrenData)
         } catch (error) {
             console.error('Failed to load child pages')
             throw error
         }
-    }, [updatePageInTree])
+    }, [updatePageInTree, queryClient])
 
     // Handle expand/collapse
     const handleExpand = useCallback((pageId) => {
@@ -657,6 +682,7 @@ const TreePageManager = ({ onEditPage }) => {
                                 onDelete={handleDelete}
                                 onAddPageBelow={handleAddPageBelow}
                                 cutPageId={cutPageId}
+                                onRefreshChildren={refreshChildPages}
                             />
                         ))}
                     </div>

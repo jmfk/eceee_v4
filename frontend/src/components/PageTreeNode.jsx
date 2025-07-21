@@ -36,7 +36,8 @@ const PageTreeNode = ({
     onPaste,
     onDelete,
     onAddPageBelow,
-    cutPageId
+    cutPageId,
+    onRefreshChildren
 }) => {
     const [isExpanded, setIsExpanded] = useState(page.isExpanded || false)
     const [isLoading, setIsLoading] = useState(false)
@@ -253,7 +254,14 @@ const PageTreeNode = ({
         onSuccess: () => {
             toast.success('Title updated successfully')
             setIsEditingTitle(false)
+            // Invalidate both root pages and any cached child pages data
             queryClient.invalidateQueries(['pages'])
+            queryClient.invalidateQueries(['page-children'])
+
+            // Refresh child pages if this page has children and they're loaded
+            if (page.childrenLoaded && page.children && page.children.length > 0 && onRefreshChildren) {
+                onRefreshChildren(page.id)
+            }
         },
         onError: (error) => {
             toast.error(error.response?.data?.detail || 'Failed to update title')
@@ -270,7 +278,14 @@ const PageTreeNode = ({
         onSuccess: () => {
             toast.success('Slug updated successfully')
             setIsEditingSlug(false)
+            // Invalidate both root pages and any cached child pages data
             queryClient.invalidateQueries(['pages'])
+            queryClient.invalidateQueries(['page-children'])
+
+            // Refresh child pages if this page has children and they're loaded
+            if (page.childrenLoaded && page.children && page.children.length > 0 && onRefreshChildren) {
+                onRefreshChildren(page.id)
+            }
         },
         onError: (error) => {
             toast.error(error.response?.data?.detail || 'Failed to update slug')
@@ -287,7 +302,14 @@ const PageTreeNode = ({
         onSuccess: () => {
             toast.success('Page published successfully')
             setIsTogglingPublication(false)
+            // Invalidate both root pages and any cached child pages data
             queryClient.invalidateQueries(['pages'])
+            queryClient.invalidateQueries(['page-children'])
+
+            // Refresh child pages if this page has children and they're loaded
+            if (page.childrenLoaded && page.children && page.children.length > 0 && onRefreshChildren) {
+                onRefreshChildren(page.id)
+            }
         },
         onError: (error) => {
             toast.error(error.response?.data?.detail || 'Failed to publish page')
@@ -304,7 +326,14 @@ const PageTreeNode = ({
         onSuccess: () => {
             toast.success('Page unpublished successfully')
             setIsTogglingPublication(false)
+            // Invalidate both root pages and any cached child pages data
             queryClient.invalidateQueries(['pages'])
+            queryClient.invalidateQueries(['page-children'])
+
+            // Refresh child pages if this page has children and they're loaded
+            if (page.childrenLoaded && page.children && page.children.length > 0 && onRefreshChildren) {
+                onRefreshChildren(page.id)
+            }
         },
         onError: (error) => {
             toast.error(error.response?.data?.detail || 'Failed to unpublish page')
@@ -597,6 +626,7 @@ const PageTreeNode = ({
                             onDelete={onDelete}
                             onAddPageBelow={onAddPageBelow}
                             cutPageId={cutPageId}
+                            onRefreshChildren={onRefreshChildren}
                         />
                     ))}
                 </div>
