@@ -55,7 +55,6 @@ const TreePageManager = ({ onEditPage }) => {
         mutationFn: ({ pageId, parentId, sortOrder }) =>
             movePage(pageId, parentId, sortOrder),
         onSuccess: () => {
-            console.log('Page moved successfully')
         },
         onError: (error, variables, context) => {
             // Revert optimistic update on error
@@ -70,7 +69,6 @@ const TreePageManager = ({ onEditPage }) => {
     const deletePageMutation = useMutation({
         mutationFn: deletePage,
         onSuccess: () => {
-            console.log('Page deleted successfully')
         },
         onError: (error, variables, context) => {
             // Revert optimistic delete on error
@@ -125,19 +123,25 @@ const TreePageManager = ({ onEditPage }) => {
 
     // Helper function to add a page to tree
     const addPageToTree = useCallback((pages, page, parentId) => {
+        const formattedPage = pageTreeUtils.formatPageForTree(page)
+
         if (!parentId) {
-            // Add to root level
-            return [...pages, pageTreeUtils.formatPageForTree(page)]
+            // Add to root level and sort by sort_order
+            const updatedPages = [...pages, formattedPage]
+            return updatedPages.sort((a, b) => a.sort_order - b.sort_order)
         }
 
         const addRecursive = (pageList) => {
             return pageList.map(existingPage => {
                 if (existingPage.id === parentId) {
+                    // Add to children and sort by sort_order
+                    const currentChildren = existingPage.children || []
+                    const updatedChildren = [...currentChildren, formattedPage]
+                    const sortedChildren = updatedChildren.sort((a, b) => a.sort_order - b.sort_order)
+
                     return {
                         ...existingPage,
-                        children: existingPage.children ?
-                            [...existingPage.children, pageTreeUtils.formatPageForTree(page)] :
-                            [pageTreeUtils.formatPageForTree(page)],
+                        children: sortedChildren,
                         children_count: (existingPage.children_count || 0) + 1
                     }
                 }
@@ -262,11 +266,8 @@ const TreePageManager = ({ onEditPage }) => {
 
                     // Simple hints - backend will normalize to proper spacing
                     if (pasteMode === 'above') {
-                        console.log('targetPage:', targetPage);
                         newSortOrder = pageTreeUtils.calculateSortOrderAbove([], targetPage)
-                        console.log('newSortOrder:', newSortOrder);
                     } else { // below
-                        console.log('targetPage:', targetPage);
                         newSortOrder = pageTreeUtils.calculateSortOrderBelow([], targetPage)
                     }
                 }
@@ -281,8 +282,6 @@ const TreePageManager = ({ onEditPage }) => {
                     parent: newParentId ? { id: newParentId } : null,
                     sort_order: newSortOrder
                 }
-                console.log('updatedPage:', updatedPage);
-                console.log('pasteMode:', pasteMode);
                 // 3. Add page to new location
                 if (pasteMode === 'child') {
                     updatedPages = addPageToTree(updatedPages, updatedPage, newParentId)
@@ -296,7 +295,6 @@ const TreePageManager = ({ onEditPage }) => {
                     // For above/below, we need to add to the same parent as target
                     updatedPages = addPageToTree(updatedPages, updatedPage, newParentId)
                 }
-
                 // Update local state immediately
                 setPages(updatedPages)
 
@@ -319,7 +317,6 @@ const TreePageManager = ({ onEditPage }) => {
                     'top': 'to top of tree',
                     'bottom': 'to bottom of tree'
                 }
-                console.log(`Page moved ${pasteMessages[pasteMode] || pasteMode}`)
             } catch (error) {
                 console.error('Failed to move page')
                 // Error handling (revert) is done in the mutation's onError
@@ -368,7 +365,6 @@ const TreePageManager = ({ onEditPage }) => {
     // Clear clipboard
     const clearClipboard = () => {
         setCutPageId(null)
-        console.log('Clipboard cleared')
     }
 
     if (error) {

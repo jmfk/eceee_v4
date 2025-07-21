@@ -432,7 +432,7 @@ describe('SlotManager', () => {
                 sort_order: expect.any(Number),
             })
         } catch (error) {
-            console.log('Move button clicked but API not called - reorder functionality may need integration testing')
+            console.error('Move button clicked but API not called - reorder functionality may need integration testing')
         }
     })
 
