@@ -43,6 +43,8 @@ const PageTreeNode = ({
     const [showHostnameModal, setShowHostnameModal] = useState(false)
     const [isEditingTitle, setIsEditingTitle] = useState(false)
     const [editingTitle, setEditingTitle] = useState('')
+    const [isEditingSlug, setIsEditingSlug] = useState(false)
+    const [editingSlug, setEditingSlug] = useState('')
     const queryClient = useQueryClient()
 
     // Sync local expansion state with page prop changes
@@ -155,6 +157,58 @@ const PageTreeNode = ({
         }
     }
 
+    // Slug editing handlers
+    const handleSlugClick = () => {
+        setIsEditingSlug(true)
+        setEditingSlug(page.slug)
+    }
+
+    const generateSlug = (text) => {
+        return text
+            .toLowerCase()
+            .replace(/[^a-z0-9\s-]/g, '')
+            .replace(/\s+/g, '-')
+            .replace(/-+/g, '-')
+            .replace(/^-+|-+$/g, '') // Remove leading and trailing dashes
+            .trim()
+    }
+
+    const handleSlugSave = () => {
+        const trimmedSlug = editingSlug.trim()
+        if (!trimmedSlug) {
+            toast.error('Slug cannot be empty')
+            return
+        }
+
+        // Auto-sanitize the slug
+        const sanitizedSlug = generateSlug(trimmedSlug)
+        if (sanitizedSlug !== trimmedSlug) {
+            setEditingSlug(sanitizedSlug)
+            return
+        }
+
+        if (sanitizedSlug === page.slug) {
+            setIsEditingSlug(false)
+            return
+        }
+        updateSlugMutation.mutate({ slug: sanitizedSlug })
+    }
+
+    const handleSlugCancel = () => {
+        setIsEditingSlug(false)
+        setEditingSlug('')
+    }
+
+    const handleSlugKeyDown = (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault()
+            handleSlugSave()
+        } else if (e.key === 'Escape') {
+            e.preventDefault()
+            handleSlugCancel()
+        }
+    }
+
     // Update page hostnames mutation
     const updateHostnamesMutation = useMutation({
         mutationFn: async (hostnamesData) => {
@@ -185,6 +239,23 @@ const PageTreeNode = ({
         onError: (error) => {
             toast.error(error.response?.data?.detail || 'Failed to update title')
             setEditingTitle(page.title) // Reset to original title on error
+        }
+    })
+
+    // Update page slug mutation
+    const updateSlugMutation = useMutation({
+        mutationFn: async (slugData) => {
+            const response = await api.patch(`/api/v1/webpages/pages/${page.id}/`, slugData)
+            return response.data
+        },
+        onSuccess: () => {
+            toast.success('Slug updated successfully')
+            setIsEditingSlug(false)
+            queryClient.invalidateQueries(['pages'])
+        },
+        onError: (error) => {
+            toast.error(error.response?.data?.detail || 'Failed to update slug')
+            setEditingSlug(page.slug) // Reset to original slug on error
         }
     })
 
@@ -305,8 +376,41 @@ const PageTreeNode = ({
                             >
                                 {getPageDisplayUrl(sanitizedPage)}
                             </button>
+                        ) : isEditingSlug ? (
+                            <div className="flex items-center gap-1">
+                                <span className="text-xs text-gray-500">/</span>
+                                <input
+                                    type="text"
+                                    value={editingSlug}
+                                    onChange={(e) => setEditingSlug(e.target.value)}
+                                    onKeyDown={handleSlugKeyDown}
+                                    className="truncate text-xs bg-white border border-blue-300 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-0 flex-1"
+                                    autoFocus
+                                    disabled={updateSlugMutation.isPending}
+                                />
+                                <button
+                                    onClick={handleSlugSave}
+                                    disabled={updateSlugMutation.isPending}
+                                    className="p-0.5 rounded hover:bg-green-100 text-green-600 transition-colors disabled:opacity-50"
+                                    title="Save slug (Enter)"
+                                >
+                                    <Save className="w-3 h-3" />
+                                </button>
+                                <button
+                                    onClick={handleSlugCancel}
+                                    disabled={updateSlugMutation.isPending}
+                                    className="p-0.5 rounded hover:bg-red-100 text-red-600 transition-colors disabled:opacity-50"
+                                    title="Cancel (Escape)"
+                                >
+                                    <X className="w-3 h-3" />
+                                </button>
+                            </div>
                         ) : (
-                            <span className="text-xs text-gray-500 truncate">
+                            <span
+                                className="text-xs text-gray-500 truncate cursor-pointer hover:text-blue-600 hover:underline transition-colors"
+                                onClick={handleSlugClick}
+                                title="Click to edit slug"
+                            >
                                 {getPageDisplayUrl(sanitizedPage)}
                             </span>
                         )}
