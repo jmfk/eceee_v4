@@ -82,7 +82,16 @@ const TreePageManager = ({ onEditPage }) => {
     // Update pages when data changes
     useEffect(() => {
         if (rootPagesData?.results) {
-            setPages(rootPagesData.results.map(page => pageTreeUtils.formatPageForTree(page)))
+            // Format pages for tree display and expand all first-level pages
+            const formattedPages = rootPagesData.results.map(page => ({
+                ...pageTreeUtils.formatPageForTree(page),
+                isExpanded: true // Auto-expand all first-level pages
+            }))
+            setPages(formattedPages)
+
+            // Add all first-level page IDs to expanded set
+            const firstLevelPageIds = rootPagesData.results.map(page => page.id)
+            setExpandedPages(new Set(firstLevelPageIds))
         }
     }, [rootPagesData])
 
@@ -192,6 +201,21 @@ const TreePageManager = ({ onEditPage }) => {
             return newSet
         })
     }, [])
+
+    // Auto-load children for first-level pages when they are expanded on initial load
+    useEffect(() => {
+        if (rootPagesData?.results && loadChildren) {
+            const pagesWithChildren = rootPagesData.results.filter(page =>
+                pageTreeUtils.hasChildren(page)
+            )
+
+            pagesWithChildren.forEach(page => {
+                loadChildren(page.id).catch(error => {
+                    console.error(`Failed to load children for page ${page.id}:`, error)
+                })
+            })
+        }
+    }, [rootPagesData, loadChildren])
 
     // Cut/Copy/Paste handlers
     const handleCut = useCallback((pageId) => {
