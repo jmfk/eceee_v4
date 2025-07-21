@@ -45,6 +45,7 @@ const PageTreeNode = ({
     const [editingTitle, setEditingTitle] = useState('')
     const [isEditingSlug, setIsEditingSlug] = useState(false)
     const [editingSlug, setEditingSlug] = useState('')
+    const [isTogglingPublication, setIsTogglingPublication] = useState(false)
     const queryClient = useQueryClient()
 
     // Sync local expansion state with page prop changes
@@ -209,6 +210,24 @@ const PageTreeNode = ({
         }
     }
 
+    // Publication status handlers
+    const handlePublicationToggle = () => {
+        if (isTogglingPublication) return // Prevent double-clicks
+
+        setIsTogglingPublication(true)
+
+        if (page.publication_status === 'published') {
+            unpublishPageMutation.mutate()
+        } else {
+            publishPageMutation.mutate()
+        }
+    }
+
+    const canTogglePublication = () => {
+        // Only allow toggling between published and unpublished for simplicity
+        return page.publication_status === 'published' || page.publication_status === 'unpublished'
+    }
+
     // Update page hostnames mutation
     const updateHostnamesMutation = useMutation({
         mutationFn: async (hostnamesData) => {
@@ -256,6 +275,40 @@ const PageTreeNode = ({
         onError: (error) => {
             toast.error(error.response?.data?.detail || 'Failed to update slug')
             setEditingSlug(page.slug) // Reset to original slug on error
+        }
+    })
+
+    // Publish page mutation
+    const publishPageMutation = useMutation({
+        mutationFn: async () => {
+            const response = await api.post(`/api/v1/webpages/pages/${page.id}/publish/`)
+            return response.data
+        },
+        onSuccess: () => {
+            toast.success('Page published successfully')
+            setIsTogglingPublication(false)
+            queryClient.invalidateQueries(['pages'])
+        },
+        onError: (error) => {
+            toast.error(error.response?.data?.detail || 'Failed to publish page')
+            setIsTogglingPublication(false)
+        }
+    })
+
+    // Unpublish page mutation
+    const unpublishPageMutation = useMutation({
+        mutationFn: async () => {
+            const response = await api.post(`/api/v1/webpages/pages/${page.id}/unpublish/`)
+            return response.data
+        },
+        onSuccess: () => {
+            toast.success('Page unpublished successfully')
+            setIsTogglingPublication(false)
+            queryClient.invalidateQueries(['pages'])
+        },
+        onError: (error) => {
+            toast.error(error.response?.data?.detail || 'Failed to unpublish page')
+            setIsTogglingPublication(false)
         }
     })
 
@@ -416,18 +469,27 @@ const PageTreeNode = ({
                         )}
                         <Tooltip
                             text={
-                                page.publication_status === 'published' ?
-                                    `Published` :
-                                    page.publication_status === 'scheduled' ?
-                                        `Scheduled` :
-                                        page.publication_status === 'unpublished' ?
-                                            `Unpublished` :
-                                            `Draft`
+                                canTogglePublication() ?
+                                    (page.publication_status === 'published' ?
+                                        'Published - Click to unpublish' :
+                                        'Unpublished - Click to publish') :
+                                    (page.publication_status === 'scheduled' ?
+                                        'Scheduled' :
+                                        page.publication_status === 'expired' ?
+                                            'Expired' :
+                                            'Draft')
                             }
                             position="top"
                         >
-                            <div className="cursor-help">
-                                {getStatusIcon()}
+                            <div
+                                className={`${canTogglePublication() ? 'cursor-pointer hover:scale-110 transition-transform' : 'cursor-help'} ${isTogglingPublication ? 'opacity-50' : ''}`}
+                                onClick={canTogglePublication() ? handlePublicationToggle : undefined}
+                            >
+                                {isTogglingPublication ? (
+                                    <Loader2 className="w-3 h-3 animate-spin text-blue-500" />
+                                ) : (
+                                    getStatusIcon()
+                                )}
                             </div>
                         </Tooltip>
 
