@@ -48,10 +48,35 @@ const TreePageManager = ({ onEditPage }) => {
         },
         onSuccess: (newPage) => {
             toast.success('Page created successfully')
-            // If we created a child page, make sure the parent is expanded
+
+            // If we created a child page, update the local tree state
             if (positioningParams?.parentId) {
-                setExpandedPages(prev => new Set([...prev, positioningParams.parentId]))
+                const parentId = positioningParams.parentId
+
+                // Add the new page to the local tree
+                setPages(prevPages => {
+                    return updatePageInTree(prevPages, parentId, (parentPage) => {
+                        const newChild = pageTreeUtils.formatPageForTree(newPage)
+                        const currentChildren = parentPage.children || []
+                        const updatedChildren = [...currentChildren, newChild].sort((a, b) => a.sort_order - b.sort_order)
+
+                        return {
+                            ...parentPage,
+                            children: updatedChildren,
+                            children_count: (parentPage.children_count || 0) + 1,
+                            childrenLoaded: true,
+                            isExpanded: true
+                        }
+                    })
+                })
+
+                // Make sure the parent is expanded
+                setExpandedPages(prev => new Set([...prev, parentId]))
+
+                // Invalidate queries to ensure data consistency
+                queryClient.invalidateQueries(['pages'])
             }
+
             setShowCreateModal(false)
             setPositioningParams(null)
             queryClient.invalidateQueries(['pages', 'root'])

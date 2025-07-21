@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
     ChevronRight,
@@ -37,6 +37,13 @@ const PageTreeNode = ({
     const [isExpanded, setIsExpanded] = useState(page.isExpanded || false)
     const [isLoading, setIsLoading] = useState(false)
     const queryClient = useQueryClient()
+
+    // Sync local expansion state with page prop changes
+    useEffect(() => {
+        if (page.isExpanded !== undefined) {
+            setIsExpanded(page.isExpanded)
+        }
+    }, [page.isExpanded])
 
     // Check if page has children
     const hasChildren = pageTreeUtils.hasChildren(page)
