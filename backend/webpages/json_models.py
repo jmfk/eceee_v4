@@ -12,6 +12,133 @@ from enum import Enum
 
 
 # ============================================================================
+# API Response Models
+# ============================================================================
+
+
+class PublicationStatus(str, Enum):
+    """Publication status choices"""
+
+    UNPUBLISHED = "unpublished"
+    SCHEDULED = "scheduled"
+    PUBLISHED = "published"
+    EXPIRED = "expired"
+
+
+class UserResponse(BaseModel):
+    """User data in API responses"""
+
+    id: int
+    username: str
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    email: Optional[str] = None
+
+
+class WebPageTreeResponse(BaseModel):
+    """Page data for tree views"""
+
+    id: int
+    title: str
+    slug: str
+    parent: Optional[int] = None
+    sort_order: int = 0
+    hostnames: List[str] = Field(default_factory=list)
+    publication_status: PublicationStatus
+    effective_date: Optional[datetime] = None
+    expiry_date: Optional[datetime] = None
+    children_count: int = 0
+
+
+class ThemeResponse(BaseModel):
+    """Theme data in API responses"""
+
+    id: int
+    name: str
+    description: Optional[str] = None
+    css_variables: Dict[str, str] = Field(default_factory=dict)
+    is_active: bool = True
+
+
+class LayoutResponse(BaseModel):
+    """Layout data in API responses"""
+
+    name: str
+    description: Optional[str] = None
+    slots: List[Dict[str, Any]] = Field(default_factory=list)
+    template_path: Optional[str] = None
+
+
+class WebPageDetailResponse(BaseModel):
+    """Detailed page data"""
+
+    id: int
+    title: str
+    slug: str
+    description: Optional[str] = None
+    parent: Optional[WebPageTreeResponse] = None
+    parent_id: Optional[int] = None
+    sort_order: int = 0
+    hostnames: List[str] = Field(default_factory=list)
+    code_layout: Optional[str] = None
+    theme: Optional[ThemeResponse] = None
+    theme_id: Optional[int] = None
+    publication_status: PublicationStatus
+    effective_date: Optional[datetime] = None
+    expiry_date: Optional[datetime] = None
+    meta_title: Optional[str] = None
+    meta_description: Optional[str] = None
+    meta_keywords: Optional[str] = None
+    linked_object_type: Optional[str] = None
+    linked_object_id: Optional[int] = None
+    created_at: datetime
+    updated_at: datetime
+    created_by: UserResponse
+    last_modified_by: UserResponse
+    absolute_url: str
+    is_published: bool
+    breadcrumbs: List[Dict[str, Any]] = Field(default_factory=list)
+    effective_layout: Optional[LayoutResponse] = None
+    effective_theme: Optional[ThemeResponse] = None
+    layout_type: Optional[str] = None
+    layout_inheritance_info: Dict[str, Any] = Field(default_factory=dict)
+    available_code_layouts: List[LayoutResponse] = Field(default_factory=list)
+    children_count: int = 0
+
+
+class WebPageListResponse(BaseModel):
+    """Page data for list views"""
+
+    id: int
+    title: str
+    slug: str
+    description: Optional[str] = None
+    parent: Optional[WebPageTreeResponse] = None
+    sort_order: int = 0
+    hostnames: List[str] = Field(default_factory=list)
+    publication_status: PublicationStatus
+    effective_date: Optional[datetime] = None
+    expiry_date: Optional[datetime] = None
+    created_at: datetime
+    updated_at: datetime
+    created_by: UserResponse
+    last_modified_by: UserResponse
+    is_published: bool
+    children_count: int = 0
+    layout: Optional[LayoutResponse] = None
+    theme: Optional[ThemeResponse] = None
+
+
+class PaginatedResponse(BaseModel):
+    """Paginated API response"""
+
+    count: int
+    next: Optional[str] = None
+    previous: Optional[str] = None
+    results: List[Any] = Field(default_factory=list)
+
+
+# ============================================================================
 # PageVersion JSON Models
 # ============================================================================
 

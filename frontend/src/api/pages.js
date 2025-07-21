@@ -5,9 +5,20 @@ const API_BASE = '/api/v1/webpages'
 /**
  * Page Tree Management API
  * Provides functions for hierarchical page management with lazy loading
+ * 
+ * @typedef {import('../types/api').WebPageTreeResponse} WebPageTreeResponse
+ * @typedef {import('../types/api').WebPageDetailResponse} WebPageDetailResponse
+ * @typedef {import('../types/api').PaginatedResponse} PaginatedResponse
+ * @typedef {import('../types/api').CreatePageRequest} CreatePageRequest
+ * @typedef {import('../types/api').UpdatePageRequest} UpdatePageRequest
+ * @typedef {import('../types/api').PageFilters} PageFilters
  */
 
 // Get root pages (pages without parent)
+/**
+ * @param {PageFilters} filters - Query filters
+ * @returns {Promise<PaginatedResponse<WebPageTreeResponse>>}
+ */
 export const getRootPages = async (filters = {}) => {
     const params = new URLSearchParams({
         parent_isnull: 'true',
@@ -150,8 +161,14 @@ export const pageTreeUtils = {
     },
 
     // Format page for tree display
+    /**
+     * @param {WebPageTreeResponse} page - Raw page data from API
+     * @returns {WebPageTreeResponse} Formatted page for tree display
+     */
     formatPageForTree: (page) => ({
         ...page,
+        // Ensure hostnames is always an array
+        hostnames: Array.isArray(page.hostnames) ? page.hostnames : [],
         isExpanded: false,
         isLoading: false,
         children: [],

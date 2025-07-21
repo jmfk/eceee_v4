@@ -14,10 +14,14 @@ import {
     AlertCircle,
     AlertTriangle,
     Loader2,
-    Plus
+    Plus,
+    X,
+    Save
 } from 'lucide-react'
 import { getPageChildren, movePage, deletePage } from '../api/pages'
 import { pageTreeUtils } from '../api/pages'
+import { api } from '../api/client.js'
+import { getPageDisplayUrl, isRootPage, sanitizePageData } from '../utils/apiValidation.js'
 import toast from 'react-hot-toast'
 import Tooltip from './Tooltip'
 
@@ -36,6 +40,7 @@ const PageTreeNode = ({
 }) => {
     const [isExpanded, setIsExpanded] = useState(page.isExpanded || false)
     const [isLoading, setIsLoading] = useState(false)
+    const [showHostnameModal, setShowHostnameModal] = useState(false)
     const queryClient = useQueryClient()
 
     // Sync local expansion state with page prop changes
@@ -57,8 +62,10 @@ const PageTreeNode = ({
 
     // Check if this is a top-level page without hostname
     const isTopLevel = level === 0
-    const hasHostnames = page.hostnames && page.hostnames.length > 0
-    const needsHostnameWarning = isTopLevel && !hasHostnames
+    const sanitizedPage = sanitizePageData(page)
+    const isRootPageCheck = isRootPage(sanitizedPage)
+    const hasHostnames = sanitizedPage.hostnames && sanitizedPage.hostnames.length > 0
+    const needsHostnameWarning = isRootPageCheck && !hasHostnames
 
     // Expand/collapse toggle
     const handleToggleExpand = async () => {
@@ -105,6 +112,28 @@ const PageTreeNode = ({
     const handleAddPageBelow = () => {
         onAddPageBelow?.(page)
     }
+
+    const handleHostnameClick = () => {
+        if (isRootPageCheck) {
+            setShowHostnameModal(true)
+        }
+    }
+
+    // Update page hostnames mutation
+    const updateHostnamesMutation = useMutation({
+        mutationFn: async (hostnamesData) => {
+            const response = await api.patch(`/api/v1/webpages/pages/${page.id}/`, hostnamesData)
+            return response.data
+        },
+        onSuccess: () => {
+            toast.success('Hostnames updated successfully')
+            setShowHostnameModal(false)
+            queryClient.invalidateQueries(['pages'])
+        },
+        onError: (error) => {
+            toast.error(error.response?.data?.detail || 'Failed to update hostnames')
+        }
+    })
 
     // Status icon based on publication status
     const getStatusIcon = () => {
@@ -181,9 +210,19 @@ const PageTreeNode = ({
                         <span className="truncate font-medium text-sm">
                             {page.title}
                         </span>
-                        <span className="text-xs text-gray-500 truncate">
-                            /{page.slug}
-                        </span>
+                        {isRootPageCheck ? (
+                            <button
+                                onClick={handleHostnameClick}
+                                className="text-xs text-gray-500 truncate hover:text-blue-600 hover:underline cursor-pointer transition-colors"
+                                title="Click to edit hostnames"
+                            >
+                                {getPageDisplayUrl(sanitizedPage)}
+                            </button>
+                        ) : (
+                            <span className="text-xs text-gray-500 truncate">
+                                {getPageDisplayUrl(sanitizedPage)}
+                            </span>
+                        )}
                         <Tooltip
                             text={
                                 page.publication_status === 'published' ?
@@ -309,6 +348,103 @@ const PageTreeNode = ({
                     ))}
                 </div>
             )}
+
+            {/* Hostname Editing Modal */}
+            {showHostnameModal && (
+                <HostnameEditModal
+                    page={page}
+                    onSave={(hostnamesData) => {
+                        updateHostnamesMutation.mutate(hostnamesData)
+                    }}
+                    onCancel={() => setShowHostnameModal(false)}
+                    isLoading={updateHostnamesMutation.isPending}
+                />
+            )}
+        </div>
+    )
+}
+
+// Hostname editing modal component
+const HostnameEditModal = ({ page, onSave, onCancel, isLoading }) => {
+    const [formData, setFormData] = useState({
+        hostnames: page.hostnames ? page.hostnames.join(', ') : ''
+    })
+
+    const handleSubmit = (e) => {
+        e.preventDefault()
+
+        // Parse hostnames from comma-separated string
+        const hostnamesArray = formData.hostnames
+            .split(',')
+            .map(h => h.trim())
+            .filter(h => h.length > 0)
+
+        const hostnamesData = {
+            hostnames: hostnamesArray
+        }
+
+        onSave(hostnamesData)
+    }
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
+                <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-lg font-medium text-gray-900">
+                        Edit Hostnames for "{page.title}"
+                    </h3>
+                    <button
+                        onClick={onCancel}
+                        className="text-gray-400 hover:text-gray-500"
+                    >
+                        <X className="w-5 h-5" />
+                    </button>
+                </div>
+
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                        <label htmlFor="hostnames" className="block text-sm font-medium text-gray-700 mb-1">
+                            Hostnames *
+                        </label>
+                        <input
+                            id="hostnames"
+                            type="text"
+                            value={formData.hostnames}
+                            onChange={(e) => setFormData(prev => ({ ...prev, hostnames: e.target.value }))}
+                            placeholder="example.com, www.example.com"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            required
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                            Enter hostnames separated by commas. Root pages need at least one hostname.
+                        </p>
+                    </div>
+
+                    <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                        <p className="text-sm text-blue-800">
+                            Root pages are accessed directly via these hostnames. Each hostname should point to your server.
+                        </p>
+                    </div>
+
+                    <div className="flex items-center justify-end space-x-3 pt-4">
+                        <button
+                            type="button"
+                            onClick={onCancel}
+                            className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={isLoading}
+                            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                        >
+                            <Save className="w-4 h-4 mr-2" />
+                            {isLoading ? 'Saving...' : 'Save Hostnames'}
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
     )
 }
