@@ -977,6 +977,35 @@ class WebPage(models.Model):
             self.versions.filter(status="published").order_by("-version_number").first()
         )
 
+    @classmethod
+    def normalize_sort_orders(cls, parent_id=None):
+        """
+        Normalize sort orders for all siblings under the same parent.
+        Assigns sort orders starting from 10, incrementing by 10 (10, 20, 30, etc.)
+
+        Args:
+            parent_id: ID of parent page, or None for root pages
+        """
+        if parent_id:
+            siblings = cls.objects.filter(parent_id=parent_id).order_by(
+                "sort_order", "title"
+            )
+        else:
+            siblings = cls.objects.filter(parent__isnull=True).order_by(
+                "sort_order", "title"
+            )
+
+        # Update sort orders with proper spacing
+        for index, page in enumerate(siblings):
+            new_sort_order = (index + 1) * 10  # 10, 20, 30, 40, etc.
+            if page.sort_order != new_sort_order:
+                page.sort_order = new_sort_order
+                page.save(update_fields=["sort_order"])
+
+    def normalize_siblings_sort_orders(self):
+        """Normalize sort orders for this page's siblings"""
+        self.__class__.normalize_sort_orders(self.parent_id)
+
 
 class PageVersion(models.Model):
     """

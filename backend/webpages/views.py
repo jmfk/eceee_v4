@@ -344,6 +344,10 @@ class WebPageViewSet(viewsets.ModelViewSet):
             created_by=self.request.user, last_modified_by=self.request.user
         )
 
+        # Normalize sort orders for the parent group
+        page = serializer.instance
+        WebPage.normalize_sort_orders(page.parent_id)
+
     def perform_update(self, serializer):
         serializer.save(last_modified_by=self.request.user)
         # Create draft version after successful update
@@ -660,6 +664,9 @@ class WebPageViewSet(viewsets.ModelViewSet):
         new_parent_id = request.data.get("parent_id")
         new_sort_order = request.data.get("sort_order", 0)
 
+        # Store old parent for normalization
+        old_parent_id = page.parent_id
+
         if new_parent_id:
             try:
                 new_parent = WebPage.objects.get(id=new_parent_id)
@@ -683,6 +690,15 @@ class WebPageViewSet(viewsets.ModelViewSet):
         page.sort_order = new_sort_order
         page.last_modified_by = request.user
         page.save()
+
+        # Normalize sort orders for both old and new parent groups
+        if old_parent_id != new_parent_id:
+            # Normalize the old parent's children (if page was moved)
+            if old_parent_id is not None or page.parent is None:
+                WebPage.normalize_sort_orders(old_parent_id)
+
+        # Normalize the new parent's children
+        WebPage.normalize_sort_orders(new_parent_id)
 
         # Create version
         page.create_version(request.user, f"Moved to parent {new_parent_id}")

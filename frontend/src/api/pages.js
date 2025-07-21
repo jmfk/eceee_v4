@@ -137,28 +137,16 @@ export const pageTreeUtils = {
 
     // Calculate sort order for pasting above a specific page
     calculateSortOrderAbove: (siblings, targetPage) => {
-        const targetIndex = siblings.findIndex(page => page.id === targetPage.id)
-        if (targetIndex === 0) {
-            // Insert at the beginning
-            return targetPage.sort_order - 1
-        } else {
-            // Insert between previous page and target
-            const previousPage = siblings[targetIndex - 1]
-            return Math.floor((previousPage.sort_order + targetPage.sort_order) / 2)
-        }
+        // Simple hint: use target's sort_order - 1
+        // Backend will normalize to proper spacing
+        return targetPage.sort_order - 1
     },
 
     // Calculate sort order for pasting below a specific page
     calculateSortOrderBelow: (siblings, targetPage) => {
-        const targetIndex = siblings.findIndex(page => page.id === targetPage.id)
-        if (targetIndex === siblings.length - 1) {
-            // Insert at the end
-            return targetPage.sort_order + 1
-        } else {
-            // Insert between target and next page
-            const nextPage = siblings[targetIndex + 1]
-            return Math.floor((targetPage.sort_order + nextPage.sort_order) / 2)
-        }
+        // Simple hint: use target's sort_order + 1
+        // Backend will normalize to proper spacing
+        return targetPage.sort_order + 1
     },
 
     // Format page for tree display

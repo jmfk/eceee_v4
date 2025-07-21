@@ -249,40 +249,25 @@ const TreePageManager = ({ onEditPage }) => {
                 } else if (pasteMode === 'top' || pasteMode === 'bottom') {
                     // Paste at root level (top or bottom)
                     newParentId = null
-                    const rootPages = pages.filter(p => !p.parent)
 
+                    // Simple hints - backend will normalize to proper spacing
                     if (pasteMode === 'top') {
-                        newSortOrder = rootPages.length > 0 ? rootPages[0].sort_order - 1 : 0
+                        newSortOrder = -1  // Hint: place at beginning
                     } else { // bottom
-                        newSortOrder = rootPages.length > 0 ? rootPages[rootPages.length - 1].sort_order + 1 : 0
+                        newSortOrder = 999999  // Hint: place at end
                     }
                 } else if (pasteMode === 'above' || pasteMode === 'below') {
                     // Paste as sibling of target page
                     newParentId = targetPage.parent?.id || null
 
-                    // Find siblings to calculate sort order
-                    const findSiblings = (pageList, parentId) => {
-                        if (parentId === null) {
-                            return pageList.filter(p => !p.parent)
-                        }
-                        for (const page of pageList) {
-                            if (page.id === parentId) {
-                                return page.children || []
-                            }
-                            if (page.children && page.children.length > 0) {
-                                const found = findSiblings(page.children, parentId)
-                                if (found.length > 0) return found
-                            }
-                        }
-                        return []
-                    }
-
-                    const siblings = findSiblings(pages, newParentId)
-
+                    // Simple hints - backend will normalize to proper spacing
                     if (pasteMode === 'above') {
-                        newSortOrder = pageTreeUtils.calculateSortOrderAbove(siblings, targetPage)
+                        console.log('targetPage:', targetPage);
+                        newSortOrder = pageTreeUtils.calculateSortOrderAbove([], targetPage)
+                        console.log('newSortOrder:', newSortOrder);
                     } else { // below
-                        newSortOrder = pageTreeUtils.calculateSortOrderBelow(siblings, targetPage)
+                        console.log('targetPage:', targetPage);
+                        newSortOrder = pageTreeUtils.calculateSortOrderBelow([], targetPage)
                     }
                 }
 
@@ -296,7 +281,8 @@ const TreePageManager = ({ onEditPage }) => {
                     parent: newParentId ? { id: newParentId } : null,
                     sort_order: newSortOrder
                 }
-
+                console.log('updatedPage:', updatedPage);
+                console.log('pasteMode:', pasteMode);
                 // 3. Add page to new location
                 if (pasteMode === 'child') {
                     updatedPages = addPageToTree(updatedPages, updatedPage, newParentId)
@@ -481,48 +467,6 @@ const TreePageManager = ({ onEditPage }) => {
                                 <option value="scheduled">Scheduled</option>
                             </select>
                         </label>
-                    </div>
-                )}
-
-                {/* Clipboard status */}
-                {cutPageId && (
-                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg space-y-2">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2 text-sm text-blue-800">
-                                <Scissors className="w-4 h-4" />
-                                <span>
-                                    Page cut to clipboard
-                                </span>
-                            </div>
-                            <Tooltip text="Clear clipboard" position="top">
-                                <button
-                                    onClick={clearClipboard}
-                                    className="text-blue-600 hover:text-blue-800 text-sm font-medium transition-colors hover:underline"
-                                >
-                                    Clear
-                                </button>
-                            </Tooltip>
-                        </div>
-                        {/* Root level paste options */}
-                        <div className="flex items-center gap-2 text-sm">
-                            <span className="text-blue-700">Paste at root level:</span>
-                            <Tooltip text="Paste at top" position="top">
-                                <button
-                                    onClick={() => handlePaste(null, 'top')}
-                                    className="px-2 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded text-xs font-medium transition-colors hover:shadow-sm"
-                                >
-                                    📋 Top
-                                </button>
-                            </Tooltip>
-                            <Tooltip text="Paste at bottom" position="top">
-                                <button
-                                    onClick={() => handlePaste(null, 'bottom')}
-                                    className="px-2 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded text-xs font-medium transition-colors hover:shadow-sm"
-                                >
-                                    📋 Bottom
-                                </button>
-                            </Tooltip>
-                        </div>
                     </div>
                 )}
             </div>
