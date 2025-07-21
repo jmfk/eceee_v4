@@ -5,8 +5,6 @@ import {
     Plus,
     RefreshCw,
     Filter,
-    Expand,
-    Minimize2,
     Scissors,
     FolderPlus,
     AlertCircle,
@@ -510,18 +508,7 @@ const TreePageManager = ({ onEditPage }) => {
         setShowRootPageModal(true)
     }, [])
 
-    // Expand/collapse all
-    const expandAll = () => {
-        // This would need to recursively expand all nodes
-        toast('Expand all functionality coming soon', {
-            icon: 'ℹ️',
-            duration: 3000
-        })
-    }
 
-    const collapseAll = () => {
-        setExpandedPages(new Set())
-    }
 
     // Clear clipboard
     const clearClipboard = () => {
@@ -558,24 +545,6 @@ const TreePageManager = ({ onEditPage }) => {
                                 className="p-2 text-gray-500 hover:text-purple-600 hover:bg-purple-50 rounded transition-colors"
                             >
                                 <Plus className="w-4 h-4" />
-                            </button>
-                        </Tooltip>
-                        <Tooltip text="Expand all" position="top">
-                            <button
-                                data-testid="expand-all-button"
-                                onClick={expandAll}
-                                className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                            >
-                                <Expand className="w-4 h-4" />
-                            </button>
-                        </Tooltip>
-                        <Tooltip text="Collapse all" position="top">
-                            <button
-                                data-testid="collapse-all-button"
-                                onClick={collapseAll}
-                                className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                            >
-                                <Minimize2 className="w-4 h-4" />
                             </button>
                         </Tooltip>
                         <Tooltip text="Refresh" position="top">
