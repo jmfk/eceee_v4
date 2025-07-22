@@ -17,13 +17,70 @@ import {
     Plus,
     X,
     Save,
-    Search
+    Search,
 } from 'lucide-react'
 import { getPageChildren, movePage, deletePage } from '../api/pages'
 import { pageTreeUtils } from '../api/pages'
 import { api } from '../api/client.js'
 import { getPageDisplayUrl, isRootPage, sanitizePageData } from '../utils/apiValidation.js'
 import Tooltip from './Tooltip'
+import { memo } from 'react'
+
+// Separate component for publication status icon that only re-renders when status changes
+const PublicationStatusIcon = memo(({
+    pageId,
+    publicationStatus,
+    canToggle,
+    isToggling,
+    onToggle
+}) => {
+    const getStatusIcon = () => {
+        switch (publicationStatus) {
+            case 'published':
+                return <Globe className="w-3 h-3 text-green-500" />
+            case 'scheduled':
+                return <Clock className="w-3 h-3 text-blue-500" />
+            case 'unpublished':
+                return <AlertCircle className="w-3 h-3 text-gray-400" />
+            default:
+                return <AlertCircle className="w-3 h-3 text-gray-400" />
+        }
+    }
+
+    const getTooltipText = () => {
+        if (canToggle) {
+            return publicationStatus === 'published' ?
+                'Published - Click to unpublish' :
+                'Unpublished - Click to publish'
+        }
+
+        switch (publicationStatus) {
+            case 'scheduled':
+                return 'Scheduled'
+            case 'expired':
+                return 'Expired'
+            default:
+                return 'Draft'
+        }
+    }
+
+    return (
+        <Tooltip text={getTooltipText()} position="top">
+            <div
+                className={`${canToggle ? 'cursor-pointer hover:scale-110 transition-transform' : 'cursor-help'} ${isToggling ? 'opacity-50' : ''}`}
+                onClick={canToggle ? onToggle : undefined}
+            >
+                {isToggling ? (
+                    <Loader2 className="w-3 h-3 animate-spin text-blue-500" />
+                ) : (
+                    getStatusIcon()
+                )}
+            </div>
+        </Tooltip>
+    )
+})
+
+PublicationStatusIcon.displayName = 'PublicationStatusIcon'
 
 const PageTreeNode = ({
     page,
@@ -245,8 +302,8 @@ const PageTreeNode = ({
 
     // Utility function to update page data in cache
     const updatePageInCache = useCallback((pageId, updates) => {
-        // Update root pages cache
-        queryClient.setQueryData(['pages', 'root'], (oldData) => {
+        // Update all page-related cache entries with the specific page update
+        queryClient.setQueriesData(['pages'], (oldData) => {
             if (!oldData) return oldData
 
             const updatePageInResults = (results) => {
@@ -267,27 +324,8 @@ const PageTreeNode = ({
             }
         })
 
-        // Update search results cache
-        queryClient.setQueryData(['pages', 'search'], (oldData) => {
-            if (!oldData) return oldData
-
-            const updatePageInResults = (results) => {
-                return results.map(p => {
-                    if (p.id === pageId) {
-                        return { ...p, ...updates }
-                    }
-                    return p
-                })
-            }
-
-            return {
-                ...oldData,
-                results: updatePageInResults(oldData.results)
-            }
-        })
-
-        // Update children cache for this page
-        queryClient.setQueryData(['page-children', pageId], (oldData) => {
+        // Also update specific page children cache
+        queryClient.setQueriesData(['page-children'], (oldData) => {
             if (!oldData) return oldData
 
             const updatePageInChildren = (results) => {
@@ -397,20 +435,6 @@ const PageTreeNode = ({
             setIsTogglingPublication(false)
         }
     })
-
-    // Status icon based on publication status
-    const getStatusIcon = () => {
-        switch (page.publication_status) {
-            case 'published':
-                return <Globe className="w-3 h-3 text-green-500" />
-            case 'scheduled':
-                return <Clock className="w-3 h-3 text-blue-500" />
-            case 'unpublished':
-                return <AlertCircle className="w-3 h-3 text-gray-400" />
-            default:
-                return <AlertCircle className="w-3 h-3 text-gray-400" />
-        }
-    }
 
     // Folder icon based on state
     const getFolderIcon = () => {
@@ -560,31 +584,13 @@ const PageTreeNode = ({
                                 {highlightSearchTerm(getPageDisplayUrl(sanitizedPage), searchTerm)}
                             </span>
                         )}
-                        <Tooltip
-                            text={
-                                canTogglePublication() ?
-                                    (page.publication_status === 'published' ?
-                                        'Published - Click to unpublish' :
-                                        'Unpublished - Click to publish') :
-                                    (page.publication_status === 'scheduled' ?
-                                        'Scheduled' :
-                                        page.publication_status === 'expired' ?
-                                            'Expired' :
-                                            'Draft')
-                            }
-                            position="top"
-                        >
-                            <div
-                                className={`${canTogglePublication() ? 'cursor-pointer hover:scale-110 transition-transform' : 'cursor-help'} ${isTogglingPublication ? 'opacity-50' : ''}`}
-                                onClick={canTogglePublication() ? handlePublicationToggle : undefined}
-                            >
-                                {isTogglingPublication ? (
-                                    <Loader2 className="w-3 h-3 animate-spin text-blue-500" />
-                                ) : (
-                                    getStatusIcon()
-                                )}
-                            </div>
-                        </Tooltip>
+                        <PublicationStatusIcon
+                            pageId={page.id}
+                            publicationStatus={page.publication_status}
+                            canToggle={canTogglePublication()}
+                            isToggling={isTogglingPublication}
+                            onToggle={handlePublicationToggle}
+                        />
 
                         {/* Hostname warning for top-level pages */}
                         {needsHostnameWarning && (

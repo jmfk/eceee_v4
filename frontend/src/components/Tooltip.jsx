@@ -1,8 +1,11 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 
 const Tooltip = ({ children, text, position = 'top', delay = 300 }) => {
     const [isVisible, setIsVisible] = useState(false)
     const [timeoutId, setTimeoutId] = useState(null)
+    const [tooltipPosition, setTooltipPosition] = useState({ top: 0, left: 0 })
+    const triggerRef = useRef(null)
+    const tooltipRef = useRef(null)
 
     const showTooltip = () => {
         const id = setTimeout(() => {
@@ -19,20 +22,48 @@ const Tooltip = ({ children, text, position = 'top', delay = 300 }) => {
         setIsVisible(false)
     }
 
-    const getPositionClasses = () => {
-        switch (position) {
-            case 'top':
-                return 'bottom-full left-1/2 transform -translate-x-1/2 mb-4'
-            case 'bottom':
-                return 'top-full left-1/2 transform -translate-x-1/2 mt-4'
-            case 'left':
-                return 'right-full top-1/2 transform -translate-y-1/2 mr-4'
-            case 'right':
-                return 'left-full top-1/2 transform -translate-y-1/2 ml-4'
-            default:
-                return 'bottom-full left-1/2 transform -translate-x-1/2 mb-4'
+    // Calculate tooltip position when visible
+    useEffect(() => {
+        if (isVisible && triggerRef.current && tooltipRef.current) {
+            const triggerRect = triggerRef.current.getBoundingClientRect()
+            const tooltipRect = tooltipRef.current.getBoundingClientRect()
+
+            let top, left
+
+            switch (position) {
+                case 'top':
+                    top = triggerRect.top - tooltipRect.height - 16
+                    left = triggerRect.left + (triggerRect.width / 2) - (tooltipRect.width / 2)
+                    break
+                case 'bottom':
+                    top = triggerRect.bottom + 16
+                    left = triggerRect.left + (triggerRect.width / 2) - (tooltipRect.width / 2)
+                    break
+                case 'left':
+                    top = triggerRect.top + (triggerRect.height / 2) - (tooltipRect.height / 2)
+                    left = triggerRect.left - tooltipRect.width - 16
+                    break
+                case 'right':
+                    top = triggerRect.top + (triggerRect.height / 2) - (tooltipRect.height / 2)
+                    left = triggerRect.right + 16
+                    break
+                default:
+                    top = triggerRect.top - tooltipRect.height - 16
+                    left = triggerRect.left + (triggerRect.width / 2) - (tooltipRect.width / 2)
+            }
+
+            // Ensure tooltip stays within viewport
+            const viewportWidth = window.innerWidth
+            const viewportHeight = window.innerHeight
+
+            if (left < 8) left = 8
+            if (left + tooltipRect.width > viewportWidth - 8) left = viewportWidth - tooltipRect.width - 8
+            if (top < 8) top = 8
+            if (top + tooltipRect.height > viewportHeight - 8) top = viewportHeight - tooltipRect.height - 8
+
+            setTooltipPosition({ top, left })
         }
-    }
+    }, [isVisible, position])
 
     const getArrowClasses = () => {
         switch (position) {
@@ -50,25 +81,33 @@ const Tooltip = ({ children, text, position = 'top', delay = 300 }) => {
     }
 
     return (
-        <div
-            className="relative inline-block"
-            onMouseEnter={showTooltip}
-            onMouseLeave={hideTooltip}
-            onFocus={showTooltip}
-            onBlur={hideTooltip}
-        >
-            {children}
+        <>
+            <div
+                ref={triggerRef}
+                className="relative inline-block"
+                onMouseEnter={showTooltip}
+                onMouseLeave={hideTooltip}
+                onFocus={showTooltip}
+                onBlur={hideTooltip}
+            >
+                {children}
+            </div>
             {isVisible && text && (
-                <div className="absolute z-50 pointer-events-none">
-                    <div className={`absolute ${getPositionClasses()}`}>
-                        <div className="bg-gray-800 text-white text-xs rounded py-1 px-2 max-w-xs whitespace-nowrap shadow-lg">
-                            {text}
-                        </div>
-                        <div className={`absolute w-0 h-0 ${getArrowClasses()}`}></div>
+                <div
+                    ref={tooltipRef}
+                    className="fixed z-[9999] pointer-events-none"
+                    style={{
+                        top: tooltipPosition.top,
+                        left: tooltipPosition.left,
+                    }}
+                >
+                    <div className="bg-gray-800 text-white text-xs rounded py-1 px-2 max-w-xs whitespace-nowrap shadow-lg">
+                        {text}
                     </div>
+                    <div className={`absolute w-0 h-0 ${getArrowClasses()}`}></div>
                 </div>
             )}
-        </div>
+        </>
     )
 }
 
