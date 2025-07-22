@@ -85,7 +85,7 @@ describe('PageTreeNode - Child Page Refresh', () => {
         mockOnRefreshChildren = vi.fn()
     })
 
-    it('should call onRefreshChildren when parent page title is updated', async () => {
+    it('should NOT call onRefreshChildren when parent page title is updated (using targeted updates)', async () => {
         const mockResponse = { data: { ...mockParentPage, title: 'Updated Parent Page' } }
         api.patch.mockResolvedValue(mockResponse)
 
@@ -115,11 +115,11 @@ describe('PageTreeNode - Child Page Refresh', () => {
             expect(api.patch).toHaveBeenCalledWith('/api/v1/webpages/pages/1/', { title: 'Updated Parent Page' })
         })
 
-        // Should call onRefreshChildren because parent has children
-        expect(mockOnRefreshChildren).toHaveBeenCalledWith(1)
+        // Should NOT call onRefreshChildren because we use targeted updates now
+        expect(mockOnRefreshChildren).not.toHaveBeenCalled()
     })
 
-    it('should call onRefreshChildren when parent page slug is updated', async () => {
+    it('should NOT call onRefreshChildren when parent page slug is updated (using targeted updates)', async () => {
         const mockResponse = { data: { ...mockParentPage, slug: 'updated-parent-page' } }
         api.patch.mockResolvedValue(mockResponse)
 
@@ -150,11 +150,11 @@ describe('PageTreeNode - Child Page Refresh', () => {
             expect(api.patch).toHaveBeenCalledWith('/api/v1/webpages/pages/1/', { slug: 'updated-parent-page' })
         })
 
-        // Should call onRefreshChildren because parent has children
-        expect(mockOnRefreshChildren).toHaveBeenCalledWith(1)
+        // Should NOT call onRefreshChildren because we use targeted updates now
+        expect(mockOnRefreshChildren).not.toHaveBeenCalled()
     })
 
-    it('should call onRefreshChildren when parent page publication status is toggled', async () => {
+    it('should NOT call onRefreshChildren when parent page publication status is toggled (using targeted updates)', async () => {
         const mockResponse = { data: { ...mockParentPage, publication_status: 'unpublished' } }
         api.post.mockResolvedValue(mockResponse)
 
@@ -176,8 +176,8 @@ describe('PageTreeNode - Child Page Refresh', () => {
             expect(api.post).toHaveBeenCalledWith('/api/v1/webpages/pages/1/unpublish/')
         })
 
-        // Should call onRefreshChildren because parent has children
-        expect(mockOnRefreshChildren).toHaveBeenCalledWith(1)
+        // Should NOT call onRefreshChildren because we use targeted updates now
+        expect(mockOnRefreshChildren).not.toHaveBeenCalled()
     })
 
     it('should NOT call onRefreshChildren when child page is updated (no children)', async () => {

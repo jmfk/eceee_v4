@@ -422,6 +422,35 @@ class WebPage(models.Model):
         except Exception:
             return False
 
+    def unpublish(self, user, change_summary="Page unpublished"):
+        """
+        Tell, Don't Ask: Let the page unpublish itself.
+
+        Returns True if unpublishing was successful, False otherwise.
+        """
+        if self.publication_status == "unpublished":
+            return False  # Already unpublished
+
+        try:
+            with transaction.atomic():
+                self.publication_status = "unpublished"
+                self.effective_date = None  # Clear effective_date when unpublishing
+                # Note: expiry_date is handled in the view layer for more granular control
+                self.last_modified_by = user
+                self.save()
+
+                # Create version record if the method exists
+                if hasattr(self, "create_version"):
+                    self.create_version(
+                        user,
+                        change_summary,
+                        status="draft",
+                    )
+
+                return True
+        except Exception:
+            return False
+
     def expire(self, user, change_summary="Page expired"):
         """
         Tell, Don't Ask: Let the page expire itself.

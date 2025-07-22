@@ -103,6 +103,17 @@ export const searchPages = async (query, filters = {}) => {
     return response.data
 }
 
+// Comprehensive search across all pages with hierarchy context
+export const searchAllPages = async (query, filters = {}) => {
+    const params = new URLSearchParams({
+        search: query,
+        include_hierarchy: 'true', // Request hierarchy information
+        ...filters
+    })
+    const response = await api.get(`${API_BASE}/pages/search_all/?${params}`)
+    return response.data
+}
+
 // Get page hierarchy path (breadcrumbs)
 export const getPagePath = async (pageId) => {
     // This would need to be implemented on the backend

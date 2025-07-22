@@ -37,16 +37,50 @@ function App() {
           </main>
           <Toaster
             position="top-center"
+            toastOptions={{
+              duration: 4000,
+              style: {
+                zIndex: 9999,
+                maxWidth: '500px',
+                background: '#fff',
+                color: '#374151',
+                border: '1px solid #d1d5db',
+                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+              },
+              success: {
+                style: {
+                  background: '#10b981',
+                  color: '#fff',
+                  border: '1px solid #059669',
+                },
+              },
+              error: {
+                style: {
+                  background: '#ef4444',
+                  color: '#fff',
+                  border: '1px solid #dc2626',
+                },
+              },
+            }}
+            containerStyle={{
+              zIndex: 9999,
+            }}
           >
             {(t) => (
-              <div style={t.style} className="flex items-center justify-between bg-green-400 border border-green-800 rounded-lg shadow-lg p-4">
+              <div
+                style={{
+                  ...t.style,
+                  zIndex: 9999,
+                }}
+                className="flex items-center justify-between rounded-lg shadow-xl p-4 toast-notification"
+              >
                 <div className="flex items-center">
                   {t.icon}
-                  <span className="ml-2">{t.message}</span>
+                  <span className="ml-2 font-medium">{t.message}</span>
                 </div>
                 <button
                   onClick={() => toast.remove(t.id)}
-                  className="ml-4 p-1 rounded hover:bg-green-500 transition-colors"
+                  className="ml-4 p-1 rounded hover:bg-black hover:bg-opacity-10 transition-colors"
                   aria-label="Close notification"
                 >
                   <X className="w-4 h-4" />

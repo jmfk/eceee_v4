@@ -16,13 +16,13 @@ import {
     Loader2,
     Plus,
     X,
-    Save
+    Save,
+    Search
 } from 'lucide-react'
 import { getPageChildren, movePage, deletePage } from '../api/pages'
 import { pageTreeUtils } from '../api/pages'
 import { api } from '../api/client.js'
 import { getPageDisplayUrl, isRootPage, sanitizePageData } from '../utils/apiValidation.js'
-import toast from 'react-hot-toast'
 import Tooltip from './Tooltip'
 
 const PageTreeNode = ({
@@ -37,7 +37,9 @@ const PageTreeNode = ({
     onDelete,
     onAddPageBelow,
     cutPageId,
-    onRefreshChildren
+    onRefreshChildren,
+    isSearchMode = false,
+    searchTerm = ''
 }) => {
     const [isExpanded, setIsExpanded] = useState(page.isExpanded || false)
     const [isLoading, setIsLoading] = useState(false)
@@ -73,6 +75,22 @@ const PageTreeNode = ({
     const hasHostnames = sanitizedPage.hostnames && sanitizedPage.hostnames.length > 0
     const needsHostnameWarning = isRootPageCheck && !hasHostnames
 
+    // Helper function to highlight search terms
+    const highlightSearchTerm = (text, searchTerm) => {
+        if (!searchTerm || !text) return text
+
+        const regex = new RegExp(`(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi')
+        const parts = text.split(regex)
+
+        return parts.map((part, index) =>
+            regex.test(part) ? (
+                <mark key={index} className="bg-yellow-200 px-1 rounded">
+                    {part}
+                </mark>
+            ) : part
+        )
+    }
+
     // Expand/collapse toggle
     const handleToggleExpand = async () => {
         if (!hasChildren) return
@@ -82,7 +100,6 @@ const PageTreeNode = ({
             try {
                 await onLoadChildren(page.id)
             } catch (error) {
-                toast.error('Failed to load child pages')
                 console.error('Error loading children:', error)
             } finally {
                 setIsLoading(false)
@@ -106,7 +123,6 @@ const PageTreeNode = ({
 
     const handleCut = () => {
         onCut?.(page.id)
-        toast.success('Page cut to clipboard')
     }
 
     const handleDelete = () => {
@@ -134,7 +150,6 @@ const PageTreeNode = ({
     const handleTitleSave = () => {
         const trimmedTitle = editingTitle.trim()
         if (!trimmedTitle) {
-            toast.error('Title cannot be empty')
             return
         }
         if (trimmedTitle === page.title) {
@@ -178,7 +193,6 @@ const PageTreeNode = ({
     const handleSlugSave = () => {
         const trimmedSlug = editingSlug.trim()
         if (!trimmedSlug) {
-            toast.error('Slug cannot be empty')
             return
         }
 
@@ -229,19 +243,86 @@ const PageTreeNode = ({
         return page.publication_status === 'published' || page.publication_status === 'unpublished'
     }
 
+    // Utility function to update page data in cache
+    const updatePageInCache = useCallback((pageId, updates) => {
+        // Update root pages cache
+        queryClient.setQueryData(['pages', 'root'], (oldData) => {
+            if (!oldData) return oldData
+
+            const updatePageInResults = (results) => {
+                return results.map(p => {
+                    if (p.id === pageId) {
+                        return { ...p, ...updates }
+                    }
+                    if (p.children && p.children.length > 0) {
+                        return { ...p, children: updatePageInResults(p.children) }
+                    }
+                    return p
+                })
+            }
+
+            return {
+                ...oldData,
+                results: updatePageInResults(oldData.results)
+            }
+        })
+
+        // Update search results cache
+        queryClient.setQueryData(['pages', 'search'], (oldData) => {
+            if (!oldData) return oldData
+
+            const updatePageInResults = (results) => {
+                return results.map(p => {
+                    if (p.id === pageId) {
+                        return { ...p, ...updates }
+                    }
+                    return p
+                })
+            }
+
+            return {
+                ...oldData,
+                results: updatePageInResults(oldData.results)
+            }
+        })
+
+        // Update children cache for this page
+        queryClient.setQueryData(['page-children', pageId], (oldData) => {
+            if (!oldData) return oldData
+
+            const updatePageInChildren = (results) => {
+                return results.map(p => {
+                    if (p.id === pageId) {
+                        return { ...p, ...updates }
+                    }
+                    if (p.children && p.children.length > 0) {
+                        return { ...p, children: updatePageInChildren(p.children) }
+                    }
+                    return p
+                })
+            }
+
+            return {
+                ...oldData,
+                results: updatePageInChildren(oldData.results)
+            }
+        })
+    }, [queryClient])
+
     // Update page hostnames mutation
     const updateHostnamesMutation = useMutation({
         mutationFn: async (hostnamesData) => {
             const response = await api.patch(`/api/v1/webpages/pages/${page.id}/`, hostnamesData)
             return response.data
         },
-        onSuccess: () => {
-            toast.success('Hostnames updated successfully')
+        onSuccess: (updatedPage) => {
             setShowHostnameModal(false)
-            queryClient.invalidateQueries(['pages'])
+
+            // Update the specific page in the tree with optimistic update
+            updatePageInCache(page.id, { hostnames: updatedPage.hostnames })
         },
         onError: (error) => {
-            toast.error(error.response?.data?.detail || 'Failed to update hostnames')
+            console.error('Failed to update hostnames:', error.response?.data?.detail || error.message)
         }
     })
 
@@ -251,20 +332,14 @@ const PageTreeNode = ({
             const response = await api.patch(`/api/v1/webpages/pages/${page.id}/`, titleData)
             return response.data
         },
-        onSuccess: () => {
-            toast.success('Title updated successfully')
+        onSuccess: (updatedPage) => {
             setIsEditingTitle(false)
-            // Invalidate both root pages and any cached child pages data
-            queryClient.invalidateQueries(['pages'])
-            queryClient.invalidateQueries(['page-children'])
 
-            // Refresh child pages if this page has children and they're loaded
-            if (page.childrenLoaded && page.children && page.children.length > 0 && onRefreshChildren) {
-                onRefreshChildren(page.id)
-            }
+            // Update the specific page in the tree with optimistic update
+            updatePageInCache(page.id, { title: updatedPage.title })
         },
         onError: (error) => {
-            toast.error(error.response?.data?.detail || 'Failed to update title')
+            console.error('Failed to update title:', error.response?.data?.detail || error.message)
             setEditingTitle(page.title) // Reset to original title on error
         }
     })
@@ -275,20 +350,14 @@ const PageTreeNode = ({
             const response = await api.patch(`/api/v1/webpages/pages/${page.id}/`, slugData)
             return response.data
         },
-        onSuccess: () => {
-            toast.success('Slug updated successfully')
+        onSuccess: (updatedPage) => {
             setIsEditingSlug(false)
-            // Invalidate both root pages and any cached child pages data
-            queryClient.invalidateQueries(['pages'])
-            queryClient.invalidateQueries(['page-children'])
 
-            // Refresh child pages if this page has children and they're loaded
-            if (page.childrenLoaded && page.children && page.children.length > 0 && onRefreshChildren) {
-                onRefreshChildren(page.id)
-            }
+            // Update the specific page in the tree with optimistic update
+            updatePageInCache(page.id, { slug: updatedPage.slug })
         },
         onError: (error) => {
-            toast.error(error.response?.data?.detail || 'Failed to update slug')
+            console.error('Failed to update slug:', error.response?.data?.detail || error.message)
             setEditingSlug(page.slug) // Reset to original slug on error
         }
     })
@@ -299,20 +368,14 @@ const PageTreeNode = ({
             const response = await api.post(`/api/v1/webpages/pages/${page.id}/publish/`)
             return response.data
         },
-        onSuccess: () => {
-            toast.success('Page published successfully')
+        onSuccess: (updatedPage) => {
             setIsTogglingPublication(false)
-            // Invalidate both root pages and any cached child pages data
-            queryClient.invalidateQueries(['pages'])
-            queryClient.invalidateQueries(['page-children'])
 
-            // Refresh child pages if this page has children and they're loaded
-            if (page.childrenLoaded && page.children && page.children.length > 0 && onRefreshChildren) {
-                onRefreshChildren(page.id)
-            }
+            // Update the specific page in the tree with optimistic update
+            updatePageInCache(page.id, { publication_status: updatedPage.publication_status || 'published' })
         },
         onError: (error) => {
-            toast.error(error.response?.data?.detail || 'Failed to publish page')
+            console.error('Failed to publish page:', error.response?.data?.detail || error.message)
             setIsTogglingPublication(false)
         }
     })
@@ -323,20 +386,14 @@ const PageTreeNode = ({
             const response = await api.post(`/api/v1/webpages/pages/${page.id}/unpublish/`)
             return response.data
         },
-        onSuccess: () => {
-            toast.success('Page unpublished successfully')
+        onSuccess: (updatedPage) => {
             setIsTogglingPublication(false)
-            // Invalidate both root pages and any cached child pages data
-            queryClient.invalidateQueries(['pages'])
-            queryClient.invalidateQueries(['page-children'])
 
-            // Refresh child pages if this page has children and they're loaded
-            if (page.childrenLoaded && page.children && page.children.length > 0 && onRefreshChildren) {
-                onRefreshChildren(page.id)
-            }
+            // Update the specific page in the tree with optimistic update
+            updatePageInCache(page.id, { publication_status: updatedPage.publication_status || 'unpublished' })
         },
         onError: (error) => {
-            toast.error(error.response?.data?.detail || 'Failed to unpublish page')
+            console.error('Failed to unpublish page:', error.response?.data?.detail || error.message)
             setIsTogglingPublication(false)
         }
     })
@@ -372,6 +429,8 @@ const PageTreeNode = ({
                 className={`
                     flex items-center px-2 py-1 hover:bg-gray-50 group relative
                     ${isCut ? 'opacity-60 bg-orange-50' : ''}
+                    ${page.isSearchResult ? 'bg-blue-50 border-l-4 border-blue-400' : ''}
+                    ${page.highlightSearch ? 'bg-yellow-50 border-l-4 border-yellow-400' : ''}
                     ${level > 0 ? 'border-l border-gray-200' : ''}
                     ${isAnimating ? 'transition-all duration-500 ease-in-out' : ''}
                     ${animationDirection === 'up' ? 'transform -translate-y-8' : ''}
@@ -413,6 +472,11 @@ const PageTreeNode = ({
 
                     {/* Page info */}
                     <div className="flex-1 min-w-0 flex items-center gap-2">
+                        {page.isSearchResult && (
+                            <div className="flex items-center">
+                                <Search className="w-3 h-3 text-blue-500" />
+                            </div>
+                        )}
                         {isEditingTitle ? (
                             <div className="flex items-center gap-1">
                                 <input
@@ -447,7 +511,7 @@ const PageTreeNode = ({
                                 onClick={handleTitleClick}
                                 title="Click to edit title"
                             >
-                                {page.title}
+                                {highlightSearchTerm(page.title, searchTerm)}
                             </span>
                         )}
                         {isRootPageCheck ? (
@@ -493,7 +557,7 @@ const PageTreeNode = ({
                                 onClick={handleSlugClick}
                                 title="Click to edit slug"
                             >
-                                {getPageDisplayUrl(sanitizedPage)}
+                                {highlightSearchTerm(getPageDisplayUrl(sanitizedPage), searchTerm)}
                             </span>
                         )}
                         <Tooltip
@@ -627,6 +691,8 @@ const PageTreeNode = ({
                             onAddPageBelow={onAddPageBelow}
                             cutPageId={cutPageId}
                             onRefreshChildren={onRefreshChildren}
+                            isSearchMode={isSearchMode}
+                            searchTerm={searchTerm}
                         />
                     ))}
                 </div>

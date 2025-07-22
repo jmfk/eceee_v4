@@ -411,12 +411,16 @@ class PublishingManagementCommandTests(TransactionTestCase):
         self.assertIn("No pages required processing", output)
 
 
-class PublishingLogicTests(TestCase):
-    """Test the core publishing logic in models"""
+class PublishingLogicTests(APITestCase):
+    """Test the publishing logic with API endpoints"""
 
     def setUp(self):
         self.user = User.objects.create_user(
             username="testuser", email="test@example.com", password="testpass123"
+        )
+        self.client.force_authenticate(user=self.user)
+        self.theme = PageTheme.objects.create(
+            name="Test Theme", css_variables={}, created_by=self.user
         )
 
     def test_is_published_method_unpublished(self):
@@ -500,6 +504,218 @@ class PublishingLogicTests(TestCase):
         self.assertTrue(version.is_current)
         self.assertIsNotNone(version.published_at)
         self.assertEqual(version.published_by, self.user)
+
+    def test_publish_with_past_effective_date_unpublishes_page(self):
+        """Test that publishing a page with past effective_date unpublishes it instead"""
+        # Create a page with a past effective_date
+        past_date = timezone.now() - timedelta(hours=1)
+        page = WebPage.objects.create(
+            title="Past Date Page",
+            slug="past-date-page",
+            code_layout="single_column",
+            publication_status="unpublished",
+            effective_date=past_date,
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        # Try to publish the page
+        publish_url = reverse("api:webpage-publish", kwargs={"pk": page.pk})
+        response = self.client.post(publish_url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        page.refresh_from_db()
+        self.assertEqual(page.publication_status, "unpublished")
+        self.assertIsNone(page.effective_date)
+        self.assertIsNotNone(page.expiry_date)
+
+        # Check response message
+        self.assertIn("effective date was in the past", response.data["message"])
+
+    def test_publish_with_future_effective_date_schedules_page(self):
+        """Test that publishing a page with future effective_date schedules it"""
+        # Create a page with a future effective_date
+        future_date = timezone.now() + timedelta(hours=1)
+        page = WebPage.objects.create(
+            title="Future Date Page",
+            slug="future-date-page",
+            code_layout="single_column",
+            publication_status="unpublished",
+            effective_date=future_date,
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        # Try to publish the page
+        publish_url = reverse("api:webpage-publish", kwargs={"pk": page.pk})
+        response = self.client.post(publish_url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        page.refresh_from_db()
+        self.assertEqual(page.publication_status, "scheduled")
+        self.assertEqual(page.effective_date, future_date)
+
+        # Check response message
+        self.assertIn("scheduled for future publication", response.data["message"])
+
+    def test_publish_without_effective_date_publishes_immediately(self):
+        """Test that publishing a page without effective_date publishes it immediately"""
+        # Create a page without effective_date
+        page = WebPage.objects.create(
+            title="No Date Page",
+            slug="no-date-page",
+            code_layout="single_column",
+            publication_status="unpublished",
+            effective_date=None,
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        # Try to publish the page
+        publish_url = reverse("api:webpage-publish", kwargs={"pk": page.pk})
+        response = self.client.post(publish_url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        page.refresh_from_db()
+        self.assertEqual(page.publication_status, "published")
+        self.assertIsNotNone(page.effective_date)
+        self.assertIsNone(page.expiry_date)
+
+        # Check response message
+        self.assertIn("published successfully", response.data["message"])
+
+    def test_unpublish_sets_expiry_date_to_now_if_not_set(self):
+        """Test that unpublishing a page sets expiry_date to now if not already set"""
+        # Create a published page without expiry_date
+        page = WebPage.objects.create(
+            title="Published Page",
+            slug="published-page",
+            code_layout="single_column",
+            publication_status="published",
+            effective_date=timezone.now() - timedelta(hours=1),
+            expiry_date=None,
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        # Unpublish the page
+        unpublish_url = reverse("api:webpage-unpublish", kwargs={"pk": page.pk})
+        response = self.client.post(unpublish_url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        page.refresh_from_db()
+        self.assertEqual(page.publication_status, "unpublished")
+        self.assertIsNone(page.effective_date)
+        self.assertIsNotNone(page.expiry_date)
+
+        # Check response message
+        self.assertIn("unpublished successfully", response.data["message"])
+
+    def test_unpublish_preserves_existing_expiry_date(self):
+        """Test that unpublishing a page preserves existing expiry_date"""
+        # Create a published page with existing expiry_date
+        existing_expiry = timezone.now() + timedelta(hours=1)
+        page = WebPage.objects.create(
+            title="Published Page with Expiry",
+            slug="published-page-with-expiry",
+            code_layout="single_column",
+            publication_status="published",
+            effective_date=timezone.now() - timedelta(hours=1),
+            expiry_date=existing_expiry,
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        # Unpublish the page
+        unpublish_url = reverse("api:webpage-unpublish", kwargs={"pk": page.pk})
+        response = self.client.post(unpublish_url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        page.refresh_from_db()
+        self.assertEqual(page.publication_status, "unpublished")
+        self.assertIsNone(page.effective_date)
+        self.assertEqual(page.expiry_date, existing_expiry)  # Preserved
+
+    def test_bulk_publish_with_mixed_dates(self):
+        """Test bulk publish with pages having different effective_date scenarios"""
+        now = timezone.now()
+        past_date = now - timedelta(hours=1)
+        future_date = now + timedelta(hours=1)
+
+        # Create pages with different scenarios
+        past_page = WebPage.objects.create(
+            title="Past Date Page",
+            slug="past-date-page",
+            code_layout="single_column",
+            publication_status="unpublished",
+            effective_date=past_date,
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        future_page = WebPage.objects.create(
+            title="Future Date Page",
+            slug="future-date-page",
+            code_layout="single_column",
+            publication_status="unpublished",
+            effective_date=future_date,
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        no_date_page = WebPage.objects.create(
+            title="No Date Page",
+            slug="no-date-page",
+            code_layout="single_column",
+            publication_status="unpublished",
+            effective_date=None,
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        # Ensure all pages are saved and refresh from database
+        past_page.refresh_from_db()
+        future_page.refresh_from_db()
+        no_date_page.refresh_from_db()
+
+        # Bulk publish all pages
+        bulk_publish_url = reverse("api:webpage-bulk-publish")
+
+        request_data = {"page_ids": [past_page.id, future_page.id, no_date_page.id]}
+
+        response = self.client.post(
+            bulk_publish_url,
+            request_data,
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        # Check response counts
+        self.assertEqual(response.data["published_count"], 1)  # no_date_page
+        self.assertEqual(response.data["scheduled_count"], 1)  # future_page
+        self.assertEqual(response.data["unpublished_count"], 1)  # past_page
+
+        # Verify individual page states
+        past_page.refresh_from_db()
+        future_page.refresh_from_db()
+        no_date_page.refresh_from_db()
+
+        self.assertEqual(past_page.publication_status, "unpublished")
+        self.assertIsNone(past_page.effective_date)
+        self.assertIsNotNone(past_page.expiry_date)
+
+        self.assertEqual(future_page.publication_status, "scheduled")
+        self.assertEqual(future_page.effective_date, future_date)
+
+        self.assertEqual(no_date_page.publication_status, "published")
+        self.assertIsNotNone(no_date_page.effective_date)
+        self.assertIsNone(no_date_page.expiry_date)
 
 
 class PublishingWorkflowIntegrationTests(APITestCase):

@@ -94,3 +94,37 @@
     @apply bg-gray-800 border-gray-600 text-white;
   }
 }
+
+/* Toast notification styles - ensure they're always visible */
+[data-sonner-toaster] {
+  z-index: 9999 !important;
+}
+
+[data-sonner-toast] {
+  z-index: 9999 !important;
+}
+
+/* React Hot Toast specific styles */
+[data-react-hot-toast] {
+  z-index: 9999 !important;
+}
+
+/* Ensure toast containers are always on top */
+div[style*="z-index"] {
+  z-index: 9999 !important;
+}
+
+/* Additional toast visibility improvements */
+.toast-container {
+  z-index: 9999 !important;
+  position: fixed !important;
+}
+
+/* Ensure modals don't block toasts */
+.modal-overlay {
+  z-index: 50 !important;
+}
+
+.toast-notification {
+  z-index: 9999 !important;
+}

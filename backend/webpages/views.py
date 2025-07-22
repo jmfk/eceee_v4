@@ -388,28 +388,157 @@ class WebPageViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(published_pages, many=True)
         return Response(serializer.data)
 
+    @action(detail=False, methods=["get"])
+    def search_all(self, request):
+        """Search across all pages with hierarchy context"""
+        search_query = request.query_params.get("search", "").strip()
+        include_hierarchy = (
+            request.query_params.get("include_hierarchy", "false").lower() == "true"
+        )
+
+        if not search_query:
+            return Response({"results": [], "query": search_query})
+
+        # Search across all pages
+        queryset = self.get_queryset()
+        search_results = queryset.filter(
+            Q(title__icontains=search_query)
+            | Q(slug__icontains=search_query)
+            | Q(description__icontains=search_query)
+            | Q(meta_title__icontains=search_query)
+            | Q(meta_description__icontains=search_query)
+        ).order_by("sort_order", "title")
+
+        if include_hierarchy:
+            # Include hierarchy information for each result
+            results_with_hierarchy = []
+            for page in search_results:
+                # Build hierarchy path
+                hierarchy_path = []
+                current = page
+                while current.parent:
+                    hierarchy_path.insert(
+                        0,
+                        {
+                            "id": current.parent.id,
+                            "title": current.parent.title,
+                            "slug": current.parent.slug,
+                        },
+                    )
+                    current = current.parent
+
+                # Add hierarchy info to page data
+                page_data = WebPageTreeSerializer(
+                    page, context={"request": request}
+                ).data
+                page_data["hierarchy_path"] = hierarchy_path
+                page_data["is_search_result"] = True
+                results_with_hierarchy.append(page_data)
+
+            return Response(
+                {
+                    "results": results_with_hierarchy,
+                    "query": search_query,
+                    "total_count": len(results_with_hierarchy),
+                }
+            )
+        else:
+            # Standard search without hierarchy
+            serializer = self.get_serializer(search_results, many=True)
+            return Response(
+                {
+                    "results": serializer.data,
+                    "query": search_query,
+                    "total_count": search_results.count(),
+                }
+            )
+
     @action(detail=True, methods=["post"])
     def publish(self, request, pk=None):
         """Publish a page immediately"""
         page = self.get_object()
-        page.publication_status = "published"
-        page.effective_date = timezone.now()
-        page.last_modified_by = request.user
-        page.save()
+        now = timezone.now()
 
-        # Create published version
-        page.create_version(
-            request.user, "Published via API", status="published", auto_publish=True
-        )
+        # Check if page has an effective_date set
+        if page.effective_date:
+            # If effective_date is in the past, unpublish instead
+            if page.effective_date <= now:
+                page.publication_status = "unpublished"
+                page.effective_date = None
+                page.expiry_date = now  # Set expiry_date to now when unpublishing
+                page.last_modified_by = request.user
+                page.save()
 
-        serializer = self.get_serializer(page)
-        return Response(serializer.data)
+                # Create version for unpublishing
+                page.create_version(
+                    request.user, "Unpublished via API - effective date was in the past"
+                )
+
+                serializer = self.get_serializer(page)
+                return Response(
+                    {
+                        "message": "Page unpublished because effective date was in the past",
+                        "effective_date": page.effective_date,
+                        "expiry_date": page.expiry_date,
+                    },
+                    status=status.HTTP_200_OK,
+                )
+            else:
+                # Effective date is in the future, set status to scheduled
+                page.publication_status = "scheduled"
+                page.last_modified_by = request.user
+                page.save()
+
+                # Create version for scheduling
+                page.create_version(
+                    request.user,
+                    f"Scheduled for publication on {page.effective_date.strftime('%Y-%m-%d %H:%M')}",
+                )
+
+                serializer = self.get_serializer(page)
+                return Response(
+                    {
+                        "message": "Page scheduled for future publication",
+                        "effective_date": page.effective_date,
+                        "expiry_date": page.expiry_date,
+                    },
+                    status=status.HTTP_200_OK,
+                )
+        else:
+            # No effective_date set, publish immediately
+            page.publication_status = "published"
+            page.effective_date = now
+            page.expiry_date = None  # Clear any existing expiry_date
+            page.last_modified_by = request.user
+            page.save()
+
+            # Create published version
+            page.create_version(
+                request.user, "Published via API", status="published", auto_publish=True
+            )
+
+            serializer = self.get_serializer(page)
+            return Response(
+                {
+                    "message": "Page published successfully",
+                    "effective_date": page.effective_date,
+                    "expiry_date": page.expiry_date,
+                },
+                status=status.HTTP_200_OK,
+            )
 
     @action(detail=True, methods=["post"])
     def unpublish(self, request, pk=None):
         """Unpublish a page"""
         page = self.get_object()
+        now = timezone.now()
+
+        # If no expiry_date is set, set it to now
+        if not page.expiry_date:
+            page.expiry_date = now
+
         page.publication_status = "unpublished"
+        page.effective_date = None  # Clear effective_date when unpublishing
         page.last_modified_by = request.user
         page.save()
 
@@ -417,7 +546,14 @@ class WebPageViewSet(viewsets.ModelViewSet):
         page.create_version(request.user, "Unpublished via API")
 
         serializer = self.get_serializer(page)
-        return Response(serializer.data)
+        return Response(
+            {
+                "message": "Page unpublished successfully",
+                "effective_date": page.effective_date,
+                "expiry_date": page.expiry_date,
+            },
+            status=status.HTTP_200_OK,
+        )
 
     @action(detail=True, methods=["post"])
     def schedule(self, request, pk=None):
@@ -492,27 +628,86 @@ class WebPageViewSet(viewsets.ModelViewSet):
 
         try:
             pages = WebPage.objects.filter(id__in=page_ids)
-            updated_pages = []
+            published_pages = []
+            scheduled_pages = []
+            unpublished_pages = []
+            now = timezone.now()
 
             for page in pages:
-                page.publication_status = "published"
-                page.effective_date = timezone.now()
-                page.last_modified_by = request.user
-                page.save()
+                # Check if page has an effective_date set
+                if page.effective_date:
+                    # If effective_date is in the past, unpublish instead
+                    if page.effective_date <= now:
+                        page.publication_status = "unpublished"
+                        page.effective_date = None
+                        page.expiry_date = (
+                            now  # Set expiry_date to now when unpublishing
+                        )
+                        page.last_modified_by = request.user
+                        page.save()
 
-                # Create version
-                page.create_version(
-                    request.user,
-                    "Bulk published via API",
-                    status="published",
-                    auto_publish=True,
+                        # Create version for unpublishing
+                        page.create_version(
+                            request.user,
+                            "Bulk unpublished via API - effective date was in the past",
+                        )
+                        unpublished_pages.append(page)
+                    else:
+                        # Effective date is in the future, set status to scheduled
+                        page.publication_status = "scheduled"
+                        page.last_modified_by = request.user
+                        page.save()
+
+                        # Create version for scheduling
+                        page.create_version(
+                            request.user,
+                            f"Bulk scheduled for publication on {page.effective_date.strftime('%Y-%m-%d %H:%M')}",
+                        )
+                        scheduled_pages.append(page)
+                else:
+                    # No effective_date set, publish immediately
+                    page.publication_status = "published"
+                    page.effective_date = now
+                    page.expiry_date = None  # Clear any existing expiry_date
+                    page.last_modified_by = request.user
+                    page.save()
+
+                    # Create version
+                    page.create_version(
+                        request.user,
+                        "Bulk published via API",
+                        status="published",
+                        auto_publish=True,
+                    )
+                    published_pages.append(page)
+
+            # Prepare response message
+            messages = []
+            if published_pages:
+                messages.append(f"Successfully published {len(published_pages)} pages")
+            if scheduled_pages:
+                messages.append(
+                    f"Scheduled {len(scheduled_pages)} pages for future publication"
                 )
-                updated_pages.append(page)
+            if unpublished_pages:
+                messages.append(
+                    f"Unpublished {len(unpublished_pages)} pages (effective date was in the past)"
+                )
 
-            serializer = self.get_serializer(updated_pages, many=True)
+            response_message = (
+                "; ".join(messages) if messages else "No pages were processed"
+            )
+
+            # Combine all updated pages for serialization
+            all_updated_pages = published_pages + scheduled_pages + unpublished_pages
+            serializer = self.get_serializer(all_updated_pages, many=True)
+
             return Response(
                 {
-                    "message": f"Successfully published {len(updated_pages)} pages",
+                    "message": response_message,
+                    "published_count": len(published_pages),
+                    "scheduled_count": len(scheduled_pages),
+                    "unpublished_count": len(unpublished_pages),
                     "pages": serializer.data,
                 }
             )

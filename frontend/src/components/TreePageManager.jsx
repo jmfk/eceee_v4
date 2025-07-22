@@ -17,12 +17,29 @@ import {
     getPageChildren,
     movePage,
     deletePage,
-    pageTreeUtils
+    pageTreeUtils,
+    searchAllPages
 } from '../api/pages'
 import { api } from '../api/client.js'
 import PageTreeNode from './PageTreeNode'
-import toast from 'react-hot-toast'
 import Tooltip from './Tooltip'
+
+// Debounce hook for search
+const useDebounce = (value, delay) => {
+    const [debouncedValue, setDebouncedValue] = useState(value)
+
+    useEffect(() => {
+        const handler = setTimeout(() => {
+            setDebouncedValue(value)
+        }, delay)
+
+        return () => {
+            clearTimeout(handler)
+        }
+    }, [value, delay])
+
+    return debouncedValue
+}
 
 const TreePageManager = ({ onEditPage }) => {
     // State management
@@ -35,8 +52,14 @@ const TreePageManager = ({ onEditPage }) => {
     const [showCreateModal, setShowCreateModal] = useState(false)
     const [showRootPageModal, setShowRootPageModal] = useState(false)
     const [positioningParams, setPositioningParams] = useState(null)
+    const [searchResults, setSearchResults] = useState([])
+    const [isSearching, setIsSearching] = useState(false)
+    const [searchExpandedPages, setSearchExpandedPages] = useState(new Set())
 
     const queryClient = useQueryClient()
+
+    // Debounce search term to avoid excessive API calls
+    const debouncedSearchTerm = useDebounce(searchTerm, 300)
 
     // Create page mutation
     const createPageMutation = useMutation({
@@ -45,8 +68,6 @@ const TreePageManager = ({ onEditPage }) => {
             return response.data
         },
         onSuccess: (newPage) => {
-            toast.success('Page created successfully')
-
             // If we created a child page, update the local tree state
             if (positioningParams?.parentId) {
                 const parentId = positioningParams.parentId
@@ -71,16 +92,38 @@ const TreePageManager = ({ onEditPage }) => {
                 // Make sure the parent is expanded
                 setExpandedPages(prev => new Set([...prev, parentId]))
 
-                // Invalidate queries to ensure data consistency
-                queryClient.invalidateQueries(['pages'])
+                // Update the cache for the parent page's children
+                queryClient.setQueryData(['page-children', parentId], (oldData) => {
+                    if (!oldData) return oldData
+
+                    const newChild = pageTreeUtils.formatPageForTree(newPage)
+                    const updatedResults = [...oldData.results, newChild].sort((a, b) => a.sort_order - b.sort_order)
+
+                    return {
+                        ...oldData,
+                        results: updatedResults
+                    }
+                })
+            } else {
+                // Root page created - update root pages cache
+                queryClient.setQueryData(['pages', 'root'], (oldData) => {
+                    if (!oldData) return oldData
+
+                    const newRootPage = pageTreeUtils.formatPageForTree(newPage)
+                    const updatedResults = [...oldData.results, newRootPage].sort((a, b) => a.sort_order - b.sort_order)
+
+                    return {
+                        ...oldData,
+                        results: updatedResults
+                    }
+                })
             }
 
             setShowCreateModal(false)
             setPositioningParams(null)
-            queryClient.invalidateQueries(['pages', 'root'])
         },
         onError: (error) => {
-            toast.error(error.response?.data?.detail || 'Failed to create page')
+            console.error('Failed to create page:', error.response?.data?.detail || error.message)
         }
     })
 
@@ -91,12 +134,23 @@ const TreePageManager = ({ onEditPage }) => {
             return response.data
         },
         onSuccess: (newPage) => {
-            toast.success('Root page created successfully')
             setShowRootPageModal(false)
-            queryClient.invalidateQueries(['pages', 'root'])
+
+            // Update root pages cache
+            queryClient.setQueryData(['pages', 'root'], (oldData) => {
+                if (!oldData) return oldData
+
+                const newRootPage = pageTreeUtils.formatPageForTree(newPage)
+                const updatedResults = [...oldData.results, newRootPage].sort((a, b) => a.sort_order - b.sort_order)
+
+                return {
+                    ...oldData,
+                    results: updatedResults
+                }
+            })
         },
         onError: (error) => {
-            toast.error(error.response?.data?.detail || 'Failed to create root page')
+            console.error('Failed to create root page:', error.response?.data?.detail || error.message)
         }
     })
 
@@ -107,13 +161,30 @@ const TreePageManager = ({ onEditPage }) => {
         error,
         refetch
     } = useQuery({
-        queryKey: ['pages', 'root', { search: searchTerm, status: statusFilter }],
+        queryKey: ['pages', 'root', { search: debouncedSearchTerm, status: statusFilter }],
         queryFn: () => {
             const filters = {}
-            if (searchTerm) filters.search = searchTerm
+            if (debouncedSearchTerm) filters.search = debouncedSearchTerm
             if (statusFilter !== 'all') filters.publication_status = statusFilter
             return getRootPages(filters)
-        }
+        },
+        enabled: !debouncedSearchTerm // Only fetch root pages when not searching
+    })
+
+    // Comprehensive search query
+    const {
+        data: searchData,
+        isLoading: searchLoading,
+        error: searchError
+    } = useQuery({
+        queryKey: ['pages', 'search', { search: debouncedSearchTerm, status: statusFilter }],
+        queryFn: () => {
+            const filters = {}
+            if (statusFilter !== 'all') filters.publication_status = statusFilter
+            return searchAllPages(debouncedSearchTerm, filters)
+        },
+        enabled: !!debouncedSearchTerm && debouncedSearchTerm.length >= 2, // Only search when term is 2+ characters
+        staleTime: 30000 // Cache search results for 30 seconds
     })
 
     // Move page mutation with optimistic updates
@@ -160,6 +231,145 @@ const TreePageManager = ({ onEditPage }) => {
             setExpandedPages(new Set(firstLevelPageIds))
         }
     }, [rootPagesData])
+
+    // Process search results and expand them in context
+    useEffect(() => {
+        if (searchData?.results && debouncedSearchTerm) {
+            setIsSearching(true)
+
+            // Process search results to build a tree with expanded paths
+            const processedResults = processSearchResults(searchData.results)
+            setPages(processedResults)
+
+            // Expand all pages in the hierarchy path of search results
+            const pagesToExpand = new Set()
+            searchData.results.forEach(result => {
+                // Add the result page itself
+                pagesToExpand.add(result.id)
+
+                // Add all parent pages in the hierarchy path
+                if (result.hierarchy_path) {
+                    result.hierarchy_path.forEach(parent => {
+                        pagesToExpand.add(parent.id)
+                    })
+                }
+            })
+
+            setExpandedPages(pagesToExpand)
+            setSearchExpandedPages(pagesToExpand)
+            setSearchResults(searchData.results)
+        } else if (!debouncedSearchTerm) {
+            // Clear search results when search term is empty
+            setIsSearching(false)
+            setSearchResults([])
+            setSearchExpandedPages(new Set())
+        }
+    }, [searchData, debouncedSearchTerm])
+
+    // Helper function to process search results into a tree structure
+    const processSearchResults = useCallback((results) => {
+        if (!results || results.length === 0) return []
+
+        // Group results by their root parent
+        const rootGroups = new Map()
+
+        results.forEach(result => {
+            let rootId = null
+            let currentPath = []
+
+            // Find the root parent
+            if (result.hierarchy_path && result.hierarchy_path.length > 0) {
+                rootId = result.hierarchy_path[0].id
+                currentPath = result.hierarchy_path
+            } else {
+                // This is a root page
+                rootId = result.id
+            }
+
+            if (!rootGroups.has(rootId)) {
+                rootGroups.set(rootId, {
+                    root: result.hierarchy_path?.[0] || result,
+                    results: [],
+                    paths: new Map()
+                })
+            }
+
+            const group = rootGroups.get(rootId)
+            group.results.push(result)
+
+            // Store the path for this result
+            if (currentPath.length > 0) {
+                group.paths.set(result.id, currentPath)
+            }
+        })
+
+        // Build the tree structure for each root group
+        const treePages = []
+
+        for (const [rootId, group] of rootGroups) {
+            // Start with the root page
+            const rootPage = pageTreeUtils.formatPageForTree(group.root)
+            rootPage.isExpanded = true
+            rootPage.children = []
+            rootPage.childrenLoaded = true
+
+            // Add all search results and their paths to this root
+            const processedChildren = new Map()
+
+            group.results.forEach(result => {
+                if (result.id === rootId) {
+                    // This is the root page itself
+                    rootPage.isSearchResult = true
+                    rootPage.highlightSearch = true
+                } else {
+                    // This is a child page, build its path
+                    const path = group.paths.get(result.id) || []
+                    let currentParent = rootPage
+
+                    // Build the path to this result
+                    for (let i = 0; i < path.length; i++) {
+                        const pathPage = path[i]
+                        let childPage = currentParent.children.find(p => p.id === pathPage.id)
+
+                        if (!childPage) {
+                            childPage = pageTreeUtils.formatPageForTree(pathPage)
+                            childPage.isExpanded = true
+                            childPage.children = []
+                            childPage.childrenLoaded = true
+                            currentParent.children.push(childPage)
+                        }
+
+                        currentParent = childPage
+                    }
+
+                    // Add the actual search result
+                    const resultPage = pageTreeUtils.formatPageForTree(result)
+                    resultPage.isSearchResult = true
+                    resultPage.highlightSearch = true
+                    resultPage.isExpanded = true
+                    resultPage.children = []
+                    resultPage.childrenLoaded = true
+
+                    currentParent.children.push(resultPage)
+                }
+            })
+
+            // Sort children by sort_order
+            const sortChildren = (children) => {
+                children.sort((a, b) => a.sort_order - b.sort_order)
+                children.forEach(child => {
+                    if (child.children && child.children.length > 0) {
+                        sortChildren(child.children)
+                    }
+                })
+            }
+
+            sortChildren(rootPage.children)
+            treePages.push(rootPage)
+        }
+
+        return treePages
+    }, [])
 
     // Helper function to optimistically update tree structure
     const updatePageInTree = useCallback((pages, pageId, updater) => {
@@ -465,11 +675,8 @@ const TreePageManager = ({ onEditPage }) => {
             onEditPage(page)
         } else {
             // Handle editing internally if no onEditPage prop provided
-            // For now, just show a message - you could implement inline editing here
-            toast('Page editing functionality needs to be implemented', {
-                icon: 'ℹ️',
-                duration: 3000
-            })
+            // For now, just log a message - you could implement inline editing here
+            console.log('Page editing functionality needs to be implemented')
         }
     }, [onEditPage])
 
@@ -508,8 +715,6 @@ const TreePageManager = ({ onEditPage }) => {
         setShowRootPageModal(true)
     }, [])
 
-
-
     // Clear clipboard
     const clearClipboard = () => {
         setCutPageId(null)
@@ -526,6 +731,23 @@ const TreePageManager = ({ onEditPage }) => {
                     className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                 >
                     Try Again
+                </button>
+            </div>
+        )
+    }
+
+    // Handle search error
+    if (searchError && searchTerm) {
+        return (
+            <div className="p-6 text-center">
+                <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Search failed</h3>
+                <p className="text-gray-600 mb-4">{searchError.message}</p>
+                <button
+                    onClick={() => setSearchTerm('')}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                    Clear Search
                 </button>
             </div>
         )
@@ -608,10 +830,12 @@ const TreePageManager = ({ onEditPage }) => {
 
             {/* Tree content */}
             <div className="flex-1 overflow-auto">
-                {isLoading ? (
+                {(isLoading || searchLoading) ? (
                     <div className="flex items-center justify-center p-8">
                         <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
-                        <span className="ml-2 text-gray-600">Loading pages...</span>
+                        <span className="ml-2 text-gray-600">
+                            {searchLoading ? 'Searching pages...' : 'Loading pages...'}
+                        </span>
                     </div>
                 ) : pages.length === 0 ? (
                     <div className="text-center p-8 text-gray-500">
@@ -620,9 +844,18 @@ const TreePageManager = ({ onEditPage }) => {
                                 <FolderPlus className="w-12 h-12 mx-auto mb-4 text-gray-400" />
                             </div>
                         </Tooltip>
-                        <p>No pages found</p>
+                        <p>
+                            {searchTerm ? 'No pages found matching your search' : 'No pages found'}
+                        </p>
                         {searchTerm ? (
-                            <p className="text-sm mt-2">Try adjusting your search or filters</p>
+                            <div className="mt-4">
+                                <button
+                                    onClick={() => setSearchTerm('')}
+                                    className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                                >
+                                    Clear Search
+                                </button>
+                            </div>
                         ) : (
                             <div className="mt-4">
                                 <button
@@ -637,6 +870,24 @@ const TreePageManager = ({ onEditPage }) => {
                     </div>
                 ) : (
                     <div className="p-2">
+                        {searchTerm && searchResults.length > 0 && (
+                            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <Search className="w-4 h-4 text-blue-600" />
+                                        <span className="text-sm font-medium text-blue-800">
+                                            Found {searchResults.length} result{searchResults.length !== 1 ? 's' : ''} for "{debouncedSearchTerm}"
+                                        </span>
+                                    </div>
+                                    <button
+                                        onClick={() => setSearchTerm('')}
+                                        className="text-blue-600 hover:text-blue-800 text-sm"
+                                    >
+                                        Clear Search
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                         {pages.map(page => (
                             <PageTreeNode
                                 key={page.id}
@@ -652,6 +903,8 @@ const TreePageManager = ({ onEditPage }) => {
                                 onAddPageBelow={handleAddPageBelow}
                                 cutPageId={cutPageId}
                                 onRefreshChildren={refreshChildPages}
+                                isSearchMode={!!searchTerm}
+                                searchTerm={searchTerm}
                             />
                         ))}
                     </div>
@@ -741,11 +994,11 @@ const PageCreationModal = ({ positioningParams, onSave, onCancel, isLoading }) =
     const handleSubmit = (e) => {
         e.preventDefault()
         if (!formData.title.trim()) {
-            toast.error('Page title is required')
+            console.error('Page title is required')
             return
         }
         if (!formData.slug.trim()) {
-            toast.error('Page slug is required')
+            console.error('Page slug is required')
             return
         }
         onSave(formData)
@@ -883,11 +1136,11 @@ const RootPageCreationModal = ({ onSave, onCancel, isLoading }) => {
     const handleSubmit = (e) => {
         e.preventDefault()
         if (!formData.title.trim()) {
-            toast.error('Page title is required')
+            console.error('Page title is required')
             return
         }
         if (!formData.hostnames.trim()) {
-            toast.error('At least one hostname is required for root pages')
+            console.error('At least one hostname is required for root pages')
             return
         }
 
