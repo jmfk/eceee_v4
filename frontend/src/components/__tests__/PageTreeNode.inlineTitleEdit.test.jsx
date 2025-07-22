@@ -63,7 +63,7 @@ describe('PageTreeNode - Inline Title Editing', () => {
 
     it('should display title as clickable text initially', () => {
         renderWithProviders(
-            <PageTreeNode page={mockPage} level={0} />
+            <PageTreeNode page={mockPage} level={0} onUpdatePageData={vi.fn()} />
         )
 
         const titleElement = screen.getByText('Test Page')
@@ -74,7 +74,7 @@ describe('PageTreeNode - Inline Title Editing', () => {
 
     it('should enter edit mode when title is clicked', async () => {
         renderWithProviders(
-            <PageTreeNode page={mockPage} level={0} />
+            <PageTreeNode page={mockPage} level={0} onUpdatePageData={vi.fn()} />
         )
 
         const titleElement = screen.getByText('Test Page')
@@ -95,7 +95,7 @@ describe('PageTreeNode - Inline Title Editing', () => {
 
     it('should cancel editing when cancel button is clicked', async () => {
         renderWithProviders(
-            <PageTreeNode page={mockPage} level={0} />
+            <PageTreeNode page={mockPage} level={0} onUpdatePageData={vi.fn()} />
         )
 
         // Enter edit mode
@@ -118,7 +118,7 @@ describe('PageTreeNode - Inline Title Editing', () => {
 
     it('should cancel editing when Escape key is pressed', async () => {
         renderWithProviders(
-            <PageTreeNode page={mockPage} level={0} />
+            <PageTreeNode page={mockPage} level={0} onUpdatePageData={vi.fn()} />
         )
 
         // Enter edit mode
@@ -143,7 +143,7 @@ describe('PageTreeNode - Inline Title Editing', () => {
         api.patch.mockResolvedValue(mockResponse)
 
         renderWithProviders(
-            <PageTreeNode page={mockPage} level={0} />
+            <PageTreeNode page={mockPage} level={0} onUpdatePageData={vi.fn()} />
         )
 
         // Enter edit mode
@@ -168,7 +168,7 @@ describe('PageTreeNode - Inline Title Editing', () => {
         api.patch.mockResolvedValue(mockResponse)
 
         renderWithProviders(
-            <PageTreeNode page={mockPage} level={0} />
+            <PageTreeNode page={mockPage} level={0} onUpdatePageData={vi.fn()} />
         )
 
         // Enter edit mode
@@ -186,7 +186,7 @@ describe('PageTreeNode - Inline Title Editing', () => {
 
     it('should not save if title is empty', async () => {
         renderWithProviders(
-            <PageTreeNode page={mockPage} level={0} />
+            <PageTreeNode page={mockPage} level={0} onUpdatePageData={vi.fn()} />
         )
 
         // Enter edit mode
@@ -210,7 +210,7 @@ describe('PageTreeNode - Inline Title Editing', () => {
 
     it('should not save if title is unchanged', async () => {
         renderWithProviders(
-            <PageTreeNode page={mockPage} level={0} />
+            <PageTreeNode page={mockPage} level={0} onUpdatePageData={vi.fn()} />
         )
 
         // Enter edit mode
@@ -235,7 +235,7 @@ describe('PageTreeNode - Inline Title Editing', () => {
         api.patch.mockRejectedValue(mockError)
 
         renderWithProviders(
-            <PageTreeNode page={mockPage} level={0} />
+            <PageTreeNode page={mockPage} level={0} onUpdatePageData={vi.fn()} />
         )
 
         // Enter edit mode
@@ -265,7 +265,7 @@ describe('PageTreeNode - Inline Title Editing', () => {
         api.patch.mockImplementation(() => new Promise(resolve => setTimeout(resolve, 100)))
 
         renderWithProviders(
-            <PageTreeNode page={mockPage} level={0} />
+            <PageTreeNode page={mockPage} level={0} onUpdatePageData={vi.fn()} />
         )
 
         // Enter edit mode

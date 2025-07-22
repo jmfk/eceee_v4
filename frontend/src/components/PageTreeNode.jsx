@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, memo } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
     ChevronRight,
@@ -24,7 +24,6 @@ import { pageTreeUtils } from '../api/pages'
 import { api } from '../api/client.js'
 import { getPageDisplayUrl, isRootPage, sanitizePageData } from '../utils/apiValidation.js'
 import Tooltip from './Tooltip'
-import { memo } from 'react'
 
 // Separate component for publication status icon that only re-renders when status changes
 const PublicationStatusIcon = memo(({
@@ -82,7 +81,7 @@ const PublicationStatusIcon = memo(({
 
 PublicationStatusIcon.displayName = 'PublicationStatusIcon'
 
-const PageTreeNode = ({
+const PageTreeNode = memo(({
     page,
     level = 0,
     onExpand,
@@ -96,7 +95,8 @@ const PageTreeNode = ({
     cutPageId,
     onRefreshChildren,
     isSearchMode = false,
-    searchTerm = ''
+    searchTerm = '',
+    onUpdatePageData
 }) => {
     const [isExpanded, setIsExpanded] = useState(page.isExpanded || false)
     const [isLoading, setIsLoading] = useState(false)
@@ -300,53 +300,6 @@ const PageTreeNode = ({
         return page.publication_status === 'published' || page.publication_status === 'unpublished'
     }
 
-    // Utility function to update page data in cache
-    const updatePageInCache = useCallback((pageId, updates) => {
-        // Update all page-related cache entries with the specific page update
-        queryClient.setQueriesData(['pages'], (oldData) => {
-            if (!oldData) return oldData
-
-            const updatePageInResults = (results) => {
-                return results.map(p => {
-                    if (p.id === pageId) {
-                        return { ...p, ...updates }
-                    }
-                    if (p.children && p.children.length > 0) {
-                        return { ...p, children: updatePageInResults(p.children) }
-                    }
-                    return p
-                })
-            }
-
-            return {
-                ...oldData,
-                results: updatePageInResults(oldData.results)
-            }
-        })
-
-        // Also update specific page children cache
-        queryClient.setQueriesData(['page-children'], (oldData) => {
-            if (!oldData) return oldData
-
-            const updatePageInChildren = (results) => {
-                return results.map(p => {
-                    if (p.id === pageId) {
-                        return { ...p, ...updates }
-                    }
-                    if (p.children && p.children.length > 0) {
-                        return { ...p, children: updatePageInChildren(p.children) }
-                    }
-                    return p
-                })
-            }
-
-            return {
-                ...oldData,
-                results: updatePageInChildren(oldData.results)
-            }
-        })
-    }, [queryClient])
-
     // Update page hostnames mutation
     const updateHostnamesMutation = useMutation({
         mutationFn: async (hostnamesData) => {
@@ -357,7 +310,7 @@ const PageTreeNode = ({
             setShowHostnameModal(false)
 
             // Update the specific page in the tree with optimistic update
-            updatePageInCache(page.id, { hostnames: updatedPage.hostnames })
+            onUpdatePageData(page.id, { hostnames: updatedPage.hostnames })
         },
         onError: (error) => {
             console.error('Failed to update hostnames:', error.response?.data?.detail || error.message)
@@ -374,7 +327,7 @@ const PageTreeNode = ({
             setIsEditingTitle(false)
 
             // Update the specific page in the tree with optimistic update
-            updatePageInCache(page.id, { title: updatedPage.title })
+            onUpdatePageData(page.id, { title: updatedPage.title })
         },
         onError: (error) => {
             console.error('Failed to update title:', error.response?.data?.detail || error.message)
@@ -392,7 +345,7 @@ const PageTreeNode = ({
             setIsEditingSlug(false)
 
             // Update the specific page in the tree with optimistic update
-            updatePageInCache(page.id, { slug: updatedPage.slug })
+            onUpdatePageData(page.id, { slug: updatedPage.slug })
         },
         onError: (error) => {
             console.error('Failed to update slug:', error.response?.data?.detail || error.message)
@@ -410,7 +363,7 @@ const PageTreeNode = ({
             setIsTogglingPublication(false)
 
             // Update the specific page in the tree with optimistic update
-            updatePageInCache(page.id, { publication_status: updatedPage.publication_status || 'published' })
+            onUpdatePageData(page.id, { publication_status: updatedPage.publication_status || 'published' })
         },
         onError: (error) => {
             console.error('Failed to publish page:', error.response?.data?.detail || error.message)
@@ -428,7 +381,7 @@ const PageTreeNode = ({
             setIsTogglingPublication(false)
 
             // Update the specific page in the tree with optimistic update
-            updatePageInCache(page.id, { publication_status: updatedPage.publication_status || 'unpublished' })
+            onUpdatePageData(page.id, { publication_status: updatedPage.publication_status || 'unpublished' })
         },
         onError: (error) => {
             console.error('Failed to unpublish page:', error.response?.data?.detail || error.message)
@@ -699,6 +652,7 @@ const PageTreeNode = ({
                             onRefreshChildren={onRefreshChildren}
                             isSearchMode={isSearchMode}
                             searchTerm={searchTerm}
+                            onUpdatePageData={onUpdatePageData}
                         />
                     ))}
                 </div>
@@ -717,7 +671,9 @@ const PageTreeNode = ({
             )}
         </div>
     )
-}
+})
+
+PageTreeNode.displayName = 'PageTreeNode'
 
 // Hostname editing modal component
 const HostnameEditModal = ({ page, onSave, onCancel, isLoading }) => {

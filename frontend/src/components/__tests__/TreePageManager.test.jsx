@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { Toaster } from 'react-hot-toast'
 import TreePageManager from '../TreePageManager'
 import * as pagesApi from '../../api/pages'
 
@@ -18,14 +17,13 @@ vi.mock('../../api/client.js', () => ({
 
 // Mock the pages API
 vi.mock('../../api/pages', () => ({
-    getRootPages: vi.fn(),
-    getPageChildren: vi.fn(),
+    getRootPages: vi.fn(() => Promise.resolve({ results: [], count: 0 })),
+    getPageChildren: vi.fn(() => Promise.resolve({ results: [], count: 0 })),
     movePage: vi.fn(),
     deletePage: vi.fn(),
+    searchAllPages: vi.fn(() => Promise.resolve({ results: [] })),
     pageTreeUtils: {
         hasChildren: vi.fn((page) => page.children_count > 0),
-        canMoveTo: vi.fn(() => true),
-        calculateSortOrder: vi.fn(() => 0),
         formatPageForTree: vi.fn((page) => ({
             ...page,
             isExpanded: false,
@@ -36,14 +34,51 @@ vi.mock('../../api/pages', () => ({
     }
 }))
 
-// Mock react-hot-toast
-vi.mock('react-hot-toast', () => ({
-    default: {
-        success: vi.fn(),
-        error: vi.fn(),
-        info: vi.fn()
-    },
-    Toaster: () => null
+// Mock the custom hooks
+vi.mock('../../hooks/useTreeState', () => ({
+    useTreeState: () => ({
+        expandedPages: new Set(),
+        loadedChildren: new Set(),
+        pageData: new Map(),
+        treeStructure: [],
+        lastUpdate: Date.now(),
+        addPage: vi.fn(),
+        updatePage: vi.fn(),
+        removePage: vi.fn(),
+        expandPage: vi.fn(),
+        collapsePage: vi.fn(),
+        markChildrenLoaded: vi.fn(),
+        updateTreeStructure: vi.fn(),
+        bulkUpdatePages: vi.fn(),
+        clearState: vi.fn(),
+        getPage: vi.fn(),
+        getAllPages: vi.fn(),
+        isPageExpanded: vi.fn(),
+        areChildrenLoaded: vi.fn(),
+        buildTree: vi.fn((pages) => pages.map(page => ({
+            ...page,
+            isExpanded: false,
+            childrenLoaded: false,
+            children: []
+        }))),
+        getTreeStats: vi.fn(() => ({
+            totalPages: 0,
+            expandedPages: 0,
+            loadedChildren: 0,
+            treeStructureLength: 0,
+            lastUpdate: Date.now()
+        }))
+    }),
+    usePageUpdates: () => ({
+        updatePageInCache: vi.fn(),
+        invalidatePageCaches: vi.fn(),
+        optimisticUpdate: vi.fn()
+    }),
+    useTreeRefresh: () => ({
+        debouncedRefresh: vi.fn(),
+        refreshPage: vi.fn(),
+        refreshTree: vi.fn()
+    })
 }))
 
 // Test data
@@ -85,7 +120,6 @@ const renderWithProviders = (component) => {
     return render(
         <QueryClientProvider client={queryClient}>
             {component}
-            <Toaster />
         </QueryClientProvider>
     )
 }
@@ -95,6 +129,7 @@ describe('TreePageManager', () => {
         vi.clearAllMocks()
         // Mock successful API response
         pagesApi.getRootPages.mockResolvedValue(mockPages)
+        pagesApi.searchAllPages.mockResolvedValue({ results: [] })
     })
 
     it('renders without crashing', async () => {
@@ -146,14 +181,11 @@ describe('TreePageManager', () => {
         expect(screen.getByDisplayValue('All')).toBeInTheDocument()
     })
 
-    it('calls onEditPage when New Page button is clicked', async () => {
-        const mockOnEditPage = vi.fn()
-        renderWithProviders(<TreePageManager onEditPage={mockOnEditPage} />)
+    it('shows add root page button', async () => {
+        renderWithProviders(<TreePageManager onEditPage={vi.fn()} />)
 
-        const newPageButton = screen.getByText('New Page')
-        fireEvent.click(newPageButton)
-
-        expect(mockOnEditPage).toHaveBeenCalledWith(null)
+        const addRootPageButton = screen.getByTestId('add-root-page-button')
+        expect(addRootPageButton).toBeInTheDocument()
     })
 
     it('handles error state gracefully', async () => {
@@ -174,15 +206,109 @@ describe('TreePageManager', () => {
         const refreshButton = screen.getByTestId('refresh-button')
         expect(refreshButton).toBeInTheDocument()
 
+        // Wait for initial load to complete
+        await waitFor(() => {
+            expect(screen.getByText('Home Page')).toBeInTheDocument()
+        })
+
+        // Clear the mock to track calls after initial load
+        pagesApi.getRootPages.mockClear()
+
+        // Click refresh button
         fireEvent.click(refreshButton)
-        // Verify API is called again
-        expect(pagesApi.getRootPages).toHaveBeenCalledTimes(2)
+
+        // Wait for the refetch to be called
+        await waitFor(() => {
+            expect(pagesApi.getRootPages).toHaveBeenCalled()
+        })
     })
 
-    it('shows expand all and collapse all buttons', async () => {
+    it('shows create first page button when no pages exist', async () => {
+        // Mock empty pages response
+        pagesApi.getRootPages.mockResolvedValue({ results: [], count: 0 })
+
         renderWithProviders(<TreePageManager onEditPage={vi.fn()} />)
 
-        expect(screen.getByTestId('expand-all-button')).toBeInTheDocument()
-        expect(screen.getByTestId('collapse-all-button')).toBeInTheDocument()
+        await waitFor(() => {
+            expect(screen.getByText('Create First Page')).toBeInTheDocument()
+        })
     })
+
+    it('shows no pages found message when no pages exist', async () => {
+        // Mock empty pages response
+        pagesApi.getRootPages.mockResolvedValue({ results: [], count: 0 })
+
+        renderWithProviders(<TreePageManager onEditPage={vi.fn()} />)
+
+        await waitFor(() => {
+            expect(screen.getByText('No pages found')).toBeInTheDocument()
+        })
+    })
+
+    it('automatically loads children for first-level pages with children', async () => {
+        // Mock pages with children
+        const mockPagesWithChildren = {
+            results: [
+                {
+                    id: 1,
+                    title: 'Home Page',
+                    slug: 'home',
+                    publication_status: 'published',
+                    children_count: 2,
+                    sort_order: 0
+                },
+                {
+                    id: 2,
+                    title: 'About Page',
+                    slug: 'about',
+                    publication_status: 'published',
+                    children_count: 0,
+                    sort_order: 1
+                }
+            ],
+            count: 2
+        }
+
+        // Mock children data
+        const mockChildren = {
+            results: [
+                {
+                    id: 3,
+                    title: 'Child Page 1',
+                    slug: 'child-1',
+                    publication_status: 'published',
+                    children_count: 0,
+                    sort_order: 0
+                },
+                {
+                    id: 4,
+                    title: 'Child Page 2',
+                    slug: 'child-2',
+                    publication_status: 'published',
+                    children_count: 0,
+                    sort_order: 1
+                }
+            ],
+            count: 2
+        }
+
+        pagesApi.getRootPages.mockResolvedValue(mockPagesWithChildren)
+        pagesApi.getPageChildren.mockResolvedValue(mockChildren)
+
+        renderWithProviders(<TreePageManager onEditPage={vi.fn()} />)
+
+        // Wait for root pages to load
+        await waitFor(() => {
+            expect(screen.getByText('Home Page')).toBeInTheDocument()
+            expect(screen.getByText('About Page')).toBeInTheDocument()
+        })
+
+        // Verify that getPageChildren was called for the page with children
+        expect(pagesApi.getPageChildren).toHaveBeenCalledWith(1)
+
+        // Verify that getPageChildren was NOT called for the page without children
+        expect(pagesApi.getPageChildren).not.toHaveBeenCalledWith(2)
+    })
+
+
 }) 

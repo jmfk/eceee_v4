@@ -54,12 +54,29 @@ const TreePageManager = ({ onEditPage }) => {
     const [positioningParams, setPositioningParams] = useState(null)
     const [searchResults, setSearchResults] = useState([])
     const [isSearching, setIsSearching] = useState(false)
-    const [searchExpandedPages, setSearchExpandedPages] = useState(new Set())
 
     const queryClient = useQueryClient()
 
     // Debounce search term to avoid excessive API calls
     const debouncedSearchTerm = useDebounce(searchTerm, 300)
+
+    // Function to expand parent pages of search results
+    const expandSearchResultParents = useCallback(async (results) => {
+        if (!results || results.length === 0) return
+
+        // Extract all parent page IDs from hierarchy paths
+        const parentIds = new Set()
+        results.forEach(result => {
+            if (result.hierarchy_path && Array.isArray(result.hierarchy_path)) {
+                result.hierarchy_path.forEach(parent => {
+                    parentIds.add(parent.id)
+                })
+            }
+        })
+
+        // Expand all parent pages
+        setExpandedPages(prev => new Set([...prev, ...parentIds]))
+    }, [setExpandedPages])
 
     // Create page mutation
     const createPageMutation = useMutation({
@@ -68,59 +85,10 @@ const TreePageManager = ({ onEditPage }) => {
             return response.data
         },
         onSuccess: (newPage) => {
-            // If we created a child page, update the local tree state
-            if (positioningParams?.parentId) {
-                const parentId = positioningParams.parentId
-
-                // Add the new page to the local tree
-                setPages(prevPages => {
-                    return updatePageInTree(prevPages, parentId, (parentPage) => {
-                        const newChild = pageTreeUtils.formatPageForTree(newPage)
-                        const currentChildren = parentPage.children || []
-                        const updatedChildren = [...currentChildren, newChild].sort((a, b) => a.sort_order - b.sort_order)
-
-                        return {
-                            ...parentPage,
-                            children: updatedChildren,
-                            children_count: (parentPage.children_count || 0) + 1,
-                            childrenLoaded: true,
-                            isExpanded: true
-                        }
-                    })
-                })
-
-                // Make sure the parent is expanded
-                setExpandedPages(prev => new Set([...prev, parentId]))
-
-                // Update the cache for the parent page's children
-                queryClient.setQueryData(['page-children', parentId], (oldData) => {
-                    if (!oldData) return oldData
-
-                    const newChild = pageTreeUtils.formatPageForTree(newPage)
-                    const updatedResults = [...oldData.results, newChild].sort((a, b) => a.sort_order - b.sort_order)
-
-                    return {
-                        ...oldData,
-                        results: updatedResults
-                    }
-                })
-            } else {
-                // Root page created - update root pages cache
-                queryClient.setQueryData(['pages', 'root'], (oldData) => {
-                    if (!oldData) return oldData
-
-                    const newRootPage = pageTreeUtils.formatPageForTree(newPage)
-                    const updatedResults = [...oldData.results, newRootPage].sort((a, b) => a.sort_order - b.sort_order)
-
-                    return {
-                        ...oldData,
-                        results: updatedResults
-                    }
-                })
-            }
-
             setShowCreateModal(false)
             setPositioningParams(null)
+            // Invalidate queries to refresh data
+            queryClient.invalidateQueries(['pages', 'root'])
         },
         onError: (error) => {
             console.error('Failed to create page:', error.response?.data?.detail || error.message)
@@ -135,19 +103,8 @@ const TreePageManager = ({ onEditPage }) => {
         },
         onSuccess: (newPage) => {
             setShowRootPageModal(false)
-
-            // Update root pages cache
-            queryClient.setQueryData(['pages', 'root'], (oldData) => {
-                if (!oldData) return oldData
-
-                const newRootPage = pageTreeUtils.formatPageForTree(newPage)
-                const updatedResults = [...oldData.results, newRootPage].sort((a, b) => a.sort_order - b.sort_order)
-
-                return {
-                    ...oldData,
-                    results: updatedResults
-                }
-            })
+            // Invalidate queries to refresh data
+            queryClient.invalidateQueries(['pages', 'root'])
         },
         onError: (error) => {
             console.error('Failed to create root page:', error.response?.data?.detail || error.message)
@@ -168,7 +125,9 @@ const TreePageManager = ({ onEditPage }) => {
             if (statusFilter !== 'all') filters.publication_status = statusFilter
             return getRootPages(filters)
         },
-        enabled: !debouncedSearchTerm // Only fetch root pages when not searching
+        enabled: !debouncedSearchTerm, // Only fetch root pages when not searching
+        staleTime: 30000, // Cache for 30 seconds
+        refetchOnWindowFocus: false
     })
 
     // Comprehensive search query
@@ -187,31 +146,29 @@ const TreePageManager = ({ onEditPage }) => {
         staleTime: 30000 // Cache search results for 30 seconds
     })
 
-    // Move page mutation with optimistic updates
+    // Move page mutation
     const movePageMutation = useMutation({
         mutationFn: ({ pageId, parentId, sortOrder }) =>
             movePage(pageId, parentId, sortOrder),
         onSuccess: () => {
+            // Invalidate relevant queries to refresh data
+            queryClient.invalidateQueries(['pages', 'root'])
+            queryClient.invalidateQueries(['page-children'])
         },
-        onError: (error, variables, context) => {
-            // Revert optimistic update on error
-            if (context?.previousPages) {
-                setPages(context.previousPages)
-            }
+        onError: (error) => {
             console.error('Failed to move page: ' + error.message)
         }
     })
 
-    // Delete page mutation with optimistic updates
+    // Delete page mutation
     const deletePageMutation = useMutation({
         mutationFn: deletePage,
         onSuccess: () => {
+            // Invalidate relevant queries to refresh data
+            queryClient.invalidateQueries(['pages', 'root'])
+            queryClient.invalidateQueries(['page-children'])
         },
-        onError: (error, variables, context) => {
-            // Revert optimistic delete on error
-            if (context?.previousPages) {
-                setPages(context.previousPages)
-            }
+        onError: (error) => {
             console.error('Failed to delete page: ' + error.message)
         }
     })
@@ -219,7 +176,7 @@ const TreePageManager = ({ onEditPage }) => {
     // Update pages when data changes
     useEffect(() => {
         if (rootPagesData?.results) {
-            // Format pages for tree display and expand all first-level pages
+            // Format pages for tree display
             const formattedPages = rootPagesData.results.map(page => ({
                 ...pageTreeUtils.formatPageForTree(page),
                 isExpanded: true // Auto-expand all first-level pages
@@ -229,166 +186,53 @@ const TreePageManager = ({ onEditPage }) => {
             // Add all first-level page IDs to expanded set
             const firstLevelPageIds = rootPagesData.results.map(page => page.id)
             setExpandedPages(new Set(firstLevelPageIds))
-        }
-    }, [rootPagesData])
 
-    // Process search results and expand them in context
+            // Auto-load children for first-level pages that have children
+            const pagesWithChildren = rootPagesData.results.filter(page => page.children_count > 0)
+            pagesWithChildren.forEach(async (page) => {
+                try {
+                    const childrenData = await getPageChildren(page.id)
+
+                    // Check if childrenData has the expected structure
+                    if (!childrenData || !childrenData.results) {
+                        console.warn(`Invalid children data structure for page ${page.id}:`, childrenData)
+                        return
+                    }
+
+                    const children = childrenData.results.map(child => pageTreeUtils.formatPageForTree(child))
+
+                    // Update the specific page node with its children
+                    setPages(prevPages => {
+                        return updatePageInTree(prevPages, page.id, (p) => ({
+                            ...p,
+                            children: children,
+                            childrenLoaded: true,
+                            isExpanded: true
+                        }))
+                    })
+
+                    // Cache the children data in React Query for invalidation
+                    queryClient.setQueryData(['page-children', page.id], childrenData)
+                } catch (error) {
+                    console.error(`Failed to load children for page ${page.id}:`, error)
+                }
+            })
+        }
+    }, [rootPagesData, queryClient])
+
+    // Process search results
     useEffect(() => {
         if (searchData?.results && debouncedSearchTerm) {
             setIsSearching(true)
-
-            // Process search results to build a tree with expanded paths
-            const processedResults = processSearchResults(searchData.results)
-            setPages(processedResults)
-
-            // Expand all pages in the hierarchy path of search results
-            const pagesToExpand = new Set()
-            searchData.results.forEach(result => {
-                // Add the result page itself
-                pagesToExpand.add(result.id)
-
-                // Add all parent pages in the hierarchy path
-                if (result.hierarchy_path) {
-                    result.hierarchy_path.forEach(parent => {
-                        pagesToExpand.add(parent.id)
-                    })
-                }
-            })
-
-            setExpandedPages(pagesToExpand)
-            setSearchExpandedPages(pagesToExpand)
             setSearchResults(searchData.results)
+
+            // Auto-expand parent pages of search results
+            expandSearchResultParents(searchData.results)
         } else if (!debouncedSearchTerm) {
-            // Clear search results when search term is empty
             setIsSearching(false)
             setSearchResults([])
-            setSearchExpandedPages(new Set())
         }
-    }, [searchData, debouncedSearchTerm])
-
-    // Helper function to process search results into a tree structure
-    const processSearchResults = useCallback((results) => {
-        if (!results || results.length === 0) return []
-
-        // Group results by their root parent
-        const rootGroups = new Map()
-
-        results.forEach(result => {
-            let rootId = null
-            let currentPath = []
-
-            // Find the root parent
-            if (result.hierarchy_path && result.hierarchy_path.length > 0) {
-                rootId = result.hierarchy_path[0].id
-                currentPath = result.hierarchy_path
-            } else {
-                // This is a root page
-                rootId = result.id
-            }
-
-            if (!rootGroups.has(rootId)) {
-                rootGroups.set(rootId, {
-                    root: result.hierarchy_path?.[0] || result,
-                    results: [],
-                    paths: new Map()
-                })
-            }
-
-            const group = rootGroups.get(rootId)
-            group.results.push(result)
-
-            // Store the path for this result
-            if (currentPath.length > 0) {
-                group.paths.set(result.id, currentPath)
-            }
-        })
-
-        // Build the tree structure for each root group
-        const treePages = []
-
-        for (const [rootId, group] of rootGroups) {
-            // Start with the root page
-            const rootPage = pageTreeUtils.formatPageForTree(group.root)
-            rootPage.isExpanded = true
-            rootPage.children = []
-            rootPage.childrenLoaded = true
-
-            // Add all search results and their paths to this root
-            const processedChildren = new Map()
-
-            group.results.forEach(result => {
-                if (result.id === rootId) {
-                    // This is the root page itself
-                    rootPage.isSearchResult = true
-                    rootPage.highlightSearch = true
-                } else {
-                    // This is a child page, build its path
-                    const path = group.paths.get(result.id) || []
-                    let currentParent = rootPage
-
-                    // Build the path to this result
-                    for (let i = 0; i < path.length; i++) {
-                        const pathPage = path[i]
-                        let childPage = currentParent.children.find(p => p.id === pathPage.id)
-
-                        if (!childPage) {
-                            childPage = pageTreeUtils.formatPageForTree(pathPage)
-                            childPage.isExpanded = true
-                            childPage.children = []
-                            childPage.childrenLoaded = true
-                            currentParent.children.push(childPage)
-                        }
-
-                        currentParent = childPage
-                    }
-
-                    // Add the actual search result
-                    const resultPage = pageTreeUtils.formatPageForTree(result)
-                    resultPage.isSearchResult = true
-                    resultPage.highlightSearch = true
-                    resultPage.isExpanded = true
-                    resultPage.children = []
-                    resultPage.childrenLoaded = true
-
-                    currentParent.children.push(resultPage)
-                }
-            })
-
-            // Sort children by sort_order
-            const sortChildren = (children) => {
-                children.sort((a, b) => a.sort_order - b.sort_order)
-                children.forEach(child => {
-                    if (child.children && child.children.length > 0) {
-                        sortChildren(child.children)
-                    }
-                })
-            }
-
-            sortChildren(rootPage.children)
-            treePages.push(rootPage)
-        }
-
-        return treePages
-    }, [])
-
-    // Helper function to optimistically update tree structure
-    const updatePageInTree = useCallback((pages, pageId, updater) => {
-        const updateRecursive = (pageList) => {
-            return pageList.map(page => {
-                if (page.id === pageId) {
-                    return updater(page)
-                }
-                if (page.children && page.children.length > 0) {
-                    return {
-                        ...page,
-                        children: updateRecursive(page.children)
-                    }
-                }
-                return page
-            }).filter(Boolean) // Remove null/undefined pages
-        }
-        return updateRecursive(pages)
-    }, [])
+    }, [searchData, debouncedSearchTerm, expandSearchResultParents])
 
     // Helper function to refresh child pages for a specific parent
     const refreshChildPages = useCallback(async (parentId) => {
@@ -410,59 +254,36 @@ const TreePageManager = ({ onEditPage }) => {
         } catch (error) {
             console.error(`Failed to refresh child pages for parent ${parentId}:`, error)
         }
-    }, [updatePageInTree, queryClient])
+    }, [queryClient])
 
-    // Helper function to remove a page from tree
-    const removePageFromTree = useCallback((pages, pageId) => {
-        const removeRecursive = (pageList) => {
-            return pageList.filter(page => page.id !== pageId).map(page => {
+    // Helper function to optimistically update tree structure
+    const updatePageInTree = useCallback((pages, pageId, updater) => {
+        const updateRecursive = (pageList) => {
+            return pageList.map(page => {
+                if (page.id === pageId) {
+                    return updater(page)
+                }
                 if (page.children && page.children.length > 0) {
                     return {
                         ...page,
-                        children: removeRecursive(page.children)
+                        children: updateRecursive(page.children)
                     }
                 }
                 return page
-            })
+            }).filter(Boolean) // Remove null/undefined pages
         }
-        return removeRecursive(pages)
+        return updateRecursive(pages)
     }, [])
 
-    // Helper function to add a page to tree
-    const addPageToTree = useCallback((pages, page, parentId) => {
-        const formattedPage = pageTreeUtils.formatPageForTree(page)
-
-        if (!parentId) {
-            // Add to root level and sort by sort_order
-            const updatedPages = [...pages, formattedPage]
-            return updatedPages.sort((a, b) => a.sort_order - b.sort_order)
-        }
-
-        const addRecursive = (pageList) => {
-            return pageList.map(existingPage => {
-                if (existingPage.id === parentId) {
-                    // Add to children and sort by sort_order
-                    const currentChildren = existingPage.children || []
-                    const updatedChildren = [...currentChildren, formattedPage]
-                    const sortedChildren = updatedChildren.sort((a, b) => a.sort_order - b.sort_order)
-
-                    return {
-                        ...existingPage,
-                        children: sortedChildren,
-                        children_count: (existingPage.children_count || 0) + 1
-                    }
-                }
-                if (existingPage.children && existingPage.children.length > 0) {
-                    return {
-                        ...existingPage,
-                        children: addRecursive(existingPage.children)
-                    }
-                }
-                return existingPage
-            })
-        }
-        return addRecursive(pages)
-    }, [])
+    // Callback function for PageTreeNode to update page data
+    const updatePageData = useCallback((pageId, updates) => {
+        setPages(prevPages => {
+            return updatePageInTree(prevPages, pageId, (page) => ({
+                ...page,
+                ...updates
+            }))
+        })
+    }, [updatePageInTree])
 
     // Load children for a specific page
     const loadChildren = useCallback(async (pageId) => {
@@ -503,21 +324,6 @@ const TreePageManager = ({ onEditPage }) => {
         })
     }, [])
 
-    // Auto-load children for first-level pages when they are expanded on initial load
-    useEffect(() => {
-        if (rootPagesData?.results && loadChildren) {
-            const pagesWithChildren = rootPagesData.results.filter(page =>
-                pageTreeUtils.hasChildren(page)
-            )
-
-            pagesWithChildren.forEach(page => {
-                loadChildren(page.id).catch(error => {
-                    console.error(`Failed to load children for page ${page.id}:`, error)
-                })
-            })
-        }
-    }, [rootPagesData, loadChildren])
-
     // Cut/Copy/Paste handlers
     const handleCut = useCallback((pageId) => {
         setCutPageId(pageId)
@@ -527,155 +333,52 @@ const TreePageManager = ({ onEditPage }) => {
         const sourcePageId = cutPageId
         if (!sourcePageId) return
 
-        if (cutPageId) {
-            // Move operation with optimistic update
-            // Store current state for potential rollback
-            const previousPages = [...pages]
-
-            // Find the page being moved and target page
-            let movedPage = null
-            let targetPage = null
-            const findPageRecursive = (pageList) => {
-                const results = { moved: null, target: null }
-                for (const page of pageList) {
-                    if (page.id === cutPageId) {
-                        results.moved = page
-                    }
-                    if (page.id === targetPageId) {
-                        results.target = page
-                    }
-                    if (page.children && page.children.length > 0) {
-                        const found = findPageRecursive(page.children)
-                        if (found.moved && !results.moved) results.moved = found.moved
-                        if (found.target && !results.target) results.target = found.target
-                    }
-                }
-                return results
-            }
-            const foundPages = findPageRecursive(pages)
-            movedPage = foundPages.moved
-            targetPage = foundPages.target
-
-            if (!movedPage) {
-                console.error('Page not found')
-                return
-            }
-
-            if (!targetPage && pasteMode !== 'top' && pasteMode !== 'bottom') {
-                console.error('Target page not found')
-                return
-            }
-
-            try {
-                let newParentId = null
-                let newSortOrder = 0
-
-                // Calculate new parent and sort order based on paste mode
-                if (pasteMode === 'child') {
-                    // Paste as child of target page
-                    newParentId = targetPageId
-                    newSortOrder = 0 // Backend will calculate
-                } else if (pasteMode === 'top' || pasteMode === 'bottom') {
-                    // Paste at root level (top or bottom)
-                    newParentId = null
-
-                    // Simple hints - backend will normalize to proper spacing
-                    if (pasteMode === 'top') {
-                        newSortOrder = -1  // Hint: place at beginning
-                    } else { // bottom
-                        newSortOrder = 999999  // Hint: place at end
-                    }
-                } else if (pasteMode === 'above' || pasteMode === 'below') {
-                    // Paste as sibling of target page
-                    newParentId = targetPage.parent?.id || null
-
-                    // Simple hints - backend will normalize to proper spacing
-                    if (pasteMode === 'above') {
-                        newSortOrder = pageTreeUtils.calculateSortOrderAbove([], targetPage)
-                    } else { // below
-                        newSortOrder = pageTreeUtils.calculateSortOrderBelow([], targetPage)
-                    }
-                }
-
-                // Optimistically update the tree
-                // 1. Remove page from its current location
-                let updatedPages = removePageFromTree(pages, cutPageId)
-
-                // 2. Update the page's parent and sort order
-                const updatedPage = {
-                    ...movedPage,
-                    parent: newParentId ? { id: newParentId } : null,
-                    sort_order: newSortOrder
-                }
-                // 3. Add page to new location
-                if (pasteMode === 'child') {
-                    updatedPages = addPageToTree(updatedPages, updatedPage, newParentId)
-                } else if (pasteMode === 'top') {
-                    // Add to beginning of root pages
-                    updatedPages = [pageTreeUtils.formatPageForTree(updatedPage), ...updatedPages]
-                } else if (pasteMode === 'bottom') {
-                    // Add to end of root pages
-                    updatedPages = [...updatedPages, pageTreeUtils.formatPageForTree(updatedPage)]
-                } else {
-                    // For above/below, we need to add to the same parent as target
-                    updatedPages = addPageToTree(updatedPages, updatedPage, newParentId)
-                }
-                // Update local state immediately
-                setPages(updatedPages)
-
-                // Call the API
-                await movePageMutation.mutateAsync(
-                    {
-                        pageId: cutPageId,
-                        parentId: newParentId,
-                        sortOrder: newSortOrder
-                    },
-                    {
-                        context: { previousPages }
-                    }
-                )
-                setCutPageId(null)
-                const pasteMessages = {
-                    'child': 'as child',
-                    'above': 'above target',
-                    'below': 'below target',
-                    'top': 'to top of tree',
-                    'bottom': 'to bottom of tree'
-                }
-            } catch (error) {
-                console.error('Failed to move page')
-                // Error handling (revert) is done in the mutation's onError
-            }
-        }
-    }, [cutPageId, pages, movePageMutation, removePageFromTree, addPageToTree])
-
-    // Delete handler with optimistic update
-    const handleDelete = useCallback(async (pageId) => {
-        // Store current state for potential rollback
-        const previousPages = [...pages]
-
         try {
-            // Optimistically remove page from tree
-            const updatedPages = removePageFromTree(pages, pageId)
-            setPages(updatedPages)
+            let newParentId = null
+            let newSortOrder = 0
+
+            // Calculate new parent and sort order based on paste mode
+            if (pasteMode === 'child') {
+                newParentId = targetPageId
+                newSortOrder = 0
+            } else if (pasteMode === 'top' || pasteMode === 'bottom') {
+                newParentId = null
+                newSortOrder = pasteMode === 'top' ? -1 : 999999
+            } else if (pasteMode === 'above' || pasteMode === 'below') {
+                const targetPage = pages.find(p => p.id === targetPageId)
+                newParentId = targetPage?.parent?.id || null
+                newSortOrder = pasteMode === 'above' ?
+                    pageTreeUtils.calculateSortOrderAbove([], targetPage) :
+                    pageTreeUtils.calculateSortOrderBelow([], targetPage)
+            }
 
             // Call the API
-            await deletePageMutation.mutateAsync(pageId, {
-                context: { previousPages }
+            await movePageMutation.mutateAsync({
+                pageId: cutPageId,
+                parentId: newParentId,
+                sortOrder: newSortOrder
             })
+
+            setCutPageId(null)
+        } catch (error) {
+            console.error('Failed to move page')
+        }
+    }, [cutPageId, pages, movePageMutation])
+
+    // Delete handler
+    const handleDelete = useCallback(async (pageId) => {
+        try {
+            await deletePageMutation.mutateAsync(pageId)
         } catch (error) {
             console.error('Delete error:', error)
-            // Error handling (revert) is done in the mutation's onError
         }
-    }, [pages, deletePageMutation, removePageFromTree])
+    }, [deletePageMutation])
 
     // Edit handler
     const handleEdit = useCallback((page) => {
         if (onEditPage) {
             onEditPage(page)
         } else {
-            // Handle editing internally if no onEditPage prop provided
-            // For now, just log a message - you could implement inline editing here
             console.log('Page editing functionality needs to be implemented')
         }
     }, [onEditPage])
@@ -683,24 +386,22 @@ const TreePageManager = ({ onEditPage }) => {
     // Add child page handler
     const handleAddPageBelow = useCallback((targetPage) => {
         if (onEditPage) {
-            // Call onEditPage with special params to indicate creating a child page
             onEditPage(null, {
                 parentPage: targetPage,
                 parentId: targetPage.id,
-                suggestedSortOrder: 0 // First child or will be calculated by backend
+                suggestedSortOrder: 0
             })
         } else {
-            // Handle page creation internally
             setPositioningParams({
                 parentPage: targetPage,
                 parentId: targetPage.id,
-                suggestedSortOrder: 0 // First child or will be calculated by backend
+                suggestedSortOrder: 0
             })
             setShowCreateModal(true)
         }
     }, [onEditPage])
 
-    // Handle create new page (for first page or global create)
+    // Handle create new page
     const handleCreateNewPage = useCallback(() => {
         if (onEditPage) {
             onEditPage(null)
@@ -905,6 +606,7 @@ const TreePageManager = ({ onEditPage }) => {
                                 onRefreshChildren={refreshChildPages}
                                 isSearchMode={!!searchTerm}
                                 searchTerm={searchTerm}
+                                onUpdatePageData={updatePageData}
                             />
                         ))}
                     </div>
