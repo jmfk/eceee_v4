@@ -123,4 +123,36 @@ describe('Notification', () => {
         expect(screen.getByText('Simple error without response data')).toBeInTheDocument()
         expect(screen.queryByText('Details:')).not.toBeInTheDocument()
     })
+
+    it('handles error objects with response data but no message property', () => {
+        const error = {
+            response: {
+                data: {
+                    detail: 'API validation error'
+                }
+            }
+        }
+
+        render(<Notification message={error} onClose={mockOnClose} />)
+
+        // Check that the main message shows the detail (first occurrence)
+        const allMessages = screen.getAllByText('API validation error')
+        expect(allMessages).toHaveLength(2) // One in main message, one in details
+
+        // Check that details section also shows the detail
+        expect(screen.getByText('Details:')).toBeInTheDocument()
+        const detailsSection = screen.getByText('Details:').closest('div')
+        expect(detailsSection).toHaveTextContent('API validation error')
+    })
+
+    it('handles error objects with no message or response data', () => {
+        const error = {
+            name: 'ValidationError',
+            code: 'INVALID_INPUT'
+        }
+
+        render(<Notification message={error} onClose={mockOnClose} />)
+
+        expect(screen.getByText('An error occurred')).toBeInTheDocument()
+    })
 }) 

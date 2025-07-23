@@ -93,7 +93,10 @@ const Notification = ({ message, onClose, type = 'error', duration = 5000 }) => 
                 {/* Content */}
                 <div>
                     <p className={`text-sm ${getTextColor()}`}>
-                        {message}
+                        {typeof message === 'string'
+                            ? message
+                            : message.message || message.response?.data?.detail || 'An error occurred'
+                        }
                     </p>
 
                     {/* Show additional error details if available */}
