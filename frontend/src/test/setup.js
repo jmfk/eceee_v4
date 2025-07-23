@@ -27,8 +27,21 @@ afterEach(() => {
 })
 
 // Mock axios for API calls
+const mockAxiosInstance = {
+    get: vi.fn(() => Promise.resolve({ data: {} })),
+    post: vi.fn(() => Promise.resolve({ data: {} })),
+    put: vi.fn(() => Promise.resolve({ data: {} })),
+    patch: vi.fn(() => Promise.resolve({ data: {} })),
+    delete: vi.fn(() => Promise.resolve({ data: {} })),
+    interceptors: {
+        request: { use: vi.fn() },
+        response: { use: vi.fn() }
+    }
+}
+
 vi.mock('axios', () => ({
     default: {
+        create: vi.fn(() => mockAxiosInstance),
         get: vi.fn(() => Promise.resolve({ data: {} })),
         post: vi.fn(() => Promise.resolve({ data: {} })),
         put: vi.fn(() => Promise.resolve({ data: {} })),
@@ -36,6 +49,9 @@ vi.mock('axios', () => ({
         delete: vi.fn(() => Promise.resolve({ data: {} })),
     },
 }))
+
+// Export the mock instance for tests to use
+export { mockAxiosInstance }
 
 // Mock react-hot-toast
 vi.mock('react-hot-toast', () => ({

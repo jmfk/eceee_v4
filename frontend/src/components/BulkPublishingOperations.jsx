@@ -9,6 +9,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { api } from '../api/client.js';
+import { extractErrorMessage } from '../utils/errorHandling.js';
 import { CheckCircle, AlertTriangle } from 'lucide-react';
 import SearchAndFilter from './bulk-publishing/SearchAndFilter';
 import BulkOperationControls from './bulk-publishing/BulkOperationControls';
@@ -105,7 +106,7 @@ const BulkPublishingOperations = () => {
             await fetchPages();
 
         } catch (err) {
-            setError(err.message);
+            setError(extractErrorMessage(err, 'Failed to perform bulk operation'))
         } finally {
             setProcessing(false);
         }

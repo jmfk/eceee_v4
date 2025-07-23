@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { vi } from 'vitest'
 import TreePageManager from '../TreePageManager'
 import { searchAllPages, getPageChildren } from '../../api/pages'
+import { NotificationProvider } from '../NotificationManager'
 
 // Mock axios
 vi.mock('axios', () => ({
@@ -105,7 +106,9 @@ describe('TreePageManager Search Functionality', () => {
     const renderTreePageManager = () => {
         return render(
             <QueryClientProvider client={queryClient}>
-                <TreePageManager onEditPage={vi.fn()} />
+                <NotificationProvider>
+                    <TreePageManager onEditPage={vi.fn()} />
+                </NotificationProvider>
             </QueryClientProvider>
         )
     }

@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react'
+import { extractErrorMessage } from '../utils/errorHandling'
 
 const useNotifications = () => {
     const [notifications, setNotifications] = useState([])
@@ -28,7 +29,8 @@ const useNotifications = () => {
 
     // Backward compatibility aliases
     const showError = useCallback((error, type = 'error') => {
-        return showNotification(error, type)
+        const message = extractErrorMessage(error, 'An error occurred')
+        return showNotification(message, type)
     }, [showNotification])
 
     const removeError = useCallback((errorId) => {

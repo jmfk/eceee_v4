@@ -1,5 +1,8 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { api } from '../api/client.js'
+import { extractErrorMessage } from '../utils/errorHandling.js'
+import toast from 'react-hot-toast'
 import {
     Plus,
     Edit3,
@@ -15,8 +18,6 @@ import {
     Settings,
     Hash
 } from 'lucide-react'
-import toast from 'react-hot-toast'
-import axios from 'axios'
 
 const ThemeEditor = () => {
     const [selectedTheme, setSelectedTheme] = useState(null)
@@ -25,16 +26,13 @@ const ThemeEditor = () => {
     const queryClient = useQueryClient()
 
     // Fetch themes
-    const { data: themesResponse, isLoading } = useQuery({
+    const { data: themes = [], isLoading } = useQuery({
         queryKey: ['themes'],
         queryFn: async () => {
-            const response = await axios.get('/api/v1/webpages/themes/')
+            const response = await api.get('/api/v1/webpages/themes/')
             return response.data
         }
     })
-
-    // Extract themes array from paginated response
-    const themes = themesResponse?.results || []
 
     return (
         <div className="space-y-6">
@@ -218,9 +216,9 @@ const ThemeForm = ({ theme = null, onSave, onCancel }) => {
     const mutation = useMutation({
         mutationFn: async (data) => {
             if (theme) {
-                return axios.put(`/api/v1/webpages/themes/${theme.id}/`, data)
+                return api.put(`/api/v1/webpages/themes/${theme.id}/`, data)
             } else {
-                return axios.post('/api/v1/webpages/themes/', data)
+                return api.post('/api/v1/webpages/themes/', data)
             }
         },
         onSuccess: () => {
@@ -228,7 +226,8 @@ const ThemeForm = ({ theme = null, onSave, onCancel }) => {
             onSave()
         },
         onError: (error) => {
-            toast.error(`Failed to ${theme ? 'update' : 'create'} theme`)
+            const message = extractErrorMessage(error, `Failed to ${theme ? 'update' : 'create'} theme`)
+            toast.error(message)
             console.error(error)
         }
     })
@@ -605,7 +604,7 @@ const ThemeEditPanel = ({ theme, onUpdate, onCancel, showPreview, onTogglePrevie
 
     const deleteMutation = useMutation({
         mutationFn: async () => {
-            return axios.delete(`/api/v1/webpages/themes/${theme.id}/`)
+            return api.delete(`/api/v1/webpages/themes/${theme.id}/`)
         },
         onSuccess: () => {
             toast.success('Theme deleted successfully')

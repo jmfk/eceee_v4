@@ -1,0 +1,74 @@
+/**
+ * Utility functions for consistent error handling across the application
+ */
+
+/**
+ * Extract user-friendly error message from various error formats
+ * @param {Error|Object|string} error - The error object or string
+ * @param {string} defaultMessage - Default message if no user-friendly message is found
+ * @returns {string} User-friendly error message
+ */
+export const extractErrorMessage = (error, defaultMessage = 'An error occurred') => {
+    if (!error) {
+        return defaultMessage
+    }
+
+    if (typeof error === 'string') {
+        return error
+    }
+
+    if (error && typeof error === 'object') {
+        // Prioritize API response detail field (most common for 400 errors)
+        if (error.response?.data?.detail) {
+            return error.response.data.detail
+        }
+
+        // Check for field-specific validation errors (e.g., {"slug": ["error message"]})
+        if (error.response?.data && typeof error.response.data === 'object') {
+            const data = error.response.data
+            // Look for field-specific errors
+            for (const [field, messages] of Object.entries(data)) {
+                if (Array.isArray(messages) && messages.length > 0) {
+                    return `${field}: ${messages[0]}`
+                }
+            }
+        }
+
+        // Check for other common API error field names
+        if (error.response?.data?.message) {
+            return error.response.data.message
+        }
+
+        if (error.response?.data?.error) {
+            return error.response.data.error
+        }
+
+        // Check for non-nested error fields
+        if (error.detail) {
+            return error.detail
+        }
+
+        if (error.message) {
+            return error.message
+        }
+
+        if (error.error) {
+            return error.error
+        }
+    }
+
+    return defaultMessage
+}
+
+/**
+ * Create a standardized error handler for React Query mutations
+ * @param {Function} toastError - Toast error function (e.g., toast.error from react-hot-toast)
+ * @param {string} defaultMessage - Default error message
+ * @returns {Function} Error handler function
+ */
+export const createErrorHandler = (toastError, defaultMessage = 'An error occurred') => {
+    return (error) => {
+        const message = extractErrorMessage(error, defaultMessage)
+        toastError(message)
+    }
+} 

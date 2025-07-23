@@ -4,6 +4,7 @@ import { vi, describe, it, expect, beforeEach } from 'vitest'
 import userEvent from '@testing-library/user-event'
 import PageTreeNode from '../PageTreeNode'
 import { api } from '../../api/client'
+import { NotificationProvider } from '../NotificationManager'
 
 // Mock the API
 vi.mock('../../api/client', () => ({
@@ -48,7 +49,9 @@ const renderWithProviders = (component) => {
 
     return render(
         <QueryClientProvider client={queryClient}>
-            {component}
+            <NotificationProvider>
+                {component}
+            </NotificationProvider>
         </QueryClientProvider>
     )
 }

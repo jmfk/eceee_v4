@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
     FileText,
@@ -34,6 +34,7 @@ import ObjectPublisher from '../components/ObjectPublisher'
 import PublicationStatusDashboard from '../components/PublicationStatusDashboard'
 import PublicationTimeline from '../components/PublicationTimeline'
 import BulkPublishingOperations from '../components/BulkPublishingOperations'
+import { extractErrorMessage } from '../utils/errorHandling.js'
 
 const SettingsManager = () => {
     const [activeTab, setActiveTab] = useState('layouts')
@@ -156,7 +157,7 @@ const SettingsManager = () => {
             queryClient.invalidateQueries(['pages'])
         },
         onError: (error) => {
-            toast.error(error.response?.data?.detail || 'Failed to create page')
+            toast.error(extractErrorMessage(error, 'Failed to create page'))
         }
     })
 
@@ -172,7 +173,7 @@ const SettingsManager = () => {
             queryClient.invalidateQueries(['pages'])
         },
         onError: (error) => {
-            toast.error(error.response?.data?.detail || 'Failed to update page')
+            toast.error(extractErrorMessage(error, 'Failed to update page'))
         }
     })
 
@@ -187,7 +188,7 @@ const SettingsManager = () => {
             queryClient.invalidateQueries(['pages'])
         },
         onError: (error) => {
-            toast.error(error.response?.data?.detail || 'Failed to delete page')
+            toast.error(extractErrorMessage(error, 'Failed to delete page'))
         }
     })
 
@@ -217,7 +218,7 @@ const SettingsManager = () => {
             setSelectedPage(newPage)
         },
         onError: (error) => {
-            toast.error(error.response?.data?.detail || 'Failed to duplicate page')
+            toast.error(extractErrorMessage(error, 'Failed to duplicate page'))
         }
     })
 

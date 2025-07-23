@@ -6,6 +6,7 @@
 import { vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render } from '@testing-library/react'
+import { NotificationProvider } from '../components/NotificationManager'
 import axios from 'axios'
 
 /**
@@ -247,7 +248,9 @@ export function renderWithQueryClient(ui, options = {}) {
 
     const Wrapper = ({ children }) => (
         <QueryClientProvider client={queryClient}>
-            {children}
+            <NotificationProvider>
+                {children}
+            </NotificationProvider>
         </QueryClientProvider>
     )
 

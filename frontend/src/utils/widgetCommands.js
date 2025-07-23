@@ -1,5 +1,6 @@
 import { api } from '../api/client.js'
 import toast from 'react-hot-toast'
+import { extractErrorMessage } from './errorHandling.js'
 
 /**
  * Command pattern implementation for widget operations
@@ -17,7 +18,7 @@ class WidgetCommand {
 
     handleError(error, defaultMessage) {
         console.error(error)
-        const message = error.response?.data?.detail || defaultMessage
+        const message = extractErrorMessage(error, defaultMessage)
         toast.error(message)
         throw error
     }
