@@ -115,8 +115,8 @@ const ObjectPublisher = ({ pageId, onObjectLinked, onObjectUnlinked }) => {
             {/* Status Messages */}
             {message.text && (
                 <div className={`p-3 rounded-md ${message.type === 'success'
-                        ? 'bg-green-50 border border-green-200 text-green-800'
-                        : 'bg-red-50 border border-red-200 text-red-800'
+                    ? 'bg-green-50 border border-green-200 text-green-800'
+                    : 'bg-red-50 border border-red-200 text-red-800'
                     }`}>
                     {message.text}
                 </div>
@@ -149,7 +149,7 @@ const ObjectPublisher = ({ pageId, onObjectLinked, onObjectUnlinked }) => {
 
             {/* Object Content Preview Modal */}
             {showObjectContent && objectContent && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                <div className="fixed inset-0 bg-black bg-opacity-10 flex items-center justify-center p-4 z-50">
                     <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden">
                         <div className="flex items-center justify-between p-4 border-b">
                             <h3 className="text-lg font-medium">Object Preview</h3>
