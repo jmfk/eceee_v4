@@ -107,6 +107,8 @@ class BaseContentModel(models.Model):
         on_delete=models.CASCADE,
         related_name="%(class)s_objects",
         help_text="Namespace for this content object",
+        null=True,
+        blank=True,
     )
 
     # Basic information
@@ -199,6 +201,8 @@ class Category(models.Model):
         on_delete=models.CASCADE,
         related_name="categories",
         help_text="Namespace for this category",
+        null=True,
+        blank=True,
     )
 
     name = models.CharField(max_length=100, unique=True)
@@ -228,6 +232,8 @@ class Tag(models.Model):
         on_delete=models.CASCADE,
         related_name="tags",
         help_text="Namespace for this tag",
+        null=True,
+        blank=True,
     )
 
     name = models.CharField(max_length=50, unique=True)

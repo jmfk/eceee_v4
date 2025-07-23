@@ -21,7 +21,8 @@ import {
     ChevronDown,
     Copy,
     Code,
-    Database
+    Database,
+    FolderOpen
 } from 'lucide-react'
 import { api } from '../api/client.js'
 import { layoutsApi, layoutUtils } from '../api/layouts'
@@ -34,6 +35,7 @@ import ObjectPublisher from '../components/ObjectPublisher'
 import PublicationStatusDashboard from '../components/PublicationStatusDashboard'
 import PublicationTimeline from '../components/PublicationTimeline'
 import BulkPublishingOperations from '../components/BulkPublishingOperations'
+import NamespaceManager from '../components/NamespaceManager'
 import { extractErrorMessage } from '../utils/errorHandling.js'
 
 const SettingsManager = () => {
@@ -142,6 +144,12 @@ const SettingsManager = () => {
             label: 'Publishing Workflow',
             icon: Calendar,
             description: 'Manage publication scheduling and status'
+        },
+        {
+            id: 'namespaces',
+            label: 'Namespaces',
+            icon: FolderOpen,
+            description: 'Manage website namespaces'
         }
     ]
 
@@ -400,6 +408,12 @@ const SettingsManager = () => {
         )
     }
 
+    const renderNamespaceManagement = () => {
+        return (
+            <NamespaceManager />
+        )
+    }
+
     const renderTabContent = () => {
         switch (activeTab) {
             case 'layouts':
@@ -414,6 +428,8 @@ const SettingsManager = () => {
                 return renderObjectPublishing()
             case 'publishing':
                 return renderPublishingWorkflow()
+            case 'namespaces':
+                return renderNamespaceManagement()
             default:
                 return null
         }

@@ -12,7 +12,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from django.utils import timezone
 
-from .models import News, Event, LibraryItem, Member, Category, Tag
+from .models import News, Event, LibraryItem, Member, Category, Tag, Namespace
 from .serializers import (
     NewsSerializer,
     EventSerializer,
@@ -20,11 +20,110 @@ from .serializers import (
     MemberSerializer,
     CategorySerializer,
     TagSerializer,
+    NamespaceSerializer,
+    NamespaceListSerializer,
     NewsListSerializer,
     EventListSerializer,
     LibraryItemListSerializer,
     MemberListSerializer,
 )
+
+
+class NamespaceViewSet(viewsets.ModelViewSet):
+    """ViewSet for Namespace model"""
+
+    queryset = Namespace.objects.all()
+    serializer_class = NamespaceSerializer
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    filter_backends = [SearchFilter, OrderingFilter]
+    search_fields = ["name", "slug", "description"]
+    ordering_fields = ["name", "slug", "created_at", "is_default"]
+    ordering = ["-is_default", "name"]
+
+    def get_serializer_class(self):
+        if self.action == "list":
+            return NamespaceListSerializer
+        return NamespaceSerializer
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+
+        # Filter by active status
+        is_active = self.request.query_params.get("is_active")
+        if is_active is not None:
+            queryset = queryset.filter(is_active=is_active.lower() == "true")
+
+        # Filter by default status
+        is_default = self.request.query_params.get("is_default")
+        if is_default is not None:
+            queryset = queryset.filter(is_default=is_default.lower() == "true")
+
+        return queryset
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
+
+    def perform_update(self, serializer):
+        # If setting this namespace as default, unset others
+        if serializer.validated_data.get("is_default", False):
+            Namespace.objects.filter(is_default=True).exclude(
+                pk=serializer.instance.pk
+            ).update(is_default=False)
+        serializer.save()
+
+    @action(detail=True, methods=["post"])
+    def set_as_default(self, request, pk=None):
+        """Set this namespace as the default namespace"""
+        namespace = self.get_object()
+
+        # Unset all other namespaces as default
+        Namespace.objects.filter(is_default=True).exclude(pk=namespace.pk).update(
+            is_default=False
+        )
+
+        # Set this namespace as default
+        namespace.is_default = True
+        namespace.save()
+
+        return Response(
+            {
+                "message": f"Namespace '{namespace.name}' set as default",
+                "namespace": NamespaceSerializer(namespace).data,
+            }
+        )
+
+    @action(detail=True, methods=["post"])
+    def get_content_summary(self, request, pk=None):
+        """Get detailed content summary for this namespace"""
+        namespace = self.get_object()
+
+        # Get counts for each content type
+        news_count = namespace.news_objects.count()
+        event_count = namespace.event_objects.count()
+        library_count = namespace.libraryitem_objects.count()
+        member_count = namespace.member_objects.count()
+        category_count = namespace.categories.count()
+        tag_count = namespace.tags.count()
+
+        return Response(
+            {
+                "namespace": NamespaceSerializer(namespace).data,
+                "content_summary": {
+                    "news": news_count,
+                    "events": event_count,
+                    "library_items": library_count,
+                    "members": member_count,
+                    "categories": category_count,
+                    "tags": tag_count,
+                    "total": news_count
+                    + event_count
+                    + library_count
+                    + member_count
+                    + category_count
+                    + tag_count,
+                },
+            }
+        )
 
 
 class CategoryViewSet(viewsets.ModelViewSet):

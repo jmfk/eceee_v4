@@ -26,6 +26,7 @@ from content.views import (
     EventViewSet,
     LibraryItemViewSet,
     MemberViewSet,
+    NamespaceViewSet,
 )
 
 router.register(r"categories", CategoryViewSet)
@@ -34,6 +35,7 @@ router.register(r"news", NewsViewSet)
 router.register(r"events", EventViewSet)
 router.register(r"library-items", LibraryItemViewSet)
 router.register(r"members", MemberViewSet)
+router.register(r"namespaces", NamespaceViewSet)
 
 urlpatterns = [
     # JWT Authentication endpoints

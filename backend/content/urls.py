@@ -10,6 +10,7 @@ from . import views
 
 # Create a router and register our viewsets
 router = DefaultRouter()
+router.register(r"namespaces", views.NamespaceViewSet)
 router.register(r"categories", views.CategoryViewSet)
 router.register(r"tags", views.TagViewSet)
 router.register(r"news", views.NewsViewSet)

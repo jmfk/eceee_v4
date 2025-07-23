@@ -78,7 +78,7 @@ class WebPage(models.Model):
 
     # Basic page information
     title = models.CharField(max_length=255)
-    slug = models.SlugField(max_length=255)
+    slug = models.SlugField(max_length=255, unique=False, null=True, blank=True)
     description = models.TextField(blank=True)
 
     # Hierarchy support
@@ -156,7 +156,6 @@ class WebPage(models.Model):
 
     class Meta:
         ordering = ["sort_order", "title"]
-        unique_together = ["parent", "slug"]
         indexes = [
             models.Index(fields=["slug"], name="webpages_slug_idx"),
             GinIndex(fields=["hostnames"], name="webpages_hostnames_gin_idx"),

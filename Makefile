@@ -19,16 +19,19 @@ frontend:
 	docker-compose up frontend
 
 # Run Django migrations
+migrations:
+	docker-compose exec backend python manage.py makemigrations
+
 migrate:
-	cd backend && python manage.py migrate
+	docker-compose exec backend python manage.py migrate
 
 # Create Django superuser
 createsuperuser:
-	cd backend && python manage.py createsuperuser
+	docker-compose exec backend python manage.py createsuperuser
 
 # Run backend tests
 backend-test:
-	cd backend && python manage.py test
+	docker-compose exec backend python manage.py test
 
 # Lint frontend code
 lint:
