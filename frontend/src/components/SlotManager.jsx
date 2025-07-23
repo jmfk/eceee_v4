@@ -523,7 +523,7 @@ const SlotManager = ({ pageId, layout, onWidgetChange }) => {
 
             {/* Widget Library Modal */}
             {showWidgetLibrary && (
-                <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+                <div className="fixed inset-0 bg-gray-600 bg-opacity-10 flex items-center justify-center z-50">
                     <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 max-h-[90vh] overflow-hidden">
                         <div className="p-4 border-b">
                             <h3 className="text-lg font-medium">
@@ -552,7 +552,7 @@ const SlotManager = ({ pageId, layout, onWidgetChange }) => {
 
             {/* Widget Configuration Modal */}
             {configuringWidget && (
-                <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+                <div className="fixed inset-0 bg-gray-600 bg-opacity-10 flex items-center justify-center z-50">
                     <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full mx-4 max-h-[90vh] overflow-hidden">
                         <div className="overflow-y-auto max-h-[90vh]">
                             <WidgetConfigurator
@@ -570,7 +570,7 @@ const SlotManager = ({ pageId, layout, onWidgetChange }) => {
 
             {/* Widget Edit Modal */}
             {editingWidget && (
-                <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+                <div className="fixed inset-0 bg-gray-600 bg-opacity-10 flex items-center justify-center z-50">
                     <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full mx-4 max-h-[90vh] overflow-hidden">
                         <div className="overflow-y-auto max-h-[90vh]">
                             <WidgetConfigurator
