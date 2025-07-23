@@ -20,6 +20,7 @@ import {
     ArrowRight
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { useNotificationContext } from './NotificationManager'
 import {
     getPageVersions,
     getVersion,
@@ -45,6 +46,7 @@ const VersionManager = ({ pageId, onClose }) => {
     const [editingVersion, setEditingVersion] = useState(null)
     const [showCreateForm, setShowCreateForm] = useState(false)
     const queryClient = useQueryClient()
+    const { showConfirm, showPrompt } = useNotificationContext()
 
     // Fetch versions for the page
     const { data: versionsData, isLoading: versionsLoading } = useQuery({
@@ -119,27 +121,54 @@ const VersionManager = ({ pageId, onClose }) => {
     const versions = versionsData?.results || []
     const formattedVersions = versions.map(formatVersionForDisplay)
 
-    const handlePublish = (version) => {
-        if (window.confirm(`Are you sure you want to publish version ${version.version_number}?`)) {
+    const handlePublish = async (version) => {
+        const confirmed = await showConfirm({
+            title: 'Publish Version',
+            message: `Are you sure you want to publish version ${version.version_number}?`,
+            confirmText: 'Publish',
+            confirmButtonStyle: 'primary'
+        })
+
+        if (confirmed) {
             publishMutation.mutate(version.id)
         }
     }
 
-    const handleDelete = (version) => {
-        if (window.confirm(`Are you sure you want to delete version ${version.version_number}?`)) {
+    const handleDelete = async (version) => {
+        const confirmed = await showConfirm({
+            title: 'Delete Version',
+            message: `Are you sure you want to delete version ${version.version_number}?`,
+            confirmText: 'Delete',
+            confirmButtonStyle: 'danger'
+        })
+
+        if (confirmed) {
             deleteMutation.mutate(version.id)
         }
     }
 
-    const handleCreateDraft = (version) => {
-        const description = prompt('Enter description for the new draft:')
+    const handleCreateDraft = async (version) => {
+        const description = await showPrompt({
+            title: 'Create Draft',
+            message: 'Enter description for the new draft:',
+            placeholder: 'Draft description...',
+            submitText: 'Create Draft'
+        })
+
         if (description !== null) {
             createDraftMutation.mutate({ versionId: version.id, description })
         }
     }
 
-    const handleRestore = (version) => {
-        if (window.confirm(`Are you sure you want to restore to version ${version.version_number}?`)) {
+    const handleRestore = async (version) => {
+        const confirmed = await showConfirm({
+            title: 'Restore Version',
+            message: `Are you sure you want to restore to version ${version.version_number}?`,
+            confirmText: 'Restore',
+            confirmButtonStyle: 'warning'
+        })
+
+        if (confirmed) {
             restoreMutation.mutate(version.id)
         }
     }
@@ -155,8 +184,8 @@ const VersionManager = ({ pageId, onClose }) => {
                 <div className="flex items-center space-x-3">
                     <span className="text-lg font-semibold">v{version.version_number}</span>
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${version.statusBadge.color === 'green' ? 'bg-green-100 text-green-800' :
-                            version.statusBadge.color === 'yellow' ? 'bg-yellow-100 text-yellow-800' :
-                                'bg-gray-100 text-gray-800'
+                        version.statusBadge.color === 'yellow' ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-gray-100 text-gray-800'
                         }`}>
                         {version.statusBadge.text}
                     </span>
@@ -376,8 +405,8 @@ const VersionManager = ({ pageId, onClose }) => {
                         <button
                             onClick={() => setActiveTab('list')}
                             className={`px-4 py-2 rounded-md text-sm font-medium ${activeTab === 'list'
-                                    ? 'bg-blue-100 text-blue-700'
-                                    : 'text-gray-500 hover:text-gray-700'
+                                ? 'bg-blue-100 text-blue-700'
+                                : 'text-gray-500 hover:text-gray-700'
                                 }`}
                         >
                             Versions
@@ -385,8 +414,8 @@ const VersionManager = ({ pageId, onClose }) => {
                         <button
                             onClick={() => setActiveTab('compare')}
                             className={`px-4 py-2 rounded-md text-sm font-medium ${activeTab === 'compare'
-                                    ? 'bg-blue-100 text-blue-700'
-                                    : 'text-gray-500 hover:text-gray-700'
+                                ? 'bg-blue-100 text-blue-700'
+                                : 'text-gray-500 hover:text-gray-700'
                                 }`}
                             disabled={!compareVersions.version1 || !compareVersions.version2}
                         >

@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import axios from 'axios'
 import toast from 'react-hot-toast'
+import { useNotificationContext } from './NotificationManager'
 import WidgetLibrary from './WidgetLibrary'
 import WidgetConfigurator from './WidgetConfigurator'
 import {
@@ -208,6 +209,7 @@ const SlotManager = ({ pageId, layout, onWidgetChange }) => {
     const [editingWidget, setEditingWidget] = useState(null)
     const [configuringWidget, setConfiguringWidget] = useState(null)
     const queryClient = useQueryClient()
+    const { showConfirm } = useNotificationContext()
 
     // Fetch page widgets from current version
     const { data: pageWidgetsData, isLoading } = useQuery({
@@ -356,7 +358,7 @@ const SlotManager = ({ pageId, layout, onWidgetChange }) => {
         })
     }
 
-    const handleDeleteWidget = (widget) => {
+    const handleDeleteWidget = async (widget) => {
         const validation = slotState.validateWidgetAction(widget, 'delete')
 
         if (!validation.isValid) {
@@ -364,7 +366,14 @@ const SlotManager = ({ pageId, layout, onWidgetChange }) => {
             return
         }
 
-        if (window.confirm('Are you sure you want to delete this widget?')) {
+        const confirmed = await showConfirm({
+            title: 'Delete Widget',
+            message: 'Are you sure you want to delete this widget?',
+            confirmText: 'Delete',
+            confirmButtonStyle: 'danger'
+        })
+
+        if (confirmed) {
             deleteWidgetMutation.mutate(widget.id)
         }
     }

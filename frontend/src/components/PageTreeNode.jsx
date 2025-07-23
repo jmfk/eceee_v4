@@ -108,7 +108,7 @@ const PageTreeNode = memo(({
     const [editingSlug, setEditingSlug] = useState('')
     const [isTogglingPublication, setIsTogglingPublication] = useState(false)
     const queryClient = useQueryClient()
-    const { showError } = useNotificationContext()
+    const { showError, showConfirm } = useNotificationContext()
 
     // Sync local expansion state with page prop changes
     useEffect(() => {
@@ -185,8 +185,15 @@ const PageTreeNode = memo(({
         onCut?.(page.id)
     }
 
-    const handleDelete = () => {
-        if (confirm(`Are you sure you want to delete "${page.title}"? This action cannot be undone.`)) {
+    const handleDelete = async () => {
+        const confirmed = await showConfirm({
+            title: 'Delete Page',
+            message: `Are you sure you want to delete "${page.title}"? This action cannot be undone.`,
+            confirmText: 'Delete',
+            confirmButtonStyle: 'danger'
+        })
+
+        if (confirmed) {
             onDelete?.(page.id)
         }
     }

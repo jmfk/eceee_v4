@@ -23,6 +23,7 @@ import {
 } from 'lucide-react'
 import { namespacesApi } from '../api/namespaces.js'
 import toast from 'react-hot-toast'
+import { useNotificationContext } from './NotificationManager'
 import { extractErrorMessage } from '../utils/errorHandling.js'
 
 const NamespaceManager = () => {
@@ -33,6 +34,7 @@ const NamespaceManager = () => {
     const [editingNamespace, setEditingNamespace] = useState(null)
     const [showContentSummary, setShowContentSummary] = useState(null)
     const queryClient = useQueryClient()
+    const { showConfirm } = useNotificationContext()
 
     // Fetch namespaces
     const { data: namespacesResponse, isLoading } = useQuery({
@@ -108,7 +110,7 @@ const NamespaceManager = () => {
 
     const namespaces = namespacesResponse?.results || []
 
-    const handleDelete = (namespace) => {
+    const handleDelete = async (namespace) => {
         if (namespace.is_default) {
             toast.error('Cannot delete the default namespace')
             return
@@ -119,7 +121,14 @@ const NamespaceManager = () => {
             return
         }
 
-        if (window.confirm(`Are you sure you want to delete "${namespace.name}"? This action cannot be undone.`)) {
+        const confirmed = await showConfirm({
+            title: 'Delete Namespace',
+            message: `Are you sure you want to delete "${namespace.name}"? This action cannot be undone.`,
+            confirmText: 'Delete',
+            confirmButtonStyle: 'danger'
+        })
+
+        if (confirmed) {
             deleteNamespaceMutation.mutate(namespace.id)
         }
     }

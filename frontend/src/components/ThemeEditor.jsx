@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../api/client.js'
 import { extractErrorMessage } from '../utils/errorHandling.js'
+import { useNotificationContext } from './NotificationManager'
 import toast from 'react-hot-toast'
 import {
     Plus,
@@ -24,6 +25,7 @@ const ThemeEditor = () => {
     const [isCreating, setIsCreating] = useState(false)
     const [showPreview, setShowPreview] = useState(false)
     const queryClient = useQueryClient()
+    const { showConfirm } = useNotificationContext()
 
     // Fetch themes
     const { data: themes = [], isLoading } = useQuery({
@@ -615,8 +617,15 @@ const ThemeEditPanel = ({ theme, onUpdate, onCancel, showPreview, onTogglePrevie
         }
     })
 
-    const handleDelete = () => {
-        if (window.confirm('Are you sure you want to delete this theme? This action cannot be undone.')) {
+    const handleDelete = async () => {
+        const confirmed = await showConfirm({
+            title: 'Delete Theme',
+            message: 'Are you sure you want to delete this theme? This action cannot be undone.',
+            confirmText: 'Delete',
+            confirmButtonStyle: 'danger'
+        })
+
+        if (confirmed) {
             deleteMutation.mutate()
         }
     }

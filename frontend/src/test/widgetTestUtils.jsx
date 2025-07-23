@@ -5,7 +5,7 @@
 
 import { vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { NotificationProvider } from '../components/NotificationManager'
 import axios from 'axios'
 

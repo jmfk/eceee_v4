@@ -2,11 +2,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import SlotManager from '../SlotManager'
+import { createTestWrapper } from '../../test/testUtils'
 import {
     setupWidgetTest,
     MockDataFactory,
     UserInteractionHelper,
-    WidgetAssertions
+    WidgetAssertions,
+    TestWidgetBuilder
 } from '../../test/widgetTestUtils'
 
 // Mock the child components
@@ -214,7 +216,7 @@ describe('SlotManager - User Behavior Tests', () => {
         it('shows helpful error when API fails during widget creation', async () => {
             // Setup API to return error
             const { renderWithQueryClient } = testUtils
-            testUtils.mockData = new testUtils.TestWidgetBuilder()
+            testUtils.mockData = new TestWidgetBuilder()
                 .withApiError({ message: 'Server error', detail: 'Failed to save widget' })
                 .build()
 
@@ -248,7 +250,7 @@ describe('SlotManager - User Behavior Tests', () => {
             const { renderWithQueryClient } = testUtils
 
             // Setup API to simulate loading
-            testUtils.mockData = new testUtils.TestWidgetBuilder()
+            testUtils.mockData = new TestWidgetBuilder()
                 .withLoadingState()
                 .build()
 

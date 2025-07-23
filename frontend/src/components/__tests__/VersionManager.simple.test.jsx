@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render } from '@testing-library/react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { createTestWrapper } from '../../test/testUtils'
 import VersionManager from '../VersionManager'
 
 // Mock the API module
@@ -35,21 +35,6 @@ vi.mock('react-hot-toast', () => ({
     }
 }))
 
-const createWrapper = () => {
-    const queryClient = new QueryClient({
-        defaultOptions: {
-            queries: { retry: false },
-            mutations: { retry: false }
-        }
-    })
-
-    return ({ children }) => (
-        <QueryClientProvider client={queryClient}>
-            {children}
-        </QueryClientProvider>
-    )
-}
-
 describe('VersionManager', () => {
     it('renders without errors', () => {
         const onClose = vi.fn()
@@ -57,7 +42,7 @@ describe('VersionManager', () => {
         expect(() => {
             render(
                 <VersionManager pageId={1} onClose={onClose} />,
-                { wrapper: createWrapper() }
+                { wrapper: createTestWrapper() }
             )
         }).not.toThrow()
     })
@@ -69,7 +54,7 @@ describe('VersionManager', () => {
         expect(() => {
             render(
                 <VersionManager pageId={pageId} onClose={onClose} />,
-                { wrapper: createWrapper() }
+                { wrapper: createTestWrapper() }
             )
         }).not.toThrow()
     })

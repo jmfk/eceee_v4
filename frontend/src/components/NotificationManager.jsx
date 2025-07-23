@@ -1,5 +1,7 @@
 import { createContext, useContext } from 'react'
 import Notification from './Notification'
+import ConfirmDialog from './ConfirmDialog'
+import PromptDialog from './PromptDialog'
 import useNotifications from '../hooks/useNotifications'
 
 // Create context for notification management
@@ -25,12 +27,11 @@ export const NotificationProvider = ({ children }) => {
 }
 
 const NotificationManager = () => {
-    const { errors, removeError } = useNotificationContext()
-
-    if (errors.length === 0) return null
+    const { errors, removeError, confirmDialog, promptDialog } = useNotificationContext()
 
     return (
         <>
+            {/* Notifications */}
             {errors.map((errorObj) => (
                 <Notification
                     key={errorObj.id}
@@ -39,6 +40,22 @@ const NotificationManager = () => {
                     onClose={() => removeError(errorObj.id)}
                 />
             ))}
+
+            {/* Confirm Dialog */}
+            {confirmDialog && (
+                <ConfirmDialog
+                    isOpen={true}
+                    {...confirmDialog}
+                />
+            )}
+
+            {/* Prompt Dialog */}
+            {promptDialog && (
+                <PromptDialog
+                    isOpen={true}
+                    {...promptDialog}
+                />
+            )}
         </>
     )
 }

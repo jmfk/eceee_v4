@@ -27,6 +27,7 @@ import {
 import { api } from '../api/client.js'
 import { layoutsApi, layoutUtils } from '../api/layouts'
 import toast from 'react-hot-toast'
+import { useNotificationContext } from '../components/NotificationManager'
 import LayoutEditor from '../components/LayoutEditor'
 import ThemeEditor from '../components/ThemeEditor'
 import SlotManager from '../components/SlotManager'
@@ -50,6 +51,7 @@ const SettingsManager = () => {
     const [layoutFilter, setLayoutFilter] = useState('all')
     const [showFilters, setShowFilters] = useState(false)
     const queryClient = useQueryClient()
+    const { showConfirm } = useNotificationContext()
 
     // Fetch pages
     const { data: pagesResponse, isLoading: pagesLoading } = useQuery({
@@ -200,8 +202,15 @@ const SettingsManager = () => {
         }
     })
 
-    const handleDeletePage = (page) => {
-        if (window.confirm(`Are you sure you want to delete "${page.title}"? This action cannot be undone.`)) {
+    const handleDeletePage = async (page) => {
+        const confirmed = await showConfirm({
+            title: 'Delete Page',
+            message: `Are you sure you want to delete "${page.title}"? This action cannot be undone.`,
+            confirmText: 'Delete',
+            confirmButtonStyle: 'danger'
+        })
+
+        if (confirmed) {
             deletePageMutation.mutate(page.id)
         }
     }
