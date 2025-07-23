@@ -16,15 +16,102 @@ from django.core.validators import URLValidator
 import uuid
 
 
+class Namespace(models.Model):
+    """
+    Namespace for organizing content objects and preventing slug conflicts.
+    Each namespace provides a separate slug space for content objects.
+    Pages are not affected by namespaces and use hostname-based routing instead.
+    """
+
+    name = models.CharField(
+        max_length=100, unique=True, help_text="Human-readable namespace name"
+    )
+    slug = models.SlugField(
+        max_length=50, unique=True, help_text="URL-safe namespace identifier"
+    )
+    description = models.TextField(
+        blank=True, help_text="Description of this namespace"
+    )
+
+    # Namespace configuration
+    is_active = models.BooleanField(
+        default=True, help_text="Whether this namespace is active"
+    )
+    is_default = models.BooleanField(
+        default=False, help_text="Whether this is the default namespace"
+    )
+
+    # Metadata
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey(
+        User, on_delete=models.PROTECT, related_name="created_namespaces"
+    )
+
+    class Meta:
+        ordering = ["name"]
+        verbose_name = "Namespace"
+        verbose_name_plural = "Namespaces"
+
+    def __str__(self):
+        return self.name
+
+    def save(self, *args, **kwargs):
+        """Ensure only one default namespace exists"""
+        if self.is_default:
+            # Set all other namespaces to not default
+            Namespace.objects.filter(is_default=True).exclude(pk=self.pk).update(
+                is_default=False
+            )
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def get_default(cls):
+        """Get the default namespace, creating one if none exists"""
+        default = cls.objects.filter(is_default=True).first()
+        if not default:
+            default = cls.objects.filter(is_active=True).first()
+            if not default:
+                # Create a default namespace if none exists
+                default = cls.objects.create(
+                    name="Default",
+                    slug="default",
+                    description="Default namespace for content",
+                    is_default=True,
+                    created_by=User.objects.first() if User.objects.exists() else None,
+                )
+        return default
+
+    def get_content_count(self):
+        """Get total count of content objects in this namespace"""
+        count = 0
+        count += self.news_objects.count()
+        count += self.event_objects.count()
+        count += self.libraryitem_objects.count()
+        count += self.member_objects.count()
+        count += self.categories.count()
+        count += self.tags.count()
+
+        return count
+
+
 class BaseContentModel(models.Model):
     """
     Abstract base model for all content objects that can be published as pages.
     Provides common fields and functionality for object publishing.
     """
 
+    # Namespace for slug organization
+    namespace = models.ForeignKey(
+        Namespace,
+        on_delete=models.CASCADE,
+        related_name="%(class)s_objects",
+        help_text="Namespace for this content object",
+    )
+
     # Basic information
     title = models.CharField(max_length=255)
-    slug = models.SlugField(max_length=255, unique=True)
+    slug = models.SlugField(max_length=255)
     description = models.TextField(blank=True)
 
     # Content
@@ -62,6 +149,7 @@ class BaseContentModel(models.Model):
     class Meta:
         abstract = True
         ordering = ["-published_date", "-created_at"]
+        unique_together = ["namespace", "slug"]
 
     def __str__(self):
         return self.title
@@ -105,8 +193,16 @@ class BaseContentModel(models.Model):
 class Category(models.Model):
     """Categories for organizing content objects"""
 
+    # Namespace for slug organization
+    namespace = models.ForeignKey(
+        Namespace,
+        on_delete=models.CASCADE,
+        related_name="categories",
+        help_text="Namespace for this category",
+    )
+
     name = models.CharField(max_length=100, unique=True)
-    slug = models.SlugField(max_length=100, unique=True)
+    slug = models.SlugField(max_length=100)
     description = models.TextField(blank=True)
     color = models.CharField(
         max_length=7, default="#3B82F6", help_text="Hex color code for this category"
@@ -117,6 +213,7 @@ class Category(models.Model):
     class Meta:
         ordering = ["name"]
         verbose_name_plural = "Categories"
+        unique_together = ["namespace", "slug"]
 
     def __str__(self):
         return self.name
@@ -125,12 +222,21 @@ class Category(models.Model):
 class Tag(models.Model):
     """Tags for content objects"""
 
+    # Namespace for slug organization
+    namespace = models.ForeignKey(
+        Namespace,
+        on_delete=models.CASCADE,
+        related_name="tags",
+        help_text="Namespace for this tag",
+    )
+
     name = models.CharField(max_length=50, unique=True)
-    slug = models.SlugField(max_length=50, unique=True)
+    slug = models.SlugField(max_length=50)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ["name"]
+        unique_together = ["namespace", "slug"]
 
     def __str__(self):
         return self.name

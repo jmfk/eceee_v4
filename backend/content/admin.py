@@ -8,18 +8,56 @@ from django.contrib import admin
 from django.utils.html import format_html
 from django.urls import reverse
 from django.utils.safestring import mark_safe
-from .models import Category, Tag, News, Event, LibraryItem, Member
+from .models import Namespace, Category, Tag, News, Event, LibraryItem, Member
+
+
+@admin.register(Namespace)
+class NamespaceAdmin(admin.ModelAdmin):
+    """Admin configuration for Namespace model"""
+
+    list_display = [
+        "name",
+        "slug",
+        "is_active",
+        "is_default",
+        "content_count",
+        "created_at",
+    ]
+    list_filter = ["is_active", "is_default", "created_at"]
+    search_fields = ["name", "description"]
+    prepopulated_fields = {"slug": ("name",)}
+    ordering = ["name"]
+    readonly_fields = ["content_count"]
+
+    fieldsets = (
+        ("Basic Information", {"fields": ("name", "slug", "description")}),
+        ("Configuration", {"fields": ("is_active", "is_default")}),
+        ("Statistics", {"fields": ("content_count",), "classes": ("collapse",)}),
+    )
+
+    def content_count(self, obj):
+        """Display total content count for this namespace"""
+        return obj.get_content_count()
+
+    content_count.short_description = "Content Objects"
 
 
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
     """Admin configuration for Category model"""
 
-    list_display = ["name", "slug", "color_badge", "is_active", "created_at"]
-    list_filter = ["is_active", "created_at"]
+    list_display = [
+        "name",
+        "slug",
+        "namespace",
+        "color_badge",
+        "is_active",
+        "created_at",
+    ]
+    list_filter = ["is_active", "namespace", "created_at"]
     search_fields = ["name", "description"]
     prepopulated_fields = {"slug": ("name",)}
-    ordering = ["name"]
+    ordering = ["namespace", "name"]
 
     def color_badge(self, obj):
         """Display color as a badge"""
@@ -37,10 +75,11 @@ class CategoryAdmin(admin.ModelAdmin):
 class TagAdmin(admin.ModelAdmin):
     """Admin configuration for Tag model"""
 
-    list_display = ["name", "slug", "usage_count", "created_at"]
+    list_display = ["name", "slug", "namespace", "usage_count", "created_at"]
+    list_filter = ["namespace", "created_at"]
     search_fields = ["name"]
     prepopulated_fields = {"slug": ("name",)}
-    ordering = ["name"]
+    ordering = ["namespace", "name"]
 
     def usage_count(self, obj):
         """Show how many objects use this tag"""
@@ -60,6 +99,7 @@ class NewsAdmin(admin.ModelAdmin):
 
     list_display = [
         "title",
+        "namespace",
         "author",
         "category",
         "priority",
@@ -72,6 +112,7 @@ class NewsAdmin(admin.ModelAdmin):
         "is_published",
         "featured",
         "priority",
+        "namespace",
         "category",
         "published_date",
         "created_at",
@@ -142,6 +183,7 @@ class EventAdmin(admin.ModelAdmin):
 
     list_display = [
         "title",
+        "namespace",
         "start_date",
         "location_name",
         "status",
@@ -153,6 +195,7 @@ class EventAdmin(admin.ModelAdmin):
         "is_published",
         "featured",
         "status",
+        "namespace",
         "category",
         "start_date",
         "created_at",
@@ -249,6 +292,7 @@ class LibraryItemAdmin(admin.ModelAdmin):
 
     list_display = [
         "title",
+        "namespace",
         "item_type",
         "file_format",
         "access_level",
@@ -262,6 +306,7 @@ class LibraryItemAdmin(admin.ModelAdmin):
         "featured",
         "item_type",
         "access_level",
+        "namespace",
         "category",
         "created_at",
     ]
@@ -338,6 +383,7 @@ class MemberAdmin(admin.ModelAdmin):
 
     list_display = [
         "get_full_name",
+        "namespace",
         "job_title",
         "department",
         "member_type",
@@ -350,6 +396,7 @@ class MemberAdmin(admin.ModelAdmin):
         "featured",
         "member_type",
         "is_current",
+        "namespace",
         "category",
         "created_at",
     ]
