@@ -24,6 +24,7 @@ import { pageTreeUtils } from '../api/pages'
 import { api } from '../api/client.js'
 import { getPageDisplayUrl, isRootPage, sanitizePageData } from '../utils/apiValidation.js'
 import Tooltip from './Tooltip'
+import { useNotificationContext } from './NotificationManager'
 
 // Separate component for publication status icon that only re-renders when status changes
 const PublicationStatusIcon = memo(({
@@ -107,6 +108,7 @@ const PageTreeNode = memo(({
     const [editingSlug, setEditingSlug] = useState('')
     const [isTogglingPublication, setIsTogglingPublication] = useState(false)
     const queryClient = useQueryClient()
+    const { showError } = useNotificationContext()
 
     // Sync local expansion state with page prop changes
     useEffect(() => {
@@ -158,6 +160,7 @@ const PageTreeNode = memo(({
                 await onLoadChildren(page.id)
             } catch (error) {
                 console.error('Error loading children:', error)
+                showError(error, 'error')
             } finally {
                 setIsLoading(false)
             }
@@ -314,6 +317,7 @@ const PageTreeNode = memo(({
         },
         onError: (error) => {
             console.error('Failed to update hostnames:', error.response?.data?.detail || error.message)
+            showError(error, 'error')
         }
     })
 
@@ -331,6 +335,7 @@ const PageTreeNode = memo(({
         },
         onError: (error) => {
             console.error('Failed to update title:', error.response?.data?.detail || error.message)
+            showError(error, 'error')
             setEditingTitle(page.title) // Reset to original title on error
         }
     })
@@ -349,6 +354,7 @@ const PageTreeNode = memo(({
         },
         onError: (error) => {
             console.error('Failed to update slug:', error.response?.data?.detail || error.message)
+            showError(error, 'error')
             setEditingSlug(page.slug) // Reset to original slug on error
         }
     })
@@ -367,6 +373,7 @@ const PageTreeNode = memo(({
         },
         onError: (error) => {
             console.error('Failed to publish page:', error.response?.data?.detail || error.message)
+            showError(error, 'error')
             setIsTogglingPublication(false)
         }
     })
@@ -385,6 +392,7 @@ const PageTreeNode = memo(({
         },
         onError: (error) => {
             console.error('Failed to unpublish page:', error.response?.data?.detail || error.message)
+            showError(error, 'error')
             setIsTogglingPublication(false)
         }
     })

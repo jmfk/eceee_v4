@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import TreePageManager from '../TreePageManager'
 import * as pagesApi from '../../api/pages'
+import { NotificationProvider } from '../NotificationManager'
 
 // Mock the API client to avoid browser dependencies
 vi.mock('../../api/client.js', () => ({
@@ -119,7 +120,9 @@ const renderWithProviders = (component) => {
 
     return render(
         <QueryClientProvider client={queryClient}>
-            {component}
+            <NotificationProvider>
+                {component}
+            </NotificationProvider>
         </QueryClientProvider>
     )
 }

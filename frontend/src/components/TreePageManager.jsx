@@ -23,6 +23,7 @@ import {
 import { api } from '../api/client.js'
 import PageTreeNode from './PageTreeNode'
 import Tooltip from './Tooltip'
+import { useNotificationContext } from './NotificationManager'
 
 // Debounce hook for search
 const useDebounce = (value, delay) => {
@@ -56,6 +57,7 @@ const TreePageManager = ({ onEditPage }) => {
     const [isSearching, setIsSearching] = useState(false)
 
     const queryClient = useQueryClient()
+    const { showError } = useNotificationContext()
 
     // Debounce search term to avoid excessive API calls
     const debouncedSearchTerm = useDebounce(searchTerm, 300)
@@ -92,6 +94,7 @@ const TreePageManager = ({ onEditPage }) => {
         },
         onError: (error) => {
             console.error('Failed to create page:', error.response?.data?.detail || error.message)
+            showError(error, 'error')
         }
     })
 
@@ -108,6 +111,7 @@ const TreePageManager = ({ onEditPage }) => {
         },
         onError: (error) => {
             console.error('Failed to create root page:', error.response?.data?.detail || error.message)
+            showError(error, 'error')
         }
     })
 
@@ -157,6 +161,7 @@ const TreePageManager = ({ onEditPage }) => {
         },
         onError: (error) => {
             console.error('Failed to move page: ' + error.message)
+            showError(error, 'error')
         }
     })
 
@@ -170,6 +175,7 @@ const TreePageManager = ({ onEditPage }) => {
         },
         onError: (error) => {
             console.error('Failed to delete page: ' + error.message)
+            showError(error, 'error')
         }
     })
 
@@ -215,6 +221,7 @@ const TreePageManager = ({ onEditPage }) => {
                     queryClient.setQueryData(['page-children', page.id], childrenData)
                 } catch (error) {
                     console.error(`Failed to load children for page ${page.id}:`, error)
+                    showError(error, 'error')
                 }
             })
         }
@@ -253,6 +260,7 @@ const TreePageManager = ({ onEditPage }) => {
             queryClient.setQueryData(['page-children', parentId], childrenData)
         } catch (error) {
             console.error(`Failed to refresh child pages for parent ${parentId}:`, error)
+            showError(error, 'error')
         }
     }, [queryClient])
 
@@ -307,6 +315,7 @@ const TreePageManager = ({ onEditPage }) => {
             queryClient.setQueryData(['page-children', pageId], childrenData)
         } catch (error) {
             console.error('Failed to load child pages')
+            showError(error, 'error')
             throw error
         }
     }, [updatePageInTree, queryClient])
@@ -362,6 +371,7 @@ const TreePageManager = ({ onEditPage }) => {
             setCutPageId(null)
         } catch (error) {
             console.error('Failed to move page')
+            showError(error, 'error')
         }
     }, [cutPageId, pages, movePageMutation])
 
@@ -371,6 +381,7 @@ const TreePageManager = ({ onEditPage }) => {
             await deletePageMutation.mutateAsync(pageId)
         } catch (error) {
             console.error('Delete error:', error)
+            showError(error, 'error')
         }
     }, [deletePageMutation])
 
