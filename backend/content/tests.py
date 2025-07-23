@@ -59,8 +59,9 @@ class ContentModelsTest(TestCase):
     def test_event_creation(self):
         """Test Event model creation and methods"""
         from datetime import datetime, timedelta
+        from django.utils import timezone
 
-        start_date = datetime.now()
+        start_date = timezone.now()
         end_date = start_date + timedelta(hours=2)
 
         event = Event.objects.create(
@@ -548,13 +549,14 @@ class ObjectPublishingIntegrationTest(TestCase):
         )
 
         from datetime import datetime, timedelta
+        from django.utils import timezone
 
         self.event = Event.objects.create(
             title="Test Event",
             slug="test-event",
             description="Event description",
-            start_date=datetime.now(),
-            end_date=datetime.now() + timedelta(hours=2),
+            start_date=timezone.now(),
+            end_date=timezone.now() + timedelta(hours=2),
             location_name="Event Location",
             is_published=True,
             created_by=self.user,

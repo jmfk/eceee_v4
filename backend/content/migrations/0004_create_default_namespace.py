@@ -11,8 +11,16 @@ def create_default_namespace(apps, schema_editor):
     # Get or create a user for the namespace
     try:
         user = User.objects.first()
-    except:
-        user = None
+        if not user:
+            # Create a superuser if no users exist
+            user = User.objects.create_superuser(
+                username="admin", email="admin@example.com", password="admin123"
+            )
+    except Exception:
+        # Create a superuser if there's any issue
+        user = User.objects.create_superuser(
+            username="admin", email="admin@example.com", password="admin123"
+        )
 
     # Create default namespace
     default_namespace, created = Namespace.objects.get_or_create(
