@@ -247,7 +247,7 @@ export const layoutUtils = {
     },
 
     // Check if layout can be edited (both types are read-only in current implementation)
-    canEditLayout: (layout) => {
+    canEditLayout: () => {
         return false  // Both code and template layouts cannot be edited through UI
     },
 

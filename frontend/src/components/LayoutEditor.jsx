@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
     Grid3X3,
@@ -22,7 +22,6 @@ import toast from 'react-hot-toast'
 import { layoutsApi, layoutUtils } from '../api/layouts'
 import LayoutRenderer from './LayoutRenderer'
 import TemplateLayoutRenderer from './TemplateLayoutRenderer'
-import EnhancedLayoutRenderer from './EnhancedLayoutRenderer'
 
 const LayoutEditor = () => {
     const [selectedLayout, setSelectedLayout] = useState(null)
@@ -48,7 +47,7 @@ const LayoutEditor = () => {
     // Reload code layouts mutation
     const reloadMutation = useMutation({
         mutationFn: () => layoutsApi.codeLayouts.reload(),
-        onSuccess: (data) => {
+        onSuccess: () => {
             toast.success('Code layouts reloaded successfully')
             queryClient.invalidateQueries(['layouts'])
         },
@@ -63,7 +62,7 @@ const LayoutEditor = () => {
         onSuccess: () => {
             toast.success('All layouts are valid')
         },
-        onError: (error) => {
+        onError: () => {
             toast.error('Layout validation failed')
         }
     })
@@ -104,13 +103,6 @@ const LayoutEditor = () => {
 
     const layouts = getAllLayouts()
     const isLoading = isLoadingCode || (isLoadingTemplate && (layoutType === 'all' || layoutType === 'template'))
-
-    // Preview size configurations
-    const previewSizes = {
-        mobile: { width: '375px', height: '667px', label: 'Mobile', icon: Smartphone },
-        tablet: { width: '768px', height: '1024px', label: 'Tablet', icon: Tablet },
-        desktop: { width: '100%', height: '600px', label: 'Desktop', icon: Desktop }
-    }
 
     return (
         <div className="space-y-6">
@@ -481,7 +473,7 @@ const LayoutDetails = ({ layout, showPreview, previewMode, setPreviewMode, showS
                             {/* Preview Size Controls */}
                             <div className="flex items-center space-x-2">
                                 {Object.entries(previewSizes).map(([key, config]) => {
-                                    const IconComponent = config.icon
+                                    const Icon = config.icon
                                     return (
                                         <button
                                             key={key}
@@ -492,7 +484,7 @@ const LayoutDetails = ({ layout, showPreview, previewMode, setPreviewMode, showS
                                                 }`}
                                             title={`Preview in ${config.label} size`}
                                         >
-                                            <IconComponent className="w-3 h-3 mr-1" />
+                                            <Icon className="w-3 h-3 mr-1" />
                                             {config.label}
                                         </button>
                                     )
@@ -555,7 +547,7 @@ const LayoutPreviewRenderer = ({ layout, showSampleWidgets, previewMode }) => {
 
         const widgetsBySlot = {}
 
-        layout.slot_configuration.slots.forEach((slot, index) => {
+        layout.slot_configuration.slots.forEach((slot, _index) => {
             const maxWidgets = slot.max_widgets || 2
             const widgetCount = Math.min(maxWidgets, 2) // Show max 2 widgets per slot in preview
 
