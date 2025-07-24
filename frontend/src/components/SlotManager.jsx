@@ -24,7 +24,7 @@ import {
     getPageWidgets,
     updateWidget,
     deleteWidget,
-    createWidget
+    addWidget
 } from '../api/versions'
 import { SlotStateFactory } from '../utils/slotState'
 import { widgetHelpers, createWidgetModel } from '../utils/widgetHelpers'
@@ -99,7 +99,7 @@ const SlotManager = ({ pageId, layout, onWidgetChange }) => {
 
     // Widget mutations
     const createWidgetMutation = useMutation({
-        mutationFn: createWidget,
+        mutationFn: ({ page, ...widgetData }) => addWidget(page, widgetData, 'Added widget'),
         onSuccess: () => {
             queryClient.invalidateQueries(['page-widgets', pageId])
             toast.success('Widget created successfully')

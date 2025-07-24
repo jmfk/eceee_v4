@@ -175,22 +175,22 @@ const LayoutSelector = ({
                         )}
                     </div>
 
-                    {/* Clear button */}
-                    {allowClear && selectedLayout && !disabled && (
-                        <button
-                            type="button"
-                            onClick={handleClear}
-                            className="absolute inset-y-0 right-8 flex items-center pr-2 hover:text-gray-700"
-                        >
-                            <X className="w-4 h-4 text-gray-400" />
-                        </button>
-                    )}
-
                     {/* Dropdown arrow */}
                     <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
                         <ChevronDown className="w-4 h-4 text-gray-400" />
                     </span>
                 </button>
+
+                {/* Clear button - moved outside main button */}
+                {allowClear && selectedLayout && !disabled && (
+                    <button
+                        type="button"
+                        onClick={handleClear}
+                        className="absolute inset-y-0 right-8 flex items-center pr-2 hover:text-gray-700 z-10"
+                    >
+                        <X className="w-4 h-4 text-gray-400" />
+                    </button>
+                )}
 
                 {/* Dropdown */}
                 {isOpen && (

@@ -1,7 +1,4 @@
 @import "tailwindcss";
-@import 'tailwindcss/base';
-@import 'tailwindcss/components';
-@import 'tailwindcss/utilities';
 
 /* Custom CSS for AI-integrated development environment */
 @layer base {

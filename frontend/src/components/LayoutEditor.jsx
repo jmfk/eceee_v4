@@ -15,8 +15,7 @@ import {
     EyeOff,
     Palette,
     Smartphone,
-    Tablet,
-    Desktop
+    Tablet
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { layoutsApi, layoutUtils } from '../api/layouts'
@@ -411,7 +410,7 @@ const LayoutDetails = ({ layout, showPreview, previewMode, setPreviewMode, showS
     const previewSizes = {
         mobile: { width: '375px', height: '667px', label: 'Mobile', icon: Smartphone },
         tablet: { width: '768px', height: '1024px', label: 'Tablet', icon: Tablet },
-        desktop: { width: '100%', height: '600px', label: 'Desktop', icon: Desktop }
+        desktop: { width: '100%', height: '600px', label: 'Desktop', icon: Monitor }
     }
 
     return (
