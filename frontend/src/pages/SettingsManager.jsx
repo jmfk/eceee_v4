@@ -247,7 +247,7 @@ const SettingsManager = () => {
 
     // Handle editing page with fullscreen editor
     const handleEditPage = (page) => {
-        navigate(`/pages/${page.id}/edit`, {
+        navigate(`/pages/${page.id}/edit/content`, {
             state: { previousView: '/settings' }
         })
     }

@@ -63,8 +63,10 @@ function App() {
                 </div>
               } />
 
-              {/* Page editor route - fullscreen without navbar */}
+              {/* Page editor routes - fullscreen without navbar */}
+              <Route path="/pages/:pageId/edit/:tab" element={<PageEditor />} />
               <Route path="/pages/:pageId/edit" element={<PageEditor />} />
+              <Route path="/pages/new/:tab" element={<PageEditor />} />
               <Route path="/pages/new" element={<PageEditor />} />
 
               {/* 404 route */}

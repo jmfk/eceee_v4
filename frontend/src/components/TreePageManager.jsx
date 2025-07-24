@@ -390,14 +390,14 @@ const TreePageManager = () => {
 
     // Edit handler
     const handleEdit = useCallback((page) => {
-        navigate(`/pages/${page.id}/edit`, {
+        navigate(`/pages/${page.id}/edit/content`, {
             state: { previousView: '/pages' }
         })
     }, [navigate])
 
     // Add child page handler
     const handleAddPageBelow = useCallback((targetPage) => {
-        navigate('/pages/new', {
+        navigate('/pages/new/content', {
             state: {
                 previousView: '/pages',
                 parentPage: targetPage,
@@ -409,7 +409,7 @@ const TreePageManager = () => {
 
     // Handle create new page
     const handleCreateNewPage = useCallback(() => {
-        navigate('/pages/new', {
+        navigate('/pages/new/content', {
             state: { previousView: '/pages' }
         })
     }, [navigate])

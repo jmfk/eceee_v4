@@ -24,17 +24,24 @@ import LayoutSelector from './LayoutSelector'
 import { layoutsApi } from '../api/layouts'
 
 const PageEditor = () => {
-    const { pageId } = useParams()
+    const { pageId, tab } = useParams()
     const navigate = useNavigate()
     const location = useLocation()
 
     // Determine previous view from location state or default to /pages
     const previousView = location.state?.previousView || '/pages'
     const isNewPage = pageId === 'new' || !pageId
-    const [activeTab, setActiveTab] = useState('content')
+    const activeTab = tab || 'content'
+
+    // Redirect to content tab if no tab is specified
+    useEffect(() => {
+        if (!tab) {
+            const defaultPath = isNewPage ? `/pages/new/content` : `/pages/${pageId}/edit/content`
+            navigate(defaultPath, { replace: true, state: { previousView } })
+        }
+    }, [tab, isNewPage, pageId, navigate, previousView])
     const [pageData, setPageData] = useState(null)
     const [isDirty, setIsDirty] = useState(false)
-    const [showPreview, setShowPreview] = useState(false)
     const [isPublishing, setIsPublishing] = useState(false)
 
     const queryClient = useQueryClient()
@@ -63,11 +70,15 @@ const PageEditor = () => {
             const response = await api.get(`/api/v1/webpages/pages/${pageId}/`)
             return response.data
         },
-        enabled: !isNewPage,
-        onSuccess: (data) => {
-            setPageData(data)
-        }
+        enabled: !isNewPage
     })
+
+    // Set page data when loaded
+    useEffect(() => {
+        if (page && !isNewPage) {
+            setPageData(page)
+        }
+    }, [page, isNewPage])
 
     // Create page mutation (for new pages)
     const createPageMutation = useMutation({
@@ -92,8 +103,20 @@ const PageEditor = () => {
 
     // Update page mutation
     const updatePageMutation = useMutation({
-        mutationFn: async (updates) => {
-            const response = await api.patch(`/api/v1/webpages/pages/${pageId}/`, updates)
+        mutationFn: async (pageData) => {
+            // Only send the fields that should be updated
+            const updateFields = {
+                title: pageData.title,
+                slug: pageData.slug,
+                description: pageData.description,
+                code_layout: pageData.code_layout,
+                publication_status: pageData.publication_status,
+                meta_title: pageData.meta_title,
+                meta_description: pageData.meta_description,
+                hostnames: pageData.hostnames
+            }
+
+            const response = await api.patch(`/api/v1/webpages/pages/${pageId}/`, updateFields)
             return response.data
         },
         onSuccess: (updatedPage) => {
@@ -172,6 +195,7 @@ const PageEditor = () => {
         { id: 'content', label: 'Content', icon: Layout },
         { id: 'settings', label: 'Settings', icon: Settings },
         { id: 'metadata', label: 'Metadata', icon: FileText },
+        { id: 'preview', label: 'Preview', icon: Eye },
     ]
 
     if (isLoading && !isNewPage) {
@@ -216,19 +240,22 @@ const PageEditor = () => {
 
                         {/* Center section - Tab navigation */}
                         <div className="flex items-center space-x-1">
-                            {tabs.map((tab) => {
-                                const Icon = tab.icon
+                            {tabs.map((tabItem) => {
+                                const Icon = tabItem.icon
+                                const tabPath = isNewPage ? `/pages/new/${tabItem.id}` : `/pages/${pageId}/edit/${tabItem.id}`
+                                const isActive = activeTab === tabItem.id
+
                                 return (
                                     <button
-                                        key={tab.id}
-                                        onClick={() => setActiveTab(tab.id)}
-                                        className={`flex items-center px-4 py-2 rounded-lg transition-colors ${activeTab === tab.id
+                                        key={tabItem.id}
+                                        onClick={() => navigate(tabPath, { state: { previousView } })}
+                                        className={`flex items-center px-4 py-2 rounded-lg transition-colors ${isActive
                                             ? 'bg-blue-100 text-blue-700'
                                             : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                                             }`}
                                     >
                                         <Icon className="w-4 h-4 mr-2" />
-                                        {tab.label}
+                                        {tabItem.label}
                                     </button>
                                 )
                             })}
@@ -236,17 +263,6 @@ const PageEditor = () => {
 
                         {/* Right section - Actions */}
                         <div className="flex items-center space-x-3">
-                            <button
-                                onClick={() => setShowPreview(!showPreview)}
-                                className={`flex items-center px-3 py-2 rounded-lg transition-colors ${showPreview
-                                    ? 'bg-green-100 text-green-700'
-                                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                                    }`}
-                            >
-                                <Eye className="w-4 h-4 mr-2" />
-                                Preview
-                            </button>
-
                             <button
                                 onClick={handleSave}
                                 disabled={!isDirty || updatePageMutation.isPending || createPageMutation.isPending}
@@ -278,35 +294,34 @@ const PageEditor = () => {
 
             {/* Main Content Area */}
             <div className="flex-1 overflow-hidden">
-                {showPreview ? (
-                    <div className="h-full bg-white">
-                        <PagePreview pageData={pageData} />
-                    </div>
-                ) : (
-                    <div className="h-full">
-                        {activeTab === 'content' && (
-                            <ContentEditor
-                                pageData={pageData}
-                                onUpdate={updatePageData}
-                                isNewPage={isNewPage}
-                            />
-                        )}
-                        {activeTab === 'settings' && (
-                            <SettingsEditor
-                                pageData={pageData}
-                                onUpdate={updatePageData}
-                                isNewPage={isNewPage}
-                            />
-                        )}
-                        {activeTab === 'metadata' && (
-                            <MetadataEditor
-                                pageData={pageData}
-                                onUpdate={updatePageData}
-                                isNewPage={isNewPage}
-                            />
-                        )}
-                    </div>
-                )}
+                <div className="h-full">
+                    {activeTab === 'content' && (
+                        <ContentEditor
+                            pageData={pageData}
+                            onUpdate={updatePageData}
+                            isNewPage={isNewPage}
+                        />
+                    )}
+                    {activeTab === 'settings' && (
+                        <SettingsEditor
+                            pageData={pageData}
+                            onUpdate={updatePageData}
+                            isNewPage={isNewPage}
+                        />
+                    )}
+                    {activeTab === 'metadata' && (
+                        <MetadataEditor
+                            pageData={pageData}
+                            onUpdate={updatePageData}
+                            isNewPage={isNewPage}
+                        />
+                    )}
+                    {activeTab === 'preview' && (
+                        <div className="h-full bg-white">
+                            <PagePreview pageData={pageData} />
+                        </div>
+                    )}
+                </div>
             </div>
 
             {/* Status bar */}
@@ -348,9 +363,6 @@ const ContentEditor = ({ pageData, onUpdate, isNewPage }) => {
             <div className="flex-1 p-6 overflow-y-auto">
                 <div className="max-w-4xl mx-auto space-y-6">
                     <div className="bg-white rounded-lg shadow p-6">
-                        <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                            Content Management
-                        </h2>
 
                         {/* Widget Management */}
                         {pageData?.id && !isNewPage && (
