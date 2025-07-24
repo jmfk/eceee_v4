@@ -18,7 +18,7 @@ export const createVersion = async (pageId, versionData) => {
 
 // Get all versions for a page
 export const getPageVersions = async (pageId, filters = {}) => {
-    const params = new URLSearchParams({ page: pageId, ...filters })
+    const params = new URLSearchParams({ page__id: pageId, ...filters })
     const response = await api.get(`${API_BASE}/versions/?${params}`)
     return response.data
 }
@@ -75,22 +75,22 @@ export const getVersionsFiltered = async (filters = {}) => {
 
 // Get current version for a page
 export const getCurrentVersion = async (pageId) => {
-    const response = await api.get(`${API_BASE}/versions/?page=${pageId}&is_current=true`)
+    const response = await api.get(`${API_BASE}/versions/?page__id=${pageId}&is_current=true`)
     return response.data.results[0] || null
 }
 
 // Get latest draft for a page
 export const getLatestDraft = async (pageId) => {
-    const response = await api.get(`${API_BASE}/versions/?page=${pageId}&status=draft&ordering=-version_number`)
+    const response = await api.get(`${API_BASE}/versions/?page__id=${pageId}&status=draft&ordering=-version_number`)
     return response.data.results[0] || null
 }
 
 // Get version statistics for a page
 export const getVersionStats = async (pageId) => {
     const [drafts, published, current] = await Promise.all([
-        api.get(`${API_BASE}/versions/?page=${pageId}&status=draft`),
-        api.get(`${API_BASE}/versions/?page=${pageId}&status=published`),
-        api.get(`${API_BASE}/versions/?page=${pageId}&is_current=true`)
+        api.get(`${API_BASE}/versions/?page__id=${pageId}&status=draft`),
+        api.get(`${API_BASE}/versions/?page__id=${pageId}&status=published`),
+        api.get(`${API_BASE}/versions/?page__id=${pageId}&is_current=true`)
     ])
 
     return {

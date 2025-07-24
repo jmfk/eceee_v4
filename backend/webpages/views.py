@@ -1594,7 +1594,7 @@ class PageVersionViewSet(viewsets.ModelViewSet):
         "page", "created_by", "published_by"
     ).all()
     serializer_class = PageVersionSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_class = PageVersionFilter
     ordering_fields = ["version_number", "created_at", "published_at"]
@@ -3540,7 +3540,7 @@ class PageVersionViewSet(viewsets.ModelViewSet):
         "page", "created_by", "published_by"
     ).all()
     serializer_class = PageVersionSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_class = PageVersionFilter
     ordering_fields = ["version_number", "created_at", "published_at"]
