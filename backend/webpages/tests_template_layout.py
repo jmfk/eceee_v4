@@ -144,6 +144,21 @@ class TestTemplateBasedLayoutBasics(TemplateBasedLayoutTestCase):
             layout = BasicTestLayout()
 
             self.assertEqual(layout.name, "basic_test")
+
+    def test_layout_has_extracted_attributes_after_init(self):
+        """Test that layout has required extracted attributes after initialization"""
+
+        class BasicTestLayout(TemplateBasedLayout):
+            name = "basic_test"
+            template_file = "test_template.html"
+
+        with patch("webpages.layout_registry.get_template") as mock_get_template:
+            mock_template = MagicMock()
+            mock_template.template.source = self.simple_html
+            mock_get_template.return_value = mock_template
+
+            layout = BasicTestLayout()
+
             self.assertTrue(hasattr(layout, "_extracted_html"))
             self.assertTrue(hasattr(layout, "_extracted_css"))
             self.assertTrue(hasattr(layout, "_parsed_slots"))
@@ -160,8 +175,8 @@ class TestTemplateBasedLayoutBasics(TemplateBasedLayoutTestCase):
         self.assertEqual(layout._extracted_css, "")
         self.assertEqual(layout._parsed_slots, [])
 
-    def test_slot_configuration_property(self):
-        """Test slot_configuration property returns correct format"""
+    def test_slot_configuration_returns_correct_format(self):
+        """Test slot_configuration property returns correct dictionary format"""
 
         class ConfigTestLayout(TemplateBasedLayout):
             name = "config_test"
@@ -177,6 +192,22 @@ class TestTemplateBasedLayoutBasics(TemplateBasedLayoutTestCase):
 
             self.assertIsInstance(config, dict)
             self.assertIn("slots", config)
+
+    def test_slot_configuration_has_correct_slot_count(self):
+        """Test slot_configuration has the expected number of slots"""
+
+        class ConfigTestLayout(TemplateBasedLayout):
+            name = "config_test"
+            template_file = "test_template.html"
+
+        with patch("webpages.layout_registry.get_template") as mock_get_template:
+            mock_template = MagicMock()
+            mock_template.template.source = self.simple_html
+            mock_get_template.return_value = mock_template
+
+            layout = ConfigTestLayout()
+            config = layout.slot_configuration
+
             self.assertIsInstance(config["slots"], list)
             self.assertEqual(len(config["slots"]), 2)
 
@@ -202,8 +233,8 @@ class TestHTMLExtraction(TemplateBasedLayoutTestCase):
             self.assertNotIn("<style>", extracted_html)
             self.assertNotIn("background: #fff", extracted_html)
 
-    def test_html_extraction_preserves_content(self):
-        """Test that HTML extraction preserves non-style content"""
+    def test_html_extraction_preserves_slot_attributes(self):
+        """Test that HTML extraction preserves slot attributes"""
 
         class HTMLTestLayout(TemplateBasedLayout):
             name = "html_test"
@@ -218,6 +249,22 @@ class TestHTMLExtraction(TemplateBasedLayoutTestCase):
             extracted_html = layout._extracted_html
 
             self.assertIn('data-widget-slot="header"', extracted_html)
+
+    def test_html_extraction_preserves_css_classes(self):
+        """Test that HTML extraction preserves CSS class attributes"""
+
+        class HTMLTestLayout(TemplateBasedLayout):
+            name = "html_test"
+            template_file = "test_template.html"
+
+        with patch("webpages.layout_registry.get_template") as mock_get_template:
+            mock_template = MagicMock()
+            mock_template.template.source = self.simple_html
+            mock_get_template.return_value = mock_template
+
+            layout = HTMLTestLayout()
+            extracted_html = layout._extracted_html
+
             self.assertIn('class="test-layout"', extracted_html)
 
 
@@ -290,8 +337,8 @@ class TestSlotParsing(TemplateBasedLayoutTestCase):
 
             self.assertEqual(len(slots), 2)
 
-    def test_slot_with_explicit_attributes(self):
-        """Test slot parsing when explicit attributes are provided"""
+    def test_slot_explicit_title_attribute(self):
+        """Test slot parsing when explicit title attribute is provided"""
 
         class SlotTestLayout(TemplateBasedLayout):
             name = "slot_test"
@@ -307,11 +354,45 @@ class TestSlotParsing(TemplateBasedLayoutTestCase):
 
             header_slot = next(slot for slot in slots if slot["name"] == "header")
             self.assertEqual(header_slot["title"], "Header")
+
+    def test_slot_explicit_description_attribute(self):
+        """Test slot parsing when explicit description attribute is provided"""
+
+        class SlotTestLayout(TemplateBasedLayout):
+            name = "slot_test"
+            template_file = "test_template.html"
+
+        with patch("webpages.layout_registry.get_template") as mock_get_template:
+            mock_template = MagicMock()
+            mock_template.template.source = self.simple_html
+            mock_get_template.return_value = mock_template
+
+            layout = SlotTestLayout()
+            slots = layout._parsed_slots
+
+            header_slot = next(slot for slot in slots if slot["name"] == "header")
             self.assertEqual(header_slot["description"], "Page header")
+
+    def test_slot_max_widgets_default_none(self):
+        """Test that max_widgets defaults to None when not specified"""
+
+        class SlotTestLayout(TemplateBasedLayout):
+            name = "slot_test"
+            template_file = "test_template.html"
+
+        with patch("webpages.layout_registry.get_template") as mock_get_template:
+            mock_template = MagicMock()
+            mock_template.template.source = self.simple_html
+            mock_get_template.return_value = mock_template
+
+            layout = SlotTestLayout()
+            slots = layout._parsed_slots
+
+            header_slot = next(slot for slot in slots if slot["name"] == "header")
             self.assertIsNone(header_slot["max_widgets"])
 
-    def test_slot_with_default_attributes(self):
-        """Test slot parsing when attributes use defaults"""
+    def test_slot_auto_generated_title(self):
+        """Test slot parsing when title uses auto-generated defaults"""
 
         class SlotTestLayout(TemplateBasedLayout):
             name = "slot_test"
@@ -329,10 +410,27 @@ class TestSlotParsing(TemplateBasedLayoutTestCase):
             self.assertEqual(
                 content_slot["title"], "Content"
             )  # Auto-generated from name
+
+    def test_slot_auto_generated_description(self):
+        """Test slot parsing when description uses auto-generated defaults"""
+
+        class SlotTestLayout(TemplateBasedLayout):
+            name = "slot_test"
+            template_file = "test_template.html"
+
+        with patch("webpages.layout_registry.get_template") as mock_get_template:
+            mock_template = MagicMock()
+            mock_template.template.source = self.simple_html
+            mock_get_template.return_value = mock_template
+
+            layout = SlotTestLayout()
+            slots = layout._parsed_slots
+
+            content_slot = next(slot for slot in slots if slot["name"] == "content")
             self.assertEqual(content_slot["description"], "content content area")
 
-    def test_slot_max_widgets_parsing(self):
-        """Test max_widgets attribute parsing with various values"""
+    def test_slot_max_widgets_integer_values(self):
+        """Test max_widgets attribute parsing with various integer values"""
 
         class ComplexSlotTestLayout(TemplateBasedLayout):
             name = "complex_slot_test"
@@ -409,24 +507,40 @@ class TestMaxWidgetsParsing(TemplateBasedLayoutTestCase):
         layout = MaxWidgetsTestLayout()
         self.assertEqual(layout._parse_max_widgets("5"), 5)
 
-    def test_none_and_empty_parsing(self):
-        """Test parsing None and empty values"""
+    def test_none_value_parsing(self):
+        """Test parsing None values"""
 
         class MaxWidgetsTestLayout(TemplateBasedLayout):
             name = "max_widgets_test"
 
         layout = MaxWidgetsTestLayout()
         self.assertIsNone(layout._parse_max_widgets(None))
+
+    def test_empty_string_parsing(self):
+        """Test parsing empty string values"""
+
+        class MaxWidgetsTestLayout(TemplateBasedLayout):
+            name = "max_widgets_test"
+
+        layout = MaxWidgetsTestLayout()
         self.assertIsNone(layout._parse_max_widgets(""))
 
-    def test_invalid_value_parsing(self):
-        """Test parsing invalid values returns None"""
+    def test_invalid_string_parsing(self):
+        """Test parsing invalid string values returns None"""
 
         class MaxWidgetsTestLayout(TemplateBasedLayout):
             name = "max_widgets_test"
 
         layout = MaxWidgetsTestLayout()
         self.assertIsNone(layout._parse_max_widgets("invalid"))
+
+    def test_float_string_parsing(self):
+        """Test parsing float string values returns None"""
+
+        class MaxWidgetsTestLayout(TemplateBasedLayout):
+            name = "max_widgets_test"
+
+        layout = MaxWidgetsTestLayout()
         self.assertIsNone(layout._parse_max_widgets("1.5"))
 
 
@@ -469,7 +583,7 @@ class TestErrorHandling(TemplateBasedLayoutTestCase):
                 with self.assertRaises(ImproperlyConfigured) as context:
                     BSTestLayout()
 
-                self.assertIn("BeautifulSoup4 is required", str(context.exception))
+                self.assertIn("Missing dependency", str(context.exception))
 
     def test_html_parsing_error(self):
         """Test error handling for HTML parsing failures"""
@@ -491,7 +605,6 @@ class TestErrorHandling(TemplateBasedLayoutTestCase):
                 with self.assertRaises(ImproperlyConfigured) as context:
                     ParseErrorLayout()
 
-                # Updated to match the new error message format
                 self.assertIn(
                     "Unexpected error parsing template", str(context.exception)
                 )
@@ -548,8 +661,8 @@ class TestCaching(TemplateBasedLayoutTestCase):
             # Should be able to call without error
             self.assertTrue(True)
 
-    def test_cache_key_generation(self):
-        """Test cache key generation"""
+    def test_cache_key_generation_base(self):
+        """Test basic cache key generation"""
 
         class CacheTestLayout(TemplateBasedLayout):
             name = "cache_test"
@@ -561,10 +674,24 @@ class TestCaching(TemplateBasedLayoutTestCase):
         layout.template_file = "test_template.html"
 
         base_key = layout._get_cache_key()
-        suffix_key = layout._get_cache_key("suffix")
 
         self.assertIn("cache_test", base_key)
         self.assertIn("test_template.html", base_key)
+
+    def test_cache_key_generation_with_suffix(self):
+        """Test cache key generation with suffix"""
+
+        class CacheTestLayout(TemplateBasedLayout):
+            name = "cache_test"
+            template_file = "test_template.html"
+
+        # Create layout without triggering template parsing
+        layout = CacheTestLayout.__new__(CacheTestLayout)
+        layout.name = "cache_test"
+        layout.template_file = "test_template.html"
+
+        suffix_key = layout._get_cache_key("suffix")
+
         self.assertTrue(suffix_key.endswith(":suffix"))
 
 
@@ -649,8 +776,8 @@ class TestValidationConfiguration(TemplateBasedLayoutTestCase):
 class TestLayoutDictionary(TemplateBasedLayoutTestCase):
     """Test layout dictionary representation"""
 
-    def test_basic_to_dict(self):
-        """Test basic dictionary representation"""
+    def test_basic_to_dict_template_based_flag(self):
+        """Test that template_based flag is set correctly"""
 
         class DictTestLayout(TemplateBasedLayout):
             name = "dict_test"
@@ -665,8 +792,56 @@ class TestLayoutDictionary(TemplateBasedLayoutTestCase):
             layout_dict = layout.to_dict()
 
             self.assertEqual(layout_dict["template_based"], True)
+
+    def test_basic_to_dict_template_file(self):
+        """Test that template_file is included in dictionary"""
+
+        class DictTestLayout(TemplateBasedLayout):
+            name = "dict_test"
+            template_file = "test_template.html"
+
+        with patch("webpages.layout_registry.get_template") as mock_get_template:
+            mock_template = MagicMock()
+            mock_template.template.source = self.simple_html
+            mock_get_template.return_value = mock_template
+
+            layout = DictTestLayout()
+            layout_dict = layout.to_dict()
+
             self.assertEqual(layout_dict["template_file"], "test_template.html")
+
+    def test_basic_to_dict_css_flag(self):
+        """Test that has_css flag is set correctly"""
+
+        class DictTestLayout(TemplateBasedLayout):
+            name = "dict_test"
+            template_file = "test_template.html"
+
+        with patch("webpages.layout_registry.get_template") as mock_get_template:
+            mock_template = MagicMock()
+            mock_template.template.source = self.simple_html
+            mock_get_template.return_value = mock_template
+
+            layout = DictTestLayout()
+            layout_dict = layout.to_dict()
+
             self.assertTrue(layout_dict["has_css"])
+
+    def test_basic_to_dict_slots_count(self):
+        """Test that parsed_slots_count is correct"""
+
+        class DictTestLayout(TemplateBasedLayout):
+            name = "dict_test"
+            template_file = "test_template.html"
+
+        with patch("webpages.layout_registry.get_template") as mock_get_template:
+            mock_template = MagicMock()
+            mock_template.template.source = self.simple_html
+            mock_get_template.return_value = mock_template
+
+            layout = DictTestLayout()
+            layout_dict = layout.to_dict()
+
             self.assertEqual(layout_dict["parsed_slots_count"], 2)
 
     def test_to_dict_includes_validation_config(self):
