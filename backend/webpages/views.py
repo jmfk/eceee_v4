@@ -22,6 +22,8 @@ from .serializers import (
     PageVersionListSerializer,
     PageVersionComparisonSerializer,
     # PageLayoutSerializer removed - now using code-based layouts only
+    LayoutSerializer,
+    LayoutTemplateDataSerializer,
     PageThemeSerializer,
     # WidgetTypeSerializer removed - widget types are now code-based
     # PageWidgetSerializer,  # Removed - widgets now in PageVersion
@@ -32,31 +34,94 @@ from .filters import WebPageFilter, PageVersionFilter
 
 class CodeLayoutViewSet(viewsets.ViewSet):
     """
-    ViewSet for managing code-based layouts.
-    Provides read-only access to registered layout classes.
+    Enhanced ViewSet for managing code-based layouts with template data support.
+
+    Phase 1.3: Provides API endpoints with optional template data inclusion,
+    caching, and versioning support while maintaining backward compatibility.
     """
 
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
+    def _get_api_version(self, request):
+        """Get API version from request headers or query params"""
+        version = request.META.get("HTTP_API_VERSION") or request.query_params.get(
+            "version", "v1"
+        )
+        return version
+
+    def _should_include_template_data(self, request):
+        """Determine if template data should be included based on request parameters"""
+        # Check query parameter
+        include_template = (
+            request.query_params.get("include_template_data", "false").lower() == "true"
+        )
+
+        # Check header for backward compatibility
+        if request.META.get("HTTP_INCLUDE_TEMPLATE_DATA", "").lower() == "true":
+            include_template = True
+
+        return include_template
+
+    def _add_caching_headers(self, response, layout_name=None):
+        """Add proper HTTP caching headers"""
+        from django.utils.http import http_date
+        from django.utils import timezone
+        import time
+
+        # Set cache control headers
+        response["Cache-Control"] = "public, max-age=3600"  # 1 hour cache
+        response["Vary"] = "Accept-Encoding, Accept, API-Version"
+
+        # Set ETag based on layout name and current time (simplified)
+        if layout_name:
+            etag = f'"{layout_name}-{int(time.time() // 3600)}"'  # Changes hourly
+            response["ETag"] = etag
+
+        # Set Last-Modified header
+        response["Last-Modified"] = http_date(timezone.now().timestamp())
+
+        return response
+
     def list(self, request):
-        """Get all registered code-based layouts"""
+        """Get all registered code-based layouts with optional template data"""
         from .layout_registry import layout_registry
         from .layout_autodiscovery import get_layout_summary
 
+        # Parse request parameters
         active_only = request.query_params.get("active_only", "true").lower() == "true"
-        layouts = layout_registry.list_layouts(active_only=active_only)
+        include_template_data = self._should_include_template_data(request)
+        api_version = self._get_api_version(request)
 
+        # Get layouts
+        layouts = layout_registry.list_layouts(active_only=active_only)
         layout_data = [layout.to_dict() for layout in layouts]
 
-        return Response(
-            {
-                "results": layout_data,
-                "summary": get_layout_summary(),
-            }
+        # Use serializer for consistent formatting and template data inclusion
+        serializer_context = {
+            "include_template_data": include_template_data,
+            "api_version": api_version,
+            "request": request,
+        }
+
+        serializer = LayoutSerializer(
+            layout_data,
+            many=True,
+            context=serializer_context,
+            include_template_data=include_template_data,
         )
 
+        response_data = {
+            "results": serializer.data,
+            "summary": get_layout_summary(),
+            "api_version": api_version,
+            "template_data_included": include_template_data,
+        }
+
+        response = Response(response_data)
+        return self._add_caching_headers(response)
+
     def retrieve(self, request, pk=None):
-        """Get a specific code-based layout by name"""
+        """Get a specific code-based layout by name with optional template data"""
         from .layout_registry import layout_registry
 
         layout = layout_registry.get_layout(pk)
@@ -65,7 +130,69 @@ class CodeLayoutViewSet(viewsets.ViewSet):
                 {"error": f"Layout '{pk}' not found"}, status=status.HTTP_404_NOT_FOUND
             )
 
-        return Response(layout.to_dict())
+        # Parse request parameters
+        include_template_data = self._should_include_template_data(request)
+        api_version = self._get_api_version(request)
+
+        # Get layout data
+        layout_data = layout.to_dict()
+
+        # Use serializer for consistent formatting
+        serializer_context = {
+            "include_template_data": include_template_data,
+            "api_version": api_version,
+            "request": request,
+        }
+
+        serializer = LayoutSerializer(
+            layout_data,
+            context=serializer_context,
+            include_template_data=include_template_data,
+        )
+
+        response = Response(serializer.data)
+        return self._add_caching_headers(response, layout_name=pk)
+
+    @action(detail=True, methods=["get"], url_path="template")
+    def template_data(self, request, pk=None):
+        """
+        New Phase 1.3 endpoint: Get complete template data for a layout
+
+        Returns full template information including HTML, CSS, and parsed slots.
+        """
+        from .layout_registry import layout_registry
+        from django.utils import timezone
+
+        layout = layout_registry.get_layout(pk)
+        if not layout:
+            return Response(
+                {"error": f"Layout '{pk}' not found"}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Prepare template data
+        layout_dict = layout.to_dict()
+
+        template_data = {
+            "layout_name": layout.name,
+            "layout_type": layout_dict.get("type", "code"),
+            "template_html": layout_dict.get("html", ""),
+            "template_css": layout_dict.get("css", ""),
+            "parsed_slots": layout_dict.get("slot_configuration", {}),
+            "template_file": layout_dict.get("template_file", ""),
+            "parsing_errors": layout_dict.get("parsing_errors", []),
+            "caching_enabled": layout_dict.get("caching_enabled", False),
+            "cache_timeout": getattr(layout, "cache_timeout", 3600),
+            "last_modified": timezone.now(),
+        }
+
+        # Add cache key if caching is enabled
+        if hasattr(layout, "_get_cache_key"):
+            template_data["cache_key"] = layout._get_cache_key("template")
+
+        serializer = LayoutTemplateDataSerializer(template_data)
+
+        response = Response(serializer.data)
+        return self._add_caching_headers(response, layout_name=pk)
 
     @action(detail=False, methods=["get"])
     def choices(self, request):
@@ -75,7 +202,8 @@ class CodeLayoutViewSet(viewsets.ViewSet):
         active_only = request.query_params.get("active_only", "true").lower() == "true"
         choices = layout_registry.get_layout_choices(active_only=active_only)
 
-        return Response(choices)
+        response = Response(choices)
+        return self._add_caching_headers(response)
 
     @action(detail=False, methods=["post"])
     def reload(self, request):
