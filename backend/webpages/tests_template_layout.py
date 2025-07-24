@@ -14,7 +14,12 @@ from django.core.exceptions import ImproperlyConfigured
 from django.core.cache import cache
 from unittest.mock import patch, MagicMock
 
-from .layout_registry import TemplateBasedLayout, register_layout
+from .layout_registry import (
+    TemplateBasedLayout,
+    TemplateParsingError,
+    CSSValidator,
+    register_layout,
+)
 
 
 class TemplateBasedLayoutTestCase(TestCase):
@@ -68,6 +73,52 @@ class TemplateBasedLayoutTestCase(TestCase):
         <div class="no-slots">
             <p>No widget slots here</p>
         </div>
+        """
+
+        # Test HTML with duplicate slot names
+        self.duplicate_slots_html = """
+        <style>
+        .duplicate-test { display: block; }
+        </style>
+        <div class="duplicate-test">
+            <div data-widget-slot="content" data-slot-title="First Content">
+                First content area
+            </div>
+            <div data-widget-slot="content" data-slot-title="Second Content">
+                Second content area with same name
+            </div>
+        </div>
+        """
+
+        # Test HTML with invalid slot names
+        self.invalid_slot_names_html = """
+        <div>
+            <div data-widget-slot="invalid slot name" data-slot-title="Invalid">
+                Invalid slot name with spaces
+            </div>
+            <div data-widget-slot="invalid@slot" data-slot-title="Invalid">
+                Invalid slot name with special characters
+            </div>
+        </div>
+        """
+
+        # Test CSS with dangerous patterns
+        self.dangerous_css = """
+        .malicious {
+            background: url(javascript:alert('xss'));
+            behavior: expression(alert('xss'));
+        }
+        @import "javascript:alert('xss')";
+        """
+
+        # Test CSS with syntax errors
+        self.invalid_css = """
+        .invalid-css {
+            background: #fff;
+            /* Missing closing brace */
+        .another-rule {
+            color: red;
+        }
         """
 
     def tearDown(self):
@@ -440,7 +491,10 @@ class TestErrorHandling(TemplateBasedLayoutTestCase):
                 with self.assertRaises(ImproperlyConfigured) as context:
                     ParseErrorLayout()
 
-                self.assertIn("Template parsing failed", str(context.exception))
+                # Updated to match the new error message format
+                self.assertIn(
+                    "Unexpected error parsing template", str(context.exception)
+                )
 
 
 class TestCaching(TemplateBasedLayoutTestCase):
@@ -703,3 +757,301 @@ class TestLayoutRegistration(TemplateBasedLayoutTestCase):
 
         # Should not raise any errors
         self.assertTrue(True)
+
+
+class TestEnhancedParsing(TemplateBasedLayoutTestCase):
+    """Test enhanced parsing features"""
+
+    def test_duplicate_slot_detection(self):
+        """Test that duplicate slot names are detected and rejected"""
+
+        class DuplicateSlotLayout(TemplateBasedLayout):
+            name = "duplicate_slot_test"
+            template_file = "test_template.html"
+            require_unique_slot_names = True
+
+        with patch("webpages.layout_registry.get_template") as mock_get_template:
+            mock_template = MagicMock()
+            mock_template.template.source = self.duplicate_slots_html
+            mock_get_template.return_value = mock_template
+
+            with self.assertRaises(ImproperlyConfigured) as context:
+                DuplicateSlotLayout()
+
+            self.assertIn("Duplicate slot names found", str(context.exception))
+            self.assertIn("content", str(context.exception))
+
+    def test_duplicate_slots_allowed_when_configured(self):
+        """Test that duplicate slots are allowed when explicitly configured"""
+
+        class AllowDuplicateSlotLayout(TemplateBasedLayout):
+            name = "allow_duplicate_test"
+            template_file = "test_template.html"
+            allow_duplicate_slots = True
+            require_unique_slot_names = False
+
+        with patch("webpages.layout_registry.get_template") as mock_get_template:
+            mock_template = MagicMock()
+            mock_template.template.source = self.duplicate_slots_html
+            mock_get_template.return_value = mock_template
+
+            # Should not raise an exception
+            layout = AllowDuplicateSlotLayout()
+            self.assertEqual(len(layout._parsed_slots), 2)
+
+    def test_invalid_slot_name_detection(self):
+        """Test that invalid slot names are detected and rejected"""
+
+        class InvalidSlotNameLayout(TemplateBasedLayout):
+            name = "invalid_slot_name_test"
+            template_file = "test_template.html"
+
+        with patch("webpages.layout_registry.get_template") as mock_get_template:
+            mock_template = MagicMock()
+            mock_template.template.source = self.invalid_slot_names_html
+            mock_get_template.return_value = mock_template
+
+            with self.assertRaises(ImproperlyConfigured) as context:
+                InvalidSlotNameLayout()
+
+            self.assertIn("Invalid slot name", str(context.exception))
+
+    def test_negative_max_widgets_handling(self):
+        """Test that negative max_widgets values are handled gracefully"""
+
+        negative_max_widgets_html = """
+        <div>
+            <div data-widget-slot="test" data-slot-max-widgets="-1">
+                Test content
+            </div>
+        </div>
+        """
+
+        class NegativeMaxWidgetsLayout(TemplateBasedLayout):
+            name = "negative_max_widgets_test"
+            template_file = "test_template.html"
+
+        with patch("webpages.layout_registry.get_template") as mock_get_template:
+            mock_template = MagicMock()
+            mock_template.template.source = negative_max_widgets_html
+            mock_get_template.return_value = mock_template
+
+            layout = NegativeMaxWidgetsLayout()
+            slot = layout._parsed_slots[0]
+            self.assertIsNone(slot["max_widgets"])  # Should be converted to None
+
+    def test_parsing_errors_property(self):
+        """Test that parsing errors are tracked and accessible"""
+
+        class ParseErrorTrackingLayout(TemplateBasedLayout):
+            name = "parse_error_tracking_test"
+            template_file = "test_template.html"
+            validate_css = True
+
+        with patch("webpages.layout_registry.get_template") as mock_get_template:
+            mock_template = MagicMock()
+            mock_template.template.source = self.simple_html + self.invalid_css
+            mock_get_template.return_value = mock_template
+
+            layout = ParseErrorTrackingLayout()
+            # Should have parsing errors for invalid CSS
+            self.assertIsInstance(layout.parsing_errors, list)
+
+    def test_enhanced_to_dict_includes_parsing_info(self):
+        """Test that to_dict includes enhanced parsing information"""
+
+        class EnhancedDictLayout(TemplateBasedLayout):
+            name = "enhanced_dict_test"
+            template_file = "test_template.html"
+
+        with patch("webpages.layout_registry.get_template") as mock_get_template:
+            mock_template = MagicMock()
+            mock_template.template.source = self.simple_html
+            mock_get_template.return_value = mock_template
+
+            layout = EnhancedDictLayout()
+            layout_dict = layout.to_dict()
+
+            self.assertIn("parsing_errors", layout_dict)
+            self.assertIn("validation_config", layout_dict)
+            self.assertIn("validate_css", layout_dict["validation_config"])
+            self.assertIn("allow_duplicate_slots", layout_dict["validation_config"])
+            self.assertIn("require_unique_slot_names", layout_dict["validation_config"])
+
+
+class TestCSSValidator(TemplateBasedLayoutTestCase):
+    """Test CSS validation functionality"""
+
+    def test_valid_css_passes_validation(self):
+        """Test that valid CSS passes validation"""
+        valid_css = """
+        .test-class {
+            background: #fff;
+            color: black;
+            margin: 10px;
+        }
+        """
+        errors = CSSValidator.validate_css(valid_css)
+        self.assertEqual(len(errors), 0)
+
+    def test_empty_css_passes_validation(self):
+        """Test that empty CSS passes validation"""
+        errors = CSSValidator.validate_css("")
+        self.assertEqual(len(errors), 0)
+
+    def test_mismatched_braces_detected(self):
+        """Test that mismatched braces are detected"""
+        invalid_css = """
+        .test-class {
+            background: #fff;
+            /* Missing closing brace */
+        .another-class {
+            color: red;
+        }
+        """
+        errors = CSSValidator.validate_css(invalid_css)
+        self.assertTrue(any("Mismatched braces" in error for error in errors))
+
+    def test_dangerous_patterns_detected(self):
+        """Test that dangerous CSS patterns are detected"""
+        dangerous_css = """
+        .malicious {
+            background: url(javascript:alert('xss'));
+        }
+        """
+        errors = CSSValidator.validate_css(dangerous_css)
+        self.assertTrue(any("dangerous" in error.lower() for error in errors))
+
+    def test_css_comments_removed_before_validation(self):
+        """Test that CSS comments are properly removed before validation"""
+        css_with_comments = """
+        /* This is a comment */
+        .test-class {
+            background: #fff; /* Another comment */
+        }
+        """
+        errors = CSSValidator.validate_css(css_with_comments)
+        self.assertEqual(len(errors), 0)
+
+
+class TestTemplateParsingError(TemplateBasedLayoutTestCase):
+    """Test enhanced error handling"""
+
+    def test_template_parsing_error_basic(self):
+        """Test basic TemplateParsingError functionality"""
+        error = TemplateParsingError("Test error message")
+        self.assertEqual(str(error), "Test error message")
+
+    def test_template_parsing_error_with_file(self):
+        """Test TemplateParsingError with template file"""
+        error = TemplateParsingError("Test error", template_file="test.html")
+        self.assertIn("Template 'test.html'", str(error))
+
+    def test_template_parsing_error_with_line_number(self):
+        """Test TemplateParsingError with line number"""
+        error = TemplateParsingError("Test error", line_number=42)
+        self.assertIn("(line 42)", str(error))
+
+    def test_template_parsing_error_with_context(self):
+        """Test TemplateParsingError with context"""
+        error = TemplateParsingError("Test error", context="Additional context")
+        self.assertIn("Context: Additional context", str(error))
+
+    def test_template_parsing_error_complete(self):
+        """Test TemplateParsingError with all parameters"""
+        error = TemplateParsingError(
+            "Test error",
+            template_file="test.html",
+            line_number=42,
+            context="Full context",
+        )
+        error_str = str(error)
+        self.assertIn("Template 'test.html'", error_str)
+        self.assertIn("(line 42)", error_str)
+        self.assertIn("Context: Full context", error_str)
+
+
+class TestCSSSafetyValidation(TemplateBasedLayoutTestCase):
+    """Test CSS safety validation in templates"""
+
+    def test_dangerous_css_causes_parsing_error(self):
+        """Test that dangerous CSS patterns cause parsing errors"""
+
+        dangerous_template = f"""
+        <style>
+        {self.dangerous_css}
+        </style>
+        <div data-widget-slot="content">Content</div>
+        """
+
+        class DangerousCSSLayout(TemplateBasedLayout):
+            name = "dangerous_css_test"
+            template_file = "test_template.html"
+            validate_css = True
+
+        with patch("webpages.layout_registry.get_template") as mock_get_template:
+            mock_template = MagicMock()
+            mock_template.template.source = dangerous_template
+            mock_get_template.return_value = mock_template
+
+            with self.assertRaises(ImproperlyConfigured) as context:
+                DangerousCSSLayout()
+
+            self.assertIn("CSS validation failed", str(context.exception))
+
+    def test_css_validation_can_be_disabled(self):
+        """Test that CSS validation can be disabled"""
+
+        dangerous_template = f"""
+        <style>
+        {self.dangerous_css}
+        </style>
+        <div data-widget-slot="content">Content</div>
+        """
+
+        class DisabledCSSValidationLayout(TemplateBasedLayout):
+            name = "disabled_css_validation_test"
+            template_file = "test_template.html"
+            validate_css = False
+
+        with patch("webpages.layout_registry.get_template") as mock_get_template:
+            mock_template = MagicMock()
+            mock_template.template.source = dangerous_template
+            mock_get_template.return_value = mock_template
+
+            # Should not raise an exception
+            layout = DisabledCSSValidationLayout()
+            self.assertEqual(len(layout._parsed_slots), 1)
+
+    def test_minor_css_issues_are_tracked_but_not_fatal(self):
+        """Test that minor CSS issues are tracked but don't prevent parsing"""
+
+        minor_issue_template = """
+        <style>
+        .test {
+            background: #fff;
+            /* Missing closing brace */
+        .another {
+            color: red;
+        }
+        </style>
+        <div data-widget-slot="content">Content</div>
+        """
+
+        class MinorCSSIssueLayout(TemplateBasedLayout):
+            name = "minor_css_issue_test"
+            template_file = "test_template.html"
+            validate_css = True
+
+        with patch("webpages.layout_registry.get_template") as mock_get_template:
+            mock_template = MagicMock()
+            mock_template.template.source = minor_issue_template
+            mock_get_template.return_value = mock_template
+
+            # Should not raise an exception but should track the error
+            layout = MinorCSSIssueLayout()
+            self.assertEqual(len(layout._parsed_slots), 1)
+            self.assertTrue(len(layout.parsing_errors) > 0)
+            self.assertTrue(
+                any("CSS validation error" in error for error in layout.parsing_errors)
+            )
