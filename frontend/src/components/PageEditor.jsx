@@ -1,0 +1,483 @@
+import { useState, useEffect } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import {
+    Save,
+    X,
+    Eye,
+    Settings,
+    Layout,
+    FileText,
+    Clock,
+    Share2,
+    MoreHorizontal,
+    ChevronDown,
+    ArrowLeft,
+    Grid3X3,
+    Palette
+} from 'lucide-react'
+import toast from 'react-hot-toast'
+import { api } from '../api/client.js'
+import { useNotificationContext } from './NotificationManager'
+import SlotManager from './SlotManager'
+import LayoutSelector from './LayoutSelector'
+import { layoutsApi } from '../api/layouts'
+
+const PageEditor = ({ pageId, onClose, previousView = 'tree' }) => {
+    const [activeTab, setActiveTab] = useState('content')
+    const [pageData, setPageData] = useState(null)
+    const [isDirty, setIsDirty] = useState(false)
+    const [showPreview, setShowPreview] = useState(false)
+    const [isPublishing, setIsPublishing] = useState(false)
+
+    const queryClient = useQueryClient()
+    const { showError, showConfirm } = useNotificationContext()
+
+    // Fetch page data
+    const { data: page, isLoading } = useQuery({
+        queryKey: ['page', pageId],
+        queryFn: async () => {
+            const response = await api.get(`/api/v1/webpages/pages/${pageId}/`)
+            return response.data
+        },
+        enabled: !!pageId,
+        onSuccess: (data) => {
+            setPageData(data)
+        }
+    })
+
+    // Update page mutation
+    const updatePageMutation = useMutation({
+        mutationFn: async (updates) => {
+            const response = await api.patch(`/api/v1/webpages/pages/${pageId}/`, updates)
+            return response.data
+        },
+        onSuccess: (updatedPage) => {
+            toast.success('Page saved successfully')
+            setPageData(updatedPage)
+            setIsDirty(false)
+            queryClient.invalidateQueries(['page', pageId])
+            queryClient.invalidateQueries(['pages', 'root'])
+        },
+        onError: (error) => {
+            showError(error, 'Failed to save page')
+        }
+    })
+
+    // Publish page mutation
+    const publishPageMutation = useMutation({
+        mutationFn: async () => {
+            const response = await api.patch(`/api/v1/webpages/pages/${pageId}/`, {
+                publication_status: 'published'
+            })
+            return response.data
+        },
+        onSuccess: (updatedPage) => {
+            toast.success('Page published successfully')
+            setPageData(updatedPage)
+            queryClient.invalidateQueries(['page', pageId])
+            queryClient.invalidateQueries(['pages', 'root'])
+        },
+        onError: (error) => {
+            showError(error, 'Failed to publish page')
+        }
+    })
+
+    // Handle close with unsaved changes check
+    const handleClose = async () => {
+        if (isDirty) {
+            const confirmed = await showConfirm({
+                title: 'Unsaved Changes',
+                message: 'You have unsaved changes. Are you sure you want to close?',
+                confirmText: 'Close without saving',
+                confirmButtonStyle: 'danger'
+            })
+            if (!confirmed) return
+        }
+        onClose()
+    }
+
+    // Handle save
+    const handleSave = () => {
+        if (pageData && isDirty) {
+            updatePageMutation.mutate(pageData)
+        }
+    }
+
+    // Handle quick publish
+    const handleQuickPublish = () => {
+        setIsPublishing(true)
+        publishPageMutation.mutate()
+        setIsPublishing(false)
+    }
+
+    // Handle page data updates
+    const updatePageData = (updates) => {
+        setPageData(prev => ({ ...prev, ...updates }))
+        setIsDirty(true)
+    }
+
+    // Tab navigation
+    const tabs = [
+        { id: 'content', label: 'Content', icon: Layout },
+        { id: 'settings', label: 'Settings', icon: Settings },
+        { id: 'metadata', label: 'Metadata', icon: FileText },
+    ]
+
+    if (isLoading) {
+        return (
+            <div className="fixed inset-0 bg-gray-50 flex items-center justify-center z-50">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                    <p className="text-gray-600">Loading page editor...</p>
+                </div>
+            </div>
+        )
+    }
+
+    return (
+        <div className="fixed inset-0 bg-gray-50 z-50 flex flex-col">
+            {/* Top Menu Bar */}
+            <div className="bg-white border-b border-gray-200 shadow-sm">
+                <div className="px-4 py-3">
+                    <div className="flex items-center justify-between">
+                        {/* Left section - Back button and page info */}
+                        <div className="flex items-center space-x-4">
+                            <button
+                                onClick={handleClose}
+                                className="flex items-center px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                            >
+                                <ArrowLeft className="w-4 h-4 mr-2" />
+                                Back to {previousView === 'tree' ? 'Tree View' : 'Previous View'}
+                            </button>
+
+                            <div className="h-6 w-px bg-gray-300"></div>
+
+                            <div>
+                                <h1 className="text-lg font-semibold text-gray-900 truncate">
+                                    {pageData?.title || 'Untitled Page'}
+                                </h1>
+                                <p className="text-sm text-gray-500">
+                                    /{pageData?.slug || 'page-slug'}
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Center section - Tab navigation */}
+                        <div className="flex items-center space-x-1">
+                            {tabs.map((tab) => {
+                                const Icon = tab.icon
+                                return (
+                                    <button
+                                        key={tab.id}
+                                        onClick={() => setActiveTab(tab.id)}
+                                        className={`flex items-center px-4 py-2 rounded-lg transition-colors ${activeTab === tab.id
+                                                ? 'bg-blue-100 text-blue-700'
+                                                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                                            }`}
+                                    >
+                                        <Icon className="w-4 h-4 mr-2" />
+                                        {tab.label}
+                                    </button>
+                                )
+                            })}
+                        </div>
+
+                        {/* Right section - Actions */}
+                        <div className="flex items-center space-x-3">
+                            <button
+                                onClick={() => setShowPreview(!showPreview)}
+                                className={`flex items-center px-3 py-2 rounded-lg transition-colors ${showPreview
+                                        ? 'bg-green-100 text-green-700'
+                                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                                    }`}
+                            >
+                                <Eye className="w-4 h-4 mr-2" />
+                                Preview
+                            </button>
+
+                            <button
+                                onClick={handleSave}
+                                disabled={!isDirty || updatePageMutation.isPending}
+                                className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <Save className="w-4 h-4 mr-2" />
+                                {updatePageMutation.isPending ? 'Saving...' : 'Save'}
+                            </button>
+
+                            <button
+                                onClick={handleQuickPublish}
+                                disabled={pageData?.publication_status === 'published' || isPublishing}
+                                className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <Share2 className="w-4 h-4 mr-2" />
+                                {isPublishing ? 'Publishing...' : 'Publish'}
+                            </button>
+
+                            <div className="relative">
+                                <button className="flex items-center px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
+                                    <MoreHorizontal className="w-4 h-4" />
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Main Content Area */}
+            <div className="flex-1 overflow-hidden">
+                {showPreview ? (
+                    <div className="h-full bg-white">
+                        <PagePreview pageData={pageData} />
+                    </div>
+                ) : (
+                    <div className="h-full">
+                        {activeTab === 'content' && (
+                            <ContentEditor
+                                pageData={pageData}
+                                onUpdate={updatePageData}
+                            />
+                        )}
+                        {activeTab === 'settings' && (
+                            <SettingsEditor
+                                pageData={pageData}
+                                onUpdate={updatePageData}
+                            />
+                        )}
+                        {activeTab === 'metadata' && (
+                            <MetadataEditor
+                                pageData={pageData}
+                                onUpdate={updatePageData}
+                            />
+                        )}
+                    </div>
+                )}
+            </div>
+
+            {/* Status bar */}
+            <div className="bg-white border-t border-gray-200 px-4 py-2">
+                <div className="flex items-center justify-between text-sm text-gray-600">
+                    <div className="flex items-center space-x-4">
+                        <span>
+                            Status: <span className={`font-medium ${pageData?.publication_status === 'published' ? 'text-green-600' :
+                                    pageData?.publication_status === 'scheduled' ? 'text-blue-600' :
+                                        'text-gray-600'
+                                }`}>
+                                {pageData?.publication_status || 'unpublished'}
+                            </span>
+                        </span>
+                        {pageData?.last_modified && (
+                            <span>
+                                Last modified: {new Date(pageData.last_modified).toLocaleString()}
+                            </span>
+                        )}
+                    </div>
+                    <div className="flex items-center space-x-2">
+                        {isDirty && (
+                            <span className="text-orange-600 font-medium">Unsaved changes</span>
+                        )}
+                        <Clock className="w-4 h-4" />
+                        <span>Auto-save enabled</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+// Content Editor Tab
+const ContentEditor = ({ pageData, onUpdate }) => {
+    return (
+        <div className="h-full flex">
+            {/* Main content area */}
+            <div className="flex-1 p-6 overflow-y-auto">
+                <div className="max-w-4xl mx-auto space-y-6">
+                    <div className="bg-white rounded-lg shadow p-6">
+                        <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                            Layout & Content
+                        </h2>
+
+                        {/* Layout Selection */}
+                        <div className="mb-6">
+                            <LayoutSelector
+                                value={pageData?.code_layout || ''}
+                                onChange={(layout) => onUpdate({ code_layout: layout })}
+                                label="Page Layout"
+                                description="Choose the layout template for this page"
+                            />
+                        </div>
+
+                        {/* Widget Management */}
+                        {pageData?.id && (
+                            <SlotManager
+                                pageId={pageData.id}
+                                layout={pageData.code_layout}
+                                onWidgetChange={() => {
+                                    // Trigger a refresh of page data if needed
+                                }}
+                            />
+                        )}
+                    </div>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+// Settings Editor Tab
+const SettingsEditor = ({ pageData, onUpdate }) => {
+    return (
+        <div className="h-full p-6 overflow-y-auto">
+            <div className="max-w-2xl mx-auto space-y-6">
+                <div className="bg-white rounded-lg shadow p-6">
+                    <h2 className="text-lg font-semibold text-gray-900 mb-6">Page Settings</h2>
+
+                    <div className="space-y-6">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Page Title
+                            </label>
+                            <input
+                                type="text"
+                                value={pageData?.title || ''}
+                                onChange={(e) => onUpdate({ title: e.target.value })}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                placeholder="Enter page title"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                URL Slug
+                            </label>
+                            <input
+                                type="text"
+                                value={pageData?.slug || ''}
+                                onChange={(e) => onUpdate({ slug: e.target.value })}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                placeholder="page-url-slug"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Description
+                            </label>
+                            <textarea
+                                value={pageData?.description || ''}
+                                onChange={(e) => onUpdate({ description: e.target.value })}
+                                rows={4}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                placeholder="Enter page description"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Publication Status
+                            </label>
+                            <select
+                                value={pageData?.publication_status || 'unpublished'}
+                                onChange={(e) => onUpdate({ publication_status: e.target.value })}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            >
+                                <option value="unpublished">Unpublished</option>
+                                <option value="scheduled">Scheduled</option>
+                                <option value="published">Published</option>
+                                <option value="expired">Expired</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+// Metadata Editor Tab
+const MetadataEditor = ({ pageData, onUpdate }) => {
+    return (
+        <div className="h-full p-6 overflow-y-auto">
+            <div className="max-w-2xl mx-auto space-y-6">
+                <div className="bg-white rounded-lg shadow p-6">
+                    <h2 className="text-lg font-semibold text-gray-900 mb-6">SEO & Metadata</h2>
+
+                    <div className="space-y-6">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Meta Title
+                            </label>
+                            <input
+                                type="text"
+                                value={pageData?.meta_title || pageData?.title || ''}
+                                onChange={(e) => onUpdate({ meta_title: e.target.value })}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                placeholder="SEO title for search engines"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Meta Description
+                            </label>
+                            <textarea
+                                value={pageData?.meta_description || pageData?.description || ''}
+                                onChange={(e) => onUpdate({ meta_description: e.target.value })}
+                                rows={3}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                placeholder="SEO description for search engines"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Hostnames
+                            </label>
+                            <input
+                                type="text"
+                                value={pageData?.hostnames?.join(', ') || ''}
+                                onChange={(e) => onUpdate({
+                                    hostnames: e.target.value.split(',').map(h => h.trim()).filter(h => h)
+                                })}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                placeholder="example.com, www.example.com"
+                            />
+                            <p className="text-sm text-gray-500 mt-1">
+                                Enter hostnames separated by commas
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+// Simple preview component
+const PagePreview = ({ pageData }) => {
+    return (
+        <div className="h-full p-6 overflow-y-auto bg-gray-100">
+            <div className="max-w-4xl mx-auto bg-white rounded-lg shadow">
+                <div className="p-8">
+                    <h1 className="text-3xl font-bold text-gray-900 mb-4">
+                        {pageData?.title || 'Untitled Page'}
+                    </h1>
+                    {pageData?.description && (
+                        <p className="text-lg text-gray-600 mb-6">
+                            {pageData.description}
+                        </p>
+                    )}
+                    <div className="prose max-w-none">
+                        <p className="text-gray-500 italic">
+                            Live preview of page content would appear here...
+                        </p>
+                        <p className="text-sm text-gray-400 mt-4">
+                            Current layout: {pageData?.code_layout || 'None selected'}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+export default PageEditor 

@@ -39,7 +39,7 @@ import BulkPublishingOperations from '../components/BulkPublishingOperations'
 import NamespaceManager from '../components/NamespaceManager'
 import { extractErrorMessage } from '../utils/errorHandling.js'
 
-const SettingsManager = () => {
+const SettingsManager = ({ onEditPage }) => {
     const [activeTab, setActiveTab] = useState('layouts')
     const [selectedPage, setSelectedPage] = useState(null)
     const [searchTerm, setSearchTerm] = useState('')
@@ -241,6 +241,17 @@ const SettingsManager = () => {
 
     const handleDuplicatePage = (page) => {
         duplicatePageMutation.mutate(page)
+    }
+
+    // Handle editing page with fullscreen editor if available
+    const handleEditPage = (page) => {
+        if (onEditPage) {
+            onEditPage(page, { previousView: 'settings' })
+        } else {
+            // Fallback to inline editing
+            setSelectedPage(page)
+            setIsEditing(true)
+        }
     }
 
 
