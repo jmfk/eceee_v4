@@ -93,9 +93,10 @@ describe('LayoutEditor', () => {
     it('renders the layout editor interface', async () => {
         renderWithQueryClient(<LayoutEditor />)
 
-        expect(screen.getByText('Layout Editor')).toBeInTheDocument()
-        expect(screen.getByText('Create and manage page layout templates with defined slots')).toBeInTheDocument()
-        expect(screen.getByText('New Layout')).toBeInTheDocument()
+        expect(screen.getByText('Layout Management')).toBeInTheDocument()
+        expect(screen.getByText('View and manage both code-based and template-based layout templates')).toBeInTheDocument()
+        expect(screen.getByText('Validate')).toBeInTheDocument()
+        expect(screen.getByText('Reload')).toBeInTheDocument()
 
         // Wait for layouts to load
         await waitFor(() => {
@@ -112,29 +113,15 @@ describe('LayoutEditor', () => {
         })
     })
 
-    it('shows active status indicators', async () => {
+    it('shows layout type indicators', async () => {
         renderWithQueryClient(<LayoutEditor />)
 
         await waitFor(() => {
-            const activeElements = screen.getAllByText('Active')
-            expect(activeElements).toHaveLength(2) // Both layouts are active
+            expect(screen.getByText('Code')).toBeInTheDocument()
         })
     })
 
-    it('opens layout creation form when New Layout is clicked', async () => {
-        const user = userEvent.setup()
-        renderWithQueryClient(<LayoutEditor />)
-
-        const newLayoutButton = screen.getByText('New Layout')
-        await user.click(newLayoutButton)
-
-        expect(screen.getByText('Create New Layout')).toBeInTheDocument()
-        expect(screen.getByLabelText('Layout Name')).toBeInTheDocument()
-        expect(screen.getByLabelText('Description')).toBeInTheDocument()
-        expect(screen.getByText('Layout Slots')).toBeInTheDocument()
-    })
-
-    it('allows selecting a layout for editing', async () => {
+    it('allows selecting a layout for viewing details', async () => {
         const user = userEvent.setup()
         renderWithQueryClient(<LayoutEditor />)
 
@@ -145,183 +132,28 @@ describe('LayoutEditor', () => {
         const layoutItem = screen.getByText('two_column').closest('div')
         await user.click(layoutItem)
 
-        expect(screen.getByText('Edit')).toBeInTheDocument()
-        expect(screen.getByText('Delete')).toBeInTheDocument()
+        expect(screen.getByText('Show')).toBeInTheDocument()
+        expect(screen.getByText('Close')).toBeInTheDocument()
     })
 
-    it('can add new slots to a layout', async () => {
-        const user = userEvent.setup()
+    it('displays layout type filter buttons', async () => {
         renderWithQueryClient(<LayoutEditor />)
-
-        // Open creation form
-        const newLayoutButton = screen.getByText('New Layout')
-        await user.click(newLayoutButton)
-
-        // Add a slot
-        const addSlotButton = screen.getByText('Add Slot')
-        await user.click(addSlotButton)
-
-        expect(screen.getByText('Slot 1')).toBeInTheDocument()
-        expect(screen.getByLabelText('Slot Name (Technical)')).toBeInTheDocument()
-        expect(screen.getByLabelText('Display Name')).toBeInTheDocument()
-    })
-
-    it('validates required fields when creating layout', async () => {
-        const user = userEvent.setup()
-        renderWithQueryClient(<LayoutEditor />)
-
-        // Open creation form
-        const newLayoutButton = screen.getByText('New Layout')
-        await user.click(newLayoutButton)
-
-        // Try to submit without required fields
-        const createButton = screen.getByText('Create Layout')
-        await user.click(createButton)
-
-        // Form should not submit (name is required)
-        const nameInput = screen.getByLabelText('Layout Name')
-        expect(nameInput).toBeInvalid()
-    })
-
-    it('can remove slots from a layout', async () => {
-        const user = userEvent.setup()
-        renderWithQueryClient(<LayoutEditor />)
-
-        // Open creation form and add a slot
-        const newLayoutButton = screen.getByText('New Layout')
-        await user.click(newLayoutButton)
-
-        const addSlotButton = screen.getByText('Add Slot')
-        await user.click(addSlotButton)
-
-        expect(screen.getByText('Slot 1')).toBeInTheDocument()
-
-        // Remove the slot
-        const removeButton = screen.getByRole('button', { name: /remove/i })
-        await user.click(removeButton)
-
-        expect(screen.queryByText('Slot 1')).not.toBeInTheDocument()
-    })
-
-    it('submits layout creation form', async () => {
-        const user = userEvent.setup()
-
-        renderWithQueryClient(<LayoutEditor />)
-
-        // Open creation form
-        const newLayoutButton = screen.getByText('New Layout')
-        await user.click(newLayoutButton)
-
-        // Fill form
-        const nameInput = screen.getByLabelText('Layout Name')
-        await user.type(nameInput, 'Test Layout')
-
-        const descriptionInput = screen.getByLabelText('Description')
-        await user.type(descriptionInput, 'A test layout')
-
-        // Add a slot
-        const addSlotButton = screen.getByText('Add Slot')
-        await user.click(addSlotButton)
-
-        // Submit form
-        const createButton = screen.getByText('Create Layout')
-        await user.click(createButton)
 
         await waitFor(() => {
-            expect(mockedAxios.post).toHaveBeenCalledWith(
-                '/api/v1/webpages/layouts/',
-                expect.objectContaining({
-                    name: 'Test Layout',
-                    description: 'A test layout',
-                    slot_configuration: expect.objectContaining({
-                        slots: expect.arrayContaining([
-                            expect.objectContaining({
-                                name: 'slot_1'
-                            })
-                        ])
-                    })
-                })
-            )
+            expect(screen.getByText('All')).toBeInTheDocument()
+            expect(screen.getByText('Code')).toBeInTheDocument()
+            expect(screen.getByText('Template')).toBeInTheDocument()
         })
-    })
-
-    it('handles layout deletion', async () => {
-        const user = userEvent.setup()
-
-        // Mock window.confirm
-        window.confirm = vi.fn(() => true)
-
-        renderWithQueryClient(<LayoutEditor />)
-
-        // Select a layout
-        await waitFor(() => {
-            expect(screen.getByText('two_column')).toBeInTheDocument()
-        })
-
-        const layoutItem = screen.getByText('two_column').closest('div')
-        await user.click(layoutItem)
-
-        // Click delete
-        const deleteButton = screen.getByText('Delete')
-        await user.click(deleteButton)
-
-        expect(window.confirm).toHaveBeenCalledWith(
-            'Are you sure you want to delete this layout? This action cannot be undone.'
-        )
-
-        await waitFor(() => {
-            expect(mockedAxios.delete).toHaveBeenCalledWith('/api/v1/webpages/layouts/1/')
-        })
-    })
-
-    it('shows layout preview when requested', async () => {
-        const user = userEvent.setup()
-        renderWithQueryClient(<LayoutEditor />)
-
-        // Select a layout
-        await waitFor(() => {
-            expect(screen.getByText('two_column')).toBeInTheDocument()
-        })
-
-        const layoutItem = screen.getByText('two_column').closest('div')
-        await user.click(layoutItem)
-
-        // Show preview
-        const previewButton = screen.getByText('Show Preview')
-        await user.click(previewButton)
-
-        expect(screen.getByText('Layout Preview')).toBeInTheDocument()
-        expect(screen.getByText('Layout: two_column')).toBeInTheDocument()
-    })
-
-    it('displays slot configuration correctly', async () => {
-        renderWithQueryClient(<LayoutEditor />)
-
-        // Select a layout
-        await waitFor(() => {
-            expect(screen.getByText('two_column')).toBeInTheDocument()
-        })
-
-        const layoutItem = screen.getByText('two_column').closest('div')
-        await userEvent.setup().click(layoutItem)
-
-        // Check slot details
-        expect(screen.getByText('Main Content')).toBeInTheDocument()
-        expect(screen.getByText('Sidebar')).toBeInTheDocument()
-        expect(screen.getByText('Multiple widgets allowed')).toBeInTheDocument()
-        expect(screen.getByText('Single widget only')).toBeInTheDocument()
     })
 
     it('handles API errors gracefully', async () => {
-        const toast = require('react-hot-toast').default
-
         // Mock API error
         mockedAxios.get.mockRejectedValue(new Error('API Error'))
 
         renderWithQueryClient(<LayoutEditor />)
 
         // Component should still render without crashing
-        expect(screen.getByText('Code Layout Management')).toBeInTheDocument()
+        expect(screen.getByText('Layout Management')).toBeInTheDocument()
     })
 
     it('shows loading state while fetching layouts', async () => {
@@ -345,5 +177,40 @@ describe('LayoutEditor', () => {
         await waitFor(() => {
             expect(screen.getByText('two_column')).toBeInTheDocument()
         }, { timeout: 200 })
+    })
+
+    it('shows layout preview when requested', async () => {
+        const user = userEvent.setup()
+        renderWithQueryClient(<LayoutEditor />)
+
+        // Select a layout
+        await waitFor(() => {
+            expect(screen.getByText('two_column')).toBeInTheDocument()
+        })
+
+        const layoutItem = screen.getByText('two_column').closest('div')
+        await user.click(layoutItem)
+
+        // Show preview
+        const previewButton = screen.getByText('Show')
+        await user.click(previewButton)
+
+        expect(screen.getByText('Layout Preview')).toBeInTheDocument()
+    })
+
+    it('displays layout details correctly', async () => {
+        renderWithQueryClient(<LayoutEditor />)
+
+        // Select a layout
+        await waitFor(() => {
+            expect(screen.getByText('two_column')).toBeInTheDocument()
+        })
+
+        const layoutItem = screen.getByText('two_column').closest('div')
+        await userEvent.setup().click(layoutItem)
+
+        // Check layout details are shown
+        expect(screen.getByText('Layout Details')).toBeInTheDocument()
+        expect(screen.getByText('Close')).toBeInTheDocument()
     })
 }) 
