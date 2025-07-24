@@ -1,0 +1,328 @@
+name: Comprehensive Testing Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  NODE_VERSION: 18
+  PYTHON_VERSION: 3.11
+
+jobs:
+  # Backend Testing Job
+  backend-tests:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: eceee_v4_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache Python dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('backend/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install Python dependencies
+        run: |
+          cd backend
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Django migrations
+        run: |
+          cd backend
+          python manage.py migrate
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/eceee_v4_test
+          REDIS_URL: redis://localhost:6379/0
+
+      - name: Run backend tests with coverage
+        run: |
+          cd backend
+          coverage run --source='.' manage.py test
+          coverage report
+          coverage xml
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/eceee_v4_test
+          REDIS_URL: redis://localhost:6379/0
+
+      - name: Upload backend coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: backend/coverage.xml
+          flags: backend
+          name: backend-coverage
+
+      - name: Run security scan with bandit
+        run: |
+          cd backend
+          pip install bandit[toml]
+          bandit -r . -f json -o bandit-report.json || true
+
+      - name: Upload security scan results
+        uses: actions/upload-artifact@v3
+        with:
+          name: backend-security-scan
+          path: backend/bandit-report.json
+
+  # Frontend Testing Job
+  frontend-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Run frontend linting
+        run: |
+          cd frontend
+          npm run lint
+
+      - name: Run frontend tests with coverage
+        run: |
+          cd frontend
+          npm run test:coverage
+
+      - name: Upload frontend coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: frontend/coverage/lcov.info
+          flags: frontend
+          name: frontend-coverage
+
+      - name: Build frontend for production
+        run: |
+          cd frontend
+          npm run build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: frontend-build
+          path: frontend/dist
+
+  # E2E Testing Job
+  e2e-tests:
+    runs-on: ubuntu-latest
+    needs: [backend-tests, frontend-tests]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Start services with Docker Compose
+        run: |
+          docker-compose up -d db redis
+          docker-compose up -d backend
+          docker-compose up -d frontend
+
+      - name: Wait for services to be ready
+        run: |
+          timeout 120 bash -c 'until curl -f http://localhost:8000/health/ 2>/dev/null; do sleep 2; done'
+          timeout 120 bash -c 'until curl -f http://localhost:3000 2>/dev/null; do sleep 2; done'
+
+      - name: Set up Node.js for Playwright
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+
+      - name: Run E2E tests
+        run: npx playwright test
+        env:
+          BASE_URL: http://localhost:3000
+          API_URL: http://localhost:8000
+
+      - name: Upload E2E test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: e2e-test-results
+          path: |
+            test-results/
+            playwright-report/
+
+      - name: Stop services
+        if: always()
+        run: docker-compose down
+
+  # Performance Testing Job
+  performance-tests:
+    runs-on: ubuntu-latest
+    needs: [backend-tests, frontend-tests]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Start services
+        run: |
+          docker-compose up -d db redis backend frontend
+
+      - name: Wait for services
+        run: |
+          timeout 120 bash -c 'until curl -f http://localhost:8000/health/ 2>/dev/null; do sleep 2; done'
+          timeout 120 bash -c 'until curl -f http://localhost:3000 2>/dev/null; do sleep 2; done'
+
+      - name: Run Lighthouse performance audit
+        uses: treosh/lighthouse-ci-action@v9
+        with:
+          urls: |
+            http://localhost:3000
+            http://localhost:3000/page-management
+          configPath: ./.lighthouserc.js
+          uploadArtifacts: true
+
+      - name: Run load testing with k6
+        run: |
+          docker run --rm -i --network host grafana/k6:latest run - <tests/performance/load-test.js
+
+      - name: Stop services
+        if: always()
+        run: docker-compose down
+
+  # Security Testing Job
+  security-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: Run OWASP ZAP security scan
+        uses: zaproxy/action-full-scan@v0.8.0
+        with:
+          target: 'http://localhost:3000'
+          rules_file_name: '.zap/rules.tsv'
+          cmd_options: '-a'
+
+  # Quality Gate Job
+  quality-gate:
+    runs-on: ubuntu-latest
+    needs: [backend-tests, frontend-tests, e2e-tests, performance-tests, security-tests]
+    if: always()
+    steps:
+      - name: Download coverage reports
+        uses: actions/download-artifact@v3
+
+      - name: Quality Gate Check
+        run: |
+          echo "🔍 Checking quality gates..."
+          
+          # Check if all required jobs passed
+          if [[ "${{ needs.backend-tests.result }}" != "success" ]]; then
+            echo "❌ Backend tests failed"
+            exit 1
+          fi
+          
+          if [[ "${{ needs.frontend-tests.result }}" != "success" ]]; then
+            echo "❌ Frontend tests failed"
+            exit 1
+          fi
+          
+          if [[ "${{ needs.e2e-tests.result }}" != "success" ]]; then
+            echo "❌ E2E tests failed"
+            exit 1
+          fi
+          
+          echo "✅ All quality gates passed!"
+
+      - name: Comment PR with results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const results = {
+              backend: '${{ needs.backend-tests.result }}',
+              frontend: '${{ needs.frontend-tests.result }}',
+              e2e: '${{ needs.e2e-tests.result }}',
+              performance: '${{ needs.performance-tests.result }}',
+              security: '${{ needs.security-tests.result }}'
+            };
+            
+            const getIcon = (result) => result === 'success' ? '✅' : '❌';
+            
+            const comment = `## 🧪 Test Results
+            
+            | Test Suite | Status |
+            |------------|--------|
+            | Backend Tests | ${getIcon(results.backend)} ${results.backend} |
+            | Frontend Tests | ${getIcon(results.frontend)} ${results.frontend} |
+            | E2E Tests | ${getIcon(results.e2e)} ${results.e2e} |
+            | Performance Tests | ${getIcon(results.performance)} ${results.performance} |
+            | Security Tests | ${getIcon(results.security)} ${results.security} |
+            
+            ${Object.values(results).every(r => r === 'success') ? 
+              '🎉 All tests passed! Ready to merge.' : 
+              '⚠️  Some tests failed. Please review and fix.'}
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            }); 
