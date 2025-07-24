@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
     Save,
@@ -22,7 +23,14 @@ import SlotManager from './SlotManager'
 import LayoutSelector from './LayoutSelector'
 import { layoutsApi } from '../api/layouts'
 
-const PageEditor = ({ pageId, onClose, previousView = 'tree' }) => {
+const PageEditor = () => {
+    const { pageId } = useParams()
+    const navigate = useNavigate()
+    const location = useLocation()
+
+    // Determine previous view from location state or default to /pages
+    const previousView = location.state?.previousView || '/pages'
+    const isNewPage = pageId === 'new' || !pageId
     const [activeTab, setActiveTab] = useState('content')
     const [pageData, setPageData] = useState(null)
     const [isDirty, setIsDirty] = useState(false)
@@ -32,16 +40,53 @@ const PageEditor = ({ pageId, onClose, previousView = 'tree' }) => {
     const queryClient = useQueryClient()
     const { showError, showConfirm } = useNotificationContext()
 
-    // Fetch page data
+    // Initialize page data for new page
+    useEffect(() => {
+        if (isNewPage && !pageData) {
+            setPageData({
+                title: '',
+                slug: '',
+                description: '',
+                publication_status: 'unpublished',
+                code_layout: '',
+                meta_title: '',
+                meta_description: '',
+                hostnames: []
+            })
+        }
+    }, [isNewPage, pageData])
+
+    // Fetch page data (skip if creating new page)
     const { data: page, isLoading } = useQuery({
         queryKey: ['page', pageId],
         queryFn: async () => {
             const response = await api.get(`/api/v1/webpages/pages/${pageId}/`)
             return response.data
         },
-        enabled: !!pageId,
+        enabled: !isNewPage,
         onSuccess: (data) => {
             setPageData(data)
+        }
+    })
+
+    // Create page mutation (for new pages)
+    const createPageMutation = useMutation({
+        mutationFn: async (pageData) => {
+            const response = await api.post('/api/v1/webpages/pages/', pageData)
+            return response.data
+        },
+        onSuccess: (newPage) => {
+            toast.success('Page created successfully')
+            setIsDirty(false)
+            // Navigate to edit the newly created page
+            navigate(`/pages/${newPage.id}/edit`, {
+                replace: true,
+                state: { previousView }
+            })
+            queryClient.invalidateQueries(['pages'])
+        },
+        onError: (error) => {
+            showError(error, 'Failed to create page')
         }
     })
 
@@ -93,18 +138,24 @@ const PageEditor = ({ pageId, onClose, previousView = 'tree' }) => {
             })
             if (!confirmed) return
         }
-        onClose()
+        navigate(previousView)
     }
 
     // Handle save
     const handleSave = () => {
         if (pageData && isDirty) {
-            updatePageMutation.mutate(pageData)
+            if (isNewPage) {
+                createPageMutation.mutate(pageData)
+            } else {
+                updatePageMutation.mutate(pageData)
+            }
         }
     }
 
-    // Handle quick publish
+    // Handle quick publish (only for existing pages)
     const handleQuickPublish = () => {
+        if (isNewPage) return
+
         setIsPublishing(true)
         publishPageMutation.mutate()
         setIsPublishing(false)
@@ -123,7 +174,7 @@ const PageEditor = ({ pageId, onClose, previousView = 'tree' }) => {
         { id: 'metadata', label: 'Metadata', icon: FileText },
     ]
 
-    if (isLoading) {
+    if (isLoading && !isNewPage) {
         return (
             <div className="fixed inset-0 bg-gray-50 flex items-center justify-center z-50">
                 <div className="text-center">
@@ -147,17 +198,18 @@ const PageEditor = ({ pageId, onClose, previousView = 'tree' }) => {
                                 className="flex items-center px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
                             >
                                 <ArrowLeft className="w-4 h-4 mr-2" />
-                                Back to {previousView === 'tree' ? 'Tree View' : 'Previous View'}
+                                Back to {previousView === '/pages' ? 'Pages' :
+                                    previousView === '/settings' ? 'Settings' : 'Previous View'}
                             </button>
 
                             <div className="h-6 w-px bg-gray-300"></div>
 
                             <div>
                                 <h1 className="text-lg font-semibold text-gray-900 truncate">
-                                    {pageData?.title || 'Untitled Page'}
+                                    {isNewPage ? 'New Page' : (pageData?.title || 'Untitled Page')}
                                 </h1>
                                 <p className="text-sm text-gray-500">
-                                    /{pageData?.slug || 'page-slug'}
+                                    /{isNewPage ? 'new-page-slug' : (pageData?.slug || 'page-slug')}
                                 </p>
                             </div>
                         </div>
@@ -171,8 +223,8 @@ const PageEditor = ({ pageId, onClose, previousView = 'tree' }) => {
                                         key={tab.id}
                                         onClick={() => setActiveTab(tab.id)}
                                         className={`flex items-center px-4 py-2 rounded-lg transition-colors ${activeTab === tab.id
-                                                ? 'bg-blue-100 text-blue-700'
-                                                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                                            ? 'bg-blue-100 text-blue-700'
+                                            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                                             }`}
                                     >
                                         <Icon className="w-4 h-4 mr-2" />
@@ -187,8 +239,8 @@ const PageEditor = ({ pageId, onClose, previousView = 'tree' }) => {
                             <button
                                 onClick={() => setShowPreview(!showPreview)}
                                 className={`flex items-center px-3 py-2 rounded-lg transition-colors ${showPreview
-                                        ? 'bg-green-100 text-green-700'
-                                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                                    ? 'bg-green-100 text-green-700'
+                                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                                     }`}
                             >
                                 <Eye className="w-4 h-4 mr-2" />
@@ -197,11 +249,12 @@ const PageEditor = ({ pageId, onClose, previousView = 'tree' }) => {
 
                             <button
                                 onClick={handleSave}
-                                disabled={!isDirty || updatePageMutation.isPending}
+                                disabled={!isDirty || updatePageMutation.isPending || createPageMutation.isPending}
                                 className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 <Save className="w-4 h-4 mr-2" />
-                                {updatePageMutation.isPending ? 'Saving...' : 'Save'}
+                                {updatePageMutation.isPending || createPageMutation.isPending ? 'Saving...' :
+                                    isNewPage ? 'Create Page' : 'Save'}
                             </button>
 
                             <button
@@ -235,18 +288,21 @@ const PageEditor = ({ pageId, onClose, previousView = 'tree' }) => {
                             <ContentEditor
                                 pageData={pageData}
                                 onUpdate={updatePageData}
+                                isNewPage={isNewPage}
                             />
                         )}
                         {activeTab === 'settings' && (
                             <SettingsEditor
                                 pageData={pageData}
                                 onUpdate={updatePageData}
+                                isNewPage={isNewPage}
                             />
                         )}
                         {activeTab === 'metadata' && (
                             <MetadataEditor
                                 pageData={pageData}
                                 onUpdate={updatePageData}
+                                isNewPage={isNewPage}
                             />
                         )}
                     </div>
@@ -259,8 +315,8 @@ const PageEditor = ({ pageId, onClose, previousView = 'tree' }) => {
                     <div className="flex items-center space-x-4">
                         <span>
                             Status: <span className={`font-medium ${pageData?.publication_status === 'published' ? 'text-green-600' :
-                                    pageData?.publication_status === 'scheduled' ? 'text-blue-600' :
-                                        'text-gray-600'
+                                pageData?.publication_status === 'scheduled' ? 'text-blue-600' :
+                                    'text-gray-600'
                                 }`}>
                                 {pageData?.publication_status || 'unpublished'}
                             </span>
@@ -285,7 +341,7 @@ const PageEditor = ({ pageId, onClose, previousView = 'tree' }) => {
 }
 
 // Content Editor Tab
-const ContentEditor = ({ pageData, onUpdate }) => {
+const ContentEditor = ({ pageData, onUpdate, isNewPage }) => {
     return (
         <div className="h-full flex">
             {/* Main content area */}
@@ -307,7 +363,7 @@ const ContentEditor = ({ pageData, onUpdate }) => {
                         </div>
 
                         {/* Widget Management */}
-                        {pageData?.id && (
+                        {pageData?.id && !isNewPage && (
                             <SlotManager
                                 pageId={pageData.id}
                                 layout={pageData.code_layout}
@@ -315,6 +371,15 @@ const ContentEditor = ({ pageData, onUpdate }) => {
                                     // Trigger a refresh of page data if needed
                                 }}
                             />
+                        )}
+
+                        {/* Message for new pages */}
+                        {isNewPage && (
+                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
+                                <p className="text-blue-700">
+                                    Save the page first to enable widget management and layout configuration.
+                                </p>
+                            </div>
                         )}
                     </div>
                 </div>
@@ -324,7 +389,7 @@ const ContentEditor = ({ pageData, onUpdate }) => {
 }
 
 // Settings Editor Tab
-const SettingsEditor = ({ pageData, onUpdate }) => {
+const SettingsEditor = ({ pageData, onUpdate, isNewPage }) => {
     return (
         <div className="h-full p-6 overflow-y-auto">
             <div className="max-w-2xl mx-auto space-y-6">
@@ -394,7 +459,7 @@ const SettingsEditor = ({ pageData, onUpdate }) => {
 }
 
 // Metadata Editor Tab
-const MetadataEditor = ({ pageData, onUpdate }) => {
+const MetadataEditor = ({ pageData, onUpdate, isNewPage }) => {
     return (
         <div className="h-full p-6 overflow-y-auto">
             <div className="max-w-2xl mx-auto space-y-6">

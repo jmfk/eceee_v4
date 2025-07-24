@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
     FileText,
@@ -39,7 +40,8 @@ import BulkPublishingOperations from '../components/BulkPublishingOperations'
 import NamespaceManager from '../components/NamespaceManager'
 import { extractErrorMessage } from '../utils/errorHandling.js'
 
-const SettingsManager = ({ onEditPage }) => {
+const SettingsManager = () => {
+    const navigate = useNavigate()
     const [activeTab, setActiveTab] = useState('layouts')
     const [selectedPage, setSelectedPage] = useState(null)
     const [searchTerm, setSearchTerm] = useState('')
@@ -243,15 +245,11 @@ const SettingsManager = ({ onEditPage }) => {
         duplicatePageMutation.mutate(page)
     }
 
-    // Handle editing page with fullscreen editor if available
+    // Handle editing page with fullscreen editor
     const handleEditPage = (page) => {
-        if (onEditPage) {
-            onEditPage(page, { previousView: 'settings' })
-        } else {
-            // Fallback to inline editing
-            setSelectedPage(page)
-            setIsEditing(true)
-        }
+        navigate(`/pages/${page.id}/edit`, {
+            state: { previousView: '/settings' }
+        })
     }
 
 

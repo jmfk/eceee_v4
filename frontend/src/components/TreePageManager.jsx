@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
     Search,
@@ -42,7 +43,9 @@ const useDebounce = (value, delay) => {
     return debouncedValue
 }
 
-const TreePageManager = ({ onEditPage }) => {
+const TreePageManager = () => {
+    const navigate = useNavigate()
+
     // State management
     const [pages, setPages] = useState([])
     const [searchTerm, setSearchTerm] = useState('')
@@ -387,40 +390,29 @@ const TreePageManager = ({ onEditPage }) => {
 
     // Edit handler
     const handleEdit = useCallback((page) => {
-        if (onEditPage) {
-            onEditPage(page)
-        } else {
-            console.log('Page editing functionality needs to be implemented')
-        }
-    }, [onEditPage])
+        navigate(`/pages/${page.id}/edit`, {
+            state: { previousView: '/pages' }
+        })
+    }, [navigate])
 
     // Add child page handler
     const handleAddPageBelow = useCallback((targetPage) => {
-        if (onEditPage) {
-            onEditPage(null, {
+        navigate('/pages/new', {
+            state: {
+                previousView: '/pages',
                 parentPage: targetPage,
                 parentId: targetPage.id,
                 suggestedSortOrder: 0
-            })
-        } else {
-            setPositioningParams({
-                parentPage: targetPage,
-                parentId: targetPage.id,
-                suggestedSortOrder: 0
-            })
-            setShowCreateModal(true)
-        }
-    }, [onEditPage])
+            }
+        })
+    }, [navigate])
 
     // Handle create new page
     const handleCreateNewPage = useCallback(() => {
-        if (onEditPage) {
-            onEditPage(null)
-        } else {
-            setPositioningParams(null)
-            setShowCreateModal(true)
-        }
-    }, [onEditPage])
+        navigate('/pages/new', {
+            state: { previousView: '/pages' }
+        })
+    }, [navigate])
 
     // Handle create root page
     const handleCreateRootPage = useCallback(() => {
