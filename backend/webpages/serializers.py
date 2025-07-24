@@ -8,6 +8,7 @@ including hierarchical relationships and inheritance logic.
 from rest_framework import serializers
 from django.contrib.auth.models import User
 from .models import WebPage, PageVersion, PageTheme
+from django.utils import timezone
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -295,6 +296,11 @@ class WebPageDetailSerializer(serializers.ModelSerializer):
     available_code_layouts = serializers.SerializerMethodField()
     children_count = serializers.SerializerMethodField()
 
+    # Enhanced CSS injection fields
+    effective_css_data = serializers.SerializerMethodField()
+    widget_css_data = serializers.SerializerMethodField()
+    css_validation_status = serializers.SerializerMethodField()
+
     class Meta:
         model = WebPage
         fields = [
@@ -309,19 +315,19 @@ class WebPageDetailSerializer(serializers.ModelSerializer):
             "code_layout",
             "theme",
             "theme_id",
+            "page_css_variables",  # New field
+            "page_custom_css",  # New field
+            "enable_css_injection",  # New field
             "publication_status",
             "effective_date",
             "expiry_date",
             "meta_title",
             "meta_description",
             "meta_keywords",
-            "linked_object_type",
-            "linked_object_id",
             "created_at",
             "updated_at",
             "created_by",
             "last_modified_by",
-            # "widgets",  # Removed - widgets now in PageVersion
             "absolute_url",
             "is_published",
             "breadcrumbs",
@@ -331,6 +337,9 @@ class WebPageDetailSerializer(serializers.ModelSerializer):
             "layout_inheritance_info",
             "available_code_layouts",
             "children_count",
+            "effective_css_data",  # New computed field
+            "widget_css_data",  # New computed field
+            "css_validation_status",  # New computed field
         ]
         read_only_fields = [
             "id",
@@ -413,6 +422,44 @@ class WebPageDetailSerializer(serializers.ModelSerializer):
 
     def get_children_count(self, obj):
         return obj.children.count()
+
+    def get_effective_css_data(self, obj):
+        """Get all CSS data for this page"""
+        try:
+            return obj.get_effective_css_data()
+        except Exception as e:
+            # Handle gracefully if CSS system isn't fully integrated
+            return {
+                "error": str(e),
+                "theme_css_variables": {},
+                "page_css_variables": obj.page_css_variables or {},
+                "enable_css_injection": obj.enable_css_injection,
+            }
+
+    def get_widget_css_data(self, obj):
+        """Get widget-specific CSS data"""
+        try:
+            return obj.get_widget_css_data()
+        except Exception as e:
+            return {"error": str(e), "widgets_css": {}, "css_dependencies": []}
+
+    def get_css_validation_status(self, obj):
+        """Get CSS validation status for this page"""
+        try:
+            is_valid, errors, warnings = obj.validate_page_css()
+            return {
+                "is_valid": is_valid,
+                "errors": errors,
+                "warnings": warnings,
+                "validated_at": timezone.now().isoformat(),
+            }
+        except Exception as e:
+            return {
+                "is_valid": False,
+                "errors": [f"Validation error: {str(e)}"],
+                "warnings": [],
+                "validated_at": timezone.now().isoformat(),
+            }
 
     def validate_code_layout(self, value):
         """Validate that the code layout exists if specified"""
