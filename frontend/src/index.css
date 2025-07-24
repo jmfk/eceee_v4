@@ -1,4 +1,7 @@
 @import "tailwindcss";
+@import 'tailwindcss/base';
+@import 'tailwindcss/components';
+@import 'tailwindcss/utilities';
 
 /* Custom CSS for AI-integrated development environment */
 @layer base {
@@ -127,4 +130,178 @@ div[style*="z-index"] {
 
 .toast-notification {
   z-index: 9999 !important;
+}
+
+/* HTML Slot Detection and Management Styles */
+.widget-slot-container {
+  position: relative;
+  min-height: 2rem;
+  transition: all 0.2s ease-in-out;
+}
+
+.widget-slot-empty {
+  border: 2px dashed #d1d5db;
+  border-radius: 0.5rem;
+  background-color: #f9fafb;
+  min-height: 3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.widget-slot-empty:hover {
+  border-color: #6b7280;
+  background-color: #f3f4f6;
+}
+
+.widget-slot-highlighted {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+  background-color: rgba(59, 130, 246, 0.05);
+  border-radius: 0.25rem;
+}
+
+.widget-slot-active {
+  outline: 2px solid #10b981;
+  outline-offset: 2px;
+  background-color: rgba(16, 185, 129, 0.05);
+  border-radius: 0.25rem;
+}
+
+.widget-slot-editing {
+  animation: slot-pulse 2s infinite;
+}
+
+@keyframes slot-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* Slot overlay for empty slots in edit mode */
+.widget-slot-container.widget-slot-empty::before {
+  content: attr(data-slot-title) " Slot";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #6b7280;
+  font-size: 0.875rem;
+  font-weight: 500;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.widget-slot-container.widget-slot-empty[data-widget-slot]::after {
+  content: "data-widget-slot=\"" attr(data-widget-slot) "\"";
+  position: absolute;
+  bottom: 0.25rem;
+  left: 0.25rem;
+  background-color: rgba(75, 85, 99, 0.9);
+  color: white;
+  font-size: 0.75rem;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+  pointer-events: none;
+  z-index: 2;
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
+}
+
+.widget-slot-container.widget-slot-highlighted::after {
+  opacity: 1;
+}
+
+/* Management overlay styles */
+.slot-management-overlay {
+  position: relative;
+  z-index: 10;
+}
+
+.empty-slot-indicator {
+  position: relative;
+  min-height: 4rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  transition: all 0.3s ease-in-out;
+}
+
+.empty-slot-indicator:hover {
+  background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.slot-limit-indicator {
+  animation: warning-pulse 2s infinite;
+}
+
+@keyframes warning-pulse {
+  0%, 100% {
+    background-color: #fefce8;
+    border-color: #fed7aa;
+  }
+  50% {
+    background-color: #fef3c7;
+    border-color: #f59e0b;
+  }
+}
+
+/* Enhanced widget wrapper in HTML slots */
+.widget-wrapper {
+  position: relative;
+  transition: all 0.2s ease-in-out;
+}
+
+.widget-wrapper:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Responsive design for slot management */
+@media (max-width: 768px) {
+  .widget-slot-container.widget-slot-empty::before {
+    font-size: 0.75rem;
+  }
+  
+  .widget-slot-container.widget-slot-empty::after {
+    font-size: 0.625rem;
+    bottom: 0.125rem;
+    left: 0.125rem;
+    padding: 0.0625rem 0.125rem;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .widget-slot-highlighted {
+    outline-color: #1e40af;
+    background-color: rgba(30, 64, 175, 0.1);
+  }
+  
+  .widget-slot-active {
+    outline-color: #047857;
+    background-color: rgba(4, 120, 87, 0.1);
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .widget-slot-container,
+  .widget-wrapper,
+  .empty-slot-indicator {
+    transition: none;
+  }
+  
+  .widget-slot-editing,
+  .slot-limit-indicator {
+    animation: none;
+  }
 }

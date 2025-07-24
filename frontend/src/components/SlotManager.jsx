@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
     Plus,
@@ -17,7 +17,12 @@ import {
     ArrowUp,
     ArrowDown,
     Code,
-    Layout
+    Layout,
+    Search,
+    Target,
+    CheckCircle,
+    XCircle,
+    Info
 } from 'lucide-react'
 import axios from 'axios'
 import toast from 'react-hot-toast'
@@ -38,6 +43,7 @@ import {
 } from '../api/versions'
 import { SlotStateFactory } from '../utils/slotState'
 import { widgetHelpers, createWidgetModel } from '../utils/widgetHelpers'
+import { useHtmlSlots } from '../hooks/useHtmlSlots'
 
 // Extracted component for widget action buttons
 const WidgetActionButtons = ({
@@ -207,6 +213,284 @@ const WidgetCard = ({
     )
 }
 
+// Enhanced HTML Slot Card Component for template-based layouts
+const HtmlSlotCard = ({
+    slot,
+    widgets = [],
+    isActive = false,
+    onAddWidget,
+    onEditWidget,
+    onDeleteWidget,
+    onSlotClick,
+    onSlotValidate
+}) => {
+    const [isHighlighted, setIsHighlighted] = useState(false)
+
+    const handleSlotClick = () => {
+        if (onSlotClick) onSlotClick(slot)
+        setIsHighlighted(!isHighlighted)
+    }
+
+    const slotValidation = slot.isValid ?
+        { isValid: true, errors: [], warnings: [] } :
+        { isValid: false, errors: slot.errors || [], warnings: slot.warnings || [] }
+
+    return (
+        <div className={`
+            bg-white border rounded-lg transition-all duration-200
+            ${isActive ? 'border-blue-500 shadow-lg' : 'border-gray-200'}
+            ${isHighlighted ? 'ring-2 ring-blue-200' : ''}
+            ${!slotValidation.isValid ? 'border-red-300 bg-red-50' : ''}
+        `}>
+            {/* Slot Header */}
+            <div
+                className="p-4 border-b border-gray-200 cursor-pointer hover:bg-gray-50"
+                onClick={handleSlotClick}
+            >
+                <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                        <div className="flex items-center space-x-2">
+                            <Target className="w-4 h-4 text-gray-400" />
+                            <h4 className="font-medium text-gray-900">
+                                {slot.display_name || slot.name}
+                            </h4>
+                            {!slotValidation.isValid && (
+                                <XCircle className="w-4 h-4 text-red-500" />
+                            )}
+                            {slotValidation.isValid && widgets.length === 0 && (
+                                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">
+                                    Empty
+                                </span>
+                            )}
+                            {widgets.length > 0 && (
+                                <span className="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded">
+                                    {widgets.length} widget{widgets.length !== 1 ? 's' : ''}
+                                </span>
+                            )}
+                            {slot.max_widgets && (
+                                <span className="text-xs bg-yellow-100 text-yellow-600 px-2 py-0.5 rounded">
+                                    Max: {slot.max_widgets}
+                                </span>
+                            )}
+                        </div>
+                        {slot.description && (
+                            <p className="text-sm text-gray-500 mt-1">
+                                {slot.description}
+                            </p>
+                        )}
+                    </div>
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation()
+                            onAddWidget(slot)
+                        }}
+                        disabled={slot.max_widgets && widgets.length >= slot.max_widgets}
+                        className="inline-flex items-center px-3 py-1 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <Plus className="w-4 h-4 mr-1" />
+                        Add Widget
+                    </button>
+                </div>
+
+                {/* Validation Errors */}
+                {!slotValidation.isValid && (
+                    <div className="mt-3 p-2 bg-red-100 border border-red-200 rounded text-sm">
+                        <div className="flex items-center space-x-1 text-red-700 font-medium mb-1">
+                            <AlertTriangle className="w-4 h-4" />
+                            <span>Slot Validation Errors</span>
+                        </div>
+                        <ul className="text-red-600 space-y-1 text-xs">
+                            {slotValidation.errors.map((error, index) => (
+                                <li key={index}>• {error}</li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
+
+                {/* Validation Warnings */}
+                {slotValidation.warnings.length > 0 && (
+                    <div className="mt-2 p-2 bg-yellow-100 border border-yellow-200 rounded text-sm">
+                        <div className="flex items-center space-x-1 text-yellow-700 font-medium mb-1">
+                            <Info className="w-4 h-4" />
+                            <span>Warnings</span>
+                        </div>
+                        <ul className="text-yellow-600 space-y-1 text-xs">
+                            {slotValidation.warnings.map((warning, index) => (
+                                <li key={index}>• {warning}</li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
+            </div>
+
+            {/* Slot Widgets */}
+            <div className="p-4">
+                {widgets.length > 0 ? (
+                    <div className="space-y-3">
+                        {widgets.map((widget, index) => (
+                            <WidgetCard
+                                key={widget.id}
+                                widget={widget}
+                                index={index}
+                                totalWidgets={widgets.length}
+                                onEdit={onEditWidget}
+                                onDelete={onDeleteWidget}
+                                onMove={(widget, direction) => {
+                                    // HTML slots don't support traditional move operations
+                                    // This could be enhanced with drag-and-drop in the future
+                                    toast.info('Widget reordering in HTML slots will be available soon')
+                                }}
+                                onVisibilityToggle={(widget) => {
+                                    // Visibility toggle still works for HTML slots
+                                    onVisibilityToggle?.(widget)
+                                }}
+                                onPriorityChange={(widget, priority) => {
+                                    // Priority changes still work for HTML slots
+                                    onPriorityChange?.(widget, priority)
+                                }}
+                            />
+                        ))}
+                    </div>
+                ) : (
+                    <div className="text-center py-8 text-gray-500">
+                        <Layers className="w-6 h-6 mx-auto mb-2" />
+                        <p className="text-sm">No widgets in this slot</p>
+                        <p className="text-xs">Click "Add Widget" to get started</p>
+                        {slot.allowed_widget_types && slot.allowed_widget_types.length > 0 && (
+                            <p className="text-xs mt-1 text-gray-400">
+                                Accepts: {slot.allowed_widget_types.join(', ')}
+                            </p>
+                        )}
+                    </div>
+                )}
+            </div>
+
+            {/* Slot Debug Info (development only) */}
+            {process.env.NODE_ENV === 'development' && (
+                <div className="border-t border-gray-200 p-3 bg-gray-50">
+                    <details className="text-xs">
+                        <summary className="cursor-pointer text-gray-600 hover:text-gray-800">
+                            Debug Info
+                        </summary>
+                        <div className="mt-2 space-y-1 text-gray-500">
+                            <div>Selector: {slot.selector}</div>
+                            <div>Element: {slot.element ? 'Available' : 'Missing'}</div>
+                            <div>CSS Classes: {slot.css_classes || 'None'}</div>
+                            {slot.responsive && <div>Responsive: Yes</div>}
+                        </div>
+                    </details>
+                </div>
+            )}
+        </div>
+    )
+}
+
+// HTML Slot Detection Panel
+const HtmlSlotDetectionPanel = ({
+    validation,
+    slotsConfiguration,
+    onSlotHighlight,
+    onSlotUnhighlight,
+    onRefreshSlots
+}) => {
+    const stats = {
+        total: slotsConfiguration.length,
+        valid: slotsConfiguration.filter(s => s.isValid).length,
+        invalid: slotsConfiguration.filter(s => !s.isValid).length,
+        empty: slotsConfiguration.filter(s => !s.widgets || s.widgets.length === 0).length
+    }
+
+    return (
+        <div className="bg-white rounded-lg shadow p-4 mb-6">
+            <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-medium text-gray-900">HTML Slot Detection</h3>
+                <button
+                    onClick={onRefreshSlots}
+                    className="inline-flex items-center px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+                >
+                    <Search className="w-4 h-4 mr-1" />
+                    Refresh
+                </button>
+            </div>
+
+            {/* Detection Stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                <div className="text-center">
+                    <div className="text-2xl font-bold text-blue-600">{stats.total}</div>
+                    <div className="text-xs text-gray-500">Total Slots</div>
+                </div>
+                <div className="text-center">
+                    <div className="text-2xl font-bold text-green-600">{stats.valid}</div>
+                    <div className="text-xs text-gray-500">Valid</div>
+                </div>
+                <div className="text-center">
+                    <div className="text-2xl font-bold text-red-600">{stats.invalid}</div>
+                    <div className="text-xs text-gray-500">Invalid</div>
+                </div>
+                <div className="text-center">
+                    <div className="text-2xl font-bold text-gray-600">{stats.empty}</div>
+                    <div className="text-xs text-gray-500">Empty</div>
+                </div>
+            </div>
+
+            {/* Validation Status */}
+            <div className={`p-3 rounded-lg ${validation.isValid ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+                <div className="flex items-center space-x-2">
+                    {validation.isValid ? (
+                        <CheckCircle className="w-5 h-5 text-green-600" />
+                    ) : (
+                        <XCircle className="w-5 h-5 text-red-600" />
+                    )}
+                    <span className={`font-medium ${validation.isValid ? 'text-green-800' : 'text-red-800'}`}>
+                        {validation.isValid ? 'All slots are valid' : `${validation.errors.length} validation error(s)`}
+                    </span>
+                </div>
+
+                {!validation.isValid && validation.errors.length > 0 && (
+                    <ul className="mt-2 text-sm text-red-700 space-y-1">
+                        {validation.errors.slice(0, 3).map((error, index) => (
+                            <li key={index}>• {error}</li>
+                        ))}
+                        {validation.errors.length > 3 && (
+                            <li className="text-red-600">... and {validation.errors.length - 3} more</li>
+                        )}
+                    </ul>
+                )}
+
+                {validation.warnings.length > 0 && (
+                    <div className="mt-2">
+                        <div className="text-yellow-700 font-medium text-sm">Warnings:</div>
+                        <ul className="text-sm text-yellow-600 space-y-1">
+                            {validation.warnings.slice(0, 2).map((warning, index) => (
+                                <li key={index}>• {warning}</li>
+                            ))}
+                            {validation.warnings.length > 2 && (
+                                <li className="text-yellow-600">... and {validation.warnings.length - 2} more</li>
+                            )}
+                        </ul>
+                    </div>
+                )}
+            </div>
+
+            {/* Slot Actions */}
+            <div className="flex space-x-2 mt-4">
+                <button
+                    onClick={onSlotHighlight}
+                    className="flex-1 px-3 py-2 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                >
+                    Highlight All Slots
+                </button>
+                <button
+                    onClick={onSlotUnhighlight}
+                    className="flex-1 px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+                >
+                    Remove Highlights
+                </button>
+            </div>
+        </div>
+    )
+}
+
 const SlotManager = ({ pageId, layout, onWidgetChange }) => {
     const [selectedSlot, setSelectedSlot] = useState(null)
     const [showWidgetLibrary, setShowWidgetLibrary] = useState(false)
@@ -214,6 +498,9 @@ const SlotManager = ({ pageId, layout, onWidgetChange }) => {
     const [configuringWidget, setConfiguringWidget] = useState(null)
     const queryClient = useQueryClient()
     const { showConfirm } = useNotificationContext()
+
+    // References for HTML slot detection
+    const templateContainerRef = useRef(null)
 
     // Fetch page widgets from current version
     const { data: pageWidgetsData, isLoading } = useQuery({
@@ -227,6 +514,35 @@ const SlotManager = ({ pageId, layout, onWidgetChange }) => {
 
     // Create slot state manager
     const slotState = SlotStateFactory.createFromQuery({ widgets: pageWidgetsData })
+
+    // Check if this is a template-based layout
+    const isTemplateBasedLayout = layout?.template_based || layout?.html
+
+    // HTML slot detection for template-based layouts
+    const htmlSlots = useHtmlSlots({
+        containerElement: templateContainerRef.current,
+        layout,
+        widgetsBySlot: slotState.getWidgetsBySlot(),
+        autoDetect: isTemplateBasedLayout,
+        observeChanges: false,
+        enableHighlighting: true,
+        onSlotChange: (slotsConfig) => {
+            // Notify parent component of slot changes if needed
+            onWidgetChange?.()
+        },
+        onSlotValidation: (validation) => {
+            if (!validation.isValid) {
+                console.warn('HTML slot validation issues:', validation.errors)
+            }
+        },
+        onSlotError: (errors) => {
+            errors.forEach(error => toast.error(error))
+        }
+    })
+
+    // Use detected HTML slots for template layouts, fallback to layout configuration for code layouts
+    const slots = isTemplateBasedLayout ? htmlSlots.slotsConfiguration : (layout.slot_configuration?.slots || [])
+    const widgetsBySlot = slotState.getWidgetsBySlot()
 
     // Fetch widget types for the library - now returns direct array
     const { data: widgetTypes } = useQuery({
@@ -415,6 +731,31 @@ const SlotManager = ({ pageId, layout, onWidgetChange }) => {
         })
     }
 
+    // HTML slot management handlers
+    const handleSlotClick = (slot) => {
+        if (isTemplateBasedLayout) {
+            htmlSlots.setActiveSlot(slot.name)
+        }
+    }
+
+    const handleSlotHighlight = () => {
+        if (isTemplateBasedLayout) {
+            htmlSlots.highlightSlots()
+        }
+    }
+
+    const handleSlotUnhighlight = () => {
+        if (isTemplateBasedLayout) {
+            htmlSlots.unhighlightSlots()
+        }
+    }
+
+    const handleRefreshSlots = () => {
+        if (isTemplateBasedLayout) {
+            htmlSlots.detectSlots()
+        }
+    }
+
     if (!layout) {
         return (
             <div className="bg-white rounded-lg shadow p-6">
@@ -426,11 +767,7 @@ const SlotManager = ({ pageId, layout, onWidgetChange }) => {
         )
     }
 
-    const slots = layout.slot_configuration?.slots || []
-    const widgetsBySlot = slotState.getWidgetsBySlot()
-
-    // Check if this is a template-based layout
-    const isTemplateBasedLayout = layout?.template_based || layout?.html
+    // Variables will be defined above after HTML slot detection
 
     if (isLoading) {
         return (
@@ -469,21 +806,33 @@ const SlotManager = ({ pageId, layout, onWidgetChange }) => {
                     </div>
                 </div>
 
+                {/* HTML Slot Detection Panel */}
+                <HtmlSlotDetectionPanel
+                    validation={htmlSlots.validation}
+                    slotsConfiguration={htmlSlots.slotsConfiguration}
+                    onSlotHighlight={handleSlotHighlight}
+                    onSlotUnhighlight={handleSlotUnhighlight}
+                    onRefreshSlots={handleRefreshSlots}
+                />
+
                 {/* Template-based layout renderer with portal management */}
                 <div className="bg-white rounded-lg shadow overflow-hidden">
-                    <TemplateLayoutRenderer
-                        layout={layout}
-                        widgetsBySlot={widgetsBySlot}
-                        mode="edit"
-                        showInheritance={true}
-                        onWidgetEdit={handleEditWidget}
-                        onWidgetAdd={handleAddWidget}
-                        className="min-h-96"
-                    />
+                    <div ref={templateContainerRef}>
+                        <TemplateLayoutRenderer
+                            layout={layout}
+                            widgetsBySlot={widgetsBySlot}
+                            mode="edit"
+                            showInheritance={true}
+                            onWidgetEdit={handleEditWidget}
+                            onWidgetAdd={handleAddWidget}
+                            onSlotClick={handleSlotClick}
+                            className="min-h-96"
+                        />
+                    </div>
 
                     {/* Widget portal manager for actual widget mounting */}
                     <WidgetPortalManager
-                        slotElements={{}} // Will be populated by TemplateLayoutRenderer
+                        slotElements={htmlSlots.slotElements}
                         widgetsBySlot={widgetsBySlot}
                         layout={layout}
                         mode="edit"
@@ -497,6 +846,45 @@ const SlotManager = ({ pageId, layout, onWidgetChange }) => {
                         showManagementOverlay={true}
                     />
                 </div>
+
+                {/* Enhanced HTML Slot Management Grid */}
+                {htmlSlots.hasSlots && (
+                    <div className="space-y-4">
+                        <h3 className="text-lg font-medium text-gray-900">HTML Slots</h3>
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            {htmlSlots.slotsConfiguration.map((slot) => {
+                                const slotWidgets = widgetsBySlot[slot.name] || []
+                                return (
+                                    <HtmlSlotCard
+                                        key={slot.name}
+                                        slot={slot}
+                                        widgets={slotWidgets}
+                                        isActive={htmlSlots.activeSlot === slot.name}
+                                        onAddWidget={handleAddWidget}
+                                        onEditWidget={handleEditWidget}
+                                        onDeleteWidget={handleDeleteWidget}
+                                        onSlotClick={handleSlotClick}
+                                        onVisibilityToggle={handleVisibilityToggle}
+                                        onPriorityChange={handlePriorityChange}
+                                    />
+                                )
+                            })}
+                        </div>
+                    </div>
+                )}
+
+                {/* No slots detected message */}
+                {!htmlSlots.hasSlots && !htmlSlots.isDetecting && (
+                    <div className="bg-white rounded-lg shadow p-8">
+                        <div className="text-center text-gray-500">
+                            <Search className="w-8 h-8 mx-auto mb-2" />
+                            <p>No HTML slots detected in this template.</p>
+                            <p className="text-sm mt-1">
+                                Add <code className="bg-gray-100 px-1 rounded">data-widget-slot="slot-name"</code> attributes to HTML elements to create slots.
+                            </p>
+                        </div>
+                    </div>
+                )}
 
                 {/* Template layout debugging info (development only) */}
                 {process.env.NODE_ENV === 'development' && (
