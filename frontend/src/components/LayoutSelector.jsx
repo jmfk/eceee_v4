@@ -4,7 +4,7 @@
  * A reusable component for selecting code-based layouts in forms.
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ChevronDown, Code, Search, X } from 'lucide-react'
 import { layoutsApi, layoutUtils } from '../api/layouts'
@@ -25,6 +25,8 @@ const LayoutSelector = ({
     const [isOpen, setIsOpen] = useState(false)
     const [searchTerm, setSearchTerm] = useState('')
     const [selectedLayout, setSelectedLayout] = useState(null)
+    const [dropdownPosition, setDropdownPosition] = useState({ openUpward: false, maxHeight: 384 })
+    const containerRef = useRef(null)
 
     // Fetch code layouts
     const { data: layoutsData, isLoading } = useQuery({
@@ -71,6 +73,55 @@ const LayoutSelector = ({
         }
     }, [value, layoutsData])
 
+    // Calculate dropdown position when opening
+    const calculateDropdownPosition = () => {
+        if (!containerRef.current) return
+
+        const rect = containerRef.current.getBoundingClientRect()
+        const viewportHeight = window.innerHeight
+        const spaceBelow = viewportHeight - rect.bottom
+        const spaceAbove = rect.top
+
+        // Use consistent height to avoid unpredictable behavior
+        const dropdownHeight = 320 // Fixed height for predictability
+
+        // Determine if we should open upward
+        const shouldOpenUpward = spaceBelow < dropdownHeight && spaceAbove > spaceBelow
+
+        setDropdownPosition({
+            openUpward: shouldOpenUpward,
+            maxHeight: dropdownHeight
+        })
+    }
+
+    // Calculate position when dropdown opens and handle click outside
+    useEffect(() => {
+        if (isOpen) {
+            calculateDropdownPosition()
+
+            // Handle resize
+            const handleResize = () => {
+                // Small delay to ensure resize is complete
+                setTimeout(calculateDropdownPosition, 10)
+            }
+
+            // Handle click outside to close dropdown
+            const handleClickOutside = (event) => {
+                if (containerRef.current && !containerRef.current.contains(event.target)) {
+                    setIsOpen(false)
+                }
+            }
+
+            window.addEventListener('resize', handleResize)
+            document.addEventListener('mousedown', handleClickOutside)
+
+            return () => {
+                window.removeEventListener('resize', handleResize)
+                document.removeEventListener('mousedown', handleClickOutside)
+            }
+        }
+    }, [isOpen])
+
     const handleSelect = (option) => {
         onChange(option.value)
         setIsOpen(false)
@@ -81,6 +132,7 @@ const LayoutSelector = ({
         e.stopPropagation()
         onChange('')
         setSelectedLayout(null)
+        setIsOpen(false)
     }
 
     const renderOption = (option) => (
@@ -132,7 +184,7 @@ const LayoutSelector = ({
     }
 
     return (
-        <div className={`relative ${className}`}>
+        <div ref={containerRef} className={`relative ${className}`}>
             {/* Label */}
             {label && (
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -194,7 +246,10 @@ const LayoutSelector = ({
 
                 {/* Dropdown */}
                 {isOpen && (
-                    <div className="absolute z-10 mt-1 w-full bg-white shadow-lg max-h-96 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm">
+                    <div
+                        className={`absolute z-10 w-full bg-white shadow-lg rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm ${dropdownPosition.openUpward ? 'bottom-full mb-1' : 'top-full mt-1'}`}
+                        style={{ maxHeight: `${dropdownPosition.maxHeight}px` }}
+                    >
                         {/* Search */}
                         <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-3 py-2">
                             <div className="relative">
@@ -248,13 +303,11 @@ const LayoutSelector = ({
                 )}
             </div>
 
-            {/* Click outside to close */}
-            {isOpen && (
-                <div
-                    className="fixed inset-0 z-0"
-                    onClick={() => setIsOpen(false)}
-                />
+            {/* Bottom spacer when dropdown is open downward - ensures scrollable space */}
+            {isOpen && !dropdownPosition.openUpward && (
+                <div style={{ height: '350px' }} />
             )}
+
         </div>
     )
 }
