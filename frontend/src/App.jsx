@@ -2,11 +2,13 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster, toast } from 'react-hot-toast'
 import { X } from 'lucide-react'
+import { useState } from 'react'
 import Navbar from '@components/Navbar'
 import HomePage from '@pages/HomePage'
 import AboutPage from '@pages/AboutPage'
 import SettingsManager from '@pages/SettingsManager'
 import TreePageManager from '@components/TreePageManager'
+import PageEditor from '@components/PageEditor'
 import NotFoundPage from '@pages/NotFoundPage'
 import { NotificationProvider } from '@components/NotificationManager'
 
@@ -22,21 +24,65 @@ const queryClient = new QueryClient({
 })
 
 function App() {
+  // State for page editor
+  const [pageEditorState, setPageEditorState] = useState({
+    isOpen: false,
+    pageId: null,
+    previousView: 'tree'
+  })
+
+  // Handle opening page editor
+  const handleEditPage = (page, context = {}) => {
+    setPageEditorState({
+      isOpen: true,
+      pageId: page?.id || null,
+      previousView: context.previousView || 'tree'
+    })
+  }
+
+  // Handle closing page editor
+  const handleClosePageEditor = () => {
+    setPageEditorState({
+      isOpen: false,
+      pageId: null,
+      previousView: 'tree'
+    })
+  }
+
   return (
     <QueryClientProvider client={queryClient}>
       <NotificationProvider>
         <Router>
           <div className="min-h-screen bg-gray-50">
-            <Navbar />
-            <main className="container mx-auto px-4 py-8">
-              <Routes>
-                <Route path="/" element={<HomePage />} />
-                <Route path="/about" element={<AboutPage />} />
-                <Route path="/pages" element={<TreePageManager />} />
-                <Route path="/settings" element={<SettingsManager />} />
-                <Route path="*" element={<NotFoundPage />} />
-              </Routes>
-            </main>
+            {/* Main application layout - hidden when page editor is open */}
+            {!pageEditorState.isOpen && (
+              <>
+                <Navbar />
+                <main className="container mx-auto px-4 py-8">
+                  <Routes>
+                    <Route path="/" element={<HomePage />} />
+                    <Route path="/about" element={<AboutPage />} />
+                    <Route path="/pages" element={
+                      <TreePageManager onEditPage={handleEditPage} />
+                    } />
+                    <Route path="/settings" element={
+                      <SettingsManager onEditPage={handleEditPage} />
+                    } />
+                    <Route path="*" element={<NotFoundPage />} />
+                  </Routes>
+                </main>
+              </>
+            )}
+
+            {/* Page Editor - renders in fullscreen when open */}
+            {pageEditorState.isOpen && (
+              <PageEditor
+                pageId={pageEditorState.pageId}
+                onClose={handleClosePageEditor}
+                previousView={pageEditorState.previousView}
+              />
+            )}
+
             <Toaster
               position="top-center"
               toastOptions={{
