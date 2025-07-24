@@ -24,6 +24,12 @@ export const layoutsApi = {
             return response.data
         },
 
+        // Get template data for layout (Phase 3.1)
+        getTemplateData: async (name) => {
+            const response = await axios.get(`${API_BASE}/code-layouts/${name}/template/`)
+            return response.data
+        },
+
         // Get layout choices for forms
         choices: async (activeOnly = true) => {
             const response = await axios.get(`${API_BASE}/code-layouts/choices/`, {
@@ -68,12 +74,45 @@ export const layoutsApi = {
                         value: layout.name,
                         label: layout.name,
                         type: 'code',
-                        layout: layout
+                        layout: layout,
+                        template_based: layout.template_based || false
                     })
                 })
             }
 
             return options
+        },
+
+        // Get enhanced layout with template data (Phase 3.1)
+        getEnhancedLayout: async (layoutName) => {
+            try {
+                // First get basic layout info
+                const layout = await layoutsApi.codeLayouts.get(layoutName)
+
+                // If it's template-based, get template data
+                if (layout.template_based || layout.html) {
+                    try {
+                        const templateData = await layoutsApi.codeLayouts.getTemplateData(layoutName)
+                        return {
+                            ...layout,
+                            ...templateData,
+                            template_data_loaded: true
+                        }
+                    } catch (templateError) {
+                        console.warn(`Could not load template data for ${layoutName}:`, templateError)
+                        return {
+                            ...layout,
+                            template_data_loaded: false,
+                            template_error: templateError.message
+                        }
+                    }
+                }
+
+                return layout
+            } catch (error) {
+                console.error(`Failed to load layout ${layoutName}:`, error)
+                throw error
+            }
         }
     },
 

@@ -15,13 +15,17 @@ import {
     GripVertical,
     Hash,
     ArrowUp,
-    ArrowDown
+    ArrowDown,
+    Code,
+    Layout
 } from 'lucide-react'
 import axios from 'axios'
 import toast from 'react-hot-toast'
 import { useNotificationContext } from './NotificationManager'
 import WidgetLibrary from './WidgetLibrary'
 import WidgetConfigurator from './WidgetConfigurator'
+import TemplateLayoutRenderer from './TemplateLayoutRenderer'
+import WidgetPortalManager from './WidgetPortalManager'
 import {
     getPageWidgets,
     addWidget,
@@ -425,6 +429,9 @@ const SlotManager = ({ pageId, layout, onWidgetChange }) => {
     const slots = layout.slot_configuration?.slots || []
     const widgetsBySlot = slotState.getWidgetsBySlot()
 
+    // Check if this is a template-based layout
+    const isTemplateBasedLayout = layout?.template_based || layout?.html
+
     if (isLoading) {
         return (
             <div className="bg-white rounded-lg shadow p-6">
@@ -440,13 +447,159 @@ const SlotManager = ({ pageId, layout, onWidgetChange }) => {
         )
     }
 
+    // For template-based layouts, use the new template renderer with portal system
+    if (isTemplateBasedLayout) {
+        return (
+            <div className="space-y-6">
+                {/* Header with template indicator */}
+                <div className="bg-white rounded-lg shadow p-4">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <div className="flex items-center space-x-2">
+                                <h3 className="text-lg font-medium text-gray-900">Template Layout: {layout.name}</h3>
+                                <span className="inline-flex items-center px-2 py-1 rounded-full bg-blue-100 text-blue-800 text-xs">
+                                    <Layout className="w-3 h-3 mr-1" />
+                                    HTML Template
+                                </span>
+                            </div>
+                            <p className="text-sm text-gray-600 mt-1">
+                                Widgets are managed through React portals in the HTML template structure
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Template-based layout renderer with portal management */}
+                <div className="bg-white rounded-lg shadow overflow-hidden">
+                    <TemplateLayoutRenderer
+                        layout={layout}
+                        widgetsBySlot={widgetsBySlot}
+                        mode="edit"
+                        showInheritance={true}
+                        onWidgetEdit={handleEditWidget}
+                        onWidgetAdd={handleAddWidget}
+                        className="min-h-96"
+                    />
+
+                    {/* Widget portal manager for actual widget mounting */}
+                    <WidgetPortalManager
+                        slotElements={{}} // Will be populated by TemplateLayoutRenderer
+                        widgetsBySlot={widgetsBySlot}
+                        layout={layout}
+                        mode="edit"
+                        showInheritance={true}
+                        onWidgetEdit={handleEditWidget}
+                        onWidgetAdd={handleAddWidget}
+                        onWidgetDelete={(widgetId) => {
+                            const widget = pageWidgetsData?.find(w => w.id === widgetId)
+                            if (widget) handleDeleteWidget(widget)
+                        }}
+                        showManagementOverlay={true}
+                    />
+                </div>
+
+                {/* Template layout debugging info (development only) */}
+                {process.env.NODE_ENV === 'development' && (
+                    <div className="bg-gray-50 rounded-lg p-4">
+                        <details className="text-sm">
+                            <summary className="font-medium text-gray-700 cursor-pointer">
+                                Template Debug Info
+                            </summary>
+                            <div className="mt-2 space-y-2 text-gray-600">
+                                <div>Template File: {layout.template_file || 'Not specified'}</div>
+                                <div>HTML Length: {layout.html?.length || 0} characters</div>
+                                <div>CSS Length: {layout.css?.length || 0} characters</div>
+                                <div>Slots: {slots.length}</div>
+                                <div>Total Widgets: {Object.values(widgetsBySlot).flat().length}</div>
+                            </div>
+                        </details>
+                    </div>
+                )}
+
+                {/* Widget Library Modal */}
+                {showWidgetLibrary && (
+                    <div className="fixed inset-0 bg-gray-600 bg-opacity-10 flex items-center justify-center z-50">
+                        <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 max-h-[90vh] overflow-hidden">
+                            <div className="p-4 border-b">
+                                <h3 className="text-lg font-medium">
+                                    Add Widget to "{selectedSlot?.display_name || selectedSlot?.name}"
+                                </h3>
+                            </div>
+                            <div className="overflow-y-auto max-h-[70vh]">
+                                <WidgetLibrary
+                                    onSelectWidget={handleSelectWidget}
+                                />
+                            </div>
+                            <div className="p-4 border-t">
+                                <button
+                                    onClick={() => {
+                                        setShowWidgetLibrary(false)
+                                        setSelectedSlot(null)
+                                    }}
+                                    className="w-full px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Widget Configuration Modal */}
+                {configuringWidget && (
+                    <div className="fixed inset-0 bg-gray-600 bg-opacity-10 flex items-center justify-center z-50">
+                        <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full mx-4 max-h-[90vh] overflow-hidden">
+                            <div className="overflow-y-auto max-h-[90vh]">
+                                <WidgetConfigurator
+                                    widgetType={configuringWidget.widgetType}
+                                    onSave={handleConfigureSave}
+                                    onCancel={() => setConfiguringWidget(null)}
+                                    title={`Add ${configuringWidget.widgetType.name}`}
+                                    showInheritanceControls={true}
+                                    isEditing={false}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Widget Edit Modal */}
+                {editingWidget && (
+                    <div className="fixed inset-0 bg-gray-600 bg-opacity-10 flex items-center justify-center z-50">
+                        <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full mx-4 max-h-[90vh] overflow-hidden">
+                            <div className="overflow-y-auto max-h-[90vh]">
+                                <WidgetConfigurator
+                                    widgetType={editingWidget.widgetType}
+                                    initialConfig={editingWidget.widget.configuration}
+                                    initialInheritanceSettings={widgetHelpers.extractInheritanceSettings(editingWidget.widget)}
+                                    onSave={handleEditSave}
+                                    onCancel={() => setEditingWidget(null)}
+                                    title={`Edit ${editingWidget.widgetType.name}`}
+                                    showInheritanceControls={true}
+                                    isEditing={true}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+        )
+    }
+
+    // Traditional code-based layout rendering
     return (
         <div className="space-y-6">
-            {/* Header */}
+            {/* Header with code-based indicator */}
             <div className="bg-white rounded-lg shadow p-4">
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Widget Management</h3>
+                <div className="flex items-center space-x-2 mb-2">
+                    <h3 className="text-lg font-medium text-gray-900">Code Layout: {layout.name}</h3>
+                    <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-100 text-green-800 text-xs">
+                        <Code className="w-3 h-3 mr-1" />
+                        Code-Based
+                    </span>
+                </div>
                 <p className="text-sm text-gray-600">
-                    Layout: <strong>{layout.name}</strong> - Manage widgets in each slot
+                    Traditional slot-based widget management with drag-and-drop interface
                 </p>
             </div>
 
