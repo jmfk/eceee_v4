@@ -28,6 +28,13 @@ class BaseWidget(ABC):
     description: str = ""
     template_name: str = "webpages/widgets/default.html"
 
+    # Enhanced CSS injection system
+    widget_css: str = ""  # Widget-specific CSS
+    css_variables: Dict[str, str] = {}  # Widget-specific CSS variables
+    css_dependencies: List[str] = []  # External CSS dependencies (URLs)
+    css_scope: str = "global"  # CSS scoping: 'global', 'widget', 'slot'
+    enable_css_injection: bool = True  # Whether this widget type supports CSS injection
+
     def __init__(self):
         if self.name is None:
             raise ImproperlyConfigured(
@@ -123,6 +130,54 @@ class BaseWidget(ABC):
             "is_active": self.is_active,
             "configuration_schema": self.configuration_model.model_json_schema(),
         }
+
+    def get_css_for_injection(
+        self, widget_instance=None, scope_id: str = None
+    ) -> Dict[str, str]:
+        """
+        Get CSS content for injection including widget-specific styles.
+
+        Args:
+            widget_instance: Specific widget instance (for dynamic CSS)
+            scope_id: CSS scope identifier for scoping
+
+        Returns:
+            Dictionary with CSS content for injection
+        """
+        css_data = {
+            "widget_css": self.widget_css,
+            "css_variables": self.css_variables.copy(),
+            "css_dependencies": self.css_dependencies.copy(),
+            "scope": self.css_scope,
+            "scope_id": scope_id or f"widget-{self.name.lower().replace(' ', '-')}",
+            "enable_injection": self.enable_css_injection,
+        }
+
+        # Allow widget instances to override CSS dynamically
+        if widget_instance and hasattr(widget_instance, "get_dynamic_css"):
+            dynamic_css = widget_instance.get_dynamic_css()
+            if dynamic_css:
+                css_data.update(dynamic_css)
+
+        return css_data
+
+    def validate_css_content(self) -> Tuple[bool, List[str]]:
+        """
+        Validate the widget's CSS content for security and syntax.
+
+        Returns:
+            Tuple of (is_valid, errors)
+        """
+        from .css_validation import css_injection_manager
+
+        if not self.widget_css:
+            return True, []
+
+        is_valid, _, errors = css_injection_manager.validate_and_inject_css(
+            self.widget_css, scope_type=self.css_scope, context=f"Widget: {self.name}"
+        )
+
+        return is_valid, errors
 
 
 class WidgetTypeRegistry:

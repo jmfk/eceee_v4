@@ -111,6 +111,19 @@ class WebPage(models.Model):
         help_text="Leave blank to inherit from parent",
     )
 
+    # Enhanced CSS injection system
+    page_css_variables = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Page-specific CSS variables that override theme variables",
+    )
+    page_custom_css = models.TextField(
+        blank=True, help_text="Page-specific custom CSS injected after theme CSS"
+    )
+    enable_css_injection = models.BooleanField(
+        default=True, help_text="Whether to enable dynamic CSS injection for this page"
+    )
+
     # Publishing control
     publication_status = models.CharField(
         max_length=20,
@@ -1033,6 +1046,219 @@ class WebPage(models.Model):
     def normalize_siblings_sort_orders(self):
         """Normalize sort orders for this page's siblings"""
         self.__class__.normalize_sort_orders(self.parent_id)
+
+    def get_effective_css_data(self):
+        """
+        Get all CSS data for this page including theme, page-specific, and widget CSS.
+
+        Returns:
+            Dictionary with all CSS data needed for injection
+        """
+        css_data = {
+            "theme_css_variables": {},
+            "theme_custom_css": "",
+            "page_css_variables": self.page_css_variables or {},
+            "page_custom_css": self.page_custom_css or "",
+            "enable_css_injection": self.enable_css_injection,
+            "layout_css": "",
+            "widgets_css": {},
+            "css_dependencies": [],
+        }
+
+        # Get theme CSS
+        effective_theme = self.get_effective_theme()
+        if effective_theme:
+            css_data["theme_css_variables"] = effective_theme.css_variables or {}
+            css_data["theme_custom_css"] = effective_theme.custom_css or ""
+
+        # Get layout CSS
+        effective_layout = self.get_effective_layout()
+        if effective_layout and hasattr(effective_layout, "css_classes"):
+            css_data["layout_css"] = effective_layout.css_classes or ""
+
+        # Merge CSS variables (page overrides theme)
+        merged_variables = css_data["theme_css_variables"].copy()
+        merged_variables.update(css_data["page_css_variables"])
+        css_data["merged_css_variables"] = merged_variables
+
+        return css_data
+
+    def get_widget_css_data(self):
+        """
+        Get CSS data from all widgets on this page.
+
+        Returns:
+            Dictionary with widget CSS data organized by slot and widget
+        """
+        from .css_validation import css_injection_manager
+
+        widgets_css = {}
+        css_dependencies = []
+
+        # Get widgets for this page (you might need to adjust this based on your widget model)
+        try:
+            widgets = self.widgets.all() if hasattr(self, "widgets") else []
+
+            for widget in widgets:
+                widget_type = widget.widget_type
+                if hasattr(widget_type, "get_css_for_injection"):
+                    scope_id = css_injection_manager.generate_css_scope_id(
+                        widget_id=str(widget.id),
+                        page_id=str(self.id),
+                        slot_name=widget.slot_name,
+                    )
+
+                    css_data = widget_type.get_css_for_injection(widget, scope_id)
+
+                    if css_data.get("enable_injection") and css_data.get("widget_css"):
+                        slot_name = widget.slot_name
+                        if slot_name not in widgets_css:
+                            widgets_css[slot_name] = []
+
+                        widgets_css[slot_name].append(
+                            {
+                                "widget_id": widget.id,
+                                "widget_type": widget_type.name,
+                                "css_data": css_data,
+                            }
+                        )
+
+                    # Collect CSS dependencies
+                    dependencies = css_data.get("css_dependencies", [])
+                    css_dependencies.extend(dependencies)
+
+        except Exception as e:
+            # Handle gracefully if widget system isn't fully integrated yet
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Could not load widget CSS data: {e}")
+
+        return {
+            "widgets_css": widgets_css,
+            "css_dependencies": list(set(css_dependencies)),  # Remove duplicates
+        }
+
+    def validate_page_css(self):
+        """
+        Validate all CSS content on this page.
+
+        Returns:
+            Tuple of (is_valid, errors, warnings)
+        """
+        from .css_validation import css_injection_manager
+
+        all_errors = []
+        all_warnings = []
+
+        # Validate page custom CSS
+        if self.page_custom_css:
+            is_valid, _, errors = css_injection_manager.validate_and_inject_css(
+                self.page_custom_css, context=f"Page: {self.title}"
+            )
+            if not is_valid:
+                all_errors.extend([f"Page CSS: {error}" for error in errors])
+
+        # Validate theme CSS if we have one
+        effective_theme = self.get_effective_theme()
+        if effective_theme and effective_theme.custom_css:
+            is_valid, _, errors = css_injection_manager.validate_and_inject_css(
+                effective_theme.custom_css, context=f"Theme: {effective_theme.name}"
+            )
+            if not is_valid:
+                all_errors.extend([f"Theme CSS: {error}" for error in errors])
+
+        # Validate widget CSS
+        widget_css_data = self.get_widget_css_data()
+        for slot_name, widgets in widget_css_data["widgets_css"].items():
+            for widget_info in widgets:
+                css_data = widget_info["css_data"]
+                if css_data.get("widget_css"):
+                    is_valid, _, errors = css_injection_manager.validate_and_inject_css(
+                        css_data["widget_css"],
+                        context=f"Widget: {widget_info['widget_type']}",
+                    )
+                    if not is_valid:
+                        all_errors.extend(
+                            [
+                                f"Widget {widget_info['widget_type']}: {error}"
+                                for error in errors
+                            ]
+                        )
+
+        return len(all_errors) == 0, all_errors, all_warnings
+
+    def generate_complete_css(self, include_scoping=True):
+        """
+        Generate complete CSS for this page including all sources.
+
+        Args:
+            include_scoping: Whether to apply CSS scoping
+
+        Returns:
+            Complete CSS string for injection
+        """
+        from .css_validation import css_injection_manager
+
+        css_parts = []
+        css_data = self.get_effective_css_data()
+
+        # Add CSS variables
+        if css_data["merged_css_variables"]:
+            variables_css = ":root {\n"
+            for key, value in css_data["merged_css_variables"].items():
+                if not key.startswith("--"):
+                    key = f"--{key}"
+                variables_css += f"  {key}: {value};\n"
+            variables_css += "}\n"
+            css_parts.append(variables_css)
+
+        # Add theme custom CSS
+        if css_data["theme_custom_css"]:
+            css_parts.append(f"/* Theme CSS */\n{css_data['theme_custom_css']}")
+
+        # Add layout CSS
+        if css_data["layout_css"]:
+            css_parts.append(f"/* Layout CSS */\n{css_data['layout_css']}")
+
+        # Add page custom CSS
+        if css_data["page_custom_css"]:
+            if include_scoping:
+                scope_id = css_injection_manager.generate_css_scope_id(
+                    page_id=str(self.id)
+                )
+                scoped_css = css_injection_manager.scope_css(
+                    css_data["page_custom_css"], scope_id, "page"
+                )
+                css_parts.append(f"/* Page CSS */\n{scoped_css}")
+            else:
+                css_parts.append(f"/* Page CSS */\n{css_data['page_custom_css']}")
+
+        # Add widget CSS
+        widget_css_data = self.get_widget_css_data()
+        for slot_name, widgets in widget_css_data["widgets_css"].items():
+            for widget_info in widgets:
+                css_data = widget_info["css_data"]
+                if css_data.get("widget_css"):
+                    if include_scoping and css_data.get("scope") != "global":
+                        is_valid, scoped_css, _ = (
+                            css_injection_manager.validate_and_inject_css(
+                                css_data["widget_css"],
+                                css_data.get("scope_id"),
+                                css_data.get("scope", "widget"),
+                                f"Widget: {widget_info['widget_type']}",
+                            )
+                        )
+                        if is_valid:
+                            css_parts.append(
+                                f"/* Widget: {widget_info['widget_type']} */\n{scoped_css}"
+                            )
+                    else:
+                        css_parts.append(
+                            f"/* Widget: {widget_info['widget_type']} */\n{css_data['widget_css']}"
+                        )
+
+        return "\n\n".join(css_parts)
 
 
 class PageVersion(models.Model):
