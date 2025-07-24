@@ -16,7 +16,7 @@ import {
     FileText,
     ImageIcon
 } from 'lucide-react'
-import axios from 'axios'
+import { api } from '../api/client'
 
 const WidgetLibrary = ({ onSelectWidget, selectedWidgetTypes = [] }) => {
     const [searchTerm, setSearchTerm] = useState('')
@@ -26,7 +26,7 @@ const WidgetLibrary = ({ onSelectWidget, selectedWidgetTypes = [] }) => {
     const { data: widgetTypes, isLoading, error } = useQuery({
         queryKey: ['widget-types'],
         queryFn: async () => {
-            const response = await axios.get('/api/v1/webpages/widget-types/')
+            const response = await api.get('/api/v1/webpages/widget-types/')
             // New API returns direct array, filter active ones
             return response.data?.filter(widget => widget.is_active) || []
         }

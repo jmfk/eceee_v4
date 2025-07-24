@@ -10,7 +10,7 @@ import {
     Search,
     Layers
 } from 'lucide-react'
-import axios from 'axios'
+import { api } from '../api/client'
 import toast from 'react-hot-toast'
 
 import WidgetLibrary from './WidgetLibrary'
@@ -92,7 +92,7 @@ const SlotManager = ({ pageId, layout, onWidgetChange }) => {
     const { data: widgetTypes } = useQuery({
         queryKey: ['widget-types'],
         queryFn: async () => {
-            const response = await axios.get('/api/v1/widgets/types/')
+            const response = await api.get('/api/v1/webpages/widget-types/')
             return response.data.results || response.data
         }
     })
@@ -111,7 +111,7 @@ const SlotManager = ({ pageId, layout, onWidgetChange }) => {
     })
 
     const updateWidgetMutation = useMutation({
-        mutationFn: ({ widgetId, data }) => updateWidget(widgetId, data),
+        mutationFn: ({ widgetId, data }) => updateWidget(pageId, widgetId, data, 'Updated widget'),
         onSuccess: () => {
             queryClient.invalidateQueries(['page-widgets', pageId])
             toast.success('Widget updated successfully')
@@ -123,7 +123,7 @@ const SlotManager = ({ pageId, layout, onWidgetChange }) => {
     })
 
     const deleteWidgetMutation = useMutation({
-        mutationFn: deleteWidget,
+        mutationFn: ({ widgetId }) => deleteWidget(pageId, widgetId, 'Deleted widget'),
         onSuccess: () => {
             queryClient.invalidateQueries(['page-widgets', pageId])
             toast.success('Widget deleted successfully')
@@ -146,7 +146,7 @@ const SlotManager = ({ pageId, layout, onWidgetChange }) => {
     }
 
     const handleDeleteWidget = (widget) => {
-        deleteWidgetMutation.mutate(widget.id)
+        deleteWidgetMutation.mutate({ widgetId: widget.id })
     }
 
     const handleCreateWidget = async (widgetTypeId, config) => {

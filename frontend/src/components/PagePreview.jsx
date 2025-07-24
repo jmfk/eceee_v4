@@ -11,7 +11,7 @@ import {
     ExternalLink,
     AlertCircle
 } from 'lucide-react'
-import axios from 'axios'
+import { api } from '../api/client'
 import LayoutRenderer from './LayoutRenderer'
 
 const PagePreview = ({
@@ -45,7 +45,7 @@ const PagePreview = ({
     const { data: samplePagesResponse } = useQuery({
         queryKey: ['sample-pages'],
         queryFn: async () => {
-            const response = await axios.get('/api/v1/webpages/pages/?limit=10')
+            const response = await api.get('/api/v1/webpages/pages/?limit=10')
             return response.data
         },
         enabled: !pageId
