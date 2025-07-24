@@ -42,6 +42,37 @@ class TemplateParsingError(Exception):
         super().__init__(full_message)
 
 
+class ExceptionWrapper:
+    """Utility for consistent exception wrapping patterns"""
+
+    @staticmethod
+    def wrap_template_error(
+        exception: Exception, template_file: str, layout_name: str
+    ) -> ImproperlyConfigured:
+        """Wrap template-related exceptions as ImproperlyConfigured"""
+        if isinstance(exception, TemplateDoesNotExist):
+            message = f"Template file '{template_file}' not found for layout '{layout_name}': {exception}"
+        elif isinstance(exception, ImportError):
+            message = f"Missing dependency for template parsing: {exception}"
+        else:
+            message = f"Unexpected error parsing template '{template_file}' for layout '{layout_name}': {exception}"
+
+        logger.error(message)
+        return ImproperlyConfigured(message)
+
+    @staticmethod
+    def wrap_parsing_error(
+        exception: Exception, template_file: str, operation: str
+    ) -> TemplateParsingError:
+        """Wrap parsing exceptions as TemplateParsingError"""
+        if isinstance(exception, TemplateParsingError):
+            return exception
+
+        message = f"Failed to {operation}: {exception}"
+        logger.error(f"Error {operation} from template: {exception}")
+        return TemplateParsingError(message, template_file=template_file)
+
+
 class CSSValidator:
     """Simple CSS syntax validator for template-based layouts"""
 
@@ -86,6 +117,55 @@ class CSSValidator:
                 errors.append(f"Potentially dangerous CSS pattern detected: {pattern}")
 
         return errors
+
+
+class SlotValidator:
+    """Validator for widget slot configurations and parsing"""
+
+    @staticmethod
+    def validate_slot_name(slot_name: str, template_file: str = None) -> None:
+        """Validate slot name format"""
+        if not re.match(r"^[a-zA-Z0-9_-]+$", slot_name):
+            raise TemplateParsingError(
+                f"Invalid slot name '{slot_name}'. Slot names must contain only letters, numbers, underscores, and hyphens.",
+                template_file=template_file,
+            )
+
+    @staticmethod
+    def validate_duplicate_slots(
+        slots: List[Dict],
+        allow_duplicates: bool,
+        require_unique: bool,
+        template_file: str = None,
+    ) -> None:
+        """Validate duplicate slot names"""
+        if require_unique and not allow_duplicates:
+            slot_names = [slot["name"] for slot in slots]
+            duplicates = set(
+                [name for name in slot_names if slot_names.count(name) > 1]
+            )
+
+            if duplicates:
+                error_msg = f"Duplicate slot names found: {', '.join(duplicates)}"
+                raise TemplateParsingError(
+                    error_msg,
+                    template_file=template_file,
+                    context=f"Slots found: {slot_names}",
+                )
+
+    @staticmethod
+    def validate_css_safety(css_content: str, template_file: str = None) -> List[str]:
+        """Validate CSS for safety issues"""
+        css_errors = CSSValidator.validate_css(css_content)
+        serious_errors = [e for e in css_errors if "dangerous" in e.lower()]
+
+        if serious_errors:
+            raise TemplateParsingError(
+                f"CSS validation failed: {'; '.join(serious_errors)}",
+                template_file=template_file,
+            )
+
+        return css_errors
 
 
 class BaseLayout(ABC):
@@ -237,83 +317,92 @@ class TemplateBasedLayout(BaseLayout):
             cache_key = self._get_cache_key("parsed")
             cached_data = cache.get(cache_key)
             if cached_data:
-                self._extracted_html = cached_data["html"]
-                self._extracted_css = cached_data["css"]
-                self._parsed_slots = cached_data["slots"]
-                self._parsing_errors = cached_data.get("errors", [])
+                self._load_from_cache(cached_data)
                 return
 
         try:
             template_content = self._load_template_content()
-            self._extracted_html = self._extract_html(template_content)
-            self._extracted_css = self._extract_css(template_content)
-            self._parsed_slots = self._parse_slots(template_content)
-
-            # Validate parsed content
+            self._extract_template_components(template_content)
             self._validate_parsed_content()
+            self._cache_parsed_data()
 
-            # Cache the parsed data
-            if self.cache_templates:
-                cache_data = {
-                    "html": self._extracted_html,
-                    "css": self._extracted_css,
-                    "slots": self._parsed_slots,
-                    "errors": self._parsing_errors,
-                }
-                cache.set(cache_key, cache_data, timeout=self.cache_timeout)
-
-        except (TemplateDoesNotExist, FileNotFoundError) as e:
-            error_msg = f"Template file '{self.template_file}' not found for layout '{self.name}': {e}"
-            logger.error(error_msg)
-            raise ImproperlyConfigured(error_msg)
-        except ImportError as e:
-            error_msg = f"Missing dependency for template parsing: {e}"
-            logger.error(error_msg)
-            raise ImproperlyConfigured(
-                "BeautifulSoup4 is required for template-based layouts. Install with: pip install beautifulsoup4"
-            )
-        except TemplateParsingError as e:
-            logger.error(str(e))
-            raise ImproperlyConfigured(str(e))
+        except (TemplateDoesNotExist, FileNotFoundError, ImportError) as e:
+            raise ExceptionWrapper.wrap_template_error(e, self.template_file, self.name)
+        except TemplateParsingError:
+            raise
         except Exception as e:
-            error_msg = f"Unexpected error parsing template '{self.template_file}' for layout '{self.name}': {e}"
-            logger.error(error_msg)
-            raise ImproperlyConfigured(error_msg)
+            raise ExceptionWrapper.wrap_template_error(e, self.template_file, self.name)
+
+    def _load_from_cache(self, cached_data: Dict[str, Any]) -> None:
+        """Load parsed data from cache"""
+        self._extracted_html = cached_data["html"]
+        self._extracted_css = cached_data["css"]
+        self._parsed_slots = cached_data["slots"]
+        self._parsing_errors = cached_data.get("errors", [])
+
+    def _extract_template_components(self, template_content: str) -> None:
+        """Extract HTML, CSS, and slots from template content"""
+        self._extracted_html = self._extract_html(template_content)
+        self._extracted_css = self._extract_css(template_content)
+        self._parsed_slots = self._parse_slots(template_content)
+
+    def _cache_parsed_data(self) -> None:
+        """Cache the parsed template data"""
+        if self.cache_templates:
+            cache_data = {
+                "html": self._extracted_html,
+                "css": self._extracted_css,
+                "slots": self._parsed_slots,
+                "errors": self._parsing_errors,
+            }
+            cache_key = self._get_cache_key("parsed")
+            cache.set(cache_key, cache_data, timeout=self.cache_timeout)
 
     def _validate_parsed_content(self):
         """Validate the parsed template content"""
         self._parsing_errors = []
 
         # Validate duplicate slot names
-        if self.require_unique_slot_names and not self.allow_duplicate_slots:
-            slot_names = [slot["name"] for slot in self._parsed_slots]
-            duplicates = set(
-                [name for name in slot_names if slot_names.count(name) > 1]
-            )
-
-            if duplicates:
-                error_msg = f"Duplicate slot names found: {', '.join(duplicates)}"
-                self._parsing_errors.append(error_msg)
-                raise TemplateParsingError(
-                    error_msg,
-                    template_file=self.template_file,
-                    context=f"Slots found: {slot_names}",
-                )
+        SlotValidator.validate_duplicate_slots(
+            self._parsed_slots,
+            self.allow_duplicate_slots,
+            self.require_unique_slot_names,
+            self.template_file,
+        )
 
         # Validate CSS if enabled
         if self.validate_css and self._extracted_css:
-            css_errors = CSSValidator.validate_css(self._extracted_css)
-            if css_errors:
+            try:
+                css_errors = SlotValidator.validate_css_safety(
+                    self._extracted_css, self.template_file
+                )
                 for error in css_errors:
                     self._parsing_errors.append(f"CSS validation error: {error}")
+            except TemplateParsingError:
+                raise
 
-                # Only raise if there are serious errors
-                serious_errors = [e for e in css_errors if "dangerous" in e.lower()]
-                if serious_errors:
-                    raise TemplateParsingError(
-                        f"CSS validation failed: {'; '.join(serious_errors)}",
-                        template_file=self.template_file,
-                    )
+    def _validate_slot_requirements(self) -> None:
+        """Validate slot count requirements"""
+        slot_count = len(self._parsed_slots)
+
+        if self.require_slots and slot_count == 0:
+            raise ImproperlyConfigured(
+                f"Template '{self.template_file}' for layout '{self.name}' contains no widget slots but slots are required"
+            )
+        elif slot_count == 0:
+            logger.warning(
+                f"Template '{self.template_file}' for layout '{self.name}' contains no widget slots"
+            )
+
+        if self.min_slots > 0 and slot_count < self.min_slots:
+            raise ImproperlyConfigured(
+                f"Layout '{self.name}' requires at least {self.min_slots} slots, but only {slot_count} found"
+            )
+
+        if self.max_slots is not None and slot_count > self.max_slots:
+            raise ImproperlyConfigured(
+                f"Layout '{self.name}' allows at most {self.max_slots} slots, but {slot_count} found"
+            )
 
     def _load_template_content(self) -> str:
         """Load template file content with caching support"""
@@ -357,9 +446,8 @@ class TemplateBasedLayout(BaseLayout):
             return str(soup)
 
         except Exception as e:
-            logger.error(f"Error extracting HTML from template: {e}")
-            raise TemplateParsingError(
-                f"Failed to parse HTML template: {e}", template_file=self.template_file
+            raise ExceptionWrapper.wrap_parsing_error(
+                e, self.template_file, "parse HTML template"
             )
 
     def _extract_css(self, content: str) -> str:
@@ -381,10 +469,8 @@ class TemplateBasedLayout(BaseLayout):
             return "\n".join(css_content)
 
         except Exception as e:
-            logger.error(f"Error extracting CSS from template: {e}")
-            raise TemplateParsingError(
-                f"Failed to extract CSS from template: {e}",
-                template_file=self.template_file,
+            raise ExceptionWrapper.wrap_parsing_error(
+                e, self.template_file, "extract CSS from template"
             )
 
     def _parse_slots(self, content: str) -> List[Dict]:
@@ -398,50 +484,48 @@ class TemplateBasedLayout(BaseLayout):
 
         try:
             soup = BeautifulSoup(content, "html.parser")
-
-            slots = []
             slot_elements = soup.find_all(attrs={"data-widget-slot": True})
 
-            for element in slot_elements:
-                slot_name = element.get("data-widget-slot")
-                if not slot_name:
-                    continue
-
-                # Validate slot name format
-                if not re.match(r"^[a-zA-Z0-9_-]+$", slot_name):
-                    raise TemplateParsingError(
-                        f"Invalid slot name '{slot_name}'. Slot names must contain only letters, numbers, underscores, and hyphens.",
-                        template_file=self.template_file,
-                    )
-
-                slot_data = {
-                    "name": slot_name,
-                    "title": element.get(
-                        "data-slot-title", slot_name.replace("_", " ").title()
-                    ),
-                    "description": element.get(
-                        "data-slot-description", f"{slot_name} content area"
-                    ),
-                    "max_widgets": self._parse_max_widgets(
-                        element.get("data-slot-max-widgets")
-                    ),
-                    "css_classes": (
-                        element.get("class", []) if element.get("class") else []
-                    ),
-                    "selector": f'[data-widget-slot="{slot_name}"]',
-                }
-                slots.append(slot_data)
-
-            return slots
+            return self._extract_slot_data(slot_elements)
 
         except Exception as e:
-            if isinstance(e, TemplateParsingError):
-                raise
-            logger.error(f"Error parsing slots from template: {e}")
-            raise TemplateParsingError(
-                f"Failed to parse widget slots from template: {e}",
-                template_file=self.template_file,
+            raise ExceptionWrapper.wrap_parsing_error(
+                e, self.template_file, "parse widget slots from template"
             )
+
+    def _extract_slot_data(self, slot_elements) -> List[Dict]:
+        """Extract slot data from parsed elements"""
+        slots = []
+
+        for element in slot_elements:
+            slot_name = element.get("data-widget-slot")
+            if not slot_name:
+                continue
+
+            # Validate slot name format
+            SlotValidator.validate_slot_name(slot_name, self.template_file)
+
+            slot_data = self._build_slot_data(element, slot_name)
+            slots.append(slot_data)
+
+        return slots
+
+    def _build_slot_data(self, element, slot_name: str) -> Dict[str, Any]:
+        """Build slot data dictionary from element"""
+        return {
+            "name": slot_name,
+            "title": element.get(
+                "data-slot-title", slot_name.replace("_", " ").title()
+            ),
+            "description": element.get(
+                "data-slot-description", f"{slot_name} content area"
+            ),
+            "max_widgets": self._parse_max_widgets(
+                element.get("data-slot-max-widgets")
+            ),
+            "css_classes": element.get("class", []) if element.get("class") else [],
+            "selector": f'[data-widget-slot="{slot_name}"]',
+        }
 
     def _parse_max_widgets(self, value) -> Optional[int]:
         """Parse max widgets attribute with enhanced validation"""
@@ -480,26 +564,10 @@ class TemplateBasedLayout(BaseLayout):
 
             # Additional validation for template-based layouts
             if self.template_file and not self._parsed_slots:
-                if self.require_slots:
-                    raise ImproperlyConfigured(
-                        f"Template '{self.template_file}' for layout '{self.name}' contains no widget slots but slots are required"
-                    )
-                else:
-                    logger.warning(
-                        f"Template '{self.template_file}' for layout '{self.name}' contains no widget slots"
-                    )
+                self._validate_slot_requirements()
 
-            # Check minimum slots requirement
-            if self.min_slots > 0 and len(self._parsed_slots) < self.min_slots:
-                raise ImproperlyConfigured(
-                    f"Layout '{self.name}' requires at least {self.min_slots} slots, but only {len(self._parsed_slots)} found"
-                )
-
-            # Check maximum slots limit
-            if self.max_slots is not None and len(self._parsed_slots) > self.max_slots:
-                raise ImproperlyConfigured(
-                    f"Layout '{self.name}' allows at most {self.max_slots} slots, but {len(self._parsed_slots)} found"
-                )
+            # Check slot count requirements
+            self._validate_slot_requirements()
 
     def clear_cache(self) -> None:
         """Clear cached template data for this layout"""
