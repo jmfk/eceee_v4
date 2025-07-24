@@ -349,18 +349,8 @@ const ContentEditor = ({ pageData, onUpdate, isNewPage }) => {
                 <div className="max-w-4xl mx-auto space-y-6">
                     <div className="bg-white rounded-lg shadow p-6">
                         <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                            Layout & Content
+                            Content Management
                         </h2>
-
-                        {/* Layout Selection */}
-                        <div className="mb-6">
-                            <LayoutSelector
-                                value={pageData?.code_layout || ''}
-                                onChange={(layout) => onUpdate({ code_layout: layout })}
-                                label="Page Layout"
-                                description="Choose the layout template for this page"
-                            />
-                        </div>
 
                         {/* Widget Management */}
                         {pageData?.id && !isNewPage && (
@@ -433,6 +423,16 @@ const SettingsEditor = ({ pageData, onUpdate, isNewPage }) => {
                                 rows={4}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 placeholder="Enter page description"
+                            />
+                        </div>
+
+                        {/* Page Layout Selection */}
+                        <div>
+                            <LayoutSelector
+                                value={pageData?.code_layout || ''}
+                                onChange={(layout) => onUpdate({ code_layout: layout })}
+                                label="Page Layout"
+                                description="Choose the layout template for this page"
                             />
                         </div>
 
