@@ -1,0 +1,304 @@
+<style>
+  .landing-layout {
+    min-height: 100vh;
+    background-color: #ffffff;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  /* Navigation */
+  .landing-nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+    padding: 15px 0;
+  }
+
+  .nav-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 30px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  /* Hero Section */
+  .landing-hero {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 120px 30px 80px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .landing-hero::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.1);
+  }
+
+  .hero-content {
+    max-width: 800px;
+    margin: 0 auto;
+    position: relative;
+    z-index: 2;
+  }
+
+  /* Features Section */
+  .landing-features {
+    padding: 80px 30px;
+    background-color: #f8fafc;
+  }
+
+  .features-container {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  /* Testimonials Section */
+  .landing-testimonials {
+    padding: 80px 30px;
+    background-color: #ffffff;
+  }
+
+  .testimonials-container {
+    max-width: 1000px;
+    margin: 0 auto;
+  }
+
+  /* CTA Section */
+  .landing-cta {
+    padding: 80px 30px;
+    background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+    color: white;
+    text-align: center;
+  }
+
+  .cta-container {
+    max-width: 800px;
+    margin: 0 auto;
+  }
+
+  /* Footer */
+  .landing-footer {
+    background-color: #1f2937;
+    color: white;
+    padding: 60px 30px 40px;
+  }
+
+  .footer-container {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  /* Responsive Design */
+  @media (max-width: 768px) {
+    .nav-container {
+      padding: 0 20px;
+    }
+
+    .landing-hero {
+      padding: 100px 20px 60px;
+    }
+
+    .landing-features,
+    .landing-testimonials,
+    .landing-cta {
+      padding: 60px 20px;
+    }
+
+    .landing-footer {
+      padding: 40px 20px 30px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .landing-hero {
+      padding: 80px 15px 50px;
+    }
+
+    .landing-features,
+    .landing-testimonials,
+    .landing-cta {
+      padding: 50px 15px;
+    }
+
+    .landing-footer {
+      padding: 30px 15px 20px;
+    }
+  }
+
+  /* Slot Styling */
+  .slot-placeholder {
+    padding: 30px;
+    border: 2px dashed #cbd5e0;
+    border-radius: 12px;
+    color: #718096;
+    font-style: italic;
+    text-align: center;
+    margin: 15px 0;
+    background-color: rgba(237, 242, 247, 0.6);
+    transition: all 0.3s ease;
+  }
+
+  .slot-placeholder:hover {
+    border-color: #a0aec0;
+    background-color: rgba(237, 242, 247, 0.9);
+    transform: translateY(-2px);
+  }
+
+  /* Section-specific slot styling */
+  .landing-nav .slot-placeholder {
+    padding: 15px 20px;
+    border: 1px dashed #cbd5e0;
+    background-color: rgba(243, 244, 246, 0.8);
+    margin: 0;
+    font-size: 14px;
+  }
+
+  .landing-hero .slot-placeholder {
+    border-color: rgba(255, 255, 255, 0.4);
+    color: rgba(255, 255, 255, 0.9);
+    background-color: rgba(255, 255, 255, 0.1);
+    font-size: 16px;
+  }
+
+  .landing-cta .slot-placeholder {
+    border-color: rgba(255, 255, 255, 0.4);
+    color: rgba(255, 255, 255, 0.9);
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+
+  .landing-footer .slot-placeholder {
+    border-color: rgba(255, 255, 255, 0.3);
+    color: rgba(255, 255, 255, 0.8);
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+
+  /* Section spacing */
+  .landing-layout section {
+    position: relative;
+  }
+
+  /* Smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* Container utilities */
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 30px;
+  }
+
+  @media (max-width: 768px) {
+    .container {
+      padding: 0 20px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .container {
+      padding: 0 15px;
+    }
+  }
+</style>
+
+<div class="landing-layout">
+  <!-- Navigation -->
+  <nav class="landing-nav">
+    <div class="nav-container"
+         data-widget-slot="navigation"
+         data-slot-title="Navigation Bar"
+         data-slot-description="Top navigation with logo, menu items, and call-to-action buttons"
+         data-slot-max-widgets="3">
+      <div class="slot-placeholder">Navigation: Logo, Menu, CTA Button</div>
+    </div>
+  </nav>
+
+  <!-- Hero Section -->
+  <section class="landing-hero">
+    <div class="hero-content"
+         data-widget-slot="hero"
+         data-slot-title="Hero Section"
+         data-slot-description="Main hero area with headline, value proposition, and primary call-to-action"
+         data-slot-max-widgets="4">
+      <div class="slot-placeholder">
+        Hero: Headline, Subheadline, CTA Button, Hero Image/Video
+        <br><br>
+        Capture attention and communicate your main value proposition
+      </div>
+    </div>
+  </section>
+
+  <!-- Features Section -->
+  <section class="landing-features">
+    <div class="features-container"
+         data-widget-slot="features"
+         data-slot-title="Features Section"
+         data-slot-description="Product features, benefits, or service highlights"
+         data-slot-max-widgets="6">
+      <div class="slot-placeholder">
+        Features: Feature Cards, Benefits, Product Highlights, Icons
+        <br><br>
+        Showcase what makes your product or service special
+      </div>
+    </div>
+  </section>
+
+  <!-- Testimonials Section -->
+  <section class="landing-testimonials">
+    <div class="testimonials-container"
+         data-widget-slot="testimonials"
+         data-slot-title="Testimonials Section"
+         data-slot-description="Customer testimonials, reviews, and social proof"
+         data-slot-max-widgets="5">
+      <div class="slot-placeholder">
+        Testimonials: Customer Reviews, Case Studies, Logos, Ratings
+        <br><br>
+        Build trust with social proof and customer success stories
+      </div>
+    </div>
+  </section>
+
+  <!-- Call-to-Action Section -->
+  <section class="landing-cta">
+    <div class="cta-container"
+         data-widget-slot="cta"
+         data-slot-title="Call-to-Action Section"
+         data-slot-description="Final conversion push with compelling offer and action buttons"
+         data-slot-max-widgets="3">
+      <div class="slot-placeholder">
+        CTA: Final Offer, Action Buttons, Urgency Elements
+        <br><br>
+        Drive conversions with a compelling final call-to-action
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="landing-footer">
+    <div class="footer-container"
+         data-widget-slot="footer"
+         data-slot-title="Footer Section"
+         data-slot-description="Footer links, contact information, legal pages, and additional resources"
+         data-slot-max-widgets="4">
+      <div class="slot-placeholder">
+        Footer: Links, Contact Info, Legal Pages, Social Media
+        <br><br>
+        Provide additional resources and contact information
+      </div>
+    </div>
+  </footer>
+</div> 

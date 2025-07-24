@@ -1,0 +1,171 @@
+<style>
+  .dashboard-layout {
+    display: grid;
+    grid-template-areas: 
+      "header header header"
+      "sidebar main metrics"
+      "sidebar main metrics"
+      "footer footer footer";
+    grid-template-columns: 250px 1fr 300px;
+    grid-template-rows: auto 1fr auto auto;
+    min-height: 100vh;
+    gap: 20px;
+    padding: 20px;
+    background-color: #f8f9fa;
+  }
+
+  .dashboard-header {
+    grid-area: header;
+    background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+    color: white;
+    padding: 20px 30px;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .dashboard-sidebar {
+    grid-area: sidebar;
+    background: white;
+    padding: 25px;
+    border-radius: 12px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e5e7eb;
+  }
+
+  .dashboard-main {
+    grid-area: main;
+    background: white;
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e5e7eb;
+    overflow-y: auto;
+  }
+
+  .dashboard-metrics {
+    grid-area: metrics;
+    background: white;
+    padding: 25px;
+    border-radius: 12px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e5e7eb;
+  }
+
+  .dashboard-footer {
+    grid-area: footer;
+    background: #374151;
+    color: white;
+    padding: 20px 30px;
+    border-radius: 12px;
+    text-align: center;
+  }
+
+  /* Responsive Design */
+  @media (max-width: 1200px) {
+    .dashboard-layout {
+      grid-template-areas: 
+        "header header"
+        "sidebar main"
+        "metrics metrics"
+        "footer footer";
+      grid-template-columns: 250px 1fr;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .dashboard-layout {
+      grid-template-areas: 
+        "header"
+        "sidebar"
+        "main"
+        "metrics"
+        "footer";
+      grid-template-columns: 1fr;
+      padding: 15px;
+      gap: 15px;
+    }
+
+    .dashboard-header,
+    .dashboard-sidebar,
+    .dashboard-main,
+    .dashboard-metrics,
+    .dashboard-footer {
+      padding: 20px;
+    }
+  }
+
+  /* Slot Styling */
+  .slot-placeholder {
+    padding: 20px;
+    border: 2px dashed #d1d5db;
+    border-radius: 8px;
+    color: #6b7280;
+    font-style: italic;
+    text-align: center;
+    margin: 10px 0;
+    background-color: rgba(243, 244, 246, 0.5);
+  }
+
+  .dashboard-header .slot-placeholder {
+    border-color: rgba(255, 255, 255, 0.3);
+    color: rgba(255, 255, 255, 0.8);
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+
+  .dashboard-footer .slot-placeholder {
+    border-color: rgba(255, 255, 255, 0.3);
+    color: rgba(255, 255, 255, 0.8);
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+
+  /* Special styling for metrics area */
+  .dashboard-metrics {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+  }
+</style>
+
+<div class="dashboard-layout">
+  <header class="dashboard-header"
+          data-widget-slot="header"
+          data-slot-title="Dashboard Header"
+          data-slot-description="Top navigation, branding, user profile, and global actions"
+          data-slot-max-widgets="3">
+    <div class="slot-placeholder">Header: Logo, Navigation, User Menu</div>
+  </header>
+
+  <aside class="dashboard-sidebar"
+         data-widget-slot="sidebar"
+         data-slot-title="Navigation Sidebar"
+         data-slot-description="Main navigation menu, filters, and secondary actions"
+         data-slot-max-widgets="6">
+    <div class="slot-placeholder">Sidebar: Navigation Menu, Filters, Quick Actions</div>
+  </aside>
+
+  <main class="dashboard-main"
+        data-widget-slot="main"
+        data-slot-title="Main Content Area"
+        data-slot-description="Primary dashboard content, data tables, charts, and main interface">
+    <div class="slot-placeholder">Main Content: Tables, Charts, Primary Interface Elements</div>
+  </main>
+
+  <section class="dashboard-metrics"
+           data-widget-slot="metrics"
+           data-slot-title="Metrics Panel"
+           data-slot-description="Key performance indicators, statistics, and quick metrics"
+           data-slot-max-widgets="8">
+    <div class="slot-placeholder">Metrics: KPIs, Statistics, Graphs, Status Indicators</div>
+  </section>
+
+  <footer class="dashboard-footer"
+          data-widget-slot="footer"
+          data-slot-title="Dashboard Footer"
+          data-slot-description="Footer information, links, and secondary navigation"
+          data-slot-max-widgets="2">
+    <div class="slot-placeholder">Footer: Copyright, Links, System Status</div>
+  </footer>
+</div> 

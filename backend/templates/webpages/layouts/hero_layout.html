@@ -1,0 +1,109 @@
+<style>
+  .hero-layout {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .hero-section {
+    min-height: 80vh;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: white;
+    position: relative;
+    padding: 60px 20px;
+  }
+
+  .hero-content {
+    max-width: 800px;
+    width: 100%;
+    z-index: 2;
+  }
+
+  .hero-section::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.2);
+    z-index: 1;
+  }
+
+  .main-content {
+    flex: 1;
+    padding: 60px 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+    width: 100%;
+  }
+
+  .footer-section {
+    background-color: #2c3e50;
+    color: white;
+    padding: 40px 20px;
+    text-align: center;
+  }
+
+  /* Responsive Design */
+  @media (max-width: 768px) {
+    .hero-section {
+      min-height: 60vh;
+      padding: 40px 20px;
+    }
+
+    .main-content {
+      padding: 40px 20px;
+    }
+
+    .footer-section {
+      padding: 30px 20px;
+    }
+  }
+
+  /* Slot Styling */
+  .slot-placeholder {
+    opacity: 0.7;
+    font-style: italic;
+    padding: 20px;
+    border: 2px dashed rgba(255, 255, 255, 0.3);
+    border-radius: 8px;
+    margin: 10px 0;
+  }
+
+  .main-content .slot-placeholder {
+    border-color: rgba(0, 0, 0, 0.2);
+    color: #6c757d;
+  }
+</style>
+
+<div class="hero-layout">
+  <section class="hero-section"
+           data-widget-slot="hero"
+           data-slot-title="Hero Section"
+           data-slot-description="Full-screen hero section with call-to-action and headline content"
+           data-slot-max-widgets="3">
+    <div class="hero-content">
+      <div class="slot-placeholder">Hero content goes here - headlines, call-to-action buttons, hero images</div>
+    </div>
+  </section>
+
+  <main class="main-content"
+        data-widget-slot="content"
+        data-slot-title="Main Content"
+        data-slot-description="Primary content area below the hero section">
+    <div class="slot-placeholder">Main content goes here - articles, features, product information</div>
+  </main>
+
+  <footer class="footer-section"
+          data-widget-slot="footer"
+          data-slot-title="Footer"
+          data-slot-description="Page footer with links, contact info, and additional content"
+          data-slot-max-widgets="4">
+    <div class="slot-placeholder">Footer content goes here - links, copyright, social media</div>
+  </footer>
+</div> 
