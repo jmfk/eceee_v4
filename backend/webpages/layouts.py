@@ -5,7 +5,7 @@ This module demonstrates how to create code-based layouts using the new layout r
 These layouts serve as examples and provide default layouts for the system.
 """
 
-from .layout_registry import BaseLayout, register_layout
+from .layout_registry import BaseLayout, TemplateBasedLayout, register_layout
 
 
 @register_layout
@@ -292,3 +292,15 @@ class CustomLayout(BaseLayout):
 from .layout_registry import layout_registry
 
 layout_registry.register(CustomLayout)
+
+
+# Example of template-based layout
+@register_layout
+class ExampleTemplateLayout(TemplateBasedLayout):
+    """Example template-based layout that automatically parses slots from HTML"""
+
+    name = "example_template"
+    description = "Example layout that uses HTML template with automatic slot parsing"
+    template_file = "webpages/layouts/example_template_layout.html"
+
+    # No need to define slot_configuration - it's automatically parsed from the template!
