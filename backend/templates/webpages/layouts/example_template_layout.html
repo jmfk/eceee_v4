@@ -1,0 +1,87 @@
+<style>
+  .example-layout {
+    display: grid;
+    grid-template-areas: 
+      "header header"
+      "content sidebar"
+      "footer footer";
+    grid-template-columns: 2fr 1fr;
+    grid-gap: 20px;
+    padding: 20px;
+    min-height: 100vh;
+  }
+
+  .header-slot {
+    grid-area: header;
+    background-color: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+  }
+
+  .content-slot {
+    grid-area: content;
+    background-color: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+
+  .sidebar-slot {
+    grid-area: sidebar;
+    background-color: #e9ecef;
+    padding: 20px;
+    border-radius: 8px;
+  }
+
+  .footer-slot {
+    grid-area: footer;
+    background-color: #6c757d;
+    color: white;
+    padding: 20px;
+    border-radius: 8px;
+  }
+
+  @media (max-width: 768px) {
+    .example-layout {
+      grid-template-areas: 
+        "header"
+        "content"
+        "sidebar"
+        "footer";
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<div class="example-layout">
+  <header class="header-slot" 
+          data-widget-slot="header" 
+          data-slot-title="Page Header" 
+          data-slot-description="Main page header with navigation and branding"
+          data-slot-max-widgets="2">
+    <div class="slot-placeholder">Header content goes here</div>
+  </header>
+  
+  <main class="content-slot" 
+        data-widget-slot="content" 
+        data-slot-title="Main Content" 
+        data-slot-description="Primary page content area">
+    <div class="slot-placeholder">Main content goes here</div>
+  </main>
+  
+  <aside class="sidebar-slot" 
+         data-widget-slot="sidebar" 
+         data-slot-title="Sidebar" 
+         data-slot-description="Complementary content and widgets"
+         data-slot-max-widgets="5">
+    <div class="slot-placeholder">Sidebar content goes here</div>
+  </aside>
+  
+  <footer class="footer-slot" 
+          data-widget-slot="footer" 
+          data-slot-title="Footer" 
+          data-slot-description="Page footer content"
+          data-slot-max-widgets="3">
+    <div class="slot-placeholder">Footer content goes here</div>
+  </footer>
+</div> 
