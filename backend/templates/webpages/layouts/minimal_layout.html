@@ -1,0 +1,197 @@
+<style>
+  .minimal-layout {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background-color: #ffffff;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  .minimal-header {
+    background: #ffffff;
+    border-bottom: 1px solid #e5e7eb;
+    padding: 20px 0;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(10px);
+    background-color: rgba(255, 255, 255, 0.95);
+  }
+
+  .minimal-header-content {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 0 30px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .minimal-main {
+    flex: 1;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 60px 30px;
+    width: 100%;
+    line-height: 1.8;
+    color: #374151;
+  }
+
+  /* Typography */
+  .minimal-main {
+    font-size: 17px;
+  }
+
+  /* Focus on content */
+  .minimal-main h1,
+  .minimal-main h2,
+  .minimal-main h3 {
+    color: #111827;
+    font-weight: 600;
+    margin-top: 2rem;
+    margin-bottom: 1rem;
+  }
+
+  .minimal-main h1 {
+    font-size: 2.5rem;
+    margin-top: 0;
+  }
+
+  .minimal-main h2 {
+    font-size: 1.875rem;
+  }
+
+  .minimal-main h3 {
+    font-size: 1.5rem;
+  }
+
+  .minimal-main p {
+    margin-bottom: 1.5rem;
+  }
+
+  /* Responsive Design */
+  @media (max-width: 768px) {
+    .minimal-header-content {
+      padding: 0 20px;
+    }
+
+    .minimal-main {
+      padding: 40px 20px;
+      font-size: 16px;
+    }
+
+    .minimal-main h1 {
+      font-size: 2rem;
+    }
+
+    .minimal-main h2 {
+      font-size: 1.5rem;
+    }
+
+    .minimal-main h3 {
+      font-size: 1.25rem;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .minimal-header {
+      padding: 15px 0;
+    }
+
+    .minimal-header-content {
+      padding: 0 15px;
+    }
+
+    .minimal-main {
+      padding: 30px 15px;
+    }
+  }
+
+  /* Slot Styling - Minimal and Clean */
+  .slot-placeholder {
+    padding: 30px;
+    border: 2px dashed #d1d5db;
+    border-radius: 12px;
+    color: #9ca3af;
+    font-style: italic;
+    text-align: center;
+    margin: 20px 0;
+    background-color: rgba(249, 250, 251, 0.7);
+    transition: all 0.3s ease;
+    font-size: 15px;
+  }
+
+  .slot-placeholder:hover {
+    border-color: #9ca3af;
+    background-color: rgba(243, 244, 246, 0.9);
+    transform: translateY(-1px);
+  }
+
+  .minimal-header .slot-placeholder {
+    padding: 20px;
+    margin: 0;
+    border: 1px dashed #d1d5db;
+    background-color: transparent;
+    border-radius: 8px;
+  }
+
+  /* Clean, distraction-free design */
+  .minimal-layout * {
+    box-sizing: border-box;
+  }
+
+  /* Print-friendly */
+  @media print {
+    .minimal-header {
+      position: static;
+      border-bottom: 2px solid #000;
+    }
+
+    .minimal-main {
+      padding: 20px 0;
+    }
+
+    .slot-placeholder {
+      display: none;
+    }
+  }
+
+  /* Focus states for accessibility */
+  .minimal-layout *:focus {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+  }
+
+  /* Content width constraints for readability */
+  .minimal-main > * {
+    max-width: 65ch;
+  }
+
+  .minimal-main > .slot-placeholder {
+    max-width: none;
+  }
+</style>
+
+<div class="minimal-layout">
+  <header class="minimal-header">
+    <div class="minimal-header-content"
+         data-widget-slot="header"
+         data-slot-title="Minimal Header"
+         data-slot-description="Clean header area for navigation, branding, or minimal top content"
+         data-slot-max-widgets="2">
+      <div class="slot-placeholder">Header: Logo, Navigation, or Title</div>
+    </div>
+  </header>
+
+  <main class="minimal-main"
+        data-widget-slot="content"
+        data-slot-title="Main Content"
+        data-slot-description="Primary content area optimized for reading and focused presentation">
+    <div class="slot-placeholder">
+      Main Content: Articles, Documentation, Blog Posts, or Focused Content
+      <br><br>
+      This layout is designed for maximum readability and minimal distractions.
+      Perfect for blogs, documentation, portfolios, or any content-focused pages.
+    </div>
+  </main>
+</div> 

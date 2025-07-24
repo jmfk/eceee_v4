@@ -1,0 +1,203 @@
+<style>
+  .sidebar-layout {
+    display: grid;
+    grid-template-areas: 
+      "header header"
+      "main sidebar"
+      "footer footer";
+    grid-template-columns: 2fr 1fr;
+    grid-template-rows: auto 1fr auto;
+    min-height: 100vh;
+    gap: 25px;
+    padding: 25px;
+    background-color: #fafafa;
+  }
+
+  .layout-header {
+    grid-area: header;
+    background: white;
+    padding: 25px 30px;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    border: 1px solid #e1e5e9;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .main-content-area {
+    grid-area: main;
+    background: white;
+    padding: 35px;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    border: 1px solid #e1e5e9;
+    overflow-y: auto;
+  }
+
+  .content-sidebar {
+    grid-area: sidebar;
+    background: white;
+    padding: 30px;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    border: 1px solid #e1e5e9;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .layout-footer {
+    grid-area: footer;
+    background: #2d3748;
+    color: white;
+    padding: 25px 30px;
+    border-radius: 10px;
+    text-align: center;
+  }
+
+  /* Article/Blog Style Content */
+  .main-content-area {
+    line-height: 1.7;
+    font-size: 16px;
+  }
+
+  .content-sidebar {
+    font-size: 14px;
+  }
+
+  /* Responsive Design */
+  @media (max-width: 1024px) {
+    .sidebar-layout {
+      grid-template-columns: 1.5fr 1fr;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .sidebar-layout {
+      grid-template-areas: 
+        "header"
+        "main"
+        "sidebar"
+        "footer";
+      grid-template-columns: 1fr;
+      padding: 20px;
+      gap: 20px;
+    }
+
+    .layout-header,
+    .main-content-area,
+    .content-sidebar,
+    .layout-footer {
+      padding: 25px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .sidebar-layout {
+      padding: 15px;
+      gap: 15px;
+    }
+
+    .layout-header,
+    .main-content-area,
+    .content-sidebar,
+    .layout-footer {
+      padding: 20px;
+    }
+  }
+
+  /* Slot Styling */
+  .slot-placeholder {
+    padding: 25px;
+    border: 2px dashed #cbd5e0;
+    border-radius: 8px;
+    color: #718096;
+    font-style: italic;
+    text-align: center;
+    margin: 10px 0;
+    background-color: rgba(237, 242, 247, 0.5);
+    transition: all 0.2s ease;
+  }
+
+  .slot-placeholder:hover {
+    border-color: #a0aec0;
+    background-color: rgba(237, 242, 247, 0.8);
+  }
+
+  .layout-footer .slot-placeholder {
+    border-color: rgba(255, 255, 255, 0.3);
+    color: rgba(255, 255, 255, 0.8);
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+
+  /* Sidebar specific styling */
+  .content-sidebar .slot-placeholder {
+    padding: 20px;
+    font-size: 13px;
+  }
+
+  /* Widget sections in sidebar */
+  .sidebar-section {
+    border-bottom: 1px solid #e2e8f0;
+    padding-bottom: 20px;
+    margin-bottom: 20px;
+  }
+
+  .sidebar-section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+  }
+</style>
+
+<div class="sidebar-layout">
+  <header class="layout-header"
+          data-widget-slot="header"
+          data-slot-title="Page Header"
+          data-slot-description="Site navigation, branding, and header content"
+          data-slot-max-widgets="3">
+    <div class="slot-placeholder">Header: Logo, Navigation Menu, Search</div>
+  </header>
+
+  <main class="main-content-area"
+        data-widget-slot="main"
+        data-slot-title="Main Content"
+        data-slot-description="Primary content area for articles, posts, and main page content">
+    <div class="slot-placeholder">Main Content: Articles, Blog Posts, Page Content, Images</div>
+  </main>
+
+  <aside class="content-sidebar">
+    <div class="sidebar-section"
+         data-widget-slot="sidebar-top"
+         data-slot-title="Sidebar Top"
+         data-slot-description="Top sidebar widgets like recent posts, categories, or featured content"
+         data-slot-max-widgets="3">
+      <div class="slot-placeholder">Sidebar Top: Recent Posts, Categories, Featured</div>
+    </div>
+
+    <div class="sidebar-section"
+         data-widget-slot="sidebar-middle"
+         data-slot-title="Sidebar Middle" 
+         data-slot-description="Middle sidebar area for ads, social media, or related content"
+         data-slot-max-widgets="4">
+      <div class="slot-placeholder">Sidebar Middle: Ads, Social Media, Related Links</div>
+    </div>
+
+    <div class="sidebar-section"
+         data-widget-slot="sidebar-bottom"
+         data-slot-title="Sidebar Bottom"
+         data-slot-description="Bottom sidebar widgets for archives, tags, or supplementary content"
+         data-slot-max-widgets="3">
+      <div class="slot-placeholder">Sidebar Bottom: Archives, Tags, Newsletter</div>
+    </div>
+  </aside>
+
+  <footer class="layout-footer"
+          data-widget-slot="footer"
+          data-slot-title="Footer"
+          data-slot-description="Site footer with links, copyright, and contact information"
+          data-slot-max-widgets="2">
+    <div class="slot-placeholder">Footer: Copyright, Links, Contact Info</div>
+  </footer>
+</div> 
