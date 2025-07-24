@@ -14,9 +14,11 @@ import {
     ChevronDown,
     ArrowLeft,
     Grid3X3,
-    Palette
+    Palette,
+    ChevronLeft,
+    ChevronRight,
+    Trash2
 } from 'lucide-react'
-import toast from 'react-hot-toast'
 import { api } from '../api/client.js'
 import { useNotificationContext } from './NotificationManager'
 import SlotManager from './SlotManager'
@@ -44,8 +46,47 @@ const PageEditor = () => {
     const [isDirty, setIsDirty] = useState(false)
     const [isPublishing, setIsPublishing] = useState(false)
 
+    // Notification system state
+    const [notifications, setNotifications] = useState([])
+    const [currentNotificationIndex, setCurrentNotificationIndex] = useState(0)
+
     const queryClient = useQueryClient()
     const { showError, showConfirm } = useNotificationContext()
+
+    // Notification management functions
+    const addNotification = (message, type = 'info') => {
+        const notification = {
+            id: Date.now(),
+            message,
+            type, // 'success', 'error', 'warning', 'info'
+            timestamp: new Date()
+        }
+
+        setNotifications(prev => {
+            const updated = [notification, ...prev].slice(0, 20) // Keep max 20 notifications
+            setCurrentNotificationIndex(0) // Show newest notification
+            return updated
+        })
+    }
+
+    const clearNotifications = () => {
+        setNotifications([])
+        setCurrentNotificationIndex(0)
+    }
+
+    const navigateNotifications = (direction) => {
+        if (notifications.length === 0) return
+
+        if (direction === 'next') {
+            setCurrentNotificationIndex(prev =>
+                prev < notifications.length - 1 ? prev + 1 : prev
+            )
+        } else if (direction === 'prev') {
+            setCurrentNotificationIndex(prev =>
+                prev > 0 ? prev - 1 : prev
+            )
+        }
+    }
 
     // Initialize page data for new page
     useEffect(() => {
@@ -87,7 +128,7 @@ const PageEditor = () => {
             return response.data
         },
         onSuccess: (newPage) => {
-            toast.success('Page created successfully')
+            addNotification('Page created successfully', 'success')
             setIsDirty(false)
             // Navigate to edit the newly created page
             navigate(`/pages/${newPage.id}/edit`, {
@@ -97,6 +138,7 @@ const PageEditor = () => {
             queryClient.invalidateQueries(['pages'])
         },
         onError: (error) => {
+            addNotification('Failed to create page', 'error')
             showError(error, 'Failed to create page')
         }
     })
@@ -120,13 +162,14 @@ const PageEditor = () => {
             return response.data
         },
         onSuccess: (updatedPage) => {
-            toast.success('Page saved successfully')
+            addNotification('Page saved successfully', 'success')
             setPageData(updatedPage)
             setIsDirty(false)
             queryClient.invalidateQueries(['page', pageId])
             queryClient.invalidateQueries(['pages', 'root'])
         },
         onError: (error) => {
+            addNotification('Failed to save page', 'error')
             showError(error, 'Failed to save page')
         }
     })
@@ -140,12 +183,13 @@ const PageEditor = () => {
             return response.data
         },
         onSuccess: (updatedPage) => {
-            toast.success('Page published successfully')
+            addNotification('Page published successfully', 'success')
             setPageData(updatedPage)
             queryClient.invalidateQueries(['page', pageId])
             queryClient.invalidateQueries(['pages', 'root'])
         },
         onError: (error) => {
+            addNotification('Failed to publish page', 'error')
             showError(error, 'Failed to publish page')
         }
     })
@@ -168,8 +212,10 @@ const PageEditor = () => {
     const handleSave = () => {
         if (pageData && isDirty) {
             if (isNewPage) {
+                addNotification('Creating page...', 'info')
                 createPageMutation.mutate(pageData)
             } else {
+                addNotification('Saving page...', 'info')
                 updatePageMutation.mutate(pageData)
             }
         }
@@ -179,6 +225,7 @@ const PageEditor = () => {
     const handleQuickPublish = () => {
         if (isNewPage) return
 
+        addNotification('Publishing page...', 'info')
         setIsPublishing(true)
         publishPageMutation.mutate()
         setIsPublishing(false)
@@ -324,25 +371,83 @@ const PageEditor = () => {
                 </div>
             </div>
 
-            {/* Status bar */}
+            {/* Status bar with notifications */}
             <div className="bg-white border-t border-gray-200 px-4 py-2">
-                <div className="flex items-center justify-between text-sm text-gray-600">
-                    <div className="flex items-center space-x-4">
-                        <span>
-                            Status: <span className={`font-medium ${pageData?.publication_status === 'published' ? 'text-green-600' :
-                                pageData?.publication_status === 'scheduled' ? 'text-blue-600' :
-                                    'text-gray-600'
-                                }`}>
-                                {pageData?.publication_status || 'unpublished'}
-                            </span>
-                        </span>
-                        {pageData?.last_modified && (
-                            <span>
-                                Last modified: {new Date(pageData.last_modified).toLocaleString()}
-                            </span>
+                <div className="flex items-center justify-between text-sm">
+                    {/* Notification area */}
+                    <div className="flex items-center space-x-2 flex-1 min-w-0">
+                        {notifications.length > 0 ? (
+                            <>
+                                {/* Notification navigation */}
+                                <button
+                                    onClick={() => navigateNotifications('prev')}
+                                    disabled={currentNotificationIndex === 0}
+                                    className="p-1 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    title="Previous notification"
+                                >
+                                    <ChevronLeft className="w-4 h-4 text-gray-600" />
+                                </button>
+
+                                {/* Current notification */}
+                                <div className="flex items-center space-x-2 flex-1 min-w-0">
+                                    <span className={`inline-block w-2 h-2 rounded-full ${notifications[currentNotificationIndex]?.type === 'success' ? 'bg-green-500' :
+                                        notifications[currentNotificationIndex]?.type === 'error' ? 'bg-red-500' :
+                                            notifications[currentNotificationIndex]?.type === 'warning' ? 'bg-yellow-500' :
+                                                'bg-blue-500'
+                                        }`} />
+                                    <span className="text-gray-700 truncate">
+                                        {notifications[currentNotificationIndex]?.message}
+                                    </span>
+                                    <span className="text-xs text-gray-500 flex-shrink-0">
+                                        {notifications[currentNotificationIndex]?.timestamp.toLocaleTimeString()}
+                                    </span>
+                                </div>
+
+                                {/* Notification counter and navigation */}
+                                <span className="text-xs text-gray-500 flex-shrink-0">
+                                    {currentNotificationIndex + 1} of {notifications.length}
+                                </span>
+
+                                <button
+                                    onClick={() => navigateNotifications('next')}
+                                    disabled={currentNotificationIndex === notifications.length - 1}
+                                    className="p-1 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    title="Next notification"
+                                >
+                                    <ChevronRight className="w-4 h-4 text-gray-600" />
+                                </button>
+
+                                {/* Clear button */}
+                                <button
+                                    onClick={clearNotifications}
+                                    className="p-1 rounded hover:bg-gray-100 text-gray-600"
+                                    title="Clear all notifications"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
+                            </>
+                        ) : (
+                            /* Default status when no notifications */
+                            <div className="flex items-center space-x-4 text-gray-600">
+                                <span>
+                                    Status: <span className={`font-medium ${pageData?.publication_status === 'published' ? 'text-green-600' :
+                                        pageData?.publication_status === 'scheduled' ? 'text-blue-600' :
+                                            'text-gray-600'
+                                        }`}>
+                                        {pageData?.publication_status || 'unpublished'}
+                                    </span>
+                                </span>
+                                {pageData?.last_modified && (
+                                    <span>
+                                        Last modified: {new Date(pageData.last_modified).toLocaleString()}
+                                    </span>
+                                )}
+                            </div>
                         )}
                     </div>
-                    <div className="flex items-center space-x-2">
+
+                    {/* Right side - Auto-save status */}
+                    <div className="flex items-center space-x-2 text-gray-600 flex-shrink-0 ml-4">
                         {isDirty && (
                             <span className="text-orange-600 font-medium">Unsaved changes</span>
                         )}
