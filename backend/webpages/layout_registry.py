@@ -8,7 +8,9 @@ enabling third-party apps to provide custom layouts without database entries.
 from abc import ABC, abstractmethod
 from typing import Dict, List, Any, Optional, Type
 from django.template.loader import get_template
+from django.template import TemplateDoesNotExist
 from django.core.exceptions import ImproperlyConfigured
+from django.core.cache import cache
 import logging
 
 logger = logging.getLogger(__name__)
@@ -126,6 +128,16 @@ class TemplateBasedLayout(BaseLayout):
     # CSS file path (optional, can use inline CSS in template)
     css_file: str = None
 
+    # Validation configuration
+    validate_slots: bool = True
+    require_slots: bool = False
+    min_slots: int = 0
+    max_slots: Optional[int] = None
+
+    # Caching configuration
+    cache_templates: bool = True
+    cache_timeout: int = 3600  # 1 hour default
+
     def __init__(self):
         super().__init__()
         self._extracted_html = ""
@@ -135,28 +147,78 @@ class TemplateBasedLayout(BaseLayout):
         if self.template_file:
             self._parse_template()
 
+    def _get_cache_key(self, suffix: str = "") -> str:
+        """Generate cache key for template data"""
+        base_key = f"template_layout:{self.name}:{self.template_file}"
+        return f"{base_key}:{suffix}" if suffix else base_key
+
     def _parse_template(self):
         """Parse HTML template to extract slots and CSS"""
+        if self.cache_templates:
+            # Try to get from cache first
+            cache_key = self._get_cache_key("parsed")
+            cached_data = cache.get(cache_key)
+            if cached_data:
+                self._extracted_html = cached_data["html"]
+                self._extracted_css = cached_data["css"]
+                self._parsed_slots = cached_data["slots"]
+                return
+
         try:
             template_content = self._load_template_content()
             self._extracted_html = self._extract_html(template_content)
             self._extracted_css = self._extract_css(template_content)
             self._parsed_slots = self._parse_slots(template_content)
+
+            # Cache the parsed data
+            if self.cache_templates:
+                cache_data = {
+                    "html": self._extracted_html,
+                    "css": self._extracted_css,
+                    "slots": self._parsed_slots,
+                }
+                cache.set(cache_key, cache_data, timeout=self.cache_timeout)
+
+        except (TemplateDoesNotExist, FileNotFoundError) as e:
+            logger.error(
+                f"Template file '{self.template_file}' not found for layout '{self.name}': {e}"
+            )
+            raise ImproperlyConfigured(
+                f"Template file '{self.template_file}' not found for layout '{self.name}'"
+            )
+        except ImportError as e:
+            logger.error(f"Missing dependency for template parsing: {e}")
+            raise ImproperlyConfigured(
+                "BeautifulSoup4 is required for template-based layouts. Install with: pip install beautifulsoup4"
+            )
         except Exception as e:
             logger.error(
-                f"Failed to parse template '{self.template_file}' for layout '{self.name}': {e}"
+                f"Unexpected error parsing template '{self.template_file}' for layout '{self.name}': {e}"
             )
             raise ImproperlyConfigured(
                 f"Template parsing failed for layout '{self.name}': {e}"
             )
 
     def _load_template_content(self) -> str:
-        """Load template file content"""
+        """Load template file content with caching support"""
+        if self.cache_templates:
+            cache_key = self._get_cache_key("content")
+            cached_content = cache.get(cache_key)
+            if cached_content:
+                return cached_content
+
         try:
             template = get_template(self.template_file)
-            return template.template.source
-        except Exception as e:
-            raise ImproperlyConfigured(
+            content = template.template.source
+
+            # Cache the template content
+            if self.cache_templates:
+                cache.set(cache_key, content, timeout=self.cache_timeout)
+
+            return content
+
+        except TemplateDoesNotExist as e:
+            raise TemplateDoesNotExist(
                 f"Could not load template '{self.template_file}' for layout '{self.name}': {e}"
             )
 
@@ -164,7 +226,12 @@ class TemplateBasedLayout(BaseLayout):
         """Extract HTML content, removing <style> tags"""
         try:
             from bs4 import BeautifulSoup
+        except ImportError:
+            raise ImportError(
+                "BeautifulSoup4 is required for template-based layouts. Install with: pip install beautifulsoup4"
+            )
 
+        try:
             soup = BeautifulSoup(content, "html.parser")
 
             # Remove style tags (they'll be handled separately)
@@ -172,16 +239,21 @@ class TemplateBasedLayout(BaseLayout):
                 style_tag.decompose()
 
             return str(soup)
-        except ImportError:
-            raise ImproperlyConfigured(
-                "BeautifulSoup4 is required for template-based layouts. Install with: pip install beautifulsoup4"
-            )
+
+        except Exception as e:
+            logger.error(f"Error extracting HTML from template: {e}")
+            raise ValueError(f"Failed to parse HTML template: {e}")
 
     def _extract_css(self, content: str) -> str:
         """Extract CSS from <style> tags"""
         try:
             from bs4 import BeautifulSoup
+        except ImportError:
+            raise ImportError(
+                "BeautifulSoup4 is required for template-based layouts. Install with: pip install beautifulsoup4"
+            )
 
+        try:
             soup = BeautifulSoup(content, "html.parser")
 
             css_content = []
@@ -189,16 +261,21 @@ class TemplateBasedLayout(BaseLayout):
                 css_content.append(style_tag.get_text().strip())
 
             return "\n".join(css_content)
-        except ImportError:
-            raise ImproperlyConfigured(
-                "BeautifulSoup4 is required for template-based layouts. Install with: pip install beautifulsoup4"
-            )
+
+        except Exception as e:
+            logger.error(f"Error extracting CSS from template: {e}")
+            raise ValueError(f"Failed to extract CSS from template: {e}")
 
     def _parse_slots(self, content: str) -> List[Dict]:
         """Parse widget slots from data-widget-slot attributes"""
         try:
             from bs4 import BeautifulSoup
+        except ImportError:
+            raise ImportError(
+                "BeautifulSoup4 is required for template-based layouts. Install with: pip install beautifulsoup4"
+            )
 
+        try:
             soup = BeautifulSoup(content, "html.parser")
 
             slots = []
@@ -228,10 +305,10 @@ class TemplateBasedLayout(BaseLayout):
                 slots.append(slot_data)
 
             return slots
-        except ImportError:
-            raise ImproperlyConfigured(
-                "BeautifulSoup4 is required for template-based layouts. Install with: pip install beautifulsoup4"
-            )
+
+        except Exception as e:
+            logger.error(f"Error parsing slots from template: {e}")
+            raise ValueError(f"Failed to parse widget slots from template: {e}")
 
     def _parse_max_widgets(self, value) -> Optional[int]:
         """Parse max widgets attribute"""
@@ -251,14 +328,38 @@ class TemplateBasedLayout(BaseLayout):
         return {"slots": self._parsed_slots}
 
     def validate_slot_configuration(self) -> None:
-        """Enhanced validation for template-based layouts"""
-        super().validate_slot_configuration()
+        """Enhanced validation for template-based layouts with configurable options"""
+        if self.validate_slots:
+            super().validate_slot_configuration()
 
-        # Additional validation for template-based layouts
-        if self.template_file and not self._parsed_slots:
-            logger.warning(
-                f"Template '{self.template_file}' for layout '{self.name}' contains no widget slots"
-            )
+            # Additional validation for template-based layouts
+            if self.template_file and not self._parsed_slots:
+                if self.require_slots:
+                    raise ImproperlyConfigured(
+                        f"Template '{self.template_file}' for layout '{self.name}' contains no widget slots but slots are required"
+                    )
+                else:
+                    logger.warning(
+                        f"Template '{self.template_file}' for layout '{self.name}' contains no widget slots"
+                    )
+
+            # Check minimum slots requirement
+            if self.min_slots > 0 and len(self._parsed_slots) < self.min_slots:
+                raise ImproperlyConfigured(
+                    f"Layout '{self.name}' requires at least {self.min_slots} slots, but only {len(self._parsed_slots)} found"
+                )
+
+            # Check maximum slots limit
+            if self.max_slots is not None and len(self._parsed_slots) > self.max_slots:
+                raise ImproperlyConfigured(
+                    f"Layout '{self.name}' allows at most {self.max_slots} slots, but {len(self._parsed_slots)} found"
+                )
+
+    def clear_cache(self) -> None:
+        """Clear cached template data for this layout"""
+        if self.cache_templates:
+            cache.delete(self._get_cache_key("parsed"))
+            cache.delete(self._get_cache_key("content"))
 
     def to_dict(self) -> Dict[str, Any]:
         """Enhanced dictionary representation including template data"""
@@ -271,6 +372,13 @@ class TemplateBasedLayout(BaseLayout):
                 "template_file": self.template_file,
                 "has_css": bool(self._extracted_css),
                 "parsed_slots_count": len(self._parsed_slots),
+                "validation_config": {
+                    "validate_slots": self.validate_slots,
+                    "require_slots": self.require_slots,
+                    "min_slots": self.min_slots,
+                    "max_slots": self.max_slots,
+                },
+                "caching_enabled": self.cache_templates,
             }
         )
 
