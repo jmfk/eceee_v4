@@ -111,6 +111,179 @@ class BaseLayout(ABC):
         }
 
 
+class TemplateBasedLayout(BaseLayout):
+    """
+    Enhanced layout class supporting HTML templates with automatic slot parsing.
+
+    This class extends BaseLayout to support loading HTML templates,
+    extracting CSS styles, and automatically parsing widget slots from
+    data-widget-slot attributes.
+    """
+
+    # Template file path (relative to templates directory)
+    template_file: str = None
+
+    # CSS file path (optional, can use inline CSS in template)
+    css_file: str = None
+
+    def __init__(self):
+        super().__init__()
+        self._extracted_html = ""
+        self._extracted_css = ""
+        self._parsed_slots = []
+
+        if self.template_file:
+            self._parse_template()
+
+    def _parse_template(self):
+        """Parse HTML template to extract slots and CSS"""
+        try:
+            template_content = self._load_template_content()
+            self._extracted_html = self._extract_html(template_content)
+            self._extracted_css = self._extract_css(template_content)
+            self._parsed_slots = self._parse_slots(template_content)
+        except Exception as e:
+            logger.error(
+                f"Failed to parse template '{self.template_file}' for layout '{self.name}': {e}"
+            )
+            raise ImproperlyConfigured(
+                f"Template parsing failed for layout '{self.name}': {e}"
+            )
+
+    def _load_template_content(self) -> str:
+        """Load template file content"""
+        try:
+            template = get_template(self.template_file)
+            return template.template.source
+        except Exception as e:
+            raise ImproperlyConfigured(
+                f"Could not load template '{self.template_file}' for layout '{self.name}': {e}"
+            )
+
+    def _extract_html(self, content: str) -> str:
+        """Extract HTML content, removing <style> tags"""
+        try:
+            from bs4 import BeautifulSoup
+
+            soup = BeautifulSoup(content, "html.parser")
+
+            # Remove style tags (they'll be handled separately)
+            for style_tag in soup.find_all("style"):
+                style_tag.decompose()
+
+            return str(soup)
+        except ImportError:
+            raise ImproperlyConfigured(
+                "BeautifulSoup4 is required for template-based layouts. Install with: pip install beautifulsoup4"
+            )
+
+    def _extract_css(self, content: str) -> str:
+        """Extract CSS from <style> tags"""
+        try:
+            from bs4 import BeautifulSoup
+
+            soup = BeautifulSoup(content, "html.parser")
+
+            css_content = []
+            for style_tag in soup.find_all("style"):
+                css_content.append(style_tag.get_text().strip())
+
+            return "\n".join(css_content)
+        except ImportError:
+            raise ImproperlyConfigured(
+                "BeautifulSoup4 is required for template-based layouts. Install with: pip install beautifulsoup4"
+            )
+
+    def _parse_slots(self, content: str) -> List[Dict]:
+        """Parse widget slots from data-widget-slot attributes"""
+        try:
+            from bs4 import BeautifulSoup
+
+            soup = BeautifulSoup(content, "html.parser")
+
+            slots = []
+            slot_elements = soup.find_all(attrs={"data-widget-slot": True})
+
+            for element in slot_elements:
+                slot_name = element.get("data-widget-slot")
+                if not slot_name:
+                    continue
+
+                slot_data = {
+                    "name": slot_name,
+                    "title": element.get(
+                        "data-slot-title", slot_name.replace("_", " ").title()
+                    ),
+                    "description": element.get(
+                        "data-slot-description", f"{slot_name} content area"
+                    ),
+                    "max_widgets": self._parse_max_widgets(
+                        element.get("data-slot-max-widgets")
+                    ),
+                    "css_classes": (
+                        element.get("class", []) if element.get("class") else []
+                    ),
+                    "selector": f'[data-widget-slot="{slot_name}"]',
+                }
+                slots.append(slot_data)
+
+            return slots
+        except ImportError:
+            raise ImproperlyConfigured(
+                "BeautifulSoup4 is required for template-based layouts. Install with: pip install beautifulsoup4"
+            )
+
+    def _parse_max_widgets(self, value) -> Optional[int]:
+        """Parse max widgets attribute"""
+        if value is None:
+            return None
+        try:
+            return int(value) if value != "" else None
+        except (ValueError, TypeError):
+            logger.warning(
+                f"Invalid max_widgets value '{value}' in template '{self.template_file}'"
+            )
+            return None
+
+    @property
+    def slot_configuration(self) -> Dict[str, Any]:
+        """Return slot configuration (implementation of abstract method)"""
+        return {"slots": self._parsed_slots}
+
+    def validate_slot_configuration(self) -> None:
+        """Enhanced validation for template-based layouts"""
+        super().validate_slot_configuration()
+
+        # Additional validation for template-based layouts
+        if self.template_file and not self._parsed_slots:
+            logger.warning(
+                f"Template '{self.template_file}' for layout '{self.name}' contains no widget slots"
+            )
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Enhanced dictionary representation including template data"""
+        base_dict = super().to_dict()
+
+        # Add template-specific data
+        base_dict.update(
+            {
+                "template_based": True,
+                "template_file": self.template_file,
+                "has_css": bool(self._extracted_css),
+                "parsed_slots_count": len(self._parsed_slots),
+            }
+        )
+
+        # Include HTML and CSS if available
+        if hasattr(self, "_extracted_html") and self._extracted_html:
+            base_dict["html"] = self._extracted_html
+
+        if hasattr(self, "_extracted_css") and self._extracted_css:
+            base_dict["css"] = self._extracted_css
+
+        return base_dict
+
+
 class LayoutRegistry:
     """
     Global registry for layout classes.
