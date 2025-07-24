@@ -395,10 +395,21 @@ export class HtmlSlotDetector {
     }
 
     /**
-     * Start observing DOM changes for dynamic slot detection
-     */
+ * Start observing DOM changes for dynamic slot detection
+ */
     startObserving() {
         if (!this.containerElement || this.observer) return
+
+        // Debounce slot detection to improve performance
+        let debounceTimeout = null
+        const debounceDelay = 300 // ms
+
+        const debouncedDetectSlots = () => {
+            clearTimeout(debounceTimeout)
+            debounceTimeout = setTimeout(() => {
+                this.detectSlots()
+            }, debounceDelay)
+        }
 
         this.observer = new MutationObserver((mutations) => {
             let shouldRedetect = false
@@ -423,7 +434,7 @@ export class HtmlSlotDetector {
             })
 
             if (shouldRedetect) {
-                this.detectSlots()
+                debouncedDetectSlots()
             }
         })
 
@@ -433,6 +444,9 @@ export class HtmlSlotDetector {
             attributes: true,
             attributeFilter: [SLOT_DETECTION_CONFIG.slotAttribute]
         })
+
+        // Store debounce timeout for cleanup
+        this._debounceTimeout = debounceTimeout
     }
 
     /**
@@ -443,6 +457,12 @@ export class HtmlSlotDetector {
             this.observer.disconnect()
             this.observer = null
         }
+
+        // Clear any pending debounced detection
+        if (this._debounceTimeout) {
+            clearTimeout(this._debounceTimeout)
+            this._debounceTimeout = null
+        }
     }
 
     /**
@@ -452,6 +472,12 @@ export class HtmlSlotDetector {
         this.stopObserving()
         this.unhighlightAllSlots()
         this.slots.clear()
+
+        // Clear any pending debounced detection
+        if (this._debounceTimeout) {
+            clearTimeout(this._debounceTimeout)
+            this._debounceTimeout = null
+        }
     }
 }
 
