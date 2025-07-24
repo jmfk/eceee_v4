@@ -1,0 +1,1 @@
+Reviews the active PR in the style of Sandi Metz. Use gh (cli) to interact with GitHub and GitHub project. This PR: 
