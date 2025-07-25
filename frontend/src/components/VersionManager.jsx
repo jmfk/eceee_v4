@@ -19,8 +19,8 @@ import {
     ArrowLeft,
     ArrowRight
 } from 'lucide-react'
-import toast from 'react-hot-toast'
 import { useNotificationContext } from './NotificationManager'
+import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import {
     getPageVersions,
     getVersion,
@@ -47,6 +47,7 @@ const VersionManager = ({ pageId, onClose }) => {
     const [showCreateForm, setShowCreateForm] = useState(false)
     const queryClient = useQueryClient()
     const { showConfirm, showPrompt } = useNotificationContext()
+    const { addNotification } = useGlobalNotifications()
 
     // Fetch versions for the page
     const { data: versionsData, isLoading: versionsLoading } = useQuery({
@@ -73,48 +74,48 @@ const VersionManager = ({ pageId, onClose }) => {
     const publishMutation = useMutation({
         mutationFn: publishVersion,
         onSuccess: () => {
-            toast.success('Version published successfully!')
+            addNotification('Version published successfully!', 'success', 'version-publish')
             queryClient.invalidateQueries(['page-versions', pageId])
             queryClient.invalidateQueries(['version-stats', pageId])
         },
         onError: (error) => {
-            toast.error(error.response?.data?.error || 'Failed to publish version')
+            addNotification('Failed to publish version', 'error', 'version-publish')
         }
     })
 
     const deleteMutation = useMutation({
         mutationFn: deleteVersion,
         onSuccess: () => {
-            toast.success('Version deleted successfully!')
+            addNotification('Version deleted successfully!', 'success', 'version-delete')
             queryClient.invalidateQueries(['page-versions', pageId])
             queryClient.invalidateQueries(['version-stats', pageId])
         },
         onError: (error) => {
-            toast.error(error.response?.data?.error || 'Failed to delete version')
+            addNotification('Failed to delete version', 'error', 'version-delete')
         }
     })
 
     const createDraftMutation = useMutation({
         mutationFn: ({ versionId, description }) => createDraftFromPublished(versionId, description),
         onSuccess: () => {
-            toast.success('Draft created successfully!')
+            addNotification('Draft created successfully!', 'success', 'version-draft')
             queryClient.invalidateQueries(['page-versions', pageId])
             queryClient.invalidateQueries(['version-stats', pageId])
         },
         onError: (error) => {
-            toast.error(error.response?.data?.error || 'Failed to create draft')
+            addNotification('Failed to create draft', 'error', 'version-draft')
         }
     })
 
     const restoreMutation = useMutation({
         mutationFn: restoreVersion,
         onSuccess: () => {
-            toast.success('Version restored successfully!')
+            addNotification('Version restored successfully!', 'success', 'version-restore')
             queryClient.invalidateQueries(['page-versions', pageId])
             queryClient.invalidateQueries(['version-stats', pageId])
         },
         onError: (error) => {
-            toast.error(error.response?.data?.error || 'Failed to restore version')
+            addNotification('Failed to restore version', 'error', 'version-restore')
         }
     })
 
@@ -267,7 +268,7 @@ const VersionManager = ({ pageId, onClose }) => {
                         onClick={() => {
                             if (!compareVersions.version1) {
                                 setCompareVersions({ version1: version, version2: null })
-                                toast.success('Select second version to compare')
+                                addNotification('Select second version to compare', 'info', 'version-compare')
                             } else if (!compareVersions.version2 && compareVersions.version1.id !== version.id) {
                                 setCompareVersions({ ...compareVersions, version2: version })
                                 handleCompare(compareVersions.version1, version)

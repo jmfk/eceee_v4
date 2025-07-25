@@ -1,6 +1,6 @@
 import { useState, useEffect, useReducer, useRef, useCallback } from 'react'
 import { Save, X, AlertCircle, Info, Settings, Layers, Eye, EyeOff, Monitor } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 
 // Reducer for managing consolidated widget configurator state
 const widgetConfiguratorReducer = (state, action) => {
@@ -84,6 +84,7 @@ const WidgetConfigurator = ({
 
     // Destructure for easier access
     const { config, inheritanceSettings, validation: { errors, isValid }, activeTab } = widgetState
+    const { addNotification } = useGlobalNotifications()
 
     // Inheritance behavior options
     const inheritanceBehaviorOptions = [
@@ -207,7 +208,7 @@ const WidgetConfigurator = ({
 
     const handleSave = () => {
         if (!isValid) {
-            toast.error('Please fix all validation errors before saving')
+            addNotification('Please fix all validation errors before saving', 'error', 'widget-validation')
             return
         }
 

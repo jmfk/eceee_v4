@@ -11,7 +11,7 @@ import {
     Layers
 } from 'lucide-react'
 import { api } from '../api/client'
-import toast from 'react-hot-toast'
+import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 
 import WidgetLibrary from './WidgetLibrary'
 import WidgetConfigurator from './WidgetConfigurator'
@@ -46,6 +46,7 @@ const SlotManager = ({ pageId, layout, onWidgetChange }) => {
     const [configuringWidget, setConfiguringWidget] = useState(null)
     const queryClient = useQueryClient()
     const templateContainerRef = useRef(null)
+    const { addNotification } = useGlobalNotifications()
 
     // Fetch page widgets
     const { data: pageWidgetsData = [], isLoading, error, refetch } = useQuery({
@@ -80,7 +81,7 @@ const SlotManager = ({ pageId, layout, onWidgetChange }) => {
             }
         },
         onSlotError: (errors) => {
-            errors.forEach(error => toast.error(error))
+            errors.forEach(error => addNotification(error, 'error', 'slot-error'))
         }
     })
 
@@ -102,11 +103,11 @@ const SlotManager = ({ pageId, layout, onWidgetChange }) => {
         mutationFn: ({ page, ...widgetData }) => addWidget(page, widgetData, 'Added widget'),
         onSuccess: () => {
             queryClient.invalidateQueries(['page-widgets', pageId])
-            toast.success('Widget created successfully')
+            addNotification('Widget created successfully', 'success', 'widget-create')
             onWidgetChange?.()
         },
         onError: (error) => {
-            toast.error(error.response?.data?.detail || 'Failed to create widget')
+            addNotification('Failed to create widget', 'error', 'widget-create')
         }
     })
 
@@ -114,11 +115,11 @@ const SlotManager = ({ pageId, layout, onWidgetChange }) => {
         mutationFn: ({ widgetId, data }) => updateWidget(pageId, widgetId, data, 'Updated widget'),
         onSuccess: () => {
             queryClient.invalidateQueries(['page-widgets', pageId])
-            toast.success('Widget updated successfully')
+            addNotification('Widget updated successfully', 'success', 'widget-update')
             onWidgetChange?.()
         },
         onError: (error) => {
-            toast.error(error.response?.data?.detail || 'Failed to update widget')
+            addNotification('Failed to update widget', 'error', 'widget-update')
         }
     })
 
@@ -126,11 +127,11 @@ const SlotManager = ({ pageId, layout, onWidgetChange }) => {
         mutationFn: ({ widgetId }) => deleteWidget(pageId, widgetId, 'Deleted widget'),
         onSuccess: () => {
             queryClient.invalidateQueries(['page-widgets', pageId])
-            toast.success('Widget deleted successfully')
+            addNotification('Widget deleted successfully', 'success', 'widget-delete')
             onWidgetChange?.()
         },
         onError: (error) => {
-            toast.error(error.response?.data?.detail || 'Failed to delete widget')
+            addNotification('Failed to delete widget', 'error', 'widget-delete')
         }
     })
 
