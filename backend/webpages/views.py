@@ -211,6 +211,102 @@ class CodeLayoutViewSet(viewsets.ViewSet):
         response = self._add_rate_limiting_headers(response, request, "list")
         return response
 
+    @action(detail=True, methods=["get"], url_path="editor-data")
+    def editor_data(self, request, pk=None):
+        """Get enhanced layout data for React editor"""
+        from .layout_registry import layout_registry
+        from .serializers import EnhancedLayoutSerializer
+
+        layout = layout_registry.get_layout(pk)
+        if not layout:
+            error_data = {"error": f"Layout '{pk}' not found"}
+            return self._create_formatted_response(
+                error_data, request, status.HTTP_404_NOT_FOUND
+            )
+
+        api_version = self._get_api_version(request)
+
+        # Log metrics
+        self._log_metrics(request, "editor_data", layout_name=pk)
+
+        # Get layout data with enhanced serialization
+        layout_data = layout.to_dict()
+
+        # Use enhanced serializer for React editor
+        serializer_context = {
+            "api_version": api_version,
+            "request": request,
+            "include_template_data": True,
+            "include_editor_data": True,
+        }
+
+        serializer = EnhancedLayoutSerializer(layout_data, context=serializer_context)
+
+        response_data = {
+            "layout": serializer.data,
+            "editor_meta": {
+                "api_version": api_version,
+                "optimized_for": "react_editor",
+                "cache_duration": 300,  # 5 minutes
+                "last_modified": None,  # Could be implemented
+            },
+        }
+
+        response = self._create_formatted_response(response_data, request)
+        response = self._add_caching_headers(response, layout_name=f"{pk}_editor")
+        response = self._add_rate_limiting_headers(response, request, "editor_data")
+        return response
+
+    @action(detail=False, methods=["get"], url_path="editor-list")
+    def editor_list(self, request):
+        """Get all layouts with enhanced editor data"""
+        from .layout_registry import layout_registry
+        from .serializers import EnhancedLayoutSerializer
+
+        active_only = request.query_params.get("active_only", "true").lower() == "true"
+        api_version = self._get_api_version(request)
+
+        # Log metrics
+        self._log_metrics(request, "editor_list")
+
+        # Get layouts with enhanced serialization
+        layouts = layout_registry.list_layouts(active_only=active_only)
+        layout_data = [layout.to_dict() for layout in layouts]
+
+        # Use enhanced serializer
+        serializer_context = {
+            "api_version": api_version,
+            "request": request,
+            "include_template_data": True,
+            "include_editor_data": True,
+        }
+
+        serializer = EnhancedLayoutSerializer(
+            layout_data,
+            many=True,
+            context=serializer_context,
+        )
+
+        response_data = {
+            "results": serializer.data,
+            "editor_meta": {
+                "total_layouts": len(layout_data),
+                "api_version": api_version,
+                "optimized_for": "react_editor",
+                "data_includes": [
+                    "template_structure",
+                    "slot_hierarchy",
+                    "css_analysis",
+                    "editor_instructions",
+                ],
+            },
+        }
+
+        response = self._create_formatted_response(response_data, request)
+        response = self._add_caching_headers(response, cache_key="editor_layouts")
+        response = self._add_rate_limiting_headers(response, request, "editor_list")
+        return response
+
     @action(detail=False, methods=["post"])
     def reload(self, request):
         """Reload all layouts (admin/dev use)"""

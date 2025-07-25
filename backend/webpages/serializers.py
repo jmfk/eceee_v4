@@ -86,12 +86,19 @@ class LayoutSerializer(serializers.Serializer):
     # Enhanced template data fields (Phase 1.3)
     template_data = serializers.SerializerMethodField()
 
+    # NEW: Enhanced editor data for React components
+    editor_data = serializers.SerializerMethodField()
+
     def __init__(self, *args, **kwargs):
         # Extract template data inclusion flag from context
         self.include_template_data = kwargs.pop("include_template_data", False)
+        self.include_editor_data = kwargs.pop("include_editor_data", False)
         if "context" in kwargs and kwargs["context"]:
             self.include_template_data = kwargs["context"].get(
                 "include_template_data", False
+            )
+            self.include_editor_data = kwargs["context"].get(
+                "include_editor_data", False
             )
         super().__init__(*args, **kwargs)
 
@@ -139,6 +146,189 @@ class LayoutSerializer(serializers.Serializer):
             return template_data if template_data else None
 
         return None
+
+    def get_editor_data(self, obj):
+        """
+        Get enhanced editor data for React components when requested.
+
+        This provides detailed template structure analysis and editor-specific
+        instructions for rendering the layout in the React editor.
+        """
+        if not self.include_editor_data:
+            return None
+
+        try:
+            from .template_parser import LayoutTemplateParser
+
+            # Get layout object if this is a dict
+            if isinstance(obj, dict):
+                layout_name = obj.get("name")
+                if layout_name:
+                    from .layout_registry import layout_registry
+
+                    layout_obj = layout_registry.get_layout(layout_name)
+                    if not layout_obj:
+                        return None
+                else:
+                    return None
+            else:
+                layout_obj = obj
+
+            # Parse the template and extract structure
+            parser = LayoutTemplateParser(layout_obj)
+
+            return {
+                "template_structure": parser.get_template_structure(),
+                "slot_hierarchy": parser.get_slot_hierarchy(),
+                "css_analysis": parser.get_css_analysis(),
+                "editor_instructions": parser.get_editor_instructions(),
+                "constraints": parser.get_layout_constraints(),
+                "responsive_breakpoints": parser.get_responsive_info(),
+                "accessibility_info": parser.get_accessibility_info(),
+                "validation_rules": parser.get_validation_rules(),
+            }
+
+        except ImportError:
+            # Template parser not available yet
+            return self._get_basic_editor_data(obj)
+        except Exception as e:
+            # Log error and return basic data
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Failed to parse template for editor data: {e}")
+            return self._get_basic_editor_data(obj)
+
+    def _get_basic_editor_data(self, obj):
+        """
+        Fallback method to provide basic editor data when template parser is not available.
+        """
+        if isinstance(obj, dict):
+            slot_config = obj.get("slot_configuration", {})
+            layout_name = obj.get("name", "unknown")
+            template_name = obj.get("template_name", "")
+            css_classes = obj.get("css_classes", "")
+        else:
+            slot_config = (
+                getattr(obj, "slot_configuration", {})
+                if hasattr(obj, "slot_configuration")
+                else {}
+            )
+            layout_name = getattr(obj, "name", "unknown")
+            template_name = getattr(obj, "template_name", "")
+            css_classes = getattr(obj, "css_classes", "")
+
+        slots = slot_config.get("slots", [])
+
+        return {
+            "layout_type": self._infer_layout_type(layout_name, len(slots)),
+            "slot_summary": {
+                "total_slots": len(slots),
+                "slots": [
+                    {
+                        "name": slot.get("name", ""),
+                        "title": slot.get("title", ""),
+                        "description": slot.get("description", ""),
+                        "max_widgets": slot.get("max_widgets"),
+                        "css_classes": slot.get("css_classes", ""),
+                        "position": idx,
+                        "is_required": idx == 0,  # Assume first slot is main content
+                        "accepts_all_widgets": slot.get("max_widgets") is None,
+                    }
+                    for idx, slot in enumerate(slots)
+                ],
+            },
+            "editor_metadata": {
+                "template_file": template_name,
+                "base_css_classes": css_classes,
+                "is_responsive": "responsive" in css_classes.lower()
+                or "col" in css_classes.lower(),
+                "complexity_level": (
+                    "basic"
+                    if len(slots) <= 2
+                    else "intermediate" if len(slots) <= 4 else "advanced"
+                ),
+                "recommended_use_cases": self._get_use_cases(layout_name, len(slots)),
+            },
+            "basic_structure": {
+                "container_classes": css_classes,
+                "slot_layout": self._infer_slot_layout(slots),
+                "hierarchy": "flat",  # Basic fallback
+            },
+        }
+
+    def _infer_layout_type(self, layout_name, slot_count):
+        """Infer layout type from name and slot count."""
+        name_lower = layout_name.lower()
+        if "single" in name_lower or slot_count <= 2:
+            return "single_column"
+        elif "two" in name_lower or "sidebar" in name_lower:
+            return "two_column"
+        elif "three" in name_lower:
+            return "three_column"
+        elif "grid" in name_lower:
+            return "grid"
+        elif "hero" in name_lower:
+            return "hero"
+        else:
+            return "custom"
+
+    def _get_use_cases(self, layout_name, slot_count):
+        """Get recommended use cases based on layout characteristics."""
+        use_cases = []
+        name_lower = layout_name.lower()
+
+        if "single" in name_lower:
+            use_cases = ["blog_posts", "articles", "simple_pages"]
+        elif "two" in name_lower or "sidebar" in name_lower:
+            use_cases = ["documentation", "product_pages", "landing_pages"]
+        elif "three" in name_lower:
+            use_cases = ["dashboards", "complex_layouts", "portal_pages"]
+        elif "hero" in name_lower:
+            use_cases = ["landing_pages", "marketing_pages", "home_pages"]
+        elif "grid" in name_lower:
+            use_cases = ["portfolios", "galleries", "product_catalogs"]
+        else:
+            use_cases = ["general_purpose"]
+
+        return use_cases
+
+    def _infer_slot_layout(self, slots):
+        """Infer the visual layout pattern of slots."""
+        if len(slots) <= 1:
+            return "single"
+        elif len(slots) == 2:
+            return (
+                "vertical"
+                if any("footer" in slot.get("name", "") for slot in slots)
+                else "horizontal"
+            )
+        elif len(slots) == 3:
+            # Check for header/main/footer pattern
+            slot_names = [slot.get("name", "").lower() for slot in slots]
+            if "header" in slot_names and "footer" in slot_names:
+                return "header_main_footer"
+            else:
+                return "three_column"
+        else:
+            return "complex_grid"
+
+
+class EnhancedLayoutSerializer(LayoutSerializer):
+    """
+    Enhanced layout serializer that always includes editor data.
+
+    This is a convenience serializer for the React editor that automatically
+    includes all the detailed template and editor information.
+    """
+
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault("include_template_data", True)
+        kwargs.setdefault("include_editor_data", True)
+        if "context" in kwargs and kwargs["context"]:
+            kwargs["context"].setdefault("include_template_data", True)
+            kwargs["context"].setdefault("include_editor_data", True)
+        super().__init__(*args, **kwargs)
 
 
 # Temporarily disabled - widgets now stored in PageVersion JSON
