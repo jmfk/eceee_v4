@@ -8,13 +8,13 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import LayoutRenderer from './LayoutRenderer';
 
-function ContentEditor({ 
-  layoutJson, 
-  widgets = {}, 
+function ContentEditor({
+  layoutJson,
+  widgets = {},
   onWidgetUpdate,
   onSlotClick,
   editable = true,
-  className = '' 
+  className = ''
 }) {
   const containerRef = useRef(null);
   const rendererRef = useRef(null);
@@ -27,9 +27,9 @@ function ContentEditor({
     if (rendererRef.current) {
       rendererRef.current.destroy();
     }
-    
+
     rendererRef.current = new LayoutRenderer();
-    
+
     // Set up widget renderer
     rendererRef.current.setWidgetRenderer((widget) => {
       return createWidgetElement(widget);
@@ -53,12 +53,12 @@ function ContentEditor({
 
     try {
       rendererRef.current.render(layoutJson, containerRef);
-      
+
       // Set up slot click handlers if in editable mode
       if (editable) {
         setupSlotInteractivity();
       }
-      
+
       setIsLoading(false);
     } catch (err) {
       console.error('ContentEditor: Error rendering layout', err);
@@ -78,6 +78,48 @@ function ContentEditor({
     });
   }, [widgets]);
 
+  // Inject CSS styles for slot interactivity
+  useEffect(() => {
+    const styleId = 'content-editor-styles';
+
+    // Remove existing styles if any
+    const existingStyle = document.getElementById(styleId);
+    if (existingStyle) {
+      existingStyle.remove();
+    }
+
+    // Add new styles
+    const style = document.createElement('style');
+    style.id = styleId;
+    style.textContent = `
+      .slot-editable {
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+      
+      .slot-editable:hover {
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+      }
+      
+      .slot-selected {
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.6) !important;
+      }
+      
+      .widget-item:hover .widget-edit-btn {
+        opacity: 1;
+      }
+    `;
+    document.head.appendChild(style);
+
+    // Cleanup function
+    return () => {
+      const styleToRemove = document.getElementById(styleId);
+      if (styleToRemove) {
+        styleToRemove.remove();
+      }
+    };
+  }, []);
+
   // Set up interactivity for slots in edit mode
   const setupSlotInteractivity = useCallback(() => {
     if (!containerRef.current || !editable) {
@@ -86,23 +128,23 @@ function ContentEditor({
 
     // Add click handlers to all slot elements
     const slotElements = containerRef.current.querySelectorAll('[data-slot-name]');
-    
+
     slotElements.forEach(slotElement => {
       const slotName = slotElement.getAttribute('data-slot-name');
-      
+
       // Add visual feedback classes
       slotElement.classList.add('slot-editable');
-      
+
       // Add click handler
       const handleSlotClick = (e) => {
         e.stopPropagation();
         setSelectedSlot(slotName);
-        
+
         // Call external slot click handler if provided
         if (onSlotClick) {
           onSlotClick(slotName, slotElement);
         }
-        
+
         // Add visual selection indicator
         document.querySelectorAll('.slot-selected').forEach(el => {
           el.classList.remove('slot-selected');
@@ -111,7 +153,7 @@ function ContentEditor({
       };
 
       slotElement.addEventListener('click', handleSlotClick);
-      
+
       // Store handler reference for cleanup
       slotElement._slotClickHandler = handleSlotClick;
     });
@@ -121,7 +163,7 @@ function ContentEditor({
   const createWidgetElement = useCallback((widget) => {
     const element = document.createElement('div');
     element.className = 'widget-item bg-white border border-gray-200 rounded-lg p-4 mb-3 shadow-sm';
-    
+
     // Add widget data attributes
     element.setAttribute('data-widget-type', widget.type);
     if (widget.id) {
@@ -130,7 +172,7 @@ function ContentEditor({
 
     // Create widget content based on type
     let content = '';
-    
+
     switch (widget.type) {
       case 'text':
         content = `
@@ -140,19 +182,19 @@ function ContentEditor({
           </div>
         `;
         break;
-        
+
       case 'image':
         content = `
           <div class="widget-image">
             <div class="text-sm font-medium text-gray-700 mb-2">Image Widget</div>
-            ${widget.config?.url ? 
-              `<img src="${widget.config.url}" alt="${widget.config.alt || ''}" class="max-w-full h-auto rounded">` :
-              '<div class="bg-gray-100 border-2 border-dashed border-gray-300 rounded p-8 text-center text-gray-500">No image</div>'
-            }
+            ${widget.config?.url ?
+            `<img src="${widget.config.url}" alt="${widget.config.alt || ''}" class="max-w-full h-auto rounded">` :
+            '<div class="bg-gray-100 border-2 border-dashed border-gray-300 rounded p-8 text-center text-gray-500">No image</div>'
+          }
           </div>
         `;
         break;
-        
+
       case 'menu':
       case 'navigation':
         const items = widget.config?.items || [];
@@ -165,20 +207,20 @@ function ContentEditor({
           </div>
         `;
         break;
-        
+
       case 'recent_posts':
         content = `
           <div class="widget-recent-posts">
             <div class="text-sm font-medium text-gray-700 mb-2">Recent Posts</div>
             <div class="space-y-2 text-sm">
-              ${Array.from({length: widget.config?.count || 3}, (_, i) => 
-                `<div class="flex justify-between"><span>Post ${i + 1}</span><span class="text-gray-500">${widget.config?.show_date ? 'Jan ' + (i + 1) : ''}</span></div>`
-              ).join('')}
+              ${Array.from({ length: widget.config?.count || 3 }, (_, i) =>
+          `<div class="flex justify-between"><span>Post ${i + 1}</span><span class="text-gray-500">${widget.config?.show_date ? 'Jan ' + (i + 1) : ''}</span></div>`
+        ).join('')}
             </div>
           </div>
         `;
         break;
-        
+
       case 'social_media':
         const platforms = widget.config?.platforms || [];
         content = `
@@ -190,7 +232,7 @@ function ContentEditor({
           </div>
         `;
         break;
-        
+
       case 'copyright':
         content = `
           <div class="widget-copyright">
@@ -199,7 +241,7 @@ function ContentEditor({
           </div>
         `;
         break;
-        
+
       default:
         content = `
           <div class="widget-default">
@@ -222,10 +264,10 @@ function ContentEditor({
         e.stopPropagation();
         console.log('Edit widget:', widget);
       };
-      
+
       element.style.position = 'relative';
       element.appendChild(editButton);
-      
+
       // Show edit button on hover
       element.addEventListener('mouseenter', () => {
         editButton.style.opacity = '1';
@@ -243,7 +285,7 @@ function ContentEditor({
     if (rendererRef.current) {
       rendererRef.current.updateSlot(slotName, newWidgets);
     }
-    
+
     if (onWidgetUpdate) {
       onWidgetUpdate(slotName, newWidgets);
     }
@@ -281,15 +323,15 @@ function ContentEditor({
           <div className="text-gray-600">Loading layout...</div>
         </div>
       )}
-      
-      <div 
-        ref={containerRef} 
+
+      <div
+        ref={containerRef}
         className={`layout-container ${editable ? 'editable' : ''}`}
         style={{
           minHeight: '400px'
         }}
       />
-      
+
       {editable && selectedSlot && (
         <div className="slot-info fixed bottom-4 right-4 bg-white border border-gray-300 rounded-lg shadow-lg p-3 text-sm z-20">
           <div className="font-medium">Selected Slot: {selectedSlot}</div>
@@ -298,25 +340,7 @@ function ContentEditor({
           </div>
         </div>
       )}
-      
-      <style jsx>{`
-        .slot-editable {
-          cursor: pointer;
-          transition: all 0.2s ease;
-        }
-        
-        .slot-editable:hover {
-          box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
-        }
-        
-        .slot-selected {
-          box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.6) !important;
-        }
-        
-        .widget-item:hover .widget-edit-btn {
-          opacity: 1;
-        }
-      `}</style>
+
     </div>
   );
 }
