@@ -26,7 +26,7 @@ class LayoutRenderer {
     try {
       // Clear existing content
       targetRef.current.innerHTML = '';
-      
+
       // Reset internal maps
       this.slotContainers.clear();
       this.slotConfigs.clear();
@@ -35,10 +35,10 @@ class LayoutRenderer {
       const rootElement = this.renderNode(layout.structure || layout);
       targetRef.current.appendChild(rootElement);
 
-      console.log('LayoutRenderer: Layout rendered successfully', {
-        slots: Array.from(this.slotContainers.keys()),
-        configs: Array.from(this.slotConfigs.keys())
-      });
+      // console.log('LayoutRenderer: Layout rendered successfully', {
+      //   slots: Array.from(this.slotContainers.keys()),
+      //   configs: Array.from(this.slotConfigs.keys())
+      // });
 
     } catch (error) {
       console.error('LayoutRenderer: Error rendering layout', error);
@@ -53,7 +53,7 @@ class LayoutRenderer {
    */
   updateSlot(slotName, widgets = []) {
     const container = this.slotContainers.get(slotName);
-    
+
     if (!container) {
       console.warn(`LayoutRenderer: Slot "${slotName}" not found`);
       return;
@@ -91,7 +91,7 @@ class LayoutRenderer {
         }
       }
 
-      console.log(`LayoutRenderer: Updated slot "${slotName}" with ${widgets.length} widgets`);
+      // console.log(`LayoutRenderer: Updated slot "${slotName}" with ${widgets.length} widgets`);
 
     } catch (error) {
       console.error(`LayoutRenderer: Error updating slot "${slotName}"`, error);
@@ -216,7 +216,7 @@ class LayoutRenderer {
     if (slotName) {
       element.setAttribute('data-slot-name', slotName);
       element.setAttribute('data-slot-title', node.slot.title || '');
-      
+
       // Store slot reference and configuration
       this.slotContainers.set(slotName, element);
       this.slotConfigs.set(slotName, node.slot);
@@ -285,7 +285,7 @@ class LayoutRenderer {
   createDefaultWidgetElement(widget) {
     const element = document.createElement('div');
     element.className = 'widget-placeholder border border-gray-300 rounded p-3 mb-2';
-    
+
     element.innerHTML = `
       <div class="text-sm font-medium text-gray-700">${widget.type || 'Unknown Widget'}</div>
       ${widget.config ? `<div class="text-xs text-gray-500 mt-1">${JSON.stringify(widget.config, null, 2)}</div>` : ''}

@@ -22,10 +22,9 @@ import {
 import { api } from '../api/client.js'
 import { useNotificationContext } from './NotificationManager'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
-import SlotManager from './SlotManager'
+import ContentEditor from './ContentEditor'
 import LayoutSelector from './LayoutSelector'
 import StatusBar from './StatusBar'
-import { layoutsApi } from '../api/layouts'
 
 const PageEditor = () => {
     const { pageId, tab } = useParams()
@@ -47,6 +46,8 @@ const PageEditor = () => {
     const [pageData, setPageData] = useState(null)
     const [isDirty, setIsDirty] = useState(false)
     const [isPublishing, setIsPublishing] = useState(false)
+    const [layoutData, setLayoutData] = useState(null)
+    const [isLoadingLayout, setIsLoadingLayout] = useState(false)
 
     const queryClient = useQueryClient()
     const { showError, showConfirm } = useNotificationContext()
@@ -114,6 +115,33 @@ const PageEditor = () => {
             setPageData(page)
         }
     }, [page, isNewPage])
+
+    // Fetch layout data when page has a code_layout
+    useEffect(() => {
+        const fetchLayoutData = async () => {
+            if (!pageData?.code_layout) {
+                setLayoutData(null)
+                return
+            }
+
+            setIsLoadingLayout(true)
+            try {
+                addNotification(`Loading layout: ${pageData.code_layout}`, 'info', 'layout-load')
+                const response = await api.get(`/api/v1/webpages/layouts/${pageData.code_layout}/json/`)
+                setLayoutData(response.data)
+                addNotification(`Layout "${pageData.code_layout}" loaded successfully`, 'success', 'layout-load')
+            } catch (error) {
+                console.error('Failed to load layout:', error)
+                addNotification(`Failed to load layout: ${pageData.code_layout}`, 'error', 'layout-load')
+                showError(error, 'Failed to load layout data')
+                setLayoutData(null)
+            } finally {
+                setIsLoadingLayout(false)
+            }
+        }
+
+        fetchLayoutData()
+    }, [pageData?.code_layout, addNotification, showError])
 
     // Create page mutation (for new pages)
     const createPageMutation = useMutation({
@@ -342,11 +370,23 @@ const PageEditor = () => {
             <div className="flex-1 overflow-hidden">
                 <div className="h-full">
                     {activeTab === 'content' && (
-                        <ContentEditor
-                            pageData={pageData}
-                            onUpdate={updatePageData}
-                            isNewPage={isNewPage}
-                        />
+                        <>
+                            {isLoadingLayout ? (
+                                <div className="h-full flex items-center justify-center bg-gray-50">
+                                    <div className="text-center">
+                                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                                        <p className="text-gray-600">Loading layout data...</p>
+                                    </div>
+                                </div>
+                            ) : (
+                                <ContentEditor
+                                    pageData={pageData}
+                                    onUpdate={updatePageData}
+                                    isNewPage={isNewPage}
+                                    layoutJson={layoutData}
+                                />
+                            )}
+                        </>
                     )}
                     {activeTab === 'settings' && (
                         <SettingsEditor
@@ -396,45 +436,6 @@ const PageEditor = () => {
     )
 }
 
-// Content Editor Tab
-const ContentEditor = ({ pageData, onUpdate, isNewPage }) => {
-    return (
-        <div className="h-full flex">
-            <h1>Content Editor</h1>
-            {/* Main content area
-
-            */}
-        </div >
-    )
-}
-//     <div className="flex-1 p-6 overflow-y-auto">
-//         <h1>Content Editor</h1>
-//         <div className="max-w-4xl mx-auto space-y-6">
-
-//             <div className="bg-white rounded-lg shadow p-6">
-
-//                 /* Widget Management */}
-//     {pageData?.id && !isNewPage && (
-//         <SlotManager
-//             pageId={pageData.id}
-//             layout={pageData.code_layout}
-//             onWidgetChange={() => {
-//                 // Trigger a refresh of page data if needed
-//             }}
-//         />
-//     )}
-
-//                 /* Message for new pages */}
-//     {isNewPage && (
-//         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
-//             <p className="text-blue-700">
-//                 Save the page first to enable widget management and layout configuration.
-//             </p>
-//         </div>
-//     )}
-// </div>
-//         </div >
-//     </div >
 // Settings Editor Tab
 const SettingsEditor = ({ pageData, onUpdate, isNewPage }) => {
     return (
