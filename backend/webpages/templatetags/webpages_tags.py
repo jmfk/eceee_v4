@@ -117,3 +117,44 @@ def child_pages_nav(page, limit=None):
         "children": children,
         "parent": page,
     }
+
+
+@register.simple_tag(takes_context=True)
+def render_slot(context, slot_name):
+    """
+    Render widgets for the specified slot
+    Usage: {% render_slot "slot_name" %}
+    """
+    from django.utils.safestring import mark_safe
+    from django.template.loader import render_to_string
+    
+    # Get widgets_by_slot from context - this is how page_detail.html provides widget data
+    widgets_by_slot = context.get('widgets_by_slot', {})
+    
+    # Get widgets for this specific slot
+    slot_widgets = widgets_by_slot.get(slot_name, [])
+    
+    if not slot_widgets:
+        # No widgets for this slot - return empty string or placeholder
+        return mark_safe('')
+    
+    # Render all widgets for this slot
+    rendered_widgets = []
+    for widget_data in slot_widgets:
+        try:
+            widget_html = render_to_string(
+                "webpages/widgets/widget_wrapper.html",
+                {
+                    'widget': widget_data.widget,
+                    'config': widget_data.widget.configuration,
+                    'inherited_from': widget_data.inherited_from,
+                    'is_override': widget_data.is_override,
+                },
+                request=context.get('request')
+            )
+            rendered_widgets.append(widget_html)
+        except Exception as e:
+            # Log error and continue with other widgets
+            continue
+    
+    return mark_safe(''.join(rendered_widgets))

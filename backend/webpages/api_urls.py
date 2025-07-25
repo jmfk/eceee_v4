@@ -13,6 +13,7 @@ from .views import (
     CodeLayoutViewSet,
     PageThemeViewSet,
     WidgetTypeViewSet,
+    layout_json,
     # PageWidgetViewSet,  # Temporarily disabled
 )
 
@@ -33,4 +34,5 @@ router.register(r"widget-types", WidgetTypeViewSet, basename="widgettype")
 # API URLs without app_name to avoid namespace conflicts when included in main API
 urlpatterns = [
     path("", include(router.urls)),
+    path("layouts/<str:layout_name>/json/", layout_json, name="layout-json"),
 ]

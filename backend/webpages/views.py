@@ -6,7 +6,7 @@ with proper authentication, permissions, and filtering.
 """
 
 from rest_framework import viewsets, status, permissions
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.filters import SearchFilter, OrderingFilter
 from django_filters.rest_framework import DjangoFilterBackend
@@ -29,6 +29,7 @@ from .serializers import (
     PageHierarchySerializer,
 )
 from .filters import WebPageFilter, PageVersionFilter
+from .utils.template_parser import LayoutSerializer as TemplateLayoutSerializer
 
 # Setup logging for API metrics
 logger = logging.getLogger("webpages.api")
@@ -567,3 +568,52 @@ class PageVersionViewSet(viewsets.ModelViewSet):
                 {"error": f"Restore failed: {str(e)}"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticatedOrReadOnly])
+def layout_json(request, layout_name):
+    """
+    Return JSON representation of a layout template
+    
+    Args:
+        layout_name: Name of the layout to serialize (e.g., 'sidebar_layout')
+        
+    Returns:
+        JSON structure representing the layout template
+    """
+    try:
+        from .layout_registry import layout_registry
+        
+        # Get the layout class from registry
+        layout_class = layout_registry.get_layout_class(layout_name)
+        if not layout_class:
+            return Response(
+                {"error": f"Layout '{layout_name}' not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Create layout instance
+        layout_instance = layout_class()
+        
+        # Use the template parser to serialize the layout
+        serializer = TemplateLayoutSerializer()
+        
+        # Create a mock layout object for the serializer
+        class MockLayout:
+            def __init__(self, name, template_name):
+                self.name = name
+                self.template_name = template_name
+                self.description = getattr(layout_instance, 'description', '')
+                self.id = name  # Use name as ID for code-based layouts
+        
+        mock_layout = MockLayout(layout_name, f"{layout_name}.html")
+        layout_json = serializer.serialize_layout(mock_layout)
+        
+        return Response(layout_json)
+        
+    except Exception as e:
+        return Response(
+            {"error": f"Error serializing layout: {str(e)}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
