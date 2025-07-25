@@ -12,8 +12,8 @@ export { default as HTMLBlockEditor } from './HTMLBlockEditor'
 export { default as NewsEditor } from './NewsEditor'
 export { default as EventsEditor } from './EventsEditor'
 export { default as CalendarEditor } from './CalendarEditor'
-// export { default as FormsEditor } from './FormsEditor'
-// export { default as GalleryEditor } from './GalleryEditor'
+export { default as FormsEditor } from './FormsEditor'
+export { default as GalleryEditor } from './GalleryEditor'
 
 /**
  * Widget Editor Registry
@@ -29,8 +29,8 @@ export const WIDGET_EDITORS = {
     'News': NewsEditor,
     'Events': EventsEditor,
     'Calendar': CalendarEditor,
-    // 'Forms': FormsEditor,
-    // 'Gallery': GalleryEditor,
+    'Forms': FormsEditor,
+    'Gallery': GalleryEditor,
 }
 
 /**
