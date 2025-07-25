@@ -78,6 +78,36 @@ const PageEditor = () => {
         enabled: !isNewPage
     })
 
+    // Add loading notifications for page data
+    useEffect(() => {
+        if (isLoading && !isNewPage) {
+            addNotification(`Loading page data...`, 'info', 'page-load')
+        } else if (page && !isNewPage) {
+            addNotification(`Page "${page.title}" loaded successfully`, 'success', 'page-load')
+        }
+    }, [isLoading, page, isNewPage, addNotification])
+
+    // Add notifications for tab navigation
+    useEffect(() => {
+        const tabNames = {
+            content: 'Content Editor',
+            settings: 'Page Settings',
+            metadata: 'Page Metadata',
+            preview: 'Page Preview'
+        }
+        const tabName = tabNames[activeTab] || activeTab
+        addNotification(`Switched to ${tabName}`, 'info', 'tab-navigation')
+    }, [activeTab, addNotification])
+
+    // Add notification for page editor opening
+    useEffect(() => {
+        if (isNewPage) {
+            addNotification('Opening page editor for new page...', 'info', 'editor-open')
+        } else if (pageId) {
+            addNotification(`Opening page editor for page ID: ${pageId}`, 'info', 'editor-open')
+        }
+    }, [isNewPage, pageId, addNotification])
+
     // Set page data when loaded
     useEffect(() => {
         if (page && !isNewPage) {
@@ -161,14 +191,19 @@ const PageEditor = () => {
     // Handle close with unsaved changes check
     const handleClose = async () => {
         if (isDirty) {
+            addNotification('Checking for unsaved changes...', 'info', 'editor-close')
             const confirmed = await showConfirm({
                 title: 'Unsaved Changes',
                 message: 'You have unsaved changes. Are you sure you want to close?',
                 confirmText: 'Close without saving',
                 confirmButtonStyle: 'danger'
             })
-            if (!confirmed) return
+            if (!confirmed) {
+                addNotification('Close cancelled - staying in editor', 'info', 'editor-close')
+                return
+            }
         }
+        addNotification('Closing page editor...', 'info', 'editor-close')
         navigate(previousView)
     }
 

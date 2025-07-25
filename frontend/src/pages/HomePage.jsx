@@ -17,10 +17,35 @@ const HomePage = () => {
 
   // Check API connection on component mount
   useEffect(() => {
+    addNotification('Welcome to eceee_v4 development environment', 'info', 'page-load')
     checkApiConnection()
-  }, [])
+  }, [addNotification])
+
+  // Add notification for page visibility changes
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        addNotification('Homepage tab focused', 'info', 'page-focus')
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [addNotification])
+
+  // Handle external link navigation with notifications
+  const handleAdminClick = () => {
+    addNotification('Opening Django Admin interface...', 'info', 'navigation')
+    window.open('/admin/', '_blank', 'noopener,noreferrer')
+  }
+
+  const handleApiDocsClick = () => {
+    addNotification('Opening API documentation...', 'info', 'navigation')
+    window.open('/api/docs/', '_blank', 'noopener,noreferrer')
+  }
 
   const checkApiConnection = async () => {
+    addNotification('Checking API connection...', 'info', 'api-check')
     try {
       const response = await fetch('/health/')
       if (response.ok) {
@@ -28,9 +53,11 @@ const HomePage = () => {
         addNotification('Backend API connection established', 'success', 'api-connection')
       } else {
         setApiStatus('error')
+        addNotification('API connection failed', 'error', 'api-connection')
       }
     } catch (error) {
       setApiStatus('error')
+      addNotification('API connection failed', 'error', 'api-connection')
       console.error('API connection failed:', error)
     }
   }
@@ -167,22 +194,18 @@ const HomePage = () => {
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <h2 className="text-2xl font-bold text-gray-900 mb-4">Quick Actions</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <a
-            href="/admin/"
-            target="_blank"
-            rel="noopener noreferrer"
+          <button
+            onClick={handleAdminClick}
             className="btn-primary text-center block"
           >
             Django Admin
-          </a>
-          <a
-            href="/api/docs/"
-            target="_blank"
-            rel="noopener noreferrer"
+          </button>
+          <button
+            onClick={handleApiDocsClick}
             className="btn-secondary text-center block"
           >
             API Documentation
-          </a>
+          </button>
           <button
             onClick={() => addNotification('Development environment is ready!', 'success', 'test-notification')}
             className="btn-secondary"

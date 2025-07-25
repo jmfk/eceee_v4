@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
     Plus,
@@ -57,7 +57,7 @@ const NamespaceManager = () => {
         mutationFn: namespacesApi.create,
         onSuccess: () => {
             addNotification('Namespace created successfully', 'success', 'namespace-create')
-            setIsCreating(false)
+            handleCloseCreateModal()
             queryClient.invalidateQueries(['namespaces'])
         },
         onError: (error) => {
@@ -69,7 +69,7 @@ const NamespaceManager = () => {
         mutationFn: ({ id, ...data }) => namespacesApi.update(id, data),
         onSuccess: () => {
             addNotification('Namespace updated successfully', 'success', 'namespace-update')
-            setEditingNamespace(null)
+            handleCloseEditModal()
             queryClient.invalidateQueries(['namespaces'])
         },
         onError: (error) => {
@@ -111,6 +111,56 @@ const NamespaceManager = () => {
 
     const namespaces = namespacesResponse?.results || []
 
+    // Add loading notifications for data fetching
+    useEffect(() => {
+        if (isLoading) {
+            addNotification('Loading namespaces...', 'info', 'namespaces-loading')
+        } else if (namespaces.length >= 0) {
+            addNotification(`Loaded ${namespaces.length} namespaces`, 'success', 'namespaces-loading')
+        }
+    }, [isLoading, namespaces.length, addNotification])
+
+    // Add notifications for user interactions
+    useEffect(() => {
+        if (searchTerm) {
+            addNotification(`Searching namespaces for: "${searchTerm}"`, 'info', 'namespace-search')
+        }
+    }, [searchTerm, addNotification])
+
+    useEffect(() => {
+        if (statusFilter !== 'all') {
+            addNotification(`Filter: ${statusFilter} namespaces`, 'info', 'namespace-filter')
+        } else {
+            addNotification('Showing all namespaces', 'info', 'namespace-filter')
+        }
+    }, [statusFilter, addNotification])
+
+    // Modal action handlers with notifications
+    const handleOpenCreateModal = useCallback(() => {
+        addNotification('Opening create namespace dialog...', 'info', 'modal-open')
+        setIsCreating(true)
+    }, [addNotification])
+
+    const handleCloseCreateModal = useCallback(() => {
+        addNotification('Create namespace dialog closed', 'info', 'modal-close')
+        setIsCreating(false)
+    }, [addNotification])
+
+    const handleOpenEditModal = useCallback((namespace) => {
+        addNotification(`Opening edit dialog for "${namespace.name}"...`, 'info', 'modal-open')
+        setEditingNamespace(namespace)
+    }, [addNotification])
+
+    const handleCloseEditModal = useCallback(() => {
+        addNotification('Edit namespace dialog closed', 'info', 'modal-close')
+        setEditingNamespace(null)
+    }, [addNotification])
+
+    const handleCloseContentSummary = useCallback(() => {
+        addNotification('Content summary closed', 'info', 'modal-close')
+        setShowContentSummary(null)
+    }, [addNotification])
+
     const handleDelete = async (namespace) => {
         if (namespace.is_default) {
             addNotification('Cannot delete the default namespace', 'error', 'namespace-validation')
@@ -143,6 +193,7 @@ const NamespaceManager = () => {
     }
 
     const handleViewContent = (namespace) => {
+        addNotification(`Loading content summary for "${namespace.name}"...`, 'info', 'content-summary')
         getContentSummaryMutation.mutate(namespace.id)
     }
 
@@ -194,7 +245,7 @@ const NamespaceManager = () => {
                     </p>
                 </div>
                 <button
-                    onClick={() => setIsCreating(true)}
+                    onClick={handleOpenCreateModal}
                     className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                 >
                     <Plus className="w-4 h-4 mr-2" />
@@ -336,7 +387,7 @@ const NamespaceManager = () => {
                                                     </button>
                                                 )}
                                                 <button
-                                                    onClick={() => setEditingNamespace(namespace)}
+                                                    onClick={() => handleOpenEditModal(namespace)}
                                                     className="text-blue-600 hover:text-blue-800"
                                                     title="Edit namespace"
                                                 >
@@ -384,7 +435,7 @@ const NamespaceManager = () => {
             {showContentSummary && (
                 <ContentSummaryModal
                     data={showContentSummary}
-                    onClose={() => setShowContentSummary(null)}
+                    onClose={handleCloseContentSummary}
                 />
             )}
         </div>

@@ -25,6 +25,7 @@ import { api } from '../api/client.js'
 import PageTreeNode from './PageTreeNode'
 import Tooltip from './Tooltip'
 import { useNotificationContext } from './NotificationManager'
+import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 
 // Debounce hook for search
 const useDebounce = (value, delay) => {
@@ -61,9 +62,48 @@ const TreePageManager = () => {
 
     const queryClient = useQueryClient()
     const { showError } = useNotificationContext()
+    const { addNotification } = useGlobalNotifications()
 
     // Debounce search term to avoid excessive API calls
     const debouncedSearchTerm = useDebounce(searchTerm, 300)
+
+    // Add loading notifications for data fetching
+    useEffect(() => {
+        if (isLoading) {
+            addNotification('Loading pages...', 'info', 'pages-loading')
+        } else if (rootPagesData) {
+            addNotification(`Loaded ${rootPagesData.length || 0} pages`, 'success', 'pages-loading')
+        }
+    }, [isLoading, rootPagesData, addNotification])
+
+    useEffect(() => {
+        if (searchLoading) {
+            addNotification(`Searching for "${debouncedSearchTerm}"...`, 'info', 'pages-search')
+        } else if (searchData && debouncedSearchTerm) {
+            addNotification(`Found ${searchData.length || 0} pages matching "${debouncedSearchTerm}"`, 'success', 'pages-search')
+        }
+    }, [searchLoading, searchData, debouncedSearchTerm, addNotification])
+
+    // Add notifications for user interactions
+    useEffect(() => {
+        if (searchTerm) {
+            addNotification(`Search term: "${searchTerm}"`, 'info', 'search-input')
+        }
+    }, [searchTerm, addNotification])
+
+    useEffect(() => {
+        if (statusFilter !== 'all') {
+            addNotification(`Filter: ${statusFilter} pages`, 'info', 'filter-change')
+        } else {
+            addNotification('Showing all pages', 'info', 'filter-change')
+        }
+    }, [statusFilter, addNotification])
+
+    // Function to handle refresh with notification
+    const handleRefresh = useCallback(() => {
+        addNotification('Refreshing pages...', 'info', 'pages-refresh')
+        refetch()
+    }, [refetch, addNotification])
 
     // Function to expand parent pages of search results
     const expandSearchResultParents = useCallback(async (results) => {
@@ -89,15 +129,20 @@ const TreePageManager = () => {
             const response = await api.post('/api/v1/webpages/pages/', pageData)
             return response.data
         },
+        onMutate: () => {
+            addNotification('Creating page...', 'info', 'page-create')
+        },
         onSuccess: (newPage) => {
             setShowCreateModal(false)
             setPositioningParams(null)
             // Invalidate queries to refresh data
             queryClient.invalidateQueries(['pages', 'root'])
+            addNotification(`Page "${newPage.title}" created successfully`, 'success', 'page-create')
         },
         onError: (error) => {
             console.error('Failed to create page:', error.response?.data?.detail || error.message)
             showError(error, 'error')
+            addNotification('Failed to create page', 'error', 'page-create')
         }
     })
 
@@ -107,14 +152,19 @@ const TreePageManager = () => {
             const response = await api.post('/api/v1/webpages/pages/', pageData)
             return response.data
         },
+        onMutate: () => {
+            addNotification('Creating root page...', 'info', 'page-create-root')
+        },
         onSuccess: (newPage) => {
             setShowRootPageModal(false)
             // Invalidate queries to refresh data
             queryClient.invalidateQueries(['pages', 'root'])
+            addNotification(`Root page "${newPage.title}" created successfully`, 'success', 'page-create-root')
         },
         onError: (error) => {
             console.error('Failed to create root page:', error.response?.data?.detail || error.message)
             showError(error, 'error')
+            addNotification('Failed to create root page', 'error', 'page-create-root')
         }
     })
 
@@ -157,28 +207,38 @@ const TreePageManager = () => {
     const movePageMutation = useMutation({
         mutationFn: ({ pageId, parentId, sortOrder }) =>
             movePage(pageId, parentId, sortOrder),
+        onMutate: () => {
+            addNotification('Moving page...', 'info', 'page-move')
+        },
         onSuccess: () => {
             // Invalidate relevant queries to refresh data
             queryClient.invalidateQueries(['pages', 'root'])
             queryClient.invalidateQueries(['page-children'])
+            addNotification('Page moved successfully', 'success', 'page-move')
         },
         onError: (error) => {
             console.error('Failed to move page: ' + error.message)
             showError(error, 'error')
+            addNotification('Failed to move page', 'error', 'page-move')
         }
     })
 
     // Delete page mutation
     const deletePageMutation = useMutation({
         mutationFn: deletePage,
+        onMutate: () => {
+            addNotification('Deleting page...', 'info', 'page-delete')
+        },
         onSuccess: () => {
             // Invalidate relevant queries to refresh data
             queryClient.invalidateQueries(['pages', 'root'])
             queryClient.invalidateQueries(['page-children'])
+            addNotification('Page deleted successfully', 'success', 'page-delete')
         },
         onError: (error) => {
             console.error('Failed to delete page: ' + error.message)
             showError(error, 'error')
+            addNotification('Failed to delete page', 'error', 'page-delete')
         }
     })
 
@@ -409,20 +469,34 @@ const TreePageManager = () => {
 
     // Handle create new page
     const handleCreateNewPage = useCallback(() => {
+        addNotification('Opening new page editor...', 'info', 'navigation')
         navigate('/pages/new/content', {
             state: { previousView: '/pages' }
         })
-    }, [navigate])
+    }, [navigate, addNotification])
 
     // Handle create root page
     const handleCreateRootPage = useCallback(() => {
+        addNotification('Opening create root page dialog...', 'info', 'modal-open')
         setShowRootPageModal(true)
-    }, [])
+    }, [addNotification])
 
     // Clear clipboard
     const clearClipboard = () => {
+        addNotification('Clipboard cleared', 'info', 'clipboard')
         setCutPageId(null)
     }
+
+    // Handle clear search with notification
+    const handleClearSearch = useCallback(() => {
+        addNotification('Search cleared', 'info', 'search-clear')
+        setSearchTerm('')
+    }, [addNotification])
+
+    // Handle modal close with notification
+    const handleModalClose = useCallback((modalType) => {
+        addNotification(`${modalType} dialog closed`, 'info', 'modal-close')
+    }, [addNotification])
 
     if (error) {
         return (
@@ -431,7 +505,7 @@ const TreePageManager = () => {
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">Failed to load pages</h3>
                 <p className="text-gray-600 mb-4">{error.message}</p>
                 <button
-                    onClick={() => refetch()}
+                    onClick={handleRefresh}
                     className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                 >
                     Try Again
@@ -448,7 +522,7 @@ const TreePageManager = () => {
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">Search failed</h3>
                 <p className="text-gray-600 mb-4">{searchError.message}</p>
                 <button
-                    onClick={() => setSearchTerm('')}
+                    onClick={handleClearSearch}
                     className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                 >
                     Clear Search
@@ -476,7 +550,7 @@ const TreePageManager = () => {
                         <Tooltip text="Refresh" position="top">
                             <button
                                 data-testid="refresh-button"
-                                onClick={() => refetch()}
+                                onClick={handleRefresh}
                                 className="p-2 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded transition-colors disabled:opacity-50"
                                 disabled={isLoading}
                             >
@@ -554,7 +628,7 @@ const TreePageManager = () => {
                         {searchTerm ? (
                             <div className="mt-4">
                                 <button
-                                    onClick={() => setSearchTerm('')}
+                                    onClick={handleClearSearch}
                                     className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
                                 >
                                     Clear Search
@@ -584,7 +658,7 @@ const TreePageManager = () => {
                                         </span>
                                     </div>
                                     <button
-                                        onClick={() => setSearchTerm('')}
+                                        onClick={handleClearSearch}
                                         className="text-blue-600 hover:text-blue-800 text-sm"
                                     >
                                         Clear Search
