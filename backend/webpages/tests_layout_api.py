@@ -93,33 +93,6 @@ class LayoutAPIPhase13EnhancementsTests(APITestCase):
         self.assertIn("results", response.data)
         self.assertIn("summary", response.data)
         self.assertIn("api_version", response.data)
-        self.assertIn("template_data_included", response.data)
-
-    def test_template_data_inclusion_via_query_param(self):
-        """Test template data inclusion via ?include_template_data=true"""
-        response = self.client.get(
-            "/api/v1/webpages/layouts/?include_template_data=true"
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertTrue(response.data["template_data_included"])
-
-        # Check if layouts have template_data field when requested
-        if response.data["results"]:
-            layout = response.data["results"][0]
-            # template_data should be present (even if None for code-based layouts)
-            self.assertIn("template_data", layout)
-
-    def test_template_data_inclusion_via_header(self):
-        """Test template data inclusion via HTTP_INCLUDE_TEMPLATE_DATA header"""
-        response = self.client.get(
-            "/api/v1/webpages/layouts/", HTTP_INCLUDE_TEMPLATE_DATA="true"
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        if response.data["results"]:
-            layout = response.data["results"][0]
-            self.assertIn("template_data", layout)
 
     def test_api_versioning_support(self):
         """Test API versioning via header and query param"""
@@ -206,31 +179,9 @@ class LayoutTemplateEndpointTests(APITestCase):
             for field in expected_fields:
                 self.assertIn(field, response.data)
 
-    def test_template_endpoint_not_found(self):
-        """Test template endpoint with non-existent layout"""
-        response = self.client.get("/api/v1/webpages/layouts/nonexistent/template/")
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-
-    def test_template_endpoint_caching_headers(self):
-        """Test that template endpoint sets proper caching headers"""
-        # Get a layout name first
-        list_response = self.client.get("/api/v1/webpages/layouts/")
-        if list_response.data["results"]:
-            layout_name = list_response.data["results"][0]["name"]
-
-            response = self.client.get(
-                f"/api/v1/webpages/layouts/{layout_name}/template/"
-            )
-            self.assertEqual(response.status_code, status.HTTP_200_OK)
-
-            # Should have caching headers
-            self.assertIn("Cache-Control", response)
-            self.assertIn("ETag", response)
-            self.assertIn("Last-Modified", response)
-
 
 class LayoutSerializerTests(TestCase):
-    """Test the LayoutSerializer and LayoutTemplateDataSerializer"""
+    """Test the LayoutSerializer"""
 
     def test_layout_serializer_basic_fields(self):
         """Test LayoutSerializer with basic layout data"""
@@ -282,33 +233,6 @@ class LayoutSerializerTests(TestCase):
         self.assertIn("html", serializer.data["template_data"])
         self.assertIn("css", serializer.data["template_data"])
         self.assertIn("slots", serializer.data["template_data"])
-
-    def test_layout_template_data_serializer(self):
-        """Test LayoutTemplateDataSerializer"""
-        from webpages.serializers import LayoutTemplateDataSerializer
-        from django.utils import timezone
-
-        template_data = {
-            "layout_name": "test_layout",
-            "layout_type": "template",
-            "template_html": "<div>Test HTML</div>",
-            "template_css": ".test { color: red; }",
-            "parsed_slots": {"slots": [{"name": "content"}]},
-            "template_file": "layouts/test.html",
-            "parsing_errors": [],
-            "caching_enabled": True,
-            "cache_timeout": 3600,
-            "last_modified": timezone.now(),
-        }
-
-        serializer = LayoutTemplateDataSerializer(template_data)
-
-        self.assertEqual(serializer.data["layout_name"], "test_layout")
-        self.assertEqual(serializer.data["layout_type"], "template")
-        self.assertIn("template_html", serializer.data)
-        self.assertIn("template_css", serializer.data)
-        self.assertIn("parsed_slots", serializer.data)
-        self.assertIn("cache_info", serializer.data)
 
 
 class LayoutAPIPermissionsTests(APITestCase):

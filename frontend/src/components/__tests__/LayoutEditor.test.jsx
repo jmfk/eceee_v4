@@ -94,7 +94,7 @@ describe('LayoutEditor', () => {
         renderWithQueryClient(<LayoutEditor />)
 
         expect(screen.getByText('Layout Management')).toBeInTheDocument()
-        expect(screen.getByText('View and manage both code-based and template-based layout templates')).toBeInTheDocument()
+        expect(screen.getByText('View and manage code-based layout templates')).toBeInTheDocument()
         expect(screen.getByText('Validate')).toBeInTheDocument()
         expect(screen.getByText('Reload')).toBeInTheDocument()
 

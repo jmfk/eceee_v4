@@ -400,37 +400,41 @@ const PageEditor = () => {
 const ContentEditor = ({ pageData, onUpdate, isNewPage }) => {
     return (
         <div className="h-full flex">
-            {/* Main content area */}
-            <div className="flex-1 p-6 overflow-y-auto">
-                <div className="max-w-4xl mx-auto space-y-6">
-                    <div className="bg-white rounded-lg shadow p-6">
+            <h1>Content Editor</h1>
+            {/* Main content area
 
-                        {/* Widget Management */}
-                        {pageData?.id && !isNewPage && (
-                            <SlotManager
-                                pageId={pageData.id}
-                                layout={pageData.code_layout}
-                                onWidgetChange={() => {
-                                    // Trigger a refresh of page data if needed
-                                }}
-                            />
-                        )}
-
-                        {/* Message for new pages */}
-                        {isNewPage && (
-                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
-                                <p className="text-blue-700">
-                                    Save the page first to enable widget management and layout configuration.
-                                </p>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
-        </div>
+            */}
+        </div >
     )
 }
+//     <div className="flex-1 p-6 overflow-y-auto">
+//         <h1>Content Editor</h1>
+//         <div className="max-w-4xl mx-auto space-y-6">
 
+//             <div className="bg-white rounded-lg shadow p-6">
+
+//                 /* Widget Management */}
+//     {pageData?.id && !isNewPage && (
+//         <SlotManager
+//             pageId={pageData.id}
+//             layout={pageData.code_layout}
+//             onWidgetChange={() => {
+//                 // Trigger a refresh of page data if needed
+//             }}
+//         />
+//     )}
+
+//                 /* Message for new pages */}
+//     {isNewPage && (
+//         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
+//             <p className="text-blue-700">
+//                 Save the page first to enable widget management and layout configuration.
+//             </p>
+//         </div>
+//     )}
+// </div>
+//         </div >
+//     </div >
 // Settings Editor Tab
 const SettingsEditor = ({ pageData, onUpdate, isNewPage }) => {
     return (

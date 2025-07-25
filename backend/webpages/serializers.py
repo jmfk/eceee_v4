@@ -141,42 +141,6 @@ class LayoutSerializer(serializers.Serializer):
         return None
 
 
-class LayoutTemplateDataSerializer(serializers.Serializer):
-    """
-    Dedicated serializer for complete template data.
-
-    Used by the new /api/layouts/{id}/template/ endpoint to provide
-    full template information with proper validation.
-    """
-
-    # Layout identification
-    layout_name = serializers.CharField(read_only=True)
-    layout_type = serializers.CharField(read_only=True)
-
-    # Template data
-    template_html = serializers.CharField(read_only=True, allow_blank=True)
-    template_css = serializers.CharField(read_only=True, allow_blank=True)
-    parsed_slots = serializers.JSONField(read_only=True)
-
-    # Metadata
-    template_file = serializers.CharField(
-        read_only=True, required=False, allow_blank=True
-    )
-    parsing_errors = serializers.ListField(read_only=True, required=False)
-    cache_info = serializers.SerializerMethodField()
-    last_modified = serializers.DateTimeField(read_only=True, required=False)
-
-    def get_cache_info(self, obj):
-        """Get caching information for the template data"""
-        if isinstance(obj, dict):
-            return {
-                "cached": obj.get("caching_enabled", False),
-                "cache_timeout": obj.get("cache_timeout", 3600),
-                "cache_key": obj.get("cache_key", None),
-            }
-        return None
-
-
 # Temporarily disabled - widgets now stored in PageVersion JSON
 # class PageWidgetSerializer(serializers.ModelSerializer):
 #     """Serializer for page widgets"""
