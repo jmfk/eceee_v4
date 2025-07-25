@@ -67,44 +67,6 @@ const TreePageManager = () => {
     // Debounce search term to avoid excessive API calls
     const debouncedSearchTerm = useDebounce(searchTerm, 300)
 
-    // Add loading notifications for data fetching
-    useEffect(() => {
-        if (isLoading) {
-            addNotification('Loading pages...', 'info', 'pages-loading')
-        } else if (rootPagesData) {
-            addNotification(`Loaded ${rootPagesData.length || 0} pages`, 'success', 'pages-loading')
-        }
-    }, [isLoading, rootPagesData, addNotification])
-
-    useEffect(() => {
-        if (searchLoading) {
-            addNotification(`Searching for "${debouncedSearchTerm}"...`, 'info', 'pages-search')
-        } else if (searchData && debouncedSearchTerm) {
-            addNotification(`Found ${searchData.length || 0} pages matching "${debouncedSearchTerm}"`, 'success', 'pages-search')
-        }
-    }, [searchLoading, searchData, debouncedSearchTerm, addNotification])
-
-    // Add notifications for user interactions
-    useEffect(() => {
-        if (searchTerm) {
-            addNotification(`Search term: "${searchTerm}"`, 'info', 'search-input')
-        }
-    }, [searchTerm, addNotification])
-
-    useEffect(() => {
-        if (statusFilter !== 'all') {
-            addNotification(`Filter: ${statusFilter} pages`, 'info', 'filter-change')
-        } else {
-            addNotification('Showing all pages', 'info', 'filter-change')
-        }
-    }, [statusFilter, addNotification])
-
-    // Function to handle refresh with notification
-    const handleRefresh = useCallback(() => {
-        addNotification('Refreshing pages...', 'info', 'pages-refresh')
-        refetch()
-    }, [refetch, addNotification])
-
     // Function to expand parent pages of search results
     const expandSearchResultParents = useCallback(async (results) => {
         if (!results || results.length === 0) return
@@ -202,6 +164,44 @@ const TreePageManager = () => {
         enabled: !!debouncedSearchTerm && debouncedSearchTerm.length >= 2, // Only search when term is 2+ characters
         staleTime: 30000 // Cache search results for 30 seconds
     })
+
+    // Add loading notifications for data fetching (after variables are declared)
+    useEffect(() => {
+        if (isLoading) {
+            addNotification('Loading pages...', 'info', 'pages-loading')
+        } else if (rootPagesData) {
+            addNotification(`Loaded ${rootPagesData.length || 0} pages`, 'success', 'pages-loading')
+        }
+    }, [isLoading, rootPagesData])
+
+    useEffect(() => {
+        if (searchLoading) {
+            addNotification(`Searching for "${debouncedSearchTerm}"...`, 'info', 'pages-search')
+        } else if (searchData && debouncedSearchTerm) {
+            addNotification(`Found ${searchData.length || 0} pages matching "${debouncedSearchTerm}"`, 'success', 'pages-search')
+        }
+    }, [searchLoading, searchData, debouncedSearchTerm])
+
+    // Add notifications for user interactions  
+    useEffect(() => {
+        if (searchTerm) {
+            addNotification(`Search term: "${searchTerm}"`, 'info', 'search-input')
+        }
+    }, [searchTerm])
+
+    useEffect(() => {
+        if (statusFilter !== 'all') {
+            addNotification(`Filter: ${statusFilter} pages`, 'info', 'filter-change')
+        } else {
+            addNotification('Showing all pages', 'info', 'filter-change')
+        }
+    }, [statusFilter])
+
+    // Function to handle refresh with notification (now refetch is available)
+    const handleRefresh = useCallback(() => {
+        addNotification('Refreshing pages...', 'info', 'pages-refresh')
+        refetch()
+    }, [addNotification, refetch])
 
     // Move page mutation
     const movePageMutation = useMutation({
