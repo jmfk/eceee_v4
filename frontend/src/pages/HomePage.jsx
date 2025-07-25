@@ -17,7 +17,6 @@ const HomePage = () => {
 
   // Check API connection on component mount (only once)
   useEffect(() => {
-    console.log('Checking API connection')
     checkApiConnection()
   }, [])
 
