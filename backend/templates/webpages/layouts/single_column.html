@@ -1,0 +1,14 @@
+<!-- templates/webpages/layouts/my_layout.html -->
+{% extends "base.html" %}
+{% load webpages_tags %}
+
+{% block content %}
+<div class="my-layout">
+    <main class="main-content">
+        {% render_slot "main" %}
+    </main>
+    <aside class="sidebar">
+        {% render_slot "sidebar" %}
+    </aside>
+</div>
+{% endblock %}

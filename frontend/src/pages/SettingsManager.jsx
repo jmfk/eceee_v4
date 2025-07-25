@@ -27,8 +27,8 @@ import {
 } from 'lucide-react'
 import { api } from '../api/client.js'
 import { layoutsApi, layoutUtils } from '../api/layouts'
-import toast from 'react-hot-toast'
 import { useNotificationContext } from '../components/NotificationManager'
+import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import LayoutEditor from '../components/LayoutEditor'
 import ThemeEditor from '../components/ThemeEditor'
 import SlotManager from '../components/SlotManager'
@@ -54,6 +54,7 @@ const SettingsManager = () => {
     const [showFilters, setShowFilters] = useState(false)
     const queryClient = useQueryClient()
     const { showConfirm } = useNotificationContext()
+    const { addNotification } = useGlobalNotifications()
 
     // Fetch pages
     const { data: pagesResponse, isLoading: pagesLoading } = useQuery({
@@ -164,12 +165,12 @@ const SettingsManager = () => {
             return response.data
         },
         onSuccess: () => {
-            toast.success('Page created successfully')
+            addNotification('Page created successfully', 'success', 'page-create')
             setIsCreating(false)
             queryClient.invalidateQueries(['pages'])
         },
         onError: (error) => {
-            toast.error(extractErrorMessage(error, 'Failed to create page'))
+            addNotification('Failed to create page', 'error', 'page-create')
         }
     })
 
@@ -179,13 +180,13 @@ const SettingsManager = () => {
             return response.data
         },
         onSuccess: () => {
-            toast.success('Page updated successfully')
+            addNotification('Page updated successfully', 'success', 'page-update')
             setIsEditing(false)
             setSelectedPage(null)
             queryClient.invalidateQueries(['pages'])
         },
         onError: (error) => {
-            toast.error(extractErrorMessage(error, 'Failed to update page'))
+            addNotification('Failed to update page', 'error', 'page-update')
         }
     })
 
@@ -195,12 +196,12 @@ const SettingsManager = () => {
             return response.data
         },
         onSuccess: () => {
-            toast.success('Page deleted successfully')
+            addNotification('Page deleted successfully', 'success', 'page-delete')
             setSelectedPage(null)
             queryClient.invalidateQueries(['pages'])
         },
         onError: (error) => {
-            toast.error(extractErrorMessage(error, 'Failed to delete page'))
+            addNotification('Failed to delete page', 'error', 'page-delete')
         }
     })
 
@@ -232,12 +233,12 @@ const SettingsManager = () => {
             return response.data
         },
         onSuccess: (newPage) => {
-            toast.success(`Page duplicated successfully as "${newPage.title}"`)
+            addNotification(`Page duplicated successfully as "${newPage.title}"`, 'success', 'page-duplicate')
             queryClient.invalidateQueries(['pages'])
             setSelectedPage(newPage)
         },
         onError: (error) => {
-            toast.error(extractErrorMessage(error, 'Failed to duplicate page'))
+            addNotification('Failed to duplicate page', 'error', 'page-duplicate')
         }
     })
 
@@ -526,11 +527,11 @@ const PageForm = ({ page = null, onSave, onCancel, isLoading = false }) => {
     const handleSubmit = (e) => {
         e.preventDefault()
         if (!formData.title.trim()) {
-            toast.error('Page title is required')
+            addNotification('Page title is required', 'error', 'form-validation')
             return
         }
         if (!formData.slug.trim()) {
-            toast.error('Page slug is required')
+            addNotification('Page slug is required', 'error', 'form-validation')
             return
         }
         onSave(formData)

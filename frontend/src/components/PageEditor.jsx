@@ -21,8 +21,10 @@ import {
 } from 'lucide-react'
 import { api } from '../api/client.js'
 import { useNotificationContext } from './NotificationManager'
+import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import SlotManager from './SlotManager'
 import LayoutSelector from './LayoutSelector'
+import StatusBar from './StatusBar'
 import { layoutsApi } from '../api/layouts'
 
 const PageEditor = () => {
@@ -46,68 +48,9 @@ const PageEditor = () => {
     const [isDirty, setIsDirty] = useState(false)
     const [isPublishing, setIsPublishing] = useState(false)
 
-    // Notification system state
-    const [notifications, setNotifications] = useState([])
-    const [currentNotificationIndex, setCurrentNotificationIndex] = useState(0)
-
     const queryClient = useQueryClient()
     const { showError, showConfirm } = useNotificationContext()
-
-    // Notification management functions
-    const addNotification = (message, type = 'info', category = null) => {
-        const notification = {
-            id: Date.now(),
-            message,
-            type, // 'success', 'error', 'warning', 'info'
-            category, // Used for replacing related notifications
-            timestamp: new Date()
-        }
-
-        setNotifications(prev => {
-            let updated = [...prev]
-
-            // If category is specified, replace existing notification with same category
-            if (category) {
-                const existingIndex = updated.findIndex(n => n.category === category)
-                if (existingIndex !== -1) {
-                    // Replace existing notification
-                    updated[existingIndex] = notification
-                    // Keep current index if we're viewing the replaced notification
-                    if (currentNotificationIndex === existingIndex) {
-                        // Stay on the same notification (now updated)
-                    } else if (currentNotificationIndex > existingIndex) {
-                        // Adjust index if we replaced a notification before current one
-                        setCurrentNotificationIndex(prev => prev)
-                    }
-                    return updated
-                }
-            }
-
-            // Add new notification at the beginning
-            updated = [notification, ...updated].slice(0, 20) // Keep max 20 notifications
-            setCurrentNotificationIndex(0) // Show newest notification
-            return updated
-        })
-    }
-
-    const clearNotifications = () => {
-        setNotifications([])
-        setCurrentNotificationIndex(0)
-    }
-
-    const navigateNotifications = (direction) => {
-        if (notifications.length === 0) return
-
-        if (direction === 'next') {
-            setCurrentNotificationIndex(prev =>
-                prev < notifications.length - 1 ? prev + 1 : prev
-            )
-        } else if (direction === 'prev') {
-            setCurrentNotificationIndex(prev =>
-                prev > 0 ? prev - 1 : prev
-            )
-        }
-    }
+    const { addNotification } = useGlobalNotifications()
 
     // Initialize page data for new page
     useEffect(() => {
@@ -393,90 +336,27 @@ const PageEditor = () => {
             </div>
 
             {/* Status bar with notifications */}
-            <div className="bg-white border-t border-gray-200 px-4 py-2">
-                <div className="flex items-center justify-between text-sm">
-                    {/* Notification area */}
-                    <div className="flex items-center space-x-2 flex-1 min-w-0">
-                        {notifications.length > 0 ? (
-                            <>
-                                {/* Notification navigation */}
-                                <button
-                                    onClick={() => navigateNotifications('prev')}
-                                    disabled={currentNotificationIndex === 0}
-                                    className="p-1 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                                    title="Previous notification"
-                                >
-                                    <ChevronLeft className="w-4 h-4 text-gray-600" />
-                                </button>
-
-                                {/* Current notification */}
-                                <div className="flex items-center space-x-2 flex-1 min-w-0">
-                                    <span className={`inline-block w-2 h-2 rounded-full ${notifications[currentNotificationIndex]?.type === 'success' ? 'bg-green-500' :
-                                        notifications[currentNotificationIndex]?.type === 'error' ? 'bg-red-500' :
-                                            notifications[currentNotificationIndex]?.type === 'warning' ? 'bg-yellow-500' :
-                                                'bg-blue-500'
-                                        }`} />
-                                    <span className="text-gray-700 truncate">
-                                        {notifications[currentNotificationIndex]?.message}
-                                    </span>
-                                    <span className="text-xs text-gray-500 flex-shrink-0">
-                                        {notifications[currentNotificationIndex]?.timestamp.toLocaleTimeString()}
-                                    </span>
-                                </div>
-
-                                {/* Notification counter and navigation */}
-                                <span className="text-xs text-gray-500 flex-shrink-0">
-                                    {currentNotificationIndex + 1} of {notifications.length}
-                                </span>
-
-                                <button
-                                    onClick={() => navigateNotifications('next')}
-                                    disabled={currentNotificationIndex === notifications.length - 1}
-                                    className="p-1 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                                    title="Next notification"
-                                >
-                                    <ChevronRight className="w-4 h-4 text-gray-600" />
-                                </button>
-
-                                {/* Clear button */}
-                                <button
-                                    onClick={clearNotifications}
-                                    className="p-1 rounded hover:bg-gray-100 text-gray-600"
-                                    title="Clear all notifications"
-                                >
-                                    <Trash2 className="w-4 h-4" />
-                                </button>
-                            </>
-                        ) : (
-                            /* Default status when no notifications */
-                            <div className="flex items-center space-x-4 text-gray-600">
-                                <span>
-                                    Status: <span className={`font-medium ${pageData?.publication_status === 'published' ? 'text-green-600' :
-                                        pageData?.publication_status === 'scheduled' ? 'text-blue-600' :
-                                            'text-gray-600'
-                                        }`}>
-                                        {pageData?.publication_status || 'unpublished'}
-                                    </span>
-                                </span>
-                                {pageData?.last_modified && (
-                                    <span>
-                                        Last modified: {new Date(pageData.last_modified).toLocaleString()}
-                                    </span>
-                                )}
-                            </div>
+            <StatusBar
+                showAutoSave={true}
+                isDirty={isDirty}
+                customStatusContent={
+                    <div className="flex items-center space-x-4">
+                        <span>
+                            Status: <span className={`font-medium ${pageData?.publication_status === 'published' ? 'text-green-600' :
+                                pageData?.publication_status === 'scheduled' ? 'text-blue-600' :
+                                    'text-gray-600'
+                                }`}>
+                                {pageData?.publication_status || 'unpublished'}
+                            </span>
+                        </span>
+                        {pageData?.last_modified && (
+                            <span>
+                                Last modified: {new Date(pageData.last_modified).toLocaleString()}
+                            </span>
                         )}
                     </div>
-
-                    {/* Right side - Auto-save status */}
-                    <div className="flex items-center space-x-2 text-gray-600 flex-shrink-0 ml-4">
-                        {isDirty && (
-                            <span className="text-orange-600 font-medium">Unsaved changes</span>
-                        )}
-                        <Clock className="w-4 h-4" />
-                        <span>Auto-save enabled</span>
-                    </div>
-                </div>
-            </div>
+                }
+            />
         </div>
     )
 }
