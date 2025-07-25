@@ -1,14 +1,29 @@
-<!-- templates/webpages/layouts/my_layout.html -->
+<!-- templates/webpages/layouts/single_column.html -->
 {% extends "base.html" %}
 {% load webpages_tags %}
 
 {% block content %}
-<div class="my-layout">
-    <main class="main-content">
-        {% render_slot "main" %}
+<div class="min-h-screen bg-white">
+  <div class="max-w-4xl mx-auto px-4 py-8">
+    <main class="bg-white rounded-lg shadow-sm border border-gray-200 p-8 mb-8"
+          data-widget-slot="main"
+          data-slot-title="Main Content"
+          data-slot-description="Primary content area for the page"
+          data-slot-max-widgets="5">
+      <div class="p-8 border-2 border-dashed border-gray-300 rounded-lg text-center text-gray-500 italic hover:border-gray-400 hover:bg-gray-50 transition-colors">
+        Main content goes here - articles, posts, or primary page content
+      </div>
     </main>
-    <aside class="sidebar">
-        {% render_slot "sidebar" %}
+    
+    <aside class="bg-gray-50 rounded-lg border border-gray-200 p-6"
+           data-widget-slot="sidebar"
+           data-slot-title="Sidebar"
+           data-slot-description="Complementary content and widgets"
+           data-slot-max-widgets="4">
+      <div class="p-6 border-2 border-dashed border-gray-300 rounded-lg text-center text-gray-500 italic hover:border-gray-400 hover:bg-white transition-colors">
+        Sidebar content goes here - widgets, navigation, or supplementary content
+      </div>
     </aside>
+  </div>
 </div>
 {% endblock %}
