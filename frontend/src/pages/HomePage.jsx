@@ -58,7 +58,8 @@ const HomePage = () => {
   const checkApiConnection = async () => {
     addNotification('Checking API connection...', 'info', 'api-check')
     try {
-      const response = await fetch('/health/')
+      // Use backend directly since we removed the proxy
+      const response = await fetch('http://localhost:8000/health/')
       if (response.ok) {
         setApiStatus('connected')
         addNotification('Backend API connection established', 'success', 'api-connection')
