@@ -54,16 +54,37 @@ const PageEditor = () => {
     const { showError, showConfirm } = useNotificationContext()
 
     // Notification management functions
-    const addNotification = (message, type = 'info') => {
+    const addNotification = (message, type = 'info', category = null) => {
         const notification = {
             id: Date.now(),
             message,
             type, // 'success', 'error', 'warning', 'info'
+            category, // Used for replacing related notifications
             timestamp: new Date()
         }
 
         setNotifications(prev => {
-            const updated = [notification, ...prev].slice(0, 20) // Keep max 20 notifications
+            let updated = [...prev]
+
+            // If category is specified, replace existing notification with same category
+            if (category) {
+                const existingIndex = updated.findIndex(n => n.category === category)
+                if (existingIndex !== -1) {
+                    // Replace existing notification
+                    updated[existingIndex] = notification
+                    // Keep current index if we're viewing the replaced notification
+                    if (currentNotificationIndex === existingIndex) {
+                        // Stay on the same notification (now updated)
+                    } else if (currentNotificationIndex > existingIndex) {
+                        // Adjust index if we replaced a notification before current one
+                        setCurrentNotificationIndex(prev => prev)
+                    }
+                    return updated
+                }
+            }
+
+            // Add new notification at the beginning
+            updated = [notification, ...updated].slice(0, 20) // Keep max 20 notifications
             setCurrentNotificationIndex(0) // Show newest notification
             return updated
         })
@@ -128,7 +149,7 @@ const PageEditor = () => {
             return response.data
         },
         onSuccess: (newPage) => {
-            addNotification('Page created successfully', 'success')
+            addNotification('Page created successfully', 'success', 'page-create')
             setIsDirty(false)
             // Navigate to edit the newly created page
             navigate(`/pages/${newPage.id}/edit`, {
@@ -138,7 +159,7 @@ const PageEditor = () => {
             queryClient.invalidateQueries(['pages'])
         },
         onError: (error) => {
-            addNotification('Failed to create page', 'error')
+            addNotification('Failed to create page', 'error', 'page-create')
             showError(error, 'Failed to create page')
         }
     })
@@ -162,14 +183,14 @@ const PageEditor = () => {
             return response.data
         },
         onSuccess: (updatedPage) => {
-            addNotification('Page saved successfully', 'success')
+            addNotification('Page saved successfully', 'success', 'page-save')
             setPageData(updatedPage)
             setIsDirty(false)
             queryClient.invalidateQueries(['page', pageId])
             queryClient.invalidateQueries(['pages', 'root'])
         },
         onError: (error) => {
-            addNotification('Failed to save page', 'error')
+            addNotification('Failed to save page', 'error', 'page-save')
             showError(error, 'Failed to save page')
         }
     })
@@ -183,13 +204,13 @@ const PageEditor = () => {
             return response.data
         },
         onSuccess: (updatedPage) => {
-            addNotification('Page published successfully', 'success')
+            addNotification('Page published successfully', 'success', 'page-publish')
             setPageData(updatedPage)
             queryClient.invalidateQueries(['page', pageId])
             queryClient.invalidateQueries(['pages', 'root'])
         },
         onError: (error) => {
-            addNotification('Failed to publish page', 'error')
+            addNotification('Failed to publish page', 'error', 'page-publish')
             showError(error, 'Failed to publish page')
         }
     })
@@ -212,10 +233,10 @@ const PageEditor = () => {
     const handleSave = () => {
         if (pageData && isDirty) {
             if (isNewPage) {
-                addNotification('Creating page...', 'info')
+                addNotification('Creating page...', 'info', 'page-create')
                 createPageMutation.mutate(pageData)
             } else {
-                addNotification('Saving page...', 'info')
+                addNotification('Saving page...', 'info', 'page-save')
                 updatePageMutation.mutate(pageData)
             }
         }
@@ -225,7 +246,7 @@ const PageEditor = () => {
     const handleQuickPublish = () => {
         if (isNewPage) return
 
-        addNotification('Publishing page...', 'info')
+        addNotification('Publishing page...', 'info', 'page-publish')
         setIsPublishing(true)
         publishPageMutation.mutate()
         setIsPublishing(false)
