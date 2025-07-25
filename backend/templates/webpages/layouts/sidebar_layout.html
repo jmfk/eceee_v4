@@ -10,18 +10,20 @@
           data-slot-title="Page Header"
           data-slot-description="Site navigation, branding, and header content"
           data-slot-max-widgets="3">
-    <div class="p-6 border-2 border-dashed border-gray-300 rounded-lg text-center text-gray-500 italic w-full hover:border-gray-400 hover:bg-gray-50/50 transition-colors">
-      Header: Logo, Navigation Menu, Search
-    </div>
+    {# default:[
+       {"type": "text", "config": {"content": "Header: Logo, Navigation Menu, Search", "style": "placeholder"}}
+    ] #}
+    {% render_slot "header" %}
   </header>
 
   <main class="col-span-1 md:col-span-2 lg:col-span-1 bg-white p-8 md:p-6 sm:p-5 rounded-xl shadow-sm border border-gray-200 overflow-y-auto leading-relaxed text-base"
         data-widget-slot="main"
         data-slot-title="Main Content"
         data-slot-description="Primary content area for articles, posts, and main page content">
-    <div class="p-6 border-2 border-dashed border-gray-300 rounded-lg text-center text-gray-500 italic hover:border-gray-400 hover:bg-gray-50/50 transition-colors">
-      Main Content: Articles, Blog Posts, Page Content, Images
-    </div>
+    {# default:[
+       {"type": "text", "config": {"content": "Main Content: Articles, Blog Posts, Page Content, Images", "style": "placeholder"}}
+    ] #}
+    {% render_slot "main" %}
   </main>
 
   <aside class="col-span-1 bg-white p-8 md:p-6 sm:p-5 rounded-xl shadow-sm border border-gray-200 flex flex-col gap-5 text-sm">
@@ -30,9 +32,10 @@
          data-slot-title="Sidebar Top"
          data-slot-description="Top sidebar widgets like recent posts, categories, or featured content"
          data-slot-max-widgets="3">
-      <div class="p-5 border-2 border-dashed border-gray-300 rounded-lg text-center text-gray-500 italic text-xs hover:border-gray-400 hover:bg-gray-50/50 transition-colors">
-        Sidebar Top: Recent Posts, Categories, Featured
-      </div>
+      {# default:[
+         {"type": "recent_posts", "config": {"count": 5, "show_date": true}}
+      ] #}
+      {% render_slot "sidebar-top" %}
     </div>
 
     <div class="pb-5 border-b border-gray-200 last:border-b-0 last:pb-0"
@@ -40,9 +43,10 @@
          data-slot-title="Sidebar Middle" 
          data-slot-description="Middle sidebar area for ads, social media, or related content"
          data-slot-max-widgets="4">
-      <div class="p-5 border-2 border-dashed border-gray-300 rounded-lg text-center text-gray-500 italic text-xs hover:border-gray-400 hover:bg-gray-50/50 transition-colors">
-        Sidebar Middle: Ads, Social Media, Related Links
-      </div>
+      {# default:[
+         {"type": "social_media", "config": {"platforms": ["twitter", "facebook", "linkedin"]}}
+      ] #}
+      {% render_slot "sidebar-middle" %}
     </div>
 
     <div class="pb-5 border-b border-gray-200 last:border-b-0 last:pb-0"
@@ -50,9 +54,11 @@
          data-slot-title="Sidebar Bottom"
          data-slot-description="Bottom sidebar widgets for archives, tags, or supplementary content"
          data-slot-max-widgets="3">
-      <div class="p-5 border-2 border-dashed border-gray-300 rounded-lg text-center text-gray-500 italic text-xs hover:border-gray-400 hover:bg-gray-50/50 transition-colors">
-        Sidebar Bottom: Archives, Tags, Newsletter
-      </div>
+      {# default:[
+         {"type": "tag_cloud", "config": {"max_tags": 20}},
+         {"type": "newsletter", "config": {"title": "Subscribe to Updates"}}
+      ] #}
+      {% render_slot "sidebar-bottom" %}
     </div>
   </aside>
 
@@ -61,9 +67,11 @@
           data-slot-title="Footer"
           data-slot-description="Site footer with links, copyright, and contact information"
           data-slot-max-widgets="2">
-    <div class="p-6 border-2 border-dashed border-gray-400 rounded-lg text-center text-gray-300 italic hover:border-gray-300 hover:bg-white/10 transition-colors">
-      Footer: Copyright, Links, Contact Info
-    </div>
+    {# default:[
+       {"type": "copyright", "config": {"year": "2024", "company": "Your Company"}},
+       {"type": "footer_links", "config": {"links": ["Privacy", "Terms", "Contact"]}}
+    ] #}
+    {% render_slot "footer" %}
   </footer>
 </div>
 {% endblock %} 
