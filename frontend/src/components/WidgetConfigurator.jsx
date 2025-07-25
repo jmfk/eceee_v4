@@ -1,6 +1,7 @@
 import { useState, useEffect, useReducer, useRef, useCallback } from 'react'
 import { Save, X, AlertCircle, Info, Settings, Layers, Eye, EyeOff, Monitor } from 'lucide-react'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
+import { getWidgetEditor } from './widget-editors'
 
 // Reducer for managing consolidated widget configurator state
 const widgetConfiguratorReducer = (state, action) => {
@@ -690,17 +691,35 @@ const WidgetConfigurator = ({
             <div className="p-6">
                 {activeTab === 'content' && (
                     <div>
-                        {Object.keys(properties).length > 0 ? (
-                            <div className="space-y-6">
-                                {Object.entries(properties).map(([fieldName, property]) =>
-                                    renderField(fieldName, property)
-                                )}
-                            </div>
-                        ) : (
-                            <div className="text-center text-gray-500 py-8">
-                                <p>No configuration options available for this widget type.</p>
-                            </div>
-                        )}
+                        {(() => {
+                            // Try to get a specialized editor for this widget type
+                            const SpecializedEditor = getWidgetEditor(widgetType?.name)
+
+                            if (SpecializedEditor) {
+                                // Use the specialized editor
+                                return (
+                                    <SpecializedEditor
+                                        config={config}
+                                        onChange={(newConfig) => dispatch({ type: 'SET_CONFIG', payload: newConfig })}
+                                        errors={errors}
+                                        widgetType={widgetType}
+                                    />
+                                )
+                            }
+
+                            // Fall back to generic form editor
+                            return Object.keys(properties).length > 0 ? (
+                                <div className="space-y-6">
+                                    {Object.entries(properties).map(([fieldName, property]) =>
+                                        renderField(fieldName, property)
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="text-center text-gray-500 py-8">
+                                    <p>No configuration options available for this widget type.</p>
+                                </div>
+                            )
+                        })()}
                     </div>
                 )}
 
@@ -712,7 +731,30 @@ const WidgetConfigurator = ({
 
                 {activeTab === 'preview' && (
                     <div>
-                        {renderWidgetPreview()}
+                        {(() => {
+                            // Try to get a specialized editor for preview functionality
+                            const SpecializedEditor = getWidgetEditor(widgetType?.name)
+
+                            if (SpecializedEditor) {
+                                // Use the specialized editor in preview-only mode
+                                return (
+                                    <div className="space-y-4">
+                                        <div className="text-center text-gray-600 text-sm mb-4">
+                                            Preview powered by specialized {widgetType.name} editor
+                                        </div>
+                                        <SpecializedEditor
+                                            config={config}
+                                            onChange={() => { }} // Read-only in preview mode
+                                            errors={{}} // No errors in preview
+                                            widgetType={widgetType}
+                                        />
+                                    </div>
+                                )
+                            }
+
+                            // Fall back to generic preview
+                            return renderWidgetPreview()
+                        })()}
                     </div>
                 )}
             </div>
