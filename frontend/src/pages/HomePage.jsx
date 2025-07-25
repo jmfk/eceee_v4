@@ -15,17 +15,28 @@ const HomePage = () => {
   const [apiStatus, setApiStatus] = useState('checking')
   const { addNotification } = useGlobalNotifications()
 
-  // Check API connection on component mount
+  // Check API connection on component mount (only once)
+  useEffect(() => {
+    checkApiConnection()
+  }, [])
+
+  // Welcome notification (only once)
   useEffect(() => {
     addNotification('Welcome to eceee_v4 development environment', 'info', 'page-load')
-    checkApiConnection()
   }, [addNotification])
 
-  // Add notification for page visibility changes
+  // Add notification for page visibility changes (throttled)
   useEffect(() => {
+    let lastNotification = 0
+    const throttleDelay = 2000 // 2 seconds
+
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        addNotification('Homepage tab focused', 'info', 'page-focus')
+        const now = Date.now()
+        if (now - lastNotification > throttleDelay) {
+          addNotification('Homepage tab focused', 'info', 'page-focus')
+          lastNotification = now
+        }
       }
     }
 
