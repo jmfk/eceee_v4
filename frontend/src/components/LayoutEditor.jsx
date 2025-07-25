@@ -17,7 +17,7 @@ import {
     Smartphone,
     Tablet
 } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import { layoutsApi, layoutUtils } from '../api/layouts'
 import LayoutRenderer from './LayoutRenderer'
 import TemplateLayoutRenderer from './TemplateLayoutRenderer'
@@ -29,6 +29,7 @@ const LayoutEditor = () => {
     const [layoutType, setLayoutType] = useState('all') // all, code, template
     const [showSampleWidgets, setShowSampleWidgets] = useState(true)
     const queryClient = useQueryClient()
+    const { addNotification } = useGlobalNotifications()
 
     // Fetch code layouts
     const { data: codeLayoutsData, isLoading: isLoadingCode } = useQuery({
@@ -47,11 +48,11 @@ const LayoutEditor = () => {
     const reloadMutation = useMutation({
         mutationFn: () => layoutsApi.codeLayouts.reload(),
         onSuccess: () => {
-            toast.success('Code layouts reloaded successfully')
+            addNotification('Code layouts reloaded successfully', 'success', 'layout-reload')
             queryClient.invalidateQueries(['layouts'])
         },
         onError: () => {
-            toast.error('Failed to reload code layouts')
+            addNotification('Failed to reload code layouts', 'error', 'layout-reload')
         }
     })
 
@@ -59,10 +60,10 @@ const LayoutEditor = () => {
     const validateMutation = useMutation({
         mutationFn: () => layoutsApi.codeLayouts.validate(),
         onSuccess: () => {
-            toast.success('All layouts are valid')
+            addNotification('All layouts are valid', 'success', 'layout-validate')
         },
         onError: () => {
-            toast.error('Layout validation failed')
+            addNotification('Layout validation failed', 'error', 'layout-validate')
         }
     })
 

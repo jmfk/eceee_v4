@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../api/client.js'
 import { extractErrorMessage } from '../utils/errorHandling.js'
 import { useNotificationContext } from './NotificationManager'
-import toast from 'react-hot-toast'
+import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import {
     Plus,
     Edit3,
@@ -26,6 +26,7 @@ const ThemeEditor = () => {
     const [showPreview, setShowPreview] = useState(false)
     const queryClient = useQueryClient()
     const { showConfirm } = useNotificationContext()
+    const { addNotification } = useGlobalNotifications()
 
     // Fetch themes
     const { data: themes = [], isLoading } = useQuery({
@@ -224,12 +225,12 @@ const ThemeForm = ({ theme = null, onSave, onCancel }) => {
             }
         },
         onSuccess: () => {
-            toast.success(`Theme ${theme ? 'updated' : 'created'} successfully`)
+            addNotification(`Theme ${theme ? 'updated' : 'created'} successfully`, 'success', 'theme-save')
             onSave()
         },
         onError: (error) => {
             const message = extractErrorMessage(error, `Failed to ${theme ? 'update' : 'create'} theme`)
-            toast.error(message)
+            addNotification(message, 'error', 'theme-save')
             console.error(error)
         }
     })
@@ -318,7 +319,7 @@ const ThemeForm = ({ theme = null, onSave, onCancel }) => {
                 ...colorSchemeTemplates[template]
             }
         })
-        toast.success(`Applied ${template} template`)
+        addNotification(`Applied ${template} template`, 'success', 'theme-template')
     }
 
     return (
@@ -609,11 +610,11 @@ const ThemeEditPanel = ({ theme, onUpdate, onCancel, showPreview, onTogglePrevie
             return api.delete(`/api/v1/webpages/themes/${theme.id}/`)
         },
         onSuccess: () => {
-            toast.success('Theme deleted successfully')
+            addNotification('Theme deleted successfully', 'success', 'theme-delete')
             onCancel()
         },
         onError: () => {
-            toast.error('Failed to delete theme')
+            addNotification('Failed to delete theme', 'error', 'theme-delete')
         }
     })
 
@@ -646,7 +647,7 @@ const ThemeEditPanel = ({ theme, onUpdate, onCancel, showPreview, onTogglePrevie
         link.download = `${theme.name.replace(/\s+/g, '-').toLowerCase()}-theme.json`
         link.click()
         URL.revokeObjectURL(url)
-        toast.success('Theme exported successfully')
+        addNotification('Theme exported successfully', 'success', 'theme-export')
     }
 
     if (isEditing) {

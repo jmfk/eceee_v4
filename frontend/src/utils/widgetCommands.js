@@ -1,5 +1,4 @@
 import { api } from '../api/client.js'
-import toast from 'react-hot-toast'
 import { extractErrorMessage } from './errorHandling.js'
 
 /**
@@ -8,23 +7,28 @@ import { extractErrorMessage } from './errorHandling.js'
  */
 
 class WidgetCommand {
-    constructor(apiClient = api) {
+    constructor(apiClient = api, notificationHandler = null) {
         this.apiClient = apiClient
+        this.notificationHandler = notificationHandler
     }
 
     async execute() {
         throw new Error('Command must implement execute method')
     }
 
-    handleError(error, defaultMessage) {
+    handleError(error, defaultMessage, category = 'widget-error') {
         console.error(error)
         const message = extractErrorMessage(error, defaultMessage)
-        toast.error(message)
+        if (this.notificationHandler) {
+            this.notificationHandler(message, 'error', category)
+        }
         throw error
     }
 
-    handleSuccess(message) {
-        if (message) toast.success(message)
+    handleSuccess(message, category = 'widget-success') {
+        if (message && this.notificationHandler) {
+            this.notificationHandler(message, 'success', category)
+        }
     }
 }
 

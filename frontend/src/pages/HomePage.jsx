@@ -9,10 +9,11 @@ import {
   Container,
   Monitor
 } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 
 const HomePage = () => {
   const [apiStatus, setApiStatus] = useState('checking')
+  const { addNotification } = useGlobalNotifications()
 
   // Check API connection on component mount
   useEffect(() => {
@@ -24,7 +25,7 @@ const HomePage = () => {
       const response = await fetch('/health/')
       if (response.ok) {
         setApiStatus('connected')
-        toast.success('Backend API connection established')
+        addNotification('Backend API connection established', 'success', 'api-connection')
       } else {
         setApiStatus('error')
       }
@@ -183,7 +184,7 @@ const HomePage = () => {
             API Documentation
           </a>
           <button
-            onClick={() => toast.success('Development environment is ready!')}
+            onClick={() => addNotification('Development environment is ready!', 'success', 'test-notification')}
             className="btn-secondary"
           >
             Test Notifications

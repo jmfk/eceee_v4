@@ -62,13 +62,13 @@ export const extractErrorMessage = (error, defaultMessage = 'An error occurred')
 
 /**
  * Create a standardized error handler for React Query mutations
- * @param {Function} toastError - Toast error function (e.g., toast.error from react-hot-toast)
+ * @param {Function} notificationHandler - Notification function (e.g., addNotification from GlobalNotificationContext)
  * @param {string} defaultMessage - Default error message
  * @returns {Function} Error handler function
  */
-export const createErrorHandler = (toastError, defaultMessage = 'An error occurred') => {
+export const createErrorHandler = (notificationHandler, defaultMessage = 'An error occurred', category = 'error') => {
     return (error) => {
         const message = extractErrorMessage(error, defaultMessage)
-        toastError(message)
+        notificationHandler(message, 'error', category)
     }
 } 

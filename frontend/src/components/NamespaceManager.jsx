@@ -22,7 +22,7 @@ import {
     AlertTriangle
 } from 'lucide-react'
 import { namespacesApi } from '../api/namespaces.js'
-import toast from 'react-hot-toast'
+import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import { useNotificationContext } from './NotificationManager'
 import { extractErrorMessage } from '../utils/errorHandling.js'
 
@@ -33,6 +33,7 @@ const NamespaceManager = () => {
     const [isCreating, setIsCreating] = useState(false)
     const [editingNamespace, setEditingNamespace] = useState(null)
     const [showContentSummary, setShowContentSummary] = useState(null)
+    const { addNotification } = useGlobalNotifications()
     const queryClient = useQueryClient()
     const { showConfirm } = useNotificationContext()
 
@@ -55,46 +56,46 @@ const NamespaceManager = () => {
     const createNamespaceMutation = useMutation({
         mutationFn: namespacesApi.create,
         onSuccess: () => {
-            toast.success('Namespace created successfully')
+            addNotification('Namespace created successfully', 'success', 'namespace-create')
             setIsCreating(false)
             queryClient.invalidateQueries(['namespaces'])
         },
         onError: (error) => {
-            toast.error(extractErrorMessage(error, 'Failed to create namespace'))
+            addNotification('Failed to create namespace', 'error', 'namespace-create')
         }
     })
 
     const updateNamespaceMutation = useMutation({
         mutationFn: ({ id, ...data }) => namespacesApi.update(id, data),
         onSuccess: () => {
-            toast.success('Namespace updated successfully')
+            addNotification('Namespace updated successfully', 'success', 'namespace-update')
             setEditingNamespace(null)
             queryClient.invalidateQueries(['namespaces'])
         },
         onError: (error) => {
-            toast.error(extractErrorMessage(error, 'Failed to update namespace'))
+            addNotification('Failed to update namespace', 'error', 'namespace-update')
         }
     })
 
     const deleteNamespaceMutation = useMutation({
         mutationFn: namespacesApi.delete,
         onSuccess: () => {
-            toast.success('Namespace deleted successfully')
+            addNotification('Namespace deleted successfully', 'success', 'namespace-delete')
             queryClient.invalidateQueries(['namespaces'])
         },
         onError: (error) => {
-            toast.error(extractErrorMessage(error, 'Failed to delete namespace'))
+            addNotification('Failed to delete namespace', 'error', 'namespace-delete')
         }
     })
 
     const setDefaultMutation = useMutation({
         mutationFn: namespacesApi.setAsDefault,
         onSuccess: (data) => {
-            toast.success(data.message)
+            addNotification(data.message, 'success', 'namespace-default')
             queryClient.invalidateQueries(['namespaces'])
         },
         onError: (error) => {
-            toast.error(extractErrorMessage(error, 'Failed to set default namespace'))
+            addNotification('Failed to set default namespace', 'error', 'namespace-default')
         }
     })
 
@@ -104,7 +105,7 @@ const NamespaceManager = () => {
             setShowContentSummary(data)
         },
         onError: (error) => {
-            toast.error(extractErrorMessage(error, 'Failed to get content summary'))
+            addNotification('Failed to get content summary', 'error', 'namespace-summary')
         }
     })
 
@@ -112,12 +113,12 @@ const NamespaceManager = () => {
 
     const handleDelete = async (namespace) => {
         if (namespace.is_default) {
-            toast.error('Cannot delete the default namespace')
+            addNotification('Cannot delete the default namespace', 'error', 'namespace-validation')
             return
         }
 
         if (namespace.content_count > 0) {
-            toast.error('Cannot delete namespace with existing content')
+            addNotification('Cannot delete namespace with existing content', 'error', 'namespace-validation')
             return
         }
 
@@ -135,7 +136,7 @@ const NamespaceManager = () => {
 
     const handleSetDefault = (namespace) => {
         if (namespace.is_default) {
-            toast.info('This namespace is already the default')
+            addNotification('This namespace is already the default', 'info', 'namespace-info')
             return
         }
         setDefaultMutation.mutate(namespace.id)
@@ -402,11 +403,11 @@ const NamespaceForm = ({ namespace = null, onSave, onCancel, isLoading = false }
     const handleSubmit = (e) => {
         e.preventDefault()
         if (!formData.name.trim()) {
-            toast.error('Namespace name is required')
+            addNotification('Namespace name is required', 'error', 'form-validation')
             return
         }
         if (!formData.slug.trim()) {
-            toast.error('Namespace slug is required')
+            addNotification('Namespace slug is required', 'error', 'form-validation')
             return
         }
         onSave(formData)
