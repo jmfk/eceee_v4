@@ -1,504 +1,550 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import '@testing-library/jest-dom'
-import { vi } from 'vitest'
-import LayoutRenderer from '../LayoutRenderer'
+/**
+ * Unit tests for LayoutRenderer error handling and validation
+ */
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import LayoutRenderer from '../LayoutRenderer';
 
-// Mock data for testing
-const mockLayout = {
-    name: 'two_column',
-    description: 'Two column layout with sidebar',
-    slot_configuration: {
-        slots: [
-            {
-                name: 'header',
-                display_name: 'Header',
-                title: 'Page Header',
-                description: 'Main header content',
-                css_classes: 'header-slot',
-                max_widgets: 2
-            },
-            {
-                name: 'content',
-                display_name: 'Main Content',
-                title: 'Content Area',
-                description: 'Primary content area',
-                css_classes: 'content-slot'
-            },
-            {
-                name: 'sidebar',
-                display_name: 'Sidebar',
-                title: 'Side Content',
-                description: 'Secondary content area',
-                css_classes: 'sidebar-slot',
-                max_widgets: 5
+describe('LayoutRenderer Security and Error Handling', () => {
+    let renderer;
+    let mockContainer;
+    let mockTargetRef;
+
+    beforeEach(() => {
+        renderer = new LayoutRenderer();
+
+        // Create mock DOM container
+        mockContainer = document.createElement('div');
+        document.body.appendChild(mockContainer);
+
+        mockTargetRef = {
+            current: mockContainer
+        };
+
+        // Clear console spies
+        vi.clearAllMocks();
+    });
+
+    afterEach(() => {
+        if (renderer) {
+            renderer.destroy();
+        }
+
+        if (mockContainer && mockContainer.parentNode) {
+            mockContainer.parentNode.removeChild(mockContainer);
+        }
+    });
+
+    describe('Layout Validation', () => {
+        it('should validate valid layout structure', () => {
+            const validLayout = {
+                type: 'element',
+                tag: 'div',
+                children: [
+                    { type: 'text', content: 'Hello World' },
+                    { type: 'slot', slot: { name: 'content' } }
+                ]
+            };
+
+            expect(renderer.validateLayout(validLayout)).toBe(true);
+        });
+
+        it('should reject invalid layout structure', () => {
+            const invalidLayouts = [
+                null,
+                undefined,
+                'string',
+                123,
+                { type: 'invalid_type' },
+                { type: 'element', children: 'not_array' }
+            ];
+
+            invalidLayouts.forEach((layout, index) => {
+                const result = renderer.validateLayout(layout);
+                expect(result).toBe(false);
+            });
+        });
+
+        it('should validate nested layout structure', () => {
+            const nestedLayout = {
+                type: 'element',
+                tag: 'div',
+                children: [
+                    {
+                        type: 'element',
+                        tag: 'section',
+                        children: [
+                            { type: 'text', content: 'Nested content' }
+                        ]
+                    }
+                ]
+            };
+
+            expect(renderer.validateLayout(nestedLayout)).toBe(true);
+        });
+
+        it('should reject layout with invalid nested children', () => {
+            const invalidNestedLayout = {
+                type: 'element',
+                tag: 'div',
+                children: [
+                    { type: 'invalid_type' },
+                    { type: 'text', content: 'Valid content' }
+                ]
+            };
+
+            expect(renderer.validateLayout(invalidNestedLayout)).toBe(false);
+        });
+    });
+
+    describe('Error Handling', () => {
+        it('should handle render errors gracefully', () => {
+            const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
+
+            const invalidLayout = null;
+            renderer.render(invalidLayout, mockTargetRef);
+
+            // Should render error message instead of crashing
+            expect(mockContainer.querySelector('.error-container')).toBeTruthy();
+            expect(consoleErrorSpy).toHaveBeenCalled();
+
+            consoleErrorSpy.mockRestore();
+        });
+
+        it('should handle widget rendering errors', () => {
+            const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
+
+            // Set a widget renderer that throws an error
+            renderer.setWidgetRenderer(() => {
+                throw new Error('Widget rendering failed');
+            });
+
+            const layoutWithSlot = {
+                type: 'slot',
+                tag: 'div',
+                slot: {
+                    name: 'test-slot',
+                    defaultWidgets: [{ type: 'test', config: {} }]
+                }
+            };
+
+            renderer.render(layoutWithSlot, mockTargetRef);
+
+            // Should handle widget error gracefully
+            expect(mockContainer.querySelector('.widget-error')).toBeTruthy();
+            expect(consoleErrorSpy).toHaveBeenCalled();
+
+            consoleErrorSpy.mockRestore();
+        });
+
+        it('should prevent operation on destroyed renderer', () => {
+            const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => { });
+
+            renderer.destroy();
+
+            const layout = { type: 'element', tag: 'div' };
+            renderer.render(layout, mockTargetRef);
+
+            expect(consoleWarnSpy).toHaveBeenCalledWith('LayoutRenderer: Cannot render on destroyed instance');
+
+            consoleWarnSpy.mockRestore();
+        });
+
+        it('should handle missing target ref gracefully', () => {
+            const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => { });
+
+            const invalidRef = { current: null };
+            const layout = { type: 'element', tag: 'div' };
+
+            renderer.render(layout, invalidRef);
+
+            expect(consoleWarnSpy).toHaveBeenCalledWith('LayoutRenderer: Target ref is not available');
+
+            consoleWarnSpy.mockRestore();
+        });
+    });
+
+    describe('Input Validation', () => {
+        it('should validate tag names', () => {
+            const layouts = [
+                { type: 'element', tag: 'script' }, // Valid but potentially dangerous
+                { type: 'element', tag: 'div123' }, // Valid
+                { type: 'element', tag: '123div' }, // Invalid (starts with number)
+                { type: 'element', tag: 'div<script>' }, // Invalid (contains special chars)
+                { type: 'element', tag: '' } // Invalid (empty)
+            ];
+
+            // First two should work, others should be handled safely
+            renderer.render(layouts[0], mockTargetRef);
+            expect(mockContainer.children.length).toBe(1);
+
+            mockContainer.innerHTML = '';
+            renderer.render(layouts[1], mockTargetRef);
+            expect(mockContainer.children.length).toBe(1);
+
+            // Invalid tag names should result in error elements
+            layouts.slice(2).forEach((layout, index) => {
+                mockContainer.innerHTML = '';
+                renderer.render(layout, mockTargetRef);
+
+                // Should render error container or node-error
+                const hasError = mockContainer.querySelector('.error-container') ||
+                    mockContainer.querySelector('.node-error');
+                expect(hasError).toBeTruthy();
+            });
+        });
+
+        it('should validate and sanitize attributes', () => {
+            const layoutWithAttributes = {
+                type: 'element',
+                tag: 'div',
+                attributes: {
+                    'valid-attr': 'safe value',
+                    'data-test': 'test',
+                    'on<click>': 'dangerous()', // Invalid attribute name
+                    'onclick': 'alert(1)' // Valid name but dangerous value (should be escaped)
+                }
+            };
+
+            renderer.render(layoutWithAttributes, mockTargetRef);
+
+            const element = mockContainer.firstChild;
+            expect(element.getAttribute('valid-attr')).toBe('safe value');
+            expect(element.getAttribute('data-test')).toBe('test');
+            expect(element.getAttribute('on<click>')).toBeNull(); // Should be filtered out
+            expect(element.getAttribute('onclick')).toBe('alert(1)'); // Should be preserved but escaped
+        });
+
+        it('should escape HTML content in text nodes', () => {
+            const layoutWithHtml = {
+                type: 'element',
+                tag: 'div',
+                children: [
+                    { type: 'text', content: '<script>alert("xss")</script>Safe text' }
+                ]
+            };
+
+            renderer.render(layoutWithHtml, mockTargetRef);
+
+            const textContent = mockContainer.textContent;
+            expect(textContent).toContain('<script>');
+            expect(textContent).toContain('Safe text');
+            // HTML should be escaped, not executed
+            expect(mockContainer.querySelector('script')).toBeNull();
+        });
+    });
+
+    describe('Memory Management', () => {
+        it('should track event listeners for cleanup', () => {
+            const mockElement = document.createElement('div');
+            const mockHandler = vi.fn();
+
+            renderer.addTrackedEventListener(mockElement, 'click', mockHandler);
+
+            // Event listener should be tracked
+            expect(renderer.eventListeners.size).toBe(1);
+
+            // Cleanup should remove listener
+            renderer.destroy();
+            expect(renderer.eventListeners.size).toBe(0);
+        });
+
+        it('should clean up DOM efficiently', () => {
+            // Add multiple elements to container
+            for (let i = 0; i < 10; i++) {
+                const child = document.createElement('div');
+                child.textContent = `Child ${i}`;
+                mockContainer.appendChild(child);
             }
-        ]
-    },
-    css_classes: '.layout-two-column { display: grid; }'
-}
 
-const mockTheme = {
-    name: 'Blue Theme',
-    css_variables: {
-        primary: '#3b82f6',
-        background: '#ffffff',
-        text: '#1f2937',
-        'text-muted': '#6b7280'
-    },
-    custom_css: '.custom-style { color: blue; }'
-}
+            expect(mockContainer.children.length).toBe(10);
 
-const mockWidgetsBySlot = {
-    header: [
-        {
-            widget: {
-                id: 1,
-                widget_type: { name: 'TextBlock' },
-                configuration: {
-                    title: 'Welcome Header',
-                    content: 'Welcome to our site',
-                    style: 'bold'
-                },
-                is_visible: true
-            },
-            inherited_from: null,
-            is_override: false
-        }
-    ],
-    content: [
-        {
-            widget: {
-                id: 2,
-                widget_type: { name: 'Image' },
-                configuration: {
-                    alt_text: 'Main content image',
-                    caption: 'Featured image'
-                },
-                is_visible: true
-            },
-            inherited_from: { id: 5, title: 'Parent Page' },
-            is_override: false
-        }
-    ],
-    sidebar: [
-        {
-            widget: {
-                id: 3,
-                widget_type: { name: 'Button' },
-                configuration: {
-                    text: 'Click Me',
-                    style: 'primary'
-                },
-                is_visible: false
-            },
-            inherited_from: null,
-            is_override: true
-        }
-    ]
-}
+            // Cleanup should remove all children efficiently
+            renderer.cleanup(mockContainer);
+            expect(mockContainer.children.length).toBe(0);
+        });
 
-describe('LayoutRenderer', () => {
-    // Basic rendering tests
-    describe('Basic Rendering', () => {
-        it('renders without layout (empty state)', () => {
-            render(<LayoutRenderer />)
+        it('should handle cleanup errors gracefully', () => {
+            const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
 
-            expect(screen.getByText('No layout selected')).toBeInTheDocument()
-            expect(screen.getByText('Choose a layout to see the structure')).toBeInTheDocument()
-        })
+            // Create a mock container that throws errors on removeChild
+            const problematicContainer = {
+                firstChild: document.createElement('div'),
+                removeChild: () => {
+                    throw new Error('Cannot remove child');
+                }
+            };
 
-        it('renders layout with no slots', () => {
-            const emptyLayout = {
-                name: 'empty_layout',
-                slot_configuration: { slots: [] }
+            // Should fallback to innerHTML clearing
+            renderer.cleanup(problematicContainer);
+
+            expect(consoleErrorSpy).toHaveBeenCalled();
+            consoleErrorSpy.mockRestore();
+        });
+    });
+
+    describe('Widget Validation', () => {
+        it('should validate widget objects', () => {
+            const validWidget = { type: 'text', config: { content: 'Hello' } };
+            const invalidWidgets = [
+                null,
+                undefined,
+                'string',
+                {},
+                { config: { content: 'Missing type' } },
+                { type: 123 }
+            ];
+
+            // Valid widget should render
+            const result = renderer.renderWidget(validWidget);
+            expect(result).toBeTruthy();
+            expect(result.className).toContain('widget-placeholder');
+
+            // Invalid widgets should return error elements
+            invalidWidgets.forEach(widget => {
+                const result = renderer.renderWidget(widget);
+                expect(result).toBeTruthy();
+                expect(result.className).toContain('widget-error');
+            });
+        });
+
+        it('should handle widget renderer errors', () => {
+            const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
+
+            // Set renderer that returns invalid result
+            renderer.setWidgetRenderer(() => 'not a dom node');
+
+            const widget = { type: 'test' };
+            const result = renderer.renderWidget(widget);
+
+            expect(result.className).toContain('widget-error');
+            expect(consoleErrorSpy).toHaveBeenCalled();
+
+            consoleErrorSpy.mockRestore();
+        });
+
+        it('should validate widget renderer function', () => {
+            const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => { });
+
+            // Invalid renderer types should be rejected
+            renderer.setWidgetRenderer('not a function');
+            renderer.setWidgetRenderer(123);
+            renderer.setWidgetRenderer({});
+
+            expect(consoleWarnSpy).toHaveBeenCalledTimes(3);
+            consoleWarnSpy.mockRestore();
+        });
+    });
+
+    describe('Slot Management', () => {
+        it('should handle slot updates with validation', () => {
+            const layoutWithSlot = {
+                type: 'slot',
+                tag: 'div',
+                slot: { name: 'test-slot' }
+            };
+
+            renderer.render(layoutWithSlot, mockTargetRef);
+
+            // Valid widget array
+            renderer.updateSlot('test-slot', [{ type: 'text', config: {} }]);
+            expect(mockContainer.children.length).toBe(1);
+
+            // Invalid widget array should be handled
+            const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
+            renderer.updateSlot('test-slot', 'not an array');
+            expect(consoleErrorSpy).toHaveBeenCalled();
+            consoleErrorSpy.mockRestore();
+        });
+
+        it('should handle missing slots gracefully', () => {
+            const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => { });
+
+            renderer.updateSlot('nonexistent-slot', []);
+
+            expect(consoleWarnSpy).toHaveBeenCalledWith('LayoutRenderer: Slot "nonexistent-slot" not found');
+            consoleWarnSpy.mockRestore();
+        });
+
+        it('should prevent slot operations on destroyed renderer', () => {
+            const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => { });
+
+            renderer.destroy();
+            renderer.updateSlot('test-slot', []);
+
+            expect(consoleWarnSpy).toHaveBeenCalledWith('LayoutRenderer: Cannot update slot on destroyed instance');
+            consoleWarnSpy.mockRestore();
+        });
+    });
+
+    describe('XSS Prevention', () => {
+        it('should escape HTML in error messages', () => {
+            const maliciousMessage = '<script>alert("xss")</script>Dangerous';
+            const errorElement = renderer.createErrorElement(maliciousMessage);
+
+            expect(errorElement.textContent).toContain('<script>');
+            expect(errorElement.querySelector('script')).toBeNull();
+        });
+
+        it('should escape HTML in widget content', () => {
+            const maliciousWidget = {
+                type: '<script>alert("xss")</script>text',
+                config: {
+                    content: '<img src=x onerror=alert("xss2")>',
+                    title: '</div><script>alert("xss3")</script>'
+                }
+            };
+
+            const result = renderer.renderWidget(maliciousWidget);
+
+            // HTML should be escaped in all content
+            expect(result.innerHTML).not.toContain('<script>');
+            expect(result.innerHTML).not.toContain('<img');
+            expect(result.innerHTML).toContain('&lt;script&gt;');
+            expect(result.querySelector('script')).toBeNull();
+            expect(result.querySelector('img')).toBeNull();
+            // Content should be safely escaped
+            expect(result.innerHTML).toContain('&lt;');
+        });
+
+        it('should escape HTML in slot placeholders', () => {
+            const maliciousSlot = {
+                type: 'slot',
+                tag: 'div',
+                slot: {
+                    name: '<script>alert("xss")</script>',
+                    title: '<img src=x onerror=alert("xss2")>',
+                    description: '</div><script>evil()</script>'
+                }
+            };
+
+            renderer.render(maliciousSlot, mockTargetRef);
+
+            const placeholder = mockContainer.querySelector('.slot-placeholder');
+            expect(placeholder).toBeTruthy();
+            expect(placeholder.innerHTML).not.toContain('<script>');
+            expect(placeholder.innerHTML).not.toContain('<img');
+            expect(placeholder.innerHTML).toContain('&lt;script&gt;');
+            // All dangerous content should be properly escaped
+            expect(placeholder.innerHTML).toContain('&lt;');
+        });
+    });
+
+    describe('Performance', () => {
+        it('should efficiently handle large number of children', () => {
+            const start = performance.now();
+
+            const largeLayout = {
+                type: 'element',
+                tag: 'div',
+                children: Array.from({ length: 1000 }, (_, i) => ({
+                    type: 'text',
+                    content: `Child ${i}`
+                }))
+            };
+
+            renderer.render(largeLayout, mockTargetRef);
+
+            const end = performance.now();
+
+            // Should complete in reasonable time (less than 100ms)
+            expect(end - start).toBeLessThan(100);
+            expect(mockContainer.children.length).toBe(1);
+            expect(mockContainer.textContent).toContain('Child 0');
+            expect(mockContainer.textContent).toContain('Child 999');
+        });
+
+        it('should handle rapid re-renders without memory leaks', () => {
+            const layout = {
+                type: 'element',
+                tag: 'div',
+                children: [{ type: 'text', content: 'Test' }]
+            };
+
+            // Render multiple times rapidly
+            for (let i = 0; i < 100; i++) {
+                renderer.render(layout, mockTargetRef);
             }
 
-            render(<LayoutRenderer layout={emptyLayout} />)
-
-            expect(screen.getByText('Layout has no slots defined')).toBeInTheDocument()
-            expect(screen.getByText('Configure the layout to add slots')).toBeInTheDocument()
-        })
-
-        it('renders all layout slots correctly', () => {
-            render(<LayoutRenderer layout={mockLayout} />)
-
-            // Check that all slots are rendered
-            expect(screen.getByText('Header')).toBeInTheDocument()
-            expect(screen.getByText('Main Content')).toBeInTheDocument()
-            expect(screen.getByText('Sidebar')).toBeInTheDocument()
-        })
-
-        it('shows slot descriptions when showSlotHeaders is true', () => {
-            render(<LayoutRenderer layout={mockLayout} showSlotHeaders={true} />)
-
-            expect(screen.getByText('Main header content')).toBeInTheDocument()
-            expect(screen.getByText('Primary content area')).toBeInTheDocument()
-            expect(screen.getByText('Secondary content area')).toBeInTheDocument()
-        })
-
-        it('hides slot headers when showSlotHeaders is false', () => {
-            render(<LayoutRenderer layout={mockLayout} showSlotHeaders={false} />)
-
-            expect(screen.queryByText('Main header content')).not.toBeInTheDocument()
-        })
-    })
-
-    // Theme application tests
-    describe('Theme Application', () => {
-        it('applies theme CSS variables correctly', () => {
-            const { container } = render(
-                <LayoutRenderer layout={mockLayout} theme={mockTheme} />
-            )
-
-            const layoutRenderer = container.querySelector('.layout-renderer')
-            const computedStyle = window.getComputedStyle(layoutRenderer)
-
-            // Note: jsdom doesn't fully support CSS custom properties,
-            // so we check the style attribute directly
-            expect(layoutRenderer).toHaveStyle('--primary: #3b82f6')
-            expect(layoutRenderer).toHaveStyle('--background: #ffffff')
-            expect(layoutRenderer).toHaveStyle('--text: #1f2937')
-        })
-
-        it('injects custom CSS from theme', () => {
-            render(<LayoutRenderer layout={mockLayout} theme={mockTheme} />)
-
-            // Check that custom CSS is injected
-            const styles = document.querySelectorAll('style')
-            const customStyle = Array.from(styles).find(style =>
-                style.innerHTML.includes('.custom-style { color: blue; }')
-            )
-            expect(customStyle).toBeTruthy()
-        })
-
-        it('injects layout CSS classes', () => {
-            render(<LayoutRenderer layout={mockLayout} theme={mockTheme} />)
-
-            const styles = document.querySelectorAll('style')
-            const layoutStyle = Array.from(styles).find(style =>
-                style.innerHTML.includes('.layout-two-column { display: grid; }')
-            )
-            expect(layoutStyle).toBeTruthy()
-        })
-    })
-
-    // Widget rendering tests
-    describe('Widget Rendering', () => {
-        it('renders widgets in correct slots', () => {
-            render(
-                <LayoutRenderer
-                    layout={mockLayout}
-                    widgetsBySlot={mockWidgetsBySlot}
-                />
-            )
-
-            // Check widgets are rendered in their slots
-            expect(screen.getByText('Welcome to our site')).toBeInTheDocument()
-            expect(screen.getByText('📷 Main content image')).toBeInTheDocument()
-            expect(screen.getByText('Click Me')).toBeInTheDocument()
-        })
-
-        it('renders TextBlock widgets correctly', () => {
-            render(
-                <LayoutRenderer
-                    layout={mockLayout}
-                    widgetsBySlot={mockWidgetsBySlot}
-                />
-            )
-
-            expect(screen.getByText('Welcome Header')).toBeInTheDocument()
-            expect(screen.getByText('Welcome to our site')).toBeInTheDocument()
-        })
-
-        it('renders Image widgets correctly', () => {
-            render(
-                <LayoutRenderer
-                    layout={mockLayout}
-                    widgetsBySlot={mockWidgetsBySlot}
-                />
-            )
-
-            expect(screen.getByText('📷 Main content image')).toBeInTheDocument()
-            expect(screen.getByText('Featured image')).toBeInTheDocument()
-        })
-
-        it('renders Button widgets correctly', () => {
-            render(
-                <LayoutRenderer
-                    layout={mockLayout}
-                    widgetsBySlot={mockWidgetsBySlot}
-                />
-            )
-
-            const button = screen.getByText('Click Me')
-            expect(button).toBeInTheDocument()
-            expect(button.closest('button')).toHaveClass('bg-blue-600')
-        })
-
-        it('shows empty slot message when slot has no widgets', () => {
-            const emptyWidgetsBySlot = { header: [], content: [], sidebar: [] }
-
-            render(
-                <LayoutRenderer
-                    layout={mockLayout}
-                    widgetsBySlot={emptyWidgetsBySlot}
-                    showEmptySlots={true}
-                />
-            )
-
-            const emptyMessages = screen.getAllByText('No widgets in this slot')
-            expect(emptyMessages).toHaveLength(3)
-        })
-
-        it('hides empty slots when showEmptySlots is false', () => {
-            const emptyWidgetsBySlot = { header: [], content: [], sidebar: [] }
-
-            render(
-                <LayoutRenderer
-                    layout={mockLayout}
-                    widgetsBySlot={emptyWidgetsBySlot}
-                    showEmptySlots={false}
-                />
-            )
-
-            expect(screen.queryByText('No widgets in this slot')).not.toBeInTheDocument()
-        })
-    })
-
-    // Inheritance display tests
-    describe('Inheritance Display', () => {
-        it('shows inheritance information when enabled', () => {
-            render(
-                <LayoutRenderer
-                    layout={mockLayout}
-                    widgetsBySlot={mockWidgetsBySlot}
-                    showInheritance={true}
-                />
-            )
-
-            expect(screen.getByText('Inherited from: Parent Page')).toBeInTheDocument()
-            expect(screen.getByText('Override')).toBeInTheDocument()
-        })
-
-        it('hides inheritance information when disabled', () => {
-            render(
-                <LayoutRenderer
-                    layout={mockLayout}
-                    widgetsBySlot={mockWidgetsBySlot}
-                    showInheritance={false}
-                />
-            )
-
-            expect(screen.queryByText('Inherited from: Parent Page')).not.toBeInTheDocument()
-            expect(screen.queryByText('Override')).not.toBeInTheDocument()
-        })
-
-        it('shows hidden widget indicator', () => {
-            render(
-                <LayoutRenderer
-                    layout={mockLayout}
-                    widgetsBySlot={mockWidgetsBySlot}
-                    showInheritance={true}
-                />
-            )
-
-            expect(screen.getByText('Hidden')).toBeInTheDocument()
-        })
-
-        it('applies inheritance styling to widgets', () => {
-            const { container } = render(
-                <LayoutRenderer
-                    layout={mockLayout}
-                    widgetsBySlot={mockWidgetsBySlot}
-                />
-            )
-
-            // Check inherited widget has orange styling
-            const inheritedWidget = container.querySelector('.border-orange-200')
-            expect(inheritedWidget).toBeInTheDocument()
-        })
-    })
-
-    // Page header tests
-    describe('Page Header', () => {
-        it('renders page title and description', () => {
-            render(
-                <LayoutRenderer
-                    layout={mockLayout}
-                    pageTitle="Test Page"
-                    pageDescription="This is a test page"
-                />
-            )
-
-            expect(screen.getByText('Test Page')).toBeInTheDocument()
-            expect(screen.getByText('This is a test page')).toBeInTheDocument()
-        })
-
-        it('renders only title when no description provided', () => {
-            render(
-                <LayoutRenderer
-                    layout={mockLayout}
-                    pageTitle="Test Page"
-                />
-            )
-
-            expect(screen.getByText('Test Page')).toBeInTheDocument()
-        })
-
-        it('renders no header when no title or description provided', () => {
-            const { container } = render(<LayoutRenderer layout={mockLayout} />)
-
-            expect(container.querySelector('header')).not.toBeInTheDocument()
-        })
-    })
-
-    // Mode-specific behavior tests
-    describe('Mode-Specific Behavior', () => {
-        it('shows edit-specific UI in edit mode', () => {
-            render(
-                <LayoutRenderer
-                    layout={mockLayout}
-                    widgetsBySlot={{ header: [], content: [], sidebar: [] }}
-                    mode="edit"
-                    showEmptySlots={true}
-                    onWidgetAdd={() => { }}
-                />
-            )
-
-            const addButtons = screen.getAllByText('Add Widget')
-            expect(addButtons.length).toBeGreaterThan(0)
-        })
-
-        it('handles widget edit clicks in edit mode', () => {
-            const mockOnWidgetEdit = vi.fn()
-
-            render(
-                <LayoutRenderer
-                    layout={mockLayout}
-                    widgetsBySlot={mockWidgetsBySlot}
-                    mode="edit"
-                    onWidgetEdit={mockOnWidgetEdit}
-                />
-            )
-
-            const widget = screen.getByText('Welcome to our site').closest('.widget-preview')
-            fireEvent.click(widget)
-
-            expect(mockOnWidgetEdit).toHaveBeenCalledWith(
-                expect.objectContaining({ id: 1 })
-            )
-        })
-
-        it('handles keyboard navigation in edit mode', () => {
-            const mockOnWidgetEdit = vi.fn()
-
-            render(
-                <LayoutRenderer
-                    layout={mockLayout}
-                    widgetsBySlot={mockWidgetsBySlot}
-                    mode="edit"
-                    onWidgetEdit={mockOnWidgetEdit}
-                />
-            )
-
-            const widget = screen.getByText('Welcome to our site').closest('.widget-preview')
-            fireEvent.keyDown(widget, { key: 'Enter' })
-
-            expect(mockOnWidgetEdit).toHaveBeenCalledWith(
-                expect.objectContaining({ id: 1 })
-            )
-        })
-
-        it('shows different content in preview mode', () => {
-            render(
-                <LayoutRenderer
-                    layout={mockLayout}
-                    widgetsBySlot={{ header: [], content: [], sidebar: [] }}
-                    mode="preview"
-                    showEmptySlots={true}
-                />
-            )
-
-            expect(screen.getAllByText('Widgets would appear here')).toHaveLength(3)
-            expect(screen.queryByText('Add Widget')).not.toBeInTheDocument()
-        })
-    })
-
-    // CSS classes and styling tests
-    describe('CSS Classes and Styling', () => {
-        it('applies layout-specific CSS classes', () => {
-            const { container } = render(<LayoutRenderer layout={mockLayout} />)
-
-            expect(container.querySelector('.layout-two_column')).toBeInTheDocument()
-        })
-
-        it('applies slot-specific CSS classes', () => {
-            const { container } = render(<LayoutRenderer layout={mockLayout} />)
-
-            expect(container.querySelector('.header-slot')).toBeInTheDocument()
-            expect(container.querySelector('.content-slot')).toBeInTheDocument()
-            expect(container.querySelector('.sidebar-slot')).toBeInTheDocument()
-        })
-
-        it('applies custom className prop', () => {
-            const { container } = render(
-                <LayoutRenderer layout={mockLayout} className="custom-class" />
-            )
-
-            expect(container.querySelector('.custom-class')).toBeInTheDocument()
-        })
-
-        it('sets correct data attributes', () => {
-            const { container } = render(<LayoutRenderer layout={mockLayout} />)
-
-            expect(container.querySelector('[data-slot="header"]')).toBeInTheDocument()
-            expect(container.querySelector('[data-slot="content"]')).toBeInTheDocument()
-            expect(container.querySelector('[data-slot="sidebar"]')).toBeInTheDocument()
-        })
-    })
-
-    // Accessibility tests
-    describe('Accessibility', () => {
-        it('provides proper ARIA roles for interactive elements', () => {
-            render(
-                <LayoutRenderer
-                    layout={mockLayout}
-                    widgetsBySlot={mockWidgetsBySlot}
-                    mode="edit"
-                    onWidgetEdit={() => { }}
-                />
-            )
-
-            const widgets = screen.getAllByRole('button')
-            expect(widgets.length).toBeGreaterThan(0)
-        })
-
-        it('supports keyboard navigation', () => {
-            render(
-                <LayoutRenderer
-                    layout={mockLayout}
-                    widgetsBySlot={mockWidgetsBySlot}
-                    mode="edit"
-                    onWidgetEdit={() => { }}
-                />
-            )
-
-            const widgets = document.querySelectorAll('[tabIndex="0"]')
-            expect(widgets.length).toBeGreaterThan(0)
-        })
-    })
-
-    // Children rendering test
-    describe('Children Rendering', () => {
-        it('renders children content correctly', () => {
-            render(
-                <LayoutRenderer layout={mockLayout}>
-                    <div data-testid="child-content">Custom child content</div>
-                </LayoutRenderer>
-            )
-
-            expect(screen.getByTestId('child-content')).toBeInTheDocument()
-            expect(screen.getByText('Custom child content')).toBeInTheDocument()
-        })
-    })
-}) 
+            // Should maintain clean state
+            expect(mockContainer.children.length).toBe(1);
+            expect(renderer.slotContainers.size).toBe(0);
+            expect(renderer.eventListeners.size).toBe(0);
+        });
+    });
+});
+
+describe('LayoutRenderer Integration', () => {
+    let renderer;
+    let mockContainer;
+    let mockTargetRef;
+
+    beforeEach(() => {
+        renderer = new LayoutRenderer();
+        mockContainer = document.createElement('div');
+        document.body.appendChild(mockContainer);
+        mockTargetRef = { current: mockContainer };
+    });
+
+    afterEach(() => {
+        renderer.destroy();
+        if (mockContainer.parentNode) {
+            mockContainer.parentNode.removeChild(mockContainer);
+        }
+    });
+
+    it('should handle complex nested layouts with slots and widgets', () => {
+        const complexLayout = {
+            type: 'element',
+            tag: 'main',
+            classes: 'container',
+            children: [
+                {
+                    type: 'element',
+                    tag: 'header',
+                    children: [
+                        {
+                            type: 'slot',
+                            tag: 'div',
+                            slot: {
+                                name: 'header-content',
+                                title: 'Header Slot',
+                                defaultWidgets: [
+                                    { type: 'navigation', config: { items: ['Home', 'About'] } }
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    type: 'element',
+                    tag: 'section',
+                    children: [
+                        { type: 'text', content: 'Welcome to our site!' },
+                        {
+                            type: 'slot',
+                            tag: 'div',
+                            slot: { name: 'main-content' }
+                        }
+                    ]
+                }
+            ]
+        };
+
+        renderer.render(complexLayout, mockTargetRef);
+
+        // Verify structure
+        expect(mockContainer.querySelector('main')).toBeTruthy();
+        expect(mockContainer.querySelector('header')).toBeTruthy();
+        expect(mockContainer.querySelector('section')).toBeTruthy();
+
+        // Verify slots
+        expect(renderer.getSlotNames()).toContain('header-content');
+        expect(renderer.getSlotNames()).toContain('main-content');
+
+        // Verify text content
+        expect(mockContainer.textContent).toContain('Welcome to our site!');
+
+        // Verify default widget rendered
+        expect(mockContainer.querySelector('[data-slot-name="header-content"]')).toBeTruthy();
+    });
+}); 

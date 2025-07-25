@@ -570,50 +570,66 @@ class PageVersionViewSet(viewsets.ModelViewSet):
             )
 
 
-@api_view(['GET'])
+@api_view(["GET"])
 @permission_classes([permissions.IsAuthenticatedOrReadOnly])
 def layout_json(request, layout_name):
     """
     Return JSON representation of a layout template
-    
+
     Args:
         layout_name: Name of the layout to serialize (e.g., 'sidebar_layout')
-        
+
     Returns:
         JSON structure representing the layout template
     """
+    import logging
+    from django.conf import settings
+
+    logger = logging.getLogger(__name__)
+
     try:
         from .layout_registry import layout_registry
-        
+
         # Get the layout class from registry
         layout_class = layout_registry.get_layout_class(layout_name)
         if not layout_class:
             return Response(
                 {"error": f"Layout '{layout_name}' not found"},
-                status=status.HTTP_404_NOT_FOUND
+                status=status.HTTP_404_NOT_FOUND,
             )
-        
+
         # Create layout instance
         layout_instance = layout_class()
-        
+
         # Use the template parser to serialize the layout
         serializer = TemplateLayoutSerializer()
-        
+
         # Create a mock layout object for the serializer
         class MockLayout:
             def __init__(self, name, template_name):
                 self.name = name
                 self.template_name = template_name
-                self.description = getattr(layout_instance, 'description', '')
+                self.description = getattr(layout_instance, "description", "")
                 self.id = name  # Use name as ID for code-based layouts
-        
+
         mock_layout = MockLayout(layout_name, f"{layout_name}.html")
         layout_json = serializer.serialize_layout(mock_layout)
-        
+
         return Response(layout_json)
-        
+
     except Exception as e:
+        # Log detailed error for debugging (server-side only)
+        logger.error(
+            f"Error serializing layout '{layout_name}': {str(e)}", exc_info=True
+        )
+
+        # Return generic error message to prevent information disclosure
+        error_msg = "Layout serialization failed"
+
+        # In debug mode, provide more details for development
+        if settings.DEBUG:
+            error_msg = f"Error serializing layout: {str(e)}"
+
         return Response(
-            {"error": f"Error serializing layout: {str(e)}"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            {"error": error_msg}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
