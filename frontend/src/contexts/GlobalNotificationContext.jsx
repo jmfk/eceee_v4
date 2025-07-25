@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from 'react'
+import { createContext, useContext, useState, useCallback, useMemo } from 'react'
 
 const GlobalNotificationContext = createContext()
 
@@ -15,8 +15,8 @@ export const GlobalNotificationProvider = ({ children }) => {
     const [notifications, setNotifications] = useState([])
     const [currentNotificationIndex, setCurrentNotificationIndex] = useState(0)
 
-    // Notification management functions
-    const addNotification = (message, type = 'info', category = null) => {
+    // Notification management functions (memoized to prevent render loops)
+    const addNotification = useCallback((message, type = 'info', category = null) => {
         const notification = {
             id: Date.now(),
             message,
@@ -34,50 +34,48 @@ export const GlobalNotificationProvider = ({ children }) => {
                 if (existingIndex !== -1) {
                     // Replace existing notification
                     updated[existingIndex] = notification
-                    // Keep current index if we're viewing the replaced notification
-                    if (currentNotificationIndex === existingIndex) {
-                        // Stay on the same notification (now updated)
-                    } else if (currentNotificationIndex > existingIndex) {
-                        // Adjust index if we replaced a notification before current one
-                        setCurrentNotificationIndex(prev => prev)
-                    }
                     return updated
                 }
             }
 
             // Add new notification at the beginning
             updated = [notification, ...updated].slice(0, 20) // Keep max 20 notifications
-            setCurrentNotificationIndex(0) // Show newest notification
             return updated
         })
-    }
 
-    const clearNotifications = () => {
+        // Reset to show newest notification when adding new ones
+        setCurrentNotificationIndex(0)
+    }, [])
+
+    const clearNotifications = useCallback(() => {
         setNotifications([])
         setCurrentNotificationIndex(0)
-    }
+    }, [])
 
-    const navigateNotifications = (direction) => {
-        if (notifications.length === 0) return
+    const navigateNotifications = useCallback((direction) => {
+        setNotifications(current => {
+            if (current.length === 0) return current
 
-        if (direction === 'next') {
-            setCurrentNotificationIndex(prev =>
-                prev < notifications.length - 1 ? prev + 1 : prev
-            )
-        } else if (direction === 'prev') {
-            setCurrentNotificationIndex(prev =>
-                prev > 0 ? prev - 1 : prev
-            )
-        }
-    }
+            if (direction === 'next') {
+                setCurrentNotificationIndex(prev =>
+                    prev < current.length - 1 ? prev + 1 : prev
+                )
+            } else if (direction === 'prev') {
+                setCurrentNotificationIndex(prev =>
+                    prev > 0 ? prev - 1 : prev
+                )
+            }
+            return current // Return current notifications unchanged
+        })
+    }, [])
 
-    const value = {
+    const value = useMemo(() => ({
         notifications,
         currentNotificationIndex,
         addNotification,
         clearNotifications,
         navigateNotifications
-    }
+    }), [notifications, currentNotificationIndex, addNotification, clearNotifications, navigateNotifications])
 
     return (
         <GlobalNotificationContext.Provider value={value}>

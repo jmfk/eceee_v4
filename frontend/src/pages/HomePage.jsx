@@ -17,13 +17,14 @@ const HomePage = () => {
 
   // Check API connection on component mount (only once)
   useEffect(() => {
+    console.log('Checking API connection')
     checkApiConnection()
   }, [])
 
-  // Welcome notification (only once)
+  // Welcome notification (only once on mount)
   useEffect(() => {
     addNotification('Welcome to eceee_v4 development environment', 'info', 'page-load')
-  }, [addNotification])
+  }, []) // Empty dependency array - runs only once on mount
 
   // Add notification for page visibility changes (throttled)
   useEffect(() => {
@@ -42,7 +43,7 @@ const HomePage = () => {
 
     document.addEventListener('visibilitychange', handleVisibilityChange)
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
-  }, [addNotification])
+  }, []) // Empty dependency - addNotification is now stable
 
   // Handle external link navigation with notifications
   const handleAdminClick = () => {
@@ -59,7 +60,7 @@ const HomePage = () => {
     addNotification('Checking API connection...', 'info', 'api-check')
     try {
       // Use backend directly since we removed the proxy
-      const response = await fetch('http://localhost:8000/health/')
+      const response = await fetch('/health/')
       if (response.ok) {
         setApiStatus('connected')
         addNotification('Backend API connection established', 'success', 'api-connection')
