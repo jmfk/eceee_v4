@@ -26,7 +26,7 @@
             </div>
             <div class="bg-purple-50 border border-purple-200 rounded p-3 mb-3">
                 <p class="text-purple-800 text-sm">
-                    <strong>Save/Load:</strong> "Save Page" captures all widget data. "Load Saved Page" restores it. "Reset" clears everything for a fresh start!
+                    <strong>Save/Load:</strong> "Save Page" captures all widget data. "Load Saved Page" restores it exactly as saved. Saved widgets always override defaults!
                 </p>
             </div>
             <div class="bg-orange-50 border border-orange-200 rounded p-3">
@@ -477,16 +477,19 @@
         document.getElementById('load-page').addEventListener('click', () => {
             const savedData = loadSavedPageData();
             if (savedData) {
-                // Load widget data into renderer
+                console.log('Manually loading saved widget data:', savedData);
+                
+                // Load widget data into renderer (this takes priority over defaults)
                 renderer.loadWidgetData(savedData);
                 
-                // Re-render the layout with loaded data
+                // Re-render the layout with loaded data (saved widgets will be used instead of defaults)
                 renderer.render(demoLayout, targetRef);
                 
                 updatePageStatus();
                 updateWidgetSummary();
                 updateSavedDataDisplay(savedData);
                 showSuccessMessage(`Loaded page with ${Object.keys(savedData).length} slots of widget data!`);
+                console.log('Saved widgets loaded - they will take priority over any defaults');
             } else {
                 alert('No saved page data found. Save a page first!');
             }
@@ -535,13 +538,19 @@
 
         // Auto-render layout on page load
         setTimeout(() => {
-            // Check if we have saved data to load
+            // Check if we have saved data to load BEFORE rendering
             if (hasSavedPageData()) {
                 const savedData = loadSavedPageData();
                 if (savedData) {
+                    console.log('Loading saved widget data before render:', savedData);
                     renderer.loadWidgetData(savedData);
                     updateSavedDataDisplay(savedData);
+                    console.log('Saved widgets will take priority over defaults');
+                } else {
+                    console.log('No valid saved data found, defaults will be used if available');
                 }
+            } else {
+                console.log('No saved data found, defaults will be used if available');
             }
             
             renderer.render(demoLayout, targetRef);

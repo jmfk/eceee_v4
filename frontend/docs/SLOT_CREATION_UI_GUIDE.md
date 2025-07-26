@@ -295,11 +295,18 @@ renderer.setUICallbacks({
 ```
 
 ### Rendering Priority
-The LayoutRenderer follows this priority when rendering slots:
+The LayoutRenderer follows this strict priority when rendering slots:
 
 1. **Saved Widgets** (highest priority) - if `hasSlotWidgetData(slotName)` returns true
-2. **Default Widgets** (auto-converted to instances for new pages)
-3. **Empty Placeholder** (lowest priority)
+   - Loaded widgets from `loadWidgetData()` or previous saves
+   - These completely override any default widgets defined in the layout
+   - Rendered with `isLoading = true` to avoid marking page as dirty
+2. **Default Widgets** (middle priority) - only if no saved widgets exist
+   - Auto-converted to instances for new/unsaved pages
+   - Rendered as placeholders for saved pages without saved widgets
+3. **Empty Placeholder** (lowest priority) - if no saved or default widgets
+
+**Important**: Saved widgets always take precedence over defaults. If you have saved widget data, defaults will be completely ignored for those slots.
 
 ### Configuration Extraction
 The system automatically extracts widget configurations from rendered DOM elements, supporting all built-in widget types with proper state preservation.
