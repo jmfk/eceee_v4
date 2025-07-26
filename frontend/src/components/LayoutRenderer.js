@@ -12,6 +12,19 @@ class LayoutRenderer {
     this.widgetRenderer = null; // Will be set externally for widget rendering
     this.eventListeners = new Map(); // Track event listeners for cleanup
     this.isDestroyed = false; // Track destruction state
+
+    // UI Enhancement properties
+    this.slotUIElements = new Map(); // Map of slot names to UI overlay elements
+    this.uiConfig = { // Default UI configuration
+      showIconMenu: false,
+      showAddWidget: false,
+      showEditSlot: false,
+      showSlotVisibility: false,
+      enableDragDrop: false,
+      enableContextMenu: false
+    };
+    this.uiCallbacks = new Map(); // Map of UI event callbacks
+    this.dragState = { isDragging: false, draggedElement: null, sourceSlot: null };
   }
 
   /**
@@ -253,6 +266,9 @@ class LayoutRenderer {
    */
   destroy() {
     try {
+      // Clean up UI elements first
+      this.removeAllSlotUI();
+
       // Clean up event listeners
       this.eventListeners.forEach((cleanup) => {
         if (typeof cleanup === 'function') {
@@ -264,6 +280,8 @@ class LayoutRenderer {
       this.slotContainers.clear();
       this.slotConfigs.clear();
       this.eventListeners.clear();
+      this.slotUIElements.clear();
+      this.uiCallbacks.clear();
 
       // Reset references
       this.widgetRenderer = null;
@@ -311,6 +329,350 @@ class LayoutRenderer {
     } catch (error) {
       console.error('LayoutRenderer: Error adding event listener', error);
     }
+  }
+
+  // UI Enhancement Methods (Vanilla JS)
+
+  /**
+   * Configure UI settings for slot interactions
+   * @param {Object} config - UI configuration object
+   */
+  setUIConfig(config = {}) {
+    this.uiConfig = { ...this.uiConfig, ...config };
+  }
+
+  /**
+   * Set UI event callbacks
+   * @param {Object} callbacks - Map of callback functions
+   */
+  setUICallbacks(callbacks = {}) {
+    this.uiCallbacks = new Map(Object.entries(callbacks));
+  }
+
+  /**
+   * Add icon menu to a slot
+   * @param {string} slotName - Name of the slot
+   * @param {Object} options - Menu options
+   */
+  addSlotIconMenu(slotName, options = {}) {
+    const slotElement = this.slotContainers.get(slotName);
+    if (!slotElement) {
+      console.warn(`LayoutRenderer: Slot "${slotName}" not found for icon menu`);
+      return;
+    }
+
+    // Remove existing UI if present
+    this.removeSlotUI(slotName);
+
+    // Create icon menu container
+    const menuContainer = document.createElement('div');
+    menuContainer.className = 'slot-icon-menu absolute top-2 right-2 z-20 opacity-80 hover:opacity-100 transition-opacity';
+    menuContainer.setAttribute('data-slot-menu', slotName);
+
+    // Create menu button (3 dots icon)
+    const menuButton = this.createIconButton('⋯', 'bg-gray-700 hover:bg-gray-800 text-white', () => {
+      this.toggleIconMenu(slotName);
+    });
+    menuButton.title = `Slot: ${slotName}`;
+    menuContainer.appendChild(menuButton);
+
+    // Create menu dropdown
+    const menuDropdown = document.createElement('div');
+    menuDropdown.className = 'slot-menu-dropdown absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg min-w-48 hidden';
+    menuDropdown.setAttribute('data-menu-dropdown', slotName);
+
+    // Add menu items
+    const menuItems = this.getMenuItems(slotName, options);
+    menuItems.forEach(item => {
+      const menuItem = this.createMenuItem(item.icon, item.label, item.action, item.className);
+      menuDropdown.appendChild(menuItem);
+    });
+
+    menuContainer.appendChild(menuDropdown);
+
+    // Position slot container relative if not already
+    if (getComputedStyle(slotElement).position === 'static') {
+      slotElement.style.position = 'relative';
+    }
+
+    // Add menu to slot
+    slotElement.appendChild(menuContainer);
+
+    // Track UI element
+    this.slotUIElements.set(slotName, menuContainer);
+
+    // Add click outside listener to close menu
+    this.addClickOutsideListener(slotName, menuDropdown);
+  }
+
+  /**
+   * Create an icon button
+   * @param {string} icon - Icon text or symbol
+   * @param {string} className - CSS classes
+   * @param {Function} onClick - Click handler
+   * @returns {HTMLElement} Button element
+   */
+  createIconButton(icon, className, onClick) {
+    const button = document.createElement('button');
+    button.innerHTML = icon;
+    button.className = `inline-flex items-center justify-center w-6 h-6 text-xs rounded transition-colors ${className}`;
+
+    if (onClick) {
+      const cleanup = () => {
+        button.removeEventListener('click', onClick);
+      };
+      button.addEventListener('click', onClick);
+      this.eventListeners.set(button, cleanup);
+    }
+
+    return button;
+  }
+
+  /**
+   * Create a menu item
+   * @param {string} icon - Item icon
+   * @param {string} label - Item label
+   * @param {Function} action - Item action
+   * @param {string} className - Additional CSS classes
+   * @returns {HTMLElement} Menu item element
+   */
+  createMenuItem(icon, label, action, className = '') {
+    const item = document.createElement('button');
+    item.className = `flex items-center w-full px-3 py-2 text-sm text-left hover:bg-gray-100 transition-colors ${className}`;
+
+    item.innerHTML = `
+      <span class="mr-3 text-gray-600">${icon}</span>
+      <span class="text-gray-900">${this.escapeHtml(label)}</span>
+    `;
+
+    if (action) {
+      const cleanup = () => {
+        item.removeEventListener('click', action);
+      };
+      item.addEventListener('click', action);
+      this.eventListeners.set(item, cleanup);
+    }
+
+    return item;
+  }
+
+  /**
+   * Get menu items for a slot
+   * @param {string} slotName - Name of the slot
+   * @param {Object} options - Menu options
+   * @returns {Array} Array of menu item configurations
+   */
+  getMenuItems(slotName, options = {}) {
+    const items = [];
+
+    // Add Widget item
+    if (this.uiConfig.showAddWidget || options.showAddWidget) {
+      items.push({
+        icon: '➕',
+        label: 'Add Widget',
+        action: () => this.executeCallback('onAddWidget', slotName),
+        className: 'text-green-700 hover:bg-green-50'
+      });
+    }
+
+    // Edit Slot item
+    if (this.uiConfig.showEditSlot || options.showEditSlot) {
+      items.push({
+        icon: '✏️',
+        label: 'Edit Slot',
+        action: () => this.executeCallback('onEditSlot', slotName),
+        className: 'text-blue-700 hover:bg-blue-50'
+      });
+    }
+
+    // Toggle Visibility item
+    if (this.uiConfig.showSlotVisibility || options.showSlotVisibility) {
+      const isVisible = this.isSlotVisible(slotName);
+      items.push({
+        icon: isVisible ? '👁️' : '🚫',
+        label: isVisible ? 'Hide Slot' : 'Show Slot',
+        action: () => this.toggleSlotVisibility(slotName),
+        className: 'text-gray-700 hover:bg-gray-50'
+      });
+    }
+
+    // Separator
+    if (items.length > 0 && (options.showClearSlot || options.showSlotInfo)) {
+      items.push({ separator: true });
+    }
+
+    // Clear Slot item
+    if (options.showClearSlot) {
+      items.push({
+        icon: '🗑️',
+        label: 'Clear Slot',
+        action: () => this.executeCallback('onClearSlot', slotName),
+        className: 'text-red-700 hover:bg-red-50'
+      });
+    }
+
+    // Slot Info item
+    if (options.showSlotInfo) {
+      items.push({
+        icon: 'ℹ️',
+        label: 'Slot Info',
+        action: () => this.executeCallback('onSlotInfo', slotName),
+        className: 'text-gray-700 hover:bg-gray-50'
+      });
+    }
+
+    return items;
+  }
+
+  /**
+   * Toggle icon menu visibility
+   * @param {string} slotName - Name of the slot
+   */
+  toggleIconMenu(slotName) {
+    const dropdown = document.querySelector(`[data-menu-dropdown="${slotName}"]`);
+    if (dropdown) {
+      const isHidden = dropdown.classList.contains('hidden');
+
+      // Close all other menus
+      document.querySelectorAll('.slot-menu-dropdown').forEach(menu => {
+        menu.classList.add('hidden');
+      });
+
+      // Toggle this menu
+      if (isHidden) {
+        dropdown.classList.remove('hidden');
+      }
+    }
+  }
+
+  /**
+   * Check if slot is visible
+   * @param {string} slotName - Name of the slot
+   * @returns {boolean} True if visible
+   */
+  isSlotVisible(slotName) {
+    const slotElement = this.slotContainers.get(slotName);
+    return slotElement && slotElement.style.display !== 'none';
+  }
+
+  /**
+   * Toggle slot visibility
+   * @param {string} slotName - Name of the slot
+   */
+  toggleSlotVisibility(slotName) {
+    const slotElement = this.slotContainers.get(slotName);
+    if (slotElement) {
+      const isVisible = this.isSlotVisible(slotName);
+      slotElement.style.display = isVisible ? 'none' : 'block';
+      slotElement.style.opacity = isVisible ? '0.5' : '1';
+
+      // Update menu if open
+      this.updateVisibilityMenuItem(slotName);
+
+      // Execute callback
+      this.executeCallback('onToggleVisibility', slotName, !isVisible);
+    }
+  }
+
+  /**
+   * Update visibility menu item
+   * @param {string} slotName - Name of the slot
+   */
+  updateVisibilityMenuItem(slotName) {
+    const dropdown = document.querySelector(`[data-menu-dropdown="${slotName}"]`);
+    if (dropdown) {
+      const visibilityItem = Array.from(dropdown.children).find(item =>
+        item.textContent.includes('Hide Slot') || item.textContent.includes('Show Slot')
+      );
+
+      if (visibilityItem) {
+        const isVisible = this.isSlotVisible(slotName);
+        const icon = visibilityItem.querySelector('span:first-child');
+        const label = visibilityItem.querySelector('span:last-child');
+
+        if (icon && label) {
+          icon.textContent = isVisible ? '👁️' : '🚫';
+          label.textContent = isVisible ? 'Hide Slot' : 'Show Slot';
+        }
+      }
+    }
+  }
+
+  /**
+   * Add click outside listener for menu
+   * @param {string} slotName - Name of the slot
+   * @param {HTMLElement} dropdown - Dropdown element
+   */
+  addClickOutsideListener(slotName, dropdown) {
+    const handleClickOutside = (event) => {
+      const menuContainer = this.slotUIElements.get(slotName);
+      if (menuContainer && !menuContainer.contains(event.target)) {
+        dropdown.classList.add('hidden');
+      }
+    };
+
+    // Add listener after a brief delay to avoid immediate closing
+    setTimeout(() => {
+      document.addEventListener('click', handleClickOutside);
+      this.eventListeners.set(`click-outside-${slotName}`, () => {
+        document.removeEventListener('click', handleClickOutside);
+      });
+    }, 100);
+  }
+
+  /**
+   * Execute a UI callback
+   * @param {string} callbackName - Name of the callback
+   * @param {string} slotName - Name of the slot
+   * @param {...any} args - Additional arguments
+   */
+  executeCallback(callbackName, slotName, ...args) {
+    const callback = this.uiCallbacks.get(callbackName);
+    if (typeof callback === 'function') {
+      try {
+        callback(slotName, ...args);
+      } catch (error) {
+        console.error(`LayoutRenderer: Error executing callback ${callbackName}`, error);
+      }
+    }
+  }
+
+  /**
+   * Remove UI elements from a slot
+   * @param {string} slotName - Name of the slot
+   */
+  removeSlotUI(slotName) {
+    const uiElement = this.slotUIElements.get(slotName);
+    if (uiElement) {
+      uiElement.remove();
+      this.slotUIElements.delete(slotName);
+    }
+
+    // Remove click outside listener
+    const clickOutsideCleanup = this.eventListeners.get(`click-outside-${slotName}`);
+    if (clickOutsideCleanup) {
+      clickOutsideCleanup();
+      this.eventListeners.delete(`click-outside-${slotName}`);
+    }
+  }
+
+  /**
+   * Remove all UI elements
+   */
+  removeAllSlotUI() {
+    this.slotUIElements.forEach((element, slotName) => {
+      this.removeSlotUI(slotName);
+    });
+  }
+
+  /**
+   * Add icon menus to all slots
+   * @param {Object} options - Global menu options
+   */
+  addIconMenusToAllSlots(options = {}) {
+    this.getSlotNames().forEach(slotName => {
+      this.addSlotIconMenu(slotName, options);
+    });
   }
 
   // Private methods
