@@ -435,7 +435,7 @@ const ContentEditor = ({
   }
 
   return (
-    <div className={`content-editor relative ${className}`}>
+    <div className={`content-editor relative h-full flex flex-col ${className}`}>
       {isLoading && (
         <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10">
           <div className="text-gray-600">Loading layout...</div>
@@ -444,11 +444,10 @@ const ContentEditor = ({
 
       <div
         ref={containerRef}
-        className={`layout-container content-editor-container ${editable ? 'editable' : ''}`}
+        className={`layout-container content-editor-container flex-1 ${editable ? 'editable' : ''}`}
         style={{
           minHeight: '400px',
-          maxHeight: '80vh', // Allow scrolling when content exceeds 80% of viewport height
-          height: 'auto',
+          height: '100%', // Use full available height from parent
           // Additional styling for visual boundaries
           border: '1px solid rgba(0, 0, 0, 0.1)',
           borderRadius: '8px',

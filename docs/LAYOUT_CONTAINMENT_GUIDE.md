@@ -179,8 +179,8 @@ For layout templates with fixed navigation:
 
 ### `.content-editor-container`
 - **Purpose**: Specialized containment for content editing interfaces
-- **Features**: Full containment with optimized vertical scrolling and custom scrollbars
-- **Use case**: ContentEditor component and similar editing interfaces
+- **Features**: Full containment with optimized vertical scrolling, custom scrollbars, and full height utilization
+- **Use case**: ContentEditor component and similar editing interfaces that need to use all available parent height
 
 ## JavaScript API Reference
 
