@@ -1073,6 +1073,7 @@ class LayoutRenderer {
    * @param {Object} widgetData - Object with slot names as keys and widget arrays as values
    */
   saveWidgetData(widgetData) {
+    console.log('saveWidgetData:', widgetData);
     // Store widget data internally
     this.savedWidgetData.clear();
     Object.entries(widgetData).forEach(([slotName, widgets]) => {
@@ -1091,6 +1092,8 @@ class LayoutRenderer {
  */
   saveCurrentWidgetState() {
     const widgetData = this.collectAllWidgetData();
+
+    console.log('widgetData:', widgetData);
     this.saveWidgetData(widgetData);
 
     // Mark as clean after successful save
@@ -1474,11 +1477,12 @@ class LayoutRenderer {
   }
 
   /**
-   * Add a widget instance to a slot and render it
-   * @param {string} slotName - Name of the target slot
-   * @param {Object} widgetInstance - Widget instance to add
-   */
-  addWidgetToSlot(slotName, widgetInstance) {
+ * Add a widget instance to a slot and render it
+ * @param {string} slotName - Name of the target slot
+ * @param {Object} widgetInstance - Widget instance to add
+ * @param {boolean} isLoading - True if loading saved widget (don't mark dirty)
+ */
+  addWidgetToSlot(slotName, widgetInstance, isLoading = false) {
     const slotElement = this.slotContainers.get(slotName);
     if (!slotElement) {
       throw new Error(`Slot "${slotName}" not found`);
@@ -1495,8 +1499,10 @@ class LayoutRenderer {
     if (widgetElement) {
       slotElement.appendChild(widgetElement);
 
-      // Mark page as dirty since a widget was added
-      this.markAsDirty(`widget added: ${widgetInstance.name} to ${slotName}`);
+      // Only mark page as dirty if this is a new widget, not a loaded one
+      if (!isLoading) {
+        this.markAsDirty(`widget added: ${widgetInstance.name} to ${slotName}`);
+      }
     }
   }
 
@@ -2534,9 +2540,10 @@ class LayoutRenderer {
       if (this.hasSlotWidgetData(slotName)) {
         // Load saved widgets for this slot
         const savedWidgets = this.getSlotWidgetData(slotName);
+        console.log(`LayoutRenderer: Loading ${savedWidgets.length} saved widgets for slot "${slotName}"`);
         savedWidgets.forEach((widgetInstance, index) => {
           try {
-            this.addWidgetToSlot(slotName, widgetInstance);
+            this.addWidgetToSlot(slotName, widgetInstance, true); // isLoading = true
           } catch (error) {
             console.error(`LayoutRenderer: Error rendering saved widget ${index} in slot ${slotName}`, error);
             const errorElement = this.createErrorWidgetElement(`Saved widget ${index + 1}: ${error.message}`);
@@ -2547,9 +2554,11 @@ class LayoutRenderer {
         // Check if we should convert default widgets to real widget instances
         if (!this.pageHasBeenSaved && !this.defaultWidgetsProcessed) {
           // Convert default widgets to actual widget instances for new/unsaved pages
+          console.log(`LayoutRenderer: Converting ${node.slot.defaultWidgets.length} default widgets to instances for slot "${slotName}"`);
           this.convertDefaultWidgetsToInstances(slotName, node.slot.defaultWidgets);
         } else {
           // For saved pages without saved widgets, render default widgets as placeholders (legacy behavior)
+          console.log(`LayoutRenderer: Rendering ${node.slot.defaultWidgets.length} default widgets as placeholders for slot "${slotName}"`);
           node.slot.defaultWidgets.forEach((defaultWidget, index) => {
             try {
               const widgetElement = this.renderWidget(defaultWidget);
@@ -2565,6 +2574,7 @@ class LayoutRenderer {
         }
       } else {
         // Show placeholder for empty slot
+        console.log(`LayoutRenderer: No saved or default widgets for slot "${slotName}" - showing placeholder`);
         const title = node.slot.title || slotName;
         const description = node.slot.description || '';
 
