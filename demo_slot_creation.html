@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LayoutRenderer - Slot Creation Demo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .slot-insertion-point {
+            transition: all 0.2s ease;
+        }
+        .slot-insertion-point:hover {
+            transform: scale(1.02);
+            box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
+        }
+        .layout-add-slot-floating {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 0.7; }
+            50% { opacity: 1; }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto p-6">
+        <h1 class="text-3xl font-bold text-gray-900 mb-6">LayoutRenderer - Slot Creation Demo</h1>
+        
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">Instructions</h2>
+            <ul class="list-disc list-inside space-y-2 text-gray-700">
+                <li><strong>Floating Add Button:</strong> Click the blue + button in the top-left to add a slot anywhere</li>
+                <li><strong>Slot Menus:</strong> Click the ••• button on existing slots for options</li>
+                <li><strong>Insertion Points:</strong> Hover over containers to see insertion points appear</li>
+                <li><strong>Add Slot Here:</strong> Click on the dashed blue lines to add slots at specific positions</li>
+                <li><strong>Slot Configuration:</strong> Fill out the form to configure your new slot</li>
+            </ul>
+        </div>
+
+        <div class="space-y-4">
+            <div class="bg-white rounded-lg p-4 border-2 border-gray-200">
+                <h3 class="text-lg font-medium mb-3">Sample Layout Container</h3>
+                <div id="layout-target" class="min-h-64 bg-gray-50 rounded border border-gray-300 p-4">
+                    <!-- Layout will be rendered here -->
+                </div>
+            </div>
+
+            <div class="flex space-x-4">
+                <button id="enable-add-ui" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
+                    Enable Add Slot UI
+                </button>
+                <button id="disable-add-ui" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors">
+                    Disable Add Slot UI
+                </button>
+                <button id="show-existing-slots" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors">
+                    Show Existing Slots
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import LayoutRenderer from './frontend/src/components/LayoutRenderer.js';
+
+        // Create layout renderer instance
+        const renderer = new LayoutRenderer();
+
+        // Sample layout with existing slots
+        const sampleLayout = {
+            structure: {
+                type: 'element',
+                tag: 'div',
+                classes: 'layout-container space-y-4',
+                children: [
+                    {
+                        type: 'element',
+                        tag: 'header',
+                        classes: 'header-section bg-blue-50 p-4 rounded',
+                        children: [
+                            {
+                                type: 'slot',
+                                tag: 'div',
+                                classes: 'header-slot min-h-16',
+                                slot: {
+                                    name: 'header-content',
+                                    title: 'Header Content',
+                                    description: 'Content for the page header'
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        type: 'element',
+                        tag: 'main',
+                        classes: 'main-section grid grid-cols-3 gap-4',
+                        children: [
+                            {
+                                type: 'slot',
+                                tag: 'section',
+                                classes: 'col-span-2 bg-gray-50 p-4 rounded min-h-32',
+                                slot: {
+                                    name: 'main-content',
+                                    title: 'Main Content',
+                                    description: 'Primary content area'
+                                }
+                            },
+                            {
+                                type: 'slot',
+                                tag: 'aside',
+                                classes: 'bg-yellow-50 p-4 rounded min-h-32',
+                                slot: {
+                                    name: 'sidebar',
+                                    title: 'Sidebar',
+                                    description: 'Secondary content and widgets'
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        type: 'element',
+                        tag: 'footer',
+                        classes: 'footer-section bg-gray-50 p-4 rounded',
+                        children: [
+                            {
+                                type: 'slot',
+                                tag: 'div',
+                                classes: 'footer-slot min-h-16',
+                                slot: {
+                                    name: 'footer-content',
+                                    title: 'Footer Content',
+                                    description: 'Content for the page footer'
+                                }
+                            }
+                        ]
+                    }
+                ]
+            }
+        };
+
+        // Get target element
+        const targetRef = { current: document.getElementById('layout-target') };
+
+        // Set up UI callbacks
+        renderer.setUICallbacks({
+            onAddNewSlot: (slotData, slotNode, insertionContext) => {
+                console.log('New slot requested:', slotData);
+                console.log('Slot node:', slotNode);
+                console.log('Insertion context:', insertionContext);
+                
+                // In a real application, you would:
+                // 1. Update the layout JSON structure
+                // 2. Save the layout to backend
+                // 3. Re-render the layout
+                
+                alert(`New slot "${slotData.name}" would be created!\nCheck console for details.`);
+            }
+        });
+
+        // Render initial layout
+        renderer.render(sampleLayout, targetRef);
+
+        // Button handlers
+        document.getElementById('enable-add-ui').addEventListener('click', () => {
+            renderer.enableAddSlotUI({
+                showFloatingAddButton: true
+            });
+            console.log('Add slot UI enabled');
+        });
+
+        document.getElementById('disable-add-ui').addEventListener('click', () => {
+            renderer.disableAddSlotUI();
+            console.log('Add slot UI disabled');
+        });
+
+        document.getElementById('show-existing-slots').addEventListener('click', () => {
+            const slotNames = renderer.getSlotNames();
+            alert(`Existing slots: ${slotNames.join(', ')}`);
+        });
+
+        // Enable add slot UI by default
+        setTimeout(() => {
+            renderer.enableAddSlotUI({
+                showFloatingAddButton: true
+            });
+        }, 1000);
+
+        // Add icon menus to existing slots
+        setTimeout(() => {
+            renderer.addIconMenusToAllSlots({
+                showAddWidget: true,
+                showEditSlot: true,
+                showSlotVisibility: true,
+                showSlotInfo: true
+            });
+        }, 1500);
+
+        // Make renderer available globally for debugging
+        window.layoutRenderer = renderer;
+    </script>
+</body>
+</html> 

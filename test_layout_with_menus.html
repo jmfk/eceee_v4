@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LayoutRenderer - Auto Slot Menus Test</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen p-6">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-2xl font-bold mb-4">LayoutRenderer - Automatic Slot Menus</h1>
+        
+        <div class="bg-white rounded-lg p-4 mb-4">
+            <p class="text-gray-700">
+                This demonstrates how slot menus appear automatically when layouts are rendered. 
+                Look for the ••• buttons on each slot after rendering.
+            </p>
+        </div>
+
+        <div class="bg-white rounded-lg p-4">
+            <h2 class="text-lg font-semibold mb-3">Rendered Layout</h2>
+            <div id="layout-container" class="border border-gray-300 rounded p-4 min-h-64 bg-gray-50">
+                <!-- Layout will be rendered here -->
+            </div>
+        </div>
+
+        <div class="mt-4 space-x-4">
+            <button id="render-layout" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                Render Layout
+            </button>
+            <button id="enable-add-ui" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+                Enable Add Slot UI
+            </button>
+            <button id="disable-menus" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">
+                Disable Menus
+            </button>
+        </div>
+    </div>
+
+    <script type="module">
+        import LayoutRenderer from './frontend/src/components/LayoutRenderer.js';
+
+        // Create renderer instance
+        const renderer = new LayoutRenderer();
+        const targetRef = { current: document.getElementById('layout-container') };
+
+        // Set up callbacks for slot interactions
+        renderer.setUICallbacks({
+            onAddWidget: (slotName) => {
+                alert(`Add widget to slot: ${slotName}`);
+            },
+            onEditSlot: (slotName) => {
+                alert(`Edit slot: ${slotName}`);
+            },
+            onToggleVisibility: (slotName, isVisible) => {
+                console.log(`Slot ${slotName} visibility toggled to: ${isVisible}`);
+            },
+            onSlotInfo: (slotName) => {
+                const config = renderer.getSlotConfig(slotName);
+                alert(`Slot Info:\nName: ${slotName}\nTitle: ${config?.title || 'N/A'}\nDescription: ${config?.description || 'N/A'}`);
+            },
+            onClearSlot: (slotName) => {
+                if (confirm(`Clear all content from slot "${slotName}"?`)) {
+                    renderer.updateSlot(slotName, []); // Clear the slot
+                }
+            },
+            onAddNewSlot: (slotData, slotNode, insertionContext) => {
+                alert(`New slot "${slotData.name}" would be added here!\nCheck console for details.`);
+                console.log('New slot data:', slotData);
+                console.log('Slot node:', slotNode);
+                console.log('Insertion context:', insertionContext);
+            }
+        });
+
+        // Sample layout that would come from your app
+        const appLayout = {
+            structure: {
+                type: 'element',
+                tag: 'div',
+                classes: 'app-layout space-y-6',
+                children: [
+                    {
+                        type: 'element',
+                        tag: 'header',
+                        classes: 'bg-blue-600 text-white p-4 rounded-lg',
+                        children: [
+                            {
+                                type: 'slot',
+                                tag: 'div',
+                                classes: 'header-slot min-h-12 flex items-center',
+                                slot: {
+                                    name: 'header-nav',
+                                    title: 'Header Navigation',
+                                    description: 'Main navigation area'
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        type: 'element',
+                        tag: 'div',
+                        classes: 'grid grid-cols-4 gap-6',
+                        children: [
+                            {
+                                type: 'slot',
+                                tag: 'main',
+                                classes: 'col-span-3 bg-white p-6 rounded-lg shadow min-h-48',
+                                slot: {
+                                    name: 'main-content',
+                                    title: 'Main Content Area',
+                                    description: 'Primary page content'
+                                }
+                            },
+                            {
+                                type: 'slot',
+                                tag: 'aside',
+                                classes: 'bg-gray-50 p-4 rounded-lg min-h-48',
+                                slot: {
+                                    name: 'sidebar',
+                                    title: 'Sidebar',
+                                    description: 'Additional content and widgets'
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        type: 'slot',
+                        tag: 'footer',
+                        classes: 'bg-gray-800 text-white p-4 rounded-lg min-h-16',
+                        slot: {
+                            name: 'footer-content',
+                            title: 'Footer',
+                            description: 'Footer links and information'
+                        }
+                    }
+                ]
+            }
+        };
+
+        // Button event handlers
+        document.getElementById('render-layout').addEventListener('click', () => {
+            console.log('Rendering layout with automatic slot menus...');
+            renderer.render(appLayout, targetRef);
+        });
+
+        document.getElementById('enable-add-ui').addEventListener('click', () => {
+            renderer.enableAddSlotUI({
+                showFloatingAddButton: true
+            });
+            console.log('Add slot UI enabled');
+        });
+
+        document.getElementById('disable-menus').addEventListener('click', () => {
+            renderer.disableSlotMenus();
+            console.log('Slot menus disabled');
+        });
+
+        // Auto-render the layout when page loads
+        setTimeout(() => {
+            renderer.render(appLayout, targetRef);
+        }, 500);
+
+        // Make renderer available for debugging
+        window.layoutRenderer = renderer;
+    </script>
+</body>
+</html> 
