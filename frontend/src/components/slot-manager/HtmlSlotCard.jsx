@@ -8,6 +8,7 @@ import {
     Layers
 } from 'lucide-react'
 import WidgetCard from './WidgetCard'
+import WidgetIconMenu from '../WidgetIconMenu'
 
 /**
  * Enhanced HTML Slot Card Component for template-based layouts
@@ -84,17 +85,12 @@ const HtmlSlotCard = ({
                             </p>
                         )}
                     </div>
-                    <button
-                        onClick={(e) => {
-                            e.stopPropagation()
-                            onAddWidget(slot)
-                        }}
-                        disabled={slot.max_widgets && widgets.length >= slot.max_widgets}
-                        className="inline-flex items-center px-3 py-1 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        <Plus className="w-4 h-4 mr-1" />
-                        Add Widget
-                    </button>
+                    <WidgetIconMenu
+                        slot={slot}
+                        onSelectWidget={(widget) => onAddWidget(slot, widget)}
+                        maxWidgetsReached={slot.max_widgets && widgets.length >= slot.max_widgets}
+                        className="flex-shrink-0"
+                    />
                 </div>
 
                 {/* Validation Errors */}

@@ -166,6 +166,7 @@ class LayoutRenderer {
    * @param {Array} widgets - Array of widget objects to render
    */
   updateSlot(slotName, widgets = []) {
+    console.log("LayoutRenderer updateSlot", slotName, widgets)
     if (this.isDestroyed) {
       console.warn('LayoutRenderer: Cannot update slot on destroyed instance');
       return;
@@ -423,6 +424,7 @@ class LayoutRenderer {
    * @returns {HTMLElement} DOM element
    */
   renderSlotElement(node) {
+    console.log("LayoutRenderer renderSlotElement", node)
     try {
       // Validate slot configuration
       if (!node.slot || typeof node.slot !== 'object') {
@@ -536,6 +538,7 @@ class LayoutRenderer {
    * @returns {HTMLElement|null} DOM element or null if rendering failed
    */
   renderWidget(widget) {
+    console.log("LayoutRenderer widget", widget)
     try {
       // Validate widget object
       if (!widget || typeof widget !== 'object') {
