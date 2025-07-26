@@ -84,9 +84,7 @@ const SlotManager = ({
         setLocalWidgetsBySlot(newWidgetsBySlot)
         onSlotUpdate?.(slotName, updatedWidgets)
 
-        toast.success(`Widget added to ${slotName} slot`)
-        setShowLibrary(false)
-        setSelectedSlot('')
+        toast.success(`${widgetData.name} added to ${slotName} slot`)
     }
 
     // Handle removing widget from slot
@@ -198,7 +196,7 @@ const SlotManager = ({
                                 <HtmlSlotCard
                                     slot={slot}
                                     widgets={getSlotWidgets(slot.name)}
-                                    onAddWidget={() => openWidgetLibrary(slot.name)}
+                                    onAddWidget={(slot, widget) => handleAddToSlot(slot.name, widget)}
                                     onRemoveWidget={(widgetId) => handleRemoveFromSlot(slot.name, widgetId)}
                                     onReorderWidgets={(reorderedWidgets) => handleReorderWidgets(slot.name, reorderedWidgets)}
                                     onConfigChange={onConfigChange}
