@@ -154,6 +154,21 @@ const ContentEditor = ({
     eventListenersRef.current.clear();
   }, []);
 
+  // Add tracked event listener
+  const addTrackedEventListener = useCallback((element, event, handler, options = {}) => {
+    try {
+      element.addEventListener(event, handler, options);
+
+      const cleanup = () => {
+        element.removeEventListener(event, handler, options);
+      };
+
+      eventListenersRef.current.set(element, cleanup);
+    } catch (error) {
+      console.error('ContentEditor: Error adding event listener', error);
+    }
+  }, []);
+
   // Setup slot interactivity
   const setupSlotInteractivity = useCallback(() => {
     if (!containerRef.current) return;
@@ -240,21 +255,6 @@ const ContentEditor = ({
       clearTimeout(timeout);
     };
   }, [editable, handleFixedPositioning, setupSlotInteractivity]);
-
-  // Add tracked event listener
-  const addTrackedEventListener = useCallback((element, event, handler, options = {}) => {
-    try {
-      element.addEventListener(event, handler, options);
-
-      const cleanup = () => {
-        element.removeEventListener(event, handler, options);
-      };
-
-      eventListenersRef.current.set(element, cleanup);
-    } catch (error) {
-      console.error('ContentEditor: Error adding event listener', error);
-    }
-  }, []);
 
   // Render layout when layoutJson changes
   useEffect(() => {
