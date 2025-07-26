@@ -16,8 +16,6 @@ The Enhanced LayoutRenderer extends the vanilla JavaScript `LayoutRenderer.js` w
 
 ### Available Menu Actions
 - ➕ **Add Widget** - Trigger widget addition workflow
-- ✏️ **Edit Slot** - Open slot configuration
-- 👁️ **Toggle Visibility** - Show/hide slot content
 - 🗑️ **Clear Slot** - Remove all widgets from slot
 - ℹ️ **Slot Info** - Display slot information
 
@@ -31,9 +29,7 @@ const renderer = new LayoutRenderer()
 
 // Configure UI settings
 renderer.setUIConfig({
-    showAddWidget: true,
-    showEditSlot: true,
-    showSlotVisibility: true
+    showAddWidget: true
 })
 
 // Set up UI callbacks
@@ -41,13 +37,6 @@ renderer.setUICallbacks({
     onAddWidget: (slotName) => {
         console.log(`Add widget to ${slotName}`)
         // Your widget addition logic
-    },
-    onEditSlot: (slotName) => {
-        console.log(`Edit slot ${slotName}`)
-        // Your slot editing logic
-    },
-    onToggleVisibility: (slotName, isVisible) => {
-        console.log(`Slot ${slotName} visibility: ${isVisible}`)
     }
 })
 
@@ -57,8 +46,6 @@ renderer.render(layoutJson, containerRef)
 // Add icon menus to all slots
 renderer.addIconMenusToAllSlots({
     showAddWidget: true,
-    showEditSlot: true,
-    showSlotVisibility: true,
     showClearSlot: true,
     showSlotInfo: true
 })

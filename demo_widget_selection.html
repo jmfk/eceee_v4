@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Widget Selection Modal Demo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen p-6">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-2xl font-bold mb-4">Widget Selection Modal Demo</h1>
+        
+        <div class="bg-white rounded-lg p-4 mb-4">
+            <p class="text-gray-700 mb-4">
+                Click the ••• button on any slot, then select "Add Widget" to see the widget selection modal in action.
+            </p>
+            <div class="bg-blue-50 border border-blue-200 rounded p-3">
+                <p class="text-blue-800 text-sm">
+                    <strong>Features:</strong> Search widgets, browse by category, click to select!
+                </p>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg p-4">
+            <h2 class="text-lg font-semibold mb-3">Demo Layout with Slots</h2>
+            <div id="layout-container" class="border border-gray-300 rounded p-4 min-h-64 bg-gray-50">
+                <!-- Layout will be rendered here -->
+            </div>
+        </div>
+
+        <div class="mt-4 space-x-4">
+            <button id="render-layout" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                Render Layout
+            </button>
+            <button id="show-widget-data" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+                Show Added Widgets
+            </button>
+            <button id="clear-widgets" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">
+                Clear All Widgets
+            </button>
+        </div>
+
+        <div id="widget-display" class="mt-4 bg-white rounded-lg p-4 hidden">
+            <h3 class="text-lg font-semibold mb-2">Added Widgets</h3>
+            <pre id="widget-data" class="bg-gray-100 p-3 rounded text-sm overflow-auto max-h-48"></pre>
+        </div>
+    </div>
+
+    <script type="module">
+        import LayoutRenderer from './frontend/src/components/LayoutRenderer.js';
+
+        // Create renderer instance
+        const renderer = new LayoutRenderer();
+        const targetRef = { current: document.getElementById('layout-container') };
+        
+        // Track added widgets
+        const addedWidgets = new Map(); // Map of slot name to widgets array
+
+        // Set up callbacks
+        renderer.setUICallbacks({
+            onWidgetSelected: (slotName, widgetInstance, widgetDef) => {
+                console.log(`Widget selected for slot "${slotName}":`, widgetInstance);
+                
+                // Add widget to tracking
+                if (!addedWidgets.has(slotName)) {
+                    addedWidgets.set(slotName, []);
+                }
+                addedWidgets.get(slotName).push(widgetInstance);
+                
+                // Show success message
+                showSuccessMessage(`${widgetDef.name} added to ${slotName}!`);
+                
+                // Update display
+                updateWidgetDisplay();
+                
+                // In a real app, you might update the slot with actual widget rendering:
+                // renderer.updateSlot(slotName, addedWidgets.get(slotName));
+            },
+            onSlotInfo: (slotName) => {
+                const config = renderer.getSlotConfig(slotName);
+                const widgetCount = addedWidgets.get(slotName)?.length || 0;
+                alert(`Slot Info:\nName: ${slotName}\nTitle: ${config?.title || 'N/A'}\nDescription: ${config?.description || 'N/A'}\nWidgets: ${widgetCount}`);
+            },
+            onClearSlot: (slotName) => {
+                if (confirm(`Clear all widgets from slot "${slotName}"?`)) {
+                    addedWidgets.delete(slotName);
+                    renderer.updateSlot(slotName, []);
+                    updateWidgetDisplay();
+                    showSuccessMessage(`Cleared slot: ${slotName}`);
+                }
+            },
+            onAddNewSlot: (slotData, slotNode, insertionContext) => {
+                alert(`New slot "${slotData.name}" would be added!\nCheck console for details.`);
+                console.log('New slot data:', slotData);
+            }
+        });
+
+        // Demo layout
+        const demoLayout = {
+            structure: {
+                type: 'element',
+                tag: 'div',
+                classes: 'demo-layout space-y-4',
+                children: [
+                    {
+                        type: 'element',
+                        tag: 'div',
+                        classes: 'grid grid-cols-2 gap-4',
+                        children: [
+                            {
+                                type: 'slot',
+                                tag: 'div',
+                                classes: 'bg-blue-50 border-2 border-blue-200 rounded-lg p-4 min-h-32',
+                                slot: {
+                                    name: 'hero-section',
+                                    title: 'Hero Section',
+                                    description: 'Main banner or hero content area'
+                                }
+                            },
+                            {
+                                type: 'slot',
+                                tag: 'div',
+                                classes: 'bg-green-50 border-2 border-green-200 rounded-lg p-4 min-h-32',
+                                slot: {
+                                    name: 'feature-highlight',
+                                    title: 'Feature Highlight',
+                                    description: 'Showcase key features or announcements'
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        type: 'slot',
+                        tag: 'div',
+                        classes: 'bg-yellow-50 border-2 border-yellow-200 rounded-lg p-4 min-h-24',
+                        slot: {
+                            name: 'content-area',
+                            title: 'Main Content',
+                            description: 'Primary content and articles'
+                        }
+                    },
+                    {
+                        type: 'element',
+                        tag: 'div',
+                        classes: 'grid grid-cols-3 gap-4',
+                        children: [
+                            {
+                                type: 'slot',
+                                tag: 'div',
+                                classes: 'bg-purple-50 border-2 border-purple-200 rounded-lg p-4 min-h-24',
+                                slot: {
+                                    name: 'sidebar-left',
+                                    title: 'Left Sidebar',
+                                    description: 'Navigation and quick links'
+                                }
+                            },
+                            {
+                                type: 'slot',
+                                tag: 'div',
+                                classes: 'bg-gray-50 border-2 border-gray-200 rounded-lg p-4 min-h-24',
+                                slot: {
+                                    name: 'main-column',
+                                    title: 'Main Column',
+                                    description: 'Central content area'
+                                }
+                            },
+                            {
+                                type: 'slot',
+                                tag: 'div',
+                                classes: 'bg-pink-50 border-2 border-pink-200 rounded-lg p-4 min-h-24',
+                                slot: {
+                                    name: 'sidebar-right',
+                                    title: 'Right Sidebar',
+                                    description: 'Related content and widgets'
+                                }
+                            }
+                        ]
+                    }
+                ]
+            }
+        };
+
+        // Helper functions
+        function showSuccessMessage(message) {
+            // Create temporary success notification
+            const notification = document.createElement('div');
+            notification.className = 'fixed top-4 right-4 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg z-50';
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
+        }
+
+        function updateWidgetDisplay() {
+            const display = document.getElementById('widget-display');
+            const dataElement = document.getElementById('widget-data');
+            
+            if (addedWidgets.size > 0) {
+                const data = {};
+                addedWidgets.forEach((widgets, slotName) => {
+                    data[slotName] = widgets;
+                });
+                
+                dataElement.textContent = JSON.stringify(data, null, 2);
+                display.classList.remove('hidden');
+            } else {
+                display.classList.add('hidden');
+            }
+        }
+
+        // Button handlers
+        document.getElementById('render-layout').addEventListener('click', () => {
+            renderer.render(demoLayout, targetRef);
+            console.log('Layout rendered with automatic slot menus');
+        });
+
+        document.getElementById('show-widget-data').addEventListener('click', () => {
+            updateWidgetDisplay();
+            if (addedWidgets.size === 0) {
+                alert('No widgets added yet! Click ••• on any slot and select "Add Widget".');
+            }
+        });
+
+        document.getElementById('clear-widgets').addEventListener('click', () => {
+            if (confirm('Clear all added widgets?')) {
+                addedWidgets.clear();
+                updateWidgetDisplay();
+                // Re-render to clear slot contents
+                renderer.render(demoLayout, targetRef);
+                showSuccessMessage('All widgets cleared!');
+            }
+        });
+
+        // Auto-render layout on page load
+        setTimeout(() => {
+            renderer.render(demoLayout, targetRef);
+        }, 500);
+
+        // Make renderer available for debugging
+        window.layoutRenderer = renderer;
+        window.addedWidgets = addedWidgets;
+    </script>
+</body>
+</html> 

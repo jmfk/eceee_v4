@@ -18,14 +18,15 @@ class LayoutRenderer {
     this.uiConfig = { // Default UI configuration
       showIconMenu: true,  // Enable icon menus by default
       showAddWidget: true,
-      showEditSlot: true,
-      showSlotVisibility: true,
+      showEditSlot: false,      // Disabled - removed from menu
+      showSlotVisibility: false, // Disabled - removed from menu
       enableDragDrop: false,
       enableContextMenu: false,
       enableAddSlotUI: false
     };
     this.uiCallbacks = new Map(); // Map of UI event callbacks
     this.dragState = { isDragging: false, draggedElement: null, sourceSlot: null };
+    this.customWidgets = null; // Custom widget definitions (if any)
   }
 
   /**
@@ -118,8 +119,6 @@ class LayoutRenderer {
         setTimeout(() => {
           this.addIconMenusToAllSlots({
             showAddWidget: this.uiConfig.showAddWidget,
-            showEditSlot: this.uiConfig.showEditSlot,
-            showSlotVisibility: this.uiConfig.showSlotVisibility,
             showSlotInfo: true,
             showClearSlot: true
           });
@@ -503,18 +502,7 @@ class LayoutRenderer {
                <circle cx="8" cy="8" r="1.5"/>
                <circle cx="13" cy="8" r="1.5"/>
              </svg>`,
-      edit: `<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-               <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708L4.5 15.207l-3.5.5.5-3.5L12.146.146zM11.207 2L2 11.207l-.25 1.75 1.75-.25L13.207 3 11.207 2z"/>
-             </svg>`,
-      eye: `<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-              <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13.133 13.133 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.133 13.133 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5c-2.12 0-3.879-1.168-5.168-2.457A13.134 13.134 0 0 1 1.172 8z"/>
-              <path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0z"/>
-            </svg>`,
-      eyeSlash: `<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                   <path d="M13.359 11.238C15.06 9.72 16 8 16 8s-3-5.5-8-5.5a7.028 7.028 0 0 0-2.79.588l.77.771A5.944 5.944 0 0 1 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.134 13.134 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755-.165.165-.337.328-.517.486l.708.709z"/>
-                   <path d="M11.297 9.176a3.5 3.5 0 0 0-4.474-4.474l.823.823a2.5 2.5 0 0 1 2.829 2.829l.822.822zm-2.943 1.299.822.822a3.5 3.5 0 0 1-4.474-4.474l.823.823a2.5 2.5 0 0 0 2.829 2.829z"/>
-                   <path d="M3.35 5.47c-.18.16-.353.322-.518.487A13.134 13.134 0 0 0 1.172 8l.195.288c.335.48.83 1.12 1.465 1.755C4.121 11.332 5.881 12.5 8 12.5c.716 0 1.39-.133 2.02-.36l.77.772A7.029 7.029 0 0 1 8 13.5C3 13.5 0 8 0 8s.939-1.721 2.641-3.238l.708.708zm10.296 8.884-12-12 .708-.708 12 12-.708.708z"/>
-                 </svg>`,
+
       trash: `<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                 <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
                 <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
@@ -588,29 +576,8 @@ class LayoutRenderer {
       items.push({
         icon: 'svg:plus',
         label: 'Add Widget',
-        action: () => this.executeCallback('onAddWidget', slotName),
+        action: () => this.showWidgetSelectionModal(slotName),
         className: 'text-green-700 hover:bg-green-50'
-      });
-    }
-
-    // Edit Slot item
-    if (this.uiConfig.showEditSlot || options.showEditSlot) {
-      items.push({
-        icon: 'svg:edit',
-        label: 'Edit Slot',
-        action: () => this.executeCallback('onEditSlot', slotName),
-        className: 'text-blue-700 hover:bg-blue-50'
-      });
-    }
-
-    // Toggle Visibility item
-    if (this.uiConfig.showSlotVisibility || options.showSlotVisibility) {
-      const isVisible = this.isSlotVisible(slotName);
-      items.push({
-        icon: isVisible ? 'svg:eye' : 'svg:eyeSlash',
-        label: isVisible ? 'Hide Slot' : 'Show Slot',
-        action: () => this.toggleSlotVisibility(slotName),
-        className: 'text-gray-700 hover:bg-gray-50'
       });
     }
 
@@ -665,63 +632,7 @@ class LayoutRenderer {
     }
   }
 
-  /**
-   * Check if slot is visible
-   * @param {string} slotName - Name of the slot
-   * @returns {boolean} True if visible
-   */
-  isSlotVisible(slotName) {
-    const slotElement = this.slotContainers.get(slotName);
-    return slotElement && slotElement.style.display !== 'none';
-  }
 
-  /**
-   * Toggle slot visibility
-   * @param {string} slotName - Name of the slot
-   */
-  toggleSlotVisibility(slotName) {
-    const slotElement = this.slotContainers.get(slotName);
-    if (slotElement) {
-      const isVisible = this.isSlotVisible(slotName);
-      slotElement.style.display = isVisible ? 'none' : 'block';
-      slotElement.style.opacity = isVisible ? '0.5' : '1';
-
-      // Update menu if open
-      this.updateVisibilityMenuItem(slotName);
-
-      // Execute callback
-      this.executeCallback('onToggleVisibility', slotName, !isVisible);
-    }
-  }
-
-  /**
-   * Update visibility menu item
-   * @param {string} slotName - Name of the slot
-   */
-  updateVisibilityMenuItem(slotName) {
-    const dropdown = document.querySelector(`[data-menu-dropdown="${slotName}"]`);
-    if (dropdown) {
-      const visibilityItem = Array.from(dropdown.children).find(item =>
-        item.textContent && (item.textContent.includes('Hide Slot') || item.textContent.includes('Show Slot'))
-      );
-
-      if (visibilityItem) {
-        const isVisible = this.isSlotVisible(slotName);
-        const iconSpan = visibilityItem.querySelector('span:first-child');
-        const labelSpan = visibilityItem.querySelector('span:last-child');
-
-        if (iconSpan && labelSpan) {
-          const newIconType = isVisible ? 'svg:eye' : 'svg:eyeSlash';
-          if (newIconType.startsWith('svg:')) {
-            iconSpan.innerHTML = this.createSVGIcon(newIconType.replace('svg:', ''));
-          } else {
-            iconSpan.innerHTML = `<span style="font-family: Arial, sans-serif; font-weight: bold;">${newIconType}</span>`;
-          }
-          labelSpan.textContent = isVisible ? 'Hide Slot' : 'Show Slot';
-        }
-      }
-    }
-  }
 
   /**
    * Add click outside listener for menu
@@ -807,16 +718,12 @@ class LayoutRenderer {
   enableSlotMenus(options = {}) {
     this.setUIConfig({
       showIconMenu: true,
-      showAddWidget: options.showAddWidget !== false,
-      showEditSlot: options.showEditSlot !== false,
-      showSlotVisibility: options.showSlotVisibility !== false
+      showAddWidget: options.showAddWidget !== false
     });
 
     // Add menus to existing slots
     this.addIconMenusToAllSlots({
       showAddWidget: this.uiConfig.showAddWidget,
-      showEditSlot: this.uiConfig.showEditSlot,
-      showSlotVisibility: this.uiConfig.showSlotVisibility,
       showSlotInfo: true,
       showClearSlot: true,
       ...options
@@ -829,13 +736,322 @@ class LayoutRenderer {
   disableSlotMenus() {
     this.setUIConfig({
       showIconMenu: false,
-      showAddWidget: false,
-      showEditSlot: false,
-      showSlotVisibility: false
+      showAddWidget: false
     });
 
     // Remove existing menus
     this.removeAllSlotUI();
+  }
+
+  // Widget Selection Modal Methods
+
+  /**
+   * Show widget selection modal for a specific slot
+   * @param {string} slotName - Name of the slot to add widget to
+   * @param {Object} options - Modal configuration options
+   */
+  showWidgetSelectionModal(slotName, options = {}) {
+    // Remove existing widget modal
+    const existingModal = document.querySelector('.widget-selection-modal');
+    if (existingModal) {
+      existingModal.remove();
+    }
+
+    // Create modal overlay
+    const overlay = document.createElement('div');
+    overlay.className = 'widget-selection-modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+
+    // Create modal content
+    const modal = document.createElement('div');
+    modal.className = 'bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-90vh overflow-hidden';
+
+    // Get available widgets
+    const availableWidgets = this.getAvailableWidgets();
+    const slotConfig = this.getSlotConfig(slotName);
+
+    modal.innerHTML = `
+      <div class="p-6">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h3 class="text-lg font-semibold text-gray-900">Add Widget to Slot</h3>
+            <p class="text-sm text-gray-600">${slotConfig?.title || slotName}</p>
+          </div>
+          <button class="widget-modal-close text-gray-400 hover:text-gray-600 transition-colors">
+            <span class="text-xl">×</span>
+          </button>
+        </div>
+        
+        <div class="mb-4">
+          <input type="text" placeholder="Search widgets..." 
+                 class="widget-search w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        
+        <div class="widget-grid grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto">
+          ${availableWidgets.map(widget => this.createWidgetCard(widget)).join('')}
+        </div>
+        
+        <div class="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-200">
+          <button class="widget-modal-cancel px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors">
+            Cancel
+          </button>
+        </div>
+      </div>
+    `;
+
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+
+    // Set up modal event handlers
+    this.setupWidgetModalHandlers(overlay, slotName);
+
+    // Track for cleanup
+    this.slotUIElements.set('widget-selection-modal', overlay);
+  }
+
+  /**
+   * Set custom widget definitions
+   * @param {Array} widgets - Array of widget definitions
+   */
+  setAvailableWidgets(widgets) {
+    this.customWidgets = widgets;
+  }
+
+  /**
+   * Get available widgets for selection
+   * @returns {Array} Array of widget definitions
+   */
+  getAvailableWidgets() {
+    // Return custom widgets if set, otherwise return default widgets
+    if (this.customWidgets && Array.isArray(this.customWidgets)) {
+      return this.customWidgets;
+    }
+
+    return [
+      {
+        type: 'text',
+        name: 'Text Block',
+        description: 'Simple text content with formatting options',
+        icon: 'T',
+        category: 'content',
+        config: {
+          content: 'Enter your text here...',
+          fontSize: 'medium',
+          alignment: 'left'
+        }
+      },
+      {
+        type: 'image',
+        name: 'Image',
+        description: 'Display images with captions and links',
+        icon: '🖼',
+        category: 'media',
+        config: {
+          src: '',
+          alt: '',
+          caption: '',
+          width: '100%'
+        }
+      },
+      {
+        type: 'button',
+        name: 'Button',
+        description: 'Interactive button with customizable styling',
+        icon: '◯',
+        category: 'interactive',
+        config: {
+          text: 'Click me',
+          style: 'primary',
+          size: 'medium',
+          action: 'link'
+        }
+      },
+      {
+        type: 'card',
+        name: 'Card',
+        description: 'Content card with title, text, and optional image',
+        icon: '📄',
+        category: 'layout',
+        config: {
+          title: 'Card Title',
+          content: 'Card description goes here...',
+          imageUrl: '',
+          showButton: false
+        }
+      },
+      {
+        type: 'list',
+        name: 'List',
+        description: 'Ordered or unordered list of items',
+        icon: '≡',
+        category: 'content',
+        config: {
+          items: ['Item 1', 'Item 2', 'Item 3'],
+          type: 'unordered',
+          style: 'default'
+        }
+      },
+      {
+        type: 'spacer',
+        name: 'Spacer',
+        description: 'Add spacing between content elements',
+        icon: '↕',
+        category: 'layout',
+        config: {
+          height: 'medium',
+          backgroundColor: 'transparent'
+        }
+      },
+      {
+        type: 'divider',
+        name: 'Divider',
+        description: 'Horizontal line to separate content sections',
+        icon: '—',
+        category: 'layout',
+        config: {
+          style: 'solid',
+          color: 'gray',
+          thickness: 'thin'
+        }
+      },
+      {
+        type: 'video',
+        name: 'Video',
+        description: 'Embed videos from various sources',
+        icon: '▶',
+        category: 'media',
+        config: {
+          src: '',
+          autoplay: false,
+          controls: true,
+          poster: ''
+        }
+      }
+    ];
+  }
+
+  /**
+   * Create widget card HTML for the selection grid
+   * @param {Object} widget - Widget definition
+   * @returns {string} HTML string for widget card
+   */
+  createWidgetCard(widget) {
+    return `
+      <div class="widget-card border border-gray-200 rounded-lg p-4 cursor-pointer hover:border-blue-300 hover:bg-blue-50 transition-all duration-200"
+           data-widget-type="${widget.type}">
+        <div class="flex items-start space-x-3">
+          <div class="widget-icon bg-gray-100 rounded-lg w-12 h-12 flex items-center justify-center text-xl font-bold text-gray-600">
+            ${this.escapeHtml(widget.icon)}
+          </div>
+          <div class="flex-1 min-w-0">
+            <h4 class="text-sm font-semibold text-gray-900 mb-1">${this.escapeHtml(widget.name)}</h4>
+            <p class="text-xs text-gray-600 leading-relaxed">${this.escapeHtml(widget.description)}</p>
+            <div class="mt-2">
+              <span class="inline-block px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded-full">
+                ${this.escapeHtml(widget.category)}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  /**
+   * Setup event handlers for widget selection modal
+   * @param {HTMLElement} overlay - Modal overlay element
+   * @param {string} slotName - Target slot name
+   */
+  setupWidgetModalHandlers(overlay, slotName) {
+    const closeButton = overlay.querySelector('.widget-modal-close');
+    const cancelButton = overlay.querySelector('.widget-modal-cancel');
+    const searchInput = overlay.querySelector('.widget-search');
+    const widgetCards = overlay.querySelectorAll('.widget-card');
+
+    // Close handlers
+    const closeModal = () => {
+      overlay.remove();
+      this.slotUIElements.delete('widget-selection-modal');
+    };
+
+    closeButton.addEventListener('click', closeModal);
+    cancelButton.addEventListener('click', closeModal);
+
+    // Click outside to close
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) {
+        closeModal();
+      }
+    });
+
+    // Search functionality
+    searchInput.addEventListener('input', (e) => {
+      const searchTerm = e.target.value.toLowerCase();
+      widgetCards.forEach(card => {
+        const widgetType = card.dataset.widgetType;
+        const widgetName = card.querySelector('h4').textContent.toLowerCase();
+        const widgetDesc = card.querySelector('p').textContent.toLowerCase();
+
+        const matches = widgetName.includes(searchTerm) ||
+          widgetDesc.includes(searchTerm) ||
+          widgetType.includes(searchTerm);
+
+        card.style.display = matches ? 'block' : 'none';
+      });
+    });
+
+    // Widget selection handlers
+    widgetCards.forEach(card => {
+      card.addEventListener('click', () => {
+        const widgetType = card.dataset.widgetType;
+        this.handleWidgetSelection(widgetType, slotName, closeModal);
+      });
+    });
+  }
+
+  /**
+   * Handle widget selection and add to slot
+   * @param {string} widgetType - Type of widget selected
+   * @param {string} slotName - Target slot name
+   * @param {Function} closeModal - Function to close the modal
+   */
+  handleWidgetSelection(widgetType, slotName, closeModal) {
+    try {
+      // Find widget definition
+      const availableWidgets = this.getAvailableWidgets();
+      const widgetDef = availableWidgets.find(w => w.type === widgetType);
+
+      if (!widgetDef) {
+        throw new Error(`Widget type "${widgetType}" not found`);
+      }
+
+      // Create widget instance with default config
+      const widgetInstance = {
+        id: this.generateWidgetId(),
+        type: widgetDef.type,
+        name: widgetDef.name,
+        config: { ...widgetDef.config }
+      };
+
+      // Execute callback for widget addition
+      this.executeCallback('onWidgetSelected', slotName, widgetInstance, widgetDef);
+
+      // Close modal
+      closeModal();
+
+      console.log(`LayoutRenderer: Widget "${widgetDef.name}" selected for slot "${slotName}"`);
+
+    } catch (error) {
+      console.error('LayoutRenderer: Error handling widget selection', error);
+      alert(`Error adding widget: ${error.message}`);
+    }
+  }
+
+  /**
+   * Generate unique widget ID
+   * @returns {string} Unique widget identifier
+   */
+  generateWidgetId() {
+    return `widget-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }
 
   // New Slot Creation UI Methods
@@ -1431,8 +1647,6 @@ class LayoutRenderer {
         setTimeout(() => {
           this.addSlotIconMenu(slotName, {
             showAddWidget: this.uiConfig.showAddWidget,
-            showEditSlot: this.uiConfig.showEditSlot,
-            showSlotVisibility: this.uiConfig.showSlotVisibility,
             showSlotInfo: true,
             showClearSlot: true
           });
