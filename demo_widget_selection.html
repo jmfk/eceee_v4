@@ -24,9 +24,14 @@
                     <strong>Widget Selection:</strong> Click ••• on any slot → "Add Widget" → Search, browse by category, click to select!
                 </p>
             </div>
-            <div class="bg-purple-50 border border-purple-200 rounded p-3">
+            <div class="bg-purple-50 border border-purple-200 rounded p-3 mb-3">
                 <p class="text-purple-800 text-sm">
                     <strong>Save/Load:</strong> "Save Page" captures all widget data. "Load Saved Page" restores it. "Reset" clears everything for a fresh start!
+                </p>
+            </div>
+            <div class="bg-orange-50 border border-orange-200 rounded p-3">
+                <p class="text-orange-800 text-sm">
+                    <strong>Auto-Save:</strong> Page automatically saves 2 seconds after any change (add/delete/edit widgets). Watch the status indicators!
                 </p>
             </div>
         </div>
@@ -60,7 +65,15 @@
             <button id="reset-page" class="px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700">
                 Reset to New Page
             </button>
+            <button id="toggle-autosave" class="px-4 py-2 bg-teal-600 text-white rounded hover:bg-teal-700">
+                Disable Auto-Save
+            </button>
+        </div>
+        
+        <div class="mt-4 flex items-center space-x-4">
             <span id="page-status" class="px-3 py-1 bg-gray-100 text-gray-700 rounded text-sm"></span>
+            <span id="dirty-status" class="px-3 py-1 bg-gray-100 text-gray-700 rounded text-sm hidden"></span>
+            <span id="autosave-status" class="px-3 py-1 bg-gray-100 text-gray-700 rounded text-sm hidden"></span>
         </div>
 
         <div id="widget-summary" class="mt-4 bg-white rounded-lg p-4 hidden">
@@ -109,9 +122,28 @@
                 // Update display
                 updateSavedDataDisplay(widgetData);
             },
+            onDirtyStateChanged: (isDirty, reason) => {
+                console.log(`Page dirty state changed: ${isDirty} (${reason})`);
+                updateDirtyStatus(isDirty, reason);
+            },
+            onAutoSave: (widgetData) => {
+                console.log('Auto-save completed:', widgetData);
+                showAutoSaveStatus('Auto-saved successfully!', 'success');
+                
+                // Save to localStorage in auto-save as well
+                localStorage.setItem('demo-page-widgets', JSON.stringify(widgetData));
+                updateSavedDataDisplay(widgetData);
+            },
+            onAutoSaveError: (error) => {
+                console.error('Auto-save failed:', error);
+                showAutoSaveStatus('Auto-save failed!', 'error');
+            },
             onEditWidget: (widgetId, widgetInstance) => {
                 alert(`Edit widget "${widgetInstance.name}" (${widgetId})\n\nThis would open a widget configuration dialog.`);
                 console.log('Edit widget:', widgetInstance);
+                
+                // Mark widget as edited (this will trigger auto-save)
+                renderer.markWidgetAsEdited(widgetId, widgetInstance);
             },
             onSlotInfo: (slotName) => {
                 const config = renderer.getSlotConfig(slotName);
@@ -352,6 +384,41 @@
             return savedData && savedData !== 'null' && savedData !== '{}';
         }
 
+        function updateDirtyStatus(isDirty, reason) {
+            const statusElement = document.getElementById('dirty-status');
+            
+            if (isDirty) {
+                statusElement.textContent = 'UNSAVED CHANGES';
+                statusElement.className = 'px-3 py-1 bg-yellow-100 text-yellow-700 rounded text-sm';
+                statusElement.classList.remove('hidden');
+            } else {
+                statusElement.classList.add('hidden');
+            }
+            
+            updatePageStatus(); // Update main status as well
+        }
+
+        function showAutoSaveStatus(message, type = 'info') {
+            const statusElement = document.getElementById('autosave-status');
+            
+            statusElement.textContent = message;
+            
+            if (type === 'success') {
+                statusElement.className = 'px-3 py-1 bg-green-100 text-green-700 rounded text-sm';
+            } else if (type === 'error') {
+                statusElement.className = 'px-3 py-1 bg-red-100 text-red-700 rounded text-sm';
+            } else {
+                statusElement.className = 'px-3 py-1 bg-blue-100 text-blue-700 rounded text-sm';
+            }
+            
+            statusElement.classList.remove('hidden');
+            
+            // Auto-hide after 3 seconds
+            setTimeout(() => {
+                statusElement.classList.add('hidden');
+            }, 3000);
+        }
+
         // Button handlers
         document.getElementById('render-layout').addEventListener('click', () => {
             renderer.render(demoLayout, targetRef);
@@ -446,6 +513,23 @@
             } else {
                 content.classList.add('hidden');
                 button.textContent = 'Show Details';
+            }
+        });
+
+        document.getElementById('toggle-autosave').addEventListener('click', () => {
+            const button = document.getElementById('toggle-autosave');
+            const currentlyEnabled = renderer.autoSaveEnabled;
+            
+            if (currentlyEnabled) {
+                renderer.setAutoSaveConfig({ enabled: false });
+                button.textContent = 'Enable Auto-Save';
+                button.className = 'px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700';
+                showAutoSaveStatus('Auto-save disabled', 'info');
+            } else {
+                renderer.setAutoSaveConfig({ enabled: true, delay: 2000 });
+                button.textContent = 'Disable Auto-Save';
+                button.className = 'px-4 py-2 bg-teal-600 text-white rounded hover:bg-teal-700';
+                showAutoSaveStatus('Auto-save enabled (2s delay)', 'success');
             }
         });
 

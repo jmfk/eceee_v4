@@ -304,6 +304,81 @@ The LayoutRenderer follows this priority when rendering slots:
 ### Configuration Extraction
 The system automatically extracts widget configurations from rendered DOM elements, supporting all built-in widget types with proper state preservation.
 
+## Auto-Save & Dirty State Tracking
+
+The LayoutRenderer automatically tracks changes and can save the page state when modifications occur:
+
+### Dirty State Detection
+The system automatically marks the page as "dirty" (needing save) when:
+- **Widget Added**: New widget added to any slot
+- **Widget Deleted**: Widget removed from any slot  
+- **Widget Edited**: Widget configuration modified
+- **Default Widgets Auto-Created**: Default widgets converted to instances
+
+### Auto-Save Configuration
+```javascript
+// Configure auto-save behavior
+renderer.setAutoSaveConfig({
+  enabled: true,    // Enable/disable auto-save
+  delay: 2000      // Delay in milliseconds (default: 2000ms)
+});
+
+// Check dirty state
+const isDirty = renderer.isDirtyState();
+
+// Manually mark as dirty (triggers auto-save)
+renderer.markAsDirty('custom reason');
+
+// Mark widget as edited (triggers auto-save)
+renderer.markWidgetAsEdited(widgetId, widgetInstance);
+```
+
+### Auto-Save Callbacks
+```javascript
+renderer.setUICallbacks({
+  onDirtyStateChanged: (isDirty, reason) => {
+    console.log(`Page ${isDirty ? 'needs saving' : 'is clean'}: ${reason}`);
+    
+    // Update UI to show unsaved changes indicator
+    updateUnsavedChangesIndicator(isDirty);
+  },
+  
+  onAutoSave: (widgetData) => {
+    console.log('Auto-save completed:', widgetData);
+    
+    // Send to API
+    fetch('/api/pages/123/widgets', {
+      method: 'POST',
+      body: JSON.stringify(widgetData)
+    });
+  },
+  
+  onAutoSaveError: (error) => {
+    console.error('Auto-save failed:', error);
+    
+    // Show error to user
+    showErrorMessage('Failed to auto-save changes');
+  }
+});
+```
+
+### Auto-Save Behavior
+1. **Change Detection**: System detects widget add/delete/edit operations
+2. **Mark Dirty**: Page marked as dirty with descriptive reason
+3. **Debounced Save**: Auto-save triggered after configured delay (default 2s)
+4. **Collect Data**: All current widget states collected from DOM
+5. **Execute Save**: `onAutoSave` callback executed with widget data
+6. **Mark Clean**: Page marked as clean after successful save
+
+### Manual Save Integration
+```javascript
+// Manual save (also marks clean and cancels pending auto-save)
+const widgetData = renderer.saveCurrentWidgetState();
+
+// Reset to clean state (for new pages)
+renderer.resetPageSavedState();
+```
+
 ## Available Widget Types
 
 The widget selection modal includes these built-in widget types:
