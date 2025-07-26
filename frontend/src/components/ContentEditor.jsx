@@ -148,16 +148,98 @@ const ContentEditor = ({
   const cleanupEventListeners = useCallback(() => {
     eventListenersRef.current.forEach((cleanup, element) => {
       if (typeof cleanup === 'function') {
-        try {
-          cleanup();
-        } catch (error) {
-          console.warn('ContentEditor: Error during event listener cleanup', error);
-        }
+        cleanup();
       }
     });
     eventListenersRef.current.clear();
-    slotInteractivitySetupRef.current = false;
   }, []);
+
+  // Setup slot interactivity
+  const setupSlotInteractivity = useCallback(() => {
+    if (!containerRef.current) return;
+
+    const slotElements = containerRef.current.querySelectorAll('[data-slot-name]');
+
+    slotElements.forEach(slotElement => {
+      const slotName = slotElement.getAttribute('data-slot-name');
+
+      // Add visual feedback classes
+      slotElement.classList.add('slot-editable');
+
+      // Create click handler
+      const handleSlotClick = (e) => {
+        e.stopPropagation();
+        setSelectedSlot(slotName);
+
+        // Call external slot click handler if provided
+        if (onSlotClick) {
+          onSlotClick(slotName, slotElement);
+        }
+
+        // Add visual selection indicator
+        const previousSelected = document.querySelectorAll('.slot-selected');
+        previousSelected.forEach(el => {
+          el.classList.remove('slot-selected');
+        });
+        slotElement.classList.add('slot-selected');
+      };
+
+      // Add tracked event listener
+      addTrackedEventListener(slotElement, 'click', handleSlotClick);
+    });
+  }, [onSlotClick, addTrackedEventListener]);
+
+  // Utility to handle fixed positioned elements within the layout container
+  const handleFixedPositioning = useCallback(() => {
+    if (!containerRef.current) return;
+
+    // Find all fixed positioned elements within the container
+    const fixedElements = containerRef.current.querySelectorAll('*');
+
+    fixedElements.forEach(element => {
+      const computedStyle = window.getComputedStyle(element);
+
+      if (computedStyle.position === 'fixed') {
+        // Add a class to identify converted elements
+        element.classList.add('fixed-contained');
+
+        // Convert fixed positioning to absolute within the containing block
+        element.style.position = 'absolute';
+
+        // Ensure the element stays within bounds
+        element.style.maxWidth = '100%';
+        element.style.maxHeight = '100%';
+
+        // Log for debugging (can be removed in production)
+        console.log('ContentEditor: Converted fixed positioned element to absolute within container', element);
+      }
+    });
+  }, []);
+
+  // Setup function to handle layout interactivity and positioning
+  const setupLayoutInteractivity = useCallback(() => {
+    if (!containerRef.current || !editable) return;
+
+    const timeout = setTimeout(() => {
+      try {
+        // Handle fixed positioning conversion
+        handleFixedPositioning();
+
+        // Setup slot interactivity
+        setupSlotInteractivity();
+
+        // Mark interactivity as set up
+        slotInteractivitySetupRef.current = true;
+      } catch (error) {
+        console.error('ContentEditor: Error setting up layout interactivity', error);
+        setError('Failed to setup layout interactivity');
+      }
+    }, 100);
+
+    return () => {
+      clearTimeout(timeout);
+    };
+  }, [editable, handleFixedPositioning, setupSlotInteractivity]);
 
   // Add tracked event listener
   const addTrackedEventListener = useCallback((element, event, handler, options = {}) => {
@@ -265,53 +347,14 @@ const ContentEditor = ({
     };
   }, []);
 
-  // Set up interactivity for slots in edit mode with proper cleanup
+  // Set up layout interactivity (slots and positioning) in edit mode with proper cleanup
   useEffect(() => {
     if (!containerRef.current || !editable || slotInteractivitySetupRef.current) {
       return;
     }
 
-    const setupInteractivity = () => {
-      const slotElements = containerRef.current.querySelectorAll('[data-slot-name]');
-
-      slotElements.forEach(slotElement => {
-        const slotName = slotElement.getAttribute('data-slot-name');
-
-        // Add visual feedback classes
-        slotElement.classList.add('slot-editable');
-
-        // Create click handler
-        const handleSlotClick = (e) => {
-          e.stopPropagation();
-          setSelectedSlot(slotName);
-
-          // Call external slot click handler if provided
-          if (onSlotClick) {
-            onSlotClick(slotName, slotElement);
-          }
-
-          // Add visual selection indicator
-          const previousSelected = document.querySelectorAll('.slot-selected');
-          previousSelected.forEach(el => {
-            el.classList.remove('slot-selected');
-          });
-          slotElement.classList.add('slot-selected');
-        };
-
-        // Add tracked event listener
-        addTrackedEventListener(slotElement, 'click', handleSlotClick);
-      });
-
-      slotInteractivitySetupRef.current = true;
-    };
-
-    // Set up interactivity after DOM is ready
-    const timeoutId = setTimeout(setupInteractivity, 100);
-
-    return () => {
-      clearTimeout(timeoutId);
-    };
-  }, [editable, onSlotClick, addTrackedEventListener]);
+    return setupLayoutInteractivity();
+  }, [editable, setupLayoutInteractivity]);
 
 
 
@@ -401,9 +444,13 @@ const ContentEditor = ({
 
       <div
         ref={containerRef}
-        className={`layout-container ${editable ? 'editable' : ''}`}
+        className={`layout-container layout-containment ${editable ? 'editable' : ''}`}
         style={{
-          minHeight: '400px'
+          minHeight: '400px',
+          // Additional styling for visual boundaries
+          border: '1px solid rgba(0, 0, 0, 0.1)',
+          borderRadius: '8px',
+          backgroundColor: 'white'
         }}
       />
 

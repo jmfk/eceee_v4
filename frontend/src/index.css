@@ -63,6 +63,64 @@
   .nav-link-active {
     @apply text-blue-600 font-semibold;
   }
+
+  /* Layout Containment Utilities */
+  /* Container that constrains absolutely and fixed positioned children */
+  .layout-containment {
+    /* CSS Containment Level 2 - constrains layout, style, and paint */
+    contain: layout style paint;
+    
+    /* Create a new containing block for absolutely positioned elements */
+    position: relative;
+    
+    /* Create a new stacking context to isolate z-index values */
+    isolation: isolate;
+    
+    /* Transform creates a containing block for fixed positioned elements */
+    transform: translateZ(0);
+    
+    /* Ensure content doesn't overflow the container */
+    overflow: hidden auto;
+  }
+  
+  /* Alternative containment for when you need scrolling */
+  .layout-containment-scroll {
+    contain: layout style;
+    position: relative;
+    isolation: isolate;
+    transform: translateZ(0);
+    overflow: auto;
+  }
+  
+  /* Containment for layout templates that need full viewport behavior but contained */
+  .template-viewport-contained {
+    /* Create a new viewport context */
+    contain: layout style paint;
+    position: relative;
+    isolation: isolate;
+    transform: translateZ(0);
+    
+    /* Full height within container */
+    min-height: 100%;
+    height: auto;
+    
+    /* Allow internal scrolling */
+    overflow: auto;
+  }
+  
+  /* Fix for fixed positioned elements within contained layouts */
+  .layout-containment .fixed-contained {
+    /* Convert fixed to absolute within the containing block */
+    position: absolute !important;
+  }
+  
+  /* Helper for absolutely positioned elements to stay within bounds */
+  .absolute-contained {
+    position: absolute;
+    /* Ensure they don't go outside the container */
+    max-width: 100%;
+    max-height: 100%;
+  }
 }
 
 @layer utilities {
