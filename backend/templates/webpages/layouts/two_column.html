@@ -1,0 +1,65 @@
+<!-- templates/webpages/layouts/two_column.html -->
+{% extends "base.html" %}
+{% load webpages_tags %}
+
+{% block content %}
+<div class="min-h-screen bg-white">
+  <div class="max-w-6xl mx-auto px-4 py-8">
+    <!-- Grid container with 2 columns -->
+    <div class="grid grid-cols-2 gap-8">
+      
+      <!-- Header spanning both columns -->
+      <header class="col-span-2 bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-4"
+              data-widget-slot="header"
+              data-slot-title="Header"
+              data-slot-description="Page header spanning both columns"
+              data-slot-max-widgets="2">
+        {# default:[
+           {"type": "text", "config": {"content": "<h1>Welcome to Your Site</h1><p>Header content area for branding and navigation.</p>", "format": "html"}}
+        ] #}
+        {% render_slot "header" %}
+      </header>
+      
+      <!-- Main content column -->
+      <main class="col-span-1 bg-white rounded-lg shadow-sm border border-gray-200 p-8"
+            data-widget-slot="main"
+            data-slot-title="Main Content"
+            data-slot-description="Primary content column"
+            data-slot-max-widgets="">
+        {# default:[
+           {"type": "text", "config": {"content": "<h2>Main Content Area</h2><p>This is the primary content area. Add widgets to customize this space with articles, images, and other content.</p>", "format": "html"}},
+           {"type": "image", "config": {"url": "/static/images/placeholder.jpg", "alt": "Placeholder image", "caption": "Example image widget"}}
+        ] #}
+        {% render_slot "main" %}
+      </main>
+      
+      <!-- Sidebar column -->
+      <aside class="col-span-1 bg-gray-50 rounded-lg border border-gray-200 p-6"
+             data-widget-slot="sidebar"
+             data-slot-title="Sidebar"
+             data-slot-description="Secondary content sidebar"
+             data-slot-max-widgets="5">
+        {# default:[
+           {"type": "text", "config": {"content": "<h3>Sidebar</h3><p>Complementary content and widgets.</p>", "format": "html"}},
+           {"type": "recent_posts", "config": {"count": 3, "show_excerpt": true}},
+           {"type": "social_media", "config": {"platforms": ["twitter", "facebook"]}}
+        ] #}
+        {% render_slot "sidebar" %}
+      </aside>
+      
+      <!-- Footer spanning both columns -->
+      <footer class="col-span-2 bg-gray-100 rounded-lg border border-gray-200 p-6 mt-4"
+              data-widget-slot="footer"
+              data-slot-title="Footer"
+              data-slot-description="Page footer spanning both columns"
+              data-slot-max-widgets="2">
+        {# default:[
+           {"type": "text", "config": {"content": "<p>&copy; 2024 Your Website. All rights reserved.</p>", "format": "html"}}
+        ] #}
+        {% render_slot "footer" %}
+      </footer>
+      
+    </div>
+  </div>
+</div>
+{% endblock %} 
