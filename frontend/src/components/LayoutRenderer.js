@@ -30,6 +30,10 @@ class LayoutRenderer {
     this.pageHasBeenSaved = false; // Track if page/layout has been saved
     this.defaultWidgetsProcessed = false; // Track if defaults have been processed
     this.savedWidgetData = new Map(); // Map of slot names to saved widget arrays
+    this.isDirty = false; // Track if page has unsaved changes
+    this.autoSaveEnabled = true; // Enable automatic saving
+    this.autoSaveDelay = 2000; // Auto-save delay in milliseconds (2 seconds)
+    this.autoSaveTimeoutId = null; // Timeout ID for pending auto-save
   }
 
   /**
@@ -108,6 +112,9 @@ class LayoutRenderer {
 
       // Reset default widget processing for new layout
       this.defaultWidgetsProcessed = false;
+
+      // Reset dirty state for new layout render
+      this.markAsClean();
 
       // Render the layout structure
       const rootElement = this.renderNode(layout.structure || layout);
@@ -288,6 +295,12 @@ class LayoutRenderer {
       // Clean up UI elements first
       this.removeAllSlotUI();
 
+      // Cancel pending auto-save
+      if (this.autoSaveTimeoutId) {
+        clearTimeout(this.autoSaveTimeoutId);
+        this.autoSaveTimeoutId = null;
+      }
+
       // Clean up event listeners
       this.eventListeners.forEach((cleanup) => {
         if (typeof cleanup === 'function') {
@@ -301,6 +314,7 @@ class LayoutRenderer {
       this.eventListeners.clear();
       this.slotUIElements.clear();
       this.uiCallbacks.clear();
+      this.savedWidgetData.clear();
 
       // Reset references
       this.widgetRenderer = null;
@@ -848,6 +862,7 @@ class LayoutRenderer {
     this.pageHasBeenSaved = false;
     this.defaultWidgetsProcessed = false;
     this.savedWidgetData.clear();
+    this.markAsClean(); // Reset dirty state
     console.log('LayoutRenderer: Page state reset - default widgets will be auto-created');
   }
 
@@ -1071,12 +1086,15 @@ class LayoutRenderer {
   }
 
   /**
-   * Save current widget state from all rendered slots
-   * @returns {Object} The collected and saved widget data
-   */
+ * Save current widget state from all rendered slots
+ * @returns {Object} The collected and saved widget data
+ */
   saveCurrentWidgetState() {
     const widgetData = this.collectAllWidgetData();
     this.saveWidgetData(widgetData);
+
+    // Mark as clean after successful save
+    this.markAsClean();
 
     // Execute callback for saving page data
     this.executeCallback('onSavePageData', widgetData);
@@ -1104,9 +1122,9 @@ class LayoutRenderer {
   }
 
   /**
-   * Load widget data from external source (e.g., API response)
-   * @param {Object} widgetData - Object with slot names as keys and widget arrays as values
-   */
+ * Load widget data from external source (e.g., API response)
+ * @param {Object} widgetData - Object with slot names as keys and widget arrays as values
+ */
   loadWidgetData(widgetData) {
     this.savedWidgetData.clear();
 
@@ -1119,9 +1137,107 @@ class LayoutRenderer {
 
       // Mark as saved since we're loading existing data
       this.pageHasBeenSaved = true;
+      this.markAsClean();
 
       console.log('LayoutRenderer: Widget data loaded:', widgetData);
     }
+  }
+
+  /**
+   * Configure auto-save settings
+   * @param {Object} config - Auto-save configuration
+   */
+  setAutoSaveConfig(config = {}) {
+    this.autoSaveEnabled = config.enabled !== false;
+    this.autoSaveDelay = config.delay || 2000;
+    console.log(`LayoutRenderer: Auto-save configured - enabled: ${this.autoSaveEnabled}, delay: ${this.autoSaveDelay}ms`);
+  }
+
+  /**
+   * Check if the page has unsaved changes
+   * @returns {boolean} True if page is dirty (has unsaved changes)
+   */
+  isDirtyState() {
+    return this.isDirty;
+  }
+
+  /**
+   * Mark page as dirty (has unsaved changes) and trigger auto-save
+   * @param {string} reason - Reason for marking dirty (for logging)
+   */
+  markAsDirty(reason = 'unknown') {
+    if (!this.isDirty) {
+      this.isDirty = true;
+      console.log(`LayoutRenderer: Page marked as dirty - ${reason}`);
+
+      // Execute callback for dirty state change
+      this.executeCallback('onDirtyStateChanged', true, reason);
+    }
+
+    // Trigger auto-save if enabled
+    if (this.autoSaveEnabled) {
+      this.triggerAutoSave();
+    }
+  }
+
+  /**
+   * Mark page as clean (no unsaved changes)
+   */
+  markAsClean() {
+    if (this.isDirty) {
+      this.isDirty = false;
+      console.log('LayoutRenderer: Page marked as clean');
+
+      // Cancel pending auto-save
+      if (this.autoSaveTimeoutId) {
+        clearTimeout(this.autoSaveTimeoutId);
+        this.autoSaveTimeoutId = null;
+      }
+
+      // Execute callback for dirty state change
+      this.executeCallback('onDirtyStateChanged', false, 'saved');
+    }
+  }
+
+  /**
+   * Trigger auto-save with debouncing
+   */
+  triggerAutoSave() {
+    // Cancel existing auto-save timeout
+    if (this.autoSaveTimeoutId) {
+      clearTimeout(this.autoSaveTimeoutId);
+    }
+
+    // Set new auto-save timeout
+    this.autoSaveTimeoutId = setTimeout(() => {
+      if (this.isDirty && this.autoSaveEnabled) {
+        console.log('LayoutRenderer: Auto-saving page...');
+
+        try {
+          const widgetData = this.saveCurrentWidgetState();
+          console.log('LayoutRenderer: Auto-save completed');
+
+          // Execute callback for auto-save
+          this.executeCallback('onAutoSave', widgetData);
+
+        } catch (error) {
+          console.error('LayoutRenderer: Auto-save failed', error);
+          this.executeCallback('onAutoSaveError', error);
+        }
+      }
+      this.autoSaveTimeoutId = null;
+    }, this.autoSaveDelay);
+
+    console.log(`LayoutRenderer: Auto-save scheduled in ${this.autoSaveDelay}ms`);
+  }
+
+  /**
+   * Mark page as dirty due to widget edit
+   * @param {string} widgetId - ID of the edited widget
+   * @param {Object} widgetInstance - Widget instance that was edited
+   */
+  markWidgetAsEdited(widgetId, widgetInstance) {
+    this.markAsDirty(`widget edited: ${widgetInstance.name} (${widgetId})`);
   }
 
   /**
@@ -1378,6 +1494,9 @@ class LayoutRenderer {
     const widgetElement = this.renderWidgetInstance(widgetInstance);
     if (widgetElement) {
       slotElement.appendChild(widgetElement);
+
+      // Mark page as dirty since a widget was added
+      this.markAsDirty(`widget added: ${widgetInstance.name} to ${slotName}`);
     }
   }
 
@@ -1717,6 +1836,8 @@ class LayoutRenderer {
     if (widgetElement) {
       const slotElement = widgetElement.closest('[data-slot-name]');
       const slotName = slotElement?.getAttribute('data-slot-name');
+      const widgetType = widgetElement.getAttribute('data-widget-type');
+      const widgetName = widgetElement.querySelector('.widget-header span')?.textContent || 'Unknown Widget';
 
       widgetElement.remove();
 
@@ -1732,6 +1853,9 @@ class LayoutRenderer {
         `;
         slotElement.appendChild(placeholder);
       }
+
+      // Mark page as dirty since a widget was removed
+      this.markAsDirty(`widget removed: ${widgetName} from ${slotName}`);
 
       console.log(`LayoutRenderer: Widget ${widgetId} removed from slot ${slotName}`);
     }
@@ -1788,6 +1912,11 @@ class LayoutRenderer {
 
       // Mark defaults as processed after the first render
       this.defaultWidgetsProcessed = true;
+
+      // Mark page as dirty since default widgets were auto-created
+      if (defaultWidgets.length > 0) {
+        this.markAsDirty(`default widgets auto-created in ${slotName}`);
+      }
 
     } catch (error) {
       console.error(`LayoutRenderer: Error converting default widgets for slot ${slotName}`, error);

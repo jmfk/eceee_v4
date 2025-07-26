@@ -59,6 +59,9 @@
             onEditWidget: (widgetId, widgetInstance) => {
                 alert(`Edit widget: ${widgetInstance.name}\nID: ${widgetId}\n\nThis would open a configuration dialog.`);
                 console.log('Edit widget:', widgetInstance);
+                
+                // Mark widget as edited (triggers auto-save)
+                renderer.markWidgetAsEdited(widgetId, widgetInstance);
             },
             onWidgetAutoCreated: (slotName, widgetInstance, widgetDef) => {
                 console.log(`Auto-created widget "${widgetInstance.name}" in slot "${slotName}"`);
@@ -66,6 +69,15 @@
             onSavePageData: (widgetData) => {
                 console.log('Page widget data ready for saving:', widgetData);
                 // In a real app, this would send to your API
+            },
+            onDirtyStateChanged: (isDirty, reason) => {
+                console.log(`Page dirty state: ${isDirty ? 'DIRTY' : 'CLEAN'} - ${reason}`);
+            },
+            onAutoSave: (widgetData) => {
+                console.log('Auto-save completed with widget data:', Object.keys(widgetData));
+            },
+            onAutoSaveError: (error) => {
+                console.error('Auto-save failed:', error);
             },
             onSlotInfo: (slotName) => {
                 const config = renderer.getSlotConfig(slotName);
