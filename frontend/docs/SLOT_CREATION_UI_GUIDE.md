@@ -187,6 +187,123 @@ When a new slot is created, the callback receives:
 }
 ```
 
+## Default Widget Auto-Creation
+
+For **new/unsaved pages**, the LayoutRenderer automatically converts default widgets defined in slot configurations into real widget instances:
+
+### How It Works
+```javascript
+// In your layout JSON, define default widgets
+const layout = {
+  structure: {
+    type: 'slot',
+    slot: {
+      name: 'hero-section',
+      defaultWidgets: [
+        {
+          type: 'text',
+          name: 'Welcome Message',
+          config: { content: 'Welcome!', fontSize: 'large' }
+        }
+      ]
+    }
+  }
+};
+
+// On first render (new page), defaults become real widgets
+renderer.render(layout, targetRef);
+
+// Mark page as saved to prevent auto-creation on subsequent renders
+renderer.markPageAsSaved();
+```
+
+### Managing Page State
+```javascript
+// Check if page has been saved
+const isSaved = renderer.hasPageBeenSaved();
+
+// Reset to new page state (enables default widget creation)
+renderer.resetPageSavedState();
+
+// Mark as saved (disables default widget creation)
+renderer.markPageAsSaved();
+```
+
+### Callback for Auto-Created Widgets
+```javascript
+renderer.setUICallbacks({
+  onWidgetAutoCreated: (slotName, widgetInstance, widgetDef) => {
+    console.log(`Auto-created: ${widgetInstance.name} in ${slotName}`);
+    // Handle auto-created widget (e.g., track in your data model)
+  }
+});
+```
+
+## Widget Data Persistence
+
+The LayoutRenderer provides comprehensive functionality for saving and loading widget state:
+
+### Collecting Widget Data
+```javascript
+// Collect all widget data from rendered slots
+const allWidgetData = renderer.collectAllWidgetData();
+// Returns: { slotName: [widgetInstance, ...], ... }
+
+// Collect from specific slot
+const slotWidgets = renderer.collectWidgetDataFromSlot('hero-section');
+```
+
+### Saving Current State
+```javascript
+// Save current widget state (collects + saves internally)
+const savedData = renderer.saveCurrentWidgetState();
+
+// Or save specific widget data
+renderer.saveWidgetData({
+  'hero-section': [
+    { id: 'w1', type: 'text', name: 'Title', config: {...} }
+  ]
+});
+```
+
+### Loading Saved Data
+```javascript
+// Load widget data from external source (e.g., API)
+renderer.loadWidgetData(widgetDataFromAPI);
+
+// Check if slot has saved data
+const hasData = renderer.hasSlotWidgetData('hero-section');
+
+// Get saved data for specific slot
+const slotData = renderer.getSlotWidgetData('hero-section');
+```
+
+### Save Callback
+```javascript
+renderer.setUICallbacks({
+  onSavePageData: (widgetData) => {
+    // Called when saveCurrentWidgetState() is executed
+    console.log('Saving widget data:', widgetData);
+    
+    // Send to API
+    fetch('/api/pages/123/widgets', {
+      method: 'POST',
+      body: JSON.stringify(widgetData)
+    });
+  }
+});
+```
+
+### Rendering Priority
+The LayoutRenderer follows this priority when rendering slots:
+
+1. **Saved Widgets** (highest priority) - if `hasSlotWidgetData(slotName)` returns true
+2. **Default Widgets** (auto-converted to instances for new pages)
+3. **Empty Placeholder** (lowest priority)
+
+### Configuration Extraction
+The system automatically extracts widget configurations from rendered DOM elements, supporting all built-in widget types with proper state preservation.
+
 ## Available Widget Types
 
 The widget selection modal includes these built-in widget types:

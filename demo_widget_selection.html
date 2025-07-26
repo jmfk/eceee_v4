@@ -12,11 +12,21 @@
         
         <div class="bg-white rounded-lg p-4 mb-4">
             <p class="text-gray-700 mb-4">
-                Click the ••• button on any slot, then select "Add Widget" to see the widget selection modal in action.
+                This demo shows the complete widget lifecycle: automatic creation, manual selection, and persistent save/load functionality.
             </p>
-            <div class="bg-blue-50 border border-blue-200 rounded p-3">
+            <div class="bg-blue-50 border border-blue-200 rounded p-3 mb-3">
                 <p class="text-blue-800 text-sm">
-                    <strong>Features:</strong> Search widgets, browse by category, click to select!
+                    <strong>Default Widgets:</strong> On NEW pages, default widgets auto-create as real widgets! After saving, they won't auto-create anymore.
+                </p>
+            </div>
+            <div class="bg-green-50 border border-green-200 rounded p-3 mb-3">
+                <p class="text-green-800 text-sm">
+                    <strong>Widget Selection:</strong> Click ••• on any slot → "Add Widget" → Search, browse by category, click to select!
+                </p>
+            </div>
+            <div class="bg-purple-50 border border-purple-200 rounded p-3">
+                <p class="text-purple-800 text-sm">
+                    <strong>Save/Load:</strong> "Save Page" captures all widget data. "Load Saved Page" restores it. "Reset" clears everything for a fresh start!
                 </p>
             </div>
         </div>
@@ -32,17 +42,38 @@
             <button id="render-layout" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
                 Render Layout
             </button>
-            <button id="show-widget-data" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
-                Show Added Widgets
+            <button id="count-widgets" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+                Count Widgets
             </button>
-            <button id="clear-widgets" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">
+            <button id="clear-all-widgets" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">
                 Clear All Widgets
             </button>
         </div>
+        
+        <div class="mt-4 space-x-4">
+            <button id="save-page" class="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700">
+                Save Page
+            </button>
+            <button id="load-page" class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
+                Load Saved Page
+            </button>
+            <button id="reset-page" class="px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700">
+                Reset to New Page
+            </button>
+            <span id="page-status" class="px-3 py-1 bg-gray-100 text-gray-700 rounded text-sm"></span>
+        </div>
 
-        <div id="widget-display" class="mt-4 bg-white rounded-lg p-4 hidden">
-            <h3 class="text-lg font-semibold mb-2">Added Widgets</h3>
-            <pre id="widget-data" class="bg-gray-100 p-3 rounded text-sm overflow-auto max-h-48"></pre>
+        <div id="widget-summary" class="mt-4 bg-white rounded-lg p-4 hidden">
+            <h3 class="text-lg font-semibold mb-2">Widget Summary</h3>
+            <div id="widget-count-display" class="text-gray-700"></div>
+        </div>
+
+        <div id="saved-data-display" class="mt-4 bg-white rounded-lg p-4 hidden">
+            <h3 class="text-lg font-semibold mb-2">Saved Widget Data</h3>
+            <button id="toggle-saved-data" class="text-sm text-blue-600 hover:text-blue-800 mb-2">Show Details</button>
+            <div id="saved-data-content" class="hidden">
+                <pre id="saved-data-json" class="bg-gray-100 p-3 rounded text-xs overflow-auto max-h-64"></pre>
+            </div>
         </div>
     </div>
 
@@ -53,39 +84,60 @@
         const renderer = new LayoutRenderer();
         const targetRef = { current: document.getElementById('layout-container') };
         
-        // Track added widgets
-        const addedWidgets = new Map(); // Map of slot name to widgets array
-
         // Set up callbacks
         renderer.setUICallbacks({
             onWidgetSelected: (slotName, widgetInstance, widgetDef) => {
                 console.log(`Widget selected for slot "${slotName}":`, widgetInstance);
                 
-                // Add widget to tracking
-                if (!addedWidgets.has(slotName)) {
-                    addedWidgets.set(slotName, []);
-                }
-                addedWidgets.get(slotName).push(widgetInstance);
-                
                 // Show success message
                 showSuccessMessage(`${widgetDef.name} added to ${slotName}!`);
                 
-                // Update display
-                updateWidgetDisplay();
+                // Widget is automatically rendered by LayoutRenderer
+            },
+            onWidgetAutoCreated: (slotName, widgetInstance, widgetDef) => {
+                console.log(`Auto-created widget "${widgetInstance.name}" in slot "${slotName}":`, widgetInstance);
                 
-                // In a real app, you might update the slot with actual widget rendering:
-                // renderer.updateSlot(slotName, addedWidgets.get(slotName));
+                // Show notification for auto-created widgets
+                showSuccessMessage(`Auto-created: ${widgetInstance.name} in ${slotName}`);
+            },
+            onSavePageData: (widgetData) => {
+                console.log('Saving page widget data:', widgetData);
+                
+                // Save to localStorage (simulating API persistence)
+                localStorage.setItem('demo-page-widgets', JSON.stringify(widgetData));
+                
+                // Update display
+                updateSavedDataDisplay(widgetData);
+            },
+            onEditWidget: (widgetId, widgetInstance) => {
+                alert(`Edit widget "${widgetInstance.name}" (${widgetId})\n\nThis would open a widget configuration dialog.`);
+                console.log('Edit widget:', widgetInstance);
             },
             onSlotInfo: (slotName) => {
                 const config = renderer.getSlotConfig(slotName);
-                const widgetCount = addedWidgets.get(slotName)?.length || 0;
+                const slotElement = document.querySelector(`[data-slot-name="${slotName}"]`);
+                const widgetCount = slotElement ? slotElement.querySelectorAll('.rendered-widget').length : 0;
                 alert(`Slot Info:\nName: ${slotName}\nTitle: ${config?.title || 'N/A'}\nDescription: ${config?.description || 'N/A'}\nWidgets: ${widgetCount}`);
             },
             onClearSlot: (slotName) => {
                 if (confirm(`Clear all widgets from slot "${slotName}"?`)) {
-                    addedWidgets.delete(slotName);
-                    renderer.updateSlot(slotName, []);
-                    updateWidgetDisplay();
+                    // Clear all widgets from the slot
+                    const slotElement = document.querySelector(`[data-slot-name="${slotName}"]`);
+                    if (slotElement) {
+                        const widgets = slotElement.querySelectorAll('.rendered-widget');
+                        widgets.forEach(widget => widget.remove());
+                        
+                        // Add placeholder back
+                        const slotConfig = renderer.getSlotConfig(slotName);
+                        const placeholder = document.createElement('div');
+                        placeholder.className = 'slot-placeholder p-4 border-2 border-dashed border-gray-300 rounded text-center text-gray-500';
+                        placeholder.innerHTML = `
+                            <div class="text-sm font-medium">${slotConfig?.title || slotName}</div>
+                            ${slotConfig?.description ? `<div class="text-xs mt-1">${slotConfig.description}</div>` : ''}
+                            <div class="text-xs mt-2 opacity-75">Click ••• to add widgets</div>
+                        `;
+                        slotElement.appendChild(placeholder);
+                    }
                     showSuccessMessage(`Cleared slot: ${slotName}`);
                 }
             },
@@ -114,7 +166,27 @@
                                 slot: {
                                     name: 'hero-section',
                                     title: 'Hero Section',
-                                    description: 'Main banner or hero content area'
+                                    description: 'Main banner or hero content area',
+                                    defaultWidgets: [
+                                        {
+                                            type: 'text',
+                                            name: 'Welcome Message',
+                                            config: {
+                                                content: 'Welcome to our amazing website!',
+                                                fontSize: 'large',
+                                                alignment: 'center'
+                                            }
+                                        },
+                                        {
+                                            type: 'button',
+                                            name: 'CTA Button',
+                                            config: {
+                                                text: 'Get Started',
+                                                style: 'primary',
+                                                size: 'large'
+                                            }
+                                        }
+                                    ]
                                 }
                             },
                             {
@@ -133,11 +205,22 @@
                         type: 'slot',
                         tag: 'div',
                         classes: 'bg-yellow-50 border-2 border-yellow-200 rounded-lg p-4 min-h-24',
-                        slot: {
-                            name: 'content-area',
-                            title: 'Main Content',
-                            description: 'Primary content and articles'
-                        }
+                                                        slot: {
+                                    name: 'content-area',
+                                    title: 'Main Content',
+                                    description: 'Primary content and articles',
+                                    defaultWidgets: [
+                                        {
+                                            type: 'card',
+                                            name: 'Featured Article',
+                                            config: {
+                                                title: 'Getting Started Guide',
+                                                content: 'Learn how to use our platform with this comprehensive guide that covers all the basics.',
+                                                showButton: true
+                                            }
+                                        }
+                                    ]
+                                }
                     },
                     {
                         type: 'element',
@@ -193,21 +276,80 @@
             }, 3000);
         }
 
-        function updateWidgetDisplay() {
-            const display = document.getElementById('widget-display');
-            const dataElement = document.getElementById('widget-data');
+        function countWidgetsInSlots() {
+            const slots = document.querySelectorAll('[data-slot-name]');
+            const summary = {};
+            let totalWidgets = 0;
+
+            slots.forEach(slot => {
+                const slotName = slot.getAttribute('data-slot-name');
+                const widgets = slot.querySelectorAll('.rendered-widget');
+                summary[slotName] = widgets.length;
+                totalWidgets += widgets.length;
+            });
+
+            return { summary, totalWidgets };
+        }
+
+        function updateWidgetSummary() {
+            const { summary, totalWidgets } = countWidgetsInSlots();
+            const display = document.getElementById('widget-summary');
+            const countDisplay = document.getElementById('widget-count-display');
             
-            if (addedWidgets.size > 0) {
-                const data = {};
-                addedWidgets.forEach((widgets, slotName) => {
-                    data[slotName] = widgets;
+            if (totalWidgets > 0) {
+                let summaryText = `<strong>Total Widgets: ${totalWidgets}</strong><br><br>`;
+                Object.entries(summary).forEach(([slotName, count]) => {
+                    summaryText += `<span class="inline-block bg-gray-100 px-2 py-1 rounded text-sm mr-2 mb-1">${slotName}: ${count}</span>`;
                 });
                 
-                dataElement.textContent = JSON.stringify(data, null, 2);
+                countDisplay.innerHTML = summaryText;
                 display.classList.remove('hidden');
             } else {
                 display.classList.add('hidden');
             }
+        }
+
+        function updatePageStatus() {
+            const statusElement = document.getElementById('page-status');
+            const hasBeenSaved = renderer.hasPageBeenSaved();
+            
+            if (hasBeenSaved) {
+                statusElement.textContent = 'Page: SAVED';
+                statusElement.className = 'px-3 py-1 bg-green-100 text-green-700 rounded text-sm';
+            } else {
+                statusElement.textContent = 'Page: NEW/UNSAVED';
+                statusElement.className = 'px-3 py-1 bg-yellow-100 text-yellow-700 rounded text-sm';
+            }
+        }
+
+        function updateSavedDataDisplay(widgetData) {
+            const display = document.getElementById('saved-data-display');
+            const jsonPre = document.getElementById('saved-data-json');
+            
+            if (widgetData && Object.keys(widgetData).length > 0) {
+                jsonPre.textContent = JSON.stringify(widgetData, null, 2);
+                display.classList.remove('hidden');
+            } else {
+                display.classList.add('hidden');
+            }
+        }
+
+        function loadSavedPageData() {
+            try {
+                const savedData = localStorage.getItem('demo-page-widgets');
+                if (savedData) {
+                    const widgetData = JSON.parse(savedData);
+                    return widgetData;
+                }
+            } catch (error) {
+                console.error('Error loading saved page data:', error);
+            }
+            return null;
+        }
+
+        function hasSavedPageData() {
+            const savedData = localStorage.getItem('demo-page-widgets');
+            return savedData && savedData !== 'null' && savedData !== '{}';
         }
 
         // Button handlers
@@ -216,31 +358,115 @@
             console.log('Layout rendered with automatic slot menus');
         });
 
-        document.getElementById('show-widget-data').addEventListener('click', () => {
-            updateWidgetDisplay();
-            if (addedWidgets.size === 0) {
+        document.getElementById('count-widgets').addEventListener('click', () => {
+            updateWidgetSummary();
+            const { totalWidgets } = countWidgetsInSlots();
+            if (totalWidgets === 0) {
                 alert('No widgets added yet! Click ••• on any slot and select "Add Widget".');
             }
         });
 
-        document.getElementById('clear-widgets').addEventListener('click', () => {
-            if (confirm('Clear all added widgets?')) {
-                addedWidgets.clear();
-                updateWidgetDisplay();
-                // Re-render to clear slot contents
-                renderer.render(demoLayout, targetRef);
+        document.getElementById('clear-all-widgets').addEventListener('click', () => {
+            const { totalWidgets } = countWidgetsInSlots();
+            if (totalWidgets === 0) {
+                alert('No widgets to clear!');
+                return;
+            }
+            
+            if (confirm(`Clear all ${totalWidgets} widgets from all slots?`)) {
+                // Clear all widgets from all slots
+                const slots = document.querySelectorAll('[data-slot-name]');
+                slots.forEach(slot => {
+                    const widgets = slot.querySelectorAll('.rendered-widget');
+                    widgets.forEach(widget => widget.remove());
+                    
+                    // Add placeholder back if slot is now empty
+                    if (slot.children.length === 1) { // Only slot menu remains
+                        const slotName = slot.getAttribute('data-slot-name');
+                        const slotConfig = renderer.getSlotConfig(slotName);
+                        const placeholder = document.createElement('div');
+                        placeholder.className = 'slot-placeholder p-4 border-2 border-dashed border-gray-300 rounded text-center text-gray-500';
+                        placeholder.innerHTML = `
+                            <div class="text-sm font-medium">${slotConfig?.title || slotName}</div>
+                            ${slotConfig?.description ? `<div class="text-xs mt-1">${slotConfig.description}</div>` : ''}
+                            <div class="text-xs mt-2 opacity-75">Click ••• to add widgets</div>
+                        `;
+                        slot.appendChild(placeholder);
+                    }
+                });
+                
+                updateWidgetSummary();
                 showSuccessMessage('All widgets cleared!');
+            }
+        });
+
+        document.getElementById('save-page').addEventListener('click', () => {
+            const widgetData = renderer.saveCurrentWidgetState();
+            updatePageStatus();
+            updateWidgetSummary();
+            showSuccessMessage(`Page saved with ${Object.keys(widgetData).length} slots and widget data!`);
+        });
+
+        document.getElementById('load-page').addEventListener('click', () => {
+            const savedData = loadSavedPageData();
+            if (savedData) {
+                // Load widget data into renderer
+                renderer.loadWidgetData(savedData);
+                
+                // Re-render the layout with loaded data
+                renderer.render(demoLayout, targetRef);
+                
+                updatePageStatus();
+                updateWidgetSummary();
+                updateSavedDataDisplay(savedData);
+                showSuccessMessage(`Loaded page with ${Object.keys(savedData).length} slots of widget data!`);
+            } else {
+                alert('No saved page data found. Save a page first!');
+            }
+        });
+
+        document.getElementById('reset-page').addEventListener('click', () => {
+            if (confirm('Reset to new page? This will clear all widgets and re-enable default widget auto-creation.')) {
+                renderer.resetPageSavedState();
+                renderer.render(demoLayout, targetRef);
+                updatePageStatus();
+                updateWidgetSummary();
+                updateSavedDataDisplay({});
+                showSuccessMessage('Page reset! Default widgets will auto-create again.');
+            }
+        });
+
+        document.getElementById('toggle-saved-data').addEventListener('click', () => {
+            const content = document.getElementById('saved-data-content');
+            const button = document.getElementById('toggle-saved-data');
+            
+            if (content.classList.contains('hidden')) {
+                content.classList.remove('hidden');
+                button.textContent = 'Hide Details';
+            } else {
+                content.classList.add('hidden');
+                button.textContent = 'Show Details';
             }
         });
 
         // Auto-render layout on page load
         setTimeout(() => {
+            // Check if we have saved data to load
+            if (hasSavedPageData()) {
+                const savedData = loadSavedPageData();
+                if (savedData) {
+                    renderer.loadWidgetData(savedData);
+                    updateSavedDataDisplay(savedData);
+                }
+            }
+            
             renderer.render(demoLayout, targetRef);
+            updatePageStatus();
+            updateWidgetSummary();
         }, 500);
 
         // Make renderer available for debugging
         window.layoutRenderer = renderer;
-        window.addedWidgets = addedWidgets;
     </script>
 </body>
 </html> 

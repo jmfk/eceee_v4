@@ -27,6 +27,9 @@ class LayoutRenderer {
     this.uiCallbacks = new Map(); // Map of UI event callbacks
     this.dragState = { isDragging: false, draggedElement: null, sourceSlot: null };
     this.customWidgets = null; // Custom widget definitions (if any)
+    this.pageHasBeenSaved = false; // Track if page/layout has been saved
+    this.defaultWidgetsProcessed = false; // Track if defaults have been processed
+    this.savedWidgetData = new Map(); // Map of slot names to saved widget arrays
   }
 
   /**
@@ -102,6 +105,9 @@ class LayoutRenderer {
       // Reset internal maps
       this.slotContainers.clear();
       this.slotConfigs.clear();
+
+      // Reset default widget processing for new layout
+      this.defaultWidgetsProcessed = false;
 
       // Render the layout structure
       const rootElement = this.renderNode(layout.structure || layout);
@@ -502,7 +508,9 @@ class LayoutRenderer {
                <circle cx="8" cy="8" r="1.5"/>
                <circle cx="13" cy="8" r="1.5"/>
              </svg>`,
-
+      edit: `<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+               <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708L4.5 15.207l-3.5.5.5-3.5L12.146.146zM11.207 2L2 11.207l-.25 1.75 1.75-.25L13.207 3 11.207 2z"/>
+             </svg>`,
       trash: `<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                 <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
                 <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
@@ -817,6 +825,306 @@ class LayoutRenderer {
   }
 
   /**
+   * Mark the page/layout as saved
+   * This prevents default widgets from being auto-created on subsequent renders
+   */
+  markPageAsSaved() {
+    this.pageHasBeenSaved = true;
+    console.log('LayoutRenderer: Page marked as saved - default widgets will not be auto-created');
+  }
+
+  /**
+   * Check if the page has been saved
+   * @returns {boolean} True if page has been saved
+   */
+  hasPageBeenSaved() {
+    return this.pageHasBeenSaved;
+  }
+
+  /**
+   * Reset the page saved state (for new pages/layouts)
+   */
+  resetPageSavedState() {
+    this.pageHasBeenSaved = false;
+    this.defaultWidgetsProcessed = false;
+    this.savedWidgetData.clear();
+    console.log('LayoutRenderer: Page state reset - default widgets will be auto-created');
+  }
+
+  /**
+   * Collect all widget data from rendered slots
+   * @returns {Object} Object with slot names as keys and widget arrays as values
+   */
+  collectAllWidgetData() {
+    const widgetData = {};
+
+    this.slotContainers.forEach((slotElement, slotName) => {
+      const widgets = this.collectWidgetDataFromSlot(slotName);
+      if (widgets.length > 0) {
+        widgetData[slotName] = widgets;
+      }
+    });
+
+    console.log('LayoutRenderer: Collected widget data from all slots:', widgetData);
+    return widgetData;
+  }
+
+  /**
+   * Collect widget data from a specific slot
+   * @param {string} slotName - Name of the slot
+   * @returns {Array} Array of widget instance objects
+   */
+  collectWidgetDataFromSlot(slotName) {
+    const slotElement = this.slotContainers.get(slotName);
+    if (!slotElement) {
+      console.warn(`LayoutRenderer: Slot "${slotName}" not found for data collection`);
+      return [];
+    }
+
+    const widgets = [];
+    const widgetElements = slotElement.querySelectorAll('.rendered-widget[data-widget-id][data-widget-type]');
+
+    widgetElements.forEach(widgetElement => {
+      try {
+        const widgetId = widgetElement.getAttribute('data-widget-id');
+        const widgetType = widgetElement.getAttribute('data-widget-type');
+        const nameElement = widgetElement.querySelector('.widget-header span');
+        const widgetName = nameElement ? nameElement.textContent : `${widgetType} Widget`;
+
+        // Extract widget configuration from rendered content
+        const config = this.extractWidgetConfigFromDOM(widgetElement, widgetType);
+
+        const widgetInstance = {
+          id: widgetId,
+          type: widgetType,
+          name: widgetName,
+          config: config
+        };
+
+        widgets.push(widgetInstance);
+
+      } catch (error) {
+        console.error(`LayoutRenderer: Error collecting widget data from element`, error, widgetElement);
+      }
+    });
+
+    return widgets;
+  }
+
+  /**
+   * Extract widget configuration from its DOM representation
+   * @param {HTMLElement} widgetElement - The widget DOM element
+   * @param {string} widgetType - Type of the widget
+   * @returns {Object} Widget configuration object
+   */
+  extractWidgetConfigFromDOM(widgetElement, widgetType) {
+    const config = {};
+    const contentElement = widgetElement.querySelector('.widget-content');
+
+    if (!contentElement) {
+      return config;
+    }
+
+    try {
+      switch (widgetType) {
+        case 'text':
+          const textElement = contentElement.firstElementChild;
+          if (textElement) {
+            config.content = textElement.textContent || textElement.innerText;
+            // Extract fontSize from class
+            const classList = Array.from(textElement.classList);
+            const fontSizeClass = classList.find(cls => cls.startsWith('text-'));
+            if (fontSizeClass) {
+              config.fontSize = fontSizeClass.replace('text-', '');
+            }
+            // Extract alignment from class
+            const alignmentClass = classList.find(cls => cls.startsWith('text-'));
+            if (alignmentClass && ['left', 'center', 'right'].includes(alignmentClass.replace('text-', ''))) {
+              config.alignment = alignmentClass.replace('text-', '');
+            }
+          }
+          break;
+
+        case 'image':
+          const imgElement = contentElement.querySelector('img');
+          if (imgElement) {
+            config.src = imgElement.src;
+            config.alt = imgElement.alt;
+            config.width = imgElement.style.width || '100%';
+          }
+          const captionElement = contentElement.querySelector('p');
+          if (captionElement) {
+            config.caption = captionElement.textContent;
+          }
+          break;
+
+        case 'button':
+          const buttonElement = contentElement.querySelector('button');
+          if (buttonElement) {
+            config.text = buttonElement.textContent;
+            // Extract style and size from classes (simplified)
+            const classList = Array.from(buttonElement.classList);
+            if (classList.includes('bg-blue-600')) config.style = 'primary';
+            else if (classList.includes('bg-gray-200')) config.style = 'secondary';
+            else if (classList.includes('bg-green-600')) config.style = 'success';
+            else if (classList.includes('bg-red-600')) config.style = 'danger';
+
+            if (classList.includes('px-3')) config.size = 'small';
+            else if (classList.includes('px-6')) config.size = 'large';
+            else config.size = 'medium';
+          }
+          break;
+
+        case 'card':
+          const titleElement = contentElement.querySelector('h3');
+          const contentTextElement = contentElement.querySelector('p');
+          const cardImgElement = contentElement.querySelector('img');
+          const cardButtonElement = contentElement.querySelector('button');
+
+          if (titleElement) config.title = titleElement.textContent;
+          if (contentTextElement) config.content = contentTextElement.textContent;
+          if (cardImgElement) config.imageUrl = cardImgElement.src;
+          config.showButton = !!cardButtonElement;
+          break;
+
+        case 'list':
+          const listElement = contentElement.querySelector('ol, ul');
+          if (listElement) {
+            config.type = listElement.tagName.toLowerCase() === 'ol' ? 'ordered' : 'unordered';
+            const items = Array.from(listElement.querySelectorAll('li')).map(li => li.textContent);
+            config.items = items;
+          }
+          break;
+
+        case 'spacer':
+          const spacerElement = contentElement.firstElementChild;
+          if (spacerElement) {
+            const height = spacerElement.style.height;
+            if (height === '16px') config.height = 'small';
+            else if (height === '64px') config.height = 'large';
+            else config.height = 'medium';
+            config.backgroundColor = spacerElement.style.backgroundColor || 'transparent';
+          }
+          break;
+
+        case 'divider':
+          const dividerElement = contentElement.querySelector('hr');
+          if (dividerElement) {
+            const classList = Array.from(dividerElement.classList);
+            if (classList.includes('border-dashed')) config.style = 'dashed';
+            else if (classList.includes('border-dotted')) config.style = 'dotted';
+            else config.style = 'solid';
+
+            if (classList.includes('border-black')) config.color = 'black';
+            else if (classList.includes('border-blue-300')) config.color = 'blue';
+            else config.color = 'gray';
+
+            config.thickness = classList.includes('border-2') ? 'thick' : 'thin';
+          }
+          break;
+
+        case 'video':
+          const videoElement = contentElement.querySelector('video');
+          if (videoElement) {
+            const sourceElement = videoElement.querySelector('source');
+            if (sourceElement) config.src = sourceElement.src;
+            config.controls = videoElement.controls;
+            config.autoplay = videoElement.autoplay;
+            if (videoElement.poster) config.poster = videoElement.poster;
+          }
+          break;
+
+        default:
+          // For unknown widget types, try to preserve any data attributes
+          const dataAttrs = Array.from(widgetElement.attributes)
+            .filter(attr => attr.name.startsWith('data-widget-config-'))
+            .reduce((acc, attr) => {
+              const key = attr.name.replace('data-widget-config-', '');
+              acc[key] = attr.value;
+              return acc;
+            }, {});
+          Object.assign(config, dataAttrs);
+      }
+
+    } catch (error) {
+      console.error(`LayoutRenderer: Error extracting config for ${widgetType} widget`, error);
+    }
+
+    return config;
+  }
+
+  /**
+   * Save widget data for all slots
+   * @param {Object} widgetData - Object with slot names as keys and widget arrays as values
+   */
+  saveWidgetData(widgetData) {
+    // Store widget data internally
+    this.savedWidgetData.clear();
+    Object.entries(widgetData).forEach(([slotName, widgets]) => {
+      this.savedWidgetData.set(slotName, [...widgets]); // Deep copy
+    });
+
+    // Mark page as saved
+    this.markPageAsSaved();
+
+    console.log('LayoutRenderer: Widget data saved:', widgetData);
+  }
+
+  /**
+   * Save current widget state from all rendered slots
+   * @returns {Object} The collected and saved widget data
+   */
+  saveCurrentWidgetState() {
+    const widgetData = this.collectAllWidgetData();
+    this.saveWidgetData(widgetData);
+
+    // Execute callback for saving page data
+    this.executeCallback('onSavePageData', widgetData);
+
+    return widgetData;
+  }
+
+  /**
+   * Load widget data for a specific slot
+   * @param {string} slotName - Name of the slot
+   * @returns {Array} Array of saved widget instances for the slot
+   */
+  getSlotWidgetData(slotName) {
+    return this.savedWidgetData.get(slotName) || [];
+  }
+
+  /**
+   * Check if a slot has saved widget data
+   * @param {string} slotName - Name of the slot
+   * @returns {boolean} True if slot has saved widgets
+   */
+  hasSlotWidgetData(slotName) {
+    const widgets = this.savedWidgetData.get(slotName);
+    return widgets && widgets.length > 0;
+  }
+
+  /**
+   * Load widget data from external source (e.g., API response)
+   * @param {Object} widgetData - Object with slot names as keys and widget arrays as values
+   */
+  loadWidgetData(widgetData) {
+    this.savedWidgetData.clear();
+
+    if (widgetData && typeof widgetData === 'object') {
+      Object.entries(widgetData).forEach(([slotName, widgets]) => {
+        if (Array.isArray(widgets)) {
+          this.savedWidgetData.set(slotName, [...widgets]); // Deep copy
+        }
+      });
+
+      // Mark as saved since we're loading existing data
+      this.pageHasBeenSaved = true;
+
+      console.log('LayoutRenderer: Widget data loaded:', widgetData);
+    }
+  }
+
+  /**
    * Get available widgets for selection
    * @returns {Array} Array of widget definitions
    */
@@ -1009,11 +1317,11 @@ class LayoutRenderer {
   }
 
   /**
-   * Handle widget selection and add to slot
-   * @param {string} widgetType - Type of widget selected
-   * @param {string} slotName - Target slot name
-   * @param {Function} closeModal - Function to close the modal
-   */
+ * Handle widget selection and add to slot
+ * @param {string} widgetType - Type of widget selected
+ * @param {string} slotName - Target slot name
+ * @param {Function} closeModal - Function to close the modal
+ */
   handleWidgetSelection(widgetType, slotName, closeModal) {
     try {
       // Find widget definition
@@ -1032,17 +1340,457 @@ class LayoutRenderer {
         config: { ...widgetDef.config }
       };
 
+      // Add widget to slot visually
+      this.addWidgetToSlot(slotName, widgetInstance);
+
       // Execute callback for widget addition
       this.executeCallback('onWidgetSelected', slotName, widgetInstance, widgetDef);
 
       // Close modal
       closeModal();
 
-      console.log(`LayoutRenderer: Widget "${widgetDef.name}" selected for slot "${slotName}"`);
+      console.log(`LayoutRenderer: Widget "${widgetDef.name}" added to slot "${slotName}"`);
 
     } catch (error) {
       console.error('LayoutRenderer: Error handling widget selection', error);
       alert(`Error adding widget: ${error.message}`);
+    }
+  }
+
+  /**
+   * Add a widget instance to a slot and render it
+   * @param {string} slotName - Name of the target slot
+   * @param {Object} widgetInstance - Widget instance to add
+   */
+  addWidgetToSlot(slotName, widgetInstance) {
+    const slotElement = this.slotContainers.get(slotName);
+    if (!slotElement) {
+      throw new Error(`Slot "${slotName}" not found`);
+    }
+
+    // Clear slot placeholder if it exists
+    const placeholder = slotElement.querySelector('.slot-placeholder');
+    if (placeholder) {
+      placeholder.remove();
+    }
+
+    // Create and add widget element
+    const widgetElement = this.renderWidgetInstance(widgetInstance);
+    if (widgetElement) {
+      slotElement.appendChild(widgetElement);
+    }
+  }
+
+  /**
+   * Render a widget instance as a DOM element
+   * @param {Object} widgetInstance - Widget instance to render
+   * @returns {HTMLElement} Rendered widget element
+   */
+  renderWidgetInstance(widgetInstance) {
+    const { id, type, name, config } = widgetInstance;
+
+    // Create main widget container
+    const widget = document.createElement('div');
+    widget.className = 'rendered-widget mb-4 p-4 border border-gray-200 rounded-lg bg-white relative';
+    widget.setAttribute('data-widget-id', id);
+    widget.setAttribute('data-widget-type', type);
+
+    // Add widget header with name and controls
+    const header = document.createElement('div');
+    header.className = 'widget-header flex items-center justify-between mb-3 pb-2 border-b border-gray-100';
+
+    const title = document.createElement('span');
+    title.className = 'text-sm font-medium text-gray-700';
+    title.textContent = name;
+
+    const controls = document.createElement('div');
+    controls.className = 'flex items-center space-x-2';
+
+    // Add edit button
+    const editBtn = this.createIconButton('svg:edit', 'text-gray-400 hover:text-blue-600 w-5 h-5', () => {
+      this.executeCallback('onEditWidget', id, widgetInstance);
+    });
+    editBtn.title = 'Edit Widget';
+
+    // Add delete button
+    const deleteBtn = this.createIconButton('svg:trash', 'text-gray-400 hover:text-red-600 w-5 h-5', () => {
+      if (confirm(`Remove ${name} widget?`)) {
+        this.removeWidgetFromSlot(id);
+      }
+    });
+    deleteBtn.title = 'Remove Widget';
+
+    controls.appendChild(editBtn);
+    controls.appendChild(deleteBtn);
+    header.appendChild(title);
+    header.appendChild(controls);
+    widget.appendChild(header);
+
+    // Add widget content
+    const content = this.renderWidgetContent(type, config);
+    widget.appendChild(content);
+
+    return widget;
+  }
+
+  /**
+   * Render widget content based on type and configuration
+   * @param {string} type - Widget type
+   * @param {Object} config - Widget configuration
+   * @returns {HTMLElement} Widget content element
+   */
+  renderWidgetContent(type, config) {
+    const content = document.createElement('div');
+    content.className = 'widget-content';
+
+    switch (type) {
+      case 'text':
+        return this.renderTextWidget(config);
+
+      case 'image':
+        return this.renderImageWidget(config);
+
+      case 'button':
+        return this.renderButtonWidget(config);
+
+      case 'card':
+        return this.renderCardWidget(config);
+
+      case 'list':
+        return this.renderListWidget(config);
+
+      case 'spacer':
+        return this.renderSpacerWidget(config);
+
+      case 'divider':
+        return this.renderDividerWidget(config);
+
+      case 'video':
+        return this.renderVideoWidget(config);
+
+      default:
+        return this.renderDefaultWidget(type, config);
+    }
+  }
+
+  /**
+   * Render text widget
+   * @param {Object} config - Widget configuration
+   * @returns {HTMLElement} Text widget element
+   */
+  renderTextWidget(config) {
+    const element = document.createElement('div');
+    element.className = `text-${config.fontSize || 'medium'} text-${config.alignment || 'left'}`;
+    element.innerHTML = this.escapeHtml(config.content || 'Enter your text here...');
+    return element;
+  }
+
+  /**
+   * Render image widget
+   * @param {Object} config - Widget configuration
+   * @returns {HTMLElement} Image widget element
+   */
+  renderImageWidget(config) {
+    const container = document.createElement('div');
+    container.className = 'text-center';
+
+    if (config.src) {
+      const img = document.createElement('img');
+      img.src = config.src;
+      img.alt = config.alt || '';
+      img.className = 'max-w-full h-auto rounded';
+      img.style.width = config.width || '100%';
+      container.appendChild(img);
+
+      if (config.caption) {
+        const caption = document.createElement('p');
+        caption.className = 'text-sm text-gray-600 mt-2';
+        caption.textContent = config.caption;
+        container.appendChild(caption);
+      }
+    } else {
+      container.className += ' border-2 border-dashed border-gray-300 p-8 rounded';
+      container.innerHTML = `
+        <div class="text-gray-500">
+          <div class="text-lg mb-2">📷</div>
+          <div class="text-sm">No image selected</div>
+        </div>
+      `;
+    }
+
+    return container;
+  }
+
+  /**
+   * Render button widget
+   * @param {Object} config - Widget configuration
+   * @returns {HTMLElement} Button widget element
+   */
+  renderButtonWidget(config) {
+    const button = document.createElement('button');
+    button.textContent = config.text || 'Click me';
+
+    const styleClasses = {
+      primary: 'bg-blue-600 hover:bg-blue-700 text-white',
+      secondary: 'bg-gray-200 hover:bg-gray-300 text-gray-800',
+      success: 'bg-green-600 hover:bg-green-700 text-white',
+      danger: 'bg-red-600 hover:bg-red-700 text-white'
+    };
+
+    const sizeClasses = {
+      small: 'px-3 py-1 text-sm',
+      medium: 'px-4 py-2',
+      large: 'px-6 py-3 text-lg'
+    };
+
+    button.className = `
+      rounded transition-colors
+      ${styleClasses[config.style] || styleClasses.primary}
+      ${sizeClasses[config.size] || sizeClasses.medium}
+    `;
+
+    return button;
+  }
+
+  /**
+   * Render card widget
+   * @param {Object} config - Widget configuration
+   * @returns {HTMLElement} Card widget element
+   */
+  renderCardWidget(config) {
+    const card = document.createElement('div');
+    card.className = 'border border-gray-200 rounded-lg p-4 bg-white';
+
+    if (config.imageUrl) {
+      const img = document.createElement('img');
+      img.src = config.imageUrl;
+      img.className = 'w-full h-32 object-cover rounded mb-3';
+      card.appendChild(img);
+    }
+
+    const title = document.createElement('h3');
+    title.className = 'text-lg font-semibold text-gray-900 mb-2';
+    title.textContent = config.title || 'Card Title';
+    card.appendChild(title);
+
+    const content = document.createElement('p');
+    content.className = 'text-gray-600 text-sm';
+    content.textContent = config.content || 'Card description goes here...';
+    card.appendChild(content);
+
+    if (config.showButton) {
+      const button = document.createElement('button');
+      button.className = 'mt-3 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors';
+      button.textContent = 'Learn More';
+      card.appendChild(button);
+    }
+
+    return card;
+  }
+
+  /**
+   * Render list widget
+   * @param {Object} config - Widget configuration
+   * @returns {HTMLElement} List widget element
+   */
+  renderListWidget(config) {
+    const listTag = config.type === 'ordered' ? 'ol' : 'ul';
+    const list = document.createElement(listTag);
+    list.className = config.type === 'ordered' ? 'list-decimal list-inside' : 'list-disc list-inside';
+
+    const items = config.items || ['Item 1', 'Item 2', 'Item 3'];
+    items.forEach(item => {
+      const li = document.createElement('li');
+      li.textContent = item;
+      li.className = 'mb-1';
+      list.appendChild(li);
+    });
+
+    return list;
+  }
+
+  /**
+   * Render spacer widget
+   * @param {Object} config - Widget configuration
+   * @returns {HTMLElement} Spacer widget element
+   */
+  renderSpacerWidget(config) {
+    const spacer = document.createElement('div');
+
+    const heights = {
+      small: '16px',
+      medium: '32px',
+      large: '64px'
+    };
+
+    spacer.style.height = heights[config.height] || heights.medium;
+    spacer.style.backgroundColor = config.backgroundColor || 'transparent';
+
+    return spacer;
+  }
+
+  /**
+   * Render divider widget
+   * @param {Object} config - Widget configuration
+   * @returns {HTMLElement} Divider widget element
+   */
+  renderDividerWidget(config) {
+    const divider = document.createElement('hr');
+
+    const styleClasses = {
+      solid: 'border-solid',
+      dashed: 'border-dashed',
+      dotted: 'border-dotted'
+    };
+
+    const colorClasses = {
+      gray: 'border-gray-300',
+      black: 'border-black',
+      blue: 'border-blue-300'
+    };
+
+    divider.className = `
+      ${styleClasses[config.style] || styleClasses.solid}
+      ${colorClasses[config.color] || colorClasses.gray}
+      ${config.thickness === 'thick' ? 'border-2' : 'border'}
+    `;
+
+    return divider;
+  }
+
+  /**
+   * Render video widget
+   * @param {Object} config - Widget configuration
+   * @returns {HTMLElement} Video widget element
+   */
+  renderVideoWidget(config) {
+    const container = document.createElement('div');
+
+    if (config.src) {
+      const video = document.createElement('video');
+      video.className = 'w-full rounded';
+      video.controls = config.controls !== false;
+      video.autoplay = config.autoplay === true;
+
+      if (config.poster) {
+        video.poster = config.poster;
+      }
+
+      const source = document.createElement('source');
+      source.src = config.src;
+      video.appendChild(source);
+
+      container.appendChild(video);
+    } else {
+      container.className = 'border-2 border-dashed border-gray-300 p-8 rounded text-center text-gray-500';
+      container.innerHTML = `
+        <div class="text-lg mb-2">▶️</div>
+        <div class="text-sm">No video selected</div>
+      `;
+    }
+
+    return container;
+  }
+
+  /**
+   * Render default widget (fallback)
+   * @param {string} type - Widget type
+   * @param {Object} config - Widget configuration
+   * @returns {HTMLElement} Default widget element
+   */
+  renderDefaultWidget(type, config) {
+    const element = document.createElement('div');
+    element.className = 'p-4 border border-gray-300 rounded bg-gray-50';
+    element.innerHTML = `
+      <div class="text-sm font-medium text-gray-700">${this.escapeHtml(type)} Widget</div>
+      <div class="text-xs text-gray-500 mt-1">Custom widget type</div>
+    `;
+    return element;
+  }
+
+  /**
+ * Remove a widget from its slot
+ * @param {string} widgetId - ID of the widget to remove
+ */
+  removeWidgetFromSlot(widgetId) {
+    const widgetElement = document.querySelector(`[data-widget-id="${widgetId}"]`);
+    if (widgetElement) {
+      const slotElement = widgetElement.closest('[data-slot-name]');
+      const slotName = slotElement?.getAttribute('data-slot-name');
+
+      widgetElement.remove();
+
+      // Add placeholder back if slot is now empty
+      if (slotElement && slotElement.children.length === 1) { // Only slot menu remains
+        const slotConfig = this.getSlotConfig(slotName);
+        const placeholder = document.createElement('div');
+        placeholder.className = 'slot-placeholder p-4 border-2 border-dashed border-gray-300 rounded text-center text-gray-500';
+        placeholder.innerHTML = `
+          <div class="text-sm font-medium">${this.escapeHtml(slotConfig?.title || slotName)}</div>
+          ${slotConfig?.description ? `<div class="text-xs mt-1">${this.escapeHtml(slotConfig.description)}</div>` : ''}
+          <div class="text-xs mt-2 opacity-75">Click ••• to add widgets</div>
+        `;
+        slotElement.appendChild(placeholder);
+      }
+
+      console.log(`LayoutRenderer: Widget ${widgetId} removed from slot ${slotName}`);
+    }
+  }
+
+  /**
+   * Convert default widgets to actual widget instances for new/unsaved pages
+   * @param {string} slotName - Name of the slot
+   * @param {Array} defaultWidgets - Array of default widget definitions
+   */
+  convertDefaultWidgetsToInstances(slotName, defaultWidgets) {
+    try {
+      const availableWidgets = this.getAvailableWidgets();
+
+      defaultWidgets.forEach((defaultWidget, index) => {
+        try {
+          // Find matching widget definition by type
+          const widgetDef = availableWidgets.find(w => w.type === defaultWidget.type);
+
+          if (widgetDef) {
+            // Create widget instance with merged config (default + specified)
+            const widgetInstance = {
+              id: this.generateWidgetId(),
+              type: defaultWidget.type,
+              name: defaultWidget.name || widgetDef.name,
+              config: { ...widgetDef.config, ...defaultWidget.config }
+            };
+
+            // Add widget to slot
+            this.addWidgetToSlot(slotName, widgetInstance);
+
+            // Execute callback to notify about auto-created widget
+            this.executeCallback('onWidgetAutoCreated', slotName, widgetInstance, widgetDef);
+
+            console.log(`LayoutRenderer: Auto-created widget "${widgetInstance.name}" in slot "${slotName}"`);
+
+          } else {
+            // Widget type not found, create a placeholder widget
+            const placeholderInstance = {
+              id: this.generateWidgetId(),
+              type: defaultWidget.type,
+              name: defaultWidget.name || `${defaultWidget.type} Widget`,
+              config: defaultWidget.config || {}
+            };
+
+            this.addWidgetToSlot(slotName, placeholderInstance);
+            console.warn(`LayoutRenderer: Created placeholder for unknown widget type "${defaultWidget.type}" in slot "${slotName}"`);
+          }
+
+        } catch (error) {
+          console.error(`LayoutRenderer: Error converting default widget ${index} in slot ${slotName}`, error);
+        }
+      });
+
+      // Mark defaults as processed after the first render
+      this.defaultWidgetsProcessed = true;
+
+    } catch (error) {
+      console.error(`LayoutRenderer: Error converting default widgets for slot ${slotName}`, error);
     }
   }
 
@@ -1653,20 +2401,39 @@ class LayoutRenderer {
         }, 100);
       }
 
-      // Initialize slot with default widgets if available
-      if (node.slot.defaultWidgets && Array.isArray(node.slot.defaultWidgets) && node.slot.defaultWidgets.length > 0) {
-        node.slot.defaultWidgets.forEach((defaultWidget, index) => {
+      // Initialize slot with widgets - priority order: saved > default > placeholder
+      if (this.hasSlotWidgetData(slotName)) {
+        // Load saved widgets for this slot
+        const savedWidgets = this.getSlotWidgetData(slotName);
+        savedWidgets.forEach((widgetInstance, index) => {
           try {
-            const widgetElement = this.renderWidget(defaultWidget);
-            if (widgetElement) {
-              element.appendChild(widgetElement);
-            }
+            this.addWidgetToSlot(slotName, widgetInstance);
           } catch (error) {
-            console.error(`LayoutRenderer: Error rendering default widget ${index} in slot ${slotName}`, error);
-            const errorElement = this.createErrorWidgetElement(`Default widget ${index + 1}: ${error.message}`);
+            console.error(`LayoutRenderer: Error rendering saved widget ${index} in slot ${slotName}`, error);
+            const errorElement = this.createErrorWidgetElement(`Saved widget ${index + 1}: ${error.message}`);
             element.appendChild(errorElement);
           }
         });
+      } else if (node.slot.defaultWidgets && Array.isArray(node.slot.defaultWidgets) && node.slot.defaultWidgets.length > 0) {
+        // Check if we should convert default widgets to real widget instances
+        if (!this.pageHasBeenSaved && !this.defaultWidgetsProcessed) {
+          // Convert default widgets to actual widget instances for new/unsaved pages
+          this.convertDefaultWidgetsToInstances(slotName, node.slot.defaultWidgets);
+        } else {
+          // For saved pages without saved widgets, render default widgets as placeholders (legacy behavior)
+          node.slot.defaultWidgets.forEach((defaultWidget, index) => {
+            try {
+              const widgetElement = this.renderWidget(defaultWidget);
+              if (widgetElement) {
+                element.appendChild(widgetElement);
+              }
+            } catch (error) {
+              console.error(`LayoutRenderer: Error rendering default widget ${index} in slot ${slotName}`, error);
+              const errorElement = this.createErrorWidgetElement(`Default widget ${index + 1}: ${error.message}`);
+              element.appendChild(errorElement);
+            }
+          });
+        }
       } else {
         // Show placeholder for empty slot
         const title = node.slot.title || slotName;
@@ -1676,7 +2443,7 @@ class LayoutRenderer {
           <div class="slot-placeholder p-4 border-2 border-dashed border-gray-300 rounded text-center text-gray-500">
             <div class="text-sm font-medium">${this.escapeHtml(title)}</div>
             ${description ? `<div class="text-xs mt-1">${this.escapeHtml(description)}</div>` : ''}
-            <div class="text-xs mt-2 opacity-75">Click to add widgets</div>
+            <div class="text-xs mt-2 opacity-75">Click ••• to add widgets</div>
           </div>
         `;
       }
