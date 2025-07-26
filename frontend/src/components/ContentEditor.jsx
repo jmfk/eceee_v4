@@ -444,9 +444,11 @@ const ContentEditor = ({
 
       <div
         ref={containerRef}
-        className={`layout-container layout-containment ${editable ? 'editable' : ''}`}
+        className={`layout-container content-editor-container ${editable ? 'editable' : ''}`}
         style={{
           minHeight: '400px',
+          maxHeight: '80vh', // Allow scrolling when content exceeds 80% of viewport height
+          height: 'auto',
           // Additional styling for visual boundaries
           border: '1px solid rgba(0, 0, 0, 0.1)',
           borderRadius: '8px',

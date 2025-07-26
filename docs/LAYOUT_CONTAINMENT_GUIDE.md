@@ -32,8 +32,8 @@ Our containment system uses modern CSS features to create isolated "layout viewp
 The `ContentEditor` component automatically applies containment to all layout containers:
 
 ```jsx
-<div className="layout-container layout-containment">
-  {/* Layout content is automatically contained */}
+<div className="layout-container content-editor-container">
+  {/* Layout content is automatically contained with vertical scrolling */}
 </div>
 ```
 
@@ -176,6 +176,11 @@ For layout templates with fixed navigation:
 - **Purpose**: Helper for absolutely positioned elements
 - **Features**: Ensures absolute elements stay within container bounds
 - **Use case**: Modals, overlays, and positioned content
+
+### `.content-editor-container`
+- **Purpose**: Specialized containment for content editing interfaces
+- **Features**: Full containment with optimized vertical scrolling and custom scrollbars
+- **Use case**: ContentEditor component and similar editing interfaces
 
 ## JavaScript API Reference
 
