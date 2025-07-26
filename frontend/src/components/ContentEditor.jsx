@@ -371,8 +371,7 @@ const ContentEditor = ({
     getSelectedSlot: () => selectedSlot
   }), [updateSlot, getSlots, getSlotConfig, selectedSlot]);
 
-  // Use imperative handle if ref is provided
-  React.useImperativeHandle(React.forwardRef(() => { }), () => api, [api]);
+
 
   if (error) {
     return (
