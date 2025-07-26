@@ -16,6 +16,12 @@ The LayoutRenderer now includes a comprehensive UI system for adding new slots d
 ### 1. Automatic Slot Menus ⭐
 Three-dot menu buttons (•••) automatically appear on every rendered slot, providing instant access to slot operations. No setup required!
 
+**"Add Widget" opens a modal with:**
+- **Widget Selection Grid** - Visual cards showing available widgets
+- **Search Functionality** - Filter widgets by name, type, or description  
+- **Categories** - Organized by content, media, interactive, and layout
+- **Widget Previews** - Icons and descriptions for each widget type
+
 ### 2. Floating Add Button
 A blue + button that appears in the top-left corner of the page, allowing users to add slots from anywhere.
 
@@ -43,14 +49,14 @@ const renderer = new LayoutRenderer();
 
 // Set up callbacks for slot interactions
 renderer.setUICallbacks({
-  onAddWidget: (slotName) => {
-    // Handle adding widget to slot
-  },
-  onEditSlot: (slotName) => {
-    // Handle slot editing
-  },
-  onToggleVisibility: (slotName, isVisible) => {
-    // Handle slot visibility toggle
+  onWidgetSelected: (slotName, widgetInstance, widgetDef) => {
+    // Handle widget selection from modal
+    // widgetInstance: {id, type, name, config}
+    // widgetDef: Original widget definition
+    console.log(`Adding ${widgetDef.name} to ${slotName}`);
+    
+    // Add widget to your data model and update slot
+    // renderer.updateSlot(slotName, [widgetInstance]);
   },
   onSlotInfo: (slotName) => {
     // Show slot information
@@ -108,9 +114,7 @@ renderer.setUICallbacks({
 
 // Enable slot menus (if disabled)
 renderer.enableSlotMenus({
-  showAddWidget: true,
-  showEditSlot: true,
-  showSlotVisibility: true
+  showAddWidget: true
 });
 
 // Disable slot menus
@@ -168,6 +172,40 @@ When a new slot is created, the callback receives:
   referenceElement: HTMLElement  // Reference element (if any)
 }
 ```
+
+### widgetInstance Object
+```javascript
+{
+  id: "widget-1234567890-abc123",  // Unique widget identifier
+  type: "text",                   // Widget type
+  name: "Text Block",            // Human-readable name
+  config: {                      // Widget configuration
+    content: "Enter your text here...",
+    fontSize: "medium",
+    alignment: "left"
+  }
+}
+```
+
+## Available Widget Types
+
+The widget selection modal includes these built-in widget types:
+
+### Content Widgets
+- **Text Block** - Simple text content with formatting options
+- **List** - Ordered or unordered list of items
+
+### Media Widgets  
+- **Image** - Display images with captions and links
+- **Video** - Embed videos from various sources
+
+### Interactive Widgets
+- **Button** - Interactive button with customizable styling
+
+### Layout Widgets
+- **Card** - Content card with title, text, and optional image
+- **Spacer** - Add spacing between content elements
+- **Divider** - Horizontal line to separate content sections
 
 ## Styling
 

@@ -46,14 +46,15 @@
 
         // Set up callbacks for slot interactions
         renderer.setUICallbacks({
-            onAddWidget: (slotName) => {
-                alert(`Add widget to slot: ${slotName}`);
-            },
-            onEditSlot: (slotName) => {
-                alert(`Edit slot: ${slotName}`);
-            },
-            onToggleVisibility: (slotName, isVisible) => {
-                console.log(`Slot ${slotName} visibility toggled to: ${isVisible}`);
+            onWidgetSelected: (slotName, widgetInstance, widgetDef) => {
+                console.log(`Widget selected for slot "${slotName}":`, widgetInstance);
+                
+                // In a real app, you would add the widget to your data model
+                // and re-render or update the slot with the new widget
+                alert(`Widget "${widgetDef.name}" added to slot "${slotName}"!\nCheck console for details.`);
+                
+                // Example: Add widget to slot (you could implement actual widget rendering here)
+                // renderer.updateSlot(slotName, [widgetInstance]);
             },
             onSlotInfo: (slotName) => {
                 const config = renderer.getSlotConfig(slotName);
