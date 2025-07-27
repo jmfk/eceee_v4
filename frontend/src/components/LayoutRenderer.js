@@ -122,10 +122,10 @@ class LayoutRenderer {
         targetRef.current.appendChild(rootElement);
       }
 
-      console.log('LayoutRenderer: Layout rendered successfully', {
-        slots: Array.from(this.slotContainers.keys()),
-        configs: Array.from(this.slotConfigs.keys())
-      });
+      // console.log('LayoutRenderer: Layout rendered successfully', {
+      //   slots: Array.from(this.slotContainers.keys()),
+      //   configs: Array.from(this.slotConfigs.keys())
+      // });
 
       // Ensure slot menus are added after rendering is complete
       if (this.uiConfig.showIconMenu) {
@@ -205,7 +205,7 @@ class LayoutRenderer {
    * @param {Array} widgets - Array of widget objects to render
    */
   updateSlot(slotName, widgets = []) {
-    console.log("LayoutRenderer updateSlot", slotName, widgets)
+    // console.log("LayoutRenderer updateSlot", slotName, widgets)
     if (this.isDestroyed) {
       console.warn('LayoutRenderer: Cannot update slot on destroyed instance');
       return;
@@ -267,7 +267,7 @@ class LayoutRenderer {
         }
       }
 
-      console.log(`LayoutRenderer: Updated slot "${slotName}" with ${widgets.length} widgets`);
+      // console.log(`LayoutRenderer: Updated slot "${slotName}" with ${widgets.length} widgets`);
 
     } catch (error) {
       console.error(`LayoutRenderer: Error updating slot "${slotName}"`, error);
@@ -320,7 +320,7 @@ class LayoutRenderer {
       this.widgetRenderer = null;
       this.isDestroyed = true;
 
-      console.log('LayoutRenderer: Instance destroyed successfully');
+      // console.log('LayoutRenderer: Instance destroyed successfully');
     } catch (error) {
       console.error('LayoutRenderer: Error during destruction', error);
     }
@@ -844,7 +844,7 @@ class LayoutRenderer {
    */
   markPageAsSaved() {
     this.pageHasBeenSaved = true;
-    console.log('LayoutRenderer: Page marked as saved - default widgets will not be auto-created');
+    // console.log('LayoutRenderer: Page marked as saved - default widgets will not be auto-created');
   }
 
   /**
@@ -863,7 +863,7 @@ class LayoutRenderer {
     this.defaultWidgetsProcessed = false;
     this.savedWidgetData.clear();
     this.markAsClean(); // Reset dirty state
-    console.log('LayoutRenderer: Page state reset - default widgets will be auto-created');
+    // console.log('LayoutRenderer: Page state reset - default widgets will be auto-created');
   }
 
   /**
@@ -880,7 +880,7 @@ class LayoutRenderer {
       }
     });
 
-    console.log('LayoutRenderer: Collected widget data from all slots:', widgetData);
+    // console.log('LayoutRenderer: Collected widget data from all slots:', widgetData);
     return widgetData;
   }
 
@@ -1073,7 +1073,7 @@ class LayoutRenderer {
    * @param {Object} widgetData - Object with slot names as keys and widget arrays as values
    */
   saveWidgetData(widgetData) {
-    console.log('saveWidgetData:', widgetData);
+    // console.log('saveWidgetData:', widgetData);
     // Store widget data internally
     this.savedWidgetData.clear();
     Object.entries(widgetData).forEach(([slotName, widgets]) => {
@@ -1083,7 +1083,7 @@ class LayoutRenderer {
     // Mark page as saved
     this.markPageAsSaved();
 
-    console.log('LayoutRenderer: Widget data saved:', widgetData);
+    // console.log('LayoutRenderer: Widget data saved:', widgetData);
   }
 
   /**
@@ -1093,7 +1093,7 @@ class LayoutRenderer {
   saveCurrentWidgetState() {
     const widgetData = this.collectAllWidgetData();
 
-    console.log('widgetData:', widgetData);
+    // console.log('widgetData:', widgetData);
     this.saveWidgetData(widgetData);
 
     // Mark as clean after successful save
@@ -1142,7 +1142,7 @@ class LayoutRenderer {
       this.pageHasBeenSaved = true;
       this.markAsClean();
 
-      console.log('LayoutRenderer: Widget data loaded:', widgetData);
+      // console.log('LayoutRenderer: Widget data loaded:', widgetData);
     }
   }
 
@@ -1153,7 +1153,7 @@ class LayoutRenderer {
   setAutoSaveConfig(config = {}) {
     this.autoSaveEnabled = config.enabled !== false;
     this.autoSaveDelay = config.delay || 2000;
-    console.log(`LayoutRenderer: Auto-save configured - enabled: ${this.autoSaveEnabled}, delay: ${this.autoSaveDelay}ms`);
+    // console.log(`LayoutRenderer: Auto-save configured - enabled: ${this.autoSaveEnabled}, delay: ${this.autoSaveDelay}ms`);
   }
 
   /**
@@ -1171,7 +1171,7 @@ class LayoutRenderer {
   markAsDirty(reason = 'unknown') {
     if (!this.isDirty) {
       this.isDirty = true;
-      console.log(`LayoutRenderer: Page marked as dirty - ${reason}`);
+      // console.log(`LayoutRenderer: Page marked as dirty - ${reason}`);
 
       // Execute callback for dirty state change
       this.executeCallback('onDirtyStateChanged', true, reason);
@@ -1189,7 +1189,7 @@ class LayoutRenderer {
   markAsClean() {
     if (this.isDirty) {
       this.isDirty = false;
-      console.log('LayoutRenderer: Page marked as clean');
+      // console.log('LayoutRenderer: Page marked as clean');
 
       // Cancel pending auto-save
       if (this.autoSaveTimeoutId) {
@@ -1214,11 +1214,11 @@ class LayoutRenderer {
     // Set new auto-save timeout
     this.autoSaveTimeoutId = setTimeout(() => {
       if (this.isDirty && this.autoSaveEnabled) {
-        console.log('LayoutRenderer: Auto-saving page...');
+        // console.log('LayoutRenderer: Auto-saving page...');
 
         try {
           const widgetData = this.saveCurrentWidgetState();
-          console.log('LayoutRenderer: Auto-save completed');
+          // console.log('LayoutRenderer: Auto-save completed');
 
           // Execute callback for auto-save
           this.executeCallback('onAutoSave', widgetData);
@@ -1231,7 +1231,7 @@ class LayoutRenderer {
       this.autoSaveTimeoutId = null;
     }, this.autoSaveDelay);
 
-    console.log(`LayoutRenderer: Auto-save scheduled in ${this.autoSaveDelay}ms`);
+    // console.log(`LayoutRenderer: Auto-save scheduled in ${this.autoSaveDelay}ms`);
   }
 
   /**
@@ -1468,7 +1468,7 @@ class LayoutRenderer {
       // Close modal
       closeModal();
 
-      console.log(`LayoutRenderer: Widget "${widgetDef.name}" added to slot "${slotName}"`);
+      // console.log(`LayoutRenderer: Widget "${widgetDef.name}" added to slot "${slotName}"`);
 
     } catch (error) {
       console.error('LayoutRenderer: Error handling widget selection', error);
@@ -1863,7 +1863,7 @@ class LayoutRenderer {
       // Mark page as dirty since a widget was removed
       this.markAsDirty(`widget removed: ${widgetName} from ${slotName}`);
 
-      console.log(`LayoutRenderer: Widget ${widgetId} removed from slot ${slotName}`);
+      // console.log(`LayoutRenderer: Widget ${widgetId} removed from slot ${slotName}`);
     }
   }
 
@@ -1896,7 +1896,7 @@ class LayoutRenderer {
             // Execute callback to notify about auto-created widget
             this.executeCallback('onWidgetAutoCreated', slotName, widgetInstance, widgetDef);
 
-            console.log(`LayoutRenderer: Auto-created widget "${widgetInstance.name}" in slot "${slotName}"`);
+            // console.log(`LayoutRenderer: Auto-created widget "${widgetInstance.name}" in slot "${slotName}"`);
 
           } else {
             // Widget type not found, create a placeholder widget
@@ -2328,7 +2328,7 @@ class LayoutRenderer {
       closeDialog();
 
       // Show success message
-      console.log(`LayoutRenderer: New slot "${slotData.name}" configuration created`);
+      // console.log(`LayoutRenderer: New slot "${slotData.name}" configuration created`);
 
     } catch (error) {
       console.error('LayoutRenderer: Error creating new slot', error);
@@ -2471,7 +2471,7 @@ class LayoutRenderer {
    * @returns {HTMLElement} DOM element
    */
   renderSlotElement(node) {
-    console.log("LayoutRenderer renderSlotElement", node)
+    // console.log("LayoutRenderer renderSlotElement", node)
     try {
       // Validate slot configuration
       if (!node.slot || typeof node.slot !== 'object') {
@@ -2540,7 +2540,7 @@ class LayoutRenderer {
       if (this.hasSlotWidgetData(slotName)) {
         // Load saved widgets for this slot
         const savedWidgets = this.getSlotWidgetData(slotName);
-        console.log(`LayoutRenderer: Loading ${savedWidgets.length} saved widgets for slot "${slotName}"`);
+        // console.log(`LayoutRenderer: Loading ${savedWidgets.length} saved widgets for slot "${slotName}"`);
         savedWidgets.forEach((widgetInstance, index) => {
           try {
             this.addWidgetToSlot(slotName, widgetInstance, true); // isLoading = true
@@ -2554,11 +2554,11 @@ class LayoutRenderer {
         // Check if we should convert default widgets to real widget instances
         if (!this.pageHasBeenSaved && !this.defaultWidgetsProcessed) {
           // Convert default widgets to actual widget instances for new/unsaved pages
-          console.log(`LayoutRenderer: Converting ${node.slot.defaultWidgets.length} default widgets to instances for slot "${slotName}"`);
+          // console.log(`LayoutRenderer: Converting ${node.slot.defaultWidgets.length} default widgets to instances for slot "${slotName}"`);
           this.convertDefaultWidgetsToInstances(slotName, node.slot.defaultWidgets);
         } else {
           // For saved pages without saved widgets, render default widgets as placeholders (legacy behavior)
-          console.log(`LayoutRenderer: Rendering ${node.slot.defaultWidgets.length} default widgets as placeholders for slot "${slotName}"`);
+          // console.log(`LayoutRenderer: Rendering ${node.slot.defaultWidgets.length} default widgets as placeholders for slot "${slotName}"`);
           node.slot.defaultWidgets.forEach((defaultWidget, index) => {
             try {
               const widgetElement = this.renderWidget(defaultWidget);
@@ -2574,7 +2574,7 @@ class LayoutRenderer {
         }
       } else {
         // Show placeholder for empty slot
-        console.log(`LayoutRenderer: No saved or default widgets for slot "${slotName}" - showing placeholder`);
+        // console.log(`LayoutRenderer: No saved or default widgets for slot "${slotName}" - showing placeholder`);
         const title = node.slot.title || slotName;
         const description = node.slot.description || '';
 
@@ -2620,7 +2620,7 @@ class LayoutRenderer {
    * @returns {HTMLElement|null} DOM element or null if rendering failed
    */
   renderWidget(widget) {
-    console.log("LayoutRenderer widget", widget)
+    // console.log("LayoutRenderer widget", widget)
     try {
       // Validate widget object
       if (!widget || typeof widget !== 'object') {

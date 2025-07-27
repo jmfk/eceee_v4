@@ -14,7 +14,10 @@ const ContentEditor = ({
   editable = false,
   onSlotClick,
   onWidgetUpdate,
-  className = ''
+  className = '',
+  pageData,
+  onUpdate,
+  isNewPage
 }) => {
   const containerRef = useRef(null);
   const rendererRef = useRef(null);
@@ -24,6 +27,8 @@ const ContentEditor = ({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [selectedSlot, setSelectedSlot] = useState(null);
+
+  console.log("ContentEditor::widgets", widgets);
 
   // Create a widget DOM element with proper memory management
   const createWidgetElement = useCallback((widget) => {
@@ -226,7 +231,7 @@ const ContentEditor = ({
         element.style.maxHeight = '100%';
 
         // Log for debugging (can be removed in production)
-        console.log('ContentEditor: Converted fixed positioned element to absolute within container', element);
+        //console.log('ContentEditor: Converted fixed positioned element to absolute within container', element);
       }
     });
   }, []);
@@ -405,14 +410,37 @@ const ContentEditor = ({
     };
   }, [cleanupEventListeners]);
 
+  // Trigger save of all current widgets
+  const saveWidgets = useCallback((options = {}) => {
+    console.log("ContentEditor::saveWidgets", options);
+    if (!layoutRenderer || !onWidgetUpdate) return;
+
+    // Get current widgets from all slots
+    const slotNames = layoutRenderer.getSlotNames();
+    const currentWidgets = {};
+
+    slotNames.forEach(slotName => {
+      currentWidgets[slotName] = layoutRenderer.getSlotWidgetData(slotName);
+    });
+
+    console.log('ContentEditor: Saving all widgets:', currentWidgets);
+
+    // Call onWidgetUpdate with the complete widgets object
+    // Note: This will save all slots at once rather than individually
+    Object.entries(currentWidgets).forEach(([slotName, widgets]) => {
+      onWidgetUpdate(slotName, widgets, options);
+    });
+  }, [layoutRenderer, onWidgetUpdate]);
+
   // Expose methods for external use
   const api = useMemo(() => ({
     updateSlot,
     getSlots,
     getSlotConfig,
     setSelectedSlot,
-    getSelectedSlot: () => selectedSlot
-  }), [updateSlot, getSlots, getSlotConfig, selectedSlot]);
+    getSelectedSlot: () => selectedSlot,
+    saveWidgets
+  }), [updateSlot, getSlots, getSlotConfig, selectedSlot, saveWidgets]);
 
 
 
