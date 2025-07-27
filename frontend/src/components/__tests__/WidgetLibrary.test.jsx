@@ -1,10 +1,32 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { vi } from 'vitest'
 import axios from 'axios'
 import WidgetLibrary from '../WidgetLibrary'
 
 // Mock axios
-jest.mock('axios')
+vi.mock('axios', () => ({
+    default: {
+        get: vi.fn(),
+        post: vi.fn(),
+        put: vi.fn(),
+        delete: vi.fn(),
+        create: vi.fn(() => ({
+            get: vi.fn(),
+            post: vi.fn(),
+            put: vi.fn(),
+            delete: vi.fn(),
+            interceptors: {
+                request: {
+                    use: vi.fn()
+                },
+                response: {
+                    use: vi.fn()
+                }
+            }
+        }))
+    }
+}))
 const mockedAxios = axios
 
 describe('WidgetLibrary', () => {
@@ -73,7 +95,7 @@ describe('WidgetLibrary', () => {
     })
 
     afterEach(() => {
-        jest.clearAllMocks()
+        vi.clearAllMocks()
     })
 
     const renderWithQueryClient = (component) => {
@@ -88,13 +110,13 @@ describe('WidgetLibrary', () => {
         // Make the API call hang to test loading state
         mockedAxios.get.mockImplementation(() => new Promise(() => { }))
 
-        renderWithQueryClient(<WidgetLibrary onSelectWidget={jest.fn()} />)
+        renderWithQueryClient(<WidgetLibrary onSelectWidget={vi.fn()} />)
 
         expect(screen.getByText('Loading widget types...')).toBeInTheDocument()
     })
 
     it('renders widget types after loading', async () => {
-        renderWithQueryClient(<WidgetLibrary onSelectWidget={jest.fn()} />)
+        renderWithQueryClient(<WidgetLibrary onSelectWidget={vi.fn()} />)
 
         await waitFor(() => {
             expect(screen.getByText('Text Block')).toBeInTheDocument()
@@ -106,7 +128,7 @@ describe('WidgetLibrary', () => {
     })
 
     it('makes correct API call', async () => {
-        renderWithQueryClient(<WidgetLibrary onSelectWidget={jest.fn()} />)
+        renderWithQueryClient(<WidgetLibrary onSelectWidget={vi.fn()} />)
 
         await waitFor(() => {
             expect(mockedAxios.get).toHaveBeenCalledWith('/api/v1/webpages/widget-types/')
@@ -114,7 +136,7 @@ describe('WidgetLibrary', () => {
     })
 
     it('filters widgets by search term', async () => {
-        renderWithQueryClient(<WidgetLibrary onSelectWidget={jest.fn()} />)
+        renderWithQueryClient(<WidgetLibrary onSelectWidget={vi.fn()} />)
 
         await waitFor(() => {
             expect(screen.getByText('Text Block')).toBeInTheDocument()
@@ -130,7 +152,7 @@ describe('WidgetLibrary', () => {
     })
 
     it('filters widgets by category', async () => {
-        renderWithQueryClient(<WidgetLibrary onSelectWidget={jest.fn()} />)
+        renderWithQueryClient(<WidgetLibrary onSelectWidget={vi.fn()} />)
 
         await waitFor(() => {
             expect(screen.getByText('Text Block')).toBeInTheDocument()
@@ -147,7 +169,7 @@ describe('WidgetLibrary', () => {
     })
 
     it('calls onSelectWidget when widget is clicked', async () => {
-        const mockOnSelectWidget = jest.fn()
+        const mockOnSelectWidget = vi.fn()
         renderWithQueryClient(<WidgetLibrary onSelectWidget={mockOnSelectWidget} />)
 
         await waitFor(() => {
@@ -170,7 +192,7 @@ describe('WidgetLibrary', () => {
 
         renderWithQueryClient(
             <WidgetLibrary
-                onSelectWidget={jest.fn()}
+                onSelectWidget={vi.fn()}
                 selectedWidgetTypes={selectedWidgetTypes}
             />
         )
@@ -187,7 +209,7 @@ describe('WidgetLibrary', () => {
     it('displays error state when API call fails', async () => {
         mockedAxios.get.mockRejectedValue(new Error('API Error'))
 
-        renderWithQueryClient(<WidgetLibrary onSelectWidget={jest.fn()} />)
+        renderWithQueryClient(<WidgetLibrary onSelectWidget={vi.fn()} />)
 
         await waitFor(() => {
             expect(screen.getByText('Error Loading Widget Types')).toBeInTheDocument()
@@ -196,7 +218,7 @@ describe('WidgetLibrary', () => {
     })
 
     it('shows empty state when no widgets match filter', async () => {
-        renderWithQueryClient(<WidgetLibrary onSelectWidget={jest.fn()} />)
+        renderWithQueryClient(<WidgetLibrary onSelectWidget={vi.fn()} />)
 
         await waitFor(() => {
             expect(screen.getByText('Text Block')).toBeInTheDocument()
@@ -212,7 +234,7 @@ describe('WidgetLibrary', () => {
     })
 
     it('displays code-based widgets info banner', async () => {
-        renderWithQueryClient(<WidgetLibrary onSelectWidget={jest.fn()} />)
+        renderWithQueryClient(<WidgetLibrary onSelectWidget={vi.fn()} />)
 
         await waitFor(() => {
             expect(screen.getByText('Code-Based Widget Types')).toBeInTheDocument()

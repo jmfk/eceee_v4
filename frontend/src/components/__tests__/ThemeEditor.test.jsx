@@ -4,6 +4,8 @@ import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import axios from 'axios'
 import ThemeEditor from '../ThemeEditor'
+import { GlobalNotificationProvider } from '../../contexts/GlobalNotificationContext'
+import { NotificationProvider } from '../NotificationManager'
 
 // Mock axios
 vi.mock('axios', () => ({
@@ -12,6 +14,20 @@ vi.mock('axios', () => ({
         post: vi.fn(),
         put: vi.fn(),
         delete: vi.fn(),
+        create: vi.fn(() => ({
+            get: vi.fn(),
+            post: vi.fn(),
+            put: vi.fn(),
+            delete: vi.fn(),
+            interceptors: {
+                request: {
+                    use: vi.fn()
+                },
+                response: {
+                    use: vi.fn()
+                }
+            }
+        }))
     }
 }))
 
@@ -73,7 +89,11 @@ const renderWithQueryClient = (component) => {
     const queryClient = createTestQueryClient()
     return render(
         <QueryClientProvider client={queryClient}>
-            {component}
+            <GlobalNotificationProvider>
+                <NotificationProvider>
+                    {component}
+                </NotificationProvider>
+            </GlobalNotificationProvider>
         </QueryClientProvider>
     )
 }
