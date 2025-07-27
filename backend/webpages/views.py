@@ -497,6 +497,65 @@ class WebPageViewSet(viewsets.ModelViewSet):
             status=status.HTTP_200_OK,
         )
 
+    @action(detail=True, methods=["post"])
+    def update_widgets(self, request, pk=None):
+        """Update page widgets by creating a new version"""
+        page = self.get_object()
+
+        # Validate request data
+        widgets_data = request.data.get("widgets", {})
+        if not isinstance(widgets_data, dict):
+            return Response(
+                {"error": "Widgets data must be a JSON object"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Get description for the version
+        description = request.data.get("description", "Widget update via API")
+        auto_publish = request.data.get("auto_publish", False)
+
+        try:
+            # Get current version data to preserve page_data
+            current_version = page.get_current_version()
+            current_page_data = current_version.page_data if current_version else {}
+
+            # Create new version with updated widgets
+            new_version = page.create_version(
+                user=request.user,
+                description=description,
+                status="published" if auto_publish else "draft",
+                auto_publish=auto_publish,
+            )
+
+            # Update the version with new widgets and preserve page_data
+            new_version.page_data = current_page_data
+            new_version.widgets = widgets_data
+            new_version.save()
+
+            # If auto-publishing, update page status
+            if auto_publish:
+                page.last_modified_by = request.user
+                page.save()
+
+            # Return updated page data
+            serializer = self.get_serializer(page)
+            return Response(
+                {
+                    "message": "Widgets updated successfully",
+                    "version_id": new_version.id,
+                    "version_number": new_version.version_number,
+                    "auto_published": auto_publish,
+                    "page": serializer.data,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to update widgets: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
 
 class PageVersionViewSet(viewsets.ModelViewSet):
     """ViewSet for page versions with workflow support."""

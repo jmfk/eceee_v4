@@ -52,6 +52,16 @@ export const getPage = async (pageId) => {
     return response.data
 }
 
+// Update page widgets (creates new version)
+export const updatePageWidgets = async (pageId, widgets, options = {}) => {
+    const response = await api.post(`${API_BASE}/pages/${pageId}/update_widgets/`, {
+        widgets,
+        description: options.description || 'Widget update',
+        auto_publish: options.autoPublish || false
+    })
+    return response.data
+}
+
 // Create a new page
 export const createPage = async (pageData) => {
     const response = await api.post(`${API_BASE}/pages/`, pageData)
