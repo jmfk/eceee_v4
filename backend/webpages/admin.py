@@ -81,11 +81,34 @@ class PageThemeAdmin(admin.ModelAdmin):
 class PageVersionInline(admin.TabularInline):
     model = PageVersion
     extra = 0
-    readonly_fields = ["version_number", "created_at", "created_by", "is_current"]
-    fields = ["version_number", "description", "is_current", "created_at", "created_by"]
+    readonly_fields = [
+        "version_number",
+        "created_at",
+        "created_by",
+        "is_current",
+        "admin_link",
+    ]
+    fields = [
+        "version_number",
+        "description",
+        "is_current",
+        "admin_link",
+    ]
 
     def has_add_permission(self, request, obj=None):
         return False  # Versions are created automatically
+
+    def admin_link(self, obj):
+        """Generate a link to the admin page for this version"""
+        if obj.pk:
+            from django.urls import reverse
+            from django.utils.html import format_html
+
+            url = reverse("admin:webpages_pageversion_change", args=[obj.pk])
+            return format_html('<a href="{}" target="_blank">View Version</a>', url)
+        return "-"
+
+    admin_link.short_description = "Admin Link"
 
 
 @admin.register(WebPage)
@@ -98,9 +121,15 @@ class WebPageAdmin(admin.ModelAdmin):
         "publication_status",
         "effective_date",
         "is_published_display",
+        "version_count_display",
         "sort_order",
         "created_at",
     ]
+
+    def get_queryset(self, request):
+        """Optimize queryset by prefetching related data"""
+        return super().get_queryset(request).prefetch_related("versions")
+
     list_filter = [
         "publication_status",
         HasHostnamesFilter,
@@ -219,6 +248,22 @@ class WebPageAdmin(admin.ModelAdmin):
 
     get_hostnames_display.short_description = "Hostnames"
 
+    def version_count_display(self, obj):
+        """Display version count with styling based on count"""
+        count = obj.versions.count()
+        if count == 0:
+            return format_html('<span style="color: gray;">No versions</span>')
+        elif count == 1:
+            return format_html('<span style="color: green;">1 version</span>')
+        elif count <= 5:
+            return format_html('<span style="color: orange;">{} versions</span>', count)
+        else:
+            return format_html(
+                '<span style="color: red; font-weight: bold;">{} versions</span>', count
+            )
+
+    version_count_display.short_description = "Versions"
+
     def is_root_page_display(self, obj):
         """Display whether this is a root page"""
         if obj.is_root_page():
@@ -265,7 +310,7 @@ class WebPageAdmin(admin.ModelAdmin):
         ):
             obj.create_version(request.user, "Admin update")
 
-    actions = ["clear_hostnames", "show_hostname_summary"]
+    actions = ["clear_hostnames", "show_hostname_summary", "compact_page_versions"]
 
     def clear_hostnames(self, request, queryset):
         """Clear hostnames from selected root pages"""
@@ -304,6 +349,107 @@ class WebPageAdmin(admin.ModelAdmin):
 
     show_hostname_summary.short_description = "Show hostname summary"
 
+    def compact_page_versions(self, request, queryset):
+        """Compact page versions by keeping only the latest published version"""
+        from django.db import transaction
+        from django.http import HttpResponseRedirect
+        from django.template.response import TemplateResponse
+        from django.utils import timezone
+
+        # Calculate what would be deleted (preview)
+        preview_data = []
+        total_versions_to_delete = 0
+
+        for page in queryset:
+            current_version = page.get_current_version()
+            if current_version:
+                old_versions_count = page.versions.exclude(
+                    id=current_version.id
+                ).count()
+                if old_versions_count > 0:
+                    preview_data.append(
+                        {
+                            "page": page,
+                            "current_version": current_version,
+                            "versions_to_delete": old_versions_count,
+                            "total_versions": page.versions.count(),
+                        }
+                    )
+                    total_versions_to_delete += old_versions_count
+
+        # If no confirmation yet, show preview page
+        if request.POST.get("confirm_compact") != "yes":
+            context = {
+                "title": "Confirm Page Version Compaction",
+                "action_name": "compact_page_versions",
+                "queryset": queryset,
+                "preview_data": preview_data,
+                "total_versions_to_delete": total_versions_to_delete,
+                "opts": self.model._meta,
+                "has_view_permission": self.has_view_permission(request),
+            }
+            return TemplateResponse(
+                request, "admin/webpages/compact_versions_confirmation.html", context
+            )
+
+        # Perform the actual compaction
+        total_deleted = 0
+        pages_processed = 0
+        errors = []
+
+        for page in queryset:
+            try:
+                with transaction.atomic():
+                    # Get the current published version
+                    current_version = page.get_current_version()
+
+                    if not current_version:
+                        errors.append(
+                            f"Page '{page.title}' has no published version - skipped"
+                        )
+                        continue
+
+                    # Get all versions except the current one
+                    old_versions = page.versions.exclude(id=current_version.id)
+                    deleted_count = old_versions.count()
+
+                    if deleted_count > 0:
+                        # Delete old versions
+                        old_versions.delete()
+                        total_deleted += deleted_count
+                        pages_processed += 1
+
+                        # Create a log entry for this compaction (widgets will be preserved automatically)
+                        page.create_version(
+                            user=request.user,
+                            description=f"Admin compaction: deleted {deleted_count} old versions",
+                            status="published",
+                            auto_publish=True,
+                        )
+
+            except Exception as e:
+                errors.append(f"Error compacting '{page.title}': {str(e)}")
+
+        # Generate success message
+        if pages_processed > 0:
+            message = f"Successfully compacted {pages_processed} page(s), deleted {total_deleted} old version(s)."
+        else:
+            message = "No versions were compacted."
+
+        # Add error information if any
+        if errors:
+            message += f" Errors: {'; '.join(errors)}"
+
+        # Show appropriate message type
+        if errors and pages_processed == 0:
+            self.message_user(request, message, level="ERROR")
+        elif errors:
+            self.message_user(request, message, level="WARNING")
+        else:
+            self.message_user(request, message, level="SUCCESS")
+
+    compact_page_versions.short_description = "Compact page versions (keep only latest)"
+
 
 @admin.register(PageVersion)
 class PageVersionAdmin(admin.ModelAdmin):
@@ -314,25 +460,65 @@ class PageVersionAdmin(admin.ModelAdmin):
         "is_current",
         "created_at",
         "created_by",
+        "page_admin_link",
     ]
     list_filter = ["is_current", "created_at", "page"]
     search_fields = ["page__title", "description"]
-    readonly_fields = ["created_at", "version_number", "page_data"]
+    readonly_fields = ["created_at", "version_number", "page_admin_link"]
 
     fieldsets = (
-        ("Version Information", {"fields": ("page", "version_number", "is_current")}),
-        ("Content", {"fields": ("description", "page_data"), "classes": ("collapse",)}),
+        (
+            "Version Information",
+            {"fields": ("page", "version_number", "is_current", "page_admin_link")},
+        ),
+        (
+            "Content",
+            {
+                "fields": ("description", "page_data", "widgets"),
+                "description": "JSON fields can be edited manually. Ensure valid JSON format.",
+            },
+        ),
         (
             "Metadata",
             {"fields": ("created_at", "created_by"), "classes": ("collapse",)},
         ),
     )
 
+    def get_form(self, request, obj=None, **kwargs):
+        """Customize form to use textarea widgets for JSON fields"""
+        form = super().get_form(request, obj, **kwargs)
+
+        # Use textarea widgets for JSON fields to make editing easier
+        if "page_data" in form.base_fields:
+            form.base_fields["page_data"].widget = admin.widgets.AdminTextareaWidget(
+                attrs={"rows": 20, "cols": 80, "style": "font-family: monospace;"}
+            )
+        if "widgets" in form.base_fields:
+            form.base_fields["widgets"].widget = admin.widgets.AdminTextareaWidget(
+                attrs={"rows": 15, "cols": 80, "style": "font-family: monospace;"}
+            )
+
+        return form
+
     def has_add_permission(self, request):
         return False  # Versions are created automatically
 
     def has_change_permission(self, request, obj=None):
-        return False  # Versions should not be manually edited
+        return True  # Allow editing for JSON field modifications
+
+    def page_admin_link(self, obj):
+        """Generate a link to the admin page for the parent page"""
+        if obj.page:
+            from django.urls import reverse
+            from django.utils.html import format_html
+
+            url = reverse("admin:webpages_webpage_change", args=[obj.page.pk])
+            return format_html(
+                '<a href="{}" target="_blank">View Page: {}</a>', url, obj.page.title
+            )
+        return "-"
+
+    page_admin_link.short_description = "Parent Page"
 
     actions = ["restore_version"]
 
@@ -343,56 +529,6 @@ class PageVersionAdmin(admin.ModelAdmin):
         self.message_user(request, f"Restored {queryset.count()} version(s)")
 
     restore_version.short_description = "Restore selected versions"
-
-
-# Removed PageWidgetAdmin - widgets are now stored in PageVersion JSON data
-# @admin.register(PageWidget)
-# class PageWidgetAdmin(admin.ModelAdmin):
-#     list_display = [
-#         "page",
-#         "widget_type",
-#         "slot_name",
-#         "sort_order",
-#         "inherit_from_parent",
-#         "override_parent",
-#         "created_at",
-#     ]
-#     list_filter = [
-#         "widget_type",
-#         "slot_name",
-#         "inherit_from_parent",
-#         "override_parent",
-#         "created_at",
-#     ]
-#     search_fields = ["page__title", "widget_type__name", "slot_name"]
-#     readonly_fields = ["created_at", "updated_at"]
-#
-#     fieldsets = (
-#         (
-#             "Basic Information",
-#             {"fields": ("page", "widget_type", "slot_name", "sort_order")},
-#         ),
-#         ("Configuration", {"fields": ("configuration",)}),
-#         (
-#             "Inheritance",
-#             {
-#                 "fields": ("inherit_from_parent", "override_parent"),
-#                 "description": "Control how this widget affects child pages",
-#             },
-#         ),
-#         (
-#             "Metadata",
-#             {
-#                 "fields": ("created_at", "updated_at", "created_by"),
-#                 "classes": ("collapse",),
-#             },
-#         ),
-#     )
-#
-#     def save_model(self, request, obj, form, change):
-#         if not change:  # Creating new object
-#             obj.created_by = request.user
-#         super().save_model(request, obj, form, change)
 
 
 # Customize admin site headers

@@ -1,0 +1,114 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls %}
+
+{% block title %}{{ title }} | {% trans 'Django site admin' %}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
+    &rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+    &rsaquo; <a href="{% url opts|admin_urlname:'changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+    &rsaquo; {{ title }}
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="content">
+    <h1>{{ title }}</h1>
+    
+    {% if preview_data %}
+        <div class="module aligned">
+            <div class="form-row">
+                <p class="help">
+                    <strong>⚠️ Warning:</strong> This action will permanently delete older page versions, keeping only the latest published version for each page.
+                    This action cannot be undone.
+                </p>
+            </div>
+            
+            <div class="form-row">
+                <h2>Summary</h2>
+                <ul>
+                    <li><strong>Pages to process:</strong> {{ preview_data|length }}</li>
+                    <li><strong>Total versions to delete:</strong> {{ total_versions_to_delete }}</li>
+                </ul>
+            </div>
+            
+            <div class="form-row">
+                <h2>Pages and versions to be compacted:</h2>
+                <table class="compact-preview-table" style="width: 100%; border-collapse: collapse; margin: 10px 0;">
+                    <thead>
+                        <tr style="background-color: #f8f9fa; border-bottom: 2px solid #dee2e6;">
+                            <th style="padding: 8px; text-align: left; border: 1px solid #dee2e6;">Page</th>
+                            <th style="padding: 8px; text-align: center; border: 1px solid #dee2e6;">Current Version</th>
+                            <th style="padding: 8px; text-align: center; border: 1px solid #dee2e6;">Total Versions</th>
+                            <th style="padding: 8px; text-align: center; border: 1px solid #dee2e6;">Versions to Delete</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in preview_data %}
+                        <tr style="border-bottom: 1px solid #dee2e6;">
+                            <td style="padding: 8px; border: 1px solid #dee2e6;">
+                                <strong>{{ item.page.title }}</strong><br>
+                                <small style="color: #6c757d;">{{ item.page.slug }}</small>
+                            </td>
+                            <td style="padding: 8px; text-align: center; border: 1px solid #dee2e6;">
+                                v{{ item.current_version.version_number }}
+                            </td>
+                            <td style="padding: 8px; text-align: center; border: 1px solid #dee2e6;">
+                                {{ item.total_versions }}
+                            </td>
+                            <td style="padding: 8px; text-align: center; border: 1px solid #dee2e6;">
+                                <span style="color: #dc3545; font-weight: bold;">{{ item.versions_to_delete }}</span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <form method="post">
+                {% csrf_token %}
+                {% for obj in queryset %}
+                    <input type="hidden" name="_selected_action" value="{{ obj.pk }}">
+                {% endfor %}
+                <input type="hidden" name="action" value="{{ action_name }}">
+                <input type="hidden" name="confirm_compact" value="yes">
+                
+                <div class="submit-row">
+                    <input type="submit" value="Yes, compact these versions" class="default" style="background-color: #dc3545; border-color: #dc3545;">
+                    <a href="{% url opts|admin_urlname:'changelist' %}" class="button cancel-link">No, take me back</a>
+                </div>
+            </form>
+        </div>
+    {% else %}
+        <div class="module aligned">
+            <div class="form-row">
+                <p>No versions found to compact. All selected pages either have no published versions or only have one version.</p>
+                <a href="{% url opts|admin_urlname:'changelist' %}" class="button">Go back</a>
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+<style>
+.compact-preview-table th {
+    font-weight: 600;
+}
+.compact-preview-table td {
+    vertical-align: top;
+}
+.submit-row {
+    margin-top: 20px;
+    padding: 10px 0;
+    border-top: 1px solid #dee2e6;
+}
+.cancel-link {
+    margin-left: 10px;
+    text-decoration: none;
+    color: #6c757d;
+}
+.cancel-link:hover {
+    color: #495057;
+}
+</style>
+{% endblock %} 

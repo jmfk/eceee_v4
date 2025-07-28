@@ -46,6 +46,18 @@ export const publishVersion = async (versionId) => {
     return response.data
 }
 
+// Get widget data for a specific version
+export const getVersionWidgets = async (versionId) => {
+    const response = await api.get(`${API_BASE}/versions/${versionId}/widgets/`)
+    return response.data
+}
+
+// Get all versions for a page
+export const getPageVersionsList = async (pageId) => {
+    const response = await api.get(`${API_BASE}/pages/${pageId}/versions/`)
+    return response.data
+}
+
 // Create a draft from a published version
 export const createDraftFromPublished = async (versionId, description = '') => {
     const response = await api.post(`${API_BASE}/versions/${versionId}/create_draft/`, {
