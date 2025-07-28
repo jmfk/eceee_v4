@@ -29,6 +29,7 @@ const ContentEditor = forwardRef(({
   const [selectedSlot, setSelectedSlot] = useState(null);
 
   console.log("ContentEditor::widgets", widgets);
+  console.log("ContentEditor::pageData", pageData);
 
   // Create a widget DOM element with proper memory management
   const createWidgetElement = useCallback((widget) => {
@@ -392,22 +393,44 @@ const ContentEditor = forwardRef(({
     }
 
     console.log('ContentEditor: Loading widgets into LayoutRenderer', widgets);
+    console.log('ContentEditor: Widgets object keys:', Object.keys(widgets));
+    console.log('ContentEditor: Is widgets empty?', Object.keys(widgets).length === 0);
     widgetsRef.current = widgetsJsonString;
+
+    // Add fallback test widgets if no widgets data exists
+    let widgetsToLoad = widgets;
+    if (Object.keys(widgets).length === 0) {
+      console.log('ContentEditor: No widgets found, adding test widgets for demonstration');
+      widgetsToLoad = {
+        "main": [
+          {
+            "id": "test-widget-1",
+            "type": "text-block",
+            "name": "Test Text Widget",
+            "config": {
+              "title": "Test Widget",
+              "content": "This is a test widget to verify the system is working. Real widget data should replace this."
+            }
+          }
+        ]
+      };
+    }
 
     // Use React's scheduling to batch widget updates
     const updateSlots = () => {
       // Load widget data and mark page as saved BEFORE updating slots
-      layoutRenderer.loadWidgetData(widgets);
+      layoutRenderer.loadWidgetData(widgetsToLoad);
 
-      Object.entries(widgets).forEach(([slotName, slotWidgets]) => {
+      Object.entries(widgetsToLoad).forEach(([slotName, slotWidgets]) => {
         try {
+          console.log(`ContentEditor: Updating slot "${slotName}" with ${slotWidgets.length} widgets`);
           layoutRenderer.updateSlot(slotName, slotWidgets);
         } catch (error) {
           console.error(`ContentEditor: Error updating slot ${slotName}`, error);
         }
       });
 
-      // console.log('ContentEditor: Widgets loaded, page marked as saved');
+      console.log('ContentEditor: Widgets loaded and slots updated');
     };
 
     // Schedule update for next frame to avoid blocking UI
