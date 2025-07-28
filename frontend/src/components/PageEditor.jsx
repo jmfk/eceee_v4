@@ -98,7 +98,10 @@ const PageEditor = () => {
 
     // Extract widgets from page data (no separate API call needed) - memoized to prevent unnecessary re-renders
     const currentVersionWidgets = useMemo(() => {
-        return pageData?.current_version_widgets || {}
+        const widgets = pageData?.current_version_widgets || {}
+        console.log('PageEditor: currentVersionWidgets from pageData:', widgets);
+        console.log('PageEditor: pageData structure:', pageData);
+        return widgets
     }, [pageData?.current_version_widgets])
 
     // Handle widget updates from ContentEditor
@@ -340,13 +343,39 @@ const PageEditor = () => {
         setIsDirty(true)
     }
 
-    // Tab navigation
+    // Tab navigation (main tabs only - Settings and Metadata moved to more menu)
     const tabs = [
         { id: 'content', label: 'Content', icon: Layout },
-        { id: 'settings', label: 'Settings', icon: Settings },
-        { id: 'metadata', label: 'Metadata', icon: FileText },
         { id: 'preview', label: 'Preview', icon: Eye },
     ]
+
+    // More menu items (includes Settings and Metadata)
+    const moreMenuItems = [
+        { id: 'settings', label: 'Settings', icon: Settings },
+        { id: 'metadata', label: 'Metadata', icon: FileText },
+    ]
+
+    // State for more menu dropdown
+    const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false)
+
+    // Close more menu when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (isMoreMenuOpen && !event.target.closest('.relative')) {
+                setIsMoreMenuOpen(false)
+            }
+        }
+
+        document.addEventListener('mousedown', handleClickOutside)
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside)
+        }
+    }, [isMoreMenuOpen])
+
+    // Close more menu when activeTab changes
+    useEffect(() => {
+        setIsMoreMenuOpen(false)
+    }, [activeTab])
 
     if (isLoading && !isNewPage) {
         return (
@@ -446,9 +475,42 @@ const PageEditor = () => {
                             </button>
 
                             <div className="relative">
-                                <button className="flex items-center px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
+                                <button
+                                    onClick={() => setIsMoreMenuOpen(!isMoreMenuOpen)}
+                                    className="flex items-center px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                                >
                                     <MoreHorizontal className="w-4 h-4" />
                                 </button>
+
+                                {/* More menu dropdown */}
+                                {isMoreMenuOpen && (
+                                    <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+                                        <div className="py-1">
+                                            {moreMenuItems.map((menuItem) => {
+                                                const Icon = menuItem.icon
+                                                const itemPath = isNewPage ? `/pages/new/${menuItem.id}` : `/pages/${pageId}/edit/${menuItem.id}`
+                                                const isActive = activeTab === menuItem.id
+
+                                                return (
+                                                    <button
+                                                        key={menuItem.id}
+                                                        onClick={() => {
+                                                            navigate(itemPath, { state: { previousView } })
+                                                            setIsMoreMenuOpen(false)
+                                                        }}
+                                                        className={`w-full flex items-center px-4 py-2 text-sm transition-colors ${isActive
+                                                            ? 'bg-blue-50 text-blue-700'
+                                                            : 'text-gray-700 hover:bg-gray-50'
+                                                            }`}
+                                                    >
+                                                        <Icon className="w-4 h-4 mr-3" />
+                                                        {menuItem.label}
+                                                    </button>
+                                                )
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
