@@ -97,12 +97,10 @@ const PageEditor = () => {
     })
 
     // Extract widgets from page data (no separate API call needed) - memoized to prevent unnecessary re-renders
+    // Note: current_version_widgets field has been removed - ContentEditor will use fallback widgets
     const currentVersionWidgets = useMemo(() => {
-        const widgets = pageData?.current_version_widgets || {}
-        console.log('PageEditor: currentVersionWidgets from pageData:', widgets);
-        console.log('PageEditor: pageData structure:', pageData);
-        return widgets
-    }, [pageData?.current_version_widgets])
+        return {}
+    }, [])
 
     // Handle widget updates from ContentEditor
     const handleWidgetUpdate = (slotName, slotWidgets, options = {}) => {
@@ -159,13 +157,13 @@ const PageEditor = () => {
     // Add notifications for widgets data
     useEffect(() => {
         if (pageData && !isNewPage) {
-            console.log('PageEditor: Page loaded with widgets:', currentVersionWidgets)
+            console.log('PageEditor: Page loaded with widgets:', currentVersionWidgets, "pageData", pageData, "isNewPage", isNewPage)
             const widgetSlotCount = Object.keys(currentVersionWidgets).length
             if (widgetSlotCount > 0) {
                 addNotification(`Page loaded with ${widgetSlotCount} widget slots`, 'success', 'widgets-load')
             }
         }
-    }, [pageData, currentVersionWidgets, isNewPage, addNotification])
+    }, [pageData, isNewPage, addNotification])
 
     // Add notifications for tab navigation
     useEffect(() => {
