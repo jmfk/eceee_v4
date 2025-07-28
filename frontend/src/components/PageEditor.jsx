@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
@@ -13,14 +13,12 @@ import {
     MoreHorizontal,
     ChevronDown,
     ArrowLeft,
-    Grid3X3,
     Palette,
     ChevronLeft,
     ChevronRight,
     Trash2
 } from 'lucide-react'
 import { api } from '../api/client.js'
-import { updatePageWidgets } from '../api/pages.js'
 import { useNotificationContext } from './NotificationManager'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import ContentEditor from './ContentEditor'
@@ -55,20 +53,7 @@ const PageEditor = () => {
     const { showError, showConfirm } = useNotificationContext()
     const { addNotification } = useGlobalNotifications()
 
-    // Mutation for updating widgets
-    const updateWidgetsMutation = useMutation({
-        mutationFn: ({ widgets, options }) => updatePageWidgets(pageId, widgets, options),
-        onSuccess: (data) => {
-            // Invalidate and refetch page data to get updated widgets
-            queryClient.invalidateQueries(['page', pageId])
-            addNotification(`Widgets updated successfully (Version ${data.version_number})`, 'success', 'widgets-save')
-            setIsDirty(false)
-        },
-        onError: (error) => {
-            console.error('Failed to update widgets:', error)
-            showError(error, 'Failed to save widgets')
-        }
-    })
+
 
     // Initialize page data for new page
     useEffect(() => {
@@ -96,54 +81,9 @@ const PageEditor = () => {
         enabled: !isNewPage
     })
 
-    // Extract widgets from page data (no separate API call needed) - memoized to prevent unnecessary re-renders
-    // Note: current_version_widgets field has been removed - ContentEditor will use fallback widgets
-    const currentVersionWidgets = useMemo(() => {
-        return {}
-    }, [])
 
-    // Handle widget updates from ContentEditor
-    const handleWidgetUpdate = (slotName, slotWidgets, options = {}) => {
-        console.log('handleWidgetUpdate', slotName, slotWidgets, options)
-        if (isNewPage) {
-            // For new pages, just update local state (will be saved when page is created)
-            // TODO: Implement local state management for new pages
-            console.log('Widget update for new page - slot:', slotName, 'widgets:', slotWidgets)
-            return
-        }
 
-        // Build complete widgets object with the updated slot
-        const updatedWidgets = {
-            ...currentVersionWidgets,
-            [slotName]: slotWidgets
-        }
 
-        console.log('Saving widgets update - slot:', slotName, 'complete widgets:', updatedWidgets)
-
-        // For existing pages, save to backend
-        updateWidgetsMutation.mutate({
-            widgets: updatedWidgets,
-            options: {
-                description: options.description || `Updated ${slotName} slot`,
-                autoPublish: options.autoPublish || false
-            }
-        })
-        setIsDirty(true)
-    }
-
-    // Manual save trigger for widgets
-    const handleManualSave = async () => {
-        if (contentEditorRef.current?.saveWidgets) {
-            try {
-                console.log('PageEditor: Manual save triggered');
-                await contentEditorRef.current.saveWidgets();
-                addNotification('Widgets saved manually', 'success', 'manual-save');
-            } catch (error) {
-                console.error('PageEditor: Manual save failed', error);
-                showError(error, 'Failed to save widgets manually');
-            }
-        }
-    }
 
     // Add loading notifications for page data
     useEffect(() => {
@@ -154,16 +94,7 @@ const PageEditor = () => {
         }
     }, [isLoading, page, isNewPage, addNotification])
 
-    // Add notifications for widgets data
-    useEffect(() => {
-        if (pageData && !isNewPage) {
-            console.log('PageEditor: Page loaded with widgets:', currentVersionWidgets, "pageData", pageData, "isNewPage", isNewPage)
-            const widgetSlotCount = Object.keys(currentVersionWidgets).length
-            if (widgetSlotCount > 0) {
-                addNotification(`Page loaded with ${widgetSlotCount} widget slots`, 'success', 'widgets-load')
-            }
-        }
-    }, [pageData, isNewPage, addNotification])
+
 
     // Add notifications for tab navigation
     useEffect(() => {
@@ -450,19 +381,6 @@ const PageEditor = () => {
                                     isNewPage ? 'Create Page' : 'Save'}
                             </button>
 
-                            {/* Save Widgets button - only show on content tab */}
-                            {activeTab === 'content' && !isNewPage && (
-                                <button
-                                    onClick={handleManualSave}
-                                    disabled={updateWidgetsMutation.isPending}
-                                    className="flex items-center px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                    title="Save current widget changes"
-                                >
-                                    <Grid3X3 className="w-4 h-4 mr-1" />
-                                    {updateWidgetsMutation.isPending ? 'Saving...' : 'Save Widgets'}
-                                </button>
-                            )}
-
                             <button
                                 onClick={handleQuickPublish}
                                 disabled={pageData?.publication_status === 'published' || isPublishing}
@@ -534,8 +452,6 @@ const PageEditor = () => {
                                     onUpdate={updatePageData}
                                     isNewPage={isNewPage}
                                     layoutJson={layoutData}
-                                    widgets={currentVersionWidgets}
-                                    onWidgetUpdate={handleWidgetUpdate}
                                     editable={true}
                                 />
                             )}
