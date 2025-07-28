@@ -265,9 +265,6 @@ class WebPageDetailSerializer(serializers.ModelSerializer):
     widget_css_data = serializers.SerializerMethodField()
     css_validation_status = serializers.SerializerMethodField()
 
-    # Current version data
-    current_version_widgets = serializers.SerializerMethodField()
-
     class Meta:
         model = WebPage
         fields = [
@@ -307,7 +304,6 @@ class WebPageDetailSerializer(serializers.ModelSerializer):
             "effective_css_data",  # New computed field
             "widget_css_data",  # New computed field
             "css_validation_status",  # New computed field
-            "current_version_widgets",  # Current version widgets
         ]
         read_only_fields = [
             "id",
@@ -428,13 +424,6 @@ class WebPageDetailSerializer(serializers.ModelSerializer):
                 "warnings": [],
                 "validated_at": timezone.now().isoformat(),
             }
-
-    def get_current_version_widgets(self, obj):
-        """Get widgets from the current published version of this page"""
-        current_version = obj.get_current_version()
-        if current_version and current_version.widgets:
-            return current_version.widgets
-        return {}
 
     def validate_code_layout(self, value):
         """Validate that the code layout exists if specified"""
