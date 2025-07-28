@@ -31,6 +31,11 @@ const ContentEditor = forwardRef(({
   console.log("ContentEditor::widgets", widgets);
   console.log("ContentEditor::pageData", pageData);
 
+  // Early return if critical props are missing
+  if (pageData === undefined) {
+    console.warn("ContentEditor: pageData is undefined - component may not render properly");
+  }
+
   // Create a widget DOM element with proper memory management
   const createWidgetElement = useCallback((widget) => {
     try {
@@ -150,9 +155,11 @@ const ContentEditor = forwardRef(({
     return rendererRef.current;
   }, [createWidgetElement]);
 
+
+
   // Initialize version management when pageData is available
   useEffect(() => {
-    if (!layoutRenderer || !pageData?.id || isNewPage) {
+    if (!layoutRenderer || !pageData?.id || isNewPage || pageData === null) {
       return;
     }
 
@@ -165,7 +172,7 @@ const ContentEditor = forwardRef(({
     layoutRenderer.setVersionCallback('version-changed', (versionData) => {
       // console.log('ContentEditor: Version changed to', versionData.version_number);
       // Optionally notify parent component about version change
-      if (onUpdate) {
+      if (onUpdate && pageData) {
         onUpdate({
           ...pageData,
           currentVersion: versionData
@@ -180,23 +187,23 @@ const ContentEditor = forwardRef(({
 
   }, [layoutRenderer, pageData?.id, isNewPage, onUpdate, pageData]);
 
-  // Add version selector UI when container is available
-  useEffect(() => {
-    if (!layoutRenderer || !containerRef.current || !pageData?.id || isNewPage) {
-      return;
-    }
+  // Don't add the LayoutRenderer's version selector - we'll create our own in the bottom toolbar
+  // useEffect(() => {
+  //   if (!layoutRenderer || !containerRef.current || !pageData?.id || isNewPage) {
+  //     return;
+  //   }
 
-    // Add version selector after a brief delay to ensure layout is rendered
-    const timeoutId = setTimeout(() => {
-      layoutRenderer.addVersionSelector(containerRef.current);
-    }, 500);
+  //   // Add version selector after a brief delay to ensure layout is rendered
+  //   const timeoutId = setTimeout(() => {
+  //     layoutRenderer.addVersionSelector(containerRef.current);
+  //   }, 500);
 
-    return () => {
-      clearTimeout(timeoutId);
-      // Clean up version selector on unmount
-      layoutRenderer.removeVersionSelector();
-    };
-  }, [layoutRenderer, pageData?.id, isNewPage]);
+  //   return () => {
+  //     clearTimeout(timeoutId);
+  //     // Clean up version selector on unmount
+  //     layoutRenderer.removeVersionSelector();
+  //   };
+  // }, [layoutRenderer, pageData?.id, isNewPage]);
 
   // Set up UI callbacks for LayoutRenderer save functionality
   useEffect(() => {
@@ -608,10 +615,8 @@ const ContentEditor = forwardRef(({
   useEffect(() => {
     return () => {
       if (layoutRenderer) {
-        // Clean up version selector UI
-        layoutRenderer.removeVersionSelector();
-        // Clear version callbacks
-        layoutRenderer.versionCallbacks.clear();
+        // Clear version callbacks only (we don't use LayoutRenderer's version selector)
+        layoutRenderer.versionCallbacks?.clear();
       }
     };
   }, [layoutRenderer]);
@@ -657,20 +662,7 @@ const ContentEditor = forwardRef(({
         }}
       />
 
-      {editable && selectedSlot && (
-        <div className="slot-info fixed bottom-4 right-4 bg-white border border-gray-300 rounded-lg shadow-lg p-3 text-sm z-20">
-          <div className="font-medium">Selected Slot: {selectedSlot}</div>
-          <div className="text-gray-600 text-xs mt-1">
-            Click outside to deselect
-          </div>
-          <button
-            onClick={() => setSelectedSlot(null)}
-            className="mt-2 text-xs bg-gray-500 text-white px-2 py-1 rounded hover:bg-gray-600"
-          >
-            Deselect
-          </button>
-        </div>
-      )}
+
     </div>
   );
 });
