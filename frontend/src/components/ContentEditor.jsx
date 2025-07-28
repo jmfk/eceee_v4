@@ -5,10 +5,10 @@
  * Uses LayoutRenderer for direct DOM manipulation instead of React's virtual DOM.
  */
 
-import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
+import React, { useRef, useEffect, useCallback, useState, useMemo, forwardRef, useImperativeHandle } from 'react';
 import LayoutRenderer from './LayoutRenderer';
 
-const ContentEditor = ({
+const ContentEditor = forwardRef(({
   layoutJson,
   widgets = {},
   editable = false,
@@ -18,7 +18,7 @@ const ContentEditor = ({
   pageData,
   onUpdate,
   isNewPage
-}) => {
+}, ref) => {
   const containerRef = useRef(null);
   const rendererRef = useRef(null);
   const eventListenersRef = useRef(new Map()); // Track event listeners for cleanup
@@ -149,6 +149,46 @@ const ContentEditor = ({
     return rendererRef.current;
   }, [createWidgetElement]);
 
+  // Set up UI callbacks for LayoutRenderer save functionality
+  useEffect(() => {
+    if (!layoutRenderer || !onWidgetUpdate) return;
+
+    console.log('ContentEditor: Setting up LayoutRenderer UI callbacks');
+
+    layoutRenderer.setUICallbacks({
+      onSavePageData: (widgetData) => {
+        console.log('ContentEditor: LayoutRenderer manual save triggered', widgetData);
+        // Convert widgetData object to individual slot updates
+        Object.entries(widgetData).forEach(([slotName, widgets]) => {
+          onWidgetUpdate(slotName, widgets, {
+            description: 'Manual save from layout renderer',
+            autoPublish: false
+          });
+        });
+      },
+
+      onAutoSave: (widgetData) => {
+        console.log('ContentEditor: LayoutRenderer auto-save triggered', widgetData);
+        // Convert widgetData object to individual slot updates
+        Object.entries(widgetData).forEach(([slotName, widgets]) => {
+          onWidgetUpdate(slotName, widgets, {
+            description: 'Auto-save from layout renderer',
+            autoPublish: false
+          });
+        });
+      },
+
+      onAutoSaveError: (error) => {
+        console.error('ContentEditor: LayoutRenderer auto-save error', error);
+      },
+
+      onDirtyStateChanged: (isDirty, reason) => {
+        console.log('ContentEditor: LayoutRenderer dirty state changed', { isDirty, reason });
+      }
+    });
+
+  }, [layoutRenderer, onWidgetUpdate]);
+
   // Cleanup function for event listeners
   const cleanupEventListeners = useCallback(() => {
     eventListenersRef.current.forEach((cleanup, element) => {
@@ -274,6 +314,9 @@ const ContentEditor = ({
       // Clean up existing event listeners
       cleanupEventListeners();
 
+      // Log ContentEditor mode
+      console.log('ContentEditor: Rendering layout in', editable ? 'editable' : 'read-only', 'mode');
+
       // Render the layout
       layoutRenderer.render(layoutJson, containerRef);
 
@@ -283,7 +326,7 @@ const ContentEditor = ({
       setError(err.message);
       setIsLoading(false);
     }
-  }, [layoutJson, layoutRenderer, cleanupEventListeners]);
+  }, [layoutJson, layoutRenderer, cleanupEventListeners, editable]);
 
   // Update widgets when widgets prop changes (with proper React state management)
   useEffect(() => {
@@ -410,27 +453,47 @@ const ContentEditor = ({
     };
   }, [cleanupEventListeners]);
 
-  // Trigger save of all current widgets
+  // Trigger save of all current widgets using LayoutRenderer's save system
   const saveWidgets = useCallback((options = {}) => {
     console.log("ContentEditor::saveWidgets", options);
-    if (!layoutRenderer || !onWidgetUpdate) return;
+    if (!layoutRenderer) return;
 
-    // Get current widgets from all slots
-    const slotNames = layoutRenderer.getSlotNames();
-    const currentWidgets = {};
+    try {
+      // Use LayoutRenderer's own save method which will trigger our callbacks
+      const savedWidgetData = layoutRenderer.saveCurrentWidgetState();
+      console.log('ContentEditor: LayoutRenderer save completed', savedWidgetData);
+      return savedWidgetData;
+    } catch (error) {
+      console.error('ContentEditor: Save failed', error);
+      throw error;
+    }
+  }, [layoutRenderer]);
 
-    slotNames.forEach(slotName => {
-      currentWidgets[slotName] = layoutRenderer.getSlotWidgetData(slotName);
-    });
+  // Enable auto-save functionality
+  const enableAutoSave = useCallback((enabled = true, delay = 5000) => {
+    if (!layoutRenderer) return;
 
-    console.log('ContentEditor: Saving all widgets:', currentWidgets);
+    layoutRenderer.autoSaveEnabled = enabled;
+    layoutRenderer.autoSaveDelay = delay;
+    console.log(`ContentEditor: Auto-save ${enabled ? 'enabled' : 'disabled'} with ${delay}ms delay`);
+  }, [layoutRenderer]);
 
-    // Call onWidgetUpdate with the complete widgets object
-    // Note: This will save all slots at once rather than individually
-    Object.entries(currentWidgets).forEach(([slotName, widgets]) => {
-      onWidgetUpdate(slotName, widgets, options);
-    });
-  }, [layoutRenderer, onWidgetUpdate]);
+  // Manually trigger auto-save check
+  const triggerAutoSave = useCallback(() => {
+    if (!layoutRenderer) return;
+    layoutRenderer.scheduleAutoSave('manual_trigger');
+  }, [layoutRenderer]);
+
+  // Set up auto-save when editing is enabled
+  useEffect(() => {
+    if (editable && layoutRenderer) {
+      // Enable auto-save with 10 second delay for editing mode
+      enableAutoSave(true, 10000);
+    } else if (layoutRenderer) {
+      // Disable auto-save for non-editable mode
+      enableAutoSave(false);
+    }
+  }, [editable, layoutRenderer, enableAutoSave]);
 
   // Expose methods for external use
   const api = useMemo(() => ({
@@ -439,8 +502,13 @@ const ContentEditor = ({
     getSlotConfig,
     setSelectedSlot,
     getSelectedSlot: () => selectedSlot,
-    saveWidgets
-  }), [updateSlot, getSlots, getSlotConfig, selectedSlot, saveWidgets]);
+    saveWidgets,
+    enableAutoSave,
+    triggerAutoSave
+  }), [updateSlot, getSlots, getSlotConfig, selectedSlot, saveWidgets, enableAutoSave, triggerAutoSave]);
+
+  // Expose API methods to parent components via ref
+  useImperativeHandle(ref, () => api, [api]);
 
 
 
@@ -499,7 +567,7 @@ const ContentEditor = ({
       )}
     </div>
   );
-};
+});
 
 // Add display name for debugging
 ContentEditor.displayName = 'ContentEditor';

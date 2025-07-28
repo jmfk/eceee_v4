@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
@@ -49,6 +49,7 @@ const PageEditor = () => {
     const [isPublishing, setIsPublishing] = useState(false)
     const [layoutData, setLayoutData] = useState(null)
     const [isLoadingLayout, setIsLoadingLayout] = useState(false)
+    const contentEditorRef = useRef(null)
 
     const queryClient = useQueryClient()
     const { showError, showConfirm } = useNotificationContext()
@@ -125,6 +126,20 @@ const PageEditor = () => {
             }
         })
         setIsDirty(true)
+    }
+
+    // Manual save trigger for widgets
+    const handleManualSave = async () => {
+        if (contentEditorRef.current?.saveWidgets) {
+            try {
+                console.log('PageEditor: Manual save triggered');
+                await contentEditorRef.current.saveWidgets();
+                addNotification('Widgets saved manually', 'success', 'manual-save');
+            } catch (error) {
+                console.error('PageEditor: Manual save failed', error);
+                showError(error, 'Failed to save widgets manually');
+            }
+        }
     }
 
     // Add loading notifications for page data
@@ -406,6 +421,19 @@ const PageEditor = () => {
                                     isNewPage ? 'Create Page' : 'Save'}
                             </button>
 
+                            {/* Save Widgets button - only show on content tab */}
+                            {activeTab === 'content' && !isNewPage && (
+                                <button
+                                    onClick={handleManualSave}
+                                    disabled={updateWidgetsMutation.isPending}
+                                    className="flex items-center px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                    title="Save current widget changes"
+                                >
+                                    <Grid3X3 className="w-4 h-4 mr-1" />
+                                    {updateWidgetsMutation.isPending ? 'Saving...' : 'Save Widgets'}
+                                </button>
+                            )}
+
                             <button
                                 onClick={handleQuickPublish}
                                 disabled={pageData?.publication_status === 'published' || isPublishing}
@@ -439,12 +467,14 @@ const PageEditor = () => {
                                 </div>
                             ) : (
                                 <ContentEditor
+                                    ref={contentEditorRef}
                                     pageData={pageData}
                                     onUpdate={updatePageData}
                                     isNewPage={isNewPage}
                                     layoutJson={layoutData}
                                     widgets={currentVersionWidgets}
                                     onWidgetUpdate={handleWidgetUpdate}
+                                    editable={true}
                                 />
                             )}
                         </>
