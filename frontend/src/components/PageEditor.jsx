@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
@@ -96,8 +96,10 @@ const PageEditor = () => {
         enabled: !isNewPage
     })
 
-    // Extract widgets from page data (no separate API call needed)
-    const currentVersionWidgets = pageData?.current_version_widgets || {}
+    // Extract widgets from page data (no separate API call needed) - memoized to prevent unnecessary re-renders
+    const currentVersionWidgets = useMemo(() => {
+        return pageData?.current_version_widgets || {}
+    }, [pageData?.current_version_widgets])
 
     // Handle widget updates from ContentEditor
     const handleWidgetUpdate = (slotName, slotWidgets, options = {}) => {

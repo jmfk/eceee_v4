@@ -155,14 +155,14 @@ const ContentEditor = forwardRef(({
       return;
     }
 
-    console.log('ContentEditor: Initializing version management for page', pageData.id);
+    // console.log('ContentEditor: Initializing version management for page', pageData.id);
 
     // Initialize version management
     layoutRenderer.initializeVersionManagement(pageData.id, null);
 
     // Set up version callbacks
     layoutRenderer.setVersionCallback('version-changed', (versionData) => {
-      console.log('ContentEditor: Version changed to', versionData.version_number);
+      // console.log('ContentEditor: Version changed to', versionData.version_number);
       // Optionally notify parent component about version change
       if (onUpdate) {
         onUpdate({
@@ -201,11 +201,11 @@ const ContentEditor = forwardRef(({
   useEffect(() => {
     if (!layoutRenderer || !onWidgetUpdate) return;
 
-    console.log('ContentEditor: Setting up LayoutRenderer UI callbacks');
+    // console.log('ContentEditor: Setting up LayoutRenderer UI callbacks');
 
     layoutRenderer.setUICallbacks({
       onSavePageData: (widgetData) => {
-        console.log('ContentEditor: LayoutRenderer manual save triggered', widgetData);
+        // console.log('ContentEditor: LayoutRenderer manual save triggered', widgetData);
         // Convert widgetData object to individual slot updates
         Object.entries(widgetData).forEach(([slotName, widgets]) => {
           onWidgetUpdate(slotName, widgets, {
@@ -216,7 +216,7 @@ const ContentEditor = forwardRef(({
       },
 
       onAutoSave: (widgetData) => {
-        console.log('ContentEditor: LayoutRenderer auto-save triggered', widgetData);
+        // console.log('ContentEditor: LayoutRenderer auto-save triggered', widgetData);
         // Convert widgetData object to individual slot updates
         Object.entries(widgetData).forEach(([slotName, widgets]) => {
           onWidgetUpdate(slotName, widgets, {
@@ -231,7 +231,7 @@ const ContentEditor = forwardRef(({
       },
 
       onDirtyStateChanged: (isDirty, reason) => {
-        console.log('ContentEditor: LayoutRenderer dirty state changed', { isDirty, reason });
+        // console.log('ContentEditor: LayoutRenderer dirty state changed', { isDirty, reason });
       }
     });
 
@@ -377,12 +377,22 @@ const ContentEditor = forwardRef(({
   }, [layoutJson, layoutRenderer, cleanupEventListeners, editable]);
 
   // Update widgets when widgets prop changes (with proper React state management)
+  const widgetsRef = useRef(null);
+  const widgetsJsonString = JSON.stringify(widgets);
+
   useEffect(() => {
     if (!layoutRenderer || !widgets) {
       return;
     }
 
+    // Skip if widgets content hasn't actually changed
+    if (widgetsRef.current === widgetsJsonString) {
+      console.log('ContentEditor: Skipped widgets reload - content unchanged');
+      return;
+    }
+
     console.log('ContentEditor: Loading widgets into LayoutRenderer', widgets);
+    widgetsRef.current = widgetsJsonString;
 
     // Use React's scheduling to batch widget updates
     const updateSlots = () => {
@@ -397,7 +407,7 @@ const ContentEditor = forwardRef(({
         }
       });
 
-      console.log('ContentEditor: Widgets loaded, page marked as saved');
+      // console.log('ContentEditor: Widgets loaded, page marked as saved');
     };
 
     // Schedule update for next frame to avoid blocking UI
@@ -406,7 +416,7 @@ const ContentEditor = forwardRef(({
     return () => {
       clearTimeout(timeoutId);
     };
-  }, [widgets, layoutRenderer]);
+  }, [widgetsJsonString, layoutRenderer]);
 
   // Inject CSS styles for slot interactivity with proper cleanup
   useEffect(() => {
@@ -516,7 +526,7 @@ const ContentEditor = forwardRef(({
     try {
       // Use LayoutRenderer's own save method which will trigger our callbacks
       const savedWidgetData = layoutRenderer.saveCurrentWidgetState();
-      console.log('ContentEditor: LayoutRenderer save completed', savedWidgetData);
+      //console.log('ContentEditor: LayoutRenderer save completed', savedWidgetData);
       return savedWidgetData;
     } catch (error) {
       console.error('ContentEditor: Save failed', error);
@@ -525,12 +535,12 @@ const ContentEditor = forwardRef(({
   }, [layoutRenderer]);
 
   // Enable auto-save functionality
-  const enableAutoSave = useCallback((enabled = true, delay = 5000) => {
+  const enableAutoSave = useCallback((enabled = false, delay = 5000) => {
     if (!layoutRenderer) return;
 
     layoutRenderer.autoSaveEnabled = enabled;
     layoutRenderer.autoSaveDelay = delay;
-    console.log(`ContentEditor: Auto-save ${enabled ? 'enabled' : 'disabled'} with ${delay}ms delay`);
+    // console.log(`ContentEditor: Auto-save ${enabled ? 'enabled' : 'disabled'} with ${delay}ms delay`);
   }, [layoutRenderer]);
 
   // Manually trigger auto-save check
