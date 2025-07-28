@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
@@ -48,6 +48,10 @@ const PageEditor = () => {
     const [layoutData, setLayoutData] = useState(null)
     const [isLoadingLayout, setIsLoadingLayout] = useState(false)
     const contentEditorRef = useRef(null)
+
+    // Version management state
+    const [currentVersion, setCurrentVersion] = useState(null)
+    const [availableVersions, setAvailableVersions] = useState([])
 
     const queryClient = useQueryClient()
     const { showError, showConfirm } = useNotificationContext()
@@ -272,6 +276,61 @@ const PageEditor = () => {
         setIsDirty(true)
     }
 
+    // Version management functions
+    const loadVersions = useCallback(async () => {
+        if (!pageData?.id || isNewPage) {
+            return;
+        }
+
+        try {
+            const { getPageVersionsList } = await import('../api/versions.js');
+            const versionsData = await getPageVersionsList(pageData.id);
+
+            setAvailableVersions(versionsData.versions || []);
+
+            // Set current version if not already set
+            if (!currentVersion && versionsData.current_version) {
+                const currentVersionData = versionsData.versions?.find(v => v.id === versionsData.current_version);
+                if (currentVersionData) {
+                    setCurrentVersion(currentVersionData);
+                }
+            }
+        } catch (error) {
+            console.error('PageEditor: Error loading versions', error);
+            showError('Failed to load page versions');
+        }
+    }, [pageData?.id, isNewPage, currentVersion, showError]);
+
+    const switchToVersion = useCallback(async (versionId) => {
+        if (!versionId) return;
+
+        try {
+            const { getVersionWidgets } = await import('../api/versions.js');
+            const versionData = await getVersionWidgets(versionId);
+
+            setCurrentVersion(versionData);
+
+            // Update the page data
+            updatePageData({
+                currentVersion: versionData
+            });
+
+            console.log('PageEditor: Switched to version', versionData.version_number);
+            addNotification({
+                type: 'info',
+                message: `Switched to version ${versionData.version_number}`
+            });
+        } catch (error) {
+            console.error('PageEditor: Error switching to version', error);
+            showError(`Failed to load version: ${error.message}`);
+        }
+    }, [updatePageData, showError, addNotification]);
+
+    // Load versions when page data is available
+    useEffect(() => {
+        loadVersions();
+    }, [loadVersions]);
+
     // Tab navigation (main tabs only - Settings and Metadata moved to more menu)
     const tabs = [
         { id: 'content', label: 'Content', icon: Layout },
@@ -483,6 +542,11 @@ const PageEditor = () => {
             <StatusBar
                 showAutoSave={true}
                 isDirty={isDirty}
+                showVersionSelector={!isNewPage && !!pageData?.id}
+                currentVersion={currentVersion}
+                availableVersions={availableVersions}
+                onVersionChange={switchToVersion}
+                onRefreshVersions={loadVersions}
                 customStatusContent={
                     <div className="flex items-center space-x-4">
                         <span>
