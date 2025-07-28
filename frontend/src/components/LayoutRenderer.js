@@ -34,6 +34,13 @@ class LayoutRenderer {
     this.autoSaveEnabled = true; // Enable automatic saving
     this.autoSaveDelay = 2000; // Auto-save delay in milliseconds (2 seconds)
     this.autoSaveTimeoutId = null; // Timeout ID for pending auto-save
+
+    // Version management properties
+    this.currentVersion = null; // Currently loaded version data
+    this.pageVersions = []; // Available versions for this page
+    this.pageId = null; // Current page ID
+    this.versionSelectorElement = null; // Version selector UI element
+    this.versionCallbacks = new Map(); // Map of version-related callbacks
   }
 
   /**
@@ -2712,6 +2719,279 @@ class LayoutRenderer {
       console.error('LayoutRenderer: Error processing Django variables', error);
       return '[Template Processing Error]';
     }
+  }
+
+  // ========================================
+  // Version Management Methods
+  // ========================================
+
+  /**
+   * Initialize version management for a page
+   * @param {number} pageId - Page ID
+   * @param {Object} initialVersion - Initial version data
+   */
+  initializeVersionManagement(pageId, initialVersion = null) {
+    this.pageId = pageId;
+    this.currentVersion = initialVersion;
+    this.pageVersions = [];
+
+    // Load available versions for this page
+    this.loadPageVersions();
+  }
+
+  /**
+   * Load all versions for the current page
+   */
+  async loadPageVersions() {
+    if (!this.pageId) {
+      console.warn('LayoutRenderer: No page ID set for version loading');
+      return;
+    }
+
+    try {
+      // Import the versions API client
+      const { getPageVersionsList } = await import('../api/versions.js');
+      const versionsData = await getPageVersionsList(this.pageId);
+
+      this.pageVersions = versionsData.versions || [];
+
+      // If no current version is set, use the current published version
+      if (!this.currentVersion && versionsData.current_version) {
+        const currentVersionData = this.pageVersions.find(v => v.id === versionsData.current_version);
+        if (currentVersionData) {
+          this.currentVersion = currentVersionData;
+        }
+      }
+
+      // Update version selector if it exists
+      this.updateVersionSelector();
+
+    } catch (error) {
+      console.error('LayoutRenderer: Error loading page versions', error);
+    }
+  }
+
+  /**
+   * Add version selector UI to the layout container
+   * @param {HTMLElement} container - Container element to add version selector to
+   */
+  addVersionSelector(container) {
+    if (!container || this.versionSelectorElement) {
+      return; // Already exists or invalid container
+    }
+
+    // Create version selector container
+    const selectorContainer = document.createElement('div');
+    selectorContainer.className = 'version-selector-container fixed top-4 left-4 z-50 bg-white border border-gray-300 rounded-lg shadow-lg p-3 max-w-sm';
+
+    // Create version indicator
+    const versionIndicator = document.createElement('div');
+    versionIndicator.className = 'version-indicator mb-2';
+    selectorContainer.appendChild(versionIndicator);
+
+    // Create version dropdown
+    const versionSelect = document.createElement('select');
+    versionSelect.className = 'version-select w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500';
+    versionSelect.setAttribute('data-version-select', 'true');
+
+    // Add change listener
+    versionSelect.addEventListener('change', (e) => {
+      const versionId = parseInt(e.target.value);
+      this.switchToVersion(versionId);
+    });
+
+    selectorContainer.appendChild(versionSelect);
+
+    // Create action buttons container
+    const actionsContainer = document.createElement('div');
+    actionsContainer.className = 'version-actions mt-2 flex gap-2';
+
+    // Refresh button
+    const refreshButton = this.createIconButton('↻', 'bg-gray-500 hover:bg-gray-600 text-white text-xs px-2 py-1', () => {
+      this.loadPageVersions();
+    });
+    refreshButton.title = 'Refresh versions';
+    actionsContainer.appendChild(refreshButton);
+
+    selectorContainer.appendChild(actionsContainer);
+
+    // Add to container
+    container.appendChild(selectorContainer);
+    this.versionSelectorElement = selectorContainer;
+
+    // Initial population
+    this.updateVersionSelector();
+  }
+
+  /**
+   * Update the version selector UI with current data
+   */
+  updateVersionSelector() {
+    if (!this.versionSelectorElement) {
+      return;
+    }
+
+    const indicator = this.versionSelectorElement.querySelector('.version-indicator');
+    const select = this.versionSelectorElement.querySelector('.version-select');
+
+    if (!indicator || !select) {
+      return;
+    }
+
+    // Update indicator
+    if (this.currentVersion) {
+      const statusClass = this.currentVersion.status === 'published' ? 'text-green-600' : 'text-orange-600';
+      const statusIcon = this.currentVersion.status === 'published' ? '✓' : '⚠';
+      indicator.innerHTML = `
+        <div class="text-sm font-medium text-gray-700">
+          <span class="${statusClass}">${statusIcon}</span>
+          Version ${this.currentVersion.version_number}
+          <span class="text-xs text-gray-500">(${this.currentVersion.status})</span>
+        </div>
+        <div class="text-xs text-gray-600">${this.escapeHtml(this.currentVersion.description || 'No description')}</div>
+      `;
+    } else {
+      indicator.innerHTML = '<div class="text-sm text-gray-500">No version selected</div>';
+    }
+
+    // Update select options
+    select.innerHTML = '';
+
+    if (this.pageVersions.length === 0) {
+      const option = document.createElement('option');
+      option.value = '';
+      option.textContent = 'Loading versions...';
+      option.disabled = true;
+      select.appendChild(option);
+      return;
+    }
+
+    // Add "Latest saved" option (first version or current)
+    const latestOption = document.createElement('option');
+    latestOption.value = this.pageVersions[0]?.id || '';
+    latestOption.textContent = '🚧 Latest saved';
+    if (this.currentVersion && this.currentVersion.id === this.pageVersions[0]?.id) {
+      latestOption.selected = true;
+    }
+    select.appendChild(latestOption);
+
+    // Add published version option
+    const publishedVersion = this.pageVersions.find(v => v.status === 'published' && v.is_current);
+    if (publishedVersion) {
+      const publishedOption = document.createElement('option');
+      publishedOption.value = publishedVersion.id;
+      publishedOption.textContent = '✓ Published version';
+      if (this.currentVersion && this.currentVersion.id === publishedVersion.id) {
+        publishedOption.selected = true;
+      }
+      select.appendChild(publishedOption);
+    }
+
+    // Add separator
+    if (this.pageVersions.length > 2) {
+      const separator = document.createElement('option');
+      separator.value = '';
+      separator.textContent = '─────────────────';
+      separator.disabled = true;
+      select.appendChild(separator);
+
+      // Add other versions
+      this.pageVersions.slice(publishedVersion ? 1 : 1).forEach(version => {
+        if (publishedVersion && version.id === publishedVersion.id) {
+          return; // Skip already added published version
+        }
+
+        const option = document.createElement('option');
+        option.value = version.id;
+        const statusIcon = version.status === 'published' ? '✓' : version.status === 'draft' ? '📝' : '📋';
+        option.textContent = `${statusIcon} v${version.version_number} - ${version.description || 'No description'}`;
+
+        if (this.currentVersion && this.currentVersion.id === version.id) {
+          option.selected = true;
+        }
+
+        select.appendChild(option);
+      });
+    }
+  }
+
+  /**
+   * Switch to a different version
+   * @param {number} versionId - Version ID to switch to
+   */
+  async switchToVersion(versionId) {
+    if (!versionId) {
+      return;
+    }
+
+    try {
+      // Import the versions API client
+      const { getVersionWidgets } = await import('../api/versions.js');
+      const versionData = await getVersionWidgets(versionId);
+
+      // Update current version
+      this.currentVersion = versionData;
+
+      // Load the widget data for this version
+      this.loadWidgetData(versionData.widgets || {});
+
+      // Update the version selector
+      this.updateVersionSelector();
+
+      // Trigger version change callback if set
+      const callback = this.versionCallbacks.get('version-changed');
+      if (callback && typeof callback === 'function') {
+        callback(versionData);
+      }
+
+      console.log('LayoutRenderer: Switched to version', versionData.version_number);
+
+    } catch (error) {
+      console.error('LayoutRenderer: Error switching to version', error);
+
+      // Show error notification if possible
+      const errorCallback = this.versionCallbacks.get('version-error');
+      if (errorCallback && typeof errorCallback === 'function') {
+        errorCallback(`Failed to load version: ${error.message}`);
+      }
+    }
+  }
+
+  /**
+   * Remove version selector UI
+   */
+  removeVersionSelector() {
+    if (this.versionSelectorElement) {
+      this.versionSelectorElement.remove();
+      this.versionSelectorElement = null;
+    }
+  }
+
+  /**
+   * Set version-related callbacks
+   * @param {string} event - Event name ('version-changed', 'version-error')
+   * @param {Function} callback - Callback function
+   */
+  setVersionCallback(event, callback) {
+    if (typeof callback === 'function') {
+      this.versionCallbacks.set(event, callback);
+    }
+  }
+
+  /**
+   * Get current version information
+   * @returns {Object|null} Current version data
+   */
+  getCurrentVersion() {
+    return this.currentVersion;
+  }
+
+  /**
+   * Get available versions
+   * @returns {Array} Array of version objects
+   */
+  getAvailableVersions() {
+    return this.pageVersions;
   }
 }
 

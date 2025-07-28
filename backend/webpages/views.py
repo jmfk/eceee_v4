@@ -556,6 +556,50 @@ class WebPageViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+    @action(detail=True, methods=["get"])
+    def versions(self, request, pk=None):
+        """Get all versions for this page"""
+        page = self.get_object()
+        versions = page.versions.select_related("created_by", "published_by").order_by(
+            "-version_number"
+        )
+
+        version_data = []
+        for version in versions:
+            version_data.append(
+                {
+                    "id": version.id,
+                    "version_number": version.version_number,
+                    "description": version.description,
+                    "status": version.status,
+                    "is_current": version.is_current,
+                    "created_at": version.created_at,
+                    "created_by": (
+                        version.created_by.username if version.created_by else None
+                    ),
+                    "published_at": version.published_at,
+                    "published_by": (
+                        version.published_by.username if version.published_by else None
+                    ),
+                    "has_widgets": bool(version.widgets),
+                    "widgets_count": len(version.widgets) if version.widgets else 0,
+                }
+            )
+
+        return Response(
+            {
+                "page_id": page.id,
+                "page_title": page.title,
+                "current_version": (
+                    page.get_current_version().id
+                    if page.get_current_version()
+                    else None
+                ),
+                "total_versions": len(version_data),
+                "versions": version_data,
+            }
+        )
+
 
 class PageVersionViewSet(viewsets.ModelViewSet):
     """ViewSet for page versions with workflow support."""
@@ -627,6 +671,28 @@ class PageVersionViewSet(viewsets.ModelViewSet):
                 {"error": f"Restore failed: {str(e)}"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+    @action(detail=True, methods=["get"])
+    def widgets(self, request, pk=None):
+        """Get widget data for this specific version"""
+        version = self.get_object()
+
+        return Response(
+            {
+                "version_id": version.id,
+                "version_number": version.version_number,
+                "page_id": version.page.id,
+                "widgets": version.widgets or {},
+                "page_data": version.page_data or {},
+                "is_current": version.is_current,
+                "status": version.status,
+                "description": version.description,
+                "created_at": version.created_at,
+                "created_by": (
+                    version.created_by.username if version.created_by else None
+                ),
+            }
+        )
 
 
 @api_view(["GET"])

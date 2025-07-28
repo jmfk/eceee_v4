@@ -149,6 +149,54 @@ const ContentEditor = forwardRef(({
     return rendererRef.current;
   }, [createWidgetElement]);
 
+  // Initialize version management when pageData is available
+  useEffect(() => {
+    if (!layoutRenderer || !pageData?.id || isNewPage) {
+      return;
+    }
+
+    console.log('ContentEditor: Initializing version management for page', pageData.id);
+
+    // Initialize version management
+    layoutRenderer.initializeVersionManagement(pageData.id, null);
+
+    // Set up version callbacks
+    layoutRenderer.setVersionCallback('version-changed', (versionData) => {
+      console.log('ContentEditor: Version changed to', versionData.version_number);
+      // Optionally notify parent component about version change
+      if (onUpdate) {
+        onUpdate({
+          ...pageData,
+          currentVersion: versionData
+        });
+      }
+    });
+
+    layoutRenderer.setVersionCallback('version-error', (errorMessage) => {
+      console.error('ContentEditor: Version error', errorMessage);
+      setError(errorMessage);
+    });
+
+  }, [layoutRenderer, pageData?.id, isNewPage, onUpdate, pageData]);
+
+  // Add version selector UI when container is available
+  useEffect(() => {
+    if (!layoutRenderer || !containerRef.current || !pageData?.id || isNewPage) {
+      return;
+    }
+
+    // Add version selector after a brief delay to ensure layout is rendered
+    const timeoutId = setTimeout(() => {
+      layoutRenderer.addVersionSelector(containerRef.current);
+    }, 500);
+
+    return () => {
+      clearTimeout(timeoutId);
+      // Clean up version selector on unmount
+      layoutRenderer.removeVersionSelector();
+    };
+  }, [layoutRenderer, pageData?.id, isNewPage]);
+
   // Set up UI callbacks for LayoutRenderer save functionality
   useEffect(() => {
     if (!layoutRenderer || !onWidgetUpdate) return;
@@ -334,8 +382,13 @@ const ContentEditor = forwardRef(({
       return;
     }
 
+    console.log('ContentEditor: Loading widgets into LayoutRenderer', widgets);
+
     // Use React's scheduling to batch widget updates
     const updateSlots = () => {
+      // Load widget data and mark page as saved BEFORE updating slots
+      layoutRenderer.loadWidgetData(widgets);
+
       Object.entries(widgets).forEach(([slotName, slotWidgets]) => {
         try {
           layoutRenderer.updateSlot(slotName, slotWidgets);
@@ -343,6 +396,8 @@ const ContentEditor = forwardRef(({
           console.error(`ContentEditor: Error updating slot ${slotName}`, error);
         }
       });
+
+      console.log('ContentEditor: Widgets loaded, page marked as saved');
     };
 
     // Schedule update for next frame to avoid blocking UI
@@ -484,16 +539,21 @@ const ContentEditor = forwardRef(({
     layoutRenderer.scheduleAutoSave('manual_trigger');
   }, [layoutRenderer]);
 
-  // Set up auto-save when editing is enabled
+  // Set up auto-save when editing is enabled AND widgets are loaded
   useEffect(() => {
-    if (editable && layoutRenderer) {
-      // Enable auto-save with 10 second delay for editing mode
-      enableAutoSave(true, 10000);
+    if (editable && layoutRenderer && widgets) {
+      // Delay auto-save activation to ensure widgets are loaded first
+      const autoSaveTimeoutId = setTimeout(() => {
+        console.log('ContentEditor: Enabling auto-save after widgets loaded');
+        enableAutoSave(true, 10000);
+      }, 100); // Small delay to ensure widget loading is complete
+
+      return () => clearTimeout(autoSaveTimeoutId);
     } else if (layoutRenderer) {
-      // Disable auto-save for non-editable mode
+      // Disable auto-save for non-editable mode or when no widgets
       enableAutoSave(false);
     }
-  }, [editable, layoutRenderer, enableAutoSave]);
+  }, [editable, layoutRenderer, widgets, enableAutoSave]);
 
   // Expose methods for external use
   const api = useMemo(() => ({
@@ -509,6 +569,18 @@ const ContentEditor = forwardRef(({
 
   // Expose API methods to parent components via ref
   useImperativeHandle(ref, () => api, [api]);
+
+  // Cleanup version management on unmount
+  useEffect(() => {
+    return () => {
+      if (layoutRenderer) {
+        // Clean up version selector UI
+        layoutRenderer.removeVersionSelector();
+        // Clear version callbacks
+        layoutRenderer.versionCallbacks.clear();
+      }
+    };
+  }, [layoutRenderer]);
 
 
 

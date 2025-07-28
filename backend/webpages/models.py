@@ -931,68 +931,93 @@ class WebPage(models.Model):
     def create_version(self, user, description="", status="draft", auto_publish=False):
         """Create a new version snapshot of the current page state"""
         from django.utils import timezone
+        from django.db import transaction
 
-        # Get the latest version number
-        latest_version = self.versions.order_by("-version_number").first()
-        version_number = (latest_version.version_number + 1) if latest_version else 1
-
-        # Serialize current page state (excluding widgets)
-        page_data = {
-            "title": self.title,
-            "slug": self.slug,
-            "description": self.description,
-            "hostnames": self.hostnames,
-            "layout": self.code_layout,
-            "theme_id": self.theme.id if self.theme else None,
-            "publication_status": self.publication_status,
-            "effective_date": (
-                self.effective_date.isoformat() if self.effective_date else None
-            ),
-            "expiry_date": self.expiry_date.isoformat() if self.expiry_date else None,
-            "meta_title": self.meta_title,
-            "meta_description": self.meta_description,
-            "meta_keywords": self.meta_keywords,
-            "linked_object_type": self.linked_object_type,
-            "linked_object_id": self.linked_object_id,
-            "parent_id": self.parent_id,
-            "sort_order": self.sort_order,
-        }
-
-        # Get widgets from current version (if exists) or start with empty list
-        current_version = self.get_current_version()
-        widgets_data = []
-        if current_version and current_version.widgets:
-            # Copy widgets from current version
-            widgets_data = current_version.widgets.copy()
-        # If no current version exists, widgets_data remains an empty list
-
-        # Prepare version fields
-        version_fields = {
-            "page": self,
-            "version_number": version_number,
-            "page_data": page_data,
-            "widgets": widgets_data,
-            "description": description,
-            "status": status,
-            "created_by": user,
-        }
-
-        # Handle auto-publish
-        if auto_publish or status == "published":
-            # Mark all previous versions as not current
-            self.versions.update(is_current=False)
-            version_fields.update(
-                {
-                    "status": "published",
-                    "is_current": True,
-                    "published_at": timezone.now(),
-                    "published_by": user,
-                }
+        # Use atomic transaction to prevent race conditions
+        with transaction.atomic():
+            # Get the latest version number with row-level locking
+            latest_version = (
+                self.versions.select_for_update().order_by("-version_number").first()
+            )
+            version_number = (
+                (latest_version.version_number + 1) if latest_version else 1
             )
 
-        # Create new version
-        version = PageVersion.objects.create(**version_fields)
-        return version
+            # Serialize current page state (excluding widgets)
+            page_data = {
+                "title": self.title,
+                "slug": self.slug,
+                "description": self.description,
+                "hostnames": self.hostnames,
+                "layout": self.code_layout,
+                "theme_id": self.theme.id if self.theme else None,
+                "publication_status": self.publication_status,
+                "effective_date": (
+                    self.effective_date.isoformat() if self.effective_date else None
+                ),
+                "expiry_date": (
+                    self.expiry_date.isoformat() if self.expiry_date else None
+                ),
+                "meta_title": self.meta_title,
+                "meta_description": self.meta_description,
+                "meta_keywords": self.meta_keywords,
+                "linked_object_type": self.linked_object_type,
+                "linked_object_id": self.linked_object_id,
+                "parent_id": self.parent_id,
+                "sort_order": self.sort_order,
+            }
+
+            # Get widgets from the most recent version with widgets (preserve widgets by default)
+            widgets_data = {}
+
+            # First try to get current published version
+            current_version = self.get_current_version()
+            if current_version and current_version.widgets:
+                widgets_data = current_version.widgets.copy()
+            else:
+                # Fallback: get the most recent version with widgets (published or draft)
+                latest_version_with_widgets = (
+                    self.versions.exclude(widgets__isnull=True)
+                    .exclude(widgets={})
+                    .exclude(widgets=[])
+                    .order_by("-version_number")
+                    .first()
+                )
+
+                if latest_version_with_widgets and latest_version_with_widgets.widgets:
+                    widgets_data = latest_version_with_widgets.widgets.copy()
+
+            # If still no widgets found, use empty dict (not list - the model should use dict as default)
+            if not widgets_data:
+                widgets_data = {}
+
+            # Prepare version fields
+            version_fields = {
+                "page": self,
+                "version_number": version_number,
+                "page_data": page_data,
+                "widgets": widgets_data,
+                "description": description,
+                "status": status,
+                "created_by": user,
+            }
+
+            # Handle auto-publish
+            if auto_publish or status == "published":
+                # Mark all previous versions as not current
+                self.versions.update(is_current=False)
+                version_fields.update(
+                    {
+                        "status": "published",
+                        "is_current": True,
+                        "published_at": timezone.now(),
+                        "published_by": user,
+                    }
+                )
+
+            # Create new version
+            version = PageVersion.objects.create(**version_fields)
+            return version
 
     def get_current_version(self):
         """Get the current published version of this page"""
@@ -1281,7 +1306,8 @@ class PageVersion(models.Model):
 
     # Widget data for this version
     widgets = models.JSONField(
-        default=list, help_text="Widget configuration data for this version"
+        default=dict,
+        help_text="Widget configuration data for this version (slot_name -> widgets array)",
     )
 
     # Version workflow
