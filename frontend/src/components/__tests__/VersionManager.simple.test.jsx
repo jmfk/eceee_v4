@@ -5,7 +5,6 @@ import VersionManager from '../VersionManager'
 
 // Mock the API module
 vi.mock('../../api/versions', () => ({
-    getPageVersions: vi.fn().mockResolvedValue({ results: [] }),
     getVersion: vi.fn().mockResolvedValue({}),
     createVersion: vi.fn().mockResolvedValue({}),
     updateVersion: vi.fn().mockResolvedValue({}),
