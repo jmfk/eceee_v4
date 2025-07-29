@@ -180,11 +180,17 @@ class WebPageDetailSerializer(serializers.ModelSerializer):
         write_only=True, required=False, allow_null=True
     )
 
-    # widgets = PageWidgetSerializer(many=True, read_only=True)  # Removed - widgets now in PageVersion
-
     # Unified API: Add widgets field for unified save
-    widgets = serializers.SerializerMethodField()
+    widgets = serializers.JSONField(required=False, allow_null=True)
     version_options = serializers.JSONField(write_only=True, required=False)
+
+    # Version creation options (legacy support)
+    auto_publish = serializers.BooleanField(
+        write_only=True, required=False, default=False
+    )
+    version_description = serializers.CharField(
+        write_only=True, required=False, default="API update"
+    )
 
     created_by = UserSerializer(read_only=True)
     last_modified_by = UserSerializer(read_only=True)
@@ -230,6 +236,8 @@ class WebPageDetailSerializer(serializers.ModelSerializer):
             "meta_keywords",
             "widgets",  # Unified API: Add widgets field
             "version_options",  # Unified API: Version options for saves
+            "auto_publish",  # Legacy version option
+            "version_description",  # Legacy version option
             "created_at",
             "updated_at",
             "created_by",
@@ -403,10 +411,15 @@ class WebPageDetailSerializer(serializers.ModelSerializer):
         return data
 
     # Unified API Methods
-    def get_widgets(self, obj):
-        """Get widgets from current version for unified API"""
-        current_version = obj.get_current_version()
-        return current_version.widgets if current_version else {}
+    def to_representation(self, instance):
+        """Override to handle widgets field reading from current version"""
+        data = super().to_representation(instance)
+
+        # For reading, get widgets from current version
+        current_version = instance.get_current_version()
+        data["widgets"] = current_version.widgets if current_version else {}
+
+        return data
 
     def update(self, instance, validated_data):
         """Handle unified save: page_data + widgets"""
@@ -414,18 +427,30 @@ class WebPageDetailSerializer(serializers.ModelSerializer):
         widgets_data = validated_data.pop("widgets", None)
         version_options = validated_data.pop("version_options", {})
 
+        # Extract legacy version options
+        legacy_auto_publish = validated_data.pop("auto_publish", None)
+        legacy_description = validated_data.pop("version_description", None)
+
         # Update page metadata (existing logic)
         updated_instance = super().update(instance, validated_data)
 
-        # If widgets provided, create/update version
-        if widgets_data is not None:
-            description = version_options.get("description", "Unified update via API")
-            auto_publish = version_options.get("auto_publish", False)
+        # Always create a version when data is updated
+        # Prefer version_options, fall back to legacy fields
+        description = (
+            version_options.get("description")
+            or legacy_description
+            or "Unified update via API"
+        )
+        auto_publish = (
+            version_options.get("auto_publish", False)
+            if version_options
+            else legacy_auto_publish if legacy_auto_publish is not None else False
+        )
 
-            # Create new version with both page_data and widgets
-            self._create_unified_version(
-                updated_instance, widgets_data, description, auto_publish
-            )
+        # Create new version with both page_data and widgets (if any)
+        self._create_unified_version(
+            updated_instance, widgets_data or {}, description, auto_publish
+        )
 
         return updated_instance
 
