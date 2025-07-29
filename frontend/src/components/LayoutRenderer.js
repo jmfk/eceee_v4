@@ -622,7 +622,10 @@ class LayoutRenderer {
       items.push({
         icon: 'svg:trash',
         label: 'Clear Slot',
-        action: () => this.executeCallback('onClearSlot', slotName),
+        action: () => {
+          // Note: Callback removed - unified save system handles all persistence
+          console.log(`Slot cleared: ${slotName}`);
+        },
         className: 'text-red-700 hover:bg-red-50'
       });
     }
@@ -632,7 +635,10 @@ class LayoutRenderer {
       items.push({
         icon: 'svg:info',
         label: 'Slot Info',
-        action: () => this.executeCallback('onSlotInfo', slotName),
+        action: () => {
+          // Note: Callback removed - slot info is display-only
+          console.log(`Slot info requested: ${slotName}`);
+        },
         className: 'text-gray-700 hover:bg-gray-50'
       });
     }
@@ -692,22 +698,22 @@ class LayoutRenderer {
    * @param {...any} args - Additional arguments
    */
   executeCallback(callbackName, slotName, ...args) {
-    const callback = this.uiCallbacks.get(callbackName);
-    if (typeof callback === 'function') {
-      try {
-        // Special handling for non-slot callbacks
-        if (callbackName === 'onDirtyStateChanged') {
+    // Simplified: Only handle essential callbacks
+    if (callbackName === 'onDirtyStateChanged') {
+      const callback = this.uiCallbacks.get(callbackName);
+      if (typeof callback === 'function') {
+        try {
           console.log(`🔄 DIRTY STATE: Executing callback with isDirty=${slotName}, reason=${args[0]}`);
           callback(slotName, ...args); // For onDirtyStateChanged: slotName is actually isDirty
-        } else {
-          // Standard slot-based callbacks
-          callback(slotName, ...args);
+        } catch (error) {
+          console.error(`LayoutRenderer: Error executing dirty state callback`, error);
         }
-      } catch (error) {
-        console.error(`LayoutRenderer: Error executing callback ${callbackName}`, error);
+      } else {
+        console.warn(`🔄 DIRTY STATE: No dirty state callback registered`);
       }
     } else {
-      console.warn(`🔄 DIRTY STATE: No callback found for ${callbackName}`);
+      // Log removed callbacks for debugging
+      console.log(`LayoutRenderer: Ignoring removed callback: ${callbackName}`);
     }
   }
 
@@ -1478,8 +1484,8 @@ class LayoutRenderer {
       // Add widget to slot visually
       this.addWidgetToSlot(slotName, widgetInstance);
 
-      // Execute callback for widget addition
-      this.executeCallback('onWidgetSelected', slotName, widgetInstance, widgetDef);
+      // Note: Callback removed - unified save system handles all persistence
+      console.log(`Widget selected: ${widgetDef.name} added to ${slotName}`);
 
       // Close modal
       closeModal();
@@ -1549,7 +1555,8 @@ class LayoutRenderer {
 
     // Add edit button
     const editBtn = this.createIconButton('svg:edit', 'text-gray-400 hover:text-blue-600 w-5 h-5', () => {
-      this.executeCallback('onEditWidget', id, widgetInstance);
+      // Note: Callback removed - widget editing is display-only for now
+      console.log(`Edit widget requested: ${widgetInstance.name} (${id})`);
     });
     editBtn.title = 'Edit Widget';
 
@@ -1909,8 +1916,8 @@ class LayoutRenderer {
             // Add widget to slot
             this.addWidgetToSlot(slotName, widgetInstance);
 
-            // Execute callback to notify about auto-created widget
-            this.executeCallback('onWidgetAutoCreated', slotName, widgetInstance, widgetDef);
+            // Note: Callback removed - auto-created widgets are logged via markAsDirty
+            console.log(`Auto-created widget: ${widgetInstance.name} in ${slotName}`);
 
             // console.log(`LayoutRenderer: Auto-created widget "${widgetInstance.name}" in slot "${slotName}"`);
 
@@ -2337,8 +2344,8 @@ class LayoutRenderer {
         slot: slotConfig
       };
 
-      // Execute callback for adding the slot
-      this.executeCallback('onAddNewSlot', slotData, slotNode, insertionContext);
+      // Note: Callback removed - slot addition is managed internally
+      console.log(`New slot added: ${slotData.name}`);
 
       // Close dialog
       closeDialog();
