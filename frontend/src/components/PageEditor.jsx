@@ -243,6 +243,7 @@ const PageEditor = () => {
 
     // Version management functions
     const loadVersions = useCallback(async () => {
+        console.log("loadVersions",)
         if (!pageData?.id || isNewPage) {
             return;
         }
@@ -250,15 +251,17 @@ const PageEditor = () => {
         try {
             const { getPageVersionsList } = await import('../api/versions.js');
             const versionsData = await getPageVersionsList(pageData.id);
-
+            console.log("versionsData", versionsData)
             setAvailableVersions(versionsData.versions || []);
-
-            // Set current version if not already set
-            if (!currentVersion && versionsData.current_version) {
-                const currentVersionData = versionsData.versions?.find(v => v.id === versionsData.current_version);
-                if (currentVersionData) {
-                    setCurrentVersion(currentVersionData);
-                }
+            console.log("currentVersion", currentVersion, versionsData.current_version)
+            // Set current version if not already set - default to last saved version (highest version number)
+            if (!currentVersion && versionsData.versions && versionsData.versions.length > 0) {
+                // Find the version with the highest version number (last saved)
+                const lastSavedVersion = versionsData.versions.reduce((latest, current) => {
+                    return (current.version_number > latest.version_number) ? current : latest;
+                });
+                console.log("lastSavedVersion", lastSavedVersion)
+                setCurrentVersion(lastSavedVersion);
             }
         } catch (error) {
             console.error('PageEditor: Error loading versions', error);
