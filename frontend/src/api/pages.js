@@ -84,7 +84,7 @@ export const savePageWithWidgets = async (pageId, pageData = {}, widgets = null,
             auto_publish: options.autoPublish || false
         };
     }
-
+    console.log("savePageWithWidgets")
     console.log('🔄 API: Unified save payload:', payload);
     const response = await api.patch(`${API_BASE}/pages/${pageId}/`, payload);
     console.log('✅ API: Unified save response:', response.data);
