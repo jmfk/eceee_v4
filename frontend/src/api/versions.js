@@ -39,12 +39,6 @@ export const publishVersion = async (versionId) => {
     return response.data
 }
 
-// Get widget data for a specific version
-export const getVersionWidgets = async (versionId) => {
-    const response = await api.get(`${API_BASE}/versions/${versionId}/widgets/`)
-    return response.data
-}
-
 // Get complete data for a specific version of a page (NEW ENDPOINT)
 export const getPageVersion = async (pageId, versionId) => {
     const response = await api.get(`${API_BASE}/pages/${pageId}/versions/${versionId}/`)

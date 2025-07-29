@@ -25,6 +25,18 @@ import ContentEditor from './ContentEditor'
 import LayoutSelector from './LayoutSelector'
 import StatusBar from './StatusBar'
 
+/**
+ * PageEditor - Unified Page State Architecture
+ * 
+ * Data Structure:
+ * - pageData: Complete current page state (metadata + widgets + version_data)
+ * - availableVersions: List of available version metadata
+ * 
+ * Version Management:
+ * - When switching versions: Load complete version data and merge into pageData
+ * - When saving: Collect all data and create new version, update both pageData
+ * - ContentEditor always uses pageData as single source of truth
+ */
 const PageEditor = () => {
     const { pageId, tab } = useParams()
     const navigate = useNavigate()
@@ -52,6 +64,9 @@ const PageEditor = () => {
     const metadataEditorRef = useRef(null)
 
     // Version management state
+    // Note: With unified page state architecture:
+    // - pageData contains complete current state (metadata + widgets + version_data)
+    // - availableVersions contains list of available version metadata
     const [currentVersion, setCurrentVersion] = useState(null)
     const [availableVersions, setAvailableVersions] = useState([])
 
@@ -75,7 +90,8 @@ const PageEditor = () => {
                 code_layout: '',
                 meta_title: '',
                 meta_description: '',
-                hostnames: []
+                hostnames: [],
+                widgets: {} // Initialize empty widgets dict for new pages
             })
         }
     }, [isNewPage, pageData])
@@ -126,7 +142,7 @@ const PageEditor = () => {
         }
     }, [isNewPage, pageId, addNotification])
 
-    // Set page data when loaded
+    // Set page data when loaded - initialize widgets array for new pages
     useEffect(() => {
         if (page && !isNewPage) {
             setPageData(page)
@@ -159,29 +175,6 @@ const PageEditor = () => {
 
         fetchLayoutData()
     }, [pageData?.code_layout, addNotification, showError])
-
-    // Create page mutation (for new pages)
-    const createPageMutation = useMutation({
-        mutationFn: async (pageData) => {
-            const response = await api.post('/api/v1/webpages/pages/', pageData)
-            return response.data
-        },
-        onSuccess: (newPage) => {
-            addNotification('Page created successfully', 'success', 'page-create')
-            setIsDirty(false)
-            // Navigate to edit the newly created page
-            navigate(`/pages/${newPage.id}/edit`, {
-                replace: true,
-                state: { previousView }
-            })
-            queryClient.invalidateQueries(['pages'])
-        },
-        onError: (error) => {
-            addNotification('Failed to create page', 'error', 'page-create')
-            showError(error, 'Failed to create page')
-        }
-    })
-
 
 
     // Publish page mutation
@@ -223,8 +216,6 @@ const PageEditor = () => {
         navigate(previousView)
     }
 
-
-
     // Handle quick publish (only for existing pages)
     const handleQuickPublish = () => {
         if (isNewPage) return
@@ -243,56 +234,57 @@ const PageEditor = () => {
 
     // Version management functions
     const loadVersions = useCallback(async () => {
-        console.log("loadVersions",)
         if (!pageData?.id || isNewPage) {
             return;
         }
-
         try {
-            const { getPageVersionsList } = await import('../api/versions.js');
+            const { getPageVersionsList, getPageVersion } = await import('../api/versions.js');
             const versionsData = await getPageVersionsList(pageData.id);
-            console.log("versionsData", versionsData)
             setAvailableVersions(versionsData.versions || []);
-            console.log("currentVersion", currentVersion, versionsData.current_version)
             // Set current version if not already set - default to last saved version (highest version number)
-            if (!currentVersion && versionsData.versions && versionsData.versions.length > 0) {
+            if (versionsData.versions && versionsData.versions.length > 0) {
                 // Find the version with the highest version number (last saved)
                 const lastSavedVersion = versionsData.versions.reduce((latest, current) => {
                     return (current.version_number > latest.version_number) ? current : latest;
                 });
-                console.log("lastSavedVersion", lastSavedVersion)
                 setCurrentVersion(lastSavedVersion);
+                // Load the complete version data including widgets
+                const newPage = await getPageVersion(pageData.id, lastSavedVersion.id);
+                setPageData(prev => {
+                    return { ...prev, ...newPage };
+                });
             }
         } catch (error) {
             console.error('PageEditor: Error loading versions', error);
             showError('Failed to load page versions');
         }
-    }, [pageData?.id, isNewPage, currentVersion, showError]);
+    }, [pageData?.id, isNewPage, showError]);
 
     const switchToVersion = useCallback(async (versionId) => {
         if (!versionId) return;
 
         try {
-            const { getVersionWidgets } = await import('../api/versions.js');
-            const versionData = await getVersionWidgets(versionId);
-
+            const { getPageVersion } = await import('../api/versions.js');
+            const pageData = await getPageVersion(pageData.id, versionId);
+            console.log('switchToVersion: loaded pageData', pageData);
+            const versionData = availableVersions.find(version => version.id === versionId);
             setCurrentVersion(versionData);
-
-            // Update the page data
-            updatePageData({
-                currentVersion: versionData
+            console.log('setCurrentVersion: versionData', versionData);
+            // Merge version-specific data (including widgets) into pageData
+            setPageData(prev => {
+                return pageData;
             });
 
-            // console.log('PageEditor: Switched to version', versionData.version_number);
+            console.log('PageEditor: Switched to version', pageData.version_number);
             addNotification({
                 type: 'info',
-                message: `Switched to version ${versionData.version_number}`
+                message: `Switched to version ${pageData.version_number}`
             });
         } catch (error) {
             console.error('PageEditor: Error switching to version', error);
             showError(`Failed to load version: ${error.message}`);
         }
-    }, [updatePageData, showError, addNotification]);
+    }, [showError, addNotification]);
 
     // Load versions when page data is available
     useEffect(() => {
@@ -321,20 +313,23 @@ const PageEditor = () => {
             // Collect all data from editors (no saving yet)
             const collectedData = {};
 
-            // Collect widget data from ContentEditor
+            // Collect current widget data (from pageData) and any unsaved changes from ContentEditor
+            collectedData.widgets = pageData.widgets || [];
             if (contentEditorRef.current && contentEditorRef.current.saveWidgets) {
-                // console.log('🔄 UNIFIED SAVE: Collecting widget data from ContentEditor');
+                // console.log('🔄 UNIFIED SAVE: Collecting any unsaved widget changes from ContentEditor');
                 try {
                     const widgetResult = await contentEditorRef.current.saveWidgets({
                         source: 'unified_save_from_statusbar',
                         description: 'Unified save triggered from status bar',
                         collectOnly: true  // Tell ContentEditor to collect data, not save
                     });
-                    collectedData.widgets = widgetResult.data || widgetResult;
+                    // Merge any changes from ContentEditor with existing widgets
+                    collectedData.widgets = widgetResult.data || widgetResult || collectedData.widgets;
                     // console.log('✅ UNIFIED SAVE: Widget data collected', collectedData.widgets);
                 } catch (error) {
                     console.error('❌ UNIFIED SAVE: Widget data collection failed', error);
-                    throw new Error(`Widget data collection failed: ${error.message}`);
+                    // Fall back to existing pageData widgets if ContentEditor fails
+                    console.log('🔄 UNIFIED SAVE: Falling back to pageData.widgets');
                 }
             }
 
@@ -366,14 +361,10 @@ const PageEditor = () => {
 
             // Combine all page data (settings + metadata)
             const unifiedPageData = {
+                ...pageData,
                 ...collectedData.settings,
                 ...collectedData.metadata
             };
-
-            // console.log('🔄 UNIFIED SAVE: Combined data ready for API call', {
-            //     pageData: unifiedPageData,
-            //     widgets: collectedData.widgets
-            // });
 
             // Single API call for everything!
             const response = await savePageWithWidgets(
@@ -385,11 +376,12 @@ const PageEditor = () => {
                     autoPublish: false
                 }
             );
-
-            // console.log('✅ UNIFIED SAVE: API call successful!', response);
-
-            // Update UI state with response
-            setPageData(response);
+            // Update UI state with response - preserve widgets and version data structure
+            setPageData(prev => ({
+                ...response,
+                widgets: response.widgets || prev.widgets || {},
+                version_data: response.version_data || prev.version_data
+            }));
             setIsDirty(false);
 
             // Mark LayoutRenderer as clean after successful save
@@ -655,6 +647,7 @@ const PageEditor = () => {
                 onSaveClick={handleSaveFromStatusBar}
                 onAutoSaveToggle={handleAutoSaveToggle}
                 autoSaveEnabled={autoSaveEnabled}
+                pageData={pageData}
                 customStatusContent={
                     <div className="flex items-center space-x-4">
                         <span>

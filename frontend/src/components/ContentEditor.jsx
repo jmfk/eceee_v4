@@ -10,7 +10,6 @@ import LayoutRenderer from './LayoutRenderer';
 
 const ContentEditor = forwardRef(({
   layoutJson,
-  widgets = {},
   editable = false,
   onSlotClick,
   onDirtyChange,
@@ -27,9 +26,6 @@ const ContentEditor = forwardRef(({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [selectedSlot, setSelectedSlot] = useState(null);
-
-  // console.log("ContentEditor::widgets", widgets);
-  // console.log("ContentEditor::pageData", pageData);
 
   // Early return if critical props are missing
   if (pageData === undefined) {
@@ -364,10 +360,10 @@ const ContentEditor = forwardRef(({
 
   // Update widgets when widgets prop changes (with proper React state management)
   const widgetsRef = useRef(null);
-  const widgetsJsonString = JSON.stringify(widgets);
+  const widgetsJsonString = JSON.stringify(pageData?.widgets);
 
   useEffect(() => {
-    if (!layoutRenderer || !widgets) {
+    if (!layoutRenderer || !pageData?.widgets) {
       return;
     }
 
@@ -383,7 +379,7 @@ const ContentEditor = forwardRef(({
     widgetsRef.current = widgetsJsonString;
 
     // Add fallback test widgets if no widgets data exists
-    let widgetsToLoad = widgets;
+    let widgetsToLoad = pageData?.widgets;
 
     // Use React's scheduling to batch widget updates
     const updateSlots = () => {
@@ -409,7 +405,7 @@ const ContentEditor = forwardRef(({
     return () => {
       clearTimeout(timeoutId);
     };
-  }, [widgetsJsonString, layoutRenderer]);
+  }, [widgetsJsonString, layoutRenderer, pageData?.widgets]);
 
   // Inject CSS styles for slot interactivity with proper cleanup
   useEffect(() => {
@@ -545,7 +541,7 @@ const ContentEditor = forwardRef(({
 
   // Set up auto-save when editing is enabled AND widgets are loaded
   useEffect(() => {
-    if (editable && layoutRenderer && widgets) {
+    if (editable && layoutRenderer && pageData?.widgets) {
       // Delay auto-save activation to ensure widgets are loaded first
       const autoSaveTimeoutId = setTimeout(() => {
         // console.log('ContentEditor: Enabling auto-save after widgets loaded');
@@ -557,7 +553,7 @@ const ContentEditor = forwardRef(({
       // Disable auto-save for non-editable mode or when no widgets
       enableAutoSave(false);
     }
-  }, [editable, layoutRenderer, widgets, enableAutoSave]);
+  }, [editable, layoutRenderer, pageData?.widgets, enableAutoSave]);
 
   // Expose methods for external use
   const api = useMemo(() => ({
