@@ -358,11 +358,11 @@ const SettingsManager = () => {
                     pageId={selectedPage.id}
                     onObjectLinked={(object, objectType) => {
                         // Refresh page data or show success message
-                        console.log('Object linked:', object, objectType)
+                        // console.log('Object linked:', object, objectType)
                     }}
                     onObjectUnlinked={() => {
                         // Refresh page data or show success message
-                        console.log('Object unlinked')
+                        // console.log('Object unlinked')
                     }}
                 />
             </div>
