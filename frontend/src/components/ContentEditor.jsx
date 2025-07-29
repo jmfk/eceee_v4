@@ -377,29 +377,13 @@ const ContentEditor = forwardRef(({
       return;
     }
 
-    console.log('ContentEditor: Loading widgets into LayoutRenderer', widgets);
-    console.log('ContentEditor: Widgets object keys:', Object.keys(widgets));
-    console.log('ContentEditor: Is widgets empty?', Object.keys(widgets).length === 0);
+    // console.log('ContentEditor: Loading widgets into LayoutRenderer', widgets);
+    // console.log('ContentEditor: Widgets object keys:', Object.keys(widgets));
+    // console.log('ContentEditor: Is widgets empty?', Object.keys(widgets).length === 0);
     widgetsRef.current = widgetsJsonString;
 
     // Add fallback test widgets if no widgets data exists
     let widgetsToLoad = widgets;
-    // if (Object.keys(widgets).length === 0) {
-    //   console.log('ContentEditor: No widgets found, adding test widgets for demonstration');
-    //   widgetsToLoad = {
-    //     "main": [
-    //       {
-    //         "id": "test-widget-1",
-    //         "type": "text-block",
-    //         "name": "Test Text Widget",
-    //         "config": {
-    //           "title": "Test Widget",
-    //           "content": "This is a test widget to verify the system is working. Real widget data should replace this."
-    //         }
-    //       }
-    //     ]
-    //   };
-    // }
 
     // Use React's scheduling to batch widget updates
     const updateSlots = () => {

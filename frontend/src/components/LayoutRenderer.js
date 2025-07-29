@@ -282,6 +282,57 @@ class LayoutRenderer {
   }
 
   /**
+   * Clear all widgets from a specific slot
+   * @param {string} slotName - Name of the slot to clear
+   */
+  clearSlot(slotName) {
+    try {
+      const slotElement = this.slotContainers.get(slotName);
+      if (!slotElement) {
+        console.warn(`LayoutRenderer: Cannot clear slot "${slotName}" - slot not found`);
+        return;
+      }
+
+      // Remove only widget elements, preserving slot menu and other UI
+      const widgetElements = slotElement.querySelectorAll('.rendered-widget');
+      widgetElements.forEach(element => element.remove());
+
+      // Remove any existing placeholder
+      const existingPlaceholder = slotElement.querySelector('.slot-placeholder');
+      if (existingPlaceholder) {
+        existingPlaceholder.remove();
+      }
+
+      // Clear saved widget data for this slot
+      this.savedWidgetData.set(slotName, []);
+
+      // Add placeholder content (without wiping entire innerHTML)
+      const placeholder = document.createElement('div');
+      placeholder.className = 'slot-placeholder p-4 border-2 border-dashed border-gray-300 rounded text-center text-gray-500';
+      placeholder.innerHTML = `<span class="text-sm">${this.escapeHtml(`Empty slot: ${slotName}`)}</span>`;
+
+      // Insert placeholder before any slot menu (which should be at the end)
+      const slotMenu = slotElement.querySelector('[data-slot-menu]');
+      if (slotMenu) {
+        slotElement.insertBefore(placeholder, slotMenu);
+      } else {
+        slotElement.appendChild(placeholder);
+        // Re-add slot menu if it's missing
+        this.addSlotIconMenu(slotName, {
+          showAddWidget: this.uiConfig.showAddWidget,
+          showSlotInfo: true,
+          showClearSlot: true
+        });
+      }
+
+      console.log(`🔄 SAVE SIGNAL: Slot "${slotName}" cleared - ${widgetElements.length} widgets removed`);
+
+    } catch (error) {
+      console.error(`LayoutRenderer: Error clearing slot "${slotName}"`, error);
+    }
+  }
+
+  /**
    * Set the widget renderer function
    * @param {Function} renderer - Function that takes a widget object and returns DOM element
    */
@@ -622,8 +673,10 @@ class LayoutRenderer {
         icon: 'svg:trash',
         label: 'Clear Slot',
         action: () => {
-          // Note: Callback removed - unified save system handles all persistence
-          console.log(`Slot cleared: ${slotName}`);
+          // Clear all widgets from the slot
+          this.clearSlot(slotName);
+          // Mark as dirty for unified save system
+          this.markAsDirty(`Cleared slot: ${slotName}`);
         },
         className: 'text-red-700 hover:bg-red-50'
       });
@@ -636,7 +689,7 @@ class LayoutRenderer {
         label: 'Slot Info',
         action: () => {
           // Note: Callback removed - slot info is display-only
-          console.log(`Slot info requested: ${slotName}`);
+          // console.log(`Slot info requested: ${slotName}`);
         },
         className: 'text-gray-700 hover:bg-gray-50'
       });
@@ -712,7 +765,7 @@ class LayoutRenderer {
       }
     } else {
       // Log removed callbacks for debugging
-      console.log(`LayoutRenderer: Ignoring removed callback: ${callbackName}`);
+      // console.log(`LayoutRenderer: Ignoring removed callback: ${callbackName}`);
     }
   }
 
@@ -894,14 +947,23 @@ class LayoutRenderer {
   collectAllWidgetData() {
     const widgetData = {};
 
+    console.log('🔍 DEBUG: collectAllWidgetData() - Available slots:', Array.from(this.slotContainers.keys()));
+
     this.slotContainers.forEach((slotElement, slotName) => {
+      console.log(`🔍 DEBUG: Collecting widgets from slot "${slotName}"`);
       const widgets = this.collectWidgetDataFromSlot(slotName);
+      console.log(`🔍 DEBUG: Slot "${slotName}" has ${widgets.length} widgets:`, widgets);
+
+      // Always include all slots in payload, even if empty
+      widgetData[slotName] = widgets;
       if (widgets.length > 0) {
-        widgetData[slotName] = widgets;
+        console.log(`✅ DEBUG: Added ${widgets.length} widgets to payload for slot "${slotName}"`);
+      } else {
+        console.log(`📝 DEBUG: Added empty array to payload for slot "${slotName}"`);
       }
     });
 
-    // console.log('LayoutRenderer: Collected widget data from all slots:', widgetData);
+    console.log('🔍 DEBUG: Final widget data payload:', widgetData);
     return widgetData;
   }
 
@@ -919,6 +981,7 @@ class LayoutRenderer {
 
     const widgets = [];
     const widgetElements = slotElement.querySelectorAll('.rendered-widget[data-widget-id][data-widget-type]');
+    console.log(`🔍 DEBUG: Slot "${slotName}" has ${widgetElements.length} widget elements in DOM`);
 
     widgetElements.forEach(widgetElement => {
       try {
@@ -1484,7 +1547,7 @@ class LayoutRenderer {
       this.addWidgetToSlot(slotName, widgetInstance);
 
       // Note: Callback removed - unified save system handles all persistence
-      console.log(`Widget selected: ${widgetDef.name} added to ${slotName}`);
+      // console.log(`Widget selected: ${widgetDef.name} added to ${slotName}`);
 
       // Close modal
       closeModal();
@@ -1555,7 +1618,7 @@ class LayoutRenderer {
     // Add edit button
     const editBtn = this.createIconButton('svg:edit', 'text-gray-400 hover:text-blue-600 w-5 h-5', () => {
       // Note: Callback removed - widget editing is display-only for now
-      console.log(`Edit widget requested: ${widgetInstance.name} (${id})`);
+      // console.log(`Edit widget requested: ${widgetInstance.name} (${id})`);
     });
     editBtn.title = 'Edit Widget';
 
@@ -1916,7 +1979,7 @@ class LayoutRenderer {
             this.addWidgetToSlot(slotName, widgetInstance);
 
             // Note: Callback removed - auto-created widgets are logged via markAsDirty
-            console.log(`Auto-created widget: ${widgetInstance.name} in ${slotName}`);
+            // console.log(`Auto-created widget: ${widgetInstance.name} in ${slotName}`);
 
             // console.log(`LayoutRenderer: Auto-created widget "${widgetInstance.name}" in slot "${slotName}"`);
 
@@ -2128,6 +2191,7 @@ class LayoutRenderer {
       // Store slot reference and configuration
       this.slotContainers.set(slotName, element);
       this.slotConfigs.set(slotName, node.slot);
+      console.log(`🔍 DEBUG: Registered slot "${slotName}" in slotContainers. Total slots: ${this.slotContainers.size}`);
 
       // Automatically add slot icon menu if UI is enabled
       if (this.uiConfig.showIconMenu) {
@@ -2542,7 +2606,7 @@ class LayoutRenderer {
         callback(versionData);
       }
 
-      console.log('LayoutRenderer: Switched to version', versionData.version_number);
+      // console.log('LayoutRenderer: Switched to version', versionData.version_number);
 
     } catch (error) {
       console.error('LayoutRenderer: Error switching to version', error);
