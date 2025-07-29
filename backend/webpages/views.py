@@ -407,36 +407,22 @@ class WebPageViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         """Enhanced to handle unified saves (page data + widgets)"""
-        # Get widgets and version options from request for unified save
-        widgets_data = self.request.data.get("widgets")
-        version_options = self.request.data.get("version_options", {})
+        # Check if there's any data to save
+        has_data = bool(self.request.data)
+
+        if not has_data:
+            return
 
         # Prepare validated data for unified save
         save_kwargs = {"last_modified_by": self.request.user}
 
-        # If widgets or version_options provided, pass them to serializer
-        if widgets_data is not None:
-            # The serializer's update method will handle widgets
-            pass  # widgets are handled in serializer.update()
-        elif self.request.data and not widgets_data:
-            # Legacy behavior: create version for page metadata changes only
-            auto_publish = self.request.data.get("auto_publish", False)
-            description = self.request.data.get("version_description", "API update")
-
-            # Save page first
-            serializer.save(**save_kwargs)
-
-            # Then create version
-            serializer.instance.create_version(
-                self.request.user,
-                description,
-                status="published" if auto_publish else "draft",
-                auto_publish=auto_publish,
-            )
-            return
-
-        # For unified save (with widgets), let serializer handle everything
+        # Save the page data (including widgets if present)
+        # The serializer's update method will handle both page fields, widgets, and version creation
+        # Version options (auto_publish, version_description) are passed through the request data
         serializer.save(**save_kwargs)
+
+        # Note: Version creation is now handled by the serializer's update method
+        # Version options are automatically extracted from validated_data in the serializer
 
     @action(detail=False, methods=["get"])
     def tree(self, request):
