@@ -406,17 +406,37 @@ class WebPageViewSet(viewsets.ModelViewSet):
         WebPage.normalize_sort_orders(page.parent_id)
 
     def perform_update(self, serializer):
-        serializer.save(last_modified_by=self.request.user)
-        # Create draft version after successful update
-        if self.request.data:
+        """Enhanced to handle unified saves (page data + widgets)"""
+        # Get widgets and version options from request for unified save
+        widgets_data = self.request.data.get("widgets")
+        version_options = self.request.data.get("version_options", {})
+
+        # Prepare validated data for unified save
+        save_kwargs = {"last_modified_by": self.request.user}
+
+        # If widgets or version_options provided, pass them to serializer
+        if widgets_data is not None:
+            # The serializer's update method will handle widgets
+            pass  # widgets are handled in serializer.update()
+        elif self.request.data and not widgets_data:
+            # Legacy behavior: create version for page metadata changes only
             auto_publish = self.request.data.get("auto_publish", False)
             description = self.request.data.get("version_description", "API update")
+
+            # Save page first
+            serializer.save(**save_kwargs)
+
+            # Then create version
             serializer.instance.create_version(
                 self.request.user,
                 description,
                 status="published" if auto_publish else "draft",
                 auto_publish=auto_publish,
             )
+            return
+
+        # For unified save (with widgets), let serializer handle everything
+        serializer.save(**save_kwargs)
 
     @action(detail=False, methods=["get"])
     def tree(self, request):
@@ -499,7 +519,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"])
     def update_widgets(self, request, pk=None):
-        """Update page widgets by creating a new version"""
+        """Legacy endpoint - now internally calls unified save"""
         page = self.get_object()
 
         # Validate request data
@@ -515,35 +535,30 @@ class WebPageViewSet(viewsets.ModelViewSet):
         auto_publish = request.data.get("auto_publish", False)
 
         try:
-            # Get current version data to preserve page_data
-            current_version = page.get_current_version()
-            current_page_data = current_version.page_data if current_version else {}
+            # Convert to unified format for internal processing
+            unified_data = {
+                "widgets": widgets_data,
+                "version_options": {
+                    "description": description,
+                    "auto_publish": auto_publish,
+                },
+            }
 
-            # Create new version with updated widgets
-            new_version = page.create_version(
-                user=request.user,
-                description=description,
-                status="published" if auto_publish else "draft",
-                auto_publish=auto_publish,
-            )
+            # Use unified save logic through serializer
+            serializer = self.get_serializer(page, data=unified_data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            updated_page = serializer.save(last_modified_by=request.user)
 
-            # Update the version with new widgets and preserve page_data
-            new_version.page_data = current_page_data
-            new_version.widgets = widgets_data
-            new_version.save()
+            # Get the latest version that was created
+            latest_version = updated_page.versions.order_by("-version_number").first()
 
-            # If auto-publishing, update page status
-            if auto_publish:
-                page.last_modified_by = request.user
-                page.save()
-
-            # Return updated page data
-            serializer = self.get_serializer(page)
             return Response(
                 {
-                    "message": "Widgets updated successfully",
-                    "version_id": new_version.id,
-                    "version_number": new_version.version_number,
+                    "message": "Widgets updated successfully (via unified API)",
+                    "version_id": latest_version.id if latest_version else None,
+                    "version_number": (
+                        latest_version.version_number if latest_version else None
+                    ),
                     "auto_published": auto_publish,
                     "page": serializer.data,
                 },

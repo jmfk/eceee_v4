@@ -182,6 +182,10 @@ class WebPageDetailSerializer(serializers.ModelSerializer):
 
     # widgets = PageWidgetSerializer(many=True, read_only=True)  # Removed - widgets now in PageVersion
 
+    # Unified API: Add widgets field for unified save
+    widgets = serializers.SerializerMethodField()
+    version_options = serializers.JSONField(write_only=True, required=False)
+
     created_by = UserSerializer(read_only=True)
     last_modified_by = UserSerializer(read_only=True)
 
@@ -224,6 +228,8 @@ class WebPageDetailSerializer(serializers.ModelSerializer):
             "meta_title",
             "meta_description",
             "meta_keywords",
+            "widgets",  # Unified API: Add widgets field
+            "version_options",  # Unified API: Version options for saves
             "created_at",
             "updated_at",
             "created_by",
@@ -395,6 +401,83 @@ class WebPageDetailSerializer(serializers.ModelSerializer):
             )
 
         return data
+
+    # Unified API Methods
+    def get_widgets(self, obj):
+        """Get widgets from current version for unified API"""
+        current_version = obj.get_current_version()
+        return current_version.widgets if current_version else {}
+
+    def update(self, instance, validated_data):
+        """Handle unified save: page_data + widgets"""
+        # Extract widgets and version options if present
+        widgets_data = validated_data.pop("widgets", None)
+        version_options = validated_data.pop("version_options", {})
+
+        # Update page metadata (existing logic)
+        updated_instance = super().update(instance, validated_data)
+
+        # If widgets provided, create/update version
+        if widgets_data is not None:
+            description = version_options.get("description", "Unified update via API")
+            auto_publish = version_options.get("auto_publish", False)
+
+            # Create new version with both page_data and widgets
+            self._create_unified_version(
+                updated_instance, widgets_data, description, auto_publish
+            )
+
+        return updated_instance
+
+    def _create_unified_version(self, page, widgets_data, description, auto_publish):
+        """Create version with both page data and widgets"""
+        from django.utils import timezone
+
+        # Get current page data by serializing the page (exclude computed fields)
+        page_data_fields = [
+            "title",
+            "slug",
+            "description",
+            "sort_order",
+            "hostnames",
+            "code_layout",
+            "page_css_variables",
+            "page_custom_css",
+            "enable_css_injection",
+            "publication_status",
+            "effective_date",
+            "expiry_date",
+            "meta_title",
+            "meta_description",
+            "meta_keywords",
+        ]
+
+        current_page_data = {}
+        for field in page_data_fields:
+            value = getattr(page, field, None)
+            if value is not None:
+                # Handle datetime fields
+                if field in ["effective_date", "expiry_date"] and hasattr(
+                    value, "isoformat"
+                ):
+                    current_page_data[field] = value.isoformat()
+                else:
+                    current_page_data[field] = value
+
+        # Create new version
+        version = page.create_version(
+            user=self.context["request"].user,
+            description=description,
+            status="published" if auto_publish else "draft",
+            auto_publish=auto_publish,
+        )
+
+        # Update version with unified data
+        version.page_data = current_page_data
+        version.widgets = widgets_data
+        version.save()
+
+        return version
 
 
 class WebPageListSerializer(serializers.ModelSerializer):

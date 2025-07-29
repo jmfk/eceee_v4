@@ -695,10 +695,21 @@ class LayoutRenderer {
     const callback = this.uiCallbacks.get(callbackName);
     if (typeof callback === 'function') {
       try {
-        callback(slotName, ...args);
+        // Special handling for non-slot callbacks
+        if (callbackName === 'onDirtyStateChanged') {
+          console.log(`🔄 DIRTY STATE: Executing callback with isDirty=${slotName}, reason=${args[0]}`);
+          callback(slotName, ...args); // For onDirtyStateChanged: slotName is actually isDirty
+        } else if (callbackName === 'onSavePageData' || callbackName === 'onAutoSave' || callbackName === 'onAutoSaveError') {
+          callback(slotName, ...args); // For save callbacks: slotName is actually the data
+        } else {
+          // Standard slot-based callbacks
+          callback(slotName, ...args);
+        }
       } catch (error) {
         console.error(`LayoutRenderer: Error executing callback ${callbackName}`, error);
       }
+    } else {
+      console.warn(`🔄 DIRTY STATE: No callback found for ${callbackName}`);
     }
   }
 
@@ -1185,9 +1196,10 @@ class LayoutRenderer {
   markAsDirty(reason = 'unknown') {
     if (!this.isDirty) {
       this.isDirty = true;
-      // console.log(`LayoutRenderer: Page marked as dirty - ${reason}`);
+      console.log(`🔄 DIRTY STATE: LayoutRenderer marked as dirty - ${reason}`);
 
       // Execute callback for dirty state change
+      console.log(`🔄 DIRTY STATE: LayoutRenderer executing onDirtyStateChanged callback`);
       this.executeCallback('onDirtyStateChanged', true, reason);
     }
 
