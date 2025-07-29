@@ -72,7 +72,7 @@ apiClient.interceptors.response.use(
     async (error) => {
         // If we get a 403 Forbidden (CSRF failure), try to refresh the token
         if (error.response?.status === 403 && error.response?.data?.detail?.includes('CSRF')) {
-            console.log('CSRF token expired, refreshing...')
+            // console.log('CSRF token expired, refreshing...')
             csrfToken = null
             await getCsrfToken()
 

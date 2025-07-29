@@ -325,7 +325,7 @@ class LayoutRenderer {
         });
       }
 
-      console.log(`🔄 SAVE SIGNAL: Slot "${slotName}" cleared - ${widgetElements.length} widgets removed`);
+      // console.log(`🔄 SAVE SIGNAL: Slot "${slotName}" cleared - ${widgetElements.length} widgets removed`);
 
     } catch (error) {
       console.error(`LayoutRenderer: Error clearing slot "${slotName}"`, error);
@@ -755,7 +755,7 @@ class LayoutRenderer {
       const callback = this.uiCallbacks.get(callbackName);
       if (typeof callback === 'function') {
         try {
-          console.log(`🔄 DIRTY STATE: Executing callback with isDirty=${slotName}, reason=${args[0]}`);
+          // console.log(`🔄 DIRTY STATE: Executing callback with isDirty=${slotName}, reason=${args[0]}`);
           callback(slotName, ...args); // For onDirtyStateChanged: slotName is actually isDirty
         } catch (error) {
           console.error(`LayoutRenderer: Error executing dirty state callback`, error);
@@ -947,23 +947,23 @@ class LayoutRenderer {
   collectAllWidgetData() {
     const widgetData = {};
 
-    console.log('🔍 DEBUG: collectAllWidgetData() - Available slots:', Array.from(this.slotContainers.keys()));
+    // console.log('🔍 DEBUG: collectAllWidgetData() - Available slots:', Array.from(this.slotContainers.keys()));
 
     this.slotContainers.forEach((slotElement, slotName) => {
-      console.log(`🔍 DEBUG: Collecting widgets from slot "${slotName}"`);
+      // console.log(`🔍 DEBUG: Collecting widgets from slot "${slotName}"`);
       const widgets = this.collectWidgetDataFromSlot(slotName);
-      console.log(`🔍 DEBUG: Slot "${slotName}" has ${widgets.length} widgets:`, widgets);
+      // console.log(`🔍 DEBUG: Slot "${slotName}" has ${widgets.length} widgets:`, widgets);
 
       // Always include all slots in payload, even if empty
       widgetData[slotName] = widgets;
-      if (widgets.length > 0) {
-        console.log(`✅ DEBUG: Added ${widgets.length} widgets to payload for slot "${slotName}"`);
-      } else {
-        console.log(`📝 DEBUG: Added empty array to payload for slot "${slotName}"`);
-      }
+      // if (widgets.length > 0) {
+      //   console.log(`✅ DEBUG: Added ${widgets.length} widgets to payload for slot "${slotName}"`);
+      // } else {
+      //   console.log(`📝 DEBUG: Added empty array to payload for slot "${slotName}"`);
+      // }
     });
 
-    console.log('🔍 DEBUG: Final widget data payload:', widgetData);
+    // console.log('🔍 DEBUG: Final widget data payload:', widgetData);
     return widgetData;
   }
 
@@ -981,7 +981,7 @@ class LayoutRenderer {
 
     const widgets = [];
     const widgetElements = slotElement.querySelectorAll('.rendered-widget[data-widget-id][data-widget-type]');
-    console.log(`🔍 DEBUG: Slot "${slotName}" has ${widgetElements.length} widget elements in DOM`);
+    // console.log(`🔍 DEBUG: Slot "${slotName}" has ${widgetElements.length} widget elements in DOM`);
 
     widgetElements.forEach(widgetElement => {
       try {
@@ -1175,19 +1175,19 @@ class LayoutRenderer {
  * @returns {Object} The collected and saved widget data
  */
   saveCurrentWidgetState() {
-    console.log('🔄 SAVE SIGNAL: LayoutRenderer.saveCurrentWidgetState() called');
+    // console.log('🔄 SAVE SIGNAL: LayoutRenderer.saveCurrentWidgetState() called');
 
-    console.log('🔄 SAVE SIGNAL: Collecting widget data from all slots...');
+    // console.log('🔄 SAVE SIGNAL: Collecting widget data from all slots...');
     const widgetData = this.collectAllWidgetData();
-    console.log('🔄 SAVE SIGNAL: Collected widget data:', widgetData);
+    // console.log('🔄 SAVE SIGNAL: Collected widget data:', widgetData);
 
-    console.log('🔄 SAVE SIGNAL: Saving widget data internally...');
+    // console.log('🔄 SAVE SIGNAL: Saving widget data internally...');
     this.saveWidgetData(widgetData);
 
     // Note: Don't mark as clean here - unified save will handle that
     // Note: Don't execute save callbacks - unified save handles persistence
 
-    console.log('✅ SAVE SIGNAL: LayoutRenderer data collection completed');
+    // console.log('✅ SAVE SIGNAL: LayoutRenderer data collection completed');
     return widgetData;
   }
 
@@ -1257,10 +1257,10 @@ class LayoutRenderer {
   markAsDirty(reason = 'unknown') {
     if (!this.isDirty) {
       this.isDirty = true;
-      console.log(`🔄 DIRTY STATE: LayoutRenderer marked as dirty - ${reason}`);
+      // console.log(`🔄 DIRTY STATE: LayoutRenderer marked as dirty - ${reason}`);
 
       // Execute callback for dirty state change
-      console.log(`🔄 DIRTY STATE: LayoutRenderer executing onDirtyStateChanged callback`);
+      // console.log(`🔄 DIRTY STATE: LayoutRenderer executing onDirtyStateChanged callback`);
       this.executeCallback('onDirtyStateChanged', true, reason);
     }
 
@@ -2191,7 +2191,7 @@ class LayoutRenderer {
       // Store slot reference and configuration
       this.slotContainers.set(slotName, element);
       this.slotConfigs.set(slotName, node.slot);
-      console.log(`🔍 DEBUG: Registered slot "${slotName}" in slotContainers. Total slots: ${this.slotContainers.size}`);
+      // console.log(`🔍 DEBUG: Registered slot "${slotName}" in slotContainers. Total slots: ${this.slotContainers.size}`);
 
       // Automatically add slot icon menu if UI is enabled
       if (this.uiConfig.showIconMenu) {

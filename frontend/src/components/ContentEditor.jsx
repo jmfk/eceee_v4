@@ -28,8 +28,8 @@ const ContentEditor = forwardRef(({
   const [error, setError] = useState(null);
   const [selectedSlot, setSelectedSlot] = useState(null);
 
-  console.log("ContentEditor::widgets", widgets);
-  console.log("ContentEditor::pageData", pageData);
+  // console.log("ContentEditor::widgets", widgets);
+  // console.log("ContentEditor::pageData", pageData);
 
   // Early return if critical props are missing
   if (pageData === undefined) {
@@ -209,11 +209,11 @@ const ContentEditor = forwardRef(({
   useEffect(() => {
     if (!layoutRenderer) return;
 
-    console.log('ContentEditor: Setting up LayoutRenderer dirty state callback');
+    // console.log('ContentEditor: Setting up LayoutRenderer dirty state callback');
 
     layoutRenderer.setUICallbacks({
       onDirtyStateChanged: (isDirty, reason) => {
-        console.log('ContentEditor: LayoutRenderer dirty state changed', { isDirty, reason });
+        // console.log('ContentEditor: LayoutRenderer dirty state changed', { isDirty, reason });
         // Propagate dirty state up to PageEditor
         if (onDirtyChange) {
           onDirtyChange(isDirty, reason);
@@ -349,7 +349,7 @@ const ContentEditor = forwardRef(({
       cleanupEventListeners();
 
       // Log ContentEditor mode
-      console.log('ContentEditor: Rendering layout in', editable ? 'editable' : 'read-only', 'mode');
+      // console.log('ContentEditor: Rendering layout in', editable ? 'editable' : 'read-only', 'mode');
 
       // Render the layout
       layoutRenderer.render(layoutJson, containerRef);
@@ -373,7 +373,7 @@ const ContentEditor = forwardRef(({
 
     // Skip if widgets content hasn't actually changed
     if (widgetsRef.current === widgetsJsonString) {
-      console.log('ContentEditor: Skipped widgets reload - content unchanged');
+      // console.log('ContentEditor: Skipped widgets reload - content unchanged');
       return;
     }
 
@@ -388,19 +388,19 @@ const ContentEditor = forwardRef(({
     // Use React's scheduling to batch widget updates
     const updateSlots = () => {
       // Load widget data and mark page as saved BEFORE updating slots
-      console.log('widgetsToLoad', widgetsToLoad);
+      // console.log('widgetsToLoad', widgetsToLoad);
       layoutRenderer.loadWidgetData(widgetsToLoad);
 
       Object.entries(widgetsToLoad).forEach(([slotName, slotWidgets]) => {
         try {
-          console.log(`ContentEditor: Updating slot "${slotName}" with ${slotWidgets.length} widgets`);
+          // console.log(`ContentEditor: Updating slot "${slotName}" with ${slotWidgets.length} widgets`);
           layoutRenderer.updateSlot(slotName, slotWidgets);
         } catch (error) {
           console.error(`ContentEditor: Error updating slot ${slotName}`, error);
         }
       });
 
-      console.log('ContentEditor: Widgets loaded and slots updated');
+      // console.log('ContentEditor: Widgets loaded and slots updated');
     };
 
     // Schedule update for next frame to avoid blocking UI
@@ -510,7 +510,7 @@ const ContentEditor = forwardRef(({
 
   // Trigger save of all current widgets using LayoutRenderer's save system
   const saveWidgets = useCallback((options = {}) => {
-    console.log("🔄 SAVE SIGNAL: ContentEditor -> LayoutRenderer", options);
+    // console.log("🔄 SAVE SIGNAL: ContentEditor -> LayoutRenderer", options);
     if (!layoutRenderer) {
       console.warn("⚠️ SAVE SIGNAL: LayoutRenderer not available");
       return;
@@ -518,9 +518,9 @@ const ContentEditor = forwardRef(({
 
     try {
       // Use LayoutRenderer's own save method which will trigger our callbacks
-      console.log("🔄 SAVE SIGNAL: Calling LayoutRenderer.saveCurrentWidgetState()");
+      // console.log("🔄 SAVE SIGNAL: Calling LayoutRenderer.saveCurrentWidgetState()");
       const savedWidgetData = layoutRenderer.saveCurrentWidgetState();
-      console.log("✅ SAVE SIGNAL: LayoutRenderer save completed", savedWidgetData);
+      // console.log("✅ SAVE SIGNAL: LayoutRenderer save completed", savedWidgetData);
       return savedWidgetData;
     } catch (error) {
       console.error("❌ SAVE SIGNAL: ContentEditor save failed", error);
@@ -548,7 +548,7 @@ const ContentEditor = forwardRef(({
     if (editable && layoutRenderer && widgets) {
       // Delay auto-save activation to ensure widgets are loaded first
       const autoSaveTimeoutId = setTimeout(() => {
-        console.log('ContentEditor: Enabling auto-save after widgets loaded');
+        // console.log('ContentEditor: Enabling auto-save after widgets loaded');
         enableAutoSave(true, 10000);
       }, 100); // Small delay to ensure widget loading is complete
 
