@@ -517,60 +517,6 @@ class WebPageViewSet(viewsets.ModelViewSet):
             status=status.HTTP_200_OK,
         )
 
-    @action(detail=True, methods=["post"])
-    def update_widgets(self, request, pk=None):
-        """Legacy endpoint - now internally calls unified save"""
-        page = self.get_object()
-
-        # Validate request data
-        widgets_data = request.data.get("widgets", {})
-        if not isinstance(widgets_data, dict):
-            return Response(
-                {"error": "Widgets data must be a JSON object"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        # Get description for the version
-        description = request.data.get("description", "Widget update via API")
-        auto_publish = request.data.get("auto_publish", False)
-
-        try:
-            # Convert to unified format for internal processing
-            unified_data = {
-                "widgets": widgets_data,
-                "version_options": {
-                    "description": description,
-                    "auto_publish": auto_publish,
-                },
-            }
-
-            # Use unified save logic through serializer
-            serializer = self.get_serializer(page, data=unified_data, partial=True)
-            serializer.is_valid(raise_exception=True)
-            updated_page = serializer.save(last_modified_by=request.user)
-
-            # Get the latest version that was created
-            latest_version = updated_page.versions.order_by("-version_number").first()
-
-            return Response(
-                {
-                    "message": "Widgets updated successfully (via unified API)",
-                    "version_id": latest_version.id if latest_version else None,
-                    "version_number": (
-                        latest_version.version_number if latest_version else None
-                    ),
-                    "auto_published": auto_publish,
-                    "page": serializer.data,
-                },
-                status=status.HTTP_200_OK,
-            )
-
-        except Exception as e:
-            return Response(
-                {"error": f"Failed to update widgets: {str(e)}"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
     @action(detail=True, methods=["get"])
     def versions(self, request, pk=None):
         """Get all versions for this page"""

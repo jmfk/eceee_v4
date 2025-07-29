@@ -182,36 +182,7 @@ const PageEditor = () => {
         }
     })
 
-    // Update page mutation
-    const updatePageMutation = useMutation({
-        mutationFn: async (pageData) => {
-            // Only send the fields that should be updated
-            const updateFields = {
-                title: pageData.title,
-                slug: pageData.slug,
-                description: pageData.description,
-                code_layout: pageData.code_layout,
-                publication_status: pageData.publication_status,
-                meta_title: pageData.meta_title,
-                meta_description: pageData.meta_description,
-                hostnames: pageData.hostnames
-            }
 
-            const response = await api.patch(`/api/v1/webpages/pages/${pageId}/`, updateFields)
-            return response.data
-        },
-        onSuccess: (updatedPage) => {
-            addNotification('Page saved successfully', 'success', 'page-save')
-            setPageData(updatedPage)
-            setIsDirty(false)
-            queryClient.invalidateQueries(['page', pageId])
-            queryClient.invalidateQueries(['pages', 'root'])
-        },
-        onError: (error) => {
-            addNotification('Failed to save page', 'error', 'page-save')
-            showError(error, 'Failed to save page')
-        }
-    })
 
     // Publish page mutation
     const publishPageMutation = useMutation({
@@ -417,6 +388,12 @@ const PageEditor = () => {
             // Update UI state with response
             setPageData(response);
             setIsDirty(false);
+
+            // Mark LayoutRenderer as clean after successful save
+            if (contentEditorRef.current?.layoutRenderer) {
+                contentEditorRef.current.layoutRenderer.markAsClean();
+                console.log('✅ UNIFIED SAVE: LayoutRenderer marked as clean');
+            }
 
             // Show success notification
             addNotification({

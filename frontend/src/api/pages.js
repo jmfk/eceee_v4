@@ -52,16 +52,7 @@ export const getPage = async (pageId) => {
     return response.data
 }
 
-// Update page widgets (creates new version) - DEPRECATED: Use savePageWithWidgets instead
-export const updatePageWidgets = async (pageId, widgets, options = {}) => {
-    console.warn('updatePageWidgets is deprecated, use savePageWithWidgets for better performance and consistency');
-    const response = await api.post(`${API_BASE}/pages/${pageId}/update_widgets/`, {
-        widgets,
-        description: options.description || 'Widget update',
-        auto_publish: options.autoPublish || false
-    })
-    return response.data
-}
+
 
 // Create a new page
 export const createPage = async (pageData) => {

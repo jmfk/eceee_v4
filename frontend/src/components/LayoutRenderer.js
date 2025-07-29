@@ -699,8 +699,6 @@ class LayoutRenderer {
         if (callbackName === 'onDirtyStateChanged') {
           console.log(`🔄 DIRTY STATE: Executing callback with isDirty=${slotName}, reason=${args[0]}`);
           callback(slotName, ...args); // For onDirtyStateChanged: slotName is actually isDirty
-        } else if (callbackName === 'onSavePageData' || callbackName === 'onAutoSave' || callbackName === 'onAutoSaveError') {
-          callback(slotName, ...args); // For save callbacks: slotName is actually the data
         } else {
           // Standard slot-based callbacks
           callback(slotName, ...args);
@@ -1118,15 +1116,10 @@ class LayoutRenderer {
     console.log('🔄 SAVE SIGNAL: Saving widget data internally...');
     this.saveWidgetData(widgetData);
 
-    // Mark as clean after successful save
-    console.log('🔄 SAVE SIGNAL: Marking page as clean...');
-    this.markAsClean();
+    // Note: Don't mark as clean here - unified save will handle that
+    // Note: Don't execute save callbacks - unified save handles persistence
 
-    // Execute callback for saving page data
-    console.log('🔄 SAVE SIGNAL: Executing onSavePageData callback...');
-    this.executeCallback('onSavePageData', widgetData);
-
-    console.log('✅ SAVE SIGNAL: LayoutRenderer save chain completed');
+    console.log('✅ SAVE SIGNAL: LayoutRenderer data collection completed');
     return widgetData;
   }
 
@@ -1203,10 +1196,7 @@ class LayoutRenderer {
       this.executeCallback('onDirtyStateChanged', true, reason);
     }
 
-    // Trigger auto-save if enabled
-    if (this.autoSaveEnabled) {
-      this.triggerAutoSave();
-    }
+    // Note: Auto-save removed - unified save system handles all saves
   }
 
   /**
