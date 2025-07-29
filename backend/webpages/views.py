@@ -405,6 +405,57 @@ class WebPageViewSet(viewsets.ModelViewSet):
         page = serializer.instance
         WebPage.normalize_sort_orders(page.parent_id)
 
+    def retrieve(self, request, pk=None):
+        """Override retrieve to include last saved version data with widgets"""
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        page_data = serializer.data
+
+        # Get the last saved version (most recent regardless of status)
+        last_saved_version = instance.versions.order_by("-version_number").first()
+        if last_saved_version:
+            # Add last saved version data to the response
+            page_data["widgets"] = last_saved_version.widgets or {}
+            page_data["page_data"] = last_saved_version.page_data or {}
+            page_data["last_saved_version"] = {
+                "version_id": last_saved_version.id,
+                "version_number": last_saved_version.version_number,
+                "is_current": last_saved_version.is_current,
+                "status": last_saved_version.status,
+                "description": last_saved_version.description,
+                "created_at": last_saved_version.created_at,
+                "created_by": (
+                    last_saved_version.created_by.username
+                    if last_saved_version.created_by
+                    else None
+                ),
+                "published_at": last_saved_version.published_at,
+                "published_by": (
+                    last_saved_version.published_by.username
+                    if last_saved_version.published_by
+                    else None
+                ),
+                "change_summary": last_saved_version.change_summary or {},
+            }
+        else:
+            # No versions exist yet
+            page_data["widgets"] = {}
+            page_data["page_data"] = {}
+            page_data["last_saved_version"] = {
+                "version_id": None,
+                "version_number": 0,
+                "is_current": False,
+                "status": None,
+                "description": None,
+                "created_at": None,
+                "created_by": None,
+                "published_at": None,
+                "published_by": None,
+                "change_summary": {},
+            }
+
+        return Response(page_data)
+
     def perform_update(self, serializer):
         """Enhanced to handle unified saves (page data + widgets)"""
         # Check if there's any data to save

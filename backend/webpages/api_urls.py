@@ -14,7 +14,6 @@ from .views import (
     PageThemeViewSet,
     WidgetTypeViewSet,
     layout_json,
-    # PageWidgetViewSet,  # Temporarily disabled
 )
 
 # Create router and register viewsets
@@ -29,7 +28,6 @@ router.register(
 )  # New unified endpoint
 router.register(r"themes", PageThemeViewSet, basename="pagetheme")
 router.register(r"widget-types", WidgetTypeViewSet, basename="widgettype")
-# router.register(r"widgets", PageWidgetViewSet, basename="pagewidget")  # Temporarily disabled
 
 # API URLs without app_name to avoid namespace conflicts when included in main API
 urlpatterns = [
