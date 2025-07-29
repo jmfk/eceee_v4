@@ -16,13 +16,6 @@ export const createVersion = async (pageId, versionData) => {
     return response.data
 }
 
-// Get all versions for a page
-export const getPageVersions = async (pageId, filters = {}) => {
-    const params = new URLSearchParams({ page__id: pageId, ...filters })
-    const response = await api.get(`${API_BASE}/versions/?${params}`)
-    return response.data
-}
-
 // Get a specific version
 export const getVersion = async (versionId) => {
     const response = await api.get(`${API_BASE}/versions/${versionId}/`)

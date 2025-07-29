@@ -22,7 +22,6 @@ import {
 import { useNotificationContext } from './NotificationManager'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import {
-    getPageVersions,
     getVersion,
     createVersion,
     updateVersion,
@@ -48,13 +47,6 @@ const VersionManager = ({ pageId, onClose }) => {
     const queryClient = useQueryClient()
     const { showConfirm, showPrompt } = useNotificationContext()
     const { addNotification } = useGlobalNotifications()
-
-    // Fetch versions for the page
-    const { data: versionsData, isLoading: versionsLoading } = useQuery({
-        queryKey: ['page-versions', pageId],
-        queryFn: () => getPageVersions(pageId),
-        enabled: !!pageId
-    })
 
     // Fetch version statistics
     const { data: versionStats } = useQuery({
