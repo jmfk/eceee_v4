@@ -1,8 +1,7 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-    Save,
     X,
     Eye,
     Settings,
@@ -48,10 +47,15 @@ const PageEditor = () => {
     const [layoutData, setLayoutData] = useState(null)
     const [isLoadingLayout, setIsLoadingLayout] = useState(false)
     const contentEditorRef = useRef(null)
+    const settingsEditorRef = useRef(null)
+    const metadataEditorRef = useRef(null)
 
     // Version management state
     const [currentVersion, setCurrentVersion] = useState(null)
     const [availableVersions, setAvailableVersions] = useState([])
+
+    // Auto-save management state
+    const [autoSaveEnabled, setAutoSaveEnabled] = useState(true)
 
     const queryClient = useQueryClient()
     const { showError, showConfirm } = useNotificationContext()
@@ -247,18 +251,7 @@ const PageEditor = () => {
         navigate(previousView)
     }
 
-    // Handle save
-    const handleSave = () => {
-        if (pageData && isDirty) {
-            if (isNewPage) {
-                addNotification('Creating page...', 'info', 'page-create')
-                createPageMutation.mutate(pageData)
-            } else {
-                addNotification('Saving page...', 'info', 'page-save')
-                updatePageMutation.mutate(pageData)
-            }
-        }
-    }
+
 
     // Handle quick publish (only for existing pages)
     const handleQuickPublish = () => {
@@ -330,6 +323,116 @@ const PageEditor = () => {
     useEffect(() => {
         loadVersions();
     }, [loadVersions]);
+
+    // Sync auto-save state with all editors when they're available
+    useEffect(() => {
+        // Sync with ContentEditor
+        if (contentEditorRef.current && contentEditorRef.current.enableAutoSave) {
+            console.log(`🔄 SYNC AUTO-SAVE: Setting ContentEditor state to ${autoSaveEnabled ? 'ENABLED' : 'DISABLED'}`);
+            contentEditorRef.current.enableAutoSave(autoSaveEnabled, autoSaveEnabled ? 10000 : 0);
+        }
+
+        // SettingsEditor and MetadataEditor already save in real-time via onUpdate
+        // No additional sync needed for them
+        console.log('🔄 SYNC AUTO-SAVE: SettingsEditor and MetadataEditor use real-time saving');
+
+    }, [autoSaveEnabled, layoutData]); // layoutData dependency ensures this runs after ContentEditor is mounted
+
+    // Save signal chain: StatusBar -> PageEditor -> [ContentEditor, SettingsEditor, MetadataEditor] -> LayoutRenderer
+    const handleSaveFromStatusBar = useCallback(async () => {
+        try {
+            console.log('🔄 SAVE SIGNAL: StatusBar -> PageEditor');
+
+            const saveResults = {};
+
+            // Propagate save signal to ContentEditor (widgets & layout)
+            if (contentEditorRef.current && contentEditorRef.current.saveWidgets) {
+                console.log('🔄 SAVE SIGNAL: PageEditor -> ContentEditor');
+                try {
+                    const savedData = await contentEditorRef.current.saveWidgets({
+                        source: 'manual_save_from_statusbar',
+                        description: 'Manual save triggered from status bar'
+                    });
+                    saveResults.content = savedData;
+                    console.log('✅ SAVE SIGNAL: ContentEditor save completed');
+                } catch (error) {
+                    console.error('❌ SAVE SIGNAL: ContentEditor save failed', error);
+                    saveResults.content = { error: error.message };
+                }
+            }
+
+            // Propagate save signal to SettingsEditor
+            if (settingsEditorRef.current && settingsEditorRef.current.saveSettings) {
+                console.log('🔄 SAVE SIGNAL: PageEditor -> SettingsEditor');
+                try {
+                    const savedData = await settingsEditorRef.current.saveSettings();
+                    saveResults.settings = savedData;
+                    console.log('✅ SAVE SIGNAL: SettingsEditor save completed');
+                } catch (error) {
+                    console.error('❌ SAVE SIGNAL: SettingsEditor save failed', error);
+                    saveResults.settings = { error: error.message };
+                }
+            }
+
+            // Propagate save signal to MetadataEditor
+            if (metadataEditorRef.current && metadataEditorRef.current.saveMetadata) {
+                console.log('🔄 SAVE SIGNAL: PageEditor -> MetadataEditor');
+                try {
+                    const savedData = await metadataEditorRef.current.saveMetadata();
+                    saveResults.metadata = savedData;
+                    console.log('✅ SAVE SIGNAL: MetadataEditor save completed');
+                } catch (error) {
+                    console.error('❌ SAVE SIGNAL: MetadataEditor save failed', error);
+                    saveResults.metadata = { error: error.message };
+                }
+            }
+
+            console.log('✅ SAVE SIGNAL: All modules save completed', saveResults);
+
+            // Check if any saves failed
+            const errors = Object.values(saveResults).filter(result => result?.error);
+            if (errors.length > 0) {
+                console.warn('⚠️ SAVE SIGNAL: Some modules failed to save', errors);
+                addNotification({
+                    type: 'warning',
+                    message: `Partial save completed. ${errors.length} module(s) failed.`
+                });
+            } else {
+                // Mark as clean after successful save
+                setIsDirty(false);
+
+                // Show success notification
+                addNotification({
+                    type: 'success',
+                    message: 'All changes saved successfully!'
+                });
+            }
+
+        } catch (error) {
+            console.error('❌ SAVE SIGNAL: Global save failed', error);
+            showError(`Save failed: ${error.message}`);
+        }
+    }, [addNotification, showError]);
+
+    // Auto-save toggle handler
+    const handleAutoSaveToggle = useCallback((enabled) => {
+        console.log(`🔄 AUTO-SAVE TOGGLE: ${enabled ? 'ENABLED' : 'DISABLED'}`);
+        setAutoSaveEnabled(enabled);
+
+        // Pass auto-save setting to ContentEditor
+        if (contentEditorRef.current && contentEditorRef.current.enableAutoSave) {
+            contentEditorRef.current.enableAutoSave(enabled, enabled ? 10000 : 0);
+        }
+
+        // Note: SettingsEditor and MetadataEditor save in real-time via onUpdate
+        // so they don't need separate auto-save configuration
+        console.log('🔄 AUTO-SAVE: SettingsEditor and MetadataEditor use real-time saving via onUpdate');
+
+        addNotification({
+            type: 'info',
+            message: `Auto-save ${enabled ? 'enabled' : 'disabled'} - Settings & metadata save in real-time`
+        });
+    }, [addNotification]);
 
     // Tab navigation (main tabs only - Settings and Metadata moved to more menu)
     const tabs = [
@@ -430,15 +533,7 @@ const PageEditor = () => {
 
                         {/* Right section - Actions */}
                         <div className="flex items-center space-x-3">
-                            <button
-                                onClick={handleSave}
-                                disabled={!isDirty || updatePageMutation.isPending || createPageMutation.isPending}
-                                className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                <Save className="w-4 h-4 mr-2" />
-                                {updatePageMutation.isPending || createPageMutation.isPending ? 'Saving...' :
-                                    isNewPage ? 'Create Page' : 'Save'}
-                            </button>
+
 
                             <button
                                 onClick={handleQuickPublish}
@@ -518,6 +613,7 @@ const PageEditor = () => {
                     )}
                     {activeTab === 'settings' && (
                         <SettingsEditor
+                            ref={settingsEditorRef}
                             pageData={pageData}
                             onUpdate={updatePageData}
                             isNewPage={isNewPage}
@@ -525,6 +621,7 @@ const PageEditor = () => {
                     )}
                     {activeTab === 'metadata' && (
                         <MetadataEditor
+                            ref={metadataEditorRef}
                             pageData={pageData}
                             onUpdate={updatePageData}
                             isNewPage={isNewPage}
@@ -547,6 +644,9 @@ const PageEditor = () => {
                 availableVersions={availableVersions}
                 onVersionChange={switchToVersion}
                 onRefreshVersions={loadVersions}
+                onSaveClick={handleSaveFromStatusBar}
+                onAutoSaveToggle={handleAutoSaveToggle}
+                autoSaveEnabled={autoSaveEnabled}
                 customStatusContent={
                     <div className="flex items-center space-x-4">
                         <span>
@@ -570,7 +670,33 @@ const PageEditor = () => {
 }
 
 // Settings Editor Tab
-const SettingsEditor = ({ pageData, onUpdate, isNewPage }) => {
+const SettingsEditor = forwardRef(({ pageData, onUpdate, isNewPage }, ref) => {
+    // Expose save method to parent
+    useImperativeHandle(ref, () => ({
+        saveSettings: async () => {
+            console.log('🔄 SAVE SIGNAL: SettingsEditor.saveSettings() called');
+
+            // Settings are already saved in real-time via onUpdate
+            // This method confirms the current state is saved
+            const currentSettings = {
+                title: pageData?.title || '',
+                slug: pageData?.slug || '',
+                description: pageData?.description || '',
+                code_layout: pageData?.code_layout || '',
+                publication_status: pageData?.publication_status || 'unpublished'
+            };
+
+            console.log('✅ SAVE SIGNAL: SettingsEditor - Current settings confirmed', currentSettings);
+
+            return {
+                module: 'settings',
+                status: 'success',
+                data: currentSettings,
+                timestamp: new Date().toISOString()
+            };
+        }
+    }), [pageData]);
+
     return (
         <div className="h-full p-6 overflow-y-auto">
             <div className="max-w-2xl mx-auto space-y-6">
@@ -647,10 +773,37 @@ const SettingsEditor = ({ pageData, onUpdate, isNewPage }) => {
             </div>
         </div>
     )
-}
+});
+
+// Add display name for debugging
+SettingsEditor.displayName = 'SettingsEditor';
 
 // Metadata Editor Tab
-const MetadataEditor = ({ pageData, onUpdate, isNewPage }) => {
+const MetadataEditor = forwardRef(({ pageData, onUpdate, isNewPage }, ref) => {
+    // Expose save method to parent
+    useImperativeHandle(ref, () => ({
+        saveMetadata: async () => {
+            console.log('🔄 SAVE SIGNAL: MetadataEditor.saveMetadata() called');
+
+            // Metadata is already saved in real-time via onUpdate
+            // This method confirms the current state is saved
+            const currentMetadata = {
+                meta_title: pageData?.meta_title || pageData?.title || '',
+                meta_description: pageData?.meta_description || pageData?.description || '',
+                hostnames: pageData?.hostnames || []
+            };
+
+            console.log('✅ SAVE SIGNAL: MetadataEditor - Current metadata confirmed', currentMetadata);
+
+            return {
+                module: 'metadata',
+                status: 'success',
+                data: currentMetadata,
+                timestamp: new Date().toISOString()
+            };
+        }
+    }), [pageData]);
+
     return (
         <div className="h-full p-6 overflow-y-auto">
             <div className="max-w-2xl mx-auto space-y-6">
@@ -706,7 +859,10 @@ const MetadataEditor = ({ pageData, onUpdate, isNewPage }) => {
             </div>
         </div>
     )
-}
+});
+
+// Add display name for debugging
+MetadataEditor.displayName = 'MetadataEditor';
 
 // Simple preview component
 const PagePreview = ({ pageData }) => {

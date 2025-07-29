@@ -551,16 +551,20 @@ const ContentEditor = forwardRef(({
 
   // Trigger save of all current widgets using LayoutRenderer's save system
   const saveWidgets = useCallback((options = {}) => {
-    console.log("ContentEditor::saveWidgets", options);
-    if (!layoutRenderer) return;
+    console.log("🔄 SAVE SIGNAL: ContentEditor -> LayoutRenderer", options);
+    if (!layoutRenderer) {
+      console.warn("⚠️ SAVE SIGNAL: LayoutRenderer not available");
+      return;
+    }
 
     try {
       // Use LayoutRenderer's own save method which will trigger our callbacks
+      console.log("🔄 SAVE SIGNAL: Calling LayoutRenderer.saveCurrentWidgetState()");
       const savedWidgetData = layoutRenderer.saveCurrentWidgetState();
-      //console.log('ContentEditor: LayoutRenderer save completed', savedWidgetData);
+      console.log("✅ SAVE SIGNAL: LayoutRenderer save completed", savedWidgetData);
       return savedWidgetData;
     } catch (error) {
-      console.error('ContentEditor: Save failed', error);
+      console.error("❌ SAVE SIGNAL: ContentEditor save failed", error);
       throw error;
     }
   }, [layoutRenderer]);

@@ -11,7 +11,11 @@ const StatusBar = ({
     currentVersion = null,
     availableVersions = [],
     onVersionChange = null,
-    onRefreshVersions = null
+    onRefreshVersions = null,
+    // Save functionality props
+    onSaveClick = null,
+    onAutoSaveToggle = null,
+    autoSaveEnabled = true
 }) => {
     const {
         notifications,
@@ -45,10 +49,10 @@ const StatusBar = ({
                                             'bg-blue-500'
                                     }`} />
                                 <span className="text-gray-700 truncate">
-                                    {typeof notifications[currentNotificationIndex]?.error === 'string'
-                                        ? notifications[currentNotificationIndex]?.error
-                                        : typeof notifications[currentNotificationIndex]?.error === 'object'
-                                            ? notifications[currentNotificationIndex]?.error?.message || 'Notification'
+                                    {typeof notifications[currentNotificationIndex]?.message === 'string'
+                                        ? notifications[currentNotificationIndex]?.message
+                                        : typeof notifications[currentNotificationIndex]?.message === 'object'
+                                            ? notifications[currentNotificationIndex]?.message?.message || 'Notification'
                                             : 'Notification'}
                                 </span>
                                 <span className="text-xs text-gray-500 flex-shrink-0">
@@ -92,12 +96,30 @@ const StatusBar = ({
                 {/* Right side - Auto-save status and other info */}
                 <div className="flex items-center space-x-2 text-gray-600 flex-shrink-0 ml-4">
                     {isDirty && (
-                        <span className="text-orange-600 font-medium">Unsaved changes</span>
+                        <button
+                            onClick={() => onSaveClick && onSaveClick()}
+                            className="text-orange-600 font-medium hover:text-orange-700 hover:bg-orange-50 px-2 py-1 rounded transition-colors cursor-pointer"
+                            title="Click to save changes"
+                        >
+                            💾 Unsaved changes - Click to save
+                        </button>
                     )}
                     {showAutoSave && (
                         <>
-                            <Clock className="w-4 h-4" />
-                            <span>Auto-save enabled</span>
+                            <div className="w-px h-4 bg-gray-300 mx-2" />
+                            <button
+                                onClick={() => onAutoSaveToggle && onAutoSaveToggle(!autoSaveEnabled)}
+                                className={`flex items-center space-x-1 px-2 py-1 rounded transition-colors ${autoSaveEnabled
+                                    ? 'text-green-600 hover:bg-green-50'
+                                    : 'text-gray-500 hover:bg-gray-50'
+                                    }`}
+                                title={`Auto-save is ${autoSaveEnabled ? 'enabled' : 'disabled'} - Click to toggle`}
+                            >
+                                <Clock className="w-4 h-4" />
+                                <span className="text-xs">
+                                    Auto-save {autoSaveEnabled ? 'ON' : 'OFF'}
+                                </span>
+                            </button>
                         </>
                     )}
 
