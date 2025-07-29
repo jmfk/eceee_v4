@@ -1098,17 +1098,24 @@ class LayoutRenderer {
  * @returns {Object} The collected and saved widget data
  */
   saveCurrentWidgetState() {
-    const widgetData = this.collectAllWidgetData();
+    console.log('🔄 SAVE SIGNAL: LayoutRenderer.saveCurrentWidgetState() called');
 
-    // console.log('widgetData:', widgetData);
+    console.log('🔄 SAVE SIGNAL: Collecting widget data from all slots...');
+    const widgetData = this.collectAllWidgetData();
+    console.log('🔄 SAVE SIGNAL: Collected widget data:', widgetData);
+
+    console.log('🔄 SAVE SIGNAL: Saving widget data internally...');
     this.saveWidgetData(widgetData);
 
     // Mark as clean after successful save
+    console.log('🔄 SAVE SIGNAL: Marking page as clean...');
     this.markAsClean();
 
     // Execute callback for saving page data
+    console.log('🔄 SAVE SIGNAL: Executing onSavePageData callback...');
     this.executeCallback('onSavePageData', widgetData);
 
+    console.log('✅ SAVE SIGNAL: LayoutRenderer save chain completed');
     return widgetData;
   }
 
