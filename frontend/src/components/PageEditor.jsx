@@ -18,6 +18,7 @@ import {
     Trash2
 } from 'lucide-react'
 import { api } from '../api/client.js'
+import { savePageWithWidgets } from '../api/pages.js'
 import { useNotificationContext } from './NotificationManager'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import ContentEditor from './ContentEditor'
@@ -338,81 +339,104 @@ const PageEditor = () => {
 
     }, [autoSaveEnabled, layoutData]); // layoutData dependency ensures this runs after ContentEditor is mounted
 
-    // Save signal chain: StatusBar -> PageEditor -> [ContentEditor, SettingsEditor, MetadataEditor] -> LayoutRenderer
+    // UNIFIED SAVE: StatusBar -> PageEditor -> Single API Call
     const handleSaveFromStatusBar = useCallback(async () => {
         try {
-            console.log('🔄 SAVE SIGNAL: StatusBar -> PageEditor');
+            console.log('🔄 UNIFIED SAVE: StatusBar -> PageEditor');
 
-            const saveResults = {};
+            // Collect all data from editors (no saving yet)
+            const collectedData = {};
 
-            // Propagate save signal to ContentEditor (widgets & layout)
+            // Collect widget data from ContentEditor
             if (contentEditorRef.current && contentEditorRef.current.saveWidgets) {
-                console.log('🔄 SAVE SIGNAL: PageEditor -> ContentEditor');
+                console.log('🔄 UNIFIED SAVE: Collecting widget data from ContentEditor');
                 try {
-                    const savedData = await contentEditorRef.current.saveWidgets({
-                        source: 'manual_save_from_statusbar',
-                        description: 'Manual save triggered from status bar'
+                    const widgetResult = await contentEditorRef.current.saveWidgets({
+                        source: 'unified_save_from_statusbar',
+                        description: 'Unified save triggered from status bar',
+                        collectOnly: true  // Tell ContentEditor to collect data, not save
                     });
-                    saveResults.content = savedData;
-                    console.log('✅ SAVE SIGNAL: ContentEditor save completed');
+                    collectedData.widgets = widgetResult.data || widgetResult;
+                    console.log('✅ UNIFIED SAVE: Widget data collected', collectedData.widgets);
                 } catch (error) {
-                    console.error('❌ SAVE SIGNAL: ContentEditor save failed', error);
-                    saveResults.content = { error: error.message };
+                    console.error('❌ UNIFIED SAVE: Widget data collection failed', error);
+                    throw new Error(`Widget data collection failed: ${error.message}`);
                 }
             }
 
-            // Propagate save signal to SettingsEditor
+            // Collect settings data from SettingsEditor
             if (settingsEditorRef.current && settingsEditorRef.current.saveSettings) {
-                console.log('🔄 SAVE SIGNAL: PageEditor -> SettingsEditor');
+                console.log('🔄 UNIFIED SAVE: Collecting settings data from SettingsEditor');
                 try {
-                    const savedData = await settingsEditorRef.current.saveSettings();
-                    saveResults.settings = savedData;
-                    console.log('✅ SAVE SIGNAL: SettingsEditor save completed');
+                    const settingsResult = await settingsEditorRef.current.saveSettings();
+                    collectedData.settings = settingsResult.data || settingsResult;
+                    console.log('✅ UNIFIED SAVE: Settings data collected', collectedData.settings);
                 } catch (error) {
-                    console.error('❌ SAVE SIGNAL: SettingsEditor save failed', error);
-                    saveResults.settings = { error: error.message };
+                    console.error('❌ UNIFIED SAVE: Settings data collection failed', error);
+                    throw new Error(`Settings data collection failed: ${error.message}`);
                 }
             }
 
-            // Propagate save signal to MetadataEditor
+            // Collect metadata from MetadataEditor
             if (metadataEditorRef.current && metadataEditorRef.current.saveMetadata) {
-                console.log('🔄 SAVE SIGNAL: PageEditor -> MetadataEditor');
+                console.log('🔄 UNIFIED SAVE: Collecting metadata from MetadataEditor');
                 try {
-                    const savedData = await metadataEditorRef.current.saveMetadata();
-                    saveResults.metadata = savedData;
-                    console.log('✅ SAVE SIGNAL: MetadataEditor save completed');
+                    const metadataResult = await metadataEditorRef.current.saveMetadata();
+                    collectedData.metadata = metadataResult.data || metadataResult;
+                    console.log('✅ UNIFIED SAVE: Metadata collected', collectedData.metadata);
                 } catch (error) {
-                    console.error('❌ SAVE SIGNAL: MetadataEditor save failed', error);
-                    saveResults.metadata = { error: error.message };
+                    console.error('❌ UNIFIED SAVE: Metadata collection failed', error);
+                    throw new Error(`Metadata collection failed: ${error.message}`);
                 }
             }
 
-            console.log('✅ SAVE SIGNAL: All modules save completed', saveResults);
+            // Combine all page data (settings + metadata)
+            const unifiedPageData = {
+                ...collectedData.settings,
+                ...collectedData.metadata
+            };
 
-            // Check if any saves failed
-            const errors = Object.values(saveResults).filter(result => result?.error);
-            if (errors.length > 0) {
-                console.warn('⚠️ SAVE SIGNAL: Some modules failed to save', errors);
-                addNotification({
-                    type: 'warning',
-                    message: `Partial save completed. ${errors.length} module(s) failed.`
-                });
-            } else {
-                // Mark as clean after successful save
-                setIsDirty(false);
+            console.log('🔄 UNIFIED SAVE: Combined data ready for API call', {
+                pageData: unifiedPageData,
+                widgets: collectedData.widgets
+            });
 
-                // Show success notification
-                addNotification({
-                    type: 'success',
-                    message: 'All changes saved successfully!'
-                });
-            }
+            // Single API call for everything!
+            const response = await savePageWithWidgets(
+                pageData.id,
+                unifiedPageData,
+                collectedData.widgets,
+                {
+                    description: 'Unified save from page editor',
+                    autoPublish: false
+                }
+            );
+
+            console.log('✅ UNIFIED SAVE: API call successful!', response);
+
+            // Update UI state with response
+            setPageData(response);
+            setIsDirty(false);
+
+            // Show success notification
+            addNotification({
+                type: 'success',
+                message: 'All changes saved successfully! (Unified Save)'
+            });
+
+            // Invalidate queries to refresh data
+            queryClient.invalidateQueries(['page', pageData.id]);
+            queryClient.invalidateQueries(['pages', 'root']);
 
         } catch (error) {
-            console.error('❌ SAVE SIGNAL: Global save failed', error);
+            console.error('❌ UNIFIED SAVE: Global save failed', error);
+            addNotification({
+                type: 'error',
+                message: `Save failed: ${error.message}`
+            });
             showError(`Save failed: ${error.message}`);
         }
-    }, [addNotification, showError]);
+    }, [addNotification, showError, pageData?.id, queryClient]);
 
     // Auto-save toggle handler
     const handleAutoSaveToggle = useCallback((enabled) => {
@@ -607,6 +631,10 @@ const PageEditor = () => {
                                     isNewPage={isNewPage}
                                     layoutJson={layoutData}
                                     editable={true}
+                                    onDirtyChange={(isDirty, reason) => {
+                                        console.log('🔄 DIRTY STATE: ContentEditor -> PageEditor', { isDirty, reason });
+                                        setIsDirty(isDirty);
+                                    }}
                                 />
                             )}
                         </>

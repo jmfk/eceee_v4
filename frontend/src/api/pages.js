@@ -52,8 +52,9 @@ export const getPage = async (pageId) => {
     return response.data
 }
 
-// Update page widgets (creates new version)
+// Update page widgets (creates new version) - DEPRECATED: Use savePageWithWidgets instead
 export const updatePageWidgets = async (pageId, widgets, options = {}) => {
+    console.warn('updatePageWidgets is deprecated, use savePageWithWidgets for better performance and consistency');
     const response = await api.post(`${API_BASE}/pages/${pageId}/update_widgets/`, {
         widgets,
         description: options.description || 'Widget update',
@@ -73,6 +74,31 @@ export const updatePage = async (pageId, pageData) => {
     const response = await api.patch(`${API_BASE}/pages/${pageId}/`, pageData)
     return response.data
 }
+
+// NEW: Unified save function (page data + widgets in one call)
+export const savePageWithWidgets = async (pageId, pageData = {}, widgets = null, options = {}) => {
+    const payload = {
+        ...pageData,  // page metadata (title, slug, description, etc.)
+    };
+
+    // Add widgets if provided
+    if (widgets !== null) {
+        payload.widgets = widgets;
+    }
+
+    // Add version options if widgets are being saved
+    if (widgets !== null || options.description || options.autoPublish !== undefined) {
+        payload.version_options = {
+            description: options.description || 'Unified save from frontend',
+            auto_publish: options.autoPublish || false
+        };
+    }
+
+    console.log('🔄 API: Unified save payload:', payload);
+    const response = await api.patch(`${API_BASE}/pages/${pageId}/`, payload);
+    console.log('✅ API: Unified save response:', response.data);
+    return response.data;
+};
 
 // Delete a page
 export const deletePage = async (pageId) => {

@@ -14,6 +14,7 @@ const ContentEditor = forwardRef(({
   editable = false,
   onSlotClick,
   onWidgetUpdate,
+  onDirtyChange,
   className = '',
   pageData,
   onUpdate,
@@ -207,31 +208,39 @@ const ContentEditor = forwardRef(({
 
   // Set up UI callbacks for LayoutRenderer save functionality
   useEffect(() => {
-    if (!layoutRenderer || !onWidgetUpdate) return;
+    if (!layoutRenderer) return;
 
-    // console.log('ContentEditor: Setting up LayoutRenderer UI callbacks');
+    console.log('ContentEditor: Setting up LayoutRenderer UI callbacks', { hasOnWidgetUpdate: !!onWidgetUpdate, hasOnDirtyChange: !!onDirtyChange });
 
     layoutRenderer.setUICallbacks({
       onSavePageData: (widgetData) => {
-        // console.log('ContentEditor: LayoutRenderer manual save triggered', widgetData);
-        // Convert widgetData object to individual slot updates
-        Object.entries(widgetData).forEach(([slotName, widgets]) => {
-          onWidgetUpdate(slotName, widgets, {
-            description: 'Manual save from layout renderer',
-            autoPublish: false
+        console.log('ContentEditor: LayoutRenderer manual save triggered', widgetData);
+        // Legacy: Convert widgetData object to individual slot updates (if onWidgetUpdate available)
+        if (onWidgetUpdate) {
+          Object.entries(widgetData).forEach(([slotName, widgets]) => {
+            onWidgetUpdate(slotName, widgets, {
+              description: 'Manual save from layout renderer',
+              autoPublish: false
+            });
           });
-        });
+        } else {
+          console.log('ContentEditor: onWidgetUpdate not available, using unified save approach');
+        }
       },
 
       onAutoSave: (widgetData) => {
-        // console.log('ContentEditor: LayoutRenderer auto-save triggered', widgetData);
-        // Convert widgetData object to individual slot updates
-        Object.entries(widgetData).forEach(([slotName, widgets]) => {
-          onWidgetUpdate(slotName, widgets, {
-            description: 'Auto-save from layout renderer',
-            autoPublish: false
+        console.log('ContentEditor: LayoutRenderer auto-save triggered', widgetData);
+        // Legacy: Convert widgetData object to individual slot updates (if onWidgetUpdate available)
+        if (onWidgetUpdate) {
+          Object.entries(widgetData).forEach(([slotName, widgets]) => {
+            onWidgetUpdate(slotName, widgets, {
+              description: 'Auto-save from layout renderer',
+              autoPublish: false
+            });
           });
-        });
+        } else {
+          console.log('ContentEditor: onWidgetUpdate not available, using unified save approach');
+        }
       },
 
       onAutoSaveError: (error) => {
@@ -239,11 +248,15 @@ const ContentEditor = forwardRef(({
       },
 
       onDirtyStateChanged: (isDirty, reason) => {
-        // console.log('ContentEditor: LayoutRenderer dirty state changed', { isDirty, reason });
+        console.log('ContentEditor: LayoutRenderer dirty state changed', { isDirty, reason });
+        // Propagate dirty state up to PageEditor
+        if (onDirtyChange) {
+          onDirtyChange(isDirty, reason);
+        }
       }
     });
 
-  }, [layoutRenderer, onWidgetUpdate]);
+  }, [layoutRenderer, onWidgetUpdate, onDirtyChange]);
 
   // Cleanup function for event listeners
   const cleanupEventListeners = useCallback(() => {
