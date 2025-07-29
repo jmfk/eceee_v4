@@ -52,6 +52,12 @@ export const getVersionWidgets = async (versionId) => {
     return response.data
 }
 
+// Get complete data for a specific version of a page (NEW ENDPOINT)
+export const getPageVersion = async (pageId, versionId) => {
+    const response = await api.get(`${API_BASE}/pages/${pageId}/versions/${versionId}/`)
+    return response.data
+}
+
 // Get all versions for a page
 export const getPageVersionsList = async (pageId) => {
     const response = await api.get(`${API_BASE}/pages/${pageId}/versions/`)

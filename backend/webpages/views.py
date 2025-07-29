@@ -547,6 +547,46 @@ class WebPageViewSet(viewsets.ModelViewSet):
             }
         )
 
+    @action(detail=True, methods=["get"], url_path="versions/(?P<version_id>[^/.]+)")
+    def version_detail(self, request, pk=None, version_id=None):
+        """Get complete data for a specific version of this page"""
+        page = self.get_object()
+
+        # Validate that the version belongs to this page
+        try:
+            version = page.versions.select_related("created_by", "published_by").get(
+                id=version_id
+            )
+        except PageVersion.DoesNotExist:
+            return Response(
+                {"error": f"Version {version_id} not found for page {page.id}"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Return complete version data including widgets (same format as PageVersionViewSet.widgets)
+        return Response(
+            {
+                "version_id": version.id,
+                "version_number": version.version_number,
+                "page_id": version.page.id,
+                "page_title": version.page.title,
+                "widgets": version.widgets or {},
+                "page_data": version.page_data or {},
+                "is_current": version.is_current,
+                "status": version.status,
+                "description": version.description,
+                "created_at": version.created_at,
+                "created_by": (
+                    version.created_by.username if version.created_by else None
+                ),
+                "published_at": version.published_at,
+                "published_by": (
+                    version.published_by.username if version.published_by else None
+                ),
+                "change_summary": version.change_summary or {},
+            }
+        )
+
 
 class PageVersionViewSet(viewsets.ModelViewSet):
     """ViewSet for page versions with workflow support."""
