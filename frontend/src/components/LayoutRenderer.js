@@ -40,6 +40,9 @@ class LayoutRenderer {
     this.pageId = null; // Current page ID
     this.versionSelectorElement = null; // Version selector UI element
     this.versionCallbacks = new Map(); // Map of version-related callbacks
+
+    // NEW: Widget data change callbacks for single source of truth
+    this.widgetDataCallbacks = new Map(); // Map of widget data change callbacks
   }
 
   /**
@@ -294,39 +297,10 @@ class LayoutRenderer {
         return;
       }
 
-      // Remove only widget elements, preserving slot menu and other UI
-      const widgetElements = slotElement.querySelectorAll('.rendered-widget');
-      widgetElements.forEach(element => element.remove());
+      // NEW: Notify parent component to update pageData.widgets instead of directly clearing DOM
+      this.executeWidgetDataCallback('clear', slotName, []);
 
-      // Remove any existing placeholder
-      const existingPlaceholder = slotElement.querySelector('.slot-placeholder');
-      if (existingPlaceholder) {
-        existingPlaceholder.remove();
-      }
-
-      // Clear saved widget data for this slot
-      this.savedWidgetData.set(slotName, []);
-
-      // Add placeholder content (without wiping entire innerHTML)
-      const placeholder = document.createElement('div');
-      placeholder.className = 'slot-placeholder p-4 border-2 border-dashed border-gray-300 rounded text-center text-gray-500';
-      placeholder.innerHTML = `<span class="text-sm">${this.escapeHtml(`Empty slot: ${slotName}`)}</span>`;
-
-      // Insert placeholder before any slot menu (which should be at the end)
-      const slotMenu = slotElement.querySelector('[data-slot-menu]');
-      if (slotMenu) {
-        slotElement.insertBefore(placeholder, slotMenu);
-      } else {
-        slotElement.appendChild(placeholder);
-        // Re-add slot menu if it's missing
-        this.addSlotIconMenu(slotName, {
-          showAddWidget: this.uiConfig.showAddWidget,
-          showSlotInfo: true,
-          showClearSlot: true
-        });
-      }
-
-      // console.log(`🔄 SAVE SIGNAL: Slot "${slotName}" cleared - ${widgetElements.length} widgets removed`);
+      // console.log(`🔄 SAVE SIGNAL: Slot "${slotName}" cleared`);
 
     } catch (error) {
       console.error(`LayoutRenderer: Error clearing slot "${slotName}"`, error);
@@ -1175,21 +1149,17 @@ class LayoutRenderer {
   /**
  * Save current widget state from all rendered slots
  * @returns {Object} The collected and saved widget data
+ * @deprecated This method is kept for backward compatibility but should use pageData.widgets as single source of truth
  */
   saveCurrentWidgetState() {
-    // console.log('🔄 SAVE SIGNAL: LayoutRenderer.saveCurrentWidgetState() called');
+    // console.log('🔄 SAVE SIGNAL: LayoutRenderer.saveCurrentWidgetState() called (DEPRECATED)');
 
-    // console.log('🔄 SAVE SIGNAL: Collecting widget data from all slots...');
+    // For backward compatibility, still collect from DOM if needed
+    // But the new approach should use pageData.widgets directly
     const widgetData = this.collectAllWidgetData();
-    // console.log('🔄 SAVE SIGNAL: Collected widget data:', widgetData);
-
-    // console.log('🔄 SAVE SIGNAL: Saving widget data internally...');
     this.saveWidgetData(widgetData);
 
-    // Note: Don't mark as clean here - unified save will handle that
-    // Note: Don't execute save callbacks - unified save handles persistence
-
-    // console.log('✅ SAVE SIGNAL: LayoutRenderer data collection completed');
+    // console.log('✅ SAVE SIGNAL: LayoutRenderer data collection completed (consider using pageData.widgets directly)');
     return widgetData;
   }
 
@@ -1546,11 +1516,8 @@ class LayoutRenderer {
         config: { ...widgetDef.config }
       };
 
-      // Add widget to slot visually
-      this.addWidgetToSlot(slotName, widgetInstance);
-
-      // Note: Callback removed - unified save system handles all persistence
-      // console.log(`Widget selected: ${widgetDef.name} added to ${slotName}`);
+      // NEW: Notify parent component to update pageData.widgets instead of directly adding to slot
+      this.executeWidgetDataCallback('add', slotName, widgetInstance);
 
       // Close modal
       closeModal();
@@ -1933,23 +1900,8 @@ class LayoutRenderer {
       const widgetType = widgetElement.getAttribute('data-widget-type');
       const widgetName = widgetElement.querySelector('.widget-header span')?.textContent || 'Unknown Widget';
 
-      widgetElement.remove();
-
-      // Add placeholder back if slot is now empty
-      if (slotElement && slotElement.children.length === 1) { // Only slot menu remains
-        const slotConfig = this.getSlotConfig(slotName);
-        const placeholder = document.createElement('div');
-        placeholder.className = 'slot-placeholder p-4 border-2 border-dashed border-gray-300 rounded text-center text-gray-500';
-        placeholder.innerHTML = `
-          <div class="text-sm font-medium">${this.escapeHtml(slotConfig?.title || slotName)}</div>
-          ${slotConfig?.description ? `<div class="text-xs mt-1">${this.escapeHtml(slotConfig.description)}</div>` : ''}
-          <div class="text-xs mt-2 opacity-75">Click ••• to add widgets</div>
-        `;
-        slotElement.appendChild(placeholder);
-      }
-
-      // Mark page as dirty since a widget was removed
-      this.markAsDirty(`widget removed: ${widgetName} from ${slotName}`);
+      // NEW: Notify parent component to update pageData.widgets instead of directly removing from DOM
+      this.executeWidgetDataCallback('remove', slotName, widgetId);
 
       // console.log(`LayoutRenderer: Widget ${widgetId} removed from slot ${slotName}`);
     }
@@ -2657,6 +2609,35 @@ class LayoutRenderer {
    */
   getAvailableVersions() {
     return this.pageVersions;
+  }
+
+  /**
+   * Set widget data change callbacks
+   * @param {Object} callbacks - Map of callback functions
+   */
+  setWidgetDataCallbacks(callbacks = {}) {
+    this.widgetDataCallbacks = new Map(Object.entries(callbacks));
+  }
+
+  /**
+   * Execute widget data callback
+   * @param {string} action - Action type ('add', 'remove', 'update', 'clear')
+   * @param {string} slotName - Name of the slot
+   * @param {Object} widgetData - Widget data (for add/update) or widget ID (for remove)
+   * @param {...any} args - Additional arguments
+   */
+  executeWidgetDataCallback(action, slotName, widgetData, ...args) {
+    const callback = this.widgetDataCallbacks.get('widgetDataChanged');
+    if (typeof callback === 'function') {
+      try {
+        // console.log(`🔄 WIDGET DATA: Executing callback for action=${action}, slot=${slotName}`);
+        callback(action, slotName, widgetData, ...args);
+      } catch (error) {
+        console.error(`LayoutRenderer: Error executing widget data callback`, error);
+      }
+    } else {
+      console.warn(`🔄 WIDGET DATA: No widgetDataChanged callback registered`);
+    }
   }
 }
 

@@ -202,7 +202,71 @@ const ContentEditor = forwardRef(({
       }
     });
 
-  }, [layoutRenderer, onDirtyChange]);
+    // NEW: Set up widget data change callbacks for single source of truth
+    layoutRenderer.setWidgetDataCallbacks({
+      widgetDataChanged: (action, slotName, widgetData) => {
+        // console.log('ContentEditor: Widget data changed', { action, slotName, widgetData });
+
+        if (!onUpdate || !pageData) {
+          console.warn('ContentEditor: Cannot update widget data - missing onUpdate callback or pageData');
+          return;
+        }
+
+        // Create updated pageData with modified widgets
+        const currentWidgets = pageData.widgets || {};
+        let updatedWidgets = { ...currentWidgets };
+
+        switch (action) {
+          case 'add':
+            // Add widget to slot array
+            if (!updatedWidgets[slotName]) {
+              updatedWidgets[slotName] = [];
+            }
+            updatedWidgets[slotName] = [...updatedWidgets[slotName], widgetData];
+            break;
+
+          case 'remove':
+            // Remove widget by ID from slot array
+            if (updatedWidgets[slotName]) {
+              updatedWidgets[slotName] = updatedWidgets[slotName].filter(
+                widget => widget.id !== widgetData
+              );
+            }
+            break;
+
+          case 'clear':
+            // Clear all widgets from slot
+            updatedWidgets[slotName] = [];
+            break;
+
+          case 'update':
+            // Update existing widget in slot
+            if (updatedWidgets[slotName]) {
+              updatedWidgets[slotName] = updatedWidgets[slotName].map(
+                widget => widget.id === widgetData.id ? widgetData : widget
+              );
+            }
+            break;
+
+          default:
+            console.warn('ContentEditor: Unknown widget data action', action);
+            return;
+        }
+
+        // Update pageData through parent component
+        onUpdate({
+          ...pageData,
+          widgets: updatedWidgets
+        });
+
+        // Mark as dirty since widgets changed
+        if (onDirtyChange) {
+          onDirtyChange(true, `widget ${action} in slot ${slotName}`);
+        }
+      }
+    });
+
+  }, [layoutRenderer, onDirtyChange, onUpdate, pageData]);
 
   // Cleanup function for event listeners
   const cleanupEventListeners = useCallback(() => {
@@ -483,25 +547,25 @@ const ContentEditor = forwardRef(({
     };
   }, [cleanupEventListeners]);
 
-  // Trigger save of all current widgets using LayoutRenderer's save system
+  // NEW: Return current widget data from pageData (single source of truth)
   const saveWidgets = useCallback((options = {}) => {
-    // console.log("🔄 SAVE SIGNAL: ContentEditor -> LayoutRenderer", options);
-    if (!layoutRenderer) {
-      console.warn("⚠️ SAVE SIGNAL: LayoutRenderer not available");
-      return;
+    // console.log("🔄 SAVE SIGNAL: ContentEditor -> pageData.widgets (single source)", options);
+
+    if (!pageData?.widgets) {
+      console.warn("⚠️ SAVE SIGNAL: pageData.widgets not available");
+      return {};
     }
 
     try {
-      // Use LayoutRenderer's own save method which will trigger our callbacks
-      // console.log("🔄 SAVE SIGNAL: Calling LayoutRenderer.saveCurrentWidgetState()");
-      const savedWidgetData = layoutRenderer.saveCurrentWidgetState();
-      // console.log("✅ SAVE SIGNAL: LayoutRenderer save completed", savedWidgetData);
-      return savedWidgetData;
+      // Simply return the current pageData.widgets - no DOM collection needed
+      const currentWidgets = pageData.widgets;
+      // console.log("✅ SAVE SIGNAL: Using pageData.widgets as single source", currentWidgets);
+      return currentWidgets;
     } catch (error) {
       console.error("❌ SAVE SIGNAL: ContentEditor save failed", error);
       throw error;
     }
-  }, [layoutRenderer]);
+  }, [pageData?.widgets]);
 
   // Enable auto-save functionality
   const enableAutoSave = useCallback((enabled = false, delay = 5000) => {
