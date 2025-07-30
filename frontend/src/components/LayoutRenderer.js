@@ -50,6 +50,8 @@ class LayoutRenderer {
     this.uiCallbacks = new Map(); // Map of UI event callbacks
     this.dragState = { isDragging: false, draggedElement: null, sourceSlot: null };
     this.customWidgets = null; // Custom widget definitions (if any)
+    this.cachedApiWidgets = null; // Cached widgets from API
+    this.widgetTypesPromise = null; // Promise for ongoing API request
     this.pageHasBeenSaved = false; // Track if page/layout has been saved
     this.defaultWidgetsProcessed = false; // Track if defaults have been processed
     this.savedWidgetData = new Map(); // Map of slot names to saved widget arrays
@@ -67,6 +69,199 @@ class LayoutRenderer {
 
     // NEW: Widget data change callbacks for single source of truth
     this.widgetDataCallbacks = new Map(); // Map of widget data change callbacks
+  }
+
+  /**
+   * Fetch widget types from the API
+   * @returns {Promise<Array>} Promise resolving to array of widget definitions
+   */
+  async fetchWidgetTypes() {
+    // Return existing promise if already fetching
+    if (this.widgetTypesPromise) {
+      return this.widgetTypesPromise;
+    }
+
+    // Return cached widgets if available and not expired
+    if (this.cachedApiWidgets && Array.isArray(this.cachedApiWidgets)) {
+      return this.cachedApiWidgets;
+    }
+
+    try {
+      console.log('LayoutRenderer: Fetching widget types from API...');
+
+      this.widgetTypesPromise = fetch('/api/v1/webpages/widget-types/')
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+          return response.json();
+        })
+        .then(apiWidgets => {
+          // Transform API response to widget card format
+          const transformedWidgets = this.transformApiWidgetsToCardFormat(apiWidgets);
+
+          // Cache the transformed widgets
+          this.cachedApiWidgets = transformedWidgets;
+
+          console.log(`LayoutRenderer: Successfully fetched ${transformedWidgets.length} widget types from API`);
+          return transformedWidgets;
+        })
+        .catch(error => {
+          console.error('LayoutRenderer: Error fetching widget types from API:', error);
+          // Return default widgets as fallback
+          const defaultWidgets = this.getDefaultWidgets();
+          console.log('LayoutRenderer: Using default widgets as fallback');
+          return defaultWidgets;
+        })
+        .finally(() => {
+          // Clear the promise so future calls can make new requests
+          this.widgetTypesPromise = null;
+        });
+
+      return await this.widgetTypesPromise;
+    } catch (error) {
+      console.error('LayoutRenderer: Unexpected error in fetchWidgetTypes:', error);
+      this.widgetTypesPromise = null;
+      return this.getDefaultWidgets();
+    }
+  }
+
+  /**
+   * Transform API widget response to widget card format
+   * @param {Array} apiWidgets - Widget types from API
+   * @returns {Array} Transformed widget definitions
+   */
+  transformApiWidgetsToCardFormat(apiWidgets) {
+    if (!Array.isArray(apiWidgets)) {
+      console.warn('LayoutRenderer: API response is not an array, using default widgets');
+      return this.getDefaultWidgets();
+    }
+
+    return apiWidgets
+      .filter(apiWidget => apiWidget.is_active !== false) // Only include active widgets
+      .map(apiWidget => {
+        try {
+          // Extract default config from configuration schema
+          const defaultConfig = this.extractDefaultConfigFromSchema(apiWidget.configuration_schema);
+
+          // Generate appropriate icon and category based on widget class and name
+          const iconAndCategory = this.generateIconAndCategory(apiWidget);
+
+          return {
+            type: this.getWidgetTypeFromClass(apiWidget.widget_class),
+            name: apiWidget.name,
+            description: apiWidget.description || 'No description available',
+            icon: iconAndCategory.icon,
+            category: iconAndCategory.category,
+            config: defaultConfig,
+            // Store original API data for potential use in widget creation
+            _apiData: {
+              widget_class: apiWidget.widget_class,
+              configuration_schema: apiWidget.configuration_schema,
+              template_json: apiWidget.template_json
+            }
+          };
+        } catch (error) {
+          console.error(`LayoutRenderer: Error transforming widget "${apiWidget.name}":`, error);
+          // Return a placeholder widget for failed transformations
+          return {
+            type: 'unknown',
+            name: apiWidget.name || 'Unknown Widget',
+            description: 'Widget configuration error',
+            icon: '⚠️',
+            category: 'other',
+            config: {},
+            _error: error.message
+          };
+        }
+      });
+  }
+
+  /**
+   * Extract default configuration from JSON schema
+   * @param {Object} schema - JSON schema for widget configuration
+   * @returns {Object} Default configuration object
+   */
+  extractDefaultConfigFromSchema(schema) {
+    const config = {};
+
+    if (!schema || typeof schema !== 'object' || !schema.properties) {
+      return config;
+    }
+
+    Object.entries(schema.properties).forEach(([key, fieldSchema]) => {
+      if (fieldSchema.default !== undefined) {
+        config[key] = fieldSchema.default;
+      } else if (fieldSchema.type === 'string') {
+        config[key] = '';
+      } else if (fieldSchema.type === 'boolean') {
+        config[key] = false;
+      } else if (fieldSchema.type === 'integer' || fieldSchema.type === 'number') {
+        config[key] = fieldSchema.minimum || 0;
+      } else if (fieldSchema.type === 'array') {
+        config[key] = [];
+      } else if (fieldSchema.type === 'object') {
+        config[key] = {};
+      }
+    });
+
+    return config;
+  }
+
+  /**
+   * Generate appropriate icon and category for a widget
+   * @param {Object} apiWidget - Widget data from API
+   * @returns {Object} Object with icon and category properties
+   */
+  generateIconAndCategory(apiWidget) {
+    const name = (apiWidget.name || '').toLowerCase();
+    const className = (apiWidget.widget_class || '').toLowerCase();
+
+    // Define icon and category mappings
+    const mappings = [
+      { keywords: ['text', 'paragraph', 'content'], icon: 'T', category: 'content' },
+      { keywords: ['button', 'link', 'cta'], icon: '◯', category: 'interactive' },
+      { keywords: ['image', 'picture', 'photo'], icon: '🖼', category: 'media' },
+      { keywords: ['video', 'media'], icon: '🎥', category: 'media' },
+      { keywords: ['card', 'tile'], icon: '📄', category: 'layout' },
+      { keywords: ['list', 'menu'], icon: '≡', category: 'content' },
+      { keywords: ['table', 'grid'], icon: '⋮⋯', category: 'layout' },
+      { keywords: ['form', 'input'], icon: '📝', category: 'interactive' },
+      { keywords: ['calendar', 'date'], icon: '📅', category: 'interactive' },
+      { keywords: ['map', 'location'], icon: '🗺', category: 'media' },
+      { keywords: ['chart', 'graph'], icon: '📊', category: 'data' },
+      { keywords: ['separator', 'divider'], icon: '─', category: 'layout' },
+      { keywords: ['hero', 'banner'], icon: '🏆', category: 'layout' },
+      { keywords: ['testimonial', 'quote'], icon: '💬', category: 'content' },
+      { keywords: ['gallery', 'slideshow'], icon: '🖼', category: 'media' }
+    ];
+
+    // Find matching mapping
+    for (const mapping of mappings) {
+      if (mapping.keywords.some(keyword =>
+        name.includes(keyword) || className.includes(keyword))) {
+        return { icon: mapping.icon, category: mapping.category };
+      }
+    }
+
+    // Default fallback
+    return { icon: '🧩', category: 'other' };
+  }
+
+  /**
+   * Convert widget class name to type identifier
+   * @param {string} widgetClass - Python widget class name
+   * @returns {string} Type identifier for internal use
+   */
+  getWidgetTypeFromClass(widgetClass) {
+    if (!widgetClass) return 'unknown';
+
+    // Convert PascalCase class name to lowercase type
+    // e.g., "TextWidget" -> "text", "ButtonWidget" -> "button"
+    return widgetClass
+      .replace(/Widget$/, '') // Remove "Widget" suffix
+      .replace(/([A-Z])/g, (match, letter) => letter.toLowerCase())
+      .replace(/^([a-z])/, (match, letter) => letter.toLowerCase());
   }
 
   /**
@@ -172,6 +367,9 @@ class LayoutRenderer {
           this.addGlobalClickOutsideListener();
         }, 200);
       }
+
+      // Preload widget types in the background for faster widget selection
+      this.preloadWidgetTypes();
 
     } catch (error) {
       console.error('LayoutRenderer: Error rendering layout', error);
@@ -936,7 +1134,7 @@ class LayoutRenderer {
    * @param {string} slotName - Name of the slot to add widget to
    * @param {Object} options - Modal configuration options
    */
-  showWidgetSelectionModal(slotName, options = {}) {
+  async showWidgetSelectionModal(slotName, options = {}) {
     // Remove existing widget modal
     const existingModal = document.querySelector('.widget-selection-modal');
     if (existingModal) {
@@ -951,10 +1149,9 @@ class LayoutRenderer {
     const modal = document.createElement('div');
     modal.className = 'bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-90vh overflow-hidden';
 
-    // Get available widgets
-    const availableWidgets = this.getAvailableWidgets();
     const slotConfig = this.getSlotConfig(slotName);
 
+    // Initially show loading state
     modal.innerHTML = `
       <div class="p-6">
         <div class="flex items-center justify-between mb-4">
@@ -967,19 +1164,11 @@ class LayoutRenderer {
           </button>
         </div>
         
-        <div class="mb-4">
-          <input type="text" placeholder="Search widgets..." 
-                 class="widget-search w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-        </div>
-        
-        <div class="widget-grid grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto">
-          ${availableWidgets.map(widget => this.createWidgetCard(widget)).join('')}
-        </div>
-        
-        <div class="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-200">
-          <button class="widget-modal-cancel px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors">
-            Cancel
-          </button>
+        <div class="flex items-center justify-center py-12">
+          <div class="text-center">
+            <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <p class="mt-2 text-sm text-gray-600">Loading widgets...</p>
+          </div>
         </div>
       </div>
     `;
@@ -987,11 +1176,99 @@ class LayoutRenderer {
     overlay.appendChild(modal);
     document.body.appendChild(overlay);
 
-    // Set up modal event handlers
-    this.setupWidgetModalHandlers(overlay, slotName);
+    // Set up basic modal event handlers for close button
+    const closeButton = overlay.querySelector('.widget-modal-close');
+    const closeModal = () => {
+      overlay.remove();
+      this.slotUIElements.delete('widget-selection-modal');
+    };
+    closeButton.addEventListener('click', closeModal);
 
     // Track for cleanup
     this.slotUIElements.set('widget-selection-modal', overlay);
+
+    try {
+      // Fetch available widgets from API
+      const availableWidgets = await this.fetchWidgetTypes();
+
+      // Update modal content with widgets
+      modal.innerHTML = `
+        <div class="p-6">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="text-lg font-semibold text-gray-900">Add Widget to Slot</h3>
+              <p class="text-sm text-gray-600">${slotConfig?.title || slotName}</p>
+            </div>
+            <button class="widget-modal-close text-gray-400 hover:text-gray-600 transition-colors">
+              <span class="text-xl">×</span>
+            </button>
+          </div>
+          
+          <div class="mb-4">
+            <input type="text" placeholder="Search widgets..." 
+                   class="widget-search w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+          
+          <div class="widget-grid grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto">
+            ${availableWidgets.map(widget => this.createWidgetCard(widget)).join('')}
+          </div>
+          
+          <div class="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-200">
+            <button class="widget-modal-cancel px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors">
+              Cancel
+            </button>
+          </div>
+        </div>
+      `;
+
+      // Set up complete modal event handlers with widgets loaded
+      this.setupWidgetModalHandlers(overlay, slotName);
+
+    } catch (error) {
+      console.error('LayoutRenderer: Error loading widgets for modal:', error);
+
+      // Show error state
+      modal.innerHTML = `
+        <div class="p-6">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="text-lg font-semibold text-gray-900">Add Widget to Slot</h3>
+              <p class="text-sm text-gray-600">${slotConfig?.title || slotName}</p>
+            </div>
+            <button class="widget-modal-close text-gray-400 hover:text-gray-600 transition-colors">
+              <span class="text-xl">×</span>
+            </button>
+          </div>
+          
+          <div class="flex items-center justify-center py-12">
+            <div class="text-center">
+              <div class="text-red-500 text-4xl mb-2">⚠️</div>
+              <p class="text-sm text-gray-600">Error loading widgets</p>
+              <p class="text-xs text-gray-500 mt-1">${error.message}</p>
+              <button class="mt-3 px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors widget-retry">
+                Retry
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      // Set up retry functionality
+      const retryButton = overlay.querySelector('.widget-retry');
+      if (retryButton) {
+        retryButton.addEventListener('click', () => {
+          overlay.remove();
+          this.slotUIElements.delete('widget-selection-modal');
+          this.showWidgetSelectionModal(slotName, options);
+        });
+      }
+
+      // Re-setup close button after content update
+      const newCloseButton = overlay.querySelector('.widget-modal-close');
+      if (newCloseButton) {
+        newCloseButton.addEventListener('click', closeModal);
+      }
+    }
   }
 
   /**
@@ -1000,6 +1277,22 @@ class LayoutRenderer {
    */
   setAvailableWidgets(widgets) {
     this.customWidgets = widgets;
+  }
+
+  /**
+   * Preload widget types from API in the background
+   * This helps ensure widget selection modal loads quickly
+   */
+  preloadWidgetTypes() {
+    // Don't preload if we already have cached widgets or custom widgets
+    if (this.cachedApiWidgets || this.customWidgets || this.widgetTypesPromise) {
+      return;
+    }
+
+    // Start fetching in background without waiting
+    this.fetchWidgetTypes().catch(error => {
+      console.log('LayoutRenderer: Background widget preload failed (this is non-critical):', error);
+    });
   }
 
   /**
@@ -1516,11 +1809,25 @@ class LayoutRenderer {
    * @returns {Array} Array of widget definitions
    */
   getAvailableWidgets() {
-    // Return custom widgets if set, otherwise return default widgets
+    // Return custom widgets if set, otherwise return cached API widgets or default widgets
     if (this.customWidgets && Array.isArray(this.customWidgets)) {
       return this.customWidgets;
     }
 
+    // Return cached API widgets if available
+    if (this.cachedApiWidgets && Array.isArray(this.cachedApiWidgets)) {
+      return this.cachedApiWidgets;
+    }
+
+    // Fallback to default widgets if API is not available
+    return this.getDefaultWidgets();
+  }
+
+  /**
+   * Get default fallback widgets
+   * @returns {Array} Array of default widget definitions
+   */
+  getDefaultWidgets() {
     return [
       {
         type: 'text',
