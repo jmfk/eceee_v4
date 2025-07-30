@@ -126,16 +126,16 @@ class BaseWidget(ABC):
         result = {
             "name": self.name,
             "description": self.description,
-            "template_name": self.template_name,
+            "widget_class": self.__class__.__name__,
             "is_active": self.is_active,
             "configuration_schema": self.configuration_model.model_json_schema(),
         }
-        
+
         # Include template JSON
         template_json = self.get_template_json()
         if template_json:
             result["template_json"] = template_json
-            
+
         return result
 
     def get_css_for_injection(
@@ -195,6 +195,7 @@ class BaseWidget(ABC):
         """
         try:
             from .utils.template_parser import WidgetSerializer
+
             serializer = WidgetSerializer()
             result = serializer.serialize_widget_template(self)
             return result["template_json"]
