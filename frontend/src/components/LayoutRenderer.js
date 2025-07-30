@@ -977,7 +977,152 @@ class LayoutRenderer {
     alert(`Edit functionality for ${widgetInstance.name} widget is coming soon!`);
   }
 
+  /**
+   * Edit widget instance using configuration_schema
+   * @param {string} widgetId - ID of the widget to edit
+   * @param {Object} widgetInstance - Widget instance to edit
+   */
+  async editWidget(widgetId, widgetInstance) {
+    // Remove any existing edit modal
+    const existingModal = document.querySelector('.widget-edit-modal');
+    if (existingModal) existingModal.remove();
 
+    console.log('editWidget', widgetId, widgetInstance);
+    // Get schema from widgetInstance._apiData (fallback to default if missing)
+    const schema = widgetInstance._apiData?.configuration_schema || {};
+    const config = widgetInstance.config || {};
+
+    // Create modal overlay
+    const overlay = document.createElement('div');
+    overlay.className = 'widget-edit-modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+
+    // Create modal content
+    const modal = document.createElement('div');
+    modal.className = 'bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 max-h-90vh overflow-y-auto';
+
+    // Modal header
+    modal.innerHTML = `
+      <div class="p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-semibold text-gray-900">Edit ${this.escapeHtml(widgetInstance.name)}</h3>
+          <button class="widget-edit-close text-gray-400 hover:text-gray-600 transition-colors"><span class="text-xl">×</span></button>
+        </div>
+        <form class="widget-edit-form space-y-4"></form>
+        <div class="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-200">
+          <button type="button" class="widget-edit-cancel px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors">Cancel</button>
+          <button type="submit" class="widget-edit-save px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors">Save</button>
+        </div>
+      </div>
+    `;
+
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+
+    // Generate form fields from schema
+    const form = modal.querySelector('.widget-edit-form');
+    this.generateFormFieldsFromSchema(form, schema, config);
+
+    // Close modal handler
+    const closeModal = () => overlay.remove();
+    modal.querySelector('.widget-edit-close').addEventListener('click', closeModal);
+    modal.querySelector('.widget-edit-cancel').addEventListener('click', closeModal);
+
+    // Save handler
+    modal.querySelector('.widget-edit-save').addEventListener('click', (e) => {
+      e.preventDefault();
+      const newConfig = this.getFormConfigFromSchema(form, schema, config);
+      // Update widget config and re-render
+      widgetInstance.config = newConfig;
+      this.markWidgetAsEdited(widgetId, widgetInstance);
+      this.updateSlot(widgetInstance.slotName, this.getSlotWidgetData(widgetInstance.slotName));
+      closeModal();
+    });
+  }
+
+  /**
+   * Generate form fields from JSON schema (vanilla JS)
+   * @param {HTMLElement} form - Form element to append fields to
+   * @param {Object} schema - JSON schema
+   * @param {Object} config - Current config values
+   */
+  generateFormFieldsFromSchema(form, schema, config) {
+    console.log('generateFormFieldsFromSchema', form, schema, config);
+    if (!schema || !schema.properties) return;
+    Object.entries(schema.properties).forEach(([key, field]) => {
+      const value = config[key] !== undefined ? config[key] : field.default || '';
+      const label = document.createElement('label');
+      label.className = 'block text-sm font-medium text-gray-700';
+      label.textContent = field.title || key;
+      label.htmlFor = `widget-edit-${key}`;
+      form.appendChild(label);
+      let input;
+      if (field.enum) {
+        input = document.createElement('select');
+        input.className = 'block w-full border border-gray-300 rounded-md px-3 py-2';
+        input.id = `widget-edit-${key}`;
+        field.enum.forEach(opt => {
+          const option = document.createElement('option');
+          option.value = opt;
+          option.textContent = opt;
+          if (opt === value) option.selected = true;
+          input.appendChild(option);
+        });
+      } else if (field.type === 'boolean') {
+        input = document.createElement('input');
+        input.type = 'checkbox';
+        input.className = 'ml-2';
+        input.id = `widget-edit-${key}`;
+        input.checked = !!value;
+      } else if (field.type === 'integer' || field.type === 'number') {
+        input = document.createElement('input');
+        input.type = 'number';
+        input.className = 'block w-full border border-gray-300 rounded-md px-3 py-2';
+        input.id = `widget-edit-${key}`;
+        input.value = value;
+      } else if (field.format === 'textarea' || field.format === 'richtext') {
+        input = document.createElement('textarea');
+        input.className = 'block w-full border border-gray-300 rounded-md px-3 py-2';
+        input.id = `widget-edit-${key}`;
+        input.value = value;
+      } else {
+        input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'block w-full border border-gray-300 rounded-md px-3 py-2';
+        input.id = `widget-edit-${key}`;
+        input.value = value;
+      }
+      input.name = key;
+      form.appendChild(input);
+    });
+  }
+
+  /**
+   * Read config values from form fields based on schema
+   * @param {HTMLElement} form - Form element
+   * @param {Object} schema - JSON schema
+   * @param {Object} oldConfig - Previous config (for fallback)
+   * @returns {Object} New config
+   */
+  getFormConfigFromSchema(form, schema, oldConfig) {
+    const config = { ...oldConfig };
+    if (!schema || !schema.properties) return config;
+    Object.entries(schema.properties).forEach(([key, field]) => {
+      const input = form.querySelector(`[name="${key}"]`);
+      if (!input) return;
+      if (field.enum) {
+        config[key] = input.value;
+      } else if (field.type === 'boolean') {
+        config[key] = input.checked;
+      } else if (field.type === 'integer' || field.type === 'number') {
+        config[key] = input.value === '' ? null : Number(input.value);
+      } else if (field.format === 'textarea' || field.format === 'richtext') {
+        config[key] = input.value;
+      } else {
+        config[key] = input.value;
+      }
+    });
+    return config;
+  }
 
   /**
    * Add click outside listener for menu
