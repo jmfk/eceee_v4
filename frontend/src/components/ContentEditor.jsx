@@ -34,6 +34,7 @@ const ContentEditor = forwardRef(({
 
   // Create a widget DOM element with proper memory management
   const createWidgetElement = useCallback((widget) => {
+    console.log("createWidgetElement", widget)
     try {
       // Validate widget object
       if (!widget || typeof widget !== 'object' || !widget.type) {
@@ -62,6 +63,7 @@ const ContentEditor = forwardRef(({
       let content = '';
 
       switch (widget.type) {
+        case 'text':
         case 'text-block':
           content = `
             <div class="text-widget">
@@ -183,23 +185,6 @@ const ContentEditor = forwardRef(({
 
   }, [layoutRenderer, pageData?.id, isNewPage, onUpdate, pageData]);
 
-  // Don't add the LayoutRenderer's version selector - we'll create our own in the bottom toolbar
-  // useEffect(() => {
-  //   if (!layoutRenderer || !containerRef.current || !pageData?.id || isNewPage) {
-  //     return;
-  //   }
-
-  //   // Add version selector after a brief delay to ensure layout is rendered
-  //   const timeoutId = setTimeout(() => {
-  //     layoutRenderer.addVersionSelector(containerRef.current);
-  //   }, 500);
-
-  //   return () => {
-  //     clearTimeout(timeoutId);
-  //     // Clean up version selector on unmount
-  //     layoutRenderer.removeVersionSelector();
-  //   };
-  // }, [layoutRenderer, pageData?.id, isNewPage]);
 
   // Set up dirty state communication with LayoutRenderer
   useEffect(() => {
@@ -299,9 +284,6 @@ const ContentEditor = forwardRef(({
         // Ensure the element stays within bounds
         element.style.maxWidth = '100%';
         element.style.maxHeight = '100%';
-
-        // Log for debugging (can be removed in production)
-        //console.log('ContentEditor: Converted fixed positioned element to absolute within container', element);
       }
     });
   }, []);
@@ -362,6 +344,7 @@ const ContentEditor = forwardRef(({
   const widgetsRef = useRef(null);
   const widgetsJsonString = JSON.stringify(pageData?.widgets);
 
+  console.log("pageData?.widgets", pageData?.widgets)
   useEffect(() => {
     if (!layoutRenderer || !pageData?.widgets) {
       return;
@@ -369,13 +352,9 @@ const ContentEditor = forwardRef(({
 
     // Skip if widgets content hasn't actually changed
     if (widgetsRef.current === widgetsJsonString) {
-      // console.log('ContentEditor: Skipped widgets reload - content unchanged');
       return;
     }
 
-    // console.log('ContentEditor: Loading widgets into LayoutRenderer', widgets);
-    // console.log('ContentEditor: Widgets object keys:', Object.keys(widgets));
-    // console.log('ContentEditor: Is widgets empty?', Object.keys(widgets).length === 0);
     widgetsRef.current = widgetsJsonString;
 
     // Add fallback test widgets if no widgets data exists
@@ -384,7 +363,7 @@ const ContentEditor = forwardRef(({
     // Use React's scheduling to batch widget updates
     const updateSlots = () => {
       // Load widget data and mark page as saved BEFORE updating slots
-      // console.log('widgetsToLoad', widgetsToLoad);
+      console.log("updateSlots", widgetsToLoad)
       layoutRenderer.loadWidgetData(widgetsToLoad);
 
       Object.entries(widgetsToLoad).forEach(([slotName, slotWidgets]) => {
@@ -405,7 +384,7 @@ const ContentEditor = forwardRef(({
     return () => {
       clearTimeout(timeoutId);
     };
-  }, [widgetsJsonString, layoutRenderer, pageData?.widgets]);
+  }, [widgetsJsonString, layoutRenderer]);
 
   // Inject CSS styles for slot interactivity with proper cleanup
   useEffect(() => {
