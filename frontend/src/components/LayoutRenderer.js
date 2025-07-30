@@ -232,7 +232,8 @@ class LayoutRenderer {
         throw new Error('Widgets must be an array');
       }
 
-      // Clean up existing content in slot
+      // Clean up existing content in slot (but preserve menu state)
+      const existingMenu = container.querySelector('[data-slot-menu]');
       this.cleanup(container);
 
       if (widgets.length > 0) {
@@ -275,6 +276,15 @@ class LayoutRenderer {
             </div>
           `;
         }
+      }
+
+      // Re-add slot menu if UI is enabled and it's not already present
+      if (this.uiConfig.showIconMenu && !container.querySelector('[data-slot-menu]')) {
+        this.addSlotIconMenu(slotName, {
+          showAddWidget: this.uiConfig.showAddWidget,
+          showSlotInfo: true,
+          showClearSlot: true
+        });
       }
 
       // console.log(`LayoutRenderer: Updated slot "${slotName}" with ${widgets.length} widgets`);
