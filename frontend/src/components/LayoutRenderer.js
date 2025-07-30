@@ -161,13 +161,14 @@ class LayoutRenderer {
    */
   cleanup(container) {
     try {
-      // Remove tracked event listeners
+      // Remove tracked event listeners only for elements within this container
       this.eventListeners.forEach((cleanup, element) => {
-        if (typeof cleanup === 'function') {
+        // Check if element is a valid Node and if it's contained within the container
+        if (element instanceof Node && container.contains(element) && typeof cleanup === 'function') {
           cleanup();
+          this.eventListeners.delete(element);
         }
       });
-      this.eventListeners.clear();
 
       // Efficiently clear container using removeChild (faster than innerHTML)
       while (container.firstChild) {
@@ -1674,6 +1675,7 @@ class LayoutRenderer {
     });
     menuButton.title = `Widget options for ${name}`;
     menuContainer.appendChild(menuButton);
+
 
     // Create menu dropdown
     const menuDropdown = document.createElement('div');
