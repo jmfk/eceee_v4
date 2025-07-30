@@ -1,9 +1,33 @@
 /**
- * LayoutRenderer - Custom DOM renderer for JSON layout structures
- * 
- * Renders JSON layout data directly to DOM elements bypassing React's virtual DOM.
- * Supports slot-based widget rendering with default widget fallbacks.
+ * LayoutRenderer.js
+ * Renders layout JSON as DOM elements with widget support and UI enhancements
  */
+
+// Constants for widget actions to eliminate magic strings
+const WIDGET_ACTIONS = {
+  ADD: 'add',
+  REMOVE: 'remove',
+  UPDATE: 'update',
+  CLEAR: 'clear'
+};
+
+// Constants for widget menu icons
+const WIDGET_ICONS = {
+  MENU: 'svg:menu',
+  EDIT: 'svg:edit',
+  TRASH: 'svg:trash'
+};
+
+// Constants for error types
+const ERROR_TYPES = {
+  WIDGET_NOT_FOUND: 'WIDGET_NOT_FOUND',
+  CONFIG_EXTRACTION_ERROR: 'CONFIG_EXTRACTION_ERROR',
+  CALLBACK_EXECUTION_ERROR: 'CALLBACK_EXECUTION_ERROR',
+  LAYOUT_VALIDATION_ERROR: 'LAYOUT_VALIDATION_ERROR',
+  RENDERING_ERROR: 'RENDERING_ERROR',
+  CLEANUP_ERROR: 'CLEANUP_ERROR',
+  AUTO_SAVE_ERROR: 'AUTO_SAVE_ERROR'
+};
 
 class LayoutRenderer {
   constructor() {
@@ -304,7 +328,7 @@ class LayoutRenderer {
       }
 
       // NEW: Notify parent component to update pageData.widgets instead of directly clearing DOM
-      this.executeWidgetDataCallback('clear', slotName, []);
+      this.executeWidgetDataCallback(WIDGET_ACTIONS.CLEAR, slotName, []);
 
     } catch (error) {
       console.error(`LayoutRenderer: Error clearing slot "${slotName}"`, error);
@@ -821,7 +845,10 @@ class LayoutRenderer {
           // console.log(`🔄 DIRTY STATE: Executing callback with isDirty=${slotName}, reason=${args[0]}`);
           callback(slotName, ...args); // For onDirtyStateChanged: slotName is actually isDirty
         } catch (error) {
-          console.error(`LayoutRenderer: Error executing dirty state callback`, error);
+          this.handleError(ERROR_TYPES.CALLBACK_EXECUTION_ERROR,
+            `executing dirty state callback with isDirty=${slotName}`,
+            error,
+            { isDirty: slotName, reason: args[0] });
         }
       } else {
         console.warn(`🔄 DIRTY STATE: No dirty state callback registered`);
@@ -1058,7 +1085,10 @@ class LayoutRenderer {
         widgets.push(widgetInstance);
 
       } catch (error) {
-        console.error(`LayoutRenderer: Error collecting widget data from element`, error, widgetElement);
+        this.handleError(ERROR_TYPES.CONFIG_EXTRACTION_ERROR,
+          `collecting widget data from element in slot ${slotName}`,
+          error,
+          { slotName, widgetElement });
       }
     });
 
@@ -1072,139 +1102,242 @@ class LayoutRenderer {
    * @returns {Object} Widget configuration object
    */
   extractWidgetConfigFromDOM(widgetElement, widgetType) {
-    const config = {};
     const contentElement = widgetElement.querySelector('.widget-content');
-
     if (!contentElement) {
-      return config;
+      return {};
     }
 
     try {
-      switch (widgetType) {
-        case 'text':
-          const textElement = contentElement.firstElementChild;
-          if (textElement) {
-            config.content = textElement.textContent || textElement.innerText;
-            // Extract fontSize from class
-            const classList = Array.from(textElement.classList);
-            const fontSizeClass = classList.find(cls => cls.startsWith('text-'));
-            if (fontSizeClass) {
-              config.fontSize = fontSizeClass.replace('text-', '');
-            }
-            // Extract alignment from class
-            const alignmentClass = classList.find(cls => cls.startsWith('text-'));
-            if (alignmentClass && ['left', 'center', 'right'].includes(alignmentClass.replace('text-', ''))) {
-              config.alignment = alignmentClass.replace('text-', '');
-            }
-          }
-          break;
+      // Use strategy pattern for widget config extraction
+      const extractorMethod = `extract${this.capitalizeFirst(widgetType)}WidgetConfig`;
+      if (typeof this[extractorMethod] === 'function') {
+        return this[extractorMethod](contentElement);
+      } else {
+        return this.extractDefaultWidgetConfig(widgetElement);
+      }
+    } catch (error) {
+      console.error(`LayoutRenderer: ${ERROR_TYPES.CONFIG_EXTRACTION_ERROR} for ${widgetType} widget`, error);
+      return {};
+    }
+  }
 
-        case 'image':
-          const imgElement = contentElement.querySelector('img');
-          if (imgElement) {
-            config.src = imgElement.src;
-            config.alt = imgElement.alt;
-            config.width = imgElement.style.width || '100%';
-          }
-          const captionElement = contentElement.querySelector('p');
-          if (captionElement) {
-            config.caption = captionElement.textContent;
-          }
-          break;
+  /**
+   * Capitalize first letter of a string
+   * @param {string} str - String to capitalize
+   * @returns {string} Capitalized string
+   */
+  capitalizeFirst(str) {
+    return str.charAt(0).toUpperCase() + str.slice(1);
+  }
 
-        case 'button':
-          const buttonElement = contentElement.querySelector('button');
-          if (buttonElement) {
-            config.text = buttonElement.textContent;
-            // Extract style and size from classes (simplified)
-            const classList = Array.from(buttonElement.classList);
-            if (classList.includes('bg-blue-600')) config.style = 'primary';
-            else if (classList.includes('bg-gray-200')) config.style = 'secondary';
-            else if (classList.includes('bg-green-600')) config.style = 'success';
-            else if (classList.includes('bg-red-600')) config.style = 'danger';
+  /**
+   * Extract text widget configuration
+   * @param {HTMLElement} contentElement - Widget content element
+   * @returns {Object} Text widget configuration
+   */
+  extractTextWidgetConfig(contentElement) {
+    const config = {};
+    const textElement = contentElement.firstElementChild;
 
-            if (classList.includes('px-3')) config.size = 'small';
-            else if (classList.includes('px-6')) config.size = 'large';
-            else config.size = 'medium';
-          }
-          break;
+    if (textElement) {
+      config.content = textElement.textContent || textElement.innerText;
 
-        case 'card':
-          const titleElement = contentElement.querySelector('h3');
-          const contentTextElement = contentElement.querySelector('p');
-          const cardImgElement = contentElement.querySelector('img');
-          const cardButtonElement = contentElement.querySelector('button');
-
-          if (titleElement) config.title = titleElement.textContent;
-          if (contentTextElement) config.content = contentTextElement.textContent;
-          if (cardImgElement) config.imageUrl = cardImgElement.src;
-          config.showButton = !!cardButtonElement;
-          break;
-
-        case 'list':
-          const listElement = contentElement.querySelector('ol, ul');
-          if (listElement) {
-            config.type = listElement.tagName.toLowerCase() === 'ol' ? 'ordered' : 'unordered';
-            const items = Array.from(listElement.querySelectorAll('li')).map(li => li.textContent);
-            config.items = items;
-          }
-          break;
-
-        case 'spacer':
-          const spacerElement = contentElement.firstElementChild;
-          if (spacerElement) {
-            const height = spacerElement.style.height;
-            if (height === '16px') config.height = 'small';
-            else if (height === '64px') config.height = 'large';
-            else config.height = 'medium';
-            config.backgroundColor = spacerElement.style.backgroundColor || 'transparent';
-          }
-          break;
-
-        case 'divider':
-          const dividerElement = contentElement.querySelector('hr');
-          if (dividerElement) {
-            const classList = Array.from(dividerElement.classList);
-            if (classList.includes('border-dashed')) config.style = 'dashed';
-            else if (classList.includes('border-dotted')) config.style = 'dotted';
-            else config.style = 'solid';
-
-            if (classList.includes('border-black')) config.color = 'black';
-            else if (classList.includes('border-blue-300')) config.color = 'blue';
-            else config.color = 'gray';
-
-            config.thickness = classList.includes('border-2') ? 'thick' : 'thin';
-          }
-          break;
-
-        case 'video':
-          const videoElement = contentElement.querySelector('video');
-          if (videoElement) {
-            const sourceElement = videoElement.querySelector('source');
-            if (sourceElement) config.src = sourceElement.src;
-            config.controls = videoElement.controls;
-            config.autoplay = videoElement.autoplay;
-            if (videoElement.poster) config.poster = videoElement.poster;
-          }
-          break;
-
-        default:
-          // For unknown widget types, try to preserve any data attributes
-          const dataAttrs = Array.from(widgetElement.attributes)
-            .filter(attr => attr.name.startsWith('data-widget-config-'))
-            .reduce((acc, attr) => {
-              const key = attr.name.replace('data-widget-config-', '');
-              acc[key] = attr.value;
-              return acc;
-            }, {});
-          Object.assign(config, dataAttrs);
+      // Extract fontSize and alignment from class
+      const classList = Array.from(textElement.classList);
+      const fontSizeClass = classList.find(cls => cls.startsWith('text-'));
+      if (fontSizeClass) {
+        config.fontSize = fontSizeClass.replace('text-', '');
       }
 
-    } catch (error) {
-      console.error(`LayoutRenderer: Error extracting config for ${widgetType} widget`, error);
+      const alignmentClass = classList.find(cls => cls.startsWith('text-'));
+      if (alignmentClass && ['left', 'center', 'right'].includes(alignmentClass.replace('text-', ''))) {
+        config.alignment = alignmentClass.replace('text-', '');
+      }
     }
 
     return config;
+  }
+
+  /**
+   * Extract image widget configuration
+   * @param {HTMLElement} contentElement - Widget content element
+   * @returns {Object} Image widget configuration
+   */
+  extractImageWidgetConfig(contentElement) {
+    const config = {};
+    const imgElement = contentElement.querySelector('img');
+
+    if (imgElement) {
+      config.src = imgElement.src;
+      config.alt = imgElement.alt;
+      config.width = imgElement.style.width || '100%';
+    }
+
+    const captionElement = contentElement.querySelector('p');
+    if (captionElement) {
+      config.caption = captionElement.textContent;
+    }
+
+    return config;
+  }
+
+  /**
+   * Extract button widget configuration
+   * @param {HTMLElement} contentElement - Widget content element
+   * @returns {Object} Button widget configuration
+   */
+  extractButtonWidgetConfig(contentElement) {
+    const config = {};
+    const buttonElement = contentElement.querySelector('button');
+
+    if (buttonElement) {
+      config.text = buttonElement.textContent;
+
+      // Extract style and size from classes
+      const classList = Array.from(buttonElement.classList);
+
+      // Determine style
+      if (classList.includes('bg-blue-600')) config.style = 'primary';
+      else if (classList.includes('bg-gray-200')) config.style = 'secondary';
+      else if (classList.includes('bg-green-600')) config.style = 'success';
+      else if (classList.includes('bg-red-600')) config.style = 'danger';
+
+      // Determine size
+      if (classList.includes('px-3')) config.size = 'small';
+      else if (classList.includes('px-6')) config.size = 'large';
+      else config.size = 'medium';
+    }
+
+    return config;
+  }
+
+  /**
+   * Extract card widget configuration
+   * @param {HTMLElement} contentElement - Widget content element
+   * @returns {Object} Card widget configuration
+   */
+  extractCardWidgetConfig(contentElement) {
+    const config = {};
+
+    const titleElement = contentElement.querySelector('h3');
+    const contentTextElement = contentElement.querySelector('p');
+    const cardImgElement = contentElement.querySelector('img');
+    const cardButtonElement = contentElement.querySelector('button');
+
+    if (titleElement) config.title = titleElement.textContent;
+    if (contentTextElement) config.content = contentTextElement.textContent;
+    if (cardImgElement) config.imageUrl = cardImgElement.src;
+    config.showButton = !!cardButtonElement;
+
+    return config;
+  }
+
+  /**
+   * Extract list widget configuration
+   * @param {HTMLElement} contentElement - Widget content element
+   * @returns {Object} List widget configuration
+   */
+  extractListWidgetConfig(contentElement) {
+    const config = {};
+    const listElement = contentElement.querySelector('ol, ul');
+
+    if (listElement) {
+      config.type = listElement.tagName.toLowerCase() === 'ol' ? 'ordered' : 'unordered';
+      const items = Array.from(listElement.querySelectorAll('li')).map(li => li.textContent);
+      config.items = items;
+    }
+
+    return config;
+  }
+
+  /**
+   * Extract spacer widget configuration
+   * @param {HTMLElement} contentElement - Widget content element
+   * @returns {Object} Spacer widget configuration
+   */
+  extractSpacerWidgetConfig(contentElement) {
+    const config = {};
+    const spacerElement = contentElement.firstElementChild;
+
+    if (spacerElement) {
+      const height = spacerElement.style.height;
+      if (height === '16px') config.height = 'small';
+      else if (height === '64px') config.height = 'large';
+      else config.height = 'medium';
+
+      config.backgroundColor = spacerElement.style.backgroundColor || 'transparent';
+    }
+
+    return config;
+  }
+
+  /**
+   * Extract divider widget configuration
+   * @param {HTMLElement} contentElement - Widget content element
+   * @returns {Object} Divider widget configuration
+   */
+  extractDividerWidgetConfig(contentElement) {
+    const config = {};
+    const dividerElement = contentElement.querySelector('hr');
+
+    if (dividerElement) {
+      const classList = Array.from(dividerElement.classList);
+
+      // Determine style
+      if (classList.includes('border-dashed')) config.style = 'dashed';
+      else if (classList.includes('border-dotted')) config.style = 'dotted';
+      else config.style = 'solid';
+
+      // Determine color
+      if (classList.includes('border-black')) config.color = 'black';
+      else if (classList.includes('border-blue-300')) config.color = 'blue';
+      else config.color = 'gray';
+
+      // Determine thickness
+      config.thickness = classList.includes('border-2') ? 'thick' : 'thin';
+    }
+
+    return config;
+  }
+
+  /**
+   * Extract video widget configuration
+   * @param {HTMLElement} contentElement - Widget content element
+   * @returns {Object} Video widget configuration
+   */
+  extractVideoWidgetConfig(contentElement) {
+    const config = {};
+    const videoElement = contentElement.querySelector('video');
+
+    if (videoElement) {
+      const sourceElement = videoElement.querySelector('source');
+      if (sourceElement) config.src = sourceElement.src;
+
+      config.controls = videoElement.controls;
+      config.autoplay = videoElement.autoplay;
+
+      if (videoElement.poster) config.poster = videoElement.poster;
+    }
+
+    return config;
+  }
+
+  /**
+   * Extract default widget configuration for unknown widget types
+   * @param {HTMLElement} widgetElement - Widget element
+   * @returns {Object} Default widget configuration
+   */
+  extractDefaultWidgetConfig(widgetElement) {
+    // For unknown widget types, try to preserve any data attributes
+    const dataAttrs = Array.from(widgetElement.attributes)
+      .filter(attr => attr.name.startsWith('data-widget-config-'))
+      .reduce((acc, attr) => {
+        const key = attr.name.replace('data-widget-config-', '');
+        acc[key] = attr.value;
+        return acc;
+      }, {});
+
+    return dataAttrs;
   }
 
   /**
@@ -1595,7 +1728,7 @@ class LayoutRenderer {
       };
 
       // NEW: Notify parent component to update pageData.widgets instead of directly adding to slot
-      this.executeWidgetDataCallback('add', slotName, widgetInstance);
+      this.executeWidgetDataCallback(WIDGET_ACTIONS.ADD, slotName, widgetInstance);
 
       // Close modal
       closeModal();
@@ -1603,7 +1736,10 @@ class LayoutRenderer {
       // console.log(`LayoutRenderer: Widget "${widgetDef.name}" added to slot "${slotName}"`);
 
     } catch (error) {
-      console.error('LayoutRenderer: Error handling widget selection', error);
+      this.handleError(ERROR_TYPES.WIDGET_NOT_FOUND,
+        `handling widget selection for type=${widgetType}, slot=${slotName}`,
+        error,
+        { widgetType, slotName });
       alert(`Error adding widget: ${error.message}`);
     }
   }
@@ -1647,59 +1783,10 @@ class LayoutRenderer {
     const { id, type, name, config } = widgetInstance;
 
     // Create main widget container
-    const widget = document.createElement('div');
-    widget.className = 'rendered-widget mb-4 p-4 border border-gray-200 rounded-lg bg-white relative';
-    widget.setAttribute('data-widget-id', id);
-    widget.setAttribute('data-widget-type', type);
+    const widget = this.createWidgetContainer(id, type);
 
     // Add widget header with name and controls
-    const header = document.createElement('div');
-    header.className = 'widget-header flex items-center justify-between mb-3 pb-2 border-b border-gray-100';
-
-    const title = document.createElement('span');
-    title.className = 'text-sm font-medium text-gray-700';
-    title.textContent = name;
-
-    const controls = document.createElement('div');
-    controls.className = 'relative';
-
-    // Create kebab menu container
-    const menuContainer = document.createElement('div');
-    menuContainer.className = 'widget-menu-container relative';
-
-    // Create kebab menu button (3 dots vertical)
-    const menuButton = this.createIconButton('svg:menu', 'text-gray-400 hover:text-gray-600 w-5 h-5', () => {
-      this.toggleWidgetMenu(id);
-    });
-    menuButton.title = `Widget options for ${name}`;
-    menuContainer.appendChild(menuButton);
-
-
-    // Create menu dropdown
-    const menuDropdown = document.createElement('div');
-    menuDropdown.className = 'widget-menu-dropdown absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg min-w-32 hidden z-30';
-    menuDropdown.setAttribute('data-widget-menu', id);
-
-    // Add edit menu item
-    const editItem = this.createMenuItem('svg:edit', 'Edit', () => {
-      this.editWidget(id, widgetInstance);
-      this.hideWidgetMenu(id);
-    }, 'text-blue-700 hover:bg-blue-50');
-    menuDropdown.appendChild(editItem);
-
-    // Add remove menu item  
-    const removeItem = this.createMenuItem('svg:trash', 'Remove', () => {
-      if (confirm(`Remove ${name} widget?`)) {
-        this.removeWidgetFromSlot(id);
-      }
-      this.hideWidgetMenu(id);
-    }, 'text-red-700 hover:bg-red-50');
-    menuDropdown.appendChild(removeItem);
-
-    menuContainer.appendChild(menuDropdown);
-    controls.appendChild(menuContainer);
-    header.appendChild(title);
-    header.appendChild(controls);
+    const header = this.createWidgetHeader(id, name, widgetInstance);
     widget.appendChild(header);
 
     // Add widget content
@@ -1707,6 +1794,103 @@ class LayoutRenderer {
     widget.appendChild(content);
 
     return widget;
+  }
+
+  /**
+   * Create the main widget container element
+   * @param {string} id - Widget ID
+   * @param {string} type - Widget type
+   * @returns {HTMLElement} Widget container element
+   */
+  createWidgetContainer(id, type) {
+    const widget = document.createElement('div');
+    widget.className = 'rendered-widget mb-4 p-4 border border-gray-200 rounded-lg bg-white relative';
+    widget.setAttribute('data-widget-id', id);
+    widget.setAttribute('data-widget-type', type);
+    return widget;
+  }
+
+  /**
+   * Create the widget header with title and controls
+   * @param {string} id - Widget ID
+   * @param {string} name - Widget name
+   * @param {Object} widgetInstance - Complete widget instance for menu actions
+   * @returns {HTMLElement} Widget header element
+   */
+  createWidgetHeader(id, name, widgetInstance) {
+    const header = document.createElement('div');
+    header.className = 'widget-header flex items-center justify-between mb-3 pb-2 border-b border-gray-100';
+
+    const title = document.createElement('span');
+    title.className = 'text-sm font-medium text-gray-700';
+    title.textContent = name;
+
+    const controls = this.createWidgetControls(id, name, widgetInstance);
+
+    header.appendChild(title);
+    header.appendChild(controls);
+
+    return header;
+  }
+
+  /**
+   * Create widget control buttons and menu
+   * @param {string} id - Widget ID
+   * @param {string} name - Widget name
+   * @param {Object} widgetInstance - Complete widget instance for menu actions
+   * @returns {HTMLElement} Controls container element
+   */
+  createWidgetControls(id, name, widgetInstance) {
+    const controls = document.createElement('div');
+    controls.className = 'relative';
+
+    const menuContainer = document.createElement('div');
+    menuContainer.className = 'widget-menu-container relative';
+
+    // Create kebab menu button
+    const menuButton = this.createIconButton(WIDGET_ICONS.MENU, 'text-gray-400 hover:text-gray-600 w-5 h-5', () => {
+      this.toggleWidgetMenu(id);
+    });
+    menuButton.title = `Widget options for ${name}`;
+    menuContainer.appendChild(menuButton);
+
+    // Create menu dropdown
+    const menuDropdown = this.createWidgetMenuDropdown(id, name, widgetInstance);
+    menuContainer.appendChild(menuDropdown);
+
+    controls.appendChild(menuContainer);
+    return controls;
+  }
+
+  /**
+   * Create the widget menu dropdown with edit and remove options
+   * @param {string} id - Widget ID
+   * @param {string} name - Widget name
+   * @param {Object} widgetInstance - Complete widget instance for menu actions
+   * @returns {HTMLElement} Menu dropdown element
+   */
+  createWidgetMenuDropdown(id, name, widgetInstance) {
+    const menuDropdown = document.createElement('div');
+    menuDropdown.className = 'widget-menu-dropdown absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg min-w-32 hidden z-30';
+    menuDropdown.setAttribute('data-widget-menu', id);
+
+    // Add edit menu item
+    const editItem = this.createMenuItem(WIDGET_ICONS.EDIT, 'Edit', () => {
+      this.editWidget(id, widgetInstance);
+      this.hideWidgetMenu(id);
+    }, 'text-blue-700 hover:bg-blue-50');
+    menuDropdown.appendChild(editItem);
+
+    // Add remove menu item  
+    const removeItem = this.createMenuItem(WIDGET_ICONS.TRASH, 'Remove', () => {
+      if (confirm(`Remove ${name} widget?`)) {
+        this.removeWidgetFromSlot(id);
+      }
+      this.hideWidgetMenu(id);
+    }, 'text-red-700 hover:bg-red-50');
+    menuDropdown.appendChild(removeItem);
+
+    return menuDropdown;
   }
 
   /**
@@ -1997,7 +2181,7 @@ class LayoutRenderer {
       const widgetName = widgetElement.querySelector('.widget-header span')?.textContent || 'Unknown Widget';
 
       // NEW: Notify parent component to update pageData.widgets instead of directly removing from DOM
-      this.executeWidgetDataCallback('remove', slotName, widgetId);
+      this.executeWidgetDataCallback(WIDGET_ACTIONS.REMOVE, slotName, widgetId);
 
       // console.log(`LayoutRenderer: Widget ${widgetId} removed from slot ${slotName}`);
     }
@@ -2715,8 +2899,27 @@ class LayoutRenderer {
   }
 
   /**
+   * Standardized error handling method
+   * @param {string} errorType - Type of error (use ERROR_TYPES constants)
+   * @param {string} context - Context where error occurred
+   * @param {Error} error - The actual error object
+   * @param {any} additionalData - Additional data for debugging
+   */
+  handleError(errorType, context, error, additionalData = null) {
+    const errorMessage = `LayoutRenderer [${errorType}]: ${context}`;
+    console.error(errorMessage, error);
+
+    if (additionalData) {
+      console.debug('Additional error context:', additionalData);
+    }
+
+    // Could be extended to send errors to monitoring service
+    // this.reportToMonitoring?.(errorType, context, error, additionalData);
+  }
+
+  /**
    * Execute widget data callback
-   * @param {string} action - Action type ('add', 'remove', 'update', 'clear')
+   * @param {string} action - Action type (use WIDGET_ACTIONS constants)
    * @param {string} slotName - Name of the slot
    * @param {Object} widgetData - Widget data (for add/update) or widget ID (for remove)
    * @param {...any} args - Additional arguments
@@ -2728,7 +2931,10 @@ class LayoutRenderer {
         // console.log(`🔄 WIDGET DATA: Executing callback for action=${action}, slot=${slotName}`);
         callback(action, slotName, widgetData, ...args);
       } catch (error) {
-        console.error(`LayoutRenderer: Error executing widget data callback`, error);
+        this.handleError(ERROR_TYPES.CALLBACK_EXECUTION_ERROR,
+          `widget data callback for action=${action}, slot=${slotName}`,
+          error,
+          { action, slotName, widgetData });
       }
     } else {
       console.warn(`🔄 WIDGET DATA: No widgetDataChanged callback registered`);
