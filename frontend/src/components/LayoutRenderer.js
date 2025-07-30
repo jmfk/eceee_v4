@@ -4,12 +4,7 @@
  */
 
 // Constants for widget actions to eliminate magic strings
-const WIDGET_ACTIONS = {
-  ADD: 'add',
-  REMOVE: 'remove',
-  UPDATE: 'update',
-  CLEAR: 'clear'
-};
+import { WIDGET_ACTIONS } from '../utils/widgetConstants';
 
 // Constants for widget menu icons
 const WIDGET_ICONS = {
@@ -148,7 +143,7 @@ class LayoutRenderer {
           const iconAndCategory = this.generateIconAndCategory(apiWidget);
 
           return {
-            type: this.getWidgetTypeFromClass(apiWidget.widget_class),
+            type: apiWidget.type, // Use unique type id from API
             name: apiWidget.name,
             description: apiWidget.description || 'No description available',
             icon: iconAndCategory.icon,
@@ -350,11 +345,6 @@ class LayoutRenderer {
         targetRef.current.appendChild(rootElement);
       }
 
-      // console.log('LayoutRenderer: Layout rendered successfully', {
-      //   slots: Array.from(this.slotContainers.keys()),
-      //   configs: Array.from(this.slotConfigs.keys())
-      // });
-
       // Ensure slot menus are added after rendering is complete
       if (this.uiConfig.showIconMenu) {
         setTimeout(() => {
@@ -462,6 +452,7 @@ class LayoutRenderer {
         widgets.forEach((widget, index) => {
           try {
             // Use renderWidgetInstance for full widget instances with controls
+            widget.slotName = slotName;
             const widgetElement = this.renderWidgetInstance(widget);
             if (widgetElement) {
               container.appendChild(widgetElement);
@@ -967,8 +958,6 @@ class LayoutRenderer {
   editWidget(widgetId, widgetInstance) {
     // For now, just log the edit request
     // In the future, this could open an edit modal or inline editor
-    console.log(`Edit widget requested: ${widgetInstance.name} (${widgetId})`, widgetInstance);
-
     // TODO: Implement widget editing functionality
     // This could:
     // 1. Open a modal with widget-specific edit form
@@ -987,9 +976,12 @@ class LayoutRenderer {
     const existingModal = document.querySelector('.widget-edit-modal');
     if (existingModal) existingModal.remove();
 
-    console.log('editWidget', widgetId, widgetInstance);
-    // Get schema from widgetInstance._apiData (fallback to default if missing)
-    const schema = widgetInstance._apiData?.configuration_schema || {};
+    // Look up widget definition by type
+    const availableWidgets = this.getAvailableWidgets();
+    const widgetDef = availableWidgets.find(w => w.type === widgetInstance.type);
+
+    // Prefer schema from widgetDef, fallback to instance _apiData
+    const schema = widgetDef?._apiData?.configuration_schema || widgetInstance._apiData?.configuration_schema || {};
     const config = widgetInstance.config || {};
 
     // Create modal overlay
@@ -1033,7 +1025,12 @@ class LayoutRenderer {
       const newConfig = this.getFormConfigFromSchema(form, schema, config);
       // Update widget config and re-render
       widgetInstance.config = newConfig;
-      this.markWidgetAsEdited(widgetId, widgetInstance);
+      // Ensure type is preserved
+      if (!widgetInstance.type && widgetDef?.type) {
+        widgetInstance.type = widgetDef.type;
+      }
+      this.executeWidgetDataCallback(WIDGET_ACTIONS.EDIT, widgetInstance.slotName, widgetInstance);
+      //this.markWidgetAsEdited(widgetId, widgetInstance);
       this.updateSlot(widgetInstance.slotName, this.getSlotWidgetData(widgetInstance.slotName));
       closeModal();
     });
@@ -1046,7 +1043,6 @@ class LayoutRenderer {
    * @param {Object} config - Current config values
    */
   generateFormFieldsFromSchema(form, schema, config) {
-    console.log('generateFormFieldsFromSchema', form, schema, config);
     if (!schema || !schema.properties) return;
     Object.entries(schema.properties).forEach(([key, field]) => {
       const value = config[key] !== undefined ? config[key] : field.default || '';
@@ -1060,6 +1056,7 @@ class LayoutRenderer {
         input = document.createElement('select');
         input.className = 'block w-full border border-gray-300 rounded-md px-3 py-2';
         input.id = `widget-edit-${key}`;
+        input.name = key;
         field.enum.forEach(opt => {
           const option = document.createElement('option');
           option.value = opt;
@@ -1072,28 +1069,32 @@ class LayoutRenderer {
         input.type = 'checkbox';
         input.className = 'ml-2';
         input.id = `widget-edit-${key}`;
+        input.name = key;
         input.checked = !!value;
       } else if (field.type === 'integer' || field.type === 'number') {
         input = document.createElement('input');
         input.type = 'number';
         input.className = 'block w-full border border-gray-300 rounded-md px-3 py-2';
         input.id = `widget-edit-${key}`;
+        input.name = key;
         input.value = value;
       } else if (field.format === 'textarea' || field.format === 'richtext') {
         input = document.createElement('textarea');
         input.className = 'block w-full border border-gray-300 rounded-md px-3 py-2';
         input.id = `widget-edit-${key}`;
+        input.name = key;
         input.value = value;
       } else {
         input = document.createElement('input');
         input.type = 'text';
         input.className = 'block w-full border border-gray-300 rounded-md px-3 py-2';
         input.id = `widget-edit-${key}`;
+        input.name = key;
         input.value = value;
       }
-      input.name = key;
       form.appendChild(input);
     });
+    // Debug: log config used for form
   }
 
   /**
@@ -1185,7 +1186,6 @@ class LayoutRenderer {
       const callback = this.uiCallbacks.get(callbackName);
       if (typeof callback === 'function') {
         try {
-          // console.log(`🔄 DIRTY STATE: Executing callback with isDirty=${slotName}, reason=${args[0]}`);
           callback(slotName, ...args); // For onDirtyStateChanged: slotName is actually isDirty
         } catch (error) {
           this.handleError(ERROR_TYPES.CALLBACK_EXECUTION_ERROR,
@@ -2171,12 +2171,13 @@ class LayoutRenderer {
         throw new Error(`Widget type "${widgetType}" not found`);
       }
 
-      // Create widget instance with default config
+      // Create widget instance with default config, unique type id, and slotName
       const widgetInstance = {
         id: this.generateWidgetId(),
-        type: widgetDef.type,
+        type: widgetDef.type, // Always use the unique type id
         name: widgetDef.name,
-        config: { ...widgetDef.config }
+        config: { ...widgetDef.config },
+        slotName // <-- always set slotName
       };
 
       // NEW: Notify parent component to update pageData.widgets instead of directly adding to slot
@@ -2215,6 +2216,7 @@ class LayoutRenderer {
     }
 
     // Create and add widget element
+    widgetInstance.slotName = slotName;
     const widgetElement = this.renderWidgetInstance(widgetInstance);
     if (widgetElement) {
       slotElement.appendChild(widgetElement);
@@ -2635,7 +2637,6 @@ class LayoutRenderer {
       // NEW: Notify parent component to update pageData.widgets instead of directly removing from DOM
       this.executeWidgetDataCallback(WIDGET_ACTIONS.REMOVE, slotName, widgetId);
 
-      // console.log(`LayoutRenderer: Widget ${widgetId} removed from slot ${slotName}`);
     }
   }
 
@@ -2664,11 +2665,6 @@ class LayoutRenderer {
 
             // Add widget to slot
             this.addWidgetToSlot(slotName, widgetInstance);
-
-            // Note: Callback removed - auto-created widgets are logged via markAsDirty
-            // console.log(`Auto-created widget: ${widgetInstance.name} in ${slotName}`);
-
-            // console.log(`LayoutRenderer: Auto-created widget "${widgetInstance.name}" in slot "${slotName}"`);
 
           } else {
             // Widget type not found, create a placeholder widget
@@ -2896,7 +2892,6 @@ class LayoutRenderer {
       if (this.hasSlotWidgetData(slotName)) {
         // Load saved widgets for this slot
         const savedWidgets = this.getSlotWidgetData(slotName);
-        // console.log(`LayoutRenderer: Loading ${savedWidgets.length} saved widgets for slot "${slotName}"`);
         savedWidgets.forEach((widgetInstance, index) => {
           try {
             this.addWidgetToSlot(slotName, widgetInstance, true); // isLoading = true
@@ -3292,8 +3287,6 @@ class LayoutRenderer {
         callback(versionData);
       }
 
-      // console.log('LayoutRenderer: Switched to version', versionData.version_number);
-
     } catch (error) {
       console.error('LayoutRenderer: Error switching to version', error);
 
@@ -3380,7 +3373,6 @@ class LayoutRenderer {
     const callback = this.widgetDataCallbacks.get('widgetDataChanged');
     if (typeof callback === 'function') {
       try {
-        // console.log(`🔄 WIDGET DATA: Executing callback for action=${action}, slot=${slotName}`);
         callback(action, slotName, widgetData, ...args);
       } catch (error) {
         this.handleError(ERROR_TYPES.CALLBACK_EXECUTION_ERROR,

@@ -7,6 +7,7 @@
 
 import React, { useRef, useEffect, useCallback, useState, useMemo, forwardRef, useImperativeHandle } from 'react';
 import LayoutRenderer from './LayoutRenderer';
+import { WIDGET_ACTIONS } from '../utils/widgetConstants';
 
 const ContentEditor = forwardRef(({
   layoutJson,
@@ -189,6 +190,7 @@ const ContentEditor = forwardRef(({
     layoutRenderer.setUICallbacks({
       onDirtyStateChanged: (isDirty, reason) => {
         // Propagate dirty state up to PageEditor
+        console.log('onDirtyStateChanged', isDirty, reason);
         if (onDirtyChange) {
           onDirtyChange(isDirty, reason);
         }
@@ -208,7 +210,7 @@ const ContentEditor = forwardRef(({
         let updatedWidgets = { ...currentWidgets };
 
         switch (action) {
-          case 'add':
+          case WIDGET_ACTIONS.ADD:
             // Add widget to slot array
             if (!updatedWidgets[slotName]) {
               updatedWidgets[slotName] = [];
@@ -216,7 +218,7 @@ const ContentEditor = forwardRef(({
             updatedWidgets[slotName] = [...updatedWidgets[slotName], widgetData];
             break;
 
-          case 'remove':
+          case WIDGET_ACTIONS.REMOVE:
             // Remove widget by ID from slot array
             if (updatedWidgets[slotName]) {
               updatedWidgets[slotName] = updatedWidgets[slotName].filter(
@@ -225,12 +227,22 @@ const ContentEditor = forwardRef(({
             }
             break;
 
-          case 'clear':
+          case WIDGET_ACTIONS.CLEAR:
             // Clear all widgets from slot
             updatedWidgets[slotName] = [];
             break;
 
-          case 'update':
+          case WIDGET_ACTIONS.UPDATE:
+            // Update existing widget in slot
+
+            if (updatedWidgets[slotName]) {
+              updatedWidgets[slotName] = updatedWidgets[slotName].map(
+                widget => widget.id === widgetData.id ? widgetData : widget
+              );
+            }
+            break;
+
+          case WIDGET_ACTIONS.EDIT:
             // Update existing widget in slot
             if (updatedWidgets[slotName]) {
               updatedWidgets[slotName] = updatedWidgets[slotName].map(
@@ -244,6 +256,8 @@ const ContentEditor = forwardRef(({
             return;
         }
 
+        console.log('call onUpdate', pageData, updatedWidgets);
+
         // Update pageData through parent component
         onUpdate({
           ...pageData,
@@ -251,6 +265,7 @@ const ContentEditor = forwardRef(({
         });
 
         // Mark as dirty since widgets changed
+        console.log('onDirtyChange', true, `widget ${action} in slot ${slotName}`);
         if (onDirtyChange) {
           onDirtyChange(true, `widget ${action} in slot ${slotName}`);
         }
@@ -554,7 +569,6 @@ const ContentEditor = forwardRef(({
 
     layoutRenderer.autoSaveEnabled = enabled;
     layoutRenderer.autoSaveDelay = delay;
-    // console.log(`ContentEditor: Auto-save ${enabled ? 'enabled' : 'disabled'} with ${delay}ms delay`);
   }, [layoutRenderer]);
 
   // Manually trigger auto-save check
@@ -568,7 +582,6 @@ const ContentEditor = forwardRef(({
     if (editable && layoutRenderer && pageData?.widgets) {
       // Delay auto-save activation to ensure widgets are loaded first
       const autoSaveTimeoutId = setTimeout(() => {
-        // console.log('ContentEditor: Enabling auto-save after widgets loaded');
         enableAutoSave(true, 10000);
       }, 100); // Small delay to ensure widget loading is complete
 
