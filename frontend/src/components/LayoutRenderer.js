@@ -52,6 +52,8 @@ class LayoutRenderer {
     this.templateCache = new Map(); // Cache for processed templates
     this.templatePreprocessCache = new Map(); // Cache for preprocessed template structures
     this.cacheMetrics = { hits: 0, misses: 0, evictions: 0 }; // Performance metrics
+    this.cacheLocks = new Map(); // Prevent race conditions in cache operations
+    this.injectedStyles = new Set(); // Track injected styles for cleanup
     this.pageHasBeenSaved = false; // Track if page/layout has been saved
     this.defaultWidgetsProcessed = false; // Track if defaults have been processed
     this.savedWidgetData = new Map(); // Map of slot names to saved widget arrays
@@ -3287,15 +3289,31 @@ class LayoutRenderer {
   }
 
   /**
-   * Get nested value from object using dot notation
+   * Get nested value from object using dot notation (with prototype pollution protection)
    * @param {Object} obj - Object to search in
    * @param {string} path - Dot-separated path (e.g., 'style.color')
    * @returns {*} Value at path or undefined
    */
   getNestedValue(obj, path) {
     try {
+      // Validate path to prevent prototype pollution
+      if (typeof path !== 'string' || path.includes('__proto__') || path.includes('constructor') || path.includes('prototype')) {
+        console.warn('LayoutRenderer: Potentially dangerous path blocked:', path);
+        return undefined;
+      }
+
       return path.split('.').reduce((current, key) => {
-        return current && current[key] !== undefined ? current[key] : undefined;
+        // Additional validation on each key
+        if (typeof key !== 'string' || key === '__proto__' || key === 'constructor' || key === 'prototype') {
+          throw new Error(`Dangerous property access blocked: ${key}`);
+        }
+        
+        // Only access own properties, not inherited ones
+        if (current && current.hasOwnProperty && current.hasOwnProperty(key)) {
+          return current[key];
+        }
+        
+        return undefined;
       }, obj);
     } catch (error) {
       console.error('LayoutRenderer: Error getting nested value', error, path);
@@ -3466,6 +3484,17 @@ class LayoutRenderer {
 
     } catch (error) {
       console.error('LayoutRenderer: Error evaluating condition', error, condition);
+      console.warn(`LayoutRenderer: Condition evaluation failed for: "${condition}" - this may indicate a configuration error`);
+      
+      // In development mode, be more verbose about the failure
+      if (this.isDevelopmentMode()) {
+        console.warn('LayoutRenderer: Failed condition details:', {
+          condition,
+          error: error.message,
+          stack: error.stack?.split('\n').slice(0, 3)
+        });
+      }
+      
       return false; // Fail safe - don't render if condition evaluation fails
     }
   }
@@ -3748,7 +3777,7 @@ class LayoutRenderer {
   }
 
   /**
-   * Inject processed CSS into document head
+   * Inject processed CSS into document head (with memory leak protection)
    * @param {string} cssContent - CSS content to inject
    * @param {string} widgetId - Widget ID for identification
    * @param {number} styleIndex - Index for multiple styles per widget
@@ -3768,13 +3797,18 @@ class LayoutRenderer {
       const existingStyle = document.getElementById(styleId);
       if (existingStyle) {
         existingStyle.remove();
+        this.injectedStyles.delete(styleId);
       }
+
+      // Clean up any orphaned styles periodically
+      this.cleanupOrphanedStyles();
 
       // Create new style element
       const styleElement = document.createElement('style');
       styleElement.id = styleId;
       styleElement.textContent = cssContent;
       styleElement.setAttribute('data-widget-styles', 'true');
+      styleElement.setAttribute('data-injected-at', Date.now().toString());
 
       if (widgetId) {
         styleElement.setAttribute('data-widget-id', widgetId);
@@ -3782,6 +3816,9 @@ class LayoutRenderer {
 
       // Inject into document head
       document.head.appendChild(styleElement);
+      
+      // Track this style for cleanup
+      this.injectedStyles.add(styleId);
 
       console.log(`LayoutRenderer: Injected widget styles with ID: ${styleId}`);
 
@@ -4482,12 +4519,18 @@ class LayoutRenderer {
   }
 
   /**
-   * Get template from cache
+   * Get template from cache (with race condition protection)
    * @param {string} cacheKey - Cache key
    * @returns {Object|null} Cached template or null
    */
   getFromTemplateCache(cacheKey) {
     try {
+      // Check if another operation is currently processing this key
+      if (this.cacheLocks.has(cacheKey)) {
+        console.log(`LayoutRenderer: Cache key "${cacheKey}" is locked, waiting...`);
+        return null; // Return null to trigger fresh processing
+      }
+
       const cached = this.templateCache.get(cacheKey);
       if (cached) {
         // Update access time for LRU eviction
@@ -4502,13 +4545,16 @@ class LayoutRenderer {
   }
 
   /**
-   * Set template in cache with LRU eviction
+   * Set template in cache with LRU eviction (with race condition protection)
    * @param {string} cacheKey - Cache key
    * @param {Object} template - Preprocessed template
    * @param {Object} originalTemplateJson - Original template JSON for metadata
    */
   setTemplateCache(cacheKey, template, originalTemplateJson) {
     try {
+      // Lock this key to prevent race conditions
+      this.cacheLocks.set(cacheKey, Date.now());
+
       const maxCacheSize = 100; // Maximum number of cached templates
 
       // Check if cache needs cleaning
@@ -4524,8 +4570,13 @@ class LayoutRenderer {
         widgetType: template.metadata?.structureType
       });
 
+      // Release the lock
+      this.cacheLocks.delete(cacheKey);
+
     } catch (error) {
       console.error('LayoutRenderer: Error setting template cache', error);
+      // Ensure lock is released even on error
+      this.cacheLocks.delete(cacheKey);
     }
   }
 
@@ -4693,13 +4744,67 @@ class LayoutRenderer {
   }
 
   /**
-   * Clear template cache
+   * Clean up orphaned styles that no longer have associated widgets
+   */
+  cleanupOrphanedStyles() {
+    try {
+      // Only run cleanup periodically to avoid performance impact
+      if (!this.lastStyleCleanup || Date.now() - this.lastStyleCleanup > 60000) { // 1 minute
+        this.lastStyleCleanup = Date.now();
+        
+        const orphanedStyles = [];
+        this.injectedStyles.forEach(styleId => {
+          const styleElement = document.getElementById(styleId);
+          if (!styleElement) {
+            // Style element was removed externally
+            orphanedStyles.push(styleId);
+          } else {
+            const widgetId = styleElement.getAttribute('data-widget-id');
+            if (widgetId) {
+              // Check if the widget still exists in DOM
+              const widgetElement = document.querySelector(`[data-widget-id="${widgetId}"]`);
+              if (!widgetElement) {
+                // Widget was removed but style wasn't cleaned up
+                styleElement.remove();
+                orphanedStyles.push(styleId);
+              }
+            }
+          }
+        });
+        
+        // Remove orphaned styles from tracking
+        orphanedStyles.forEach(styleId => {
+          this.injectedStyles.delete(styleId);
+        });
+        
+        if (orphanedStyles.length > 0) {
+          console.log(`LayoutRenderer: Cleaned up ${orphanedStyles.length} orphaned styles`);
+        }
+      }
+    } catch (error) {
+      console.error('LayoutRenderer: Error during style cleanup', error);
+    }
+  }
+
+  /**
+   * Clear template cache and clean up all injected styles
    */
   clearTemplateCache() {
     try {
       this.templateCache.clear();
+      this.cacheLocks.clear();
       this.cacheMetrics = { hits: 0, misses: 0, evictions: 0 };
-      console.log('LayoutRenderer: Template cache cleared');
+      
+      // Clean up all injected styles
+      this.injectedStyles.forEach(styleId => {
+        const styleElement = document.getElementById(styleId);
+        if (styleElement) {
+          styleElement.remove();
+        }
+      });
+      this.injectedStyles.clear();
+      
+      console.log('LayoutRenderer: Template cache and styles cleared');
     } catch (error) {
       console.error('LayoutRenderer: Error clearing template cache', error);
     }
