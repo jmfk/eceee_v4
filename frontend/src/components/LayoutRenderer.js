@@ -144,6 +144,8 @@ class LayoutRenderer {
             showSlotInfo: true,
             showClearSlot: true
           });
+          // Add global click outside listener for all menus
+          this.addGlobalClickOutsideListener();
         }, 200);
       }
 
@@ -214,9 +216,7 @@ class LayoutRenderer {
    * @param {Array} widgets - Array of widget objects to render
    */
   updateSlot(slotName, widgets = []) {
-    console.log("LayoutRenderer", slotName, widgets)
     if (this.isDestroyed) {
-      console.warn('LayoutRenderer: Cannot update slot on destroyed instance');
       return;
     }
 
@@ -225,7 +225,6 @@ class LayoutRenderer {
     if (!container) {
       return;
     }
-    console.log("container", container)
     try {
       // Validate widgets array
       if (!Array.isArray(widgets)) {
@@ -233,16 +232,14 @@ class LayoutRenderer {
       }
 
       // Clean up existing content in slot (but preserve menu state)
-      const existingMenu = container.querySelector('[data-slot-menu]');
       this.cleanup(container);
 
       if (widgets.length > 0) {
         // Render provided widgets
         widgets.forEach((widget, index) => {
-          console.log("widget", widget, index)
           try {
-            const widgetElement = this.renderWidget(widget);
-            console.log("widgetElement", widgetElement)
+            // Use renderWidgetInstance for full widget instances with controls
+            const widgetElement = this.renderWidgetInstance(widget);
             if (widgetElement) {
               container.appendChild(widgetElement);
             }
@@ -253,29 +250,29 @@ class LayoutRenderer {
           }
         });
       } else {
-        // No widgets provided, use defaults if available
-        const slotConfig = this.slotConfigs.get(slotName);
-        if (slotConfig?.defaultWidgets?.length > 0) {
-          slotConfig.defaultWidgets.forEach((defaultWidget, index) => {
-            try {
-              const widgetElement = this.renderWidget(defaultWidget);
-              if (widgetElement) {
-                container.appendChild(widgetElement);
-              }
-            } catch (error) {
-              console.error(`LayoutRenderer: Error rendering default widget ${index} in slot ${slotName}`, error);
-              const errorElement = this.createErrorWidgetElement(`Default widget ${index + 1}: ${error.message}`);
-              container.appendChild(errorElement);
-            }
-          });
-        } else {
-          // No widgets or defaults - show placeholder
-          container.innerHTML = `
-            <div class="slot-placeholder p-4 border-2 border-dashed border-gray-300 rounded text-center text-gray-500">
-              <span class="text-sm">${this.escapeHtml(`Empty slot: ${slotName}`)}</span>
-            </div>
-          `;
-        }
+        // // No widgets provided, use defaults if available
+        // const slotConfig = this.slotConfigs.get(slotName);
+        // if (slotConfig?.defaultWidgets?.length > 0) {
+        //   slotConfig.defaultWidgets.forEach((defaultWidget, index) => {
+        //     try {
+        //       const widgetElement = this.renderWidget(defaultWidget);
+        //       if (widgetElement) {
+        //         container.appendChild(widgetElement);
+        //       }
+        //     } catch (error) {
+        //       console.error(`LayoutRenderer: Error rendering default widget ${index} in slot ${slotName}`, error);
+        //       const errorElement = this.createErrorWidgetElement(`Default widget ${index + 1}: ${error.message}`);
+        //       container.appendChild(errorElement);
+        //     }
+        //   });
+        // } else {
+        //   // No widgets or defaults - show placeholder
+        //   container.innerHTML = `
+        //     <div class="slot-placeholder p-4 border-2 border-dashed border-gray-300 rounded text-center text-gray-500">
+        //       <span class="text-sm">${this.escapeHtml(`Empty slot: ${slotName}`)}</span>
+        //     </div>
+        //   `;
+        // }
       }
 
       // Re-add slot menu if UI is enabled and it's not already present
@@ -286,8 +283,6 @@ class LayoutRenderer {
           showClearSlot: true
         });
       }
-
-      // console.log(`LayoutRenderer: Updated slot "${slotName}" with ${widgets.length} widgets`);
 
     } catch (error) {
       console.error(`LayoutRenderer: Error updating slot "${slotName}"`, error);
@@ -310,8 +305,6 @@ class LayoutRenderer {
       // NEW: Notify parent component to update pageData.widgets instead of directly clearing DOM
       this.executeWidgetDataCallback('clear', slotName, []);
 
-      // console.log(`🔄 SAVE SIGNAL: Slot "${slotName}" cleared`);
-
     } catch (error) {
       console.error(`LayoutRenderer: Error clearing slot "${slotName}"`, error);
     }
@@ -322,7 +315,6 @@ class LayoutRenderer {
    * @param {Function} renderer - Function that takes a widget object and returns DOM element
    */
   setWidgetRenderer(renderer) {
-    console.log("setWidgetRenderer", renderer)
     if (typeof renderer !== 'function') {
       console.warn('LayoutRenderer: Widget renderer must be a function');
       return;
@@ -363,7 +355,6 @@ class LayoutRenderer {
       this.widgetRenderer = null;
       this.isDestroyed = true;
 
-      // console.log('LayoutRenderer: Instance destroyed successfully');
     } catch (error) {
       console.error('LayoutRenderer: Error during destruction', error);
     }
@@ -705,6 +696,64 @@ class LayoutRenderer {
     }
   }
 
+  /**
+ * Toggle widget menu visibility
+ * @param {string} widgetId - ID of the widget
+ */
+  toggleWidgetMenu(widgetId) {
+    const dropdown = document.querySelector(`[data-widget-menu="${widgetId}"]`);
+
+    if (dropdown) {
+      const isHidden = dropdown.classList.contains('hidden');
+
+      // Close all other widget menus
+      document.querySelectorAll('.widget-menu-dropdown').forEach(menu => {
+        menu.classList.add('hidden');
+      });
+
+      // Close all slot menus too
+      document.querySelectorAll('.slot-menu-dropdown').forEach(menu => {
+        menu.classList.add('hidden');
+      });
+
+      // Toggle this menu
+      if (isHidden) {
+        dropdown.classList.remove('hidden');
+      } else {
+        dropdown.classList.add('hidden');
+      }
+    }
+  }
+
+  /**
+   * Hide widget menu
+   * @param {string} widgetId - ID of the widget
+   */
+  hideWidgetMenu(widgetId) {
+    const dropdown = document.querySelector(`[data-widget-menu="${widgetId}"]`);
+    if (dropdown) {
+      dropdown.classList.add('hidden');
+    }
+  }
+
+  /**
+   * Edit widget functionality
+   * @param {string} widgetId - ID of the widget
+   * @param {Object} widgetInstance - Widget instance data
+   */
+  editWidget(widgetId, widgetInstance) {
+    // For now, just log the edit request
+    // In the future, this could open an edit modal or inline editor
+    console.log(`Edit widget requested: ${widgetInstance.name} (${widgetId})`, widgetInstance);
+
+    // TODO: Implement widget editing functionality
+    // This could:
+    // 1. Open a modal with widget-specific edit form
+    // 2. Switch to inline editing mode
+    // 3. Use the widget data callback system to update pageData.widgets
+    alert(`Edit functionality for ${widgetInstance.name} widget is coming soon!`);
+  }
+
 
 
   /**
@@ -727,6 +776,33 @@ class LayoutRenderer {
         document.removeEventListener('click', handleClickOutside);
       });
     }, 100);
+  }
+
+  /**
+   * Add global click outside listener for all menus
+   */
+  addGlobalClickOutsideListener() {
+    if (this.eventListeners.has('global-click-outside')) {
+      return; // Already exists
+    }
+
+    const handleGlobalClickOutside = (event) => {
+      // Check if click is outside any menu
+      const isInsideSlotMenu = event.target.closest('.slot-icon-menu');
+      const isInsideWidgetMenu = event.target.closest('.widget-menu-container');
+
+      if (!isInsideSlotMenu && !isInsideWidgetMenu) {
+        // Close all menus
+        document.querySelectorAll('.slot-menu-dropdown, .widget-menu-dropdown').forEach(menu => {
+          menu.classList.add('hidden');
+        });
+      }
+    };
+
+    document.addEventListener('click', handleGlobalClickOutside);
+    this.eventListeners.set('global-click-outside', () => {
+      document.removeEventListener('click', handleGlobalClickOutside);
+    });
   }
 
   /**
@@ -933,20 +1009,12 @@ class LayoutRenderer {
   collectAllWidgetData() {
     const widgetData = {};
 
-    // console.log('🔍 DEBUG: collectAllWidgetData() - Available slots:', Array.from(this.slotContainers.keys()));
 
     this.slotContainers.forEach((slotElement, slotName) => {
-      // console.log(`🔍 DEBUG: Collecting widgets from slot "${slotName}"`);
       const widgets = this.collectWidgetDataFromSlot(slotName);
-      // console.log(`🔍 DEBUG: Slot "${slotName}" has ${widgets.length} widgets:`, widgets);
 
       // Always include all slots in payload, even if empty
       widgetData[slotName] = widgets;
-      // if (widgets.length > 0) {
-      //   console.log(`✅ DEBUG: Added ${widgets.length} widgets to payload for slot "${slotName}"`);
-      // } else {
-      //   console.log(`📝 DEBUG: Added empty array to payload for slot "${slotName}"`);
-      // }
     });
 
     // console.log('🔍 DEBUG: Final widget data payload:', widgetData);
@@ -1201,7 +1269,6 @@ class LayoutRenderer {
 
     if (widgetData && typeof widgetData === 'object') {
       Object.entries(widgetData).forEach(([slotName, widgets]) => {
-        console.log("loadWidgetData", slotName, widgets)
         if (Array.isArray(widgets)) {
           this.savedWidgetData.set(slotName, [...widgets]); // Deep copy
         }
@@ -1578,6 +1645,8 @@ class LayoutRenderer {
   renderWidgetInstance(widgetInstance) {
     const { id, type, name, config } = widgetInstance;
 
+    console.log("renderWidgetInstance", widgetInstance)
+
     // Create main widget container
     const widget = document.createElement('div');
     widget.className = 'rendered-widget mb-4 p-4 border border-gray-200 rounded-lg bg-white relative';
@@ -1593,25 +1662,42 @@ class LayoutRenderer {
     title.textContent = name;
 
     const controls = document.createElement('div');
-    controls.className = 'flex items-center space-x-2';
+    controls.className = 'relative';
 
-    // Add edit button
-    const editBtn = this.createIconButton('svg:edit', 'text-gray-400 hover:text-blue-600 w-5 h-5', () => {
-      // Note: Callback removed - widget editing is display-only for now
-      // console.log(`Edit widget requested: ${widgetInstance.name} (${id})`);
+    // Create kebab menu container
+    const menuContainer = document.createElement('div');
+    menuContainer.className = 'widget-menu-container relative';
+
+    // Create kebab menu button (3 dots vertical)
+    const menuButton = this.createIconButton('svg:menu', 'text-gray-400 hover:text-gray-600 w-5 h-5', () => {
+      this.toggleWidgetMenu(id);
     });
-    editBtn.title = 'Edit Widget';
+    menuButton.title = `Widget options for ${name}`;
+    menuContainer.appendChild(menuButton);
 
-    // Add delete button
-    const deleteBtn = this.createIconButton('svg:trash', 'text-gray-400 hover:text-red-600 w-5 h-5', () => {
+    // Create menu dropdown
+    const menuDropdown = document.createElement('div');
+    menuDropdown.className = 'widget-menu-dropdown absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg min-w-32 hidden z-30';
+    menuDropdown.setAttribute('data-widget-menu', id);
+
+    // Add edit menu item
+    const editItem = this.createMenuItem('svg:edit', 'Edit', () => {
+      this.editWidget(id, widgetInstance);
+      this.hideWidgetMenu(id);
+    }, 'text-blue-700 hover:bg-blue-50');
+    menuDropdown.appendChild(editItem);
+
+    // Add remove menu item  
+    const removeItem = this.createMenuItem('svg:trash', 'Remove', () => {
       if (confirm(`Remove ${name} widget?`)) {
         this.removeWidgetFromSlot(id);
       }
-    });
-    deleteBtn.title = 'Remove Widget';
+      this.hideWidgetMenu(id);
+    }, 'text-red-700 hover:bg-red-50');
+    menuDropdown.appendChild(removeItem);
 
-    controls.appendChild(editBtn);
-    controls.appendChild(deleteBtn);
+    menuContainer.appendChild(menuDropdown);
+    controls.appendChild(menuContainer);
     header.appendChild(title);
     header.appendChild(controls);
     widget.appendChild(header);
@@ -2184,28 +2270,28 @@ class LayoutRenderer {
             element.appendChild(errorElement);
           }
         });
-      } else if (node.slot.defaultWidgets && Array.isArray(node.slot.defaultWidgets) && node.slot.defaultWidgets.length > 0) {
-        // Check if we should convert default widgets to real widget instances
-        if (!this.pageHasBeenSaved && !this.defaultWidgetsProcessed) {
-          // Convert default widgets to actual widget instances for new/unsaved pages
-          // console.log(`LayoutRenderer: Converting ${node.slot.defaultWidgets.length} default widgets to instances for slot "${slotName}"`);
-          this.convertDefaultWidgetsToInstances(slotName, node.slot.defaultWidgets);
-        } else {
-          // For saved pages without saved widgets, render default widgets as placeholders (legacy behavior)
-          // console.log(`LayoutRenderer: Rendering ${node.slot.defaultWidgets.length} default widgets as placeholders for slot "${slotName}"`);
-          node.slot.defaultWidgets.forEach((defaultWidget, index) => {
-            try {
-              const widgetElement = this.renderWidget(defaultWidget);
-              if (widgetElement) {
-                element.appendChild(widgetElement);
-              }
-            } catch (error) {
-              console.error(`LayoutRenderer: Error rendering default widget ${index} in slot ${slotName}`, error);
-              const errorElement = this.createErrorWidgetElement(`Default widget ${index + 1}: ${error.message}`);
-              element.appendChild(errorElement);
-            }
-          });
-        }
+        // } else if (node.slot.defaultWidgets && Array.isArray(node.slot.defaultWidgets) && node.slot.defaultWidgets.length > 0) {
+        //   // Check if we should convert default widgets to real widget instances
+        //   if (!this.pageHasBeenSaved && !this.defaultWidgetsProcessed) {
+        //     // Convert default widgets to actual widget instances for new/unsaved pages
+        //     // console.log(`LayoutRenderer: Converting ${node.slot.defaultWidgets.length} default widgets to instances for slot "${slotName}"`);
+        //     this.convertDefaultWidgetsToInstances(slotName, node.slot.defaultWidgets);
+        //   } else {
+        //     // For saved pages without saved widgets, render default widgets as placeholders (legacy behavior)
+        //     // console.log(`LayoutRenderer: Rendering ${node.slot.defaultWidgets.length} default widgets as placeholders for slot "${slotName}"`);
+        //     node.slot.defaultWidgets.forEach((defaultWidget, index) => {
+        //       try {
+        //         const widgetElement = this.renderWidget(defaultWidget);
+        //         if (widgetElement) {
+        //           element.appendChild(widgetElement);
+        //         }
+        //       } catch (error) {
+        //         console.error(`LayoutRenderer: Error rendering default widget ${index} in slot ${slotName}`, error);
+        //         const errorElement = this.createErrorWidgetElement(`Default widget ${index + 1}: ${error.message}`);
+        //         element.appendChild(errorElement);
+        //       }
+        //     });
+        //   }
       } else {
         // Show placeholder for empty slot
         // console.log(`LayoutRenderer: No saved or default widgets for slot "${slotName}" - showing placeholder`);
@@ -2254,7 +2340,6 @@ class LayoutRenderer {
    * @returns {HTMLElement|null} DOM element or null if rendering failed
    */
   renderWidget(widget) {
-    console.log("renderWidget", widget)
     try {
       // Validate widget object
       if (!widget || typeof widget !== 'object') {

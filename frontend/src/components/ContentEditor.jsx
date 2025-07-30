@@ -34,7 +34,6 @@ const ContentEditor = forwardRef(({
 
   // Create a widget DOM element with proper memory management
   const createWidgetElement = useCallback((widget) => {
-    console.log("createWidgetElement", widget)
     try {
       // Validate widget object
       if (!widget || typeof widget !== 'object' || !widget.type) {
@@ -161,14 +160,11 @@ const ContentEditor = forwardRef(({
       return;
     }
 
-    // console.log('ContentEditor: Initializing version management for page', pageData.id);
-
     // Initialize version management
     layoutRenderer.initializeVersionManagement(pageData.id, null);
 
     // Set up version callbacks
     layoutRenderer.setVersionCallback('version-changed', (versionData) => {
-      // console.log('ContentEditor: Version changed to', versionData.version_number);
       // Optionally notify parent component about version change
       if (onUpdate && pageData) {
         onUpdate({
@@ -190,11 +186,8 @@ const ContentEditor = forwardRef(({
   useEffect(() => {
     if (!layoutRenderer) return;
 
-    // console.log('ContentEditor: Setting up LayoutRenderer dirty state callback');
-
     layoutRenderer.setUICallbacks({
       onDirtyStateChanged: (isDirty, reason) => {
-        // console.log('ContentEditor: LayoutRenderer dirty state changed', { isDirty, reason });
         // Propagate dirty state up to PageEditor
         if (onDirtyChange) {
           onDirtyChange(isDirty, reason);
@@ -205,8 +198,6 @@ const ContentEditor = forwardRef(({
     // NEW: Set up widget data change callbacks for single source of truth
     layoutRenderer.setWidgetDataCallbacks({
       widgetDataChanged: (action, slotName, widgetData) => {
-        // console.log('ContentEditor: Widget data changed', { action, slotName, widgetData });
-
         if (!onUpdate || !pageData) {
           console.warn('ContentEditor: Cannot update widget data - missing onUpdate callback or pageData');
           return;
@@ -390,9 +381,6 @@ const ContentEditor = forwardRef(({
       // Clean up existing event listeners
       cleanupEventListeners();
 
-      // Log ContentEditor mode
-      // console.log('ContentEditor: Rendering layout in', editable ? 'editable' : 'read-only', 'mode');
-
       // Render the layout
       layoutRenderer.render(layoutJson, containerRef);
 
@@ -408,7 +396,6 @@ const ContentEditor = forwardRef(({
   const widgetsRef = useRef(null);
   const widgetsJsonString = JSON.stringify(pageData?.widgets);
 
-  console.log("pageData?.widgets", pageData?.widgets)
   useEffect(() => {
     if (!layoutRenderer || !pageData?.widgets) {
       return;
@@ -427,19 +414,15 @@ const ContentEditor = forwardRef(({
     // Use React's scheduling to batch widget updates
     const updateSlots = () => {
       // Load widget data and mark page as saved BEFORE updating slots
-      console.log("updateSlots", widgetsToLoad)
       layoutRenderer.loadWidgetData(widgetsToLoad);
 
       Object.entries(widgetsToLoad).forEach(([slotName, slotWidgets]) => {
         try {
-          // console.log(`ContentEditor: Updating slot "${slotName}" with ${slotWidgets.length} widgets`);
           layoutRenderer.updateSlot(slotName, slotWidgets);
         } catch (error) {
           console.error(`ContentEditor: Error updating slot ${slotName}`, error);
         }
       });
-
-      // console.log('ContentEditor: Widgets loaded and slots updated');
     };
 
     // Schedule update for next frame to avoid blocking UI
@@ -549,7 +532,6 @@ const ContentEditor = forwardRef(({
 
   // NEW: Return current widget data from pageData (single source of truth)
   const saveWidgets = useCallback((options = {}) => {
-    // console.log("🔄 SAVE SIGNAL: ContentEditor -> pageData.widgets (single source)", options);
 
     if (!pageData?.widgets) {
       console.warn("⚠️ SAVE SIGNAL: pageData.widgets not available");
@@ -559,7 +541,6 @@ const ContentEditor = forwardRef(({
     try {
       // Simply return the current pageData.widgets - no DOM collection needed
       const currentWidgets = pageData.widgets;
-      // console.log("✅ SAVE SIGNAL: Using pageData.widgets as single source", currentWidgets);
       return currentWidgets;
     } catch (error) {
       console.error("❌ SAVE SIGNAL: ContentEditor save failed", error);

@@ -266,16 +266,13 @@ const PageEditor = () => {
         try {
             const { getPageVersion } = await import('../api/versions.js');
             const pageData = await getPageVersion(pageData.id, versionId);
-            console.log('switchToVersion: loaded pageData', pageData);
             const versionData = availableVersions.find(version => version.id === versionId);
             setCurrentVersion(versionData);
-            console.log('setCurrentVersion: versionData', versionData);
             // Merge version-specific data (including widgets) into pageData
             setPageData(prev => {
                 return pageData;
             });
 
-            console.log('PageEditor: Switched to version', pageData.version_number);
             addNotification({
                 type: 'info',
                 message: `Switched to version ${pageData.version_number}`
@@ -328,8 +325,6 @@ const PageEditor = () => {
                     // console.log('✅ UNIFIED SAVE: Widget data collected', collectedData.widgets);
                 } catch (error) {
                     console.error('❌ UNIFIED SAVE: Widget data collection failed', error);
-                    // Fall back to existing pageData widgets if ContentEditor fails
-                    console.log('🔄 UNIFIED SAVE: Falling back to pageData.widgets');
                 }
             }
 
