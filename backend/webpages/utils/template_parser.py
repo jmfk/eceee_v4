@@ -341,6 +341,202 @@ class TemplateParser:
         return None
 
 
+class WidgetTemplateParser:
+    """Parse widget Django templates into JSON representation"""
+
+    def __init__(self):
+        self.cache_timeout = getattr(
+            settings, "WIDGET_TEMPLATE_PARSER_CACHE_TIMEOUT", 300
+        )  # 5 minutes default
+        self.template_variable_pattern = re.compile(
+            r"\{\{\s*([^}]+)\s*\}\}", re.MULTILINE
+        )
+        self.template_tag_pattern = re.compile(
+            r"\{\%\s*([^%]+)\s*\%\}", re.MULTILINE
+        )
+
+    def parse_widget_template(self, template_name: str) -> Dict[str, Any]:
+        """
+        Parse a widget Django template file into JSON representation
+
+        Args:
+            template_name: Path to template file (e.g., 'webpages/widgets/text_block.html')
+
+        Returns:
+            Dict containing the JSON template structure
+        """
+        # Check cache first
+        cache_key = f"widget_template_parser:{template_name}"
+        cached_result = cache.get(cache_key)
+        if cached_result:
+            logger.debug(f"Widget template parser cache hit for {template_name}")
+            return cached_result
+
+        try:
+            template = get_template(template_name)
+            template_source = template.template.source
+
+            # Parse the template content directly (widgets don't have content blocks)
+            soup = BeautifulSoup(template_source, "html.parser")
+
+            # Find root elements (excluding comments and whitespace)
+            root_elements = [elem for elem in soup.children if elem.name]
+
+            if not root_elements:
+                raise ValueError("No root HTML element found in widget template")
+
+            # Parse the template structure
+            parsed_elements = []
+            for root_element in root_elements:
+                element_json = self._parse_widget_element(root_element, template_source)
+                if element_json:
+                    parsed_elements.append(element_json)
+
+            # Extract template variables and tags
+            template_variables = self._extract_template_variables(template_source)
+            template_tags = self._extract_template_tags(template_source)
+
+            # Build result
+            result = {
+                "structure": parsed_elements[0] if len(parsed_elements) == 1 else {
+                    "type": "fragment",
+                    "children": parsed_elements
+                },
+                "template_variables": template_variables,
+                "template_tags": template_tags,
+                "has_inline_css": self._has_inline_css(template_source),
+            }
+
+            # Cache the result
+            cache.set(cache_key, result, self.cache_timeout)
+            logger.debug(f"Widget template parser cached result for {template_name}")
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Error parsing widget template {template_name}: {e}")
+            raise Exception("Widget template parsing failed")
+
+    def _parse_widget_element(self, element, template_source: str) -> Dict[str, Any]:
+        """Parse a BeautifulSoup element into JSON node for widgets"""
+
+        if isinstance(element, NavigableString):
+            if isinstance(element, Comment):
+                return None  # Skip comments
+
+            content = str(element).strip()
+            if content:
+                # Check if content contains template variables
+                variables = self.template_variable_pattern.findall(content)
+                if variables:
+                    return {
+                        "type": "template_text",
+                        "content": escape(content),
+                        "variables": [escape(var.strip()) for var in variables]
+                    }
+                else:
+                    return {
+                        "type": "text",
+                        "content": escape(content),
+                    }
+            return None
+
+        # Handle style tags specially
+        if element.name == "style":
+            css_content = element.get_text().strip()
+            return {
+                "type": "style",
+                "css": escape(css_content),
+                "variables": self.template_variable_pattern.findall(css_content)
+            }
+
+        # Regular HTML element
+        node = {"type": "element", "tag": element.name}
+
+        # Extract classes (may contain template variables)
+        if element.get("class"):
+            classes = " ".join(element.get("class"))
+            node["classes"] = escape(classes)
+            # Check for template variables in classes
+            class_variables = self.template_variable_pattern.findall(classes)
+            if class_variables:
+                node["class_variables"] = [escape(var.strip()) for var in class_variables]
+
+        # Extract attributes (may contain template variables)
+        attributes = {}
+        template_attributes = {}
+        
+        for attr_name, attr_value in element.attrs.items():
+            if attr_name == "class":
+                continue  # Already handled above
+                
+            if isinstance(attr_value, list):
+                attr_value = " ".join(attr_value)
+            
+            attr_value_str = str(attr_value)
+            escaped_attr_name = escape(str(attr_name)[:100])
+            escaped_attr_value = escape(attr_value_str[:1000])
+            
+            # Check for template variables in attribute values
+            attr_variables = self.template_variable_pattern.findall(attr_value_str)
+            if attr_variables:
+                template_attributes[escaped_attr_name] = {
+                    "value": escaped_attr_value,
+                    "variables": [escape(var.strip()) for var in attr_variables]
+                }
+            else:
+                attributes[escaped_attr_name] = escaped_attr_value
+
+        if attributes:
+            node["attributes"] = attributes
+        if template_attributes:
+            node["template_attributes"] = template_attributes
+
+        # Parse children
+        children = []
+        for child in element.children:
+            child_node = self._parse_widget_element(child, template_source)
+            if child_node:
+                children.append(child_node)
+
+        if children:
+            node["children"] = children
+
+        return node
+
+    def _extract_template_variables(self, template_source: str) -> List[str]:
+        """Extract all template variables from the template source"""
+        variables = set()
+        matches = self.template_variable_pattern.findall(template_source)
+        
+        for match in matches:
+            # Clean up the variable (remove filters, etc.)
+            var_parts = match.split("|")[0].strip()  # Remove filters
+            variables.add(escape(var_parts[:200]))  # Limit length and escape
+        
+        return sorted(list(variables))
+
+    def _extract_template_tags(self, template_source: str) -> List[str]:
+        """Extract all template tags from the template source"""
+        tags = set()
+        matches = self.template_tag_pattern.findall(template_source)
+        
+        for match in matches:
+            # Extract the tag name (first word)
+            tag_parts = match.strip().split()
+            if tag_parts:
+                tag_name = tag_parts[0]
+                # Only include common Django template tags
+                if tag_name in ['if', 'endif', 'for', 'endfor', 'comment', 'endcomment', 'load', 'include', 'extends', 'block', 'endblock']:
+                    tags.add(escape(tag_name))
+        
+        return sorted(list(tags))
+
+    def _has_inline_css(self, template_source: str) -> bool:
+        """Check if template contains inline CSS (style tags)"""
+        return "<style>" in template_source.lower()
+
+
 class LayoutSerializer:
     """Serialize PageLayout objects to JSON"""
 
@@ -378,3 +574,39 @@ class LayoutSerializer:
             # Re-raise with generic message to prevent information disclosure
             logger.error(f"Error serializing layout {layout.name}: {e}")
             raise Exception("Template parsing failed")  # Generic error message
+
+
+class WidgetSerializer:
+    """Serialize widget templates to JSON"""
+
+    def __init__(self):
+        self.parser = WidgetTemplateParser()
+
+    def serialize_widget_template(self, widget_instance) -> Dict[str, Any]:
+        """
+        Serialize a widget's template to JSON representation
+
+        Args:
+            widget_instance: Widget instance with template_name attribute
+
+        Returns:
+            Dict containing the JSON template structure
+        """
+        try:
+            template_name = widget_instance.template_name
+            template_json = self.parser.parse_widget_template(template_name)
+
+            # Add widget metadata
+            result = {
+                "widget": {
+                    "name": widget_instance.name,
+                    "template_name": template_name,
+                },
+                "template_json": template_json,
+            }
+
+            return result
+        except Exception as e:
+            # Re-raise with generic message to prevent information disclosure
+            logger.error(f"Error serializing widget template {widget_instance.name}: {e}")
+            raise Exception("Widget template parsing failed")
