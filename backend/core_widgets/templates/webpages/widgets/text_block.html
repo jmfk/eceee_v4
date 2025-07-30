@@ -1,0 +1,11 @@
+<div class="text-widget">
+    {% if config.title %}
+        <h3>{{ config.title }}</h3>
+    {% endif %}
+    
+    {% if config.content %}
+        <div class="content" style="text-align: {{ config.alignment|default:'left' }};">
+            {{ config.content|linebreaks }}
+        </div>
+    {% endif %}
+</div> 

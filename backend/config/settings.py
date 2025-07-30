@@ -66,6 +66,8 @@ LOCAL_APPS = [
     "htmx",
     "webpages",
     "content",
+    "core_widgets",  # Core widget types - can be disabled to use only custom widgets
+    "example_custom_widgets",  # Example of custom site-specific widgets
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
