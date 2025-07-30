@@ -123,13 +123,20 @@ class BaseWidget(ABC):
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert widget type to dictionary representation"""
-        return {
+        result = {
             "name": self.name,
             "description": self.description,
             "template_name": self.template_name,
             "is_active": self.is_active,
             "configuration_schema": self.configuration_model.model_json_schema(),
         }
+        
+        # Include template JSON
+        template_json = self.get_template_json()
+        if template_json:
+            result["template_json"] = template_json
+            
+        return result
 
     def get_css_for_injection(
         self, widget_instance=None, scope_id: str = None
@@ -178,6 +185,22 @@ class BaseWidget(ABC):
         )
 
         return is_valid, errors
+
+    def get_template_json(self) -> Optional[Dict[str, Any]]:
+        """
+        Get the JSON representation of this widget's template.
+
+        Returns:
+            Dict containing the template JSON structure, or None if parsing fails
+        """
+        try:
+            from .utils.template_parser import WidgetSerializer
+            serializer = WidgetSerializer()
+            result = serializer.serialize_widget_template(self)
+            return result["template_json"]
+        except Exception as e:
+            logger.warning(f"Failed to parse template for widget '{self.name}': {e}")
+            return None
 
 
 class WidgetTypeRegistry:
