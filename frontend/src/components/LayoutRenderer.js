@@ -47,6 +47,11 @@ class LayoutRenderer {
     this.customWidgets = null; // Custom widget definitions (if any)
     this.cachedApiWidgets = null; // Cached widgets from API
     this.widgetTypesPromise = null; // Promise for ongoing API request
+
+    // Template JSON caching for performance
+    this.templateCache = new Map(); // Cache for processed templates
+    this.templatePreprocessCache = new Map(); // Cache for preprocessed template structures
+    this.cacheMetrics = { hits: 0, misses: 0, evictions: 0 }; // Performance metrics
     this.pageHasBeenSaved = false; // Track if page/layout has been saved
     this.defaultWidgetsProcessed = false; // Track if defaults have been processed
     this.savedWidgetData = new Map(); // Map of slot names to saved widget arrays
@@ -84,7 +89,7 @@ class LayoutRenderer {
     try {
       console.log('LayoutRenderer: Fetching widget types from API...');
 
-      this.widgetTypesPromise = fetch('/api/v1/webpages/widget-types/')
+      this.widgetTypesPromise = fetch('/api/v1/webpages/widget-types/?include_template_json=true')
         .then(response => {
           if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -92,21 +97,29 @@ class LayoutRenderer {
           return response.json();
         })
         .then(apiWidgets => {
+          console.log('LayoutRenderer: Raw API response:', apiWidgets);
+
           // Transform API response to widget card format
           const transformedWidgets = this.transformApiWidgetsToCardFormat(apiWidgets);
+          console.log('LayoutRenderer: Transformed widgets:', transformedWidgets);
 
           // Cache the transformed widgets
           this.cachedApiWidgets = transformedWidgets;
 
           console.log(`LayoutRenderer: Successfully fetched ${transformedWidgets.length} widget types from API`);
+
+          // Preload widget templates in the background for performance
+          setTimeout(() => {
+            this.preloadWidgetTemplates(transformedWidgets);
+          }, 100);
+
           return transformedWidgets;
         })
         .catch(error => {
           console.error('LayoutRenderer: Error fetching widget types from API:', error);
-          // Return default widgets as fallback
-          const defaultWidgets = this.getDefaultWidgets();
-          console.log('LayoutRenderer: Using default widgets as fallback');
-          return defaultWidgets;
+          // Don't cache anything on error, just return empty array
+          console.warn('LayoutRenderer: API error - no widgets available until API is restored');
+          return [];
         })
         .finally(() => {
           // Clear the promise so future calls can make new requests
@@ -117,7 +130,8 @@ class LayoutRenderer {
     } catch (error) {
       console.error('LayoutRenderer: Unexpected error in fetchWidgetTypes:', error);
       this.widgetTypesPromise = null;
-      return this.getDefaultWidgets();
+      console.warn('LayoutRenderer: Unexpected error - no widgets available until API is restored');
+      return [];
     }
   }
 
@@ -128,8 +142,8 @@ class LayoutRenderer {
    */
   transformApiWidgetsToCardFormat(apiWidgets) {
     if (!Array.isArray(apiWidgets)) {
-      console.warn('LayoutRenderer: API response is not an array, using default widgets');
-      return this.getDefaultWidgets();
+      console.warn('LayoutRenderer: API response is not an array - invalid API response format');
+      return [];
     }
 
     return apiWidgets
@@ -341,7 +355,20 @@ class LayoutRenderer {
 
       // Render the layout structure
       const rootElement = this.renderNode(layout.structure || layout);
-      if (rootElement) {
+
+      // Handle both sync and async results
+      if (rootElement && typeof rootElement.then === 'function') {
+        // It's a Promise (contains slots)
+        rootElement.then(resolvedElement => {
+          if (resolvedElement && targetRef.current) {
+            targetRef.current.appendChild(resolvedElement);
+          }
+        }).catch(error => {
+          console.error('LayoutRenderer: Error rendering async root element', error);
+          this.renderError(targetRef.current, error.message);
+        });
+      } else if (rootElement) {
+        // It's a regular DOM element
         targetRef.current.appendChild(rootElement);
       }
 
@@ -428,7 +455,7 @@ class LayoutRenderer {
    * @param {string} slotName - Name of the slot to update
    * @param {Array} widgets - Array of widget objects to render
    */
-  updateSlot(slotName, widgets = []) {
+  async updateSlot(slotName, widgets = []) {
     if (this.isDestroyed) {
       return;
     }
@@ -449,11 +476,12 @@ class LayoutRenderer {
 
       if (widgets.length > 0) {
         // Render provided widgets
-        widgets.forEach((widget, index) => {
+        for (let index = 0; index < widgets.length; index++) {
+          const widget = widgets[index];
           try {
             // Use renderWidgetInstance for full widget instances with controls
             widget.slotName = slotName;
-            const widgetElement = this.renderWidgetInstance(widget);
+            const widgetElement = await this.renderWidgetInstance(widget);
             if (widgetElement) {
               container.appendChild(widgetElement);
             }
@@ -462,7 +490,7 @@ class LayoutRenderer {
             const errorElement = this.createErrorWidgetElement(`Widget ${index + 1}: ${error.message}`);
             container.appendChild(errorElement);
           }
-        });
+        }
       } else {
         // // No widgets provided, use defaults if available
         // const slotConfig = this.slotConfigs.get(slotName);
@@ -983,7 +1011,8 @@ class LayoutRenderer {
     if (existingModal) existingModal.remove();
 
     // Look up widget definition by type
-    const availableWidgets = this.getAvailableWidgets();
+    const availableWidgets = await this.getAvailableWidgets();
+    console.log('availableWidgets', availableWidgets);
     const widgetDef = availableWidgets.find(w => w.type === widgetInstance.type);
 
     // Prefer schema from widgetDef, fallback to instance _apiData
@@ -1956,11 +1985,48 @@ class LayoutRenderer {
   }
 
   /**
-   * Get available widgets for selection
-   * @returns {Array} Array of widget definitions
+ * Get available widgets for selection (async version)
+ * @returns {Promise<Array>} Promise resolving to array of widget definitions
+ */
+  async getAvailableWidgets() {
+    console.log('getAvailableWidgets called');
+    console.log('this.customWidgets:', this.customWidgets);
+    console.log('this.cachedApiWidgets:', this.cachedApiWidgets);
+
+    // Return custom widgets if set
+    if (this.customWidgets && Array.isArray(this.customWidgets)) {
+      console.log('Returning custom widgets');
+      return this.customWidgets;
+    }
+
+    // If we have cached API widgets, return them immediately
+    if (this.cachedApiWidgets && Array.isArray(this.cachedApiWidgets)) {
+      console.log('Returning cached API widgets:', this.cachedApiWidgets.length, 'widgets');
+      return this.cachedApiWidgets;
+    }
+
+    // If no cached widgets, fetch them from API
+    console.log('No cached widgets, fetching from API...');
+    try {
+      const widgets = await this.fetchWidgetTypes();
+      console.log('Fetched widgets:', widgets.length, 'widgets');
+      return widgets;
+    } catch (error) {
+      console.error('LayoutRenderer: Error fetching widgets in getAvailableWidgets:', error);
+      this.handleNoWidgetsAvailable();
+      return [];
+    }
+  }
+
+  /**
+   * Synchronous version for backward compatibility (deprecated)
+   * @returns {Array} Array of widget definitions or empty array if not loaded
+   * @deprecated Use getAvailableWidgets() async version instead
    */
-  getAvailableWidgets() {
-    // Return custom widgets if set, otherwise return cached API widgets or default widgets
+  getAvailableWidgetsSync() {
+    console.log('getAvailableWidgetsSync called (deprecated)');
+
+    // Return custom widgets if set
     if (this.customWidgets && Array.isArray(this.customWidgets)) {
       return this.customWidgets;
     }
@@ -1970,117 +2036,48 @@ class LayoutRenderer {
       return this.cachedApiWidgets;
     }
 
-    // Fallback to default widgets if API is not available
-    return this.getDefaultWidgets();
+    // No widgets available yet
+    console.warn('LayoutRenderer: No widgets loaded yet - use async getAvailableWidgets() instead');
+    return [];
+  }
+
+  /**
+   * Handle case when no widgets are available from backend
+   */
+  handleNoWidgetsAvailable() {
+    try {
+      // Emit a custom event that React components can listen to
+      const event = new CustomEvent('layoutRenderer:noWidgets', {
+        detail: {
+          message: 'No widgets available from backend API',
+          timestamp: new Date().toISOString(),
+          renderer: this
+        }
+      });
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(event);
+      }
+    } catch (error) {
+      console.error('LayoutRenderer: Error dispatching no widgets event', error);
+    }
+  }
+
+  /**
+   * Force refresh widgets from API (useful for debugging)
+   */
+  async forceRefreshWidgets() {
+    console.log('LayoutRenderer: Force refreshing widgets from API...');
+    this.cachedApiWidgets = null;
+    this.widgetTypesPromise = null;
+    return await this.fetchWidgetTypes();
   }
 
   /**
    * Get default fallback widgets
    * @returns {Array} Array of default widget definitions
    */
-  getDefaultWidgets() {
-    return [
-      {
-        type: 'text',
-        name: 'Text Block',
-        description: 'Simple text content with formatting options',
-        icon: 'T',
-        category: 'content',
-        config: {
-          content: 'Enter your text here...',
-          fontSize: 'medium',
-          alignment: 'left'
-        }
-      },
-      {
-        type: 'image',
-        name: 'Image',
-        description: 'Display images with captions and links',
-        icon: '🖼',
-        category: 'media',
-        config: {
-          src: '',
-          alt: '',
-          caption: '',
-          width: '100%'
-        }
-      },
-      {
-        type: 'button',
-        name: 'Button',
-        description: 'Interactive button with customizable styling',
-        icon: '◯',
-        category: 'interactive',
-        config: {
-          text: 'Click me',
-          style: 'primary',
-          size: 'medium',
-          action: 'link'
-        }
-      },
-      {
-        type: 'card',
-        name: 'Card',
-        description: 'Content card with title, text, and optional image',
-        icon: '📄',
-        category: 'layout',
-        config: {
-          title: 'Card Title',
-          content: 'Card description goes here...',
-          imageUrl: '',
-          showButton: false
-        }
-      },
-      {
-        type: 'list',
-        name: 'List',
-        description: 'Ordered or unordered list of items',
-        icon: '≡',
-        category: 'content',
-        config: {
-          items: ['Item 1', 'Item 2', 'Item 3'],
-          type: 'unordered',
-          style: 'default'
-        }
-      },
-      {
-        type: 'spacer',
-        name: 'Spacer',
-        description: 'Add spacing between content elements',
-        icon: '↕',
-        category: 'layout',
-        config: {
-          height: 'medium',
-          backgroundColor: 'transparent'
-        }
-      },
-      {
-        type: 'divider',
-        name: 'Divider',
-        description: 'Horizontal line to separate content sections',
-        icon: '—',
-        category: 'layout',
-        config: {
-          style: 'solid',
-          color: 'gray',
-          thickness: 'thin'
-        }
-      },
-      {
-        type: 'video',
-        name: 'Video',
-        description: 'Embed videos from various sources',
-        icon: '▶',
-        category: 'media',
-        config: {
-          src: '',
-          autoplay: false,
-          controls: true,
-          poster: ''
-        }
-      }
-    ];
-  }
+
 
   /**
    * Create widget card HTML for the selection grid
@@ -2209,7 +2206,7 @@ class LayoutRenderer {
  * @param {Object} widgetInstance - Widget instance to add
  * @param {boolean} isLoading - True if loading saved widget (don't mark dirty)
  */
-  addWidgetToSlot(slotName, widgetInstance, isLoading = false) {
+  async addWidgetToSlot(slotName, widgetInstance, isLoading = false) {
     const slotElement = this.slotContainers.get(slotName);
     if (!slotElement) {
       throw new Error(`Slot "${slotName}" not found`);
@@ -2223,7 +2220,7 @@ class LayoutRenderer {
 
     // Create and add widget element
     widgetInstance.slotName = slotName;
-    const widgetElement = this.renderWidgetInstance(widgetInstance);
+    const widgetElement = await this.renderWidgetInstance(widgetInstance);
     if (widgetElement) {
       slotElement.appendChild(widgetElement);
 
@@ -2239,7 +2236,7 @@ class LayoutRenderer {
    * @param {Object} widgetInstance - Widget instance to render
    * @returns {HTMLElement} Rendered widget element
    */
-  renderWidgetInstance(widgetInstance) {
+  async renderWidgetInstance(widgetInstance) {
     const { id, type, name, config } = widgetInstance;
 
     // Create main widget container
@@ -2249,8 +2246,9 @@ class LayoutRenderer {
     const header = this.createWidgetHeader(id, name, widgetInstance);
     widget.appendChild(header);
 
-    // Add widget content
-    const content = this.renderWidgetContent(type, config);
+    // Add widget content - pass full widgetInstance for template_json access
+    const content = await this.renderWidgetContent(type, config, widgetInstance);
+    console.log('renderWidgetInstance', content);
     widget.appendChild(content);
 
     return widget;
@@ -2357,12 +2355,57 @@ class LayoutRenderer {
    * Render widget content based on type and configuration
    * @param {string} type - Widget type
    * @param {Object} config - Widget configuration
+   * @param {Object} widgetInstance - Full widget instance (optional, for template_json access)
    * @returns {HTMLElement} Widget content element
    */
-  renderWidgetContent(type, config) {
-    const content = document.createElement('div');
-    content.className = 'widget-content';
+  async renderWidgetContent(type, config, widgetInstance = null) {
+    try {
+      // Check if widget has template_json available for rendering
+      // Look up widget definition by type
+      const availableWidgets = await this.getAvailableWidgets();
+      console.log('availableWidgets', availableWidgets);
+      console.log('widgetInstance.type', widgetInstance.type);
+      const widgetDef = availableWidgets.find(w => w.type === widgetInstance.type);
+      console.log('_apiData', widgetDef);
 
+      if (widgetInstance &&
+        widgetDef?._apiData &&
+        widgetDef?._apiData?.template_json) {
+
+        console.log(`LayoutRenderer: Using template_json for widget type "${type}"`);
+
+        try {
+          // Use template_json rendering with caching
+          console.log('renderFromTemplateJsonCached', widgetDef._apiData.template_json);
+          return this.renderFromTemplateJsonCached(
+            widgetDef._apiData.template_json,
+            config,
+            type,
+            widgetInstance.id // Pass widget ID for CSS scoping
+          );
+        } catch (templateError) {
+          console.error(`LayoutRenderer: template_json rendering failed for "${type}", falling back to legacy`, templateError);
+          // Fall through to legacy rendering
+        }
+      }
+
+      // Legacy rendering fallback or for widgets without template_json
+      console.log(`LayoutRenderer: Using legacy rendering for widget type "${type}"`);
+      return this.renderWidgetContentLegacy(type, config);
+
+    } catch (error) {
+      console.error('LayoutRenderer: Error in renderWidgetContent', error);
+      return this.createErrorWidgetElement(`Widget render error: ${error.message}`);
+    }
+  }
+
+  /**
+   * Legacy widget content rendering (existing switch statement logic)
+   * @param {string} type - Widget type
+   * @param {Object} config - Widget configuration
+   * @returns {HTMLElement} Widget content element
+   */
+  renderWidgetContentLegacy(type, config) {
     switch (type) {
       case 'text':
         return this.renderTextWidget(config);
@@ -2651,11 +2694,12 @@ class LayoutRenderer {
    * @param {string} slotName - Name of the slot
    * @param {Array} defaultWidgets - Array of default widget definitions
    */
-  convertDefaultWidgetsToInstances(slotName, defaultWidgets) {
+  async convertDefaultWidgetsToInstances(slotName, defaultWidgets) {
     try {
-      const availableWidgets = this.getAvailableWidgets();
+      const availableWidgets = await this.getAvailableWidgets();
 
-      defaultWidgets.forEach((defaultWidget, index) => {
+      for (let index = 0; index < defaultWidgets.length; index++) {
+        const defaultWidget = defaultWidgets[index];
         try {
           // Find matching widget definition by type
           const widgetDef = availableWidgets.find(w => w.type === defaultWidget.type);
@@ -2670,7 +2714,7 @@ class LayoutRenderer {
             };
 
             // Add widget to slot
-            this.addWidgetToSlot(slotName, widgetInstance);
+            await this.addWidgetToSlot(slotName, widgetInstance);
 
           } else {
             // Widget type not found, create a placeholder widget
@@ -2681,14 +2725,14 @@ class LayoutRenderer {
               config: defaultWidget.config || {}
             };
 
-            this.addWidgetToSlot(slotName, placeholderInstance);
+            await this.addWidgetToSlot(slotName, placeholderInstance);
             console.warn(`LayoutRenderer: Created placeholder for unknown widget type "${defaultWidget.type}" in slot "${slotName}"`);
           }
 
         } catch (error) {
           console.error(`LayoutRenderer: Error converting default widget ${index} in slot ${slotName}`, error);
         }
-      });
+      }
 
       // Mark defaults as processed after the first render
       this.defaultWidgetsProcessed = true;
@@ -2722,7 +2766,7 @@ class LayoutRenderer {
   /**
    * Render a JSON node to DOM element
    * @param {Object} node - JSON node to render
-   * @returns {Node} DOM node
+   * @returns {Node|Promise<Node>} DOM node (slots return Promise)
    */
   renderNode(node) {
     try {
@@ -2734,7 +2778,7 @@ class LayoutRenderer {
         case 'element':
           return this.renderElement(node);
         case 'slot':
-          return this.renderSlotElement(node);
+          return this.renderSlotElement(node); // This returns a Promise now
         case 'text':
           return this.renderTextNode(node);
         default:
@@ -2801,10 +2845,23 @@ class LayoutRenderer {
 
       // Render children
       if (node.children && Array.isArray(node.children)) {
-        node.children.forEach(child => {
+        for (const child of node.children) {
           try {
             const childElement = this.renderNode(child);
-            if (childElement) {
+            // Handle both sync and async results
+            if (childElement && typeof childElement.then === 'function') {
+              // It's a Promise (slot element)
+              childElement.then(resolvedElement => {
+                if (resolvedElement) {
+                  element.appendChild(resolvedElement);
+                }
+              }).catch(error => {
+                console.error('LayoutRenderer: Error rendering async child node', error);
+                const errorElement = this.createErrorElement(`Async child render error: ${error.message}`);
+                element.appendChild(errorElement);
+              });
+            } else if (childElement) {
+              // It's a regular DOM element
               element.appendChild(childElement);
             }
           } catch (error) {
@@ -2812,7 +2869,7 @@ class LayoutRenderer {
             const errorElement = this.createErrorElement(`Child render error: ${error.message}`);
             element.appendChild(errorElement);
           }
-        });
+        }
       }
 
       return element;
@@ -2827,7 +2884,7 @@ class LayoutRenderer {
    * @param {Object} node - Slot node object
    * @returns {HTMLElement} DOM element
    */
-  renderSlotElement(node) {
+  async renderSlotElement(node) {
     // console.log("LayoutRenderer renderSlotElement", node)
     try {
       // Validate slot configuration
@@ -2898,15 +2955,16 @@ class LayoutRenderer {
       if (this.hasSlotWidgetData(slotName)) {
         // Load saved widgets for this slot
         const savedWidgets = this.getSlotWidgetData(slotName);
-        savedWidgets.forEach((widgetInstance, index) => {
+        for (let index = 0; index < savedWidgets.length; index++) {
+          const widgetInstance = savedWidgets[index];
           try {
-            this.addWidgetToSlot(slotName, widgetInstance, true); // isLoading = true
+            await this.addWidgetToSlot(slotName, widgetInstance, true); // isLoading = true
           } catch (error) {
             console.error(`LayoutRenderer: Error rendering saved widget ${index} in slot ${slotName}`, error);
             const errorElement = this.createErrorWidgetElement(`Saved widget ${index + 1}: ${error.message}`);
             element.appendChild(errorElement);
           }
-        });
+        }
         // } else if (node.slot.defaultWidgets && Array.isArray(node.slot.defaultWidgets) && node.slot.defaultWidgets.length > 0) {
         //   // Check if we should convert default widgets to real widget instances
         //   if (!this.pageHasBeenSaved && !this.defaultWidgetsProcessed) {
@@ -2970,6 +3028,1686 @@ class LayoutRenderer {
       return document.createTextNode(`[Text Error: ${error.message}]`);
     }
   }
+
+  // ======================================================================
+  // TEMPLATE JSON PROCESSING ENGINE
+  // ======================================================================
+
+  /**
+   * Render widget content from template_json structure
+   * @param {Object} templateJson - Parsed template JSON from backend
+   * @param {Object} config - Widget configuration object
+   * @param {string} widgetType - Widget type identifier
+   * @param {string} widgetId - Widget ID for CSS scoping (optional)
+   * @returns {HTMLElement} Rendered widget content element
+   */
+  renderFromTemplateJson(templateJson, config, widgetType, widgetId = null) {
+    try {
+      // Validate template_json structure
+      if (!templateJson || typeof templateJson !== 'object') {
+        throw new Error('Invalid template_json object');
+      }
+
+      if (!templateJson.structure) {
+        throw new Error('template_json missing structure property');
+      }
+
+      console.log(`LayoutRenderer: Rendering widget "${widgetType}" from template_json`, templateJson);
+
+      // Process the template structure with config and template logic support
+      const templateTags = templateJson.template_tags || [];
+      let element;
+
+      if (templateTags.length > 0 && (templateTags.includes('if') || templateTags.includes('for'))) {
+        // Use enhanced processing for templates with logic
+        console.log(`LayoutRenderer: Using enhanced logic processing for widget "${widgetType}" with tags:`, templateTags);
+        element = this.processTemplateStructureWithLogic(templateJson.structure, config, templateTags);
+      } else {
+        // Use standard processing for simple templates
+        element = this.processTemplateStructure(templateJson.structure, config);
+      }
+
+      // Handle inline CSS if present
+      if (templateJson.has_inline_css) {
+        this.processInlineStyles(templateJson, config, widgetId);
+      }
+
+      return element;
+
+    } catch (error) {
+      console.error(`LayoutRenderer: Error rendering template_json for widget "${widgetType}"`, error);
+
+      // Enhanced error handling with detailed fallback
+      return this.createTemplateErrorElement(error, widgetType, {
+        templateJson,
+        config,
+        widgetId
+      });
+    }
+  }
+
+  /**
+   * Recursively process template structure and convert to DOM elements
+   * @param {Object} structure - Template structure object
+   * @param {Object} config - Widget configuration
+   * @returns {HTMLElement|Text|DocumentFragment} DOM node
+   */
+  processTemplateStructure(structure, config) {
+    try {
+      if (!structure || typeof structure !== 'object') {
+        throw new Error('Invalid template structure');
+      }
+
+      switch (structure.type) {
+        case 'element':
+          return this.createElementFromTemplate(structure, config);
+
+        case 'template_text':
+          return this.processTemplateText(structure, config);
+
+        case 'text':
+          return this.processStaticText(structure);
+
+        case 'style':
+          return this.processStyleElement(structure, config);
+
+        case 'fragment':
+          return this.processFragment(structure, config);
+
+        default:
+          console.warn(`LayoutRenderer: Unknown template structure type: ${structure.type}`);
+          return document.createTextNode(`[Unknown template type: ${structure.type}]`);
+      }
+
+    } catch (error) {
+      return this.handleTemplateStructureError(error, structure, config);
+    }
+  }
+
+  /**
+   * Create DOM element from template element structure
+   * @param {Object} elementData - Template element data
+   * @param {Object} config - Widget configuration
+   * @returns {HTMLElement} DOM element
+   */
+  createElementFromTemplate(elementData, config) {
+    try {
+      // Create the base element
+      const element = document.createElement(elementData.tag || 'div');
+
+      // Process classes with template variables
+      if (elementData.classes) {
+        const processedClasses = this.resolveTemplateVariables(elementData.classes, config);
+        element.className = processedClasses;
+      }
+
+      // Process static attributes
+      if (elementData.attributes) {
+        Object.entries(elementData.attributes).forEach(([key, value]) => {
+          element.setAttribute(key, value);
+        });
+      }
+
+      // Process template attributes (attributes with variables)
+      if (elementData.template_attributes) {
+        this.processTemplateAttributes(element, elementData.template_attributes, config);
+      }
+
+      // Process children recursively
+      if (elementData.children && Array.isArray(elementData.children)) {
+        elementData.children.forEach(child => {
+          const childNode = this.processTemplateStructure(child, config);
+          if (childNode) {
+            element.appendChild(childNode);
+          }
+        });
+      }
+
+      return element;
+
+    } catch (error) {
+      return this.handleTemplateStructureError(error, elementData, config);
+    }
+  }
+
+  /**
+   * Process template attributes that contain variables
+   * @param {HTMLElement} element - Target DOM element
+   * @param {Object} templateAttrs - Template attributes with variables
+   * @param {Object} config - Widget configuration
+   */
+  processTemplateAttributes(element, templateAttrs, config) {
+    try {
+      Object.entries(templateAttrs).forEach(([attrName, attrData]) => {
+        if (attrData && attrData.value) {
+          const resolvedValue = this.resolveTemplateVariables(attrData.value, config);
+          element.setAttribute(attrName, resolvedValue);
+        }
+      });
+    } catch (error) {
+      console.error('LayoutRenderer: Error processing template attributes', error);
+    }
+  }
+
+  /**
+   * Process template text with variable substitution
+   * @param {Object} textData - Template text data
+   * @param {Object} config - Widget configuration
+   * @returns {Text} DOM text node
+   */
+  processTemplateText(textData, config) {
+    try {
+      if (!textData.content) {
+        return document.createTextNode('');
+      }
+
+      const resolvedContent = this.resolveTemplateVariables(textData.content, config);
+      return document.createTextNode(resolvedContent);
+
+    } catch (error) {
+      return this.handleTemplateStructureError(error, textData, config);
+    }
+  }
+
+  /**
+   * Process static text (no variables)
+   * @param {Object} textData - Static text data
+   * @returns {Text} DOM text node
+   */
+  processStaticText(textData) {
+    return document.createTextNode(textData.content || '');
+  }
+
+  /**
+   * Process template fragment (multiple root elements)
+   * @param {Object} fragmentData - Fragment data with children
+   * @param {Object} config - Widget configuration
+   * @returns {DocumentFragment} Document fragment containing all children
+   */
+  processFragment(fragmentData, config) {
+    const fragment = document.createDocumentFragment();
+
+    if (fragmentData.children && Array.isArray(fragmentData.children)) {
+      fragmentData.children.forEach(child => {
+        const childNode = this.processTemplateStructure(child, config);
+        if (childNode) {
+          fragment.appendChild(childNode);
+        }
+      });
+    }
+
+    return fragment;
+  }
+
+  /**
+   * Resolve Django template variables in a string
+   * @param {string} templateString - String containing {{ variable }} patterns
+   * @param {Object} config - Widget configuration object
+   * @returns {string} String with variables resolved to actual values
+   */
+  resolveTemplateVariables(templateString, config) {
+    try {
+      if (typeof templateString !== 'string') {
+        return String(templateString || '');
+      }
+
+      // Replace {{ config.field }} patterns with actual values
+      return templateString.replace(/\{\{\s*([^}]+)\s*\}\}/g, (match, expression) => {
+        try {
+          // Clean up the expression
+          const cleanExpression = expression.trim();
+
+          // Handle basic config.field access
+          if (cleanExpression.startsWith('config.')) {
+            const fieldPath = cleanExpression.substring(7); // Remove 'config.'
+            const value = this.getNestedValue(config, fieldPath);
+
+            // Apply basic Django filters if present
+            if (cleanExpression.includes('|')) {
+              return this.applyTemplateFilters(value, cleanExpression);
+            }
+
+            return value !== undefined ? String(value) : '';
+          }
+
+          // For non-config variables, return empty string for now
+          console.warn(`LayoutRenderer: Unhandled template variable: ${cleanExpression}`);
+          return '';
+
+        } catch (error) {
+          console.error('LayoutRenderer: Error resolving template variable', error, expression);
+          return match; // Return original if resolution fails
+        }
+      });
+
+    } catch (error) {
+      console.error('LayoutRenderer: Error in resolveTemplateVariables', error);
+      return templateString;
+    }
+  }
+
+  /**
+   * Get nested value from object using dot notation
+   * @param {Object} obj - Object to search in
+   * @param {string} path - Dot-separated path (e.g., 'style.color')
+   * @returns {*} Value at path or undefined
+   */
+  getNestedValue(obj, path) {
+    try {
+      return path.split('.').reduce((current, key) => {
+        return current && current[key] !== undefined ? current[key] : undefined;
+      }, obj);
+    } catch (error) {
+      console.error('LayoutRenderer: Error getting nested value', error, path);
+      return undefined;
+    }
+  }
+
+  /**
+   * Apply basic Django template filters to a value
+   * @param {*} value - Value to filter
+   * @param {string} expression - Full expression with filters
+   * @returns {string} Filtered value
+   */
+  applyTemplateFilters(value, expression) {
+    try {
+      // Extract filter part after the pipe
+      const filterPart = expression.split('|')[1];
+      if (!filterPart) return String(value || '');
+
+      const filterName = filterPart.trim().split(':')[0];
+      const filterArg = filterPart.includes(':') ? filterPart.split(':')[1].replace(/"/g, '') : null;
+
+      switch (filterName) {
+        case 'default':
+          return value !== undefined && value !== null && value !== '' ? String(value) : (filterArg || '');
+
+        case 'linebreaks':
+          return String(value || '').replace(/\n/g, '<br>');
+
+        case 'safe':
+          // For now, just return as string - would need proper HTML escaping in production
+          return String(value || '');
+
+        case 'escape':
+          return this.escapeHtml(String(value || ''));
+
+        default:
+          console.warn(`LayoutRenderer: Unhandled template filter: ${filterName}`);
+          return String(value || '');
+      }
+
+    } catch (error) {
+      console.error('LayoutRenderer: Error applying template filters', error);
+      return String(value || '');
+    }
+  }
+
+  /**
+   * Process style elements with template variables (placeholder for Phase 5)
+   * @param {Object} styleData - Style element data
+   * @param {Object} config - Widget configuration
+   * @returns {HTMLStyleElement} Style element
+   */
+  processStyleElement(styleData, config) {
+    // Placeholder implementation - will be enhanced in Phase 5
+    const styleElement = document.createElement('style');
+
+    if (styleData.css) {
+      const processedCSS = this.resolveTemplateVariables(styleData.css, config);
+      styleElement.textContent = processedCSS;
+    }
+
+    return styleElement;
+  }
+
+  /**
+   * Process conditional logic in template structure
+   * @param {Object} structure - Template structure that may contain conditionals
+   * @param {Object} config - Widget configuration
+   * @param {Array} templateTags - Array of template tags used in the template
+   * @returns {HTMLElement|Text|DocumentFragment|null} Processed element or null if condition fails
+   */
+  processConditionalLogic(structure, config, templateTags = []) {
+    try {
+      // Check if this structure has conditional logic
+      if (structure.condition) {
+        const shouldRender = this.evaluateCondition(structure.condition, config);
+        if (!shouldRender) {
+          return null; // Don't render this element
+        }
+      }
+
+      // Check for template tags that indicate conditional rendering
+      if (templateTags.includes('if')) {
+        // Look for conditional attributes or patterns in the structure
+        if (structure.conditionalRender) {
+          const shouldRender = this.evaluateCondition(structure.conditionalRender, config);
+          if (!shouldRender) {
+            return null;
+          }
+        }
+      }
+
+      // Process the structure normally if condition passes
+      return this.processTemplateStructure(structure, config);
+
+    } catch (error) {
+      console.error('LayoutRenderer: Error processing conditional logic', error, structure);
+      return this.processTemplateStructure(structure, config); // Fallback to normal processing
+    }
+  }
+
+  /**
+   * Evaluate a conditional expression
+   * @param {string|Object} condition - Condition to evaluate
+   * @param {Object} config - Widget configuration
+   * @returns {boolean} True if condition passes, false otherwise
+   */
+  evaluateCondition(condition, config) {
+    try {
+      if (typeof condition === 'string') {
+        // Handle string conditions like "config.show_title"
+        if (condition.startsWith('config.')) {
+          const fieldPath = condition.substring(7); // Remove 'config.'
+          const value = this.getNestedValue(config, fieldPath);
+          return Boolean(value);
+        }
+
+        // Handle negation like "not config.hide_element"
+        if (condition.startsWith('not ')) {
+          const innerCondition = condition.substring(4).trim();
+          return !this.evaluateCondition(innerCondition, config);
+        }
+
+        // Handle comparison operators
+        if (condition.includes('==')) {
+          const [left, right] = condition.split('==').map(s => s.trim());
+          const leftValue = this.resolveTemplateVariables(`{{ ${left} }}`, config);
+          const rightValue = right.replace(/['"]/g, ''); // Remove quotes
+          return leftValue === rightValue;
+        }
+
+        if (condition.includes('!=')) {
+          const [left, right] = condition.split('!=').map(s => s.trim());
+          const leftValue = this.resolveTemplateVariables(`{{ ${left} }}`, config);
+          const rightValue = right.replace(/['"]/g, ''); // Remove quotes
+          return leftValue !== rightValue;
+        }
+
+        // Default: try to resolve as template variable
+        const resolvedValue = this.resolveTemplateVariables(`{{ ${condition} }}`, config);
+        return Boolean(resolvedValue);
+      }
+
+      if (typeof condition === 'object' && condition !== null) {
+        // Handle object-based conditions
+        if (condition.type === 'field_check') {
+          const value = this.getNestedValue(config, condition.field);
+          return Boolean(value);
+        }
+
+        if (condition.type === 'comparison') {
+          const leftValue = this.getNestedValue(config, condition.left);
+          const rightValue = condition.right;
+          switch (condition.operator) {
+            case '==': return leftValue == rightValue;
+            case '!=': return leftValue != rightValue;
+            case '>': return leftValue > rightValue;
+            case '<': return leftValue < rightValue;
+            case '>=': return leftValue >= rightValue;
+            case '<=': return leftValue <= rightValue;
+            default: return Boolean(leftValue);
+          }
+        }
+      }
+
+      return Boolean(condition);
+
+    } catch (error) {
+      console.error('LayoutRenderer: Error evaluating condition', error, condition);
+      return false; // Fail safe - don't render if condition evaluation fails
+    }
+  }
+
+  /**
+   * Process loop logic in template structure
+   * @param {Object} structure - Template structure that may contain loops
+   * @param {Object} config - Widget configuration
+   * @param {Array} templateTags - Array of template tags used in the template
+   * @returns {DocumentFragment} Fragment containing all loop iterations
+   */
+  processLoopLogic(structure, config, templateTags = []) {
+    try {
+      const fragment = document.createDocumentFragment();
+
+      // Check if this structure has loop logic
+      if (structure.loop && structure.loop.iterable) {
+        const iterableValue = this.getNestedValue(config, structure.loop.iterable);
+
+        if (Array.isArray(iterableValue)) {
+          iterableValue.forEach((item, index) => {
+            // Create a new config context for this iteration
+            const iterationConfig = {
+              ...config,
+              [structure.loop.variable || 'item']: item,
+              forloop: {
+                counter: index + 1,
+                counter0: index,
+                first: index === 0,
+                last: index === iterableValue.length - 1,
+                length: iterableValue.length
+              }
+            };
+
+            // Process the template structure with the iteration context
+            const iterationElement = this.processTemplateStructure(structure.template, iterationConfig);
+            if (iterationElement) {
+              fragment.appendChild(iterationElement);
+            }
+          });
+        }
+      }
+
+      return fragment;
+
+    } catch (error) {
+      console.error('LayoutRenderer: Error processing loop logic', error, structure);
+      return document.createDocumentFragment(); // Return empty fragment on error
+    }
+  }
+
+  /**
+   * Enhanced processTemplateStructure with template logic support
+   * @param {Object} structure - Template structure object
+   * @param {Object} config - Widget configuration
+   * @param {Array} templateTags - Array of template tags (for context)
+   * @returns {HTMLElement|Text|DocumentFragment} DOM node
+   */
+  processTemplateStructureWithLogic(structure, config, templateTags = []) {
+    try {
+      if (!structure || typeof structure !== 'object') {
+        throw new Error('Invalid template structure');
+      }
+
+      // Handle conditional logic first
+      if (structure.condition || (templateTags.includes('if') && structure.conditionalRender)) {
+        const result = this.processConditionalLogic(structure, config, templateTags);
+        if (result === null) {
+          return document.createTextNode(''); // Return empty text node if condition fails
+        }
+        return result;
+      }
+
+      // Handle loop logic
+      if (structure.loop || (templateTags.includes('for') && structure.iterable)) {
+        return this.processLoopLogic(structure, config, templateTags);
+      }
+
+      // Handle enhanced template logic for existing types
+      switch (structure.type) {
+        case 'element':
+          return this.createElementFromTemplateWithLogic(structure, config, templateTags);
+
+        case 'template_text':
+          // Check for conditional text rendering
+          if (structure.showIf) {
+            const shouldShow = this.evaluateCondition(structure.showIf, config);
+            if (!shouldShow) {
+              return document.createTextNode('');
+            }
+          }
+          return this.processTemplateText(structure, config);
+
+        case 'conditional_block':
+          // Special type for conditional blocks
+          const shouldRender = this.evaluateCondition(structure.condition, config);
+          if (shouldRender && structure.content) {
+            return this.processTemplateStructureWithLogic(structure.content, config, templateTags);
+          }
+          return document.createTextNode('');
+
+        default:
+          // Fall back to regular processing
+          return this.processTemplateStructure(structure, config);
+      }
+
+    } catch (error) {
+      console.error('LayoutRenderer: Error processing template structure with logic', error, structure);
+      return document.createTextNode(`[Logic Error: ${error.message}]`);
+    }
+  }
+
+  /**
+   * Enhanced element creation with template logic support
+   * @param {Object} elementData - Template element data
+   * @param {Object} config - Widget configuration
+   * @param {Array} templateTags - Array of template tags
+   * @returns {HTMLElement} DOM element
+   */
+  createElementFromTemplateWithLogic(elementData, config, templateTags = []) {
+    try {
+      // Check element-level conditions
+      if (elementData.showIf) {
+        const shouldShow = this.evaluateCondition(elementData.showIf, config);
+        if (!shouldShow) {
+          return document.createTextNode(''); // Return empty text node if condition fails
+        }
+      }
+
+      // Create the base element using existing method
+      const element = this.createElementFromTemplate(elementData, config);
+
+      // Enhanced children processing with logic support
+      if (elementData.children && Array.isArray(elementData.children)) {
+        // Clear existing children (from base method) and reprocess with logic
+        element.innerHTML = '';
+
+        elementData.children.forEach(child => {
+          const childNode = this.processTemplateStructureWithLogic(child, config, templateTags);
+          if (childNode && childNode.nodeType) {
+            element.appendChild(childNode);
+          }
+        });
+      }
+
+      return element;
+
+    } catch (error) {
+      console.error('LayoutRenderer: Error creating element with logic', error, elementData);
+      const errorElement = document.createElement('div');
+      errorElement.className = 'widget-error';
+      errorElement.textContent = `Element Logic Error: ${error.message}`;
+      return errorElement;
+    }
+  }
+
+  /**
+   * Process inline styles and inject them into the document
+   * @param {Object} templateJson - Full template JSON
+   * @param {Object} config - Widget configuration
+   * @param {string} widgetId - Unique widget ID for scoping styles
+   */
+  processInlineStyles(templateJson, config, widgetId = null) {
+    try {
+      if (!templateJson.has_inline_css) {
+        return;
+      }
+
+      console.log('LayoutRenderer: Processing inline CSS for template_json');
+
+      // Find all style elements in the template structure
+      const styleElements = this.extractStyleElements(templateJson.structure);
+
+      if (styleElements.length === 0) {
+        return;
+      }
+
+      // Process each style element
+      styleElements.forEach((styleData, index) => {
+        if (styleData.css) {
+          const processedCSS = this.resolveTemplateVariables(styleData.css, config);
+          const scopedCSS = widgetId ? this.scopeCSS(processedCSS, widgetId) : processedCSS;
+
+          // Inject the CSS into the document
+          this.injectWidgetStyles(scopedCSS, widgetId, index);
+        }
+      });
+
+    } catch (error) {
+      console.error('LayoutRenderer: Error processing inline styles', error);
+    }
+  }
+
+  /**
+   * Extract all style elements from template structure recursively
+   * @param {Object} structure - Template structure to search
+   * @returns {Array} Array of style element data
+   */
+  extractStyleElements(structure) {
+    const styleElements = [];
+
+    const extractFromNode = (node) => {
+      if (!node || typeof node !== 'object') {
+        return;
+      }
+
+      // Check if this node is a style element
+      if (node.type === 'style' && node.css) {
+        styleElements.push(node);
+      }
+
+      // Check if this is an element with inline styles
+      if (node.type === 'element' && node.attributes && node.attributes.style) {
+        styleElements.push({
+          type: 'inline_style',
+          css: node.attributes.style,
+          selector: node.tag
+        });
+      }
+
+      // Recursively check children
+      if (node.children && Array.isArray(node.children)) {
+        node.children.forEach(child => extractFromNode(child));
+      }
+
+      // Check template structures
+      if (node.template) {
+        extractFromNode(node.template);
+      }
+
+      // Check conditional content
+      if (node.content) {
+        extractFromNode(node.content);
+      }
+    };
+
+    extractFromNode(structure);
+    return styleElements;
+  }
+
+  /**
+   * Scope CSS rules to a specific widget instance
+   * @param {string} css - Original CSS content
+   * @param {string} widgetId - Widget ID for scoping
+   * @returns {string} Scoped CSS content
+   */
+  scopeCSS(css, widgetId) {
+    try {
+      if (!widgetId || !css) {
+        return css;
+      }
+
+      const widgetSelector = `[data-widget-id="${widgetId}"]`;
+
+      // Simple CSS scoping - prepend widget selector to all rules
+      const scopedCSS = css.replace(/([^{}]+){/g, (match, selector) => {
+        // Clean up the selector
+        const cleanSelector = selector.trim();
+
+        // Skip @-rules (media queries, keyframes, etc.)
+        if (cleanSelector.startsWith('@')) {
+          return match;
+        }
+
+        // Scope the selector
+        const scopedSelector = cleanSelector
+          .split(',')
+          .map(s => `${widgetSelector} ${s.trim()}`)
+          .join(', ');
+
+        return `${scopedSelector} {`;
+      });
+
+      return scopedCSS;
+
+    } catch (error) {
+      console.error('LayoutRenderer: Error scoping CSS', error);
+      return css; // Return original CSS if scoping fails
+    }
+  }
+
+  /**
+   * Inject processed CSS into document head
+   * @param {string} cssContent - CSS content to inject
+   * @param {string} widgetId - Widget ID for identification
+   * @param {number} styleIndex - Index for multiple styles per widget
+   */
+  injectWidgetStyles(cssContent, widgetId, styleIndex = 0) {
+    try {
+      if (!cssContent) {
+        return;
+      }
+
+      // Create unique ID for this style element
+      const styleId = widgetId
+        ? `widget-styles-${widgetId}-${styleIndex}`
+        : `template-styles-${Date.now()}-${styleIndex}`;
+
+      // Remove existing style element if it exists
+      const existingStyle = document.getElementById(styleId);
+      if (existingStyle) {
+        existingStyle.remove();
+      }
+
+      // Create new style element
+      const styleElement = document.createElement('style');
+      styleElement.id = styleId;
+      styleElement.textContent = cssContent;
+      styleElement.setAttribute('data-widget-styles', 'true');
+
+      if (widgetId) {
+        styleElement.setAttribute('data-widget-id', widgetId);
+      }
+
+      // Inject into document head
+      document.head.appendChild(styleElement);
+
+      console.log(`LayoutRenderer: Injected widget styles with ID: ${styleId}`);
+
+    } catch (error) {
+      console.error('LayoutRenderer: Error injecting widget styles', error);
+    }
+  }
+
+  /**
+   * Clean up widget styles when widget is removed
+   * @param {string} widgetId - Widget ID to clean up styles for
+   */
+  cleanupWidgetStyles(widgetId) {
+    try {
+      if (!widgetId) {
+        return;
+      }
+
+      // Find and remove all style elements for this widget
+      const widgetStyles = document.querySelectorAll(`style[data-widget-id="${widgetId}"]`);
+      widgetStyles.forEach(styleElement => {
+        styleElement.remove();
+      });
+
+      console.log(`LayoutRenderer: Cleaned up styles for widget ${widgetId}`);
+
+    } catch (error) {
+      console.error('LayoutRenderer: Error cleaning up widget styles', error);
+    }
+  }
+
+  /**
+   * Enhanced processStyleElement with improved CSS processing
+   * @param {Object} styleData - Style element data
+   * @param {Object} config - Widget configuration
+   * @returns {HTMLStyleElement} Style element
+   */
+  processStyleElement(styleData, config) {
+    try {
+      const styleElement = document.createElement('style');
+
+      if (styleData.css) {
+        const processedCSS = this.resolveTemplateVariables(styleData.css, config);
+        styleElement.textContent = processedCSS;
+
+        // Add metadata for tracking
+        styleElement.setAttribute('data-template-style', 'true');
+
+        // Apply scoping if in widget context
+        if (styleData.scope && styleData.widgetId) {
+          const scopedCSS = this.scopeCSS(processedCSS, styleData.widgetId);
+          styleElement.textContent = scopedCSS;
+        }
+      }
+
+      return styleElement;
+
+    } catch (error) {
+      console.error('LayoutRenderer: Error processing style element', error, styleData);
+      const errorElement = document.createElement('style');
+      errorElement.textContent = `/* Style processing error: ${error.message} */`;
+      return errorElement;
+    }
+  }
+
+  /**
+   * Process CSS variables and custom properties
+   * @param {string} css - CSS content
+   * @param {Object} config - Widget configuration
+   * @returns {string} CSS with resolved variables
+   */
+  processCSSVariables(css, config) {
+    try {
+      if (!css) return css;
+
+      // Process CSS custom properties with template variables
+      return css.replace(/var\(--([^,)]+)(?:,\s*([^)]+))?\)/g, (match, varName, fallback) => {
+        // Try to resolve the variable from config
+        const configValue = this.getNestedValue(config, varName);
+
+        if (configValue !== undefined) {
+          return configValue;
+        }
+
+        // Use fallback if provided
+        if (fallback) {
+          return fallback;
+        }
+
+        // Keep original var() if no resolution available
+        return match;
+      });
+
+    } catch (error) {
+      console.error('LayoutRenderer: Error processing CSS variables', error);
+      return css;
+    }
+  }
+
+  /**
+   * Create a detailed error element for template rendering failures
+   * @param {Error} error - The error that occurred
+   * @param {string} widgetType - Widget type that failed
+   * @param {Object} context - Additional context for debugging
+   * @returns {HTMLElement} Error element with debugging information
+   */
+  createTemplateErrorElement(error, widgetType, context = {}) {
+    try {
+      const errorContainer = document.createElement('div');
+      errorContainer.className = 'widget-error bg-red-50 border border-red-200 rounded-lg p-4 text-red-700';
+
+      // Error header
+      const header = document.createElement('div');
+      header.className = 'font-semibold text-red-800 mb-2';
+      header.textContent = `Template Rendering Error: ${widgetType}`;
+      errorContainer.appendChild(header);
+
+      // Error message
+      const message = document.createElement('div');
+      message.className = 'text-sm mb-2';
+      message.textContent = error.message;
+      errorContainer.appendChild(message);
+
+      // Error details (in development mode)
+      if (this.isDevelopmentMode()) {
+        const details = this.createErrorDetails(error, context);
+        errorContainer.appendChild(details);
+      }
+
+      // Fallback action button
+      const fallbackButton = this.createFallbackButton(widgetType, context);
+      if (fallbackButton) {
+        errorContainer.appendChild(fallbackButton);
+      }
+
+      return errorContainer;
+
+    } catch (fallbackError) {
+      console.error('LayoutRenderer: Error creating error element', fallbackError);
+
+      // Ultimate fallback - simple text element
+      const simpleError = document.createElement('div');
+      simpleError.className = 'widget-error-simple text-red-600 p-2 border border-red-300';
+      simpleError.textContent = `Widget Error: ${widgetType} - ${error.message}`;
+      return simpleError;
+    }
+  }
+
+  /**
+   * Create detailed error information for debugging
+   * @param {Error} error - The error that occurred
+   * @param {Object} context - Additional context
+   * @returns {HTMLElement} Error details element
+   */
+  createErrorDetails(error, context) {
+    const details = document.createElement('details');
+    details.className = 'mt-2';
+
+    const summary = document.createElement('summary');
+    summary.className = 'cursor-pointer text-xs text-red-600 hover:text-red-800';
+    summary.textContent = 'Error Details (Development Mode)';
+    details.appendChild(summary);
+
+    const content = document.createElement('div');
+    content.className = 'mt-2 text-xs font-mono bg-red-100 p-2 rounded border';
+
+    const errorInfo = {
+      error: {
+        name: error.name,
+        message: error.message,
+        stack: error.stack?.split('\n').slice(0, 5).join('\n') // First 5 lines of stack
+      },
+      context: {
+        hasTemplateJson: !!context.templateJson,
+        hasConfig: !!context.config,
+        widgetId: context.widgetId,
+        templateStructureType: context.templateJson?.structure?.type,
+        templateTags: context.templateJson?.template_tags,
+        configKeys: context.config ? Object.keys(context.config) : []
+      },
+      timestamp: new Date().toISOString()
+    };
+
+    content.textContent = JSON.stringify(errorInfo, null, 2);
+    details.appendChild(content);
+
+    return details;
+  }
+
+  /**
+   * Create fallback action button for error recovery
+   * @param {string} widgetType - Widget type that failed
+   * @param {Object} context - Additional context
+   * @returns {HTMLElement|null} Fallback button or null
+   */
+  createFallbackButton(widgetType, context) {
+    try {
+      const button = document.createElement('button');
+      button.className = 'mt-2 px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700';
+      button.textContent = 'Use Legacy Rendering';
+
+      button.addEventListener('click', () => {
+        try {
+          // Try to render using legacy method
+          const legacyContent = this.renderWidgetContentLegacy(widgetType, context.config || {});
+
+          // Replace the error element with legacy content
+          const errorElement = button.closest('.widget-error');
+          if (errorElement && legacyContent) {
+            errorElement.parentNode.replaceChild(legacyContent, errorElement);
+          }
+
+        } catch (legacyError) {
+          console.error('LayoutRenderer: Legacy rendering also failed', legacyError);
+          button.textContent = 'All Rendering Failed';
+          button.disabled = true;
+        }
+      });
+
+      return button;
+
+    } catch (error) {
+      console.error('LayoutRenderer: Error creating fallback button', error);
+      return null;
+    }
+  }
+
+  /**
+   * Enhanced error handling for template structure processing
+   * @param {Error} error - The error that occurred
+   * @param {Object} structure - Template structure that caused the error
+   * @param {Object} config - Widget configuration
+   * @returns {HTMLElement} Error element or safe fallback
+   */
+  handleTemplateStructureError(error, structure, config) {
+    try {
+      console.error('LayoutRenderer: Template structure error', error, structure);
+
+      // Try to create a safe fallback based on structure type
+      switch (structure?.type) {
+        case 'element':
+          return this.createSafeElementFallback(structure, config);
+
+        case 'template_text':
+          return this.createSafeTextFallback(structure, config);
+
+        case 'text':
+          return document.createTextNode(structure.content || '[Text Error]');
+
+        default:
+          return document.createTextNode(`[${structure?.type || 'Unknown'} Error: ${error.message}]`);
+      }
+
+    } catch (fallbackError) {
+      console.error('LayoutRenderer: Fallback creation failed', fallbackError);
+      return document.createTextNode(`[Critical Error: ${error.message}]`);
+    }
+  }
+
+  /**
+   * Create safe element fallback when element processing fails
+   * @param {Object} structure - Element structure
+   * @param {Object} config - Widget configuration
+   * @returns {HTMLElement} Safe fallback element
+   */
+  createSafeElementFallback(structure, config) {
+    try {
+      const element = document.createElement(structure.tag || 'div');
+      element.className = 'template-error-fallback border border-orange-300 bg-orange-50 p-2';
+
+      // Add safe attributes
+      if (structure.attributes) {
+        Object.entries(structure.attributes).forEach(([key, value]) => {
+          try {
+            if (typeof value === 'string' && !value.includes('<')) {
+              element.setAttribute(key, value);
+            }
+          } catch (attrError) {
+            console.warn('LayoutRenderer: Skipping unsafe attribute', key, value);
+          }
+        });
+      }
+
+      // Add error message
+      const errorMsg = document.createElement('small');
+      errorMsg.className = 'text-orange-600';
+      errorMsg.textContent = `[Element processing error]`;
+      element.appendChild(errorMsg);
+
+      return element;
+
+    } catch (error) {
+      console.error('LayoutRenderer: Safe element fallback failed', error);
+      const div = document.createElement('div');
+      div.textContent = '[Element Error]';
+      return div;
+    }
+  }
+
+  /**
+   * Create safe text fallback when text processing fails
+   * @param {Object} structure - Text structure
+   * @param {Object} config - Widget configuration
+   * @returns {Text} Safe text node
+   */
+  createSafeTextFallback(structure, config) {
+    try {
+      // Try to extract any text content safely
+      let content = structure.content || '[Text processing error]';
+
+      // Remove any template variables that failed to resolve
+      content = content.replace(/\{\{[^}]*\}\}/g, '[Variable Error]');
+
+      return document.createTextNode(content);
+
+    } catch (error) {
+      console.error('LayoutRenderer: Safe text fallback failed', error);
+      return document.createTextNode('[Text Error]');
+    }
+  }
+
+  /**
+   * Validate template_json structure before processing
+   * @param {Object} templateJson - Template JSON to validate
+   * @returns {Object} Validation result with errors
+   */
+  validateTemplateJson(templateJson) {
+    const errors = [];
+    const warnings = [];
+
+    try {
+      // Check basic structure
+      if (!templateJson || typeof templateJson !== 'object') {
+        errors.push('Invalid template_json: not an object');
+        return { isValid: false, errors, warnings };
+      }
+
+      if (!templateJson.structure) {
+        errors.push('Missing required structure property');
+      }
+
+      // Validate structure recursively
+      if (templateJson.structure) {
+        this.validateTemplateStructure(templateJson.structure, errors, warnings);
+      }
+
+      // Check template variables
+      if (templateJson.template_variables && !Array.isArray(templateJson.template_variables)) {
+        warnings.push('template_variables should be an array');
+      }
+
+      // Check template tags
+      if (templateJson.template_tags && !Array.isArray(templateJson.template_tags)) {
+        warnings.push('template_tags should be an array');
+      }
+
+      return {
+        isValid: errors.length === 0,
+        errors,
+        warnings
+      };
+
+    } catch (error) {
+      errors.push(`Validation error: ${error.message}`);
+      return { isValid: false, errors, warnings };
+    }
+  }
+
+  /**
+   * Validate template structure recursively
+   * @param {Object} structure - Structure to validate
+   * @param {Array} errors - Array to collect errors
+   * @param {Array} warnings - Array to collect warnings
+   */
+  validateTemplateStructure(structure, errors, warnings) {
+    try {
+      if (!structure || typeof structure !== 'object') {
+        errors.push('Invalid structure: not an object');
+        return;
+      }
+
+      if (!structure.type) {
+        errors.push('Structure missing type property');
+        return;
+      }
+
+      const validTypes = ['element', 'template_text', 'text', 'style', 'fragment', 'conditional_block'];
+      if (!validTypes.includes(structure.type)) {
+        warnings.push(`Unknown structure type: ${structure.type}`);
+      }
+
+      // Validate children if present
+      if (structure.children && Array.isArray(structure.children)) {
+        structure.children.forEach((child, index) => {
+          this.validateTemplateStructure(child, errors, warnings);
+        });
+      }
+
+    } catch (error) {
+      errors.push(`Structure validation error: ${error.message}`);
+    }
+  }
+
+  /**
+   * Check if we're in development mode for enhanced error reporting
+   * @returns {boolean} True if in development mode
+   */
+  isDevelopmentMode() {
+    try {
+      // Check various indicators of development mode
+      return (
+        window.location.hostname === 'localhost' ||
+        window.location.hostname === '127.0.0.1' ||
+        window.location.port === '3000' ||
+        window.location.search.includes('debug=true') ||
+        localStorage.getItem('layoutRenderer.debug') === 'true'
+      );
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /**
+   * Enhanced createErrorWidgetElement with better error handling
+   * @param {string} message - Error message
+   * @param {Object} context - Additional context
+   * @returns {HTMLElement} Error widget element
+   */
+  createErrorWidgetElement(message, context = {}) {
+    try {
+      const errorElement = document.createElement('div');
+      errorElement.className = 'widget-error bg-red-50 border border-red-200 rounded p-3 text-red-700';
+
+      const icon = document.createElement('span');
+      icon.textContent = '⚠️ ';
+
+      const text = document.createElement('span');
+      text.textContent = message;
+
+      errorElement.appendChild(icon);
+      errorElement.appendChild(text);
+
+      // Add context information in development mode
+      if (this.isDevelopmentMode() && context) {
+        const details = document.createElement('details');
+        details.className = 'mt-2';
+
+        const summary = document.createElement('summary');
+        summary.className = 'text-xs cursor-pointer';
+        summary.textContent = 'Error Context';
+        details.appendChild(summary);
+
+        const contextContent = document.createElement('pre');
+        contextContent.className = 'text-xs mt-1 p-2 bg-red-100 rounded overflow-auto max-h-32';
+        contextContent.textContent = JSON.stringify(context, null, 2);
+        details.appendChild(contextContent);
+
+        errorElement.appendChild(details);
+      }
+
+      return errorElement;
+
+    } catch (error) {
+      console.error('LayoutRenderer: Error creating error widget element', error);
+
+      // Ultimate fallback
+      const simple = document.createElement('div');
+      simple.className = 'text-red-600 p-2';
+      simple.textContent = `Error: ${message}`;
+      return simple;
+    }
+  }
+
+  /**
+   * Enhanced renderFromTemplateJson with caching
+   * @param {Object} templateJson - Parsed template JSON from backend
+   * @param {Object} config - Widget configuration object
+   * @param {string} widgetType - Widget type identifier
+   * @param {string} widgetId - Widget ID for CSS scoping (optional)
+   * @returns {HTMLElement} Rendered widget content element
+   */
+  renderFromTemplateJsonCached(templateJson, config, widgetType, widgetId = null) {
+    try {
+      // Create cache key based on template structure and config
+      const cacheKey = this.generateTemplateCacheKey(templateJson, config, widgetType);
+
+      // Check if we have a cached preprocessed template
+      const cachedTemplate = this.getFromTemplateCache(cacheKey);
+      if (cachedTemplate) {
+        console.log(`LayoutRenderer: Using cached template for "${widgetType}"`);
+        this.cacheMetrics.hits++;
+
+        // Clone and process the cached template with current config
+        return this.processCachedTemplate(cachedTemplate, config, widgetId);
+      }
+
+      this.cacheMetrics.misses++;
+
+      // Validate template_json structure before processing
+      const validation = this.validateTemplateJson(templateJson);
+      if (!validation.isValid) {
+        throw new Error(`Invalid template_json: ${validation.errors.join(', ')}`);
+      }
+
+      if (validation.warnings.length > 0) {
+        console.warn(`LayoutRenderer: Template warnings for "${widgetType}":`, validation.warnings);
+      }
+
+      console.log(`LayoutRenderer: Processing and caching template for "${widgetType}"`);
+
+      // Preprocess the template structure for caching
+      const preprocessedTemplate = this.preprocessTemplateStructure(templateJson);
+
+      // Cache the preprocessed template
+      this.setTemplateCache(cacheKey, preprocessedTemplate, templateJson);
+
+      // Process the template with current config
+      return this.processCachedTemplate(preprocessedTemplate, config, widgetId);
+
+    } catch (error) {
+      console.error(`LayoutRenderer: Error in cached template rendering for "${widgetType}"`, error);
+
+      // Enhanced error handling with detailed fallback
+      return this.createTemplateErrorElement(error, widgetType, {
+        templateJson,
+        config,
+        widgetId,
+        cacheMetrics: this.cacheMetrics
+      });
+    }
+  }
+
+  /**
+   * Generate a cache key for template caching
+   * @param {Object} templateJson - Template JSON
+   * @param {Object} config - Widget configuration
+   * @param {string} widgetType - Widget type
+   * @returns {string} Cache key
+   */
+  generateTemplateCacheKey(templateJson, config, widgetType) {
+    try {
+      // Create a cache key based on template structure and config schema
+      const templateHash = this.hashObject(templateJson.structure);
+      const configSchema = this.extractConfigSchema(config);
+      const configHash = this.hashObject(configSchema);
+
+      return `${widgetType}_${templateHash}_${configHash}`;
+
+    } catch (error) {
+      console.warn('LayoutRenderer: Error generating cache key, using fallback', error);
+      return `${widgetType}_${Date.now()}_${Math.random()}`;
+    }
+  }
+
+  /**
+   * Simple object hashing for cache keys
+   * @param {Object} obj - Object to hash
+   * @returns {string} Hash string
+   */
+  hashObject(obj) {
+    try {
+      const str = JSON.stringify(obj, Object.keys(obj).sort());
+      let hash = 0;
+      for (let i = 0; i < str.length; i++) {
+        const char = str.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash; // Convert to 32-bit integer
+      }
+      return hash.toString(36);
+    } catch (error) {
+      return 'hash_error';
+    }
+  }
+
+  /**
+   * Extract configuration schema for caching (structure without values)
+   * @param {Object} config - Widget configuration
+   * @returns {Object} Configuration schema
+   */
+  extractConfigSchema(config) {
+    try {
+      if (!config || typeof config !== 'object') {
+        return {};
+      }
+
+      const schema = {};
+      Object.keys(config).forEach(key => {
+        const value = config[key];
+        schema[key] = typeof value;
+
+        // For objects, recursively extract schema
+        if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+          schema[key] = { type: 'object', keys: Object.keys(value) };
+        } else if (Array.isArray(value)) {
+          schema[key] = { type: 'array', length: value.length };
+        }
+      });
+
+      return schema;
+    } catch (error) {
+      return {};
+    }
+  }
+
+  /**
+   * Preprocess template structure for efficient caching
+   * @param {Object} templateJson - Original template JSON
+   * @returns {Object} Preprocessed template structure
+   */
+  preprocessTemplateStructure(templateJson) {
+    try {
+      return {
+        structure: this.preprocessNode(templateJson.structure),
+        templateTags: templateJson.template_tags || [],
+        templateVariables: templateJson.template_variables || [],
+        hasInlineCSS: templateJson.has_inline_css || false,
+        metadata: {
+          preprocessedAt: Date.now(),
+          structureType: templateJson.structure?.type
+        }
+      };
+    } catch (error) {
+      console.error('LayoutRenderer: Error preprocessing template structure', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Recursively preprocess template nodes for caching
+   * @param {Object} node - Template node to preprocess
+   * @returns {Object} Preprocessed node
+   */
+  preprocessNode(node) {
+    try {
+      if (!node || typeof node !== 'object') {
+        return node;
+      }
+
+      const preprocessed = { ...node };
+
+      // Preprocess children recursively
+      if (node.children && Array.isArray(node.children)) {
+        preprocessed.children = node.children.map(child => this.preprocessNode(child));
+      }
+
+      // Preprocess template-specific structures
+      if (node.template) {
+        preprocessed.template = this.preprocessNode(node.template);
+      }
+
+      if (node.content && typeof node.content === 'object') {
+        preprocessed.content = this.preprocessNode(node.content);
+      }
+
+      return preprocessed;
+    } catch (error) {
+      console.error('LayoutRenderer: Error preprocessing node', error, node);
+      return node; // Return original on error
+    }
+  }
+
+  /**
+   * Process cached template with current configuration
+   * @param {Object} cachedTemplate - Preprocessed template from cache
+   * @param {Object} config - Current widget configuration
+   * @param {string} widgetId - Widget ID for CSS scoping
+   * @returns {HTMLElement} Rendered element
+   */
+  processCachedTemplate(cachedTemplate, config, widgetId) {
+    try {
+      const templateTags = cachedTemplate.templateTags || [];
+      let element;
+
+      if (templateTags.length > 0 && (templateTags.includes('if') || templateTags.includes('for'))) {
+        // Use enhanced processing for templates with logic
+        element = this.processTemplateStructureWithLogic(cachedTemplate.structure, config, templateTags);
+      } else {
+        // Use standard processing for simple templates
+        element = this.processTemplateStructure(cachedTemplate.structure, config);
+      }
+
+      // Handle inline CSS if present
+      if (cachedTemplate.hasInlineCSS) {
+        // Reconstruct templateJson for CSS processing
+        const templateJson = {
+          structure: cachedTemplate.structure,
+          has_inline_css: cachedTemplate.hasInlineCSS
+        };
+        this.processInlineStyles(templateJson, config, widgetId);
+      }
+
+      return element;
+
+    } catch (error) {
+      console.error('LayoutRenderer: Error processing cached template', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get template from cache
+   * @param {string} cacheKey - Cache key
+   * @returns {Object|null} Cached template or null
+   */
+  getFromTemplateCache(cacheKey) {
+    try {
+      const cached = this.templateCache.get(cacheKey);
+      if (cached) {
+        // Update access time for LRU eviction
+        cached.lastAccessed = Date.now();
+        return cached.template;
+      }
+      return null;
+    } catch (error) {
+      console.error('LayoutRenderer: Error getting from template cache', error);
+      return null;
+    }
+  }
+
+  /**
+   * Set template in cache with LRU eviction
+   * @param {string} cacheKey - Cache key
+   * @param {Object} template - Preprocessed template
+   * @param {Object} originalTemplateJson - Original template JSON for metadata
+   */
+  setTemplateCache(cacheKey, template, originalTemplateJson) {
+    try {
+      const maxCacheSize = 100; // Maximum number of cached templates
+
+      // Check if cache needs cleaning
+      if (this.templateCache.size >= maxCacheSize) {
+        this.evictLeastRecentlyUsedTemplates(maxCacheSize * 0.8); // Keep 80% of max
+      }
+
+      this.templateCache.set(cacheKey, {
+        template,
+        createdAt: Date.now(),
+        lastAccessed: Date.now(),
+        originalSize: JSON.stringify(originalTemplateJson).length,
+        widgetType: template.metadata?.structureType
+      });
+
+    } catch (error) {
+      console.error('LayoutRenderer: Error setting template cache', error);
+    }
+  }
+
+  /**
+   * Evict least recently used templates from cache
+   * @param {number} targetSize - Target cache size after eviction
+   */
+  evictLeastRecentlyUsedTemplates(targetSize) {
+    try {
+      const entries = Array.from(this.templateCache.entries());
+
+      // Sort by last accessed time (oldest first)
+      entries.sort((a, b) => a[1].lastAccessed - b[1].lastAccessed);
+
+      const toEvict = entries.length - targetSize;
+      for (let i = 0; i < toEvict; i++) {
+        this.templateCache.delete(entries[i][0]);
+        this.cacheMetrics.evictions++;
+      }
+
+      console.log(`LayoutRenderer: Evicted ${toEvict} templates from cache`);
+
+    } catch (error) {
+      console.error('LayoutRenderer: Error evicting templates from cache', error);
+    }
+  }
+
+  /**
+   * Preload and cache widget templates for faster rendering
+   * @param {Array} widgets - Array of widget definitions with template_json
+   */
+  async preloadWidgetTemplates(widgets) {
+    try {
+      if (!Array.isArray(widgets)) {
+        return;
+      }
+
+      console.log(`LayoutRenderer: Preloading ${widgets.length} widget templates...`);
+
+      const preloadPromises = widgets.map(async (widget) => {
+        try {
+          if (widget._apiData?.template_json) {
+            // Create a sample config for preprocessing
+            const sampleConfig = this.createSampleConfig(widget._apiData.configuration_schema);
+
+            // Preprocess and cache the template
+            const cacheKey = this.generateTemplateCacheKey(
+              widget._apiData.template_json,
+              sampleConfig,
+              widget.type
+            );
+
+            if (!this.getFromTemplateCache(cacheKey)) {
+              const preprocessed = this.preprocessTemplateStructure(widget._apiData.template_json);
+              this.setTemplateCache(cacheKey, preprocessed, widget._apiData.template_json);
+            }
+          }
+        } catch (error) {
+          console.warn(`LayoutRenderer: Failed to preload template for widget "${widget.type}"`, error);
+        }
+      });
+
+      await Promise.all(preloadPromises);
+      console.log('LayoutRenderer: Widget template preloading completed');
+
+    } catch (error) {
+      console.error('LayoutRenderer: Error preloading widget templates', error);
+    }
+  }
+
+  /**
+   * Create sample configuration from schema for template preprocessing
+   * @param {Object} schema - Configuration schema
+   * @returns {Object} Sample configuration
+   */
+  createSampleConfig(schema) {
+    try {
+      if (!schema || typeof schema !== 'object') {
+        return {};
+      }
+
+      const sampleConfig = {};
+
+      // Extract properties from JSON schema
+      if (schema.properties) {
+        Object.entries(schema.properties).forEach(([key, propSchema]) => {
+          sampleConfig[key] = this.createSampleValue(propSchema);
+        });
+      }
+
+      return sampleConfig;
+
+    } catch (error) {
+      console.warn('LayoutRenderer: Error creating sample config', error);
+      return {};
+    }
+  }
+
+  /**
+   * Create sample value based on property schema
+   * @param {Object} propSchema - Property schema
+   * @returns {*} Sample value
+   */
+  createSampleValue(propSchema) {
+    try {
+      switch (propSchema.type) {
+        case 'string':
+          return propSchema.default || 'sample_text';
+        case 'number':
+        case 'integer':
+          return propSchema.default || 0;
+        case 'boolean':
+          return propSchema.default || false;
+        case 'array':
+          return propSchema.default || [];
+        case 'object':
+          return propSchema.default || {};
+        default:
+          return propSchema.default || '';
+      }
+    } catch (error) {
+      return '';
+    }
+  }
+
+  /**
+   * Get cache performance metrics
+   * @returns {Object} Cache metrics
+   */
+  getCacheMetrics() {
+    const hitRate = this.cacheMetrics.hits + this.cacheMetrics.misses > 0
+      ? (this.cacheMetrics.hits / (this.cacheMetrics.hits + this.cacheMetrics.misses) * 100).toFixed(2)
+      : 0;
+
+    return {
+      ...this.cacheMetrics,
+      hitRate: `${hitRate}%`,
+      cacheSize: this.templateCache.size,
+      memoryUsage: this.estimateCacheMemoryUsage()
+    };
+  }
+
+  /**
+   * Estimate cache memory usage
+   * @returns {string} Estimated memory usage
+   */
+  estimateCacheMemoryUsage() {
+    try {
+      let totalSize = 0;
+      this.templateCache.forEach(entry => {
+        totalSize += entry.originalSize || 0;
+      });
+
+      // Convert to human readable format
+      if (totalSize < 1024) {
+        return `${totalSize}B`;
+      } else if (totalSize < 1024 * 1024) {
+        return `${(totalSize / 1024).toFixed(1)}KB`;
+      } else {
+        return `${(totalSize / (1024 * 1024)).toFixed(1)}MB`;
+      }
+    } catch (error) {
+      return 'Unknown';
+    }
+  }
+
+  /**
+   * Clear template cache
+   */
+  clearTemplateCache() {
+    try {
+      this.templateCache.clear();
+      this.cacheMetrics = { hits: 0, misses: 0, evictions: 0 };
+      console.log('LayoutRenderer: Template cache cleared');
+    } catch (error) {
+      console.error('LayoutRenderer: Error clearing template cache', error);
+    }
+  }
+
+  // ======================================================================
+  // END TEMPLATE JSON PROCESSING ENGINE  
+  // ======================================================================
 
   /**
    * Render a widget object to DOM element
