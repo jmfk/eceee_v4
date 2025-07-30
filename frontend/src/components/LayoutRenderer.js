@@ -898,14 +898,20 @@ class LayoutRenderer {
     if (dropdown) {
       const isHidden = dropdown.classList.contains('hidden');
 
-      // Close all other menus
+      // Close all other slot menus
       document.querySelectorAll('.slot-menu-dropdown').forEach(menu => {
+        menu.classList.add('hidden');
+      });
+      // Close all widget menus too
+      document.querySelectorAll('.widget-menu-dropdown').forEach(menu => {
         menu.classList.add('hidden');
       });
 
       // Toggle this menu
       if (isHidden) {
         dropdown.classList.remove('hidden');
+      } else {
+        dropdown.classList.add('hidden');
       }
     }
   }
