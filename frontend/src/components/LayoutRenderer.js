@@ -211,7 +211,7 @@ class LayoutRenderer {
    * @param {Array} widgets - Array of widget objects to render
    */
   updateSlot(slotName, widgets = []) {
-    // console.log("LayoutRenderer updateSlot", slotName, widgets)
+    console.log("LayoutRenderer", slotName, widgets)
     if (this.isDestroyed) {
       console.warn('LayoutRenderer: Cannot update slot on destroyed instance');
       return;
@@ -220,10 +220,9 @@ class LayoutRenderer {
     const container = this.slotContainers.get(slotName);
 
     if (!container) {
-      console.warn(`LayoutRenderer: Slot "${slotName}" not found`);
       return;
     }
-
+    console.log("container", container)
     try {
       // Validate widgets array
       if (!Array.isArray(widgets)) {
@@ -236,8 +235,10 @@ class LayoutRenderer {
       if (widgets.length > 0) {
         // Render provided widgets
         widgets.forEach((widget, index) => {
+          console.log("widget", widget, index)
           try {
             const widgetElement = this.renderWidget(widget);
+            console.log("widgetElement", widgetElement)
             if (widgetElement) {
               container.appendChild(widgetElement);
             }
@@ -337,6 +338,7 @@ class LayoutRenderer {
    * @param {Function} renderer - Function that takes a widget object and returns DOM element
    */
   setWidgetRenderer(renderer) {
+    console.log("setWidgetRenderer", renderer)
     if (typeof renderer !== 'function') {
       console.warn('LayoutRenderer: Widget renderer must be a function');
       return;
@@ -1219,6 +1221,7 @@ class LayoutRenderer {
 
     if (widgetData && typeof widgetData === 'object') {
       Object.entries(widgetData).forEach(([slotName, widgets]) => {
+        console.log("loadWidgetData", slotName, widgets)
         if (Array.isArray(widgets)) {
           this.savedWidgetData.set(slotName, [...widgets]); // Deep copy
         }
@@ -2289,7 +2292,7 @@ class LayoutRenderer {
    * @returns {HTMLElement|null} DOM element or null if rendering failed
    */
   renderWidget(widget) {
-    // console.log("LayoutRenderer widget", widget)
+    console.log("renderWidget", widget)
     try {
       // Validate widget object
       if (!widget || typeof widget !== 'object') {
