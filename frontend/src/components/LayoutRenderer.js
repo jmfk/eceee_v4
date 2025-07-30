@@ -1646,8 +1646,6 @@ class LayoutRenderer {
   renderWidgetInstance(widgetInstance) {
     const { id, type, name, config } = widgetInstance;
 
-    console.log("renderWidgetInstance", widgetInstance)
-
     // Create main widget container
     const widget = document.createElement('div');
     widget.className = 'rendered-widget mb-4 p-4 border border-gray-200 rounded-lg bg-white relative';
