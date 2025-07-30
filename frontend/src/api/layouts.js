@@ -11,7 +11,7 @@ export const layoutsApi = {
     codeLayouts: {
         // Get all code layouts
         list: async (activeOnly = true) => {
-            const response = await axios.get(`${API_BASE}/code-layouts/`, {
+            const response = await axios.get(`${API_BASE}/layouts/`, {
                 params: { active_only: activeOnly }
             })
             return response.data
@@ -19,13 +19,13 @@ export const layoutsApi = {
 
         // Get specific code layout
         get: async (name) => {
-            const response = await axios.get(`${API_BASE}/code-layouts/${name}/`)
+            const response = await axios.get(`${API_BASE}/layouts/${name}/`)
             return response.data
         },
 
         // Get layout choices for forms
         choices: async (activeOnly = true) => {
-            const response = await axios.get(`${API_BASE}/code-layouts/choices/`, {
+            const response = await axios.get(`${API_BASE}/layouts/choices/`, {
                 params: { active_only: activeOnly }
             })
             return response.data
@@ -33,13 +33,13 @@ export const layoutsApi = {
 
         // Reload layouts (admin)
         reload: async () => {
-            const response = await axios.post(`${API_BASE}/code-layouts/reload/`)
+            const response = await axios.post(`${API_BASE}/layouts/reload/`)
             return response.data
         },
 
         // Validate layouts (admin)
         validate: async () => {
-            const response = await axios.get(`${API_BASE}/code-layouts/validate/`)
+            const response = await axios.get(`${API_BASE}/layouts/validate/`)
             return response.data
         }
     },

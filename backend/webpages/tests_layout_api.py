@@ -14,8 +14,8 @@ import json
 from unittest.mock import patch, MagicMock
 
 
-class LayoutAPIBackwardCompatibilityTests(APITestCase):
-    """Test that existing API consumers continue to work without changes"""
+class LayoutAPIUnifiedEndpointTests(APITestCase):
+    """Test that unified layout endpoints work correctly"""
 
     def setUp(self):
         self.client = APIClient()
@@ -23,15 +23,15 @@ class LayoutAPIBackwardCompatibilityTests(APITestCase):
             username="testuser", email="test@example.com", password="testpass123"
         )
 
-    def test_existing_code_layouts_list_endpoint(self):
-        """Test that /api/v1/webpages/code-layouts/ still works as before"""
-        response = self.client.get("/api/v1/webpages/code-layouts/")
+    def test_unified_layouts_list_endpoint(self):
+        """Test that /api/v1/webpages/layouts/ works correctly"""
+        response = self.client.get("/api/v1/webpages/layouts/")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("results", response.data)
         self.assertIn("summary", response.data)
 
-        # Verify structure is unchanged for backward compatibility
+        # Verify structure is correct
         if response.data["results"]:
             layout = response.data["results"][0]
             required_fields = [
@@ -45,14 +45,14 @@ class LayoutAPIBackwardCompatibilityTests(APITestCase):
             for field in required_fields:
                 self.assertIn(field, layout)
 
-    def test_existing_code_layouts_detail_endpoint(self):
-        """Test that /api/code-layouts/{name}/ still works as before"""
+    def test_unified_layouts_detail_endpoint(self):
+        """Test that /api/layouts/{name}/ works correctly"""
         # First get a layout name from the list
-        list_response = self.client.get("/api/v1/webpages/code-layouts/")
+        list_response = self.client.get("/api/v1/webpages/layouts/")
         if list_response.data["results"]:
             layout_name = list_response.data["results"][0]["name"]
 
-            response = self.client.get(f"/api/v1/webpages/code-layouts/{layout_name}/")
+            response = self.client.get(f"/api/v1/webpages/layouts/{layout_name}/")
             self.assertEqual(response.status_code, status.HTTP_200_OK)
 
             # Verify required fields exist
@@ -67,9 +67,9 @@ class LayoutAPIBackwardCompatibilityTests(APITestCase):
             for field in required_fields:
                 self.assertIn(field, response.data)
 
-    def test_choices_endpoint_unchanged(self):
-        """Test that choices endpoint still works"""
-        response = self.client.get("/api/v1/webpages/code-layouts/choices/")
+    def test_unified_choices_endpoint(self):
+        """Test that unified choices endpoint works"""
+        response = self.client.get("/api/v1/webpages/layouts/choices/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         # Should return a list of choices

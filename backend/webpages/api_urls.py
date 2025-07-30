@@ -20,12 +20,10 @@ from .views import (
 router = DefaultRouter()
 router.register(r"pages", WebPageViewSet, basename="webpage")
 router.register(r"versions", PageVersionViewSet, basename="pageversion")
-# router.register(r"layouts", PageLayoutViewSet, basename="pagelayout")  # Removed - using code layouts only
-router.register(r"code-layouts", CodeLayoutViewSet, basename="codelayout")
 # Phase 1.3: Enhanced layout endpoints with template data support
 router.register(
     r"layouts", CodeLayoutViewSet, basename="layout"
-)  # New unified endpoint
+)  # Unified endpoint for all layout operations
 router.register(r"themes", PageThemeViewSet, basename="pagetheme")
 router.register(r"widget-types", WidgetTypeViewSet, basename="widgettype")
 
