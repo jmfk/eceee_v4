@@ -124,6 +124,7 @@ class BaseWidget(ABC):
     def to_dict(self) -> Dict[str, Any]:
         """Convert widget type to dictionary representation"""
         result = {
+            "type": self.type,  # Unique type id
             "name": self.name,
             "description": self.description,
             "widget_class": self.__class__.__name__,
@@ -137,6 +138,13 @@ class BaseWidget(ABC):
             result["template_json"] = template_json
 
         return result
+
+    @property
+    def type(self):
+        module = self.__class__.__module__
+        app_label = module.split('.')[0]
+        class_id = self.__class__.__name__
+        return f'{app_label}.{class_id}'
 
     def get_css_for_injection(
         self, widget_instance=None, scope_id: str = None
