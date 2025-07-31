@@ -909,11 +909,10 @@ const PagePreview = ({ pageData, isLoadingLayout, layoutData }) => {
                             <button
                                 key={key}
                                 onClick={() => setViewportSize(key)}
-                                className={`inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                                    viewportSize === key
+                                className={`inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${viewportSize === key
                                         ? 'bg-blue-100 text-blue-700 border border-blue-200'
                                         : 'bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200'
-                                }`}
+                                    }`}
                                 title={`Switch to ${viewport.label} view`}
                             >
                                 <span className="mr-1">{viewport.icon}</span>
@@ -932,52 +931,53 @@ const PagePreview = ({ pageData, isLoadingLayout, layoutData }) => {
 
             {/* Preview Content */}
             <div className="flex-1 bg-gray-100 overflow-auto">
-                <div className="h-full flex items-start justify-center p-4">
-                    {/* Viewport Container */}
-                    <div 
-                        className={`bg-white shadow-lg overflow-auto transition-all duration-300 ${
-                            viewportSize === 'desktop' 
-                                ? 'w-full h-full rounded-lg' 
-                                : viewportSize === 'tablet'
-                                ? 'border-2 border-gray-800 rounded-xl shadow-2xl'
-                                : 'border-2 border-gray-900 rounded-3xl shadow-2xl'
-                        }`}
-                        style={{
-                            width: currentViewport.width,
-                            height: viewportSize === 'desktop' ? '100%' : currentViewport.height,
-                            maxWidth: '100%',
-                            maxHeight: viewportSize === 'desktop' ? '100%' : 'calc(100vh - 200px)',
-                            // Add device-like styling for mobile and tablet
-                            ...(viewportSize === 'mobile' && {
-                                background: 'linear-gradient(145deg, #1f2937, #374151)',
-                                padding: '8px',
-                            }),
-                            ...(viewportSize === 'tablet' && {
-                                background: 'linear-gradient(145deg, #374151, #4b5563)',
-                                padding: '6px',
-                            })
-                        }}
-                    >
-                        {/* Device-like inner container for mobile/tablet */}
-                        {viewportSize !== 'desktop' ? (
-                            <div className="bg-white w-full h-full rounded-lg overflow-auto">
-                                <ContentEditor
-                                    layoutJson={layoutData}
-                                    pageData={pageData}
-                                    editable={false}
-                                    className="h-full preview-mode"
-                                />
-                            </div>
-                        ) : (
+                {viewportSize === 'desktop' ? (
+                    /* Desktop: Full responsive container */
+                    <div className="h-full p-4">
+                        <div className="bg-white shadow-lg rounded-lg w-full h-full overflow-auto">
                             <ContentEditor
                                 layoutJson={layoutData}
                                 pageData={pageData}
                                 editable={false}
                                 className="h-full preview-mode"
                             />
-                        )}
+                        </div>
                     </div>
-                </div>
+                ) : (
+                    /* Mobile/Tablet: Fixed-size device containers with external scrolling */
+                    <div className="h-full p-4 overflow-auto">
+                        <div className="min-h-full flex items-start justify-center">
+                            {/* Fixed-size device frame */}
+                            <div 
+                                className={`transition-all duration-300 flex-shrink-0 ${
+                                    viewportSize === 'tablet'
+                                        ? 'border-2 border-gray-800 rounded-xl shadow-2xl'
+                                        : 'border-2 border-gray-900 rounded-3xl shadow-2xl'
+                                }`}
+                                style={{
+                                    width: currentViewport.width,
+                                    height: currentViewport.height,
+                                    // Add device-like styling for mobile and tablet
+                                    background: viewportSize === 'mobile' 
+                                        ? 'linear-gradient(145deg, #1f2937, #374151)'
+                                        : 'linear-gradient(145deg, #374151, #4b5563)',
+                                    padding: viewportSize === 'mobile' ? '8px' : '6px',
+                                }}
+                            >
+                                {/* Inner screen with fixed dimensions and internal scrolling */}
+                                <div className="bg-white w-full h-full rounded-lg overflow-auto">
+                                    <ContentEditor
+                                        layoutJson={layoutData}
+                                        pageData={pageData}
+                                        editable={false}
+                                        className="preview-mode"
+                                        style={{ minHeight: '100%' }}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
