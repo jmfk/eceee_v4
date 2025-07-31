@@ -10,6 +10,7 @@ from django.utils.html import format_html
 from django.urls import reverse
 from django.utils.safestring import mark_safe
 from .models import WebPage, PageVersion, PageTheme
+from .middleware import HostnameUpdateMixin
 
 
 class HasHostnamesFilter(admin.SimpleListFilter):
@@ -112,7 +113,7 @@ class PageVersionInline(admin.TabularInline):
 
 
 @admin.register(WebPage)
-class WebPageAdmin(admin.ModelAdmin):
+class WebPageAdmin(HostnameUpdateMixin, admin.ModelAdmin):
     list_display = [
         "title",
         "slug",

@@ -479,7 +479,7 @@ class HostnamePageView(View):
         hostname = self.request.get_host().lower()
 
         # Get the path from the URL
-        slug_path = self.kwargs.get("slug_path", "")
+        slug_path = getattr(self, "kwargs", {}).get("slug_path", "")
         slug_parts = (
             [part for part in slug_path.split("/") if part] if slug_path else []
         )

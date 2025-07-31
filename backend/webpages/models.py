@@ -1285,6 +1285,53 @@ class WebPage(models.Model):
 
         return "\n\n".join(css_parts)
 
+    def save(self, *args, **kwargs):
+        """Override save to clear hostname cache when hostnames change."""
+        # Check if hostnames are being changed (for cache invalidation)
+        hostname_changed = False
+        if self.pk:  # Only check for existing objects
+            try:
+                old_instance = WebPage.objects.get(pk=self.pk)
+                if old_instance.hostnames != self.hostnames:
+                    hostname_changed = True
+            except WebPage.DoesNotExist:
+                pass
+        elif self.hostnames:  # New object with hostnames
+            hostname_changed = True
+
+        super().save(*args, **kwargs)
+
+        # Clear hostname cache if hostnames changed
+        if hostname_changed:
+            self._clear_hostname_cache()
+
+    def delete(self, *args, **kwargs):
+        """Override delete to clear hostname cache if page had hostnames."""
+        had_hostnames = bool(self.hostnames)
+        super().delete(*args, **kwargs)
+
+        if had_hostnames:
+            self._clear_hostname_cache()
+
+    def _clear_hostname_cache(self):
+        """Clear the hostname cache when hostnames are updated."""
+        try:
+            from django.core.cache import cache
+
+            cache.delete("webpages_allowed_hosts")
+
+            # Also try to import and use the middleware method if available
+            try:
+                from .middleware import DynamicHostValidationMiddleware
+
+                DynamicHostValidationMiddleware.clear_hostname_cache()
+            except ImportError:
+                pass
+
+        except Exception:
+            # Don't fail if cache is not available
+            pass
+
 
 class PageVersion(models.Model):
     """
