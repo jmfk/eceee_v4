@@ -1,6 +1,11 @@
-# Core Widgets App
+# ECEEE v4 Core Widgets
 
-This Django app contains the built-in widget types for the eceee_v4 CMS.
+> **Built-in Widget Types for AI-Integrated Content Management System**  
+> **Status**: Production Ready with Type-Safe Architecture  
+> **Tech Stack**: Django + Pydantic + Auto-Discovery  
+> **Last Updated**: December 2024
+
+This Django app contains the built-in widget types for the eceee_v4 CMS, providing a comprehensive set of commonly used widgets with type-safe configuration validation.
 
 ## Purpose
 
@@ -79,3 +84,17 @@ To use only custom widgets without the built-in types:
 ## Widget Registry Integration
 
 All widgets are automatically registered with the global widget registry (`webpages.widget_registry.widget_type_registry`) through the autodiscovery system in `webpages.widget_autodiscovery.py`.
+
+## 🔗 Related Documentation
+
+- **[Code-Based Widget System](../docs/CODE_BASED_WIDGET_SYSTEM.md)** - Widget architecture and development guide
+- **[Widget System Migration Guide](../../docs/WIDGET_SYSTEM_MIGRATION_GUIDE.md)** - Migration from legacy system
+- **[Backend README](../README.md)** - Complete backend documentation
+- **[Complete Documentation Index](../../DOCUMENTATION_INDEX.md)** - All project documentation
+
+---
+
+**ECEEE v4 Core Widgets**: Type-safe built-in widget library  
+**Status**: Production Ready with Auto-Discovery  
+**Integration**: Seamless widget registry integration  
+**Documentation**: Comprehensive and Current
