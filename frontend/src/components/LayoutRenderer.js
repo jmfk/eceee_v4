@@ -2137,8 +2137,8 @@ class LayoutRenderer {
  */
   handleWidgetSelection(widgetType, slotName, closeModal) {
     try {
-      // Find widget definition
-      const availableWidgets = this.getAvailableWidgets();
+      // Find widget definition using sync version for immediate response
+      const availableWidgets = this.getAvailableWidgetsSync();
       const widgetDef = availableWidgets.find(w => w.type === widgetType);
 
       if (!widgetDef) {
