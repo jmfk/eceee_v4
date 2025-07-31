@@ -4215,6 +4215,43 @@ class LayoutRenderer {
         warnings.push(`Unknown structure type: ${structure.type}`);
       }
 
+      // Validate type-specific properties
+      switch (structure.type) {
+        case 'conditional_block':
+          if (!structure.condition || typeof structure.condition !== 'string') {
+            errors.push('conditional_block missing valid condition property');
+          }
+          if (!structure.content) {
+            errors.push('conditional_block missing content property');
+          } else {
+            this.validateTemplateStructure(structure.content, errors, warnings);
+          }
+          break;
+
+        case 'loop_block':
+          if (!structure.loop || typeof structure.loop !== 'string') {
+            errors.push('loop_block missing valid loop property');
+          }
+          if (!structure.content) {
+            errors.push('loop_block missing content property');
+          } else {
+            this.validateTemplateStructure(structure.content, errors, warnings);
+          }
+          break;
+
+        case 'fragment':
+          if (!structure.children || !Array.isArray(structure.children)) {
+            warnings.push('fragment should have children array');
+          }
+          break;
+
+        case 'element':
+          if (!structure.tag || typeof structure.tag !== 'string') {
+            errors.push('element missing valid tag property');
+          }
+          break;
+      }
+
       // Validate children if present
       if (structure.children && Array.isArray(structure.children)) {
         structure.children.forEach((child, index) => {
