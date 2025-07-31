@@ -791,4 +791,279 @@ gh issue create --title "Phase 1.2: Create template parsing engine" --body-file 
 3. **Phase 3** (Integration): Issues 8-10
 4. **Phase 4** (Testing & Polish): Issues 11-12
 
-Each phase should be completed before starting the next to ensure proper dependencies are met. 
+Each phase should be completed before starting the next to ensure proper dependencies are met.
+
+---
+
+## Frontend Bug Reports
+
+### Bug 1: Unsafe parseInt usage without error handling
+
+**Title:** `Bug: Unsafe parseInt usage without error handling`
+
+**Labels:** `bug`, `frontend`, `medium-priority`
+
+**Body:**
+```markdown
+## Description
+Multiple components use `parseInt()` without proper error handling, which can lead to NaN values and unexpected behavior.
+
+## Affected Files
+- `frontend/src/components/StatusBar.jsx:133` - `parseInt(e.target.value)` for version selection
+- `frontend/src/components/LayoutRenderer.js:4990` - `parseInt(e.target.value)` for version selection  
+- `frontend/src/components/widget-editors/EventsEditor.jsx:262` - `parseInt(e.target.value)` for capacity field
+
+## Impact
+- UI components may break with invalid numeric inputs
+- Version selection could fail silently
+- Form validation bypassed
+
+## Recommended Fix
+Wrap parseInt calls in validation:
+```javascript
+const parsed = parseInt(value, 10);
+if (isNaN(parsed)) {
+    // Handle error case
+    return;
+}
+```
+
+## Priority
+Medium - Can cause UI malfunctions
+```
+
+---
+
+### Bug 2: Missing key props in React list renders
+
+**Title:** `Bug: Missing key props in React list renders causing performance issues`
+
+**Labels:** `bug`, `frontend`, `performance`, `medium-priority`
+
+**Body:**
+```markdown
+## Description
+Multiple components render lists without proper key props, which can cause React rendering performance issues and state management bugs.
+
+## Affected Files
+- `frontend/src/components/slot-manager/HtmlSlotCard.jsx:103,118,130` - Missing keys in error/warning/widget lists
+- `frontend/src/components/ThemeEditor.jsx:117,131,150,388,450,755,855` - Missing keys in theme-related lists
+- `frontend/src/components/NotificationManager.jsx:34` - Missing keys in error list
+- Multiple other components affected
+
+## Impact
+- Degraded React rendering performance
+- Potential state management bugs when lists change
+- Console warnings in development
+
+## Recommended Fix
+Add unique key props to all mapped elements:
+```javascript
+{items.map((item, index) => (
+    <Component key={item.id || index} {...props} />
+))}
+```
+
+## Priority
+Medium - Performance and reliability issue
+```
+
+---
+
+### Bug 3: Potential memory leaks from untracked event listeners
+
+**Title:** `Bug: Potential memory leaks from untracked event listeners`
+
+**Labels:** `bug`, `frontend`, `memory-leak`, `high-priority`
+
+**Body:**
+```markdown
+## Description
+Several components add event listeners to global objects (document, window) without properly removing them in cleanup functions, potentially causing memory leaks.
+
+## Affected Files
+- `frontend/src/components/LayoutRenderer.js` - Multiple addEventListener calls not properly tracked for cleanup
+- `frontend/src/utils/cssInjectionManager.js:38` - window beforeunload listener  
+- `frontend/src/components/ContentEditor.jsx` - Complex event listener management
+
+## Critical Areas
+1. **LayoutRenderer.js**: Lines 724,731,774,776,855,857,1055,1056,1059,1179,1207,1366,1440,1450,2127,2128,2131,2138,2155,4022,4989
+2. **Modal.jsx**: Lines 19,20 - Global keydown listeners
+
+## Impact
+- Memory leaks in long-running sessions
+- Potential performance degradation
+- Event handler conflicts
+
+## Recommended Fix
+1. Audit all global event listeners
+2. Ensure proper cleanup in useEffect return functions
+3. Use WeakMap or Set to track listeners for cleanup
+
+## Priority
+High - Memory leaks affect application stability
+```
+
+---
+
+### Bug 4: Missing null/undefined checks in StatusBar component
+
+**Title:** `Bug: Missing null/undefined checks in StatusBar component`
+
+**Labels:** `bug`, `frontend`, `medium-priority`
+
+**Body:**
+```markdown
+## Description
+The StatusBar component assumes certain properties exist on objects without null checks, which can cause runtime errors.
+
+## Affected Code
+`frontend/src/components/StatusBar.jsx:59`
+
+## Issue
+- Assumes `timestamp` property exists and has `toLocaleTimeString()` method
+- If timestamp is not a Date object or is null/undefined, this will throw an error
+
+## Impact
+- Runtime errors when notifications have invalid timestamp data
+- UI crashes in status bar
+
+## Recommended Fix
+```javascript
+{notifications[currentNotificationIndex]?.timestamp?.toLocaleTimeString?.() || 'Unknown time'}
+```
+
+## Priority
+Medium - Can cause UI crashes
+```
+
+---
+
+### Bug 5: ContentEditor pageData undefined warning indicates race condition
+
+**Title:** `Bug: ContentEditor pageData undefined warning indicates potential race condition`
+
+**Labels:** `bug`, `frontend`, `race-condition`, `medium-priority`
+
+**Body:**
+```markdown
+## Description
+The ContentEditor component shows a warning about pageData being undefined, indicating a potential race condition in component initialization.
+
+## Affected Code
+`frontend/src/components/ContentEditor.jsx:32-34`
+
+## Issue
+- Component can render before pageData is available
+- No loading state or error boundary handling for this case
+
+## Impact
+- Component may render incorrectly or crash
+- Poor user experience with broken initial states
+
+## Recommended Fix
+```javascript
+if (pageData === undefined) {
+    return <LoadingSpinner />;
+}
+```
+
+## Priority
+Medium - Affects component reliability
+```
+
+---
+
+### Bug 6: LayoutRenderer complexity indicates architectural issues
+
+**Title:** `Bug: LayoutRenderer complexity indicates potential architectural issues`
+
+**Labels:** `bug`, `frontend`, `technical-debt`, `refactor`, `high-priority`
+
+**Body:**
+```markdown
+## Description
+The LayoutRenderer.js file shows signs of excessive complexity with multiple console.error/warn statements indicating error-prone code.
+
+## Evidence of Issues
+- **File size**: 5,238 lines in a single JavaScript class
+- **Error handling**: 30+ console.error/warn statements throughout the file
+- **Complex state management**: Multiple Maps, event listeners, caching systems
+
+## Architectural Concerns
+- Single Responsibility Principle violation
+- Too many concerns mixed in one class
+- Difficult to test and maintain
+
+## Recommended Solution
+Refactor into smaller, focused modules:
+- WidgetManager, SlotManager, UIManager, VersionManager, CacheManager
+
+## Priority
+High - Architectural debt affecting maintainability
+```
+
+---
+
+### Bug 7: Modal component lacks error handling for callback functions
+
+**Title:** `Bug: Modal component lacks error handling for callback functions`
+
+**Labels:** `bug`, `frontend`, `low-priority`
+
+**Body:**
+```markdown
+## Description
+The Modal component calls `onClose` function without verifying it's actually a function.
+
+## Affected Code
+`frontend/src/components/Modal.jsx:16,57,73`
+
+## Impact
+- Runtime errors if onClose is undefined/null
+
+## Recommended Fix
+```javascript
+const handleClose = () => {
+    if (typeof onClose === 'function') {
+        onClose();
+    }
+};
+```
+
+## Priority
+Low - Easy to avoid but should be defensive
+```
+
+---
+
+### Bug 8: TreePageManager useEffect hooks may cause infinite loops
+
+**Title:** `Bug: TreePageManager useEffect hooks may cause infinite loops`
+
+**Labels:** `bug`, `frontend`, `performance`, `medium-priority`
+
+**Body:**
+```markdown
+## Description
+The TreePageManager component has multiple useEffect hooks with complex dependencies that could potentially cause infinite re-renders.
+
+## Affected Areas
+`frontend/src/components/TreePageManager.jsx` - Lines 168-191
+
+## Potential Issues
+- Complex dependency arrays with unstable dependencies
+- State updates in effects triggering cascading re-renders
+
+## Impact
+- Performance degradation from unnecessary re-renders
+- Potential infinite loops crashing the browser
+
+## Recommended Investigation
+1. Add console.log statements to track effect executions
+2. Use React DevTools Profiler to identify excessive re-renders
+3. Review all dependency arrays for stability
+
+## Priority
+Medium - Could cause performance issues
+``` 
