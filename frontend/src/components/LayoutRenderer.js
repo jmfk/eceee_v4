@@ -26,22 +26,26 @@ const ERROR_TYPES = {
 };
 
 class LayoutRenderer {
-  constructor() {
+  constructor(options = {}) {
     this.slotContainers = new Map(); // Map of slot names to DOM elements
     this.slotConfigs = new Map(); // Map of slot names to their configurations
     this.widgetRenderer = null; // Will be set externally for widget rendering
     this.eventListeners = new Map(); // Track event listeners for cleanup
     this.isDestroyed = false; // Track destruction state
 
+    // Extract editable option (defaults to true for backward compatibility)
+    const { editable = true } = options;
+    this.editable = editable;
+
     // UI Enhancement properties
     this.slotUIElements = new Map(); // Map of slot names to UI overlay elements
-    this.uiConfig = { // Default UI configuration
-      showIconMenu: true,  // Enable icon menus by default
-      showAddWidget: true,
+    this.uiConfig = { // UI configuration based on editable mode
+      showIconMenu: editable,  // Only show icon menus in editable mode
+      showAddWidget: editable, // Only show add widget in editable mode
       showEditSlot: false,      // Disabled - removed from menu
       showSlotVisibility: false, // Disabled - removed from menu
-      enableDragDrop: false,
-      enableContextMenu: false
+      enableDragDrop: editable, // Only enable drag/drop in editable mode
+      enableContextMenu: editable // Only enable context menu in editable mode
     };
     this.uiCallbacks = new Map(); // Map of UI event callbacks
     this.dragState = { isDragging: false, draggedElement: null, sourceSlot: null };
@@ -753,21 +757,23 @@ class LayoutRenderer {
       slotElement.style.minHeight = '40px';
     }
 
-    // Add hover effect to make slots more discoverable
-    slotElement.style.transition = 'background-color 0.2s ease, border-color 0.2s ease';
-    slotElement.addEventListener('mouseenter', () => {
-      if (!slotElement.style.backgroundColor || slotElement.style.backgroundColor === 'transparent') {
-        slotElement.style.backgroundColor = 'rgba(59, 130, 246, 0.05)';
-        slotElement.style.borderColor = 'rgba(59, 130, 246, 0.2)';
-      }
-    });
+    // Add hover effect to make slots more discoverable (only in editable mode)
+    if (this.editable) {
+      slotElement.style.transition = 'background-color 0.2s ease, border-color 0.2s ease';
+      slotElement.addEventListener('mouseenter', () => {
+        if (!slotElement.style.backgroundColor || slotElement.style.backgroundColor === 'transparent') {
+          slotElement.style.backgroundColor = 'rgba(59, 130, 246, 0.05)';
+          slotElement.style.borderColor = 'rgba(59, 130, 246, 0.2)';
+        }
+      });
 
-    slotElement.addEventListener('mouseleave', () => {
-      if (slotElement.style.backgroundColor === 'rgba(59, 130, 246, 0.05)') {
-        slotElement.style.backgroundColor = '';
-        slotElement.style.borderColor = '';
-      }
-    });
+      slotElement.addEventListener('mouseleave', () => {
+        if (slotElement.style.backgroundColor === 'rgba(59, 130, 246, 0.05)') {
+          slotElement.style.backgroundColor = '';
+          slotElement.style.borderColor = '';
+        }
+      });
+    }
 
     // Add menu to slot
     slotElement.appendChild(menuContainer);
@@ -2246,9 +2252,11 @@ class LayoutRenderer {
     // Create main widget container
     const widget = this.createWidgetContainer(id, type);
 
-    // Add widget header with name and controls
-    const header = this.createWidgetHeader(id, name, widgetInstance);
-    widget.appendChild(header);
+    // Add widget header with name and controls (only in editable mode)
+    if (this.editable) {
+      const header = this.createWidgetHeader(id, name, widgetInstance);
+      widget.appendChild(header);
+    }
 
     // Add widget content - pass full widgetInstance for template_json access
     const content = await this.renderWidgetContent(type, config, widgetInstance);

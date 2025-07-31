@@ -950,8 +950,8 @@ const PagePreview = ({ pageData, isLoadingLayout, layoutData }) => {
                             {/* Fixed-size device frame */}
                             <div
                                 className={`transition-all duration-300 flex-shrink-0 ${viewportSize === 'tablet'
-                                        ? 'border-2 border-gray-800 rounded-xl shadow-2xl'
-                                        : 'border-2 border-gray-900 rounded-3xl shadow-2xl'
+                                    ? 'border-2 border-gray-800 rounded-xl shadow-2xl'
+                                    : 'border-2 border-gray-900 rounded-3xl shadow-2xl'
                                     }`}
                                 style={{
                                     width: currentViewport.width,
@@ -964,7 +964,7 @@ const PagePreview = ({ pageData, isLoadingLayout, layoutData }) => {
                                 }}
                             >
                                 {/* Inner screen with fixed dimensions and device-like scrolling */}
-                                <div 
+                                <div
                                     className="bg-white w-full h-full rounded-lg overflow-auto relative"
                                     style={{
                                         // Device-like smooth scrolling
@@ -982,7 +982,7 @@ const PagePreview = ({ pageData, isLoadingLayout, layoutData }) => {
                                             pageData={pageData}
                                             editable={false}
                                             className="preview-mode device-content"
-                                            style={{ 
+                                            style={{
                                                 minHeight: 'auto',
                                                 height: 'auto',
                                                 display: 'block',
