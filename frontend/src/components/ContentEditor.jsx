@@ -146,12 +146,17 @@ const ContentEditor = forwardRef(({
 
   // Memoize the layout renderer to prevent unnecessary re-creation
   const layoutRenderer = useMemo(() => {
-    if (!rendererRef.current) {
-      rendererRef.current = new LayoutRenderer();
+    // Always create new renderer when editable state changes
+    if (!rendererRef.current || rendererRef.current.editable !== editable) {
+      // Clean up existing renderer if it exists
+      if (rendererRef.current) {
+        rendererRef.current.cleanup();
+      }
+      rendererRef.current = new LayoutRenderer({ editable });
       rendererRef.current.setWidgetRenderer(createWidgetElement);
     }
     return rendererRef.current;
-  }, [createWidgetElement]);
+  }, [createWidgetElement, editable]);
 
 
 
@@ -480,6 +485,19 @@ const ContentEditor = forwardRef(({
       
       .preview-mode .layout-container {
         border: none !important;
+      }
+
+      /* Device content styles for mobile/tablet preview */
+      .device-content {
+        overflow: visible !important;
+        height: auto !important;
+        min-height: auto !important;
+      }
+      
+      .device-content .layout-container {
+        height: auto !important;
+        min-height: auto !important;
+        overflow: visible !important;
       }
     `;
     document.head.appendChild(style);

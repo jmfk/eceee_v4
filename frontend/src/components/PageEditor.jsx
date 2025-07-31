@@ -910,8 +910,8 @@ const PagePreview = ({ pageData, isLoadingLayout, layoutData }) => {
                                 key={key}
                                 onClick={() => setViewportSize(key)}
                                 className={`inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${viewportSize === key
-                                        ? 'bg-blue-100 text-blue-700 border border-blue-200'
-                                        : 'bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200'
+                                    ? 'bg-blue-100 text-blue-700 border border-blue-200'
+                                    : 'bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200'
                                     }`}
                                 title={`Switch to ${viewport.label} view`}
                             >
@@ -948,31 +948,50 @@ const PagePreview = ({ pageData, isLoadingLayout, layoutData }) => {
                     <div className="h-full p-4 overflow-auto">
                         <div className="min-h-full flex items-start justify-center">
                             {/* Fixed-size device frame */}
-                            <div 
-                                className={`transition-all duration-300 flex-shrink-0 ${
-                                    viewportSize === 'tablet'
+                            <div
+                                className={`transition-all duration-300 flex-shrink-0 ${viewportSize === 'tablet'
                                         ? 'border-2 border-gray-800 rounded-xl shadow-2xl'
                                         : 'border-2 border-gray-900 rounded-3xl shadow-2xl'
-                                }`}
+                                    }`}
                                 style={{
                                     width: currentViewport.width,
                                     height: currentViewport.height,
                                     // Add device-like styling for mobile and tablet
-                                    background: viewportSize === 'mobile' 
+                                    background: viewportSize === 'mobile'
                                         ? 'linear-gradient(145deg, #1f2937, #374151)'
                                         : 'linear-gradient(145deg, #374151, #4b5563)',
                                     padding: viewportSize === 'mobile' ? '8px' : '6px',
                                 }}
                             >
-                                {/* Inner screen with fixed dimensions and internal scrolling */}
-                                <div className="bg-white w-full h-full rounded-lg overflow-auto">
-                                    <ContentEditor
-                                        layoutJson={layoutData}
-                                        pageData={pageData}
-                                        editable={false}
-                                        className="preview-mode"
-                                        style={{ minHeight: '100%' }}
-                                    />
+                                {/* Inner screen with fixed dimensions and device-like scrolling */}
+                                <div 
+                                    className="bg-white w-full h-full rounded-lg overflow-auto relative"
+                                    style={{
+                                        // Device-like smooth scrolling
+                                        scrollBehavior: 'smooth',
+                                        WebkitOverflowScrolling: 'touch',
+                                        // Custom scrollbar for device-like appearance
+                                        scrollbarWidth: 'thin',
+                                        scrollbarColor: '#CBD5E0 transparent'
+                                    }}
+                                >
+                                    {/* Device content area with natural scrolling */}
+                                    <div className="w-full">
+                                        <ContentEditor
+                                            layoutJson={layoutData}
+                                            pageData={pageData}
+                                            editable={false}
+                                            className="preview-mode device-content"
+                                            style={{ 
+                                                minHeight: 'auto',
+                                                height: 'auto',
+                                                display: 'block',
+                                                overflow: 'visible'
+                                            }}
+                                        />
+                                        {/* Add bottom padding for device-like scroll experience */}
+                                        <div className="h-20 w-full"></div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
