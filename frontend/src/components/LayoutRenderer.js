@@ -94,8 +94,6 @@ class LayoutRenderer {
     }
 
     try {
-      console.log('LayoutRenderer: Fetching widget types from API...');
-
       this.widgetTypesPromise = fetch('/api/v1/webpages/widget-types/?include_template_json=true')
         .then(response => {
           if (!response.ok) {
@@ -104,16 +102,11 @@ class LayoutRenderer {
           return response.json();
         })
         .then(apiWidgets => {
-          console.log('LayoutRenderer: Raw API response:', apiWidgets);
-
           // Transform API response to widget card format
           const transformedWidgets = this.transformApiWidgetsToCardFormat(apiWidgets);
-          console.log('LayoutRenderer: Transformed widgets:', transformedWidgets);
 
           // Cache the transformed widgets
           this.cachedApiWidgets = transformedWidgets;
-
-          console.log(`LayoutRenderer: Successfully fetched ${transformedWidgets.length} widget types from API`);
 
           // Preload widget templates in the background for performance
           setTimeout(() => {
@@ -915,7 +908,7 @@ class LayoutRenderer {
         label: 'Slot Info',
         action: () => {
           // Note: Callback removed - slot info is display-only
-          // console.log(`Slot info requested: ${slotName}`);
+          console.log(`Slot info requested: ${slotName}`);
         },
         className: 'text-gray-700 hover:bg-gray-50'
       });
@@ -1019,7 +1012,6 @@ class LayoutRenderer {
 
     // Look up widget definition by type
     const availableWidgets = await this.getAvailableWidgets();
-    console.log('availableWidgets', availableWidgets);
     const widgetDef = availableWidgets.find(w => w.type === widgetInstance.type);
 
     // Prefer schema from widgetDef, fallback to instance _apiData
@@ -1240,7 +1232,7 @@ class LayoutRenderer {
       }
     } else {
       // Log removed callbacks for debugging
-      // console.log(`LayoutRenderer: Ignoring removed callback: ${callbackName}`);
+      console.log(`LayoutRenderer: Ignoring removed callback: ${callbackName}`);
     }
   }
 
@@ -1488,7 +1480,6 @@ class LayoutRenderer {
    */
   markPageAsSaved() {
     this.pageHasBeenSaved = true;
-    // console.log('LayoutRenderer: Page marked as saved - default widgets will not be auto-created');
   }
 
   /**
@@ -1507,7 +1498,6 @@ class LayoutRenderer {
     this.defaultWidgetsProcessed = false;
     this.savedWidgetData.clear();
     this.markAsClean(); // Reset dirty state
-    // console.log('LayoutRenderer: Page state reset - default widgets will be auto-created');
   }
 
   /**
@@ -1525,7 +1515,6 @@ class LayoutRenderer {
       widgetData[slotName] = widgets;
     });
 
-    // console.log('🔍 DEBUG: Final widget data payload:', widgetData);
     return widgetData;
   }
 
@@ -1543,7 +1532,6 @@ class LayoutRenderer {
 
     const widgets = [];
     const widgetElements = slotElement.querySelectorAll('.rendered-widget[data-widget-id][data-widget-type]');
-    // console.log(`🔍 DEBUG: Slot "${slotName}" has ${widgetElements.length} widget elements in DOM`);
 
     widgetElements.forEach(widgetElement => {
       try {
@@ -1825,7 +1813,6 @@ class LayoutRenderer {
    * @param {Object} widgetData - Object with slot names as keys and widget arrays as values
    */
   saveWidgetData(widgetData) {
-    // console.log('saveWidgetData:', widgetData);
     // Store widget data internally
     this.savedWidgetData.clear();
     Object.entries(widgetData).forEach(([slotName, widgets]) => {
@@ -1835,7 +1822,6 @@ class LayoutRenderer {
     // Mark page as saved
     this.markPageAsSaved();
 
-    // console.log('LayoutRenderer: Widget data saved:', widgetData);
   }
 
   /**
@@ -1844,14 +1830,11 @@ class LayoutRenderer {
  * @deprecated This method is kept for backward compatibility but should use pageData.widgets as single source of truth
  */
   saveCurrentWidgetState() {
-    // console.log('🔄 SAVE SIGNAL: LayoutRenderer.saveCurrentWidgetState() called (DEPRECATED)');
-
     // For backward compatibility, still collect from DOM if needed
     // But the new approach should use pageData.widgets directly
     const widgetData = this.collectAllWidgetData();
     this.saveWidgetData(widgetData);
 
-    // console.log('✅ SAVE SIGNAL: LayoutRenderer data collection completed (consider using pageData.widgets directly)');
     return widgetData;
   }
 
@@ -1892,7 +1875,6 @@ class LayoutRenderer {
       this.pageHasBeenSaved = true;
       this.markAsClean();
 
-      // console.log('LayoutRenderer: Widget data loaded:', widgetData);
     }
   }
 
@@ -1903,7 +1885,6 @@ class LayoutRenderer {
   setAutoSaveConfig(config = {}) {
     this.autoSaveEnabled = config.enabled !== false;
     this.autoSaveDelay = config.delay || 2000;
-    // console.log(`LayoutRenderer: Auto-save configured - enabled: ${this.autoSaveEnabled}, delay: ${this.autoSaveDelay}ms`);
   }
 
   /**
@@ -1921,10 +1902,8 @@ class LayoutRenderer {
   markAsDirty(reason = 'unknown') {
     if (!this.isDirty) {
       this.isDirty = true;
-      // console.log(`🔄 DIRTY STATE: LayoutRenderer marked as dirty - ${reason}`);
 
       // Execute callback for dirty state change
-      // console.log(`🔄 DIRTY STATE: LayoutRenderer executing onDirtyStateChanged callback`);
       this.executeCallback('onDirtyStateChanged', true, reason);
     }
 
@@ -1937,7 +1916,6 @@ class LayoutRenderer {
   markAsClean() {
     if (this.isDirty) {
       this.isDirty = false;
-      // console.log('LayoutRenderer: Page marked as clean');
 
       // Cancel pending auto-save
       if (this.autoSaveTimeoutId) {
@@ -1962,11 +1940,9 @@ class LayoutRenderer {
     // Set new auto-save timeout
     this.autoSaveTimeoutId = setTimeout(() => {
       if (this.isDirty && this.autoSaveEnabled) {
-        // console.log('LayoutRenderer: Auto-saving page...');
 
         try {
           const widgetData = this.saveCurrentWidgetState();
-          // console.log('LayoutRenderer: Auto-save completed');
 
           // Execute callback for auto-save
           this.executeCallback('onAutoSave', widgetData);
@@ -1979,7 +1955,6 @@ class LayoutRenderer {
       this.autoSaveTimeoutId = null;
     }, this.autoSaveDelay);
 
-    // console.log(`LayoutRenderer: Auto-save scheduled in ${this.autoSaveDelay}ms`);
   }
 
   /**
@@ -1996,27 +1971,19 @@ class LayoutRenderer {
  * @returns {Promise<Array>} Promise resolving to array of widget definitions
  */
   async getAvailableWidgets() {
-    console.log('getAvailableWidgets called');
-    console.log('this.customWidgets:', this.customWidgets);
-    console.log('this.cachedApiWidgets:', this.cachedApiWidgets);
-
     // Return custom widgets if set
     if (this.customWidgets && Array.isArray(this.customWidgets)) {
-      console.log('Returning custom widgets');
       return this.customWidgets;
     }
 
     // If we have cached API widgets, return them immediately
     if (this.cachedApiWidgets && Array.isArray(this.cachedApiWidgets)) {
-      console.log('Returning cached API widgets:', this.cachedApiWidgets.length, 'widgets');
       return this.cachedApiWidgets;
     }
 
     // If no cached widgets, fetch them from API
-    console.log('No cached widgets, fetching from API...');
     try {
       const widgets = await this.fetchWidgetTypes();
-      console.log('Fetched widgets:', widgets.length, 'widgets');
       return widgets;
     } catch (error) {
       console.error('LayoutRenderer: Error fetching widgets in getAvailableWidgets:', error);
@@ -2031,8 +1998,6 @@ class LayoutRenderer {
    * @deprecated Use getAvailableWidgets() async version instead
    */
   getAvailableWidgetsSync() {
-    console.log('getAvailableWidgetsSync called (deprecated)');
-
     // Return custom widgets if set
     if (this.customWidgets && Array.isArray(this.customWidgets)) {
       return this.customWidgets;
@@ -2074,7 +2039,6 @@ class LayoutRenderer {
    * Force refresh widgets from API (useful for debugging)
    */
   async forceRefreshWidgets() {
-    console.log('LayoutRenderer: Force refreshing widgets from API...');
     this.cachedApiWidgets = null;
     this.widgetTypesPromise = null;
     return await this.fetchWidgetTypes();
@@ -2196,8 +2160,6 @@ class LayoutRenderer {
       // Close modal
       closeModal();
 
-      // console.log(`LayoutRenderer: Widget "${widgetDef.name}" added to slot "${slotName}"`);
-
     } catch (error) {
       this.handleError(ERROR_TYPES.WIDGET_NOT_FOUND,
         `handling widget selection for type=${widgetType}, slot=${slotName}`,
@@ -2255,7 +2217,6 @@ class LayoutRenderer {
 
     // Add widget content - pass full widgetInstance for template_json access
     const content = await this.renderWidgetContent(type, config, widgetInstance);
-    console.log('renderWidgetInstance', content);
     widget.appendChild(content);
 
     return widget;
@@ -2370,20 +2331,14 @@ class LayoutRenderer {
       // Check if widget has template_json available for rendering
       // Look up widget definition by type
       const availableWidgets = await this.getAvailableWidgets();
-      console.log('availableWidgets', availableWidgets);
-      console.log('widgetInstance.type', widgetInstance.type);
       const widgetDef = availableWidgets.find(w => w.type === widgetInstance.type);
-      console.log('_apiData', widgetDef);
 
       if (widgetInstance &&
         widgetDef?._apiData &&
         widgetDef?._apiData?.template_json) {
 
-        console.log(`LayoutRenderer: Using template_json for widget type "${type}"`);
-
         try {
           // Use template_json rendering with caching
-          console.log('renderFromTemplateJsonCached', widgetDef._apiData.template_json);
           return this.renderFromTemplateJsonCached(
             widgetDef._apiData.template_json,
             config,
@@ -2397,7 +2352,6 @@ class LayoutRenderer {
       }
 
       // Legacy rendering fallback or for widgets without template_json
-      console.log(`LayoutRenderer: Using legacy rendering for widget type "${type}"`);
       return this.renderWidgetContentLegacy(type, config);
 
     } catch (error) {
@@ -2892,7 +2846,6 @@ class LayoutRenderer {
    * @returns {HTMLElement} DOM element
    */
   async renderSlotElement(node) {
-    // console.log("LayoutRenderer renderSlotElement", node)
     try {
       // Validate slot configuration
       if (!node.slot || typeof node.slot !== 'object') {
@@ -2944,7 +2897,6 @@ class LayoutRenderer {
       // Store slot reference and configuration
       this.slotContainers.set(slotName, element);
       this.slotConfigs.set(slotName, node.slot);
-      // console.log(`🔍 DEBUG: Registered slot "${slotName}" in slotContainers. Total slots: ${this.slotContainers.size}`);
 
       // Automatically add slot icon menu if UI is enabled
       if (this.uiConfig.showIconMenu) {
@@ -2972,31 +2924,8 @@ class LayoutRenderer {
             element.appendChild(errorElement);
           }
         }
-        // } else if (node.slot.defaultWidgets && Array.isArray(node.slot.defaultWidgets) && node.slot.defaultWidgets.length > 0) {
-        //   // Check if we should convert default widgets to real widget instances
-        //   if (!this.pageHasBeenSaved && !this.defaultWidgetsProcessed) {
-        //     // Convert default widgets to actual widget instances for new/unsaved pages
-        //     // console.log(`LayoutRenderer: Converting ${node.slot.defaultWidgets.length} default widgets to instances for slot "${slotName}"`);
-        //     this.convertDefaultWidgetsToInstances(slotName, node.slot.defaultWidgets);
-        //   } else {
-        //     // For saved pages without saved widgets, render default widgets as placeholders (legacy behavior)
-        //     // console.log(`LayoutRenderer: Rendering ${node.slot.defaultWidgets.length} default widgets as placeholders for slot "${slotName}"`);
-        //     node.slot.defaultWidgets.forEach((defaultWidget, index) => {
-        //       try {
-        //         const widgetElement = this.renderWidget(defaultWidget);
-        //         if (widgetElement) {
-        //           element.appendChild(widgetElement);
-        //         }
-        //       } catch (error) {
-        //         console.error(`LayoutRenderer: Error rendering default widget ${index} in slot ${slotName}`, error);
-        //         const errorElement = this.createErrorWidgetElement(`Default widget ${index + 1}: ${error.message}`);
-        //         element.appendChild(errorElement);
-        //       }
-        //     });
-        //   }
       } else {
         // Show placeholder for empty slot
-        // console.log(`LayoutRenderer: No saved or default widgets for slot "${slotName}" - showing placeholder`);
         const title = node.slot.title || slotName;
         const description = node.slot.description || '';
 
@@ -3059,7 +2988,6 @@ class LayoutRenderer {
         throw new Error('template_json missing structure property');
       }
 
-      console.log(`LayoutRenderer: Rendering widget "${widgetType}" from template_json`, templateJson);
 
       // Process the template structure with config and template logic support
       const templateTags = templateJson.template_tags || [];
@@ -3067,7 +2995,6 @@ class LayoutRenderer {
 
       if (templateTags.length > 0 && (templateTags.includes('if') || templateTags.includes('for'))) {
         // Use enhanced processing for templates with logic
-        console.log(`LayoutRenderer: Using enhanced logic processing for widget "${widgetType}" with tags:`, templateTags);
         element = this.templateRenderer.processTemplateStructureWithLogic(templateJson.structure, config, templateTags);
       } else {
         // Use standard processing for simple templates
@@ -3668,8 +3595,6 @@ class LayoutRenderer {
         return;
       }
 
-      console.log('LayoutRenderer: Processing inline CSS for template_json');
-
       // Find all style elements in the template structure
       const styleElements = this.extractStyleElements(templateJson.structure);
 
@@ -3825,8 +3750,6 @@ class LayoutRenderer {
       // Track this style for cleanup
       this.injectedStyles.add(styleId);
 
-      console.log(`LayoutRenderer: Injected widget styles with ID: ${styleId}`);
-
     } catch (error) {
       console.error('LayoutRenderer: Error injecting widget styles', error);
     }
@@ -3847,8 +3770,6 @@ class LayoutRenderer {
       widgetStyles.forEach(styleElement => {
         styleElement.remove();
       });
-
-      console.log(`LayoutRenderer: Cleaned up styles for widget ${widgetId}`);
 
     } catch (error) {
       console.error('LayoutRenderer: Error cleaning up widget styles', error);
@@ -4060,26 +3981,52 @@ class LayoutRenderer {
    */
   handleTemplateStructureError(error, structure, config) {
     try {
-      console.error('LayoutRenderer: Template structure error', error, structure);
+      // Enhanced error logging with more context
+      console.error('LayoutRenderer: Template structure error', {
+        error: error.message,
+        stack: error.stack,
+        structure: structure,
+        config: this.debug ? config : 'Enable debug mode for config details',
+        timestamp: new Date().toISOString()
+      });
 
       // Try to create a safe fallback based on structure type
       switch (structure?.type) {
         case 'element':
-          return this.templateRenderer.createSafeElementFallback(structure, config);
+          return this.createSafeElementFallback(structure, config, error);
 
         case 'template_text':
-          return this.templateRenderer.createSafeTextFallback(structure, config);
+          return this.templateRenderer.createSafeTextFallback(structure, config, error);
 
         case 'text':
-          return document.createTextNode(structure.content || '[Text Error]');
+          const textError = document.createElement('span');
+          textError.className = 'template-error-text';
+          textError.style.color = '#dc2626';
+          textError.style.backgroundColor = '#fef2f2';
+          textError.style.padding = '2px 4px';
+          textError.style.borderRadius = '2px';
+          textError.textContent = `[LayoutRenderer Text Error: ${error.message}] Content: "${structure.content || 'undefined'}"`;
+          return textError;
 
         default:
-          return document.createTextNode(`[${structure?.type || 'Unknown'} Error: ${error.message}]`);
+          const unknownError = document.createElement('span');
+          unknownError.className = 'template-error-unknown';
+          unknownError.style.color = '#dc2626';
+          unknownError.style.backgroundColor = '#fef2f2';
+          unknownError.style.padding = '2px 4px';
+          unknownError.style.border = '1px solid #dc2626';
+          unknownError.style.borderRadius = '2px';
+          unknownError.textContent = `[LayoutRenderer ${structure?.type || 'Unknown'} Error: ${error.message}]`;
+          return unknownError;
       }
 
     } catch (fallbackError) {
       console.error('LayoutRenderer: Fallback creation failed', fallbackError);
-      return document.createTextNode(`[Critical Error: ${error.message}]`);
+      const criticalError = document.createElement('span');
+      criticalError.style.color = '#dc2626';
+      criticalError.style.fontWeight = 'bold';
+      criticalError.textContent = `[LayoutRenderer Critical Error: ${error.message}]`;
+      return criticalError;
     }
   }
 
@@ -4089,7 +4036,7 @@ class LayoutRenderer {
    * @param {Object} config - Widget configuration
    * @returns {HTMLElement} Safe fallback element
    */
-  createSafeElementFallback(structure, config) {
+  createSafeElementFallback(structure, config, originalError = null) {
     try {
       const element = document.createElement(structure.tag || 'div');
       element.className = 'template-error-fallback border border-orange-300 bg-orange-50 p-2';
@@ -4107,11 +4054,9 @@ class LayoutRenderer {
         });
       }
 
-      // Add error message
-      const errorMsg = document.createElement('small');
-      errorMsg.className = 'text-orange-600';
-      errorMsg.textContent = `[Element processing error]`;
-      element.appendChild(errorMsg);
+      // Add detailed error information
+      const errorInfo = this.templateRenderer.createErrorInfoElement(originalError, structure, config, 'LayoutRenderer Element');
+      element.appendChild(errorInfo);
 
       return element;
 
@@ -4350,7 +4295,6 @@ class LayoutRenderer {
       // Check if we have a cached preprocessed template
       const cachedTemplate = this.getFromTemplateCache(cacheKey);
       if (cachedTemplate) {
-        console.log(`LayoutRenderer: Using cached template for "${widgetType}"`);
         this.cacheMetrics.hits++;
 
         // Clone and process the cached template with current config
@@ -4368,8 +4312,6 @@ class LayoutRenderer {
       if (validation.warnings.length > 0) {
         console.warn(`LayoutRenderer: Template warnings for "${widgetType}":`, validation.warnings);
       }
-
-      console.log(`LayoutRenderer: Processing and caching template for "${widgetType}"`);
 
       // Preprocess the template structure for caching
       const preprocessedTemplate = this.preprocessTemplateStructure(templateJson);
@@ -4569,7 +4511,6 @@ class LayoutRenderer {
     try {
       // Check if another operation is currently processing this key
       if (this.cacheLocks.has(cacheKey)) {
-        console.log(`LayoutRenderer: Cache key "${cacheKey}" is locked, waiting...`);
         return null; // Return null to trigger fresh processing
       }
 
@@ -4639,8 +4580,6 @@ class LayoutRenderer {
         this.cacheMetrics.evictions++;
       }
 
-      console.log(`LayoutRenderer: Evicted ${toEvict} templates from cache`);
-
     } catch (error) {
       console.error('LayoutRenderer: Error evicting templates from cache', error);
     }
@@ -4655,8 +4594,6 @@ class LayoutRenderer {
       if (!Array.isArray(widgets)) {
         return;
       }
-
-      console.log(`LayoutRenderer: Preloading ${widgets.length} widget templates...`);
 
       const preloadPromises = widgets.map(async (widget) => {
         try {
@@ -4682,7 +4619,6 @@ class LayoutRenderer {
       });
 
       await Promise.all(preloadPromises);
-      console.log('LayoutRenderer: Widget template preloading completed');
 
     } catch (error) {
       console.error('LayoutRenderer: Error preloading widget templates', error);
@@ -4846,7 +4782,6 @@ class LayoutRenderer {
       });
       this.injectedStyles.clear();
 
-      console.log('LayoutRenderer: Template cache and styles cleared');
     } catch (error) {
       console.error('LayoutRenderer: Error clearing template cache', error);
     }

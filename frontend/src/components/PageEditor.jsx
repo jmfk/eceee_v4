@@ -292,28 +292,19 @@ const PageEditor = () => {
     useEffect(() => {
         // Sync with ContentEditor
         if (contentEditorRef.current && contentEditorRef.current.enableAutoSave) {
-            // console.log(`🔄 SYNC AUTO-SAVE: Setting ContentEditor state to ${autoSaveEnabled ? 'ENABLED' : 'DISABLED'}`);
             contentEditorRef.current.enableAutoSave(autoSaveEnabled, autoSaveEnabled ? 10000 : 0);
         }
-
-        // SettingsEditor and MetadataEditor already save in real-time via onUpdate
-        // No additional sync needed for them
-        // console.log('🔄 SYNC AUTO-SAVE: SettingsEditor and MetadataEditor use real-time saving');
-
     }, [autoSaveEnabled, layoutData]); // layoutData dependency ensures this runs after ContentEditor is mounted
 
     // UNIFIED SAVE: StatusBar -> PageEditor -> Single API Call
     const handleSaveFromStatusBar = useCallback(async () => {
         try {
-            // console.log('🔄 UNIFIED SAVE: StatusBar -> PageEditor');
-
             // Collect all data from editors (no saving yet)
             const collectedData = {};
 
             // Collect current widget data (from pageData) and any unsaved changes from ContentEditor
             collectedData.widgets = pageData.widgets || [];
             if (contentEditorRef.current && contentEditorRef.current.saveWidgets) {
-                // console.log('🔄 UNIFIED SAVE: Collecting any unsaved widget changes from ContentEditor');
                 try {
                     const widgetResult = await contentEditorRef.current.saveWidgets({
                         source: 'unified_save_from_statusbar',
@@ -322,7 +313,6 @@ const PageEditor = () => {
                     });
                     // Merge any changes from ContentEditor with existing widgets
                     collectedData.widgets = widgetResult.data || widgetResult || collectedData.widgets;
-                    // console.log('✅ UNIFIED SAVE: Widget data collected', collectedData.widgets);
                 } catch (error) {
                     console.error('❌ UNIFIED SAVE: Widget data collection failed', error);
                 }
@@ -330,11 +320,9 @@ const PageEditor = () => {
 
             // Collect settings data from SettingsEditor
             if (settingsEditorRef.current && settingsEditorRef.current.saveSettings) {
-                // console.log('🔄 UNIFIED SAVE: Collecting settings data from SettingsEditor');
                 try {
                     const settingsResult = await settingsEditorRef.current.saveSettings();
                     collectedData.settings = settingsResult.data || settingsResult;
-                    // console.log('✅ UNIFIED SAVE: Settings data collected', collectedData.settings);
                 } catch (error) {
                     console.error('❌ UNIFIED SAVE: Settings data collection failed', error);
                     throw new Error(`Settings data collection failed: ${error.message}`);
@@ -343,11 +331,9 @@ const PageEditor = () => {
 
             // Collect metadata from MetadataEditor
             if (metadataEditorRef.current && metadataEditorRef.current.saveMetadata) {
-                // console.log('🔄 UNIFIED SAVE: Collecting metadata from MetadataEditor');
                 try {
                     const metadataResult = await metadataEditorRef.current.saveMetadata();
                     collectedData.metadata = metadataResult.data || metadataResult;
-                    // console.log('✅ UNIFIED SAVE: Metadata collected', collectedData.metadata);
                 } catch (error) {
                     console.error('❌ UNIFIED SAVE: Metadata collection failed', error);
                     throw new Error(`Metadata collection failed: ${error.message}`);
@@ -382,7 +368,6 @@ const PageEditor = () => {
             // Mark LayoutRenderer as clean after successful save
             if (contentEditorRef.current?.layoutRenderer) {
                 contentEditorRef.current.layoutRenderer.markAsClean();
-                // console.log('✅ UNIFIED SAVE: LayoutRenderer marked as clean');
             }
 
             // Show success notification
@@ -407,17 +392,12 @@ const PageEditor = () => {
 
     // Auto-save toggle handler
     const handleAutoSaveToggle = useCallback((enabled) => {
-        // console.log(`🔄 AUTO-SAVE TOGGLE: ${enabled ? 'ENABLED' : 'DISABLED'}`);
         setAutoSaveEnabled(enabled);
 
         // Pass auto-save setting to ContentEditor
         if (contentEditorRef.current && contentEditorRef.current.enableAutoSave) {
             contentEditorRef.current.enableAutoSave(enabled, enabled ? 10000 : 0);
         }
-
-        // Note: SettingsEditor and MetadataEditor save in real-time via onUpdate
-        // so they don't need separate auto-save configuration
-        // console.log('🔄 AUTO-SAVE: SettingsEditor and MetadataEditor use real-time saving via onUpdate');
 
         addNotification({
             type: 'info',
@@ -599,7 +579,6 @@ const PageEditor = () => {
                                     layoutJson={layoutData}
                                     editable={true}
                                     onDirtyChange={(isDirty, reason) => {
-                                        // console.log('🔄 DIRTY STATE: ContentEditor -> PageEditor', { isDirty, reason });
                                         setIsDirty(isDirty);
                                     }}
                                 />
@@ -670,8 +649,6 @@ const SettingsEditor = forwardRef(({ pageData, onUpdate, isNewPage }, ref) => {
     // Expose save method to parent
     useImperativeHandle(ref, () => ({
         saveSettings: async () => {
-            // console.log('🔄 SAVE SIGNAL: SettingsEditor.saveSettings() called');
-
             // Settings are already saved in real-time via onUpdate
             // This method confirms the current state is saved
             const currentSettings = {
@@ -681,8 +658,6 @@ const SettingsEditor = forwardRef(({ pageData, onUpdate, isNewPage }, ref) => {
                 code_layout: pageData?.code_layout || '',
                 publication_status: pageData?.publication_status || 'unpublished'
             };
-
-            // console.log('✅ SAVE SIGNAL: SettingsEditor - Current settings confirmed', currentSettings);
 
             return {
                 module: 'settings',
@@ -779,8 +754,6 @@ const MetadataEditor = forwardRef(({ pageData, onUpdate, isNewPage }, ref) => {
     // Expose save method to parent
     useImperativeHandle(ref, () => ({
         saveMetadata: async () => {
-            // console.log('🔄 SAVE SIGNAL: MetadataEditor.saveMetadata() called');
-
             // Metadata is already saved in real-time via onUpdate
             // This method confirms the current state is saved
             const currentMetadata = {
@@ -788,8 +761,6 @@ const MetadataEditor = forwardRef(({ pageData, onUpdate, isNewPage }, ref) => {
                 meta_description: pageData?.meta_description || pageData?.description || '',
                 hostnames: pageData?.hostnames || []
             };
-
-            // console.log('✅ SAVE SIGNAL: MetadataEditor - Current metadata confirmed', currentMetadata);
 
             return {
                 module: 'metadata',

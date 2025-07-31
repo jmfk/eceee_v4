@@ -190,7 +190,6 @@ const ContentEditor = forwardRef(({
     layoutRenderer.setUICallbacks({
       onDirtyStateChanged: (isDirty, reason) => {
         // Propagate dirty state up to PageEditor
-        console.log('onDirtyStateChanged', isDirty, reason);
         if (onDirtyChange) {
           onDirtyChange(isDirty, reason);
         }
@@ -256,8 +255,6 @@ const ContentEditor = forwardRef(({
             return;
         }
 
-        console.log('call onUpdate', pageData, updatedWidgets);
-
         // Update pageData through parent component
         onUpdate({
           ...pageData,
@@ -265,7 +262,6 @@ const ContentEditor = forwardRef(({
         });
 
         // Mark as dirty since widgets changed
-        console.log('onDirtyChange', true, `widget ${action} in slot ${slotName}`);
         if (onDirtyChange) {
           onDirtyChange(true, `widget ${action} in slot ${slotName}`);
         }

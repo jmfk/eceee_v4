@@ -19,9 +19,22 @@ class DjangoTemplateRenderer {
     /**
      * Create a new Django Template Renderer instance
      */
-    constructor() {
-        // Initialize any instance state if needed
-        this.debug = false;
+    constructor(options = {}) {
+        // Initialize debug mode - enabled by default in development or if globally enabled
+        this.debug = options.debug !== undefined ? options.debug :
+            (typeof window !== 'undefined' && (
+                window.TEMPLATE_DEBUG_MODE ||
+                window.location?.hostname === 'localhost'
+            ));
+
+        if (this.debug) {
+            console.log('🐛 DjangoTemplateRenderer: Debug mode enabled - detailed error information will be shown');
+        }
+
+        // Expose global debug function
+        if (typeof window !== 'undefined' && !window.enableTemplateDebug) {
+            window.enableTemplateDebug = DjangoTemplateRenderer.enableGlobalDebug;
+        }
     }
 
     /**
@@ -526,28 +539,52 @@ class DjangoTemplateRenderer {
      */
     handleTemplateStructureError(error, structure, config) {
         try {
-            if (this.debug) {
-                console.error('DjangoTemplateRenderer: Template structure error', error, structure);
-            }
+            // Enhanced error logging with more context
+            console.error('DjangoTemplateRenderer: Template structure error', {
+                error: error.message,
+                stack: error.stack,
+                structure: structure,
+                config: this.debug ? config : 'Enable debug mode for config details',
+                timestamp: new Date().toISOString()
+            });
 
             // Try to create a safe fallback based on structure type
             switch (structure?.type) {
                 case 'element':
-                    return this.createSafeElementFallback(structure, config);
+                    return this.createSafeElementFallback(structure, config, error);
 
                 case 'template_text':
-                    return this.createSafeTextFallback(structure, config);
+                    return this.createSafeTextFallback(structure, config, error);
 
                 case 'text':
-                    return document.createTextNode(structure.content || '[Text Error]');
+                    const textError = document.createElement('span');
+                    textError.className = 'template-error-text';
+                    textError.style.color = '#dc2626';
+                    textError.style.backgroundColor = '#fef2f2';
+                    textError.style.padding = '2px 4px';
+                    textError.style.borderRadius = '2px';
+                    textError.textContent = `[Text Error: ${error.message}] Content: "${structure.content || 'undefined'}"`;
+                    return textError;
 
                 default:
-                    return document.createTextNode(`[${structure?.type || 'Unknown'} Error: ${error.message}]`);
+                    const unknownError = document.createElement('span');
+                    unknownError.className = 'template-error-unknown';
+                    unknownError.style.color = '#dc2626';
+                    unknownError.style.backgroundColor = '#fef2f2';
+                    unknownError.style.padding = '2px 4px';
+                    unknownError.style.border = '1px solid #dc2626';
+                    unknownError.style.borderRadius = '2px';
+                    unknownError.textContent = `[${structure?.type || 'Unknown'} Error: ${error.message}]`;
+                    return unknownError;
             }
 
         } catch (fallbackError) {
             console.error('DjangoTemplateRenderer: Fallback creation failed', fallbackError);
-            return document.createTextNode(`[Critical Error: ${error.message}]`);
+            const criticalError = document.createElement('span');
+            criticalError.style.color = '#dc2626';
+            criticalError.style.fontWeight = 'bold';
+            criticalError.textContent = `[Critical Error: ${error.message}]`;
+            return criticalError;
         }
     }
 
@@ -559,7 +596,7 @@ class DjangoTemplateRenderer {
      * @param {Object} config - Configuration object
      * @returns {HTMLElement} Safe fallback element
      */
-    createSafeElementFallback(structure, config) {
+    createSafeElementFallback(structure, config, originalError = null) {
         try {
             const element = document.createElement(structure.tag || 'div');
             element.className = 'template-error-fallback';
@@ -567,12 +604,17 @@ class DjangoTemplateRenderer {
             element.style.backgroundColor = '#fff7ed';
             element.style.padding = '8px';
 
-            // Add safe attributes
+            // Add safe attributes (but preserve error styling)
             if (structure.attributes) {
                 Object.entries(structure.attributes).forEach(([key, value]) => {
                     try {
                         if (typeof value === 'string' && !value.includes('<')) {
-                            element.setAttribute(key, value);
+                            // For class attribute, append to existing error class instead of replacing
+                            if (key === 'class') {
+                                element.className = 'template-error-fallback ' + value;
+                            } else {
+                                element.setAttribute(key, value);
+                            }
                         }
                     } catch (attrError) {
                         if (this.debug) {
@@ -582,11 +624,9 @@ class DjangoTemplateRenderer {
                 });
             }
 
-            // Add error message
-            const errorMsg = document.createElement('small');
-            errorMsg.className = 'text-orange-600';
-            errorMsg.textContent = `[Element processing error]`;
-            element.appendChild(errorMsg);
+            // Add detailed error information
+            const errorInfo = this.createErrorInfoElement(originalError, structure, config, 'Element');
+            element.appendChild(errorInfo);
 
             return element;
 
@@ -600,25 +640,307 @@ class DjangoTemplateRenderer {
 
     /**
      * Create safe text fallback when text processing fails
-     * Creates text node with sanitized content
+     * Creates text node with sanitized content and debugging info
      * 
      * @param {Object} structure - Text structure that failed
      * @param {Object} config - Configuration object
-     * @returns {Text} Safe text node
+     * @param {Error} originalError - The original error that caused the fallback
+     * @returns {HTMLElement} Safe text element with debugging info
      */
-    createSafeTextFallback(structure, config) {
+    createSafeTextFallback(structure, config, originalError = null) {
         try {
-            // Try to extract any text content safely
-            let content = structure.content || '[Text processing error]';
+            const textElement = document.createElement('div');
+            textElement.className = 'template-error-text-fallback';
+            textElement.style.cssText = `
+                background: #fef2f2;
+                border: 1px solid #fca5a5;
+                border-radius: 4px;
+                padding: 8px;
+                margin: 4px 0;
+                font-family: system-ui, -apple-system, sans-serif;
+                font-size: 12px;
+                color: #991b1b;
+                text-align: left;
+                display: inline-block;
+                max-width: 100%;
+            `;
 
-            // Remove any template variables that failed to resolve
-            content = content.replace(/\{\{[^}]*\}\}/g, '[Variable Error]');
+            // Error header
+            const errorHeader = document.createElement('div');
+            errorHeader.style.cssText = `
+                font-weight: 600;
+                margin-bottom: 4px;
+                display: flex;
+                align-items: center;
+                gap: 4px;
+            `;
+            errorHeader.innerHTML = `
+                <span style="font-size: 14px;">⚠️</span>
+                <span>Text Processing Error</span>
+            `;
+            textElement.appendChild(errorHeader);
 
-            return document.createTextNode(content);
+            // Error message
+            const errorMsg = document.createElement('div');
+            errorMsg.style.cssText = `
+                background: #ffffff;
+                border: 1px solid #fca5a5;
+                border-radius: 3px;
+                padding: 4px 6px;
+                font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+                font-size: 11px;
+                color: #dc2626;
+                margin-bottom: 4px;
+                word-break: break-word;
+            `;
+            errorMsg.textContent = originalError?.message || 'Unknown error';
+            textElement.appendChild(errorMsg);
+
+            // Content preview if available
+            if (structure?.content) {
+                const contentPreview = document.createElement('div');
+                contentPreview.style.cssText = `
+                    font-size: 10px;
+                    color: #7f1d1d;
+                    opacity: 0.8;
+                `;
+                const preview = structure.content.substring(0, 50);
+                contentPreview.textContent = `Content: "${preview}${structure.content.length > 50 ? '...' : ''}"`;
+                textElement.appendChild(contentPreview);
+            }
+
+            if (this.debug && originalError) {
+                textElement.title = `Error: ${originalError.message}\nStack: ${originalError.stack}\nStructure: ${JSON.stringify(structure, null, 2)}`;
+            }
+
+            return textElement;
 
         } catch (error) {
             console.error('DjangoTemplateRenderer: Safe text fallback failed', error);
-            return document.createTextNode('[Text Error]');
+            const fallbackElement = document.createElement('span');
+            fallbackElement.style.cssText = `
+                color: #dc2626;
+                background: #fef2f2;
+                padding: 2px 4px;
+                border-radius: 2px;
+                font-size: 12px;
+            `;
+            fallbackElement.textContent = `[Critical Text Error: ${error.message}]`;
+            return fallbackElement;
+        }
+    }
+
+    /**
+ * Create detailed error information element for debugging
+ * 
+ * @param {Error} error - The original error
+ * @param {Object} structure - Template structure that failed 
+ * @param {Object} config - Configuration object
+ * @param {string} context - Context description (e.g., 'Element', 'Text')
+ * @returns {HTMLElement} Error info element
+ */
+    createErrorInfoElement(error, structure, config, context = 'Template') {
+        const errorContainer = document.createElement('div');
+        errorContainer.className = 'template-error-details';
+        errorContainer.style.cssText = `
+            background: #fef2f2;
+            border: 1px solid #fca5a5;
+            border-radius: 6px;
+            padding: 12px;
+            margin: 8px 0;
+            font-family: system-ui, -apple-system, sans-serif;
+            font-size: 13px;
+            line-height: 1.4;
+            color: #991b1b;
+            text-align: left;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        `;
+
+        // Error header with icon
+        const errorHeader = document.createElement('div');
+        errorHeader.style.cssText = `
+            font-weight: 600;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        `;
+        errorHeader.innerHTML = `
+            <span style="font-size: 16px;">🐛</span>
+            <span>${context} Processing Error</span>
+        `;
+        errorContainer.appendChild(errorHeader);
+
+        // Error message in readable format
+        const errorMsg = document.createElement('div');
+        errorMsg.style.cssText = `
+            background: #ffffff;
+            border: 1px solid #fca5a5;
+            border-radius: 4px;
+            padding: 8px;
+            margin-bottom: 8px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 12px;
+            color: #dc2626;
+            white-space: pre-wrap;
+            word-break: break-word;
+        `;
+        errorMsg.textContent = error?.message || 'Unknown error';
+        errorContainer.appendChild(errorMsg);
+
+        // Technical details section
+        if (structure || (this.debug && config)) {
+            const detailsSection = document.createElement('div');
+            detailsSection.style.cssText = `
+                border-top: 1px solid #fca5a5;
+                padding-top: 8px;
+                margin-top: 8px;
+            `;
+
+            const detailsHeader = document.createElement('div');
+            detailsHeader.style.cssText = `
+                font-weight: 500;
+                margin-bottom: 6px;
+                color: #7f1d1d;
+            `;
+            detailsHeader.textContent = 'Technical Details:';
+            detailsSection.appendChild(detailsHeader);
+
+            // Structure info in formatted block
+            if (structure) {
+                const structureBlock = document.createElement('pre');
+                structureBlock.style.cssText = `
+                    background: #ffffff;
+                    border: 1px solid #fca5a5;
+                    border-radius: 4px;
+                    padding: 8px;
+                    margin: 4px 0;
+                    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+                    font-size: 11px;
+                    color: #7f1d1d;
+                    white-space: pre;
+                    overflow-x: auto;
+                    text-align: left;
+                `;
+
+                let structureText = `Template Structure:
+  Type: ${structure.type || 'undefined'}
+  Tag:  ${structure.tag || 'undefined'}`;
+
+                if (structure.attributes && Object.keys(structure.attributes).length > 0) {
+                    const attrs = Object.keys(structure.attributes);
+                    structureText += `
+  Attributes: ${attrs.slice(0, 5).join(', ')}${attrs.length > 5 ? ` (+${attrs.length - 5} more)` : ''}`;
+                }
+
+                structureBlock.textContent = structureText;
+                detailsSection.appendChild(structureBlock);
+            }
+
+            // Config info (if debug mode) in formatted block
+            if (this.debug && config && Object.keys(config).length > 0) {
+                const configBlock = document.createElement('pre');
+                configBlock.style.cssText = `
+                    background: #ffffff;
+                    border: 1px solid #fca5a5;
+                    border-radius: 4px;
+                    padding: 8px;
+                    margin: 4px 0;
+                    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+                    font-size: 11px;
+                    color: #7f1d1d;
+                    white-space: pre;
+                    overflow-x: auto;
+                    text-align: left;
+                `;
+
+                const configKeys = Object.keys(config);
+                let configText = `Widget Configuration:
+  Keys: ${configKeys.slice(0, 5).join(', ')}${configKeys.length > 5 ? ` (+${configKeys.length - 5} more)` : ''}`;
+
+                // Show sample values for first few keys
+                const sampleEntries = Object.entries(config).slice(0, 3);
+                if (sampleEntries.length > 0) {
+                    configText += '\n  Sample values:';
+                    sampleEntries.forEach(([key, value]) => {
+                        const preview = typeof value === 'string' && value.length > 30
+                            ? value.substring(0, 30) + '...'
+                            : String(value);
+                        configText += `\n    ${key}: ${preview}`;
+                    });
+                }
+
+                configBlock.textContent = configText;
+                detailsSection.appendChild(configBlock);
+            }
+
+            errorContainer.appendChild(detailsSection);
+        }
+
+        // Add click handler for detailed debug info
+        if (this.debug) {
+            const debugFooter = document.createElement('div');
+            debugFooter.style.cssText = `
+                border-top: 1px solid #fca5a5;
+                padding-top: 8px;
+                margin-top: 8px;
+                font-size: 11px;
+                color: #7f1d1d;
+                cursor: pointer;
+                text-align: center;
+                opacity: 0.8;
+                transition: opacity 0.2s;
+            `;
+            debugFooter.textContent = '🔍 Click for full debug console output';
+            debugFooter.title = 'Click to see complete error details in browser console';
+
+            debugFooter.addEventListener('mouseenter', () => {
+                debugFooter.style.opacity = '1';
+                debugFooter.style.textDecoration = 'underline';
+            });
+
+            debugFooter.addEventListener('mouseleave', () => {
+                debugFooter.style.opacity = '0.8';
+                debugFooter.style.textDecoration = 'none';
+            });
+
+            debugFooter.addEventListener('click', () => {
+                console.group(`🐛 Template Error Debug - ${context}`);
+                console.error('Error Details:', {
+                    message: error?.message,
+                    stack: error?.stack,
+                    name: error?.name
+                });
+                console.log('Template Structure:', structure);
+                console.log('Widget Config:', config);
+                console.log('Timestamp:', new Date().toISOString());
+                console.groupEnd();
+            });
+
+            errorContainer.appendChild(debugFooter);
+        }
+
+        return errorContainer;
+    }
+
+    /**
+     * Enable or disable debug mode
+     * @param {boolean} enabled - Whether to enable debug mode
+     */
+    setDebugMode(enabled) {
+        this.debug = enabled;
+        console.log(`🐛 DjangoTemplateRenderer: Debug mode ${enabled ? 'enabled' : 'disabled'}`);
+    }
+
+    /**
+     * Global function to enable debug mode for all template renderers
+     * Usage: window.enableTemplateDebug() or window.enableTemplateDebug(false)
+     */
+    static enableGlobalDebug(enabled = true) {
+        if (typeof window !== 'undefined') {
+            window.TEMPLATE_DEBUG_MODE = enabled;
+            console.log(`🐛 Global Template Debug Mode ${enabled ? 'enabled' : 'disabled'}`);
+            console.log('This affects new renderer instances. Call renderer.setDebugMode() for existing instances.');
         }
     }
 
