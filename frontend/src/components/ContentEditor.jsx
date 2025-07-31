@@ -316,13 +316,6 @@ const ContentEditor = forwardRef(({
         if (onSlotClick) {
           onSlotClick(slotName, slotElement);
         }
-
-        // Add visual selection indicator
-        const previousSelected = document.querySelectorAll('.slot-selected');
-        previousSelected.forEach(el => {
-          el.classList.remove('slot-selected');
-        });
-        slotElement.classList.add('slot-selected');
       };
 
       // Add tracked event listener
@@ -465,10 +458,6 @@ const ContentEditor = forwardRef(({
       
       .slot-editable:hover {
         box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
-      }
-      
-      .slot-selected {
-        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.6) !important;
       }
       
       .widget-item:hover .widget-edit-btn {
