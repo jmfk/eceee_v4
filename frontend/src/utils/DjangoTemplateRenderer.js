@@ -54,14 +54,17 @@ class DjangoTemplateRenderer {
 
                     // Handle basic config.field access
                     if (cleanExpression.startsWith('config.')) {
-                        const fieldPath = cleanExpression.substring(7); // Remove 'config.'
-                        const value = this.getNestedValue(config, fieldPath);
-
                         // Apply basic Django filters if present
                         if (cleanExpression.includes('|')) {
+                            // Extract just the field path (before the |)
+                            const fieldPart = cleanExpression.split('|')[0].trim();
+                            const fieldPath = fieldPart.substring(7); // Remove 'config.'
+                            const value = this.getNestedValue(config, fieldPath);
                             return this.applyTemplateFilters(value, cleanExpression);
                         }
 
+                        const fieldPath = cleanExpression.substring(7); // Remove 'config.'
+                        const value = this.getNestedValue(config, fieldPath);
                         return value !== undefined ? String(value) : '';
                     }
 
@@ -116,7 +119,7 @@ class DjangoTemplateRenderer {
                 }
 
                 // Only access own properties, not inherited ones
-                if (current && current.hasOwnProperty && current.hasOwnProperty(key)) {
+                if (current && Object.prototype.hasOwnProperty.call(current, key)) {
                     return current[key];
                 }
 
@@ -146,12 +149,39 @@ class DjangoTemplateRenderer {
      */
     applyTemplateFilters(value, expression) {
         try {
-            // Extract filter part after the pipe
-            const filterPart = expression.split('|')[1];
-            if (!filterPart) return String(value || '');
+            // Split by pipes to get all filters (skip first part which is the variable)
+            const parts = expression.split('|');
+            if (parts.length < 2) return String(value || '');
 
-            const filterName = filterPart.trim().split(':')[0];
-            const filterArg = filterPart.includes(':') ? filterPart.split(':')[1].replace(/"/g, '') : null;
+            // Apply filters in sequence, starting with the initial value
+            let result = value;
+
+            // Process each filter from left to right
+            for (let i = 1; i < parts.length; i++) {
+                const filterPart = parts[i].trim();
+                result = this.applySingleFilter(result, filterPart);
+            }
+
+            return result;
+
+        } catch (error) {
+            console.error('DjangoTemplateRenderer: Error applying template filters', error);
+            return String(value || '');
+        }
+    }
+
+    /**
+     * Apply a single filter to a value
+     * 
+     * @param {*} value - The value to filter
+     * @param {string} filterPart - The filter specification (e.g., 'default:"No Title"')
+     * @returns {string} The filtered value
+     */
+    applySingleFilter(value, filterPart) {
+        try {
+            const filterName = filterPart.split(':')[0].trim();
+            const filterArg = filterPart.includes(':') ?
+                filterPart.substring(filterPart.indexOf(':') + 1).replace(/^"(.*)"$/, '$1') : null;
 
             switch (filterName) {
                 case 'default':
@@ -175,7 +205,7 @@ class DjangoTemplateRenderer {
 
                 case 'title':
                     return String(value || '').replace(/\w\S*/g, (txt) =>
-                        txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase()
+                        txt.charAt(0).toUpperCase() + txt.slice(1).toLowerCase()
                     );
 
                 case 'length':
@@ -190,7 +220,7 @@ class DjangoTemplateRenderer {
             }
 
         } catch (error) {
-            console.error('DjangoTemplateRenderer: Error applying template filters', error);
+            console.error('DjangoTemplateRenderer: Error applying single filter', error);
             return String(value || '');
         }
     }
@@ -490,7 +520,10 @@ class DjangoTemplateRenderer {
     createSafeElementFallback(structure, config) {
         try {
             const element = document.createElement(structure.tag || 'div');
-            element.className = 'template-error-fallback border border-orange-300 bg-orange-50 p-2';
+            element.className = 'template-error-fallback';
+            element.style.border = '1px solid #fb923c';
+            element.style.backgroundColor = '#fff7ed';
+            element.style.padding = '8px';
 
             // Add safe attributes
             if (structure.attributes) {
@@ -736,8 +769,8 @@ class DjangoTemplateRenderer {
     evaluateCondition(condition, config) {
         try {
             if (typeof condition === 'string') {
-                // Handle string conditions like "config.show_title"
-                if (condition.startsWith('config.')) {
+                // Handle string conditions like "config.show_title" (but not comparisons)
+                if (condition.startsWith('config.') && !condition.includes('==') && !condition.includes('!=')) {
                     const fieldPath = condition.substring(7); // Remove 'config.'
                     const value = this.getNestedValue(config, fieldPath);
                     return Boolean(value);
