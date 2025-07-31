@@ -603,7 +603,11 @@ const PageEditor = () => {
                     )}
                     {activeTab === 'preview' && (
                         <div className="h-full bg-white">
-                            <PagePreview pageData={pageData} />
+                            <PagePreview
+                                pageData={pageData}
+                                isLoadingLayout={isLoadingLayout}
+                                layoutData={layoutData}
+                            />
                         </div>
                     )}
                 </div>
@@ -832,7 +836,16 @@ const MetadataEditor = forwardRef(({ pageData, onUpdate, isNewPage }, ref) => {
 MetadataEditor.displayName = 'MetadataEditor';
 
 // Preview component that renders actual page content without editing controls
-const PagePreview = ({ pageData }) => {
+const PagePreview = ({ pageData, isLoadingLayout, layoutData }) => {
+    const [viewportSize, setViewportSize] = useState('desktop');
+
+    // Viewport configurations with realistic device dimensions
+    const viewports = {
+        desktop: { width: '100%', height: '100%', label: 'Desktop', icon: '🖥️' },
+        tablet: { width: '820px', height: '1180px', label: 'iPad Pro', icon: '📱' },
+        mobile: { width: '390px', height: '844px', label: 'iPhone 14', icon: '📱' }
+    };
+
     if (!pageData) {
         return (
             <div className="h-full flex items-center justify-center bg-gray-50">
@@ -855,16 +868,116 @@ const PagePreview = ({ pageData }) => {
         );
     }
 
+    // Show loading state if layout data is still being fetched
+    if (isLoadingLayout) {
+        return (
+            <div className="h-full bg-gray-50 overflow-auto">
+                <div className="h-full p-4 flex items-center justify-center">
+                    <div className="text-center text-gray-500">
+                        <p className="text-lg">Loading preview...</p>
+                        <p className="text-sm">Fetching layout data</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // Show error state if layout data failed to load
+    if (!layoutData && pageData.code_layout) {
+        return (
+            <div className="h-full bg-gray-50 overflow-auto">
+                <div className="h-full p-4 flex items-center justify-center">
+                    <div className="text-center text-red-500">
+                        <p className="text-lg">Preview unavailable</p>
+                        <p className="text-sm">Failed to load layout: {pageData.code_layout}</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    const currentViewport = viewports[viewportSize];
+
     return (
-        <div className="h-full bg-gray-50 overflow-auto">
-            <div className="h-full p-4">
-                {/* Use ContentEditor in non-editable mode to render the actual layout and widgets */}
-                <ContentEditor
-                    layoutJson={pageData.code_layout}
-                    pageData={pageData}
-                    editable={false}
-                    className="h-full preview-mode"
-                />
+        <div className="h-full bg-gray-50 flex flex-col">
+            {/* Responsive Preview Controls */}
+            <div className="flex-shrink-0 bg-white border-b border-gray-200 px-4 py-3">
+                <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-medium text-gray-900">Preview</h3>
+                    <div className="flex items-center space-x-1">
+                        {Object.entries(viewports).map(([key, viewport]) => (
+                            <button
+                                key={key}
+                                onClick={() => setViewportSize(key)}
+                                className={`inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                                    viewportSize === key
+                                        ? 'bg-blue-100 text-blue-700 border border-blue-200'
+                                        : 'bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200'
+                                }`}
+                                title={`Switch to ${viewport.label} view`}
+                            >
+                                <span className="mr-1">{viewport.icon}</span>
+                                {viewport.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+                {/* Viewport Size Indicator */}
+                {viewportSize !== 'desktop' && (
+                    <div className="mt-2 text-xs text-gray-500 text-center">
+                        {currentViewport.width} × {currentViewport.height}
+                    </div>
+                )}
+            </div>
+
+            {/* Preview Content */}
+            <div className="flex-1 bg-gray-100 overflow-auto">
+                <div className="h-full flex items-start justify-center p-4">
+                    {/* Viewport Container */}
+                    <div 
+                        className={`bg-white shadow-lg overflow-auto transition-all duration-300 ${
+                            viewportSize === 'desktop' 
+                                ? 'w-full h-full rounded-lg' 
+                                : viewportSize === 'tablet'
+                                ? 'border-2 border-gray-800 rounded-xl shadow-2xl'
+                                : 'border-2 border-gray-900 rounded-3xl shadow-2xl'
+                        }`}
+                        style={{
+                            width: currentViewport.width,
+                            height: viewportSize === 'desktop' ? '100%' : currentViewport.height,
+                            maxWidth: '100%',
+                            maxHeight: viewportSize === 'desktop' ? '100%' : 'calc(100vh - 200px)',
+                            // Add device-like styling for mobile and tablet
+                            ...(viewportSize === 'mobile' && {
+                                background: 'linear-gradient(145deg, #1f2937, #374151)',
+                                padding: '8px',
+                            }),
+                            ...(viewportSize === 'tablet' && {
+                                background: 'linear-gradient(145deg, #374151, #4b5563)',
+                                padding: '6px',
+                            })
+                        }}
+                    >
+                        {/* Device-like inner container for mobile/tablet */}
+                        {viewportSize !== 'desktop' ? (
+                            <div className="bg-white w-full h-full rounded-lg overflow-auto">
+                                <ContentEditor
+                                    layoutJson={layoutData}
+                                    pageData={pageData}
+                                    editable={false}
+                                    className="h-full preview-mode"
+                                />
+                            </div>
+                        ) : (
+                            <ContentEditor
+                                layoutJson={layoutData}
+                                pageData={pageData}
+                                editable={false}
+                                className="h-full preview-mode"
+                            />
+                        )}
+                    </div>
+                </div>
             </div>
         </div>
     );
