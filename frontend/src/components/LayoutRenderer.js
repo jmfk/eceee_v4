@@ -5,6 +5,7 @@
 
 // Constants for widget actions to eliminate magic strings
 import { WIDGET_ACTIONS } from '../utils/widgetConstants';
+import DjangoTemplateRenderer from '../utils/DjangoTemplateRenderer.js';
 
 // Constants for widget menu icons
 const WIDGET_ICONS = {
@@ -71,6 +72,10 @@ class LayoutRenderer {
 
     // NEW: Widget data change callbacks for single source of truth
     this.widgetDataCallbacks = new Map(); // Map of widget data change callbacks
+
+    // Initialize Django Template Renderer for template processing
+    this.templateRenderer = new DjangoTemplateRenderer();
+    this.templateRenderer.setDebugMode(this.isDevelopmentMode());
   }
 
   /**
@@ -432,7 +437,7 @@ class LayoutRenderer {
       container.innerHTML = `
         <div class="error-container p-4 border border-red-300 bg-red-50 rounded">
           <div class="text-red-700 font-medium">Layout Rendering Error</div>
-          <div class="text-red-600 text-sm mt-1">${this.escapeHtml(message)}</div>
+          <div class="text-red-600 text-sm mt-1">${this.templateRenderer.escapeHtml(message)}</div>
         </div>
       `;
     } catch (error) {
@@ -513,7 +518,7 @@ class LayoutRenderer {
         //   // No widgets or defaults - show placeholder
         //   container.innerHTML = `
         //     <div class="slot-placeholder p-4 border-2 border-dashed border-gray-300 rounded text-center text-gray-500">
-        //       <span class="text-sm">${this.escapeHtml(`Empty slot: ${slotName}`)}</span>
+        //       <span class="text-sm">${this.templateRenderer.escapeHtml(`Empty slot: ${slotName}`)}</span>
         //     </div>
         //   `;
         // }
@@ -761,7 +766,7 @@ class LayoutRenderer {
       if (icon.startsWith('svg:')) {
         button.innerHTML = this.createSVGIcon(icon.replace('svg:', ''));
       } else {
-        button.innerHTML = `<span style="font-family: Arial, sans-serif; font-weight: bold;">${this.escapeHtml(icon)}</span>`;
+        button.innerHTML = `<span style="font-family: Arial, sans-serif; font-weight: bold;">${this.templateRenderer.escapeHtml(icon)}</span>`;
       }
     } else {
       // Fallback to plus icon if no icon provided
@@ -1033,7 +1038,7 @@ class LayoutRenderer {
     modal.innerHTML = `
       <div class="p-6">
         <div class="flex items-center justify-between mb-4">
-          <h3 class="text-lg font-semibold text-gray-900">Edit ${this.escapeHtml(widgetInstance.name)}</h3>
+          <h3 class="text-lg font-semibold text-gray-900">Edit ${this.templateRenderer.escapeHtml(widgetInstance.name)}</h3>
           <button class="widget-edit-close text-gray-400 hover:text-gray-600 transition-colors"><span class="text-xl">×</span></button>
         </div>
         <form class="widget-edit-form space-y-4"></form>
@@ -2092,14 +2097,14 @@ class LayoutRenderer {
            data-widget-type="${widget.type}">
         <div class="flex items-start space-x-3">
           <div class="widget-icon bg-gray-100 rounded-lg w-12 h-12 flex items-center justify-center text-xl font-bold text-gray-600">
-            ${this.escapeHtml(widget.icon)}
+            ${this.templateRenderer.escapeHtml(widget.icon)}
           </div>
           <div class="flex-1 min-w-0">
-            <h4 class="text-sm font-semibold text-gray-900 mb-1">${this.escapeHtml(widget.name)}</h4>
-            <p class="text-xs text-gray-600 leading-relaxed">${this.escapeHtml(widget.description)}</p>
+            <h4 class="text-sm font-semibold text-gray-900 mb-1">${this.templateRenderer.escapeHtml(widget.name)}</h4>
+            <p class="text-xs text-gray-600 leading-relaxed">${this.templateRenderer.escapeHtml(widget.description)}</p>
             <div class="mt-2">
               <span class="inline-block px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded-full">
-                ${this.escapeHtml(widget.category)}
+                ${this.templateRenderer.escapeHtml(widget.category)}
               </span>
             </div>
           </div>
@@ -2446,7 +2451,7 @@ class LayoutRenderer {
   renderTextWidget(config) {
     const element = document.createElement('div');
     element.className = `text-${config.fontSize || 'medium'} text-${config.alignment || 'left'}`;
-    element.innerHTML = this.escapeHtml(config.content || 'Enter your text here...');
+    element.innerHTML = this.templateRenderer.escapeHtml(config.content || 'Enter your text here...');
     return element;
   }
 
@@ -2667,7 +2672,7 @@ class LayoutRenderer {
     const element = document.createElement('div');
     element.className = 'p-4 border border-gray-300 rounded bg-gray-50';
     element.innerHTML = `
-      <div class="text-sm font-medium text-gray-700">${this.escapeHtml(type)} Widget</div>
+      <div class="text-sm font-medium text-gray-700">${this.templateRenderer.escapeHtml(type)} Widget</div>
       <div class="text-xs text-gray-500 mt-1">Custom widget type</div>
     `;
     return element;
@@ -2997,8 +3002,8 @@ class LayoutRenderer {
 
         element.innerHTML = `
           <div class="slot-placeholder p-4 border-2 border-dashed border-gray-300 rounded text-center text-gray-500">
-            <div class="text-sm font-medium">${this.escapeHtml(title)}</div>
-            ${description ? `<div class="text-xs mt-1">${this.escapeHtml(description)}</div>` : ''}
+            <div class="text-sm font-medium">${this.templateRenderer.escapeHtml(title)}</div>
+            ${description ? `<div class="text-xs mt-1">${this.templateRenderer.escapeHtml(description)}</div>` : ''}
             <div class="text-xs mt-2 opacity-75">Click ••• to add widgets</div>
           </div>
         `;
@@ -3063,7 +3068,7 @@ class LayoutRenderer {
       if (templateTags.length > 0 && (templateTags.includes('if') || templateTags.includes('for'))) {
         // Use enhanced processing for templates with logic
         console.log(`LayoutRenderer: Using enhanced logic processing for widget "${widgetType}" with tags:`, templateTags);
-        element = this.processTemplateStructureWithLogic(templateJson.structure, config, templateTags);
+        element = this.templateRenderer.processTemplateStructureWithLogic(templateJson.structure, config, templateTags);
       } else {
         // Use standard processing for simple templates
         element = this.processTemplateStructure(templateJson.structure, config);
@@ -3102,19 +3107,19 @@ class LayoutRenderer {
 
       switch (structure.type) {
         case 'element':
-          return this.createElementFromTemplate(structure, config);
+          return this.templateRenderer.createElementFromTemplate(structure, config);
 
         case 'template_text':
-          return this.processTemplateText(structure, config);
+          return this.templateRenderer.processTemplateText(structure, config);
 
         case 'text':
-          return this.processStaticText(structure);
+          return this.templateRenderer.processStaticText(structure);
 
         case 'style':
-          return this.processStyleElement(structure, config);
+          return this.templateRenderer.processStyleElement(structure, config);
 
         case 'fragment':
-          return this.processFragment(structure, config);
+          return this.templateRenderer.processFragment(structure, config);
 
         default:
           console.warn(`LayoutRenderer: Unknown template structure type: ${structure.type}`);
@@ -3122,7 +3127,7 @@ class LayoutRenderer {
       }
 
     } catch (error) {
-      return this.handleTemplateStructureError(error, structure, config);
+      return this.templateRenderer.handleTemplateStructureError(error, structure, config);
     }
   }
 
@@ -3139,7 +3144,7 @@ class LayoutRenderer {
 
       // Process classes with template variables
       if (elementData.classes) {
-        const processedClasses = this.resolveTemplateVariables(elementData.classes, config);
+        const processedClasses = this.templateRenderer.resolveTemplateVariables(elementData.classes, config);
         element.className = processedClasses;
       }
 
@@ -3152,13 +3157,13 @@ class LayoutRenderer {
 
       // Process template attributes (attributes with variables)
       if (elementData.template_attributes) {
-        this.processTemplateAttributes(element, elementData.template_attributes, config);
+        this.templateRenderer.processTemplateAttributes(element, elementData.template_attributes, config);
       }
 
       // Process children recursively
       if (elementData.children && Array.isArray(elementData.children)) {
         elementData.children.forEach(child => {
-          const childNode = this.processTemplateStructure(child, config);
+          const childNode = this.templateRenderer.processTemplateStructure(child, config);
           if (childNode) {
             element.appendChild(childNode);
           }
@@ -3168,7 +3173,7 @@ class LayoutRenderer {
       return element;
 
     } catch (error) {
-      return this.handleTemplateStructureError(error, elementData, config);
+      return this.templateRenderer.handleTemplateStructureError(error, elementData, config);
     }
   }
 
@@ -3182,7 +3187,7 @@ class LayoutRenderer {
     try {
       Object.entries(templateAttrs).forEach(([attrName, attrData]) => {
         if (attrData && attrData.value) {
-          const resolvedValue = this.resolveTemplateVariables(attrData.value, config);
+          const resolvedValue = this.templateRenderer.resolveTemplateVariables(attrData.value, config);
           element.setAttribute(attrName, resolvedValue);
         }
       });
@@ -3203,11 +3208,11 @@ class LayoutRenderer {
         return document.createTextNode('');
       }
 
-      const resolvedContent = this.resolveTemplateVariables(textData.content, config);
+      const resolvedContent = this.templateRenderer.resolveTemplateVariables(textData.content, config);
       return document.createTextNode(resolvedContent);
 
     } catch (error) {
-      return this.handleTemplateStructureError(error, textData, config);
+      return this.templateRenderer.handleTemplateStructureError(error, textData, config);
     }
   }
 
@@ -3231,7 +3236,7 @@ class LayoutRenderer {
 
     if (fragmentData.children && Array.isArray(fragmentData.children)) {
       fragmentData.children.forEach(child => {
-        const childNode = this.processTemplateStructure(child, config);
+        const childNode = this.templateRenderer.processTemplateStructure(child, config);
         if (childNode) {
           fragment.appendChild(childNode);
         }
@@ -3262,11 +3267,11 @@ class LayoutRenderer {
           // Handle basic config.field access
           if (cleanExpression.startsWith('config.')) {
             const fieldPath = cleanExpression.substring(7); // Remove 'config.'
-            const value = this.getNestedValue(config, fieldPath);
+            const value = this.templateRenderer.getNestedValue(config, fieldPath);
 
             // Apply basic Django filters if present
             if (cleanExpression.includes('|')) {
-              return this.applyTemplateFilters(value, cleanExpression);
+              return this.templateRenderer.applyTemplateFilters(value, cleanExpression);
             }
 
             return value !== undefined ? String(value) : '';
@@ -3307,12 +3312,12 @@ class LayoutRenderer {
         if (typeof key !== 'string' || key === '__proto__' || key === 'constructor' || key === 'prototype') {
           throw new Error(`Dangerous property access blocked: ${key}`);
         }
-        
+
         // Only access own properties, not inherited ones
         if (current && current.hasOwnProperty && current.hasOwnProperty(key)) {
           return current[key];
         }
-        
+
         return undefined;
       }, obj);
     } catch (error) {
@@ -3348,7 +3353,7 @@ class LayoutRenderer {
           return String(value || '');
 
         case 'escape':
-          return this.escapeHtml(String(value || ''));
+          return this.templateRenderer.escapeHtml(String(value || ''));
 
         default:
           console.warn(`LayoutRenderer: Unhandled template filter: ${filterName}`);
@@ -3372,7 +3377,7 @@ class LayoutRenderer {
     const styleElement = document.createElement('style');
 
     if (styleData.css) {
-      const processedCSS = this.resolveTemplateVariables(styleData.css, config);
+      const processedCSS = this.templateRenderer.resolveTemplateVariables(styleData.css, config);
       styleElement.textContent = processedCSS;
     }
 
@@ -3390,7 +3395,7 @@ class LayoutRenderer {
     try {
       // Check if this structure has conditional logic
       if (structure.condition) {
-        const shouldRender = this.evaluateCondition(structure.condition, config);
+        const shouldRender = this.templateRenderer.evaluateCondition(structure.condition, config);
         if (!shouldRender) {
           return null; // Don't render this element
         }
@@ -3400,7 +3405,7 @@ class LayoutRenderer {
       if (templateTags.includes('if')) {
         // Look for conditional attributes or patterns in the structure
         if (structure.conditionalRender) {
-          const shouldRender = this.evaluateCondition(structure.conditionalRender, config);
+          const shouldRender = this.templateRenderer.evaluateCondition(structure.conditionalRender, config);
           if (!shouldRender) {
             return null;
           }
@@ -3408,11 +3413,11 @@ class LayoutRenderer {
       }
 
       // Process the structure normally if condition passes
-      return this.processTemplateStructure(structure, config);
+      return this.templateRenderer.processTemplateStructure(structure, config);
 
     } catch (error) {
       console.error('LayoutRenderer: Error processing conditional logic', error, structure);
-      return this.processTemplateStructure(structure, config); // Fallback to normal processing
+      return this.templateRenderer.processTemplateStructure(structure, config); // Fallback to normal processing
     }
   }
 
@@ -3428,45 +3433,45 @@ class LayoutRenderer {
         // Handle string conditions like "config.show_title"
         if (condition.startsWith('config.')) {
           const fieldPath = condition.substring(7); // Remove 'config.'
-          const value = this.getNestedValue(config, fieldPath);
+          const value = this.templateRenderer.getNestedValue(config, fieldPath);
           return Boolean(value);
         }
 
         // Handle negation like "not config.hide_element"
         if (condition.startsWith('not ')) {
           const innerCondition = condition.substring(4).trim();
-          return !this.evaluateCondition(innerCondition, config);
+          return !this.templateRenderer.evaluateCondition(innerCondition, config);
         }
 
         // Handle comparison operators
         if (condition.includes('==')) {
           const [left, right] = condition.split('==').map(s => s.trim());
-          const leftValue = this.resolveTemplateVariables(`{{ ${left} }}`, config);
+          const leftValue = this.templateRenderer.resolveTemplateVariables(`{{ ${left} }}`, config);
           const rightValue = right.replace(/['"]/g, ''); // Remove quotes
           return leftValue === rightValue;
         }
 
         if (condition.includes('!=')) {
           const [left, right] = condition.split('!=').map(s => s.trim());
-          const leftValue = this.resolveTemplateVariables(`{{ ${left} }}`, config);
+          const leftValue = this.templateRenderer.resolveTemplateVariables(`{{ ${left} }}`, config);
           const rightValue = right.replace(/['"]/g, ''); // Remove quotes
           return leftValue !== rightValue;
         }
 
         // Default: try to resolve as template variable
-        const resolvedValue = this.resolveTemplateVariables(`{{ ${condition} }}`, config);
+        const resolvedValue = this.templateRenderer.resolveTemplateVariables(`{{ ${condition} }}`, config);
         return Boolean(resolvedValue);
       }
 
       if (typeof condition === 'object' && condition !== null) {
         // Handle object-based conditions
         if (condition.type === 'field_check') {
-          const value = this.getNestedValue(config, condition.field);
+          const value = this.templateRenderer.getNestedValue(config, condition.field);
           return Boolean(value);
         }
 
         if (condition.type === 'comparison') {
-          const leftValue = this.getNestedValue(config, condition.left);
+          const leftValue = this.templateRenderer.getNestedValue(config, condition.left);
           const rightValue = condition.right;
           switch (condition.operator) {
             case '==': return leftValue == rightValue;
@@ -3485,7 +3490,7 @@ class LayoutRenderer {
     } catch (error) {
       console.error('LayoutRenderer: Error evaluating condition', error, condition);
       console.warn(`LayoutRenderer: Condition evaluation failed for: "${condition}" - this may indicate a configuration error`);
-      
+
       // In development mode, be more verbose about the failure
       if (this.isDevelopmentMode()) {
         console.warn('LayoutRenderer: Failed condition details:', {
@@ -3494,7 +3499,7 @@ class LayoutRenderer {
           stack: error.stack?.split('\n').slice(0, 3)
         });
       }
-      
+
       return false; // Fail safe - don't render if condition evaluation fails
     }
   }
@@ -3512,7 +3517,7 @@ class LayoutRenderer {
 
       // Check if this structure has loop logic
       if (structure.loop && structure.loop.iterable) {
-        const iterableValue = this.getNestedValue(config, structure.loop.iterable);
+        const iterableValue = this.templateRenderer.getNestedValue(config, structure.loop.iterable);
 
         if (Array.isArray(iterableValue)) {
           iterableValue.forEach((item, index) => {
@@ -3561,7 +3566,7 @@ class LayoutRenderer {
 
       // Handle conditional logic first
       if (structure.condition || (templateTags.includes('if') && structure.conditionalRender)) {
-        const result = this.processConditionalLogic(structure, config, templateTags);
+        const result = this.templateRenderer.processConditionalLogic(structure, config, templateTags);
         if (result === null) {
           return document.createTextNode(''); // Return empty text node if condition fails
         }
@@ -3570,35 +3575,35 @@ class LayoutRenderer {
 
       // Handle loop logic
       if (structure.loop || (templateTags.includes('for') && structure.iterable)) {
-        return this.processLoopLogic(structure, config, templateTags);
+        return this.templateRenderer.processLoopLogic(structure, config, templateTags);
       }
 
       // Handle enhanced template logic for existing types
       switch (structure.type) {
         case 'element':
-          return this.createElementFromTemplateWithLogic(structure, config, templateTags);
+          return this.templateRenderer.createElementFromTemplateWithLogic(structure, config, templateTags);
 
         case 'template_text':
           // Check for conditional text rendering
           if (structure.showIf) {
-            const shouldShow = this.evaluateCondition(structure.showIf, config);
+            const shouldShow = this.templateRenderer.evaluateCondition(structure.showIf, config);
             if (!shouldShow) {
               return document.createTextNode('');
             }
           }
-          return this.processTemplateText(structure, config);
+          return this.templateRenderer.processTemplateText(structure, config);
 
         case 'conditional_block':
           // Special type for conditional blocks
-          const shouldRender = this.evaluateCondition(structure.condition, config);
+          const shouldRender = this.templateRenderer.evaluateCondition(structure.condition, config);
           if (shouldRender && structure.content) {
-            return this.processTemplateStructureWithLogic(structure.content, config, templateTags);
+            return this.templateRenderer.processTemplateStructureWithLogic(structure.content, config, templateTags);
           }
           return document.createTextNode('');
 
         default:
           // Fall back to regular processing
-          return this.processTemplateStructure(structure, config);
+          return this.templateRenderer.processTemplateStructure(structure, config);
       }
 
     } catch (error) {
@@ -3618,14 +3623,14 @@ class LayoutRenderer {
     try {
       // Check element-level conditions
       if (elementData.showIf) {
-        const shouldShow = this.evaluateCondition(elementData.showIf, config);
+        const shouldShow = this.templateRenderer.evaluateCondition(elementData.showIf, config);
         if (!shouldShow) {
           return document.createTextNode(''); // Return empty text node if condition fails
         }
       }
 
       // Create the base element using existing method
-      const element = this.createElementFromTemplate(elementData, config);
+      const element = this.templateRenderer.createElementFromTemplate(elementData, config);
 
       // Enhanced children processing with logic support
       if (elementData.children && Array.isArray(elementData.children)) {
@@ -3633,7 +3638,7 @@ class LayoutRenderer {
         element.innerHTML = '';
 
         elementData.children.forEach(child => {
-          const childNode = this.processTemplateStructureWithLogic(child, config, templateTags);
+          const childNode = this.templateRenderer.processTemplateStructureWithLogic(child, config, templateTags);
           if (childNode && childNode.nodeType) {
             element.appendChild(childNode);
           }
@@ -3675,7 +3680,7 @@ class LayoutRenderer {
       // Process each style element
       styleElements.forEach((styleData, index) => {
         if (styleData.css) {
-          const processedCSS = this.resolveTemplateVariables(styleData.css, config);
+          const processedCSS = this.templateRenderer.resolveTemplateVariables(styleData.css, config);
           const scopedCSS = widgetId ? this.scopeCSS(processedCSS, widgetId) : processedCSS;
 
           // Inject the CSS into the document
@@ -3816,7 +3821,7 @@ class LayoutRenderer {
 
       // Inject into document head
       document.head.appendChild(styleElement);
-      
+
       // Track this style for cleanup
       this.injectedStyles.add(styleId);
 
@@ -3861,7 +3866,7 @@ class LayoutRenderer {
       const styleElement = document.createElement('style');
 
       if (styleData.css) {
-        const processedCSS = this.resolveTemplateVariables(styleData.css, config);
+        const processedCSS = this.templateRenderer.resolveTemplateVariables(styleData.css, config);
         styleElement.textContent = processedCSS;
 
         // Add metadata for tracking
@@ -3897,7 +3902,7 @@ class LayoutRenderer {
       // Process CSS custom properties with template variables
       return css.replace(/var\(--([^,)]+)(?:,\s*([^)]+))?\)/g, (match, varName, fallback) => {
         // Try to resolve the variable from config
-        const configValue = this.getNestedValue(config, varName);
+        const configValue = this.templateRenderer.getNestedValue(config, varName);
 
         if (configValue !== undefined) {
           return configValue;
@@ -4060,10 +4065,10 @@ class LayoutRenderer {
       // Try to create a safe fallback based on structure type
       switch (structure?.type) {
         case 'element':
-          return this.createSafeElementFallback(structure, config);
+          return this.templateRenderer.createSafeElementFallback(structure, config);
 
         case 'template_text':
-          return this.createSafeTextFallback(structure, config);
+          return this.templateRenderer.createSafeTextFallback(structure, config);
 
         case 'text':
           return document.createTextNode(structure.content || '[Text Error]');
@@ -4494,7 +4499,7 @@ class LayoutRenderer {
 
       if (templateTags.length > 0 && (templateTags.includes('if') || templateTags.includes('for'))) {
         // Use enhanced processing for templates with logic
-        element = this.processTemplateStructureWithLogic(cachedTemplate.structure, config, templateTags);
+        element = this.templateRenderer.processTemplateStructureWithLogic(cachedTemplate.structure, config, templateTags);
       } else {
         // Use standard processing for simple templates
         element = this.processTemplateStructure(cachedTemplate.structure, config);
@@ -4751,7 +4756,7 @@ class LayoutRenderer {
       // Only run cleanup periodically to avoid performance impact
       if (!this.lastStyleCleanup || Date.now() - this.lastStyleCleanup > 60000) { // 1 minute
         this.lastStyleCleanup = Date.now();
-        
+
         const orphanedStyles = [];
         this.injectedStyles.forEach(styleId => {
           const styleElement = document.getElementById(styleId);
@@ -4771,12 +4776,12 @@ class LayoutRenderer {
             }
           }
         });
-        
+
         // Remove orphaned styles from tracking
         orphanedStyles.forEach(styleId => {
           this.injectedStyles.delete(styleId);
         });
-        
+
         if (orphanedStyles.length > 0) {
           console.log(`LayoutRenderer: Cleaned up ${orphanedStyles.length} orphaned styles`);
         }
@@ -4794,7 +4799,7 @@ class LayoutRenderer {
       this.templateCache.clear();
       this.cacheLocks.clear();
       this.cacheMetrics = { hits: 0, misses: 0, evictions: 0 };
-      
+
       // Clean up all injected styles
       this.injectedStyles.forEach(styleId => {
         const styleElement = document.getElementById(styleId);
@@ -4803,7 +4808,7 @@ class LayoutRenderer {
         }
       });
       this.injectedStyles.clear();
-      
+
       console.log('LayoutRenderer: Template cache and styles cleared');
     } catch (error) {
       console.error('LayoutRenderer: Error clearing template cache', error);
@@ -4859,8 +4864,8 @@ class LayoutRenderer {
       const element = document.createElement('div');
       element.className = 'widget-placeholder border border-gray-300 rounded p-3 mb-2';
 
-      const widgetType = this.escapeHtml(widget.type || 'Unknown Widget');
-      const configText = widget.config ? this.escapeHtml(JSON.stringify(widget.config, null, 2)) : '';
+      const widgetType = this.templateRenderer.escapeHtml(widget.type || 'Unknown Widget');
+      const configText = widget.config ? this.templateRenderer.escapeHtml(JSON.stringify(widget.config, null, 2)) : '';
 
       element.innerHTML = `
         <div class="text-sm font-medium text-gray-700">${widgetType}</div>
@@ -4883,7 +4888,7 @@ class LayoutRenderer {
     try {
       const element = document.createElement('div');
       element.className = 'widget-error border border-red-300 bg-red-50 rounded p-3 mb-2';
-      element.innerHTML = `<div class="text-sm text-red-700">Widget Error: ${this.escapeHtml(message)}</div>`;
+      element.innerHTML = `<div class="text-sm text-red-700">Widget Error: ${this.templateRenderer.escapeHtml(message)}</div>`;
       return element;
     } catch (error) {
       console.error('LayoutRenderer: Error creating error widget element', error);
@@ -5040,7 +5045,7 @@ class LayoutRenderer {
           Version ${this.currentVersion.version_number}
           <span class="text-xs text-gray-500">(${this.currentVersion.status})</span>
         </div>
-        <div class="text-xs text-gray-600">${this.escapeHtml(this.currentVersion.description || 'No description')}</div>
+        <div class="text-xs text-gray-600">${this.templateRenderer.escapeHtml(this.currentVersion.description || 'No description')}</div>
       `;
     } else {
       indicator.innerHTML = '<div class="text-sm text-gray-500">No version selected</div>';
