@@ -391,6 +391,13 @@ class DjangoTemplateRenderer {
                 this.processTemplateAttributes(element, elementData.template_attributes, config);
             }
 
+            // Process conditional attributes (inline conditionals from Django templates)
+            if (elementData.attributes && elementData.attributes['data-conditional-attrs']) {
+                this.processConditionalAttributes(element, elementData.attributes['data-conditional-attrs'], config);
+                // Remove the processing attribute from the final element
+                element.removeAttribute('data-conditional-attrs');
+            }
+
             // Process children recursively
             if (elementData.children && Array.isArray(elementData.children)) {
                 elementData.children.forEach(child => {
@@ -432,6 +439,101 @@ class DjangoTemplateRenderer {
             });
         } catch (error) {
             console.error('DjangoTemplateRenderer: Error processing template attributes', error);
+        }
+    }
+
+    /**
+     * Process conditional attributes from inline Django template conditionals
+     * Handles data-conditional-attrs attribute created by backend preprocessing
+     * 
+     * @param {HTMLElement} element - Target DOM element
+     * @param {string} conditionalData - Conditional attribute data in format "condition|attributes"
+     * @param {Object} config - Configuration object
+     * 
+     * @example
+     * // For Django template: {% if config.open_in_new_tab %}target="_blank" rel="noopener"{% endif %}
+     * // Backend creates: data-conditional-attrs="config.open_in_new_tab|target=&quot;_blank&quot; rel=&quot;noopener&quot;"
+     * // This method evaluates condition and applies attributes if true
+     */
+    processConditionalAttributes(element, conditionalData, config) {
+        try {
+            if (!conditionalData || typeof conditionalData !== 'string') {
+                if (this.debug) {
+                    console.warn('DjangoTemplateRenderer: Invalid conditional attributes data');
+                }
+                return;
+            }
+
+            // Parse the conditional data format: "condition|attributes"
+            const separatorIndex = conditionalData.indexOf('|');
+            if (separatorIndex === -1) {
+                if (this.debug) {
+                    console.warn('DjangoTemplateRenderer: Invalid conditional attributes format');
+                }
+                return;
+            }
+
+            const condition = conditionalData.substring(0, separatorIndex).trim();
+            const attributesString = conditionalData.substring(separatorIndex + 1).trim();
+
+            // Evaluate the condition
+            const shouldApplyAttributes = this.evaluateCondition(condition, config);
+
+            if (shouldApplyAttributes) {
+                // Parse and apply the attributes
+                this.parseAndApplyAttributes(element, attributesString);
+            }
+
+        } catch (error) {
+            console.error('DjangoTemplateRenderer: Error processing conditional attributes', error);
+            if (this.debug) {
+                this.debugError('Conditional Attributes Processing Error', {
+                    conditionalData,
+                    config,
+                    error: error.message
+                });
+            }
+        }
+    }
+
+    /**
+     * Parse attribute string and apply to element
+     * Handles both key="value" and boolean attributes
+     * 
+     * @param {HTMLElement} element - Target DOM element  
+     * @param {string} attributesString - Attributes to parse and apply
+     * 
+     * @example
+     * parseAndApplyAttributes(element, 'target="_blank" rel="noopener noreferrer"')
+     * parseAndApplyAttributes(element, 'disabled')
+     */
+    parseAndApplyAttributes(element, attributesString) {
+        try {
+            // Handle HTML entity decoding for escaped quotes
+            const decoded = attributesString
+                .replace(/&quot;/g, '"')
+                .replace(/&lt;/g, '<')
+                .replace(/&gt;/g, '>')
+                .replace(/&amp;/g, '&');
+
+            // Parse attributes using regex to handle key="value" pairs and boolean attributes
+            const attributePattern = /(\w+)(?:\s*=\s*"([^"]*)")?/g;
+            let match;
+
+            while ((match = attributePattern.exec(decoded)) !== null) {
+                const [, attrName, attrValue] = match;
+
+                if (attrValue !== undefined) {
+                    // Key-value attribute
+                    element.setAttribute(attrName, attrValue);
+                } else {
+                    // Boolean attribute (like "disabled")
+                    element.setAttribute(attrName, '');
+                }
+            }
+
+        } catch (error) {
+            console.error('DjangoTemplateRenderer: Error parsing attributes', error);
         }
     }
 

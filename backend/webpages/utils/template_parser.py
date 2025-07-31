@@ -362,6 +362,11 @@ class WidgetTemplateParser:
             r"\{\%\s*for\s+([^%]+?)\s*\%\}(.*?)\{\%\s*endfor\s*\%\}",
             re.DOTALL | re.MULTILINE,
         )
+        # Pattern for inline conditionals within HTML tags (e.g., {% if condition %}attribute="value"{% endif %})
+        self.inline_conditional_pattern = re.compile(
+            r"\{\%\s*if\s+([^%]+?)\s*\%\}([^{]*?)\{\%\s*endif\s*\%\}",
+            re.MULTILINE,
+        )
 
     def _preprocess_django_template(self, template_source: str) -> str:
         """
@@ -380,12 +385,14 @@ class WidgetTemplateParser:
         def replace_if_blocks(match):
             condition = match.group(1).strip()
             content = match.group(2).strip()
-            
+
             # Validate condition is safe
             if not self._validate_template_condition(condition):
-                logger.warning(f"Potentially unsafe Django template condition blocked: {condition[:100]}")
-                return f'<!-- Invalid template condition: {escape(condition[:50])} -->'
-            
+                logger.warning(
+                    f"Potentially unsafe Django template condition blocked: {condition[:100]}"
+                )
+                return f"<!-- Invalid template condition: {escape(condition[:50])} -->"
+
             # Use Django's escape() for proper HTML attribute encoding
             escaped_condition = escape(condition)
             return f'<template-conditional data-condition="{escaped_condition}">{content}</template-conditional>'
@@ -393,18 +400,50 @@ class WidgetTemplateParser:
         def replace_for_blocks(match):
             loop_expr = match.group(1).strip()
             content = match.group(2).strip()
-            
+
             # Validate loop expression is safe
             if not self._validate_template_loop_expression(loop_expr):
-                logger.warning(f"Potentially unsafe Django template loop expression blocked: {loop_expr[:100]}")
-                return f'<!-- Invalid template loop: {escape(loop_expr[:50])} -->'
-            
+                logger.warning(
+                    f"Potentially unsafe Django template loop expression blocked: {loop_expr[:100]}"
+                )
+                return f"<!-- Invalid template loop: {escape(loop_expr[:50])} -->"
+
             # Use Django's escape() for proper HTML attribute encoding
             escaped_loop = escape(loop_expr)
-            return f'<template-loop data-loop="{escaped_loop}">{content}</template-loop>'
+            return (
+                f'<template-loop data-loop="{escaped_loop}">{content}</template-loop>'
+            )
 
-        # Apply transformations
-        processed = self.if_block_pattern.sub(replace_if_blocks, template_source)
+        def replace_inline_conditionals(match):
+            condition = match.group(1).strip()
+            attribute_content = match.group(2).strip()
+
+            # Validate condition is safe
+            if not self._validate_template_condition(condition):
+                logger.warning(
+                    f"Potentially unsafe Django template condition blocked: {condition[:100]}"
+                )
+                return f"<!-- Invalid inline conditional: {escape(condition[:50])} -->"
+
+            # Parse the attribute content to extract attribute name and value
+            # Handle cases like: target="_blank" rel="noopener noreferrer"
+            # or single attributes like: disabled
+            if "=" in attribute_content:
+                # Multiple attributes possible, preserve the exact format
+                escaped_condition = escape(condition)
+                escaped_content = escape(attribute_content)
+                return f'data-conditional-attrs="{escaped_condition}|{escaped_content}"'
+            else:
+                # Single attribute without value (like "disabled")
+                escaped_condition = escape(condition)
+                escaped_content = escape(attribute_content.strip())
+                return f'data-conditional-attrs="{escaped_condition}|{escaped_content}"'
+
+        # Apply transformations - process inline conditionals first, then block conditionals
+        processed = self.inline_conditional_pattern.sub(
+            replace_inline_conditionals, template_source
+        )
+        processed = self.if_block_pattern.sub(replace_if_blocks, processed)
         processed = self.for_block_pattern.sub(replace_for_blocks, processed)
 
         return processed
@@ -412,71 +451,75 @@ class WidgetTemplateParser:
     def _validate_template_condition(self, condition: str) -> bool:
         """
         Validate that a Django template condition is safe to process
-        
+
         Args:
             condition: The template condition to validate
-            
+
         Returns:
             True if condition is safe, False otherwise
         """
         if not condition or len(condition) > 200:  # Reasonable length limit
             return False
-            
+
         # Check for dangerous patterns
         dangerous_patterns = [
-            '__',  # Dunder methods
-            'import',  # Import statements
-            'exec',  # Code execution
-            'eval',  # Expression evaluation
-            '<script',  # Script tags
-            'javascript:',  # JavaScript URLs
-            'data:',  # Data URLs
-            '{{',  # Nested template syntax
-            '{%',  # Nested template tags
+            "__",  # Dunder methods
+            "import",  # Import statements
+            "exec",  # Code execution
+            "eval",  # Expression evaluation
+            "<script",  # Script tags
+            "javascript:",  # JavaScript URLs
+            "data:",  # Data URLs
+            "{{",  # Nested template syntax
+            "{%",  # Nested template tags
         ]
-        
+
         condition_lower = condition.lower()
         for pattern in dangerous_patterns:
             if pattern in condition_lower:
                 return False
-                
+
         # Only allow safe Django template syntax patterns
-        safe_pattern = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)*(\s+(and|or|not)\s+[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)*)*$')
+        safe_pattern = re.compile(
+            r"^[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)*(\s+(and|or|not)\s+[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)*)*$"
+        )
         return bool(safe_pattern.match(condition.strip()))
 
     def _validate_template_loop_expression(self, loop_expr: str) -> bool:
         """
         Validate that a Django template loop expression is safe to process
-        
+
         Args:
             loop_expr: The template loop expression to validate
-            
+
         Returns:
             True if expression is safe, False otherwise
         """
         if not loop_expr or len(loop_expr) > 200:  # Reasonable length limit
             return False
-            
+
         # Check for dangerous patterns (same as condition validation)
         dangerous_patterns = [
-            '__',  # Dunder methods
-            'import',  # Import statements
-            'exec',  # Code execution
-            'eval',  # Expression evaluation
-            '<script',  # Script tags
-            'javascript:',  # JavaScript URLs
-            'data:',  # Data URLs
-            '{{',  # Nested template syntax
-            '{%',  # Nested template tags
+            "__",  # Dunder methods
+            "import",  # Import statements
+            "exec",  # Code execution
+            "eval",  # Expression evaluation
+            "<script",  # Script tags
+            "javascript:",  # JavaScript URLs
+            "data:",  # Data URLs
+            "{{",  # Nested template syntax
+            "{%",  # Nested template tags
         ]
-        
+
         loop_expr_lower = loop_expr.lower()
         for pattern in dangerous_patterns:
             if pattern in loop_expr_lower:
                 return False
-                
+
         # Only allow safe Django for loop syntax: "item in items" or "key, value in items.items"
-        safe_pattern = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*(\s*,\s*[a-zA-Z_][a-zA-Z0-9_]*)*\s+in\s+[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)*$')
+        safe_pattern = re.compile(
+            r"^[a-zA-Z_][a-zA-Z0-9_]*(\s*,\s*[a-zA-Z_][a-zA-Z0-9_]*)*\s+in\s+[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)*$"
+        )
         return bool(safe_pattern.match(loop_expr.strip()))
 
     def parse_widget_template(self, template_name: str) -> Dict[str, Any]:
@@ -492,18 +535,18 @@ class WidgetTemplateParser:
         # Input validation
         if not template_name or not isinstance(template_name, str):
             raise ValueError("template_name must be a non-empty string")
-            
+
         if len(template_name) > 500:  # Reasonable path length limit
             raise ValueError("template_name is too long")
-            
+
         # Validate template name contains only safe characters
-        if not re.match(r'^[a-zA-Z0-9_/.-]+$', template_name):
+        if not re.match(r"^[a-zA-Z0-9_/.-]+$", template_name):
             raise ValueError("template_name contains invalid characters")
-            
+
         # Prevent path traversal attacks
-        if '..' in template_name or template_name.startswith('/'):
+        if ".." in template_name or template_name.startswith("/"):
             raise ValueError("template_name contains invalid path components")
-        
+
         # Check cache first
         cache_key = f"widget_template_parser:{template_name}"
         cached_result = cache.get(cache_key)
@@ -596,18 +639,21 @@ class WidgetTemplateParser:
         # Handle template-conditional elements (converted from {% if %} blocks)
         if element.name == "template-conditional":
             condition = element.get("data-condition", "")
-            
+
             # Safely decode condition - it was already validated during pre-processing
             # Use html.unescape for proper HTML entity decoding
             from html import unescape
+
             unescaped_condition = unescape(condition)
-            
+
             # Re-validate the unescaped condition for additional security
             if not self._validate_template_condition(unescaped_condition):
-                logger.warning(f"Invalid condition detected during parsing: {unescaped_condition[:50]}")
+                logger.warning(
+                    f"Invalid condition detected during parsing: {unescaped_condition[:50]}"
+                )
                 return {
                     "type": "text",
-                    "content": "<!-- Invalid template condition -->"
+                    "content": "<!-- Invalid template condition -->",
                 }
 
             # Parse children of the conditional block
@@ -630,19 +676,19 @@ class WidgetTemplateParser:
         # Handle template-loop elements (converted from {% for %} blocks)
         if element.name == "template-loop":
             loop_expr = element.get("data-loop", "")
-            
+
             # Safely decode loop expression - it was already validated during pre-processing
             # Use html.unescape for proper HTML entity decoding
             from html import unescape
+
             unescaped_loop = unescape(loop_expr)
-            
+
             # Re-validate the unescaped loop expression for additional security
             if not self._validate_template_loop_expression(unescaped_loop):
-                logger.warning(f"Invalid loop expression detected during parsing: {unescaped_loop[:50]}")
-                return {
-                    "type": "text",
-                    "content": "<!-- Invalid template loop -->"
-                }
+                logger.warning(
+                    f"Invalid loop expression detected during parsing: {unescaped_loop[:50]}"
+                )
+                return {"type": "text", "content": "<!-- Invalid template loop -->"}
 
             # Parse children of the loop block
             children = []
