@@ -27,7 +27,8 @@ class DjangoTemplateRenderer {
                 window.location?.hostname === 'localhost'
             ));
 
-        if (this.debug) {
+        // Only show debug message in verbose mode to reduce console noise
+        if (this.debug && window.TEMPLATE_DEBUG_VERBOSE) {
             console.log('🐛 DjangoTemplateRenderer: Debug mode enabled - detailed error information will be shown');
         }
 
@@ -504,18 +505,16 @@ class DjangoTemplateRenderer {
                 const computedHashRaw = this.computeSimpleHash(`${condition}|${attributesString}`) & 0x7FFFFFFF;
 
                 if (computedHashDecoded.toString() !== expectedHash && computedHashRaw.toString() !== expectedHash) {
-                    if (this.debug) {
-                        console.warn('DjangoTemplateRenderer: Content integrity check failed for conditional attributes', {
+                    // Hash mismatch detected - likely from template generated before hash validation
+                    // Continue processing with security validation but log only in development
+                    if (this.debug && window.location?.hostname === 'localhost' && window.TEMPLATE_DEBUG_VERBOSE) {
+                        console.warn('DjangoTemplateRenderer: Hash validation mismatch (legacy template)', {
                             expectedHash,
                             computedHashDecoded: computedHashDecoded.toString(),
-                            computedHashRaw: computedHashRaw.toString(),
-                            condition,
-                            attributesString,
-                            note: 'Continuing with validation - this may be from legacy templates without hashes'
+                            computedHashRaw: computedHashRaw.toString()
                         });
                     }
-                    // For backward compatibility with existing templates, continue processing 
-                    // but with enhanced validation - don't return here
+                    // Enhanced validation still applies - continue processing safely
                 }
             }
 
@@ -1203,7 +1202,10 @@ class DjangoTemplateRenderer {
      */
     setDebugMode(enabled) {
         this.debug = enabled;
-        console.log(`🐛 DjangoTemplateRenderer: Debug mode ${enabled ? 'enabled' : 'disabled'}`);
+        // Only log debug mode changes in verbose mode
+        if (window.TEMPLATE_DEBUG_VERBOSE) {
+            console.log(`🐛 DjangoTemplateRenderer: Debug mode ${enabled ? 'enabled' : 'disabled'}`);
+        }
     }
 
     /**

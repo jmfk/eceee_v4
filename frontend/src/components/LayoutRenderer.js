@@ -48,6 +48,7 @@ class LayoutRenderer {
     this.customWidgets = null; // Custom widget definitions (if any)
     this.cachedApiWidgets = null; // Cached widgets from API
     this.widgetTypesPromise = null; // Promise for ongoing API request
+    this.debug = this.isDevelopmentMode(); // Initialize debug mode
 
     // Template JSON caching for performance
     this.templateCache = new Map(); // Cache for processed templates
@@ -281,13 +282,31 @@ class LayoutRenderer {
   validateLayout(layout) {
     try {
       if (!layout || typeof layout !== 'object') {
+        if (this.debug) {
+          console.warn('LayoutRenderer: Layout is not an object', { layout, type: typeof layout });
+        }
         return false;
       }
 
       const structure = layout.structure || layout;
-      return this.validateNode(structure);
+      const isValid = this.validateNode(structure);
+
+      if (!isValid && this.debug) {
+        console.warn('LayoutRenderer: Layout validation failed', {
+          layout,
+          structure,
+          layoutKeys: Object.keys(layout),
+          structureType: typeof structure,
+          hasStructure: 'structure' in layout
+        });
+      }
+
+      return isValid;
     } catch (error) {
       console.error('LayoutRenderer: Layout validation error', error);
+      if (this.debug) {
+        console.error('LayoutRenderer: Layout that caused error:', layout);
+      }
       return false;
     }
   }
@@ -299,17 +318,33 @@ class LayoutRenderer {
    */
   validateNode(node) {
     if (!node || typeof node !== 'object') {
+      if (this.debug) {
+        console.warn('LayoutRenderer: Invalid node - not an object', node);
+      }
       return false;
     }
 
     const validTypes = ['element', 'slot', 'text'];
     if (!validTypes.includes(node.type)) {
+      if (this.debug) {
+        console.warn('LayoutRenderer: Invalid node type', {
+          type: node.type,
+          validTypes,
+          node: node
+        });
+      }
       return false;
     }
 
     // Validate children if present
     if (node.children !== undefined) {
       if (!Array.isArray(node.children)) {
+        if (this.debug) {
+          console.warn('LayoutRenderer: Children must be an array', {
+            children: node.children,
+            type: typeof node.children
+          });
+        }
         return false; // Children must be an array if present
       }
       return node.children.every(child => this.validateNode(child));
