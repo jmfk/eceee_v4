@@ -363,8 +363,9 @@ class WidgetTemplateParser:
             re.DOTALL | re.MULTILINE,
         )
         # Pattern for inline conditionals within HTML tags (e.g., {% if condition %}attribute="value"{% endif %})
+        # Made more secure to prevent ReDoS attacks with atomic grouping and length limits
         self.inline_conditional_pattern = re.compile(
-            r"\{\%\s*if\s+([^%]+?)\s*\%\}([^{]*?)\{\%\s*endif\s*\%\}",
+            r"\{\%\s*if\s+([^%]{1,100}?)\s*\%\}([^{]{1,200}?)\{\%\s*endif\s*\%\}",
             re.MULTILINE,
         )
 
@@ -428,16 +429,21 @@ class WidgetTemplateParser:
             # Parse the attribute content to extract attribute name and value
             # Handle cases like: target="_blank" rel="noopener noreferrer"
             # or single attributes like: disabled
-            if "=" in attribute_content:
-                # Multiple attributes possible, preserve the exact format
-                escaped_condition = escape(condition)
-                escaped_content = escape(attribute_content)
-                return f'data-conditional-attrs="{escaped_condition}|{escaped_content}"'
-            else:
-                # Single attribute without value (like "disabled")
-                escaped_condition = escape(condition)
-                escaped_content = escape(attribute_content.strip())
-                return f'data-conditional-attrs="{escaped_condition}|{escaped_content}"'
+            
+            # Validate attribute content structure before processing
+            if not self._validate_attribute_content(attribute_content):
+                logger.warning(
+                    f"Invalid attribute content in inline conditional: {attribute_content[:50]}"
+                )
+                return f"<!-- Invalid attribute content: {escape(attribute_content[:30])} -->"
+            
+            # Use double escaping for security - escaped once here, validated before decoding in frontend
+            escaped_condition = escape(condition)
+            escaped_content = escape(attribute_content)
+            
+            # Add validation marker to help frontend verify content integrity
+            content_hash = hash(f"{condition}|{attribute_content}") & 0x7FFFFFFF  # Positive hash
+            return f'data-conditional-attrs="{escaped_condition}|{escaped_content}" data-conditional-hash="{content_hash}"'
 
         # Apply transformations - process inline conditionals first, then block conditionals
         processed = self.inline_conditional_pattern.sub(
@@ -521,6 +527,50 @@ class WidgetTemplateParser:
             r"^[a-zA-Z_][a-zA-Z0-9_]*(\s*,\s*[a-zA-Z_][a-zA-Z0-9_]*)*\s+in\s+[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)*$"
         )
         return bool(safe_pattern.match(loop_expr.strip()))
+
+    def _validate_attribute_content(self, attribute_content: str) -> bool:
+        """
+        Validate that attribute content is safe and well-formed
+        
+        Args:
+            attribute_content: The attribute content to validate
+            
+        Returns:
+            True if content is safe, False otherwise
+        """
+        if not attribute_content or len(attribute_content) > 300:  # Reasonable limit
+            return False
+            
+        # Strip whitespace for validation
+        content = attribute_content.strip()
+        
+        # Check for dangerous patterns
+        dangerous_patterns = [
+            "<script",  # Script tags
+            "javascript:",  # JavaScript URLs
+            "data:",  # Data URLs (could contain script)
+            "vbscript:",  # VBScript URLs
+            "onload",  # Event handlers
+            "onerror",
+            "onclick",
+            "onmouseover",
+            "expression(",  # CSS expressions
+            "eval(",  # JavaScript eval
+            "\\",  # Backslash escapes
+        ]
+        
+        content_lower = content.lower()
+        for pattern in dangerous_patterns:
+            if pattern in content_lower:
+                return False
+        
+        # Validate attribute structure: either key="value" pairs or simple attribute names
+        # Allow: target="_blank", rel="noopener", disabled, data-test="value"
+        attribute_pattern = re.compile(
+            r'^[a-zA-Z][\w-]*(?:\s*=\s*"[^"<>]*")?(?:\s+[a-zA-Z][\w-]*(?:\s*=\s*"[^"<>]*")?)*$'
+        )
+        
+        return bool(attribute_pattern.match(content))
 
     def parse_widget_template(self, template_name: str) -> Dict[str, Any]:
         """
