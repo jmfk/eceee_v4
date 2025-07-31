@@ -15,7 +15,8 @@ global.document = {
         textContent: '',
         setAttribute: vi.fn(),
         appendChild: vi.fn(),
-        nodeType: 1
+        nodeType: 1,
+        style: {}
     })),
     createTextNode: vi.fn((text) => ({
         textContent: text,
@@ -133,6 +134,21 @@ describe('DjangoTemplateRenderer', () => {
                 const result = renderer.applyTemplateFilters('test', 'config.text|unknown');
                 expect(result).toBe('test');
             });
+
+            it('should chain multiple filters correctly', () => {
+                const result = renderer.applyTemplateFilters('', 'config.title|default:"hello world"|upper');
+                expect(result).toBe('HELLO WORLD');
+            });
+
+            it('should chain filters with complex arguments', () => {
+                const result = renderer.applyTemplateFilters('line 1\nline 2', 'config.content|linebreaks|upper');
+                expect(result).toBe('LINE 1<BR>LINE 2');
+            });
+
+            it('should chain three filters', () => {
+                const result = renderer.applyTemplateFilters('', 'config.title|default:"hello world"|title|length');
+                expect(result).toBe('11');
+            });
         });
 
         describe('getNestedValue', () => {
@@ -198,13 +214,13 @@ describe('DjangoTemplateRenderer', () => {
 
             it('should handle equality comparison', () => {
                 const config = { status: 'active' };
-                const result = renderer.evaluateCondition('config.status == active', config);
+                const result = renderer.evaluateCondition('config.status == "active"', config);
                 expect(result).toBe(true);
             });
 
             it('should handle inequality comparison', () => {
                 const config = { status: 'inactive' };
-                const result = renderer.evaluateCondition('config.status != active', config);
+                const result = renderer.evaluateCondition('config.status != "active"', config);
                 expect(result).toBe(true);
             });
 
@@ -379,13 +395,13 @@ describe('DjangoTemplateRenderer', () => {
                 children: [
                     {
                         type: 'template_text',
-                        content: 'Welcome {{ config.user.name|default:"Guest" }}!'
+                        content: 'Welcome {{ config.name|default:"Guest" }}!'
                     }
                 ]
             };
             const config = {
                 theme: 'modern',
-                user: { name: 'John' }
+                name: 'John'
             };
 
             const result = renderer.processTemplateStructure(structure, config);
@@ -394,13 +410,18 @@ describe('DjangoTemplateRenderer', () => {
             expect(document.createTextNode).toHaveBeenCalledWith('Welcome John!');
         });
 
+        it('should handle simple upper filter in resolveTemplateVariables', () => {
+            const config = { author: 'john doe' };
+            const result = renderer.resolveTemplateVariables('{{ config.author|upper }}', config);
+            expect(result).toBe('JOHN DOE');
+        });
+
         it('should handle templates with filters and defaults', () => {
             const template = '{{ config.title|default:"Default Title" }} - {{ config.author|upper }}';
             const config = { author: 'john doe' };
 
             const result = renderer.resolveTemplateVariables(template, config);
-
-            expect(result).toBe('Default Title - john doe'); // Note: upper filter not chained yet
+            expect(result).toBe('Default Title - JOHN DOE');
         });
     });
 });
