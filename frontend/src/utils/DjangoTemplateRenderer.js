@@ -286,16 +286,46 @@ class DjangoTemplateRenderer {
                     return this.processFragment(structure, config);
 
                 case 'conditional_block':
-                    // Handle conditional blocks in standard processing too
-                    const shouldRender = this.evaluateCondition(structure.condition, config);
-                    if (shouldRender && structure.content) {
-                        return this.processTemplateStructure(structure.content, config);
+                    // Handle conditional blocks with proper error handling
+                    try {
+                        if (!structure.condition || typeof structure.condition !== 'string') {
+                            console.warn('DjangoTemplateRenderer: Invalid condition in conditional_block');
+                            return document.createTextNode('<!-- Invalid condition -->');
+                        }
+
+                        const shouldRender = this.evaluateCondition(structure.condition, config);
+                        if (shouldRender && structure.content) {
+                            // Validate content structure before processing
+                            if (typeof structure.content !== 'object' || !structure.content.type) {
+                                console.warn('DjangoTemplateRenderer: Invalid content in conditional_block');
+                                return document.createTextNode('<!-- Invalid content structure -->');
+                            }
+                            return this.processTemplateStructure(structure.content, config);
+                        }
+                        return document.createTextNode('');
+                    } catch (error) {
+                        console.error('DjangoTemplateRenderer: Error processing conditional_block', error);
+                        return document.createTextNode('<!-- Conditional block error -->');
                     }
-                    return document.createTextNode('');
 
                 case 'loop_block':
-                    // Handle loop blocks in standard processing too
-                    return this.processLoopLogic(structure, config, []);
+                    // Handle loop blocks with proper error handling
+                    try {
+                        if (!structure.loop || typeof structure.loop !== 'string') {
+                            console.warn('DjangoTemplateRenderer: Invalid loop expression in loop_block');
+                            return document.createTextNode('<!-- Invalid loop expression -->');
+                        }
+
+                        if (!structure.content || typeof structure.content !== 'object') {
+                            console.warn('DjangoTemplateRenderer: Invalid content in loop_block');
+                            return document.createTextNode('<!-- Invalid loop content -->');
+                        }
+
+                        return this.processLoopLogic(structure, config, []);
+                    } catch (error) {
+                        console.error('DjangoTemplateRenderer: Error processing loop_block', error);
+                        return document.createTextNode('<!-- Loop block error -->');
+                    }
 
                 default:
                     if (this.debug) {
