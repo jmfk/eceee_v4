@@ -391,12 +391,12 @@ class DjangoTemplateRenderer {
                 this.processTemplateAttributes(element, elementData.template_attributes, config);
             }
 
-                        // Process conditional attributes (inline conditionals from Django templates)
+            // Process conditional attributes (inline conditionals from Django templates)
             if (elementData.attributes && elementData.attributes['data-conditional-attrs']) {
                 const conditionalHash = elementData.attributes['data-conditional-hash'] || null;
                 this.processConditionalAttributes(
-                    element, 
-                    elementData.attributes['data-conditional-attrs'], 
+                    element,
+                    elementData.attributes['data-conditional-attrs'],
                     config,
                     conditionalHash
                 );
@@ -486,7 +486,7 @@ class DjangoTemplateRenderer {
             const condition = conditionalData.substring(0, separatorIndex).trim();
             const attributesString = conditionalData.substring(separatorIndex + 1).trim();
 
-                        // Security validation: Verify content integrity if hash is provided
+            // Security validation: Verify content integrity if hash is provided
             if (expectedHash && expectedHash !== 'test-skip-hash' && expectedHash !== 'undefined') {
                 // First try with HTML-decoded content (frontend-calculated hash)
                 const decodedAttributes = attributesString
@@ -499,10 +499,10 @@ class DjangoTemplateRenderer {
                     .replace(/&lt;/g, '<')
                     .replace(/&gt;/g, '>')
                     .replace(/&amp;/g, '&');
-                
+
                 const computedHashDecoded = this.computeSimpleHash(`${decodedCondition}|${decodedAttributes}`) & 0x7FFFFFFF;
                 const computedHashRaw = this.computeSimpleHash(`${condition}|${attributesString}`) & 0x7FFFFFFF;
-                
+
                 if (computedHashDecoded.toString() !== expectedHash && computedHashRaw.toString() !== expectedHash) {
                     if (this.debug) {
                         console.warn('DjangoTemplateRenderer: Content integrity check failed for conditional attributes', {
