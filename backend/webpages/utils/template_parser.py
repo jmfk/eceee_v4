@@ -351,9 +351,52 @@ class WidgetTemplateParser:
         self.template_variable_pattern = re.compile(
             r"\{\{\s*([^}]+)\s*\}\}", re.MULTILINE
         )
-        self.template_tag_pattern = re.compile(
-            r"\{\%\s*([^%]+)\s*\%\}", re.MULTILINE
+        self.template_tag_pattern = re.compile(r"\{\%\s*([^%]+)\s*\%\}", re.MULTILINE)
+        # Patterns for Django template logic blocks
+        self.if_block_pattern = re.compile(
+            r"\{\%\s*if\s+([^%]+)\s*\%\}(.*?)\{\%\s*endif\s*\%\}",
+            re.DOTALL | re.MULTILINE,
         )
+        self.for_block_pattern = re.compile(
+            r"\{\%\s*for\s+([^%]+)\s*\%\}(.*?)\{\%\s*endfor\s*\%\}",
+            re.DOTALL | re.MULTILINE,
+        )
+
+    def _preprocess_django_template(self, template_source: str) -> str:
+        """
+        Pre-process Django template to convert template logic into parseable HTML elements
+
+        Converts Django template blocks like {% if %} into custom HTML elements
+        that BeautifulSoup can properly parse as structured content.
+
+        Args:
+            template_source: Raw Django template source code
+
+        Returns:
+            Processed template source with template logic converted to HTML elements
+        """
+
+        def replace_if_blocks(match):
+            condition = match.group(1).strip()
+            content = match.group(2).strip()
+            # Escape quotes in condition to prevent HTML attribute issues
+            escaped_condition = condition.replace('"', "&quot;").replace("'", "&#39;")
+            return f'<template-conditional data-condition="{escaped_condition}">{content}</template-conditional>'
+
+        def replace_for_blocks(match):
+            loop_expr = match.group(1).strip()
+            content = match.group(2).strip()
+            # Escape quotes in loop expression
+            escaped_loop = loop_expr.replace('"', "&quot;").replace("'", "&#39;")
+            return (
+                f'<template-loop data-loop="{escaped_loop}">{content}</template-loop>'
+            )
+
+        # Apply transformations
+        processed = self.if_block_pattern.sub(replace_if_blocks, template_source)
+        processed = self.for_block_pattern.sub(replace_for_blocks, processed)
+
+        return processed
 
     def parse_widget_template(self, template_name: str) -> Dict[str, Any]:
         """
@@ -376,8 +419,11 @@ class WidgetTemplateParser:
             template = get_template(template_name)
             template_source = template.template.source
 
-            # Parse the template content directly (widgets don't have content blocks)
-            soup = BeautifulSoup(template_source, "html.parser")
+            # Pre-process Django template logic before BeautifulSoup parsing
+            processed_source = self._preprocess_django_template(template_source)
+
+            # Parse the processed template content
+            soup = BeautifulSoup(processed_source, "html.parser")
 
             # Find root elements (excluding comments and whitespace)
             root_elements = [elem for elem in soup.children if elem.name]
@@ -398,10 +444,11 @@ class WidgetTemplateParser:
 
             # Build result
             result = {
-                "structure": parsed_elements[0] if len(parsed_elements) == 1 else {
-                    "type": "fragment",
-                    "children": parsed_elements
-                },
+                "structure": (
+                    parsed_elements[0]
+                    if len(parsed_elements) == 1
+                    else {"type": "fragment", "children": parsed_elements}
+                ),
                 "template_variables": template_variables,
                 "template_tags": template_tags,
                 "has_inline_css": self._has_inline_css(template_source),
@@ -432,7 +479,7 @@ class WidgetTemplateParser:
                     return {
                         "type": "template_text",
                         "content": escape(content),
-                        "variables": [escape(var.strip()) for var in variables]
+                        "variables": [escape(var.strip()) for var in variables],
                     }
                 else:
                     return {
@@ -447,7 +494,51 @@ class WidgetTemplateParser:
             return {
                 "type": "style",
                 "css": escape(css_content),
-                "variables": self.template_variable_pattern.findall(css_content)
+                "variables": self.template_variable_pattern.findall(css_content),
+            }
+
+        # Handle template-conditional elements (converted from {% if %} blocks)
+        if element.name == "template-conditional":
+            condition = element.get("data-condition", "")
+            unescaped_condition = condition.replace("&quot;", '"').replace("&#39;", "'")
+
+            # Parse children of the conditional block
+            children = []
+            for child in element.children:
+                child_node = self._parse_widget_element(child, template_source)
+                if child_node:
+                    children.append(child_node)
+
+            return {
+                "type": "conditional_block",
+                "condition": escape(unescaped_condition),
+                "content": (
+                    children[0]
+                    if len(children) == 1
+                    else {"type": "fragment", "children": children}
+                ),
+            }
+
+        # Handle template-loop elements (converted from {% for %} blocks)
+        if element.name == "template-loop":
+            loop_expr = element.get("data-loop", "")
+            unescaped_loop = loop_expr.replace("&quot;", '"').replace("&#39;", "'")
+
+            # Parse children of the loop block
+            children = []
+            for child in element.children:
+                child_node = self._parse_widget_element(child, template_source)
+                if child_node:
+                    children.append(child_node)
+
+            return {
+                "type": "loop_block",
+                "loop": escape(unescaped_loop),
+                "content": (
+                    children[0]
+                    if len(children) == 1
+                    else {"type": "fragment", "children": children}
+                ),
             }
 
         # Regular HTML element
@@ -460,29 +551,31 @@ class WidgetTemplateParser:
             # Check for template variables in classes
             class_variables = self.template_variable_pattern.findall(classes)
             if class_variables:
-                node["class_variables"] = [escape(var.strip()) for var in class_variables]
+                node["class_variables"] = [
+                    escape(var.strip()) for var in class_variables
+                ]
 
         # Extract attributes (may contain template variables)
         attributes = {}
         template_attributes = {}
-        
+
         for attr_name, attr_value in element.attrs.items():
             if attr_name == "class":
                 continue  # Already handled above
-                
+
             if isinstance(attr_value, list):
                 attr_value = " ".join(attr_value)
-            
+
             attr_value_str = str(attr_value)
             escaped_attr_name = escape(str(attr_name)[:100])
             escaped_attr_value = escape(attr_value_str[:1000])
-            
+
             # Check for template variables in attribute values
             attr_variables = self.template_variable_pattern.findall(attr_value_str)
             if attr_variables:
                 template_attributes[escaped_attr_name] = {
                     "value": escaped_attr_value,
-                    "variables": [escape(var.strip()) for var in attr_variables]
+                    "variables": [escape(var.strip()) for var in attr_variables],
                 }
             else:
                 attributes[escaped_attr_name] = escaped_attr_value
@@ -508,28 +601,40 @@ class WidgetTemplateParser:
         """Extract all template variables from the template source"""
         variables = set()
         matches = self.template_variable_pattern.findall(template_source)
-        
+
         for match in matches:
             # Clean up the variable (remove filters, etc.)
             var_parts = match.split("|")[0].strip()  # Remove filters
             variables.add(escape(var_parts[:200]))  # Limit length and escape
-        
+
         return sorted(list(variables))
 
     def _extract_template_tags(self, template_source: str) -> List[str]:
         """Extract all template tags from the template source"""
         tags = set()
         matches = self.template_tag_pattern.findall(template_source)
-        
+
         for match in matches:
             # Extract the tag name (first word)
             tag_parts = match.strip().split()
             if tag_parts:
                 tag_name = tag_parts[0]
                 # Only include common Django template tags
-                if tag_name in ['if', 'endif', 'for', 'endfor', 'comment', 'endcomment', 'load', 'include', 'extends', 'block', 'endblock']:
+                if tag_name in [
+                    "if",
+                    "endif",
+                    "for",
+                    "endfor",
+                    "comment",
+                    "endcomment",
+                    "load",
+                    "include",
+                    "extends",
+                    "block",
+                    "endblock",
+                ]:
                     tags.add(escape(tag_name))
-        
+
         return sorted(list(tags))
 
     def _has_inline_css(self, template_source: str) -> bool:
@@ -608,5 +713,7 @@ class WidgetSerializer:
             return result
         except Exception as e:
             # Re-raise with generic message to prevent information disclosure
-            logger.error(f"Error serializing widget template {widget_instance.name}: {e}")
+            logger.error(
+                f"Error serializing widget template {widget_instance.name}: {e}"
+            )
             raise Exception("Widget template parsing failed")
