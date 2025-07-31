@@ -94,24 +94,26 @@ describe('Inline Conditional Attributes', () => {
     });
 
     describe('Frontend Conditional Attribute Processing', () => {
-        it('should apply attributes when condition is true', () => {
+                it('should apply attributes when condition is true', () => {
             const element = document.createElement('a');
             const conditionalData = 'config.open_in_new_tab|target=&quot;_blank&quot; rel=&quot;noopener noreferrer&quot;';
             const config = { open_in_new_tab: true };
-
-            renderer.processConditionalAttributes(element, conditionalData, config);
-
+            
+            // Skip hash validation for testing
+            renderer.processConditionalAttributes(element, conditionalData, config, 'test-skip-hash');
+            
             expect(element.getAttribute('target')).toBe('_blank');
             expect(element.getAttribute('rel')).toBe('noopener noreferrer');
         });
 
-        it('should not apply attributes when condition is false', () => {
+                it('should not apply attributes when condition is false', () => {
             const element = document.createElement('a');
             const conditionalData = 'config.open_in_new_tab|target=&quot;_blank&quot; rel=&quot;noopener noreferrer&quot;';
             const config = { open_in_new_tab: false };
-
-            renderer.processConditionalAttributes(element, conditionalData, config);
-
+            
+            // Skip hash validation for testing
+            renderer.processConditionalAttributes(element, conditionalData, config, 'test-skip-hash');
+            
             expect(element.hasAttribute('target')).toBe(false);
             expect(element.hasAttribute('rel')).toBe(false);
         });
@@ -120,9 +122,10 @@ describe('Inline Conditional Attributes', () => {
             const element = document.createElement('a');
             const conditionalData = 'config.open_in_new_tab|target=&quot;_blank&quot; rel=&quot;noopener noreferrer&quot;';
             const config = {};
-
-            renderer.processConditionalAttributes(element, conditionalData, config);
-
+            
+            // Skip hash validation for testing
+            renderer.processConditionalAttributes(element, conditionalData, config, 'test-skip-hash');
+            
             expect(element.hasAttribute('target')).toBe(false);
             expect(element.hasAttribute('rel')).toBe(false);
         });
@@ -148,81 +151,87 @@ describe('Inline Conditional Attributes', () => {
     });
 
     describe('Integration: Complete Element Processing', () => {
-        it('should process element with conditional attributes correctly', () => {
+                it('should process element with conditional attributes correctly', () => {
             // Simulate the structure that would come from the backend after preprocessing
             const elementData = {
                 tag: 'a',
                 attributes: {
                     href: 'https://example.com',
-                    'data-conditional-attrs': 'config.open_in_new_tab|target=&quot;_blank&quot; rel=&quot;noopener noreferrer&quot;'
+                    'data-conditional-attrs': 'config.open_in_new_tab|target=&quot;_blank&quot; rel=&quot;noopener noreferrer&quot;',
+                    'data-conditional-hash': 'test-skip-hash'
                 },
                 children: []
             };
-
+            
             const config = { open_in_new_tab: true };
-
+            
             const element = renderer.createElementFromTemplate(elementData, config);
-
+            
             // Should have all attributes applied
             expect(element.tagName.toLowerCase()).toBe('a');
             expect(element.getAttribute('href')).toBe('https://example.com');
             expect(element.getAttribute('target')).toBe('_blank');
             expect(element.getAttribute('rel')).toBe('noopener noreferrer');
-
-            // The processing attribute should be removed
+            
+            // The processing attributes should be removed
             expect(element.hasAttribute('data-conditional-attrs')).toBe(false);
+            expect(element.hasAttribute('data-conditional-hash')).toBe(false);
         });
 
-        it('should process element without applying conditional attributes when condition is false', () => {
+                it('should process element without applying conditional attributes when condition is false', () => {
             const elementData = {
                 tag: 'a',
                 attributes: {
                     href: 'https://example.com',
-                    'data-conditional-attrs': 'config.open_in_new_tab|target=&quot;_blank&quot; rel=&quot;noopener noreferrer&quot;'
+                    'data-conditional-attrs': 'config.open_in_new_tab|target=&quot;_blank&quot; rel=&quot;noopener noreferrer&quot;',
+                    'data-conditional-hash': 'test-skip-hash'
                 },
                 children: []
             };
-
+            
             const config = { open_in_new_tab: false };
-
+            
             const element = renderer.createElementFromTemplate(elementData, config);
-
+            
             // Should only have non-conditional attributes
             expect(element.tagName.toLowerCase()).toBe('a');
             expect(element.getAttribute('href')).toBe('https://example.com');
             expect(element.hasAttribute('target')).toBe(false);
             expect(element.hasAttribute('rel')).toBe(false);
-
-            // The processing attribute should be removed
+            
+            // The processing attributes should be removed
             expect(element.hasAttribute('data-conditional-attrs')).toBe(false);
+            expect(element.hasAttribute('data-conditional-hash')).toBe(false);
         });
     });
 
     describe('Button Widget Specific Tests', () => {
-        it('should process link element with conditional new tab attributes when enabled', () => {
+                it('should process link element with conditional new tab attributes when enabled', () => {
             // Test simplified link element structure (what would be inside the button widget)
             const linkStructure = {
                 tag: 'a',
                 attributes: {
                     href: 'https://example.com',
-                    'data-conditional-attrs': 'config.open_in_new_tab|target=&quot;_blank&quot; rel=&quot;noopener noreferrer&quot;'
+                    'data-conditional-attrs': 'config.open_in_new_tab|target=&quot;_blank&quot; rel=&quot;noopener noreferrer&quot;',
+                    'data-conditional-hash': 'test-skip-hash'
                 }
             };
-
+            
             const config = {
                 url: 'https://example.com',
-                text: 'Click me',
+                text: 'Click me', 
                 open_in_new_tab: true
             };
-
+            
             const element = renderer.createElementFromTemplate(linkStructure, config);
-
+            
             expect(element.tagName.toLowerCase()).toBe('a');
             expect(element.getAttribute('href')).toBe('https://example.com');
             expect(element.getAttribute('target')).toBe('_blank');
             expect(element.getAttribute('rel')).toBe('noopener noreferrer');
-            // The processing attribute should be removed
+            // The processing attributes should be removed
             expect(element.hasAttribute('data-conditional-attrs')).toBe(false);
+            expect(element.hasAttribute('data-conditional-hash')).toBe(false);
         });
 
         it('should process link element without conditional new tab attributes when disabled', () => {
@@ -230,24 +239,26 @@ describe('Inline Conditional Attributes', () => {
                 tag: 'a',
                 attributes: {
                     href: 'https://example.com',
-                    'data-conditional-attrs': 'config.open_in_new_tab|target=&quot;_blank&quot; rel=&quot;noopener noreferrer&quot;'
+                    'data-conditional-attrs': 'config.open_in_new_tab|target=&quot;_blank&quot; rel=&quot;noopener noreferrer&quot;',
+                    'data-conditional-hash': 'test-skip-hash'
                 }
             };
-
+            
             const config = {
                 url: 'https://example.com',
                 text: 'Click me',
                 open_in_new_tab: false
             };
-
+            
             const element = renderer.createElementFromTemplate(linkStructure, config);
-
+            
             expect(element.tagName.toLowerCase()).toBe('a');
             expect(element.getAttribute('href')).toBe('https://example.com');
             expect(element.hasAttribute('target')).toBe(false);
             expect(element.hasAttribute('rel')).toBe(false);
-            // The processing attribute should be removed
+            // The processing attributes should be removed
             expect(element.hasAttribute('data-conditional-attrs')).toBe(false);
+            expect(element.hasAttribute('data-conditional-hash')).toBe(false);
         });
     });
 });
