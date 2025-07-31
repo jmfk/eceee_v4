@@ -831,32 +831,43 @@ const MetadataEditor = forwardRef(({ pageData, onUpdate, isNewPage }, ref) => {
 // Add display name for debugging
 MetadataEditor.displayName = 'MetadataEditor';
 
-// Simple preview component
+// Preview component that renders actual page content without editing controls
 const PagePreview = ({ pageData }) => {
-    return (
-        <div className="h-full p-6 overflow-y-auto bg-gray-100">
-            <div className="max-w-4xl mx-auto bg-white rounded-lg shadow">
-                <div className="p-8">
-                    <h1 className="text-3xl font-bold text-gray-900 mb-4">
-                        {pageData?.title || 'Untitled Page'}
-                    </h1>
-                    {pageData?.description && (
-                        <p className="text-lg text-gray-600 mb-6">
-                            {pageData.description}
-                        </p>
-                    )}
-                    <div className="prose max-w-none">
-                        <p className="text-gray-500 italic">
-                            Live preview of page content would appear here...
-                        </p>
-                        <p className="text-sm text-gray-400 mt-4">
-                            Current layout: {pageData?.code_layout || 'None selected'}
-                        </p>
-                    </div>
+    if (!pageData) {
+        return (
+            <div className="h-full flex items-center justify-center bg-gray-50">
+                <div className="text-center text-gray-500">
+                    <p className="text-lg">No page data available</p>
+                    <p className="text-sm">Save your page to see the preview</p>
                 </div>
             </div>
+        );
+    }
+
+    if (!pageData.code_layout) {
+        return (
+            <div className="h-full flex items-center justify-center bg-gray-50">
+                <div className="text-center text-gray-500">
+                    <p className="text-lg">No layout selected</p>
+                    <p className="text-sm">Choose a layout to see the preview</p>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="h-full bg-gray-50 overflow-auto">
+            <div className="h-full p-4">
+                {/* Use ContentEditor in non-editable mode to render the actual layout and widgets */}
+                <ContentEditor
+                    layoutJson={pageData.code_layout}
+                    pageData={pageData}
+                    editable={false}
+                    className="h-full preview-mode"
+                />
+            </div>
         </div>
-    )
+    );
 }
 
 export default PageEditor 

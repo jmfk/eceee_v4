@@ -295,9 +295,9 @@ const ContentEditor = forwardRef(({
     }
   }, []);
 
-  // Setup slot interactivity
+  // Setup slot interactivity (only when editable)
   const setupSlotInteractivity = useCallback(() => {
-    if (!containerRef.current) return;
+    if (!containerRef.current || !editable) return;
 
     const slotElements = containerRef.current.querySelectorAll('[data-slot-name]');
 
@@ -321,7 +321,7 @@ const ContentEditor = forwardRef(({
       // Add tracked event listener
       addTrackedEventListener(slotElement, 'click', handleSlotClick);
     });
-  }, [onSlotClick, addTrackedEventListener]);
+  }, [onSlotClick, addTrackedEventListener, editable]);
 
   // Utility to handle fixed positioned elements within the layout container
   const handleFixedPositioning = useCallback(() => {
@@ -462,6 +462,24 @@ const ContentEditor = forwardRef(({
       
       .widget-item:hover .widget-edit-btn {
         opacity: 1;
+      }
+      
+      /* Preview mode styles - disable editing visual cues */
+      .preview-mode .slot-editable {
+        cursor: default;
+      }
+      
+      .preview-mode .slot-editable:hover {
+        box-shadow: none;
+      }
+      
+      .preview-mode .widget-item:hover .widget-edit-btn,
+      .preview-mode .widget-edit-btn {
+        display: none !important;
+      }
+      
+      .preview-mode .layout-container {
+        border: none !important;
       }
     `;
     document.head.appendChild(style);
