@@ -285,6 +285,18 @@ class DjangoTemplateRenderer {
                 case 'fragment':
                     return this.processFragment(structure, config);
 
+                case 'conditional_block':
+                    // Handle conditional blocks in standard processing too
+                    const shouldRender = this.evaluateCondition(structure.condition, config);
+                    if (shouldRender && structure.content) {
+                        return this.processTemplateStructure(structure.content, config);
+                    }
+                    return document.createTextNode('');
+
+                case 'loop_block':
+                    // Handle loop blocks in standard processing too
+                    return this.processLoopLogic(structure, config, []);
+
                 default:
                     if (this.debug) {
                         console.warn(`DjangoTemplateRenderer: Unknown template structure type: ${structure.type}`);

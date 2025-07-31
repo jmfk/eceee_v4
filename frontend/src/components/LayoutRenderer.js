@@ -3071,7 +3071,7 @@ class LayoutRenderer {
         element = this.templateRenderer.processTemplateStructureWithLogic(templateJson.structure, config, templateTags);
       } else {
         // Use standard processing for simple templates
-        element = this.processTemplateStructure(templateJson.structure, config);
+        element = this.templateRenderer.processTemplateStructure(templateJson.structure, config);
       }
 
       // Handle inline CSS if present
@@ -4210,7 +4210,7 @@ class LayoutRenderer {
         return;
       }
 
-      const validTypes = ['element', 'template_text', 'text', 'style', 'fragment', 'conditional_block'];
+      const validTypes = ['element', 'template_text', 'text', 'style', 'fragment', 'conditional_block', 'loop_block'];
       if (!validTypes.includes(structure.type)) {
         warnings.push(`Unknown structure type: ${structure.type}`);
       }
