@@ -21,9 +21,29 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Security Settings
 SECRET_KEY = config("SECRET_KEY", default="dev-secret-key-change-in-production-12345")
 DEBUG = config("DEBUG", default=True, cast=bool)
-ALLOWED_HOSTS = config(
+# Dynamic hostname validation settings
+SKIP_HOST_VALIDATION_IN_DEBUG = config(
+    "SKIP_HOST_VALIDATION_IN_DEBUG", default=False, cast=bool
+)
+
+# ALLOWED_HOSTS configuration
+# We use a two-tier approach:
+# 1. Django's ALLOWED_HOSTS is set to allow all hosts (for performance)
+# 2. DynamicHostValidationMiddleware does the actual validation
+_static_hosts = config(
     "ALLOWED_HOSTS", default="localhost,127.0.0.1,backend,frontend"
 ).split(",")
+
+# Allow all hosts at Django level - our middleware handles validation
+ALLOWED_HOSTS = ["*"]
+
+# Store static hosts for middleware validation
+STATIC_ALLOWED_HOSTS = _static_hosts
+
+# Note: The DynamicHostValidationMiddleware handles all host validation
+# using both STATIC_ALLOWED_HOSTS and database hostnames from WebPage.hostnames.
+# This enables multi-site functionality where hostnames can be managed
+# through the admin interface while maintaining security.
 
 # Application definition
 DJANGO_APPS = [
@@ -75,6 +95,7 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 MIDDLEWARE = [
     "django_prometheus.middleware.PrometheusBeforeMiddleware",
     "corsheaders.middleware.CorsMiddleware",
+    "webpages.middleware.DynamicHostValidationMiddleware",  # Must be before SecurityMiddleware
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",

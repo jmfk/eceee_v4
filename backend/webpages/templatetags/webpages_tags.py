@@ -127,34 +127,88 @@ def render_slot(context, slot_name):
     """
     from django.utils.safestring import mark_safe
     from django.template.loader import render_to_string
-    
+
     # Get widgets_by_slot from context - this is how page_detail.html provides widget data
-    widgets_by_slot = context.get('widgets_by_slot', {})
-    
+    widgets_by_slot = context.get("widgets_by_slot", {})
+
     # Get widgets for this specific slot
     slot_widgets = widgets_by_slot.get(slot_name, [])
-    
+
     if not slot_widgets:
         # No widgets for this slot - return empty string or placeholder
-        return mark_safe('')
-    
-    # Render all widgets for this slot
+        return mark_safe("")
+
+    # Check if we have new-style rendered widgets (from WebPageRenderer)
+    if slot_widgets and isinstance(slot_widgets[0], dict) and "html" in slot_widgets[0]:
+        # New format from WebPageRenderer
+        rendered_widgets = [widget_info["html"] for widget_info in slot_widgets]
+        return mark_safe("".join(rendered_widgets))
+
+    # Legacy format - render widgets manually
     rendered_widgets = []
     for widget_data in slot_widgets:
         try:
             widget_html = render_to_string(
                 "webpages/widgets/widget_wrapper.html",
                 {
-                    'widget': widget_data.widget,
-                    'config': widget_data.widget.configuration,
-                    'inherited_from': widget_data.inherited_from,
-                    'is_override': widget_data.is_override,
+                    "widget": widget_data.widget,
+                    "config": widget_data.widget.configuration,
+                    "inherited_from": widget_data.inherited_from,
+                    "is_override": widget_data.is_override,
                 },
-                request=context.get('request')
+                request=context.get("request"),
             )
             rendered_widgets.append(widget_html)
         except Exception as e:
             # Log error and continue with other widgets
             continue
-    
-    return mark_safe(''.join(rendered_widgets))
+
+    return mark_safe("".join(rendered_widgets))
+
+
+@register.simple_tag(takes_context=True)
+def render_page_backend(context, page, version=None):
+    """
+    Render a complete WebPage using the backend renderer.
+    Usage: {% render_page_backend page %}
+    """
+    from django.utils.safestring import mark_safe
+    from ..renderers import WebPageRenderer
+
+    try:
+        renderer = WebPageRenderer(request=context.get("request"))
+        result = renderer.render(page, version=version, context=context)
+        return mark_safe(result["html"])
+    except Exception as e:
+        # Return error message in development, empty in production
+        from django.conf import settings
+
+        if settings.DEBUG:
+            return mark_safe(f"<!-- Error rendering page: {e} -->")
+        return mark_safe("")
+
+
+@register.simple_tag(takes_context=True)
+def render_page_with_css(context, page, version=None):
+    """
+    Render a complete WebPage with CSS using the backend renderer.
+    Returns a dict with 'html' and 'css' keys.
+    Usage: {% render_page_with_css page as page_data %}{{ page_data.html }}
+    """
+    from ..renderers import WebPageRenderer
+
+    try:
+        renderer = WebPageRenderer(request=context.get("request"))
+        return renderer.render(page, version=version, context=context)
+    except Exception as e:
+        # Return error message in development, empty in production
+        from django.conf import settings
+
+        if settings.DEBUG:
+            return {
+                "html": f"<!-- Error rendering page: {e} -->",
+                "css": "",
+                "meta": "",
+                "debug_info": {"error": str(e)},
+            }
+        return {"html": "", "css": "", "meta": "", "debug_info": {}}

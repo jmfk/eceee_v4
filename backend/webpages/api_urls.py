@@ -14,6 +14,8 @@ from .views import (
     PageThemeViewSet,
     WidgetTypeViewSet,
     layout_json,
+    render_page_backend,
+    render_page_preview,
 )
 
 # Create router and register viewsets
@@ -31,4 +33,12 @@ router.register(r"widget-types", WidgetTypeViewSet, basename="widgettype")
 urlpatterns = [
     path("", include(router.urls)),
     path("layouts/<str:layout_name>/json/", layout_json, name="layout-json"),
+    # Backend rendering endpoints
+    path("pages/<int:page_id>/render/", render_page_backend, name="page-render"),
+    path(
+        "pages/<int:page_id>/versions/<int:version_id>/render/",
+        render_page_backend,
+        name="page-version-render",
+    ),
+    path("pages/preview/", render_page_preview, name="page-preview"),
 ]
