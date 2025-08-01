@@ -69,13 +69,6 @@ class WebPage(models.Model):
     Root pages (without parent) can be associated with hostnames for multi-site support.
     """
 
-    PUBLICATION_STATUS_CHOICES = [
-        ("unpublished", "Unpublished"),
-        ("scheduled", "Scheduled"),
-        ("published", "Published"),
-        ("expired", "Expired"),
-    ]
-
     # Basic page information
     title = models.CharField(max_length=255)
     slug = models.SlugField(max_length=255, unique=False, null=True, blank=True)
@@ -122,26 +115,6 @@ class WebPage(models.Model):
     )
     enable_css_injection = models.BooleanField(
         default=True, help_text="Whether to enable dynamic CSS injection for this page"
-    )
-
-    # Publishing control
-    publication_status = models.CharField(
-        max_length=20,
-        choices=PUBLICATION_STATUS_CHOICES,
-        default="unpublished",
-        db_index=True,
-    )
-    effective_date = models.DateTimeField(
-        null=True,
-        blank=True,
-        help_text="When this page should become public",
-        db_index=True,
-    )
-    expiry_date = models.DateTimeField(
-        null=True,
-        blank=True,
-        help_text="When this page should no longer be public",
-        db_index=True,
     )
 
     # SEO and metadata
@@ -509,167 +482,6 @@ class WebPage(models.Model):
         current_version = self.get_current_published_version(now)
         return current_version is not None
 
-    def is_published_legacy(self):
-        """LEGACY: Check if this page should be visible using old logic (for migration)"""
-        now = timezone.now()
-
-        if self.publication_status != "published":
-            return False
-
-        if self.effective_date and self.effective_date > now:
-            return False
-
-        if self.expiry_date and self.expiry_date <= now:
-            return False
-
-        return True
-
-    def get_publication_schedule(self):
-        """Get the publication schedule for this page as a value object."""
-        from .publishing import PublicationSchedule
-
-        return PublicationSchedule(self.effective_date, self.expiry_date)
-
-    def should_be_published_now(self, now=None):
-        """
-        Tell, Don't Ask: Let the page tell us if it should be published now.
-
-        This addresses the code smell where external code was asking the page
-        about its state and then making decisions.
-        """
-        if now is None:
-            now = timezone.now()
-
-        return (
-            self.publication_status == "scheduled"
-            and self.get_publication_schedule().should_be_published_at(now)
-        )
-
-    def should_be_expired_now(self, now=None):
-        """
-        Tell, Don't Ask: Let the page tell us if it should be expired now.
-        """
-        if now is None:
-            now = timezone.now()
-
-        return (
-            self.publication_status == "published"
-            and self.get_publication_schedule().should_be_expired_at(now)
-        )
-
-    def publish(self, user, change_summary="Page published"):
-        """
-        Tell, Don't Ask: Let the page publish itself.
-
-        Returns True if publication was successful, False otherwise.
-        """
-        if self.publication_status == "published":
-            return False  # Already published
-
-        try:
-            with transaction.atomic():
-                self.publication_status = "published"
-                self.last_modified_by = user
-                self.save()
-
-                # Create version record if the method exists
-                if hasattr(self, "create_version"):
-                    self.create_version(
-                        user,
-                        change_summary,
-                        status="published",
-                        auto_publish=True,
-                    )
-
-                return True
-        except Exception:
-            return False
-
-    def unpublish(self, user, change_summary="Page unpublished"):
-        """
-        Tell, Don't Ask: Let the page unpublish itself.
-
-        Returns True if unpublishing was successful, False otherwise.
-        """
-        if self.publication_status == "unpublished":
-            return False  # Already unpublished
-
-        try:
-            with transaction.atomic():
-                self.publication_status = "unpublished"
-                self.effective_date = None  # Clear effective_date when unpublishing
-                # Note: expiry_date is handled in the view layer for more granular control
-                self.last_modified_by = user
-                self.save()
-
-                # Create version record if the method exists
-                if hasattr(self, "create_version"):
-                    self.create_version(
-                        user,
-                        change_summary,
-                        status="draft",
-                    )
-
-                return True
-        except Exception:
-            return False
-
-    def expire(self, user, change_summary="Page expired"):
-        """
-        Tell, Don't Ask: Let the page expire itself.
-
-        Returns True if expiration was successful, False otherwise.
-        """
-        if self.publication_status != "published":
-            return False  # Not currently published
-
-        try:
-            with transaction.atomic():
-                self.publication_status = "expired"
-                self.last_modified_by = user
-                self.save()
-
-                # Create version record if the method exists
-                if hasattr(self, "create_version"):
-                    self.create_version(
-                        user,
-                        change_summary,
-                        status="draft",
-                    )
-
-                return True
-        except Exception:
-            return False
-
-    def schedule(self, schedule, user, change_summary="Page scheduled"):
-        """
-        Tell, Don't Ask: Let the page schedule itself with a PublicationSchedule.
-
-        Returns True if scheduling was successful, False otherwise.
-        """
-        if not schedule.is_valid():
-            return False
-
-        try:
-            with transaction.atomic():
-                self.publication_status = "scheduled"
-                self.effective_date = schedule.effective_date
-                self.expiry_date = schedule.expiry_date
-                self.last_modified_by = user
-                self.save()
-
-                # Create version record if the method exists
-                if hasattr(self, "create_version"):
-                    self.create_version(
-                        user,
-                        change_summary,
-                        status="draft",
-                    )
-
-                return True
-        except Exception:
-            return False
-
     def get_breadcrumbs(self):
         """Get list of pages from root to this page for breadcrumb navigation"""
         breadcrumbs = []
@@ -897,8 +709,8 @@ class WebPage(models.Model):
             # Collect widgets from inheritance chain using PageVersion data
             current = self
             while current:
-                # Get current version for this page
-                current_version = current.get_current_version()
+                # Get current published version for this page
+                current_version = current.get_current_published_version()
                 page_widgets = []
                 has_overrides = False
 
@@ -1089,7 +901,7 @@ class WebPage(models.Model):
         service = ObjectPublishingService(self)
         return service.sync_with_object(user)
 
-    def create_version(self, user, description="", status="draft", auto_publish=False):
+    def create_version(self, user, description=""):
         """Create a new version snapshot of the current page state"""
         from django.utils import timezone
         from django.db import transaction
@@ -1104,7 +916,7 @@ class WebPage(models.Model):
                 (latest_version.version_number + 1) if latest_version else 1
             )
 
-            # Serialize current page state (excluding widgets)
+            # Serialize current page state (excluding widgets and publishing dates)
             page_data = {
                 "title": self.title,
                 "slug": self.slug,
@@ -1112,13 +924,6 @@ class WebPage(models.Model):
                 "hostnames": self.hostnames,
                 "layout": self.code_layout,
                 "theme_id": self.theme.id if self.theme else None,
-                "publication_status": self.publication_status,
-                "effective_date": (
-                    self.effective_date.isoformat() if self.effective_date else None
-                ),
-                "expiry_date": (
-                    self.expiry_date.isoformat() if self.expiry_date else None
-                ),
                 "meta_title": self.meta_title,
                 "meta_description": self.meta_description,
                 "meta_keywords": self.meta_keywords,
@@ -1132,7 +937,7 @@ class WebPage(models.Model):
             widgets_data = {}
 
             # First try to get current published version
-            current_version = self.get_current_version()
+            current_version = self.get_current_published_version()
             if current_version and current_version.widgets:
                 widgets_data = current_version.widgets.copy()
             else:
@@ -1152,32 +957,15 @@ class WebPage(models.Model):
             if not widgets_data:
                 widgets_data = {}
 
-            # Prepare version fields
-            version_fields = {
-                "page": self,
-                "version_number": version_number,
-                "page_data": page_data,
-                "widgets": widgets_data,
-                "description": description,
-                "status": status,
-                "created_by": user,
-            }
-
-            # Handle auto-publish
-            if auto_publish or status == "published":
-                # Mark all previous versions as not current
-                self.versions.update(is_current=False)
-                version_fields.update(
-                    {
-                        "status": "published",
-                        "is_current": True,
-                        "published_at": timezone.now(),
-                        "published_by": user,
-                    }
-                )
-
-            # Create new version
-            version = PageVersion.objects.create(**version_fields)
+            # Create new version (no legacy status fields)
+            version = PageVersion.objects.create(
+                page=self,
+                version_number=version_number,
+                page_data=page_data,
+                widgets=widgets_data,
+                description=description,
+                created_by=user,
+            )
             return version
 
     def get_current_published_version(self, now=None):
@@ -1200,28 +988,29 @@ class WebPage(models.Model):
             .first()
         )
 
-    def get_current_version(self):
-        """LEGACY: Get the current published version using old logic"""
-        return self.versions.filter(is_current=True, status="published").first()
+    def get_latest_version(self):
+        """Get the latest version of this page (regardless of publication status)"""
+        return self.versions.order_by("-version_number").first()
 
-    def get_latest_draft(self):
-        """Get the latest draft version of this page"""
-        return self.versions.filter(status="draft").order_by("-version_number").first()
-
-    def has_unpublished_changes(self):
-        """Check if there are draft versions newer than the current published version"""
-        current = self.get_current_version()
+    def has_newer_versions(self):
+        """Check if there are versions newer than the current published version"""
+        current = self.get_current_published_version()
         if not current:
-            return self.versions.filter(status="draft").exists()
+            return self.versions.exists()
 
-        return self.versions.filter(
-            status="draft", version_number__gt=current.version_number
-        ).exists()
+        return self.versions.filter(version_number__gt=current.version_number).exists()
 
     def get_latest_published_version(self):
-        """Get the latest published version by version number"""
+        """Get the latest published version by effective date"""
+        from django.utils import timezone
+
+        now = timezone.now()
+
         return (
-            self.versions.filter(status="published").order_by("-version_number").first()
+            self.versions.filter(effective_date__lte=now)
+            .filter(models.Q(expiry_date__isnull=True) | models.Q(expiry_date__gt=now))
+            .order_by("-effective_date", "-version_number")
+            .first()
         )
 
     @classmethod
@@ -1520,12 +1309,6 @@ class PageVersion(models.Model):
     Enables rollback, comparison, and change tracking with draft/published workflow.
     """
 
-    VERSION_STATUS_CHOICES = [
-        ("draft", "Draft"),
-        ("published", "Published"),
-        ("archived", "Archived"),
-    ]
-
     page = models.ForeignKey(WebPage, on_delete=models.CASCADE, related_name="versions")
     version_number = models.PositiveIntegerField()
 
@@ -1550,28 +1333,6 @@ class PageVersion(models.Model):
         blank=True,
         help_text="When this version should no longer be live",
         db_index=True,
-    )
-
-    # Version workflow (legacy - will be removed in Phase 3)
-    status = models.CharField(
-        max_length=20,
-        choices=VERSION_STATUS_CHOICES,
-        default="draft",
-        help_text="Current status of this version (LEGACY - use dates instead)",
-    )
-    is_current = models.BooleanField(
-        default=False, help_text="Whether this is the currently active version (LEGACY)"
-    )
-    published_at = models.DateTimeField(
-        null=True, blank=True, help_text="When this version was published (LEGACY)"
-    )
-    published_by = models.ForeignKey(
-        User,
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL,
-        related_name="published_versions",
-        help_text="User who published this version (LEGACY)",
     )
 
     # Version metadata
@@ -1606,6 +1367,7 @@ class PageVersion(models.Model):
             and self.effective_date >= self.expiry_date
         ):
             from django.core.exceptions import ValidationError
+
             raise ValidationError("Effective date must be before expiry date.")
 
     # New date-based publishing methods
@@ -1667,18 +1429,14 @@ class PageVersion(models.Model):
         return "published"
 
     def publish(self, user):
-        """Publish this version, making it the current live version"""
+        """Publish this version by setting effective_date to now"""
         from django.utils import timezone
 
-        # Mark all other versions as not current
-        self.page.versions.update(is_current=False)
-
-        # Update this version
-        self.status = "published"
-        self.is_current = True
-        self.published_at = timezone.now()
-        self.published_by = user
-        self.save()
+        # Set effective_date to now to make this version live
+        self.effective_date = timezone.now()
+        # Clear expiry_date to make it indefinite (unless already set)
+        # Don't override existing expiry_date as it might be intentional
+        self.save(update_fields=["effective_date"])
 
         # Apply the stored page data to the page
         self._apply_version_data()
@@ -1765,20 +1523,19 @@ class PageVersion(models.Model):
 
     def create_draft_from_published(self, user, description=""):
         """Create a new draft version based on this published version"""
-        if self.status != "published":
+        if not self.is_published():
             raise ValueError("Can only create drafts from published versions")
 
         # Get next version number
         latest_version = self.page.versions.order_by("-version_number").first()
         version_number = (latest_version.version_number + 1) if latest_version else 1
 
-        # Create new draft version
+        # Create new draft version (no effective_date = draft)
         draft = PageVersion.objects.create(
             page=self.page,
             version_number=version_number,
             page_data=self.page_data.copy(),
-            widgets=self.widgets.copy() if self.widgets else [],
-            status="draft",
+            widgets=self.widgets.copy() if self.widgets else {},
             description=description or f"Draft based on version {self.version_number}",
             created_by=user,
         )
