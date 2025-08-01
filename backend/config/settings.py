@@ -45,6 +45,10 @@ for host in _static_hosts:
         _extended_hosts.extend([f"{host}:3000", f"{host}:5173"])
 
 # Allow all hosts at Django level - our middleware handles validation
+# This can give security warnings but we are relying on
+# webpages.middleware.DynamicHostValidationMiddleware to handle the actual
+# validation.
+# (So we keeping this to disable host validation in SecurityMiddleware)
 ALLOWED_HOSTS = ["*"]
 
 # Store static hosts for middleware validation
@@ -54,6 +58,13 @@ STATIC_ALLOWED_HOSTS = _extended_hosts
 # using both STATIC_ALLOWED_HOSTS and database hostnames from WebPage.hostnames.
 # This enables multi-site functionality where hostnames can be managed
 # through the admin interface while maintaining security.
+
+# Database failure fallback behavior for DynamicHostValidationMiddleware
+# Options:
+# - 'deny' (default): Deny hosts not in STATIC_ALLOWED_HOSTS during DB outages (most secure)
+# - 'allow': Allow all hosts during DB outages (least secure, maximum availability)
+# - 'static_only': Explicitly only check STATIC_ALLOWED_HOSTS (same as 'deny' but clearer)
+DATABASE_FAILURE_FALLBACK = "deny"
 
 # Application definition
 DJANGO_APPS = [

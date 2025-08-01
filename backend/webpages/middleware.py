@@ -1,5 +1,10 @@
 """
 Middleware for dynamic host validation using database hostnames.
+
+This middleware provides secure fallback behavior during database outages:
+- By default, denies hosts not in STATIC_ALLOWED_HOSTS when database is unavailable
+- Configurable via DATABASE_FAILURE_FALLBACK setting ('deny', 'allow', 'static_only')
+- Logs all fallback decisions for security monitoring
 """
 
 import logging
@@ -53,7 +58,6 @@ class DynamicHostValidationMiddleware(MiddlewareMixin):
                 "You may need to add this host to ALLOWED_HOSTS or register it in the database.",
                 content_type="text/plain",
             )
-
         return None
 
     def _get_host_from_request(self, request):
@@ -107,6 +111,9 @@ class DynamicHostValidationMiddleware(MiddlewareMixin):
 
             if allowed_hosts is None:
                 allowed_hosts = self._load_database_hostnames()
+                # Check if loading failed (indicated by special error marker)
+                if allowed_hosts == "_DATABASE_ERROR_":
+                    raise Exception("Database error loading hostnames")
                 cache.set(self.CACHE_KEY, allowed_hosts, self.CACHE_TIMEOUT)
 
             # Normalize host for comparison
@@ -124,10 +131,9 @@ class DynamicHostValidationMiddleware(MiddlewareMixin):
             return False
 
         except Exception as e:
-            # If database is not available or has errors, log and allow
-            # This prevents middleware from breaking the site
+            # Handle database failure with secure fallback behavior
             logger.error(f"Error checking database hostnames: {e}")
-            return False
+            return self._handle_database_failure_fallback(host)
 
     def _load_database_hostnames(self):
         """Load hostnames from the database."""
@@ -137,7 +143,42 @@ class DynamicHostValidationMiddleware(MiddlewareMixin):
             return WebPage.get_all_hostnames()
         except Exception as e:
             logger.error(f"Error loading hostnames from database: {e}")
-            return []
+            return "_DATABASE_ERROR_"  # Special marker to indicate database error
+
+    def _handle_database_failure_fallback(self, host):
+        """
+        Handle database failure with configurable secure fallback behavior.
+
+        Available fallback strategies (controlled by DATABASE_FAILURE_FALLBACK setting):
+        - 'deny' (default): Deny all hosts not in STATIC_ALLOWED_HOSTS (most secure)
+        - 'allow': Allow all hosts (least secure, maximum availability)
+        - 'static_only': Explicitly check against static hosts only (same as 'deny' but clearer)
+
+        Returns:
+            bool: Whether to allow the host during database failure
+        """
+        fallback_strategy = getattr(settings, "DATABASE_FAILURE_FALLBACK", "deny")
+
+        if fallback_strategy == "allow":
+            logger.warning(
+                f"Database failure fallback: ALLOWING host '{host}' due to "
+                f"DATABASE_FAILURE_FALLBACK='allow' setting. This reduces security."
+            )
+            return True
+        elif fallback_strategy == "static_only":
+            # Explicitly check against static hosts
+            result = self._check_static_allowed_hosts(host)
+            logger.warning(
+                f"Database failure fallback: {'ALLOWING' if result else 'DENYING'} host '{host}' "
+                f"based on static ALLOWED_HOSTS check only"
+            )
+            return result
+        else:  # 'deny' or any other value
+            logger.warning(
+                f"Database failure fallback: DENYING host '{host}' (not in STATIC_ALLOWED_HOSTS). "
+                f"Set DATABASE_FAILURE_FALLBACK='allow' to allow all hosts during outages."
+            )
+            return False
 
     @classmethod
     def clear_hostname_cache(cls):
