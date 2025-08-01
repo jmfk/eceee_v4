@@ -500,8 +500,17 @@ class WebPage(models.Model):
             return self.parent.get_effective_theme()
         return None
 
-    def is_published(self):
-        """Check if this page should be visible to the public"""
+    def is_published(self, now=None):
+        """
+        Check if this page should be visible to the public.
+
+        NEW: Page is published if it has a currently published version (date-based).
+        """
+        current_version = self.get_current_published_version(now)
+        return current_version is not None
+
+    def is_published_legacy(self):
+        """LEGACY: Check if this page should be visible using old logic (for migration)"""
         now = timezone.now()
 
         if self.publication_status != "published":
@@ -710,13 +719,14 @@ class WebPage(models.Model):
                 # Warn about wildcard hostname usage
                 if normalized_hostname == "*":
                     import logging
+
                     logger = logging.getLogger(__name__)
                     logger.warning(
                         f"SECURITY WARNING: Page '{self.title}' (ID: {self.id}) contains wildcard hostname (*). "
                         f"This allows access from ANY domain and significantly reduces security. "
                         f"Consider using specific hostnames for production environments."
                     )
-                
+
                 if normalized_hostname not in ["*", "default"]:
                     # Hostname validation supporting domains, IPv6, and optional ports
                     import re
@@ -1170,8 +1180,28 @@ class WebPage(models.Model):
             version = PageVersion.objects.create(**version_fields)
             return version
 
+    def get_current_published_version(self, now=None):
+        """
+        Get the currently published version of this page using date-based logic.
+
+        Returns the latest version that:
+        - Has effective_date <= now
+        - Has no expiry_date OR expiry_date > now
+        """
+        if now is None:
+            from django.utils import timezone
+
+            now = timezone.now()
+
+        return (
+            self.versions.filter(effective_date__lte=now)
+            .filter(models.Q(expiry_date__isnull=True) | models.Q(expiry_date__gt=now))
+            .order_by("-effective_date", "-version_number")
+            .first()
+        )
+
     def get_current_version(self):
-        """Get the current published version of this page"""
+        """LEGACY: Get the current published version using old logic"""
         return self.versions.filter(is_current=True, status="published").first()
 
     def get_latest_draft(self):
@@ -1508,18 +1538,32 @@ class PageVersion(models.Model):
         help_text="Widget configuration data for this version (slot_name -> widgets array)",
     )
 
-    # Version workflow
+    # Publishing dates (new date-based system)
+    effective_date = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When this version becomes live/published",
+        db_index=True,
+    )
+    expiry_date = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When this version should no longer be live",
+        db_index=True,
+    )
+
+    # Version workflow (legacy - will be removed in Phase 3)
     status = models.CharField(
         max_length=20,
         choices=VERSION_STATUS_CHOICES,
         default="draft",
-        help_text="Current status of this version",
+        help_text="Current status of this version (LEGACY - use dates instead)",
     )
     is_current = models.BooleanField(
-        default=False, help_text="Whether this is the currently active version"
+        default=False, help_text="Whether this is the currently active version (LEGACY)"
     )
     published_at = models.DateTimeField(
-        null=True, blank=True, help_text="When this version was published"
+        null=True, blank=True, help_text="When this version was published (LEGACY)"
     )
     published_by = models.ForeignKey(
         User,
@@ -1527,7 +1571,7 @@ class PageVersion(models.Model):
         blank=True,
         on_delete=models.SET_NULL,
         related_name="published_versions",
-        help_text="User who published this version",
+        help_text="User who published this version (LEGACY)",
     )
 
     # Version metadata
@@ -1550,6 +1594,77 @@ class PageVersion(models.Model):
 
     def __str__(self):
         return f"{self.page.title} v{self.version_number}"
+
+    def clean(self):
+        """Validate the version data"""
+        super().clean()
+
+        # Validate effective and expiry dates
+        if (
+            self.effective_date
+            and self.expiry_date
+            and self.effective_date >= self.expiry_date
+        ):
+            from django.core.exceptions import ValidationError
+            raise ValidationError("Effective date must be before expiry date.")
+
+    # New date-based publishing methods
+    def is_published(self, now=None):
+        """
+        Check if this version is currently published based on dates.
+
+        A version is published if:
+        - It has an effective_date that has passed
+        - It either has no expiry_date or the expiry_date hasn't passed
+        """
+        if now is None:
+            from django.utils import timezone
+
+            now = timezone.now()
+
+        # Must have an effective date that has passed
+        if not self.effective_date or self.effective_date > now:
+            return False
+
+        # Must not be expired
+        if self.expiry_date and self.expiry_date <= now:
+            return False
+
+        return True
+
+    def is_current_published(self, now=None):
+        """
+        Check if this is the current published version for its page.
+
+        The current published version is the latest published version by effective_date.
+        """
+        if not self.is_published(now):
+            return False
+
+        current_version = self.page.get_current_published_version(now)
+        return current_version == self
+
+    def get_publication_status(self, now=None):
+        """
+        Get a human-readable publication status based on dates.
+
+        Returns: 'draft', 'scheduled', 'published', 'expired'
+        """
+        if now is None:
+            from django.utils import timezone
+
+            now = timezone.now()
+
+        if not self.effective_date:
+            return "draft"
+
+        if self.effective_date > now:
+            return "scheduled"
+
+        if self.expiry_date and self.expiry_date <= now:
+            return "expired"
+
+        return "published"
 
     def publish(self, user):
         """Publish this version, making it the current live version"""
