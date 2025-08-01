@@ -52,7 +52,6 @@ class DynamicHostValidationTest(TestCase):
             hostnames=["test.example.com", "app.example.com"],
             created_by=self.user,
             last_modified_by=self.user,
-            last_modified_by=self.user,
         )
 
         # Should allow database hostnames
@@ -178,13 +177,59 @@ class DynamicHostValidationTest(TestCase):
         response = self.middleware.process_request(request)
         self.assertIsNone(response)  # Should be allowed
 
-    def test_error_handling_with_database_unavailable(self):
-        """Test graceful handling when database is unavailable."""
+    def test_error_handling_with_database_unavailable_default_deny(self):
+        """Test graceful handling when database is unavailable with default 'deny' strategy."""
         with patch("webpages.models.WebPage.get_all_hostnames") as mock_get_hostnames:
             mock_get_hostnames.side_effect = Exception("Database error")
 
-            # Should not raise exception, should return False
+            # Should not raise exception, should return False (deny) by default
             result = self.middleware._check_database_hostnames("test.com")
+            self.assertFalse(result)
+
+    @override_settings(DATABASE_FAILURE_FALLBACK="allow")
+    def test_database_failure_fallback_allow_strategy(self):
+        """Test database failure fallback with 'allow' strategy."""
+        with patch("webpages.models.WebPage.get_all_hostnames") as mock_get_hostnames:
+            mock_get_hostnames.side_effect = Exception("Database error")
+
+            # Should allow any host when strategy is 'allow'
+            result = self.middleware._check_database_hostnames("any-host.com")
+            self.assertTrue(result)
+
+    @override_settings(
+        DATABASE_FAILURE_FALLBACK="static_only",
+        STATIC_ALLOWED_HOSTS=["allowed.com", "localhost"],
+    )
+    def test_database_failure_fallback_static_only_strategy(self):
+        """Test database failure fallback with 'static_only' strategy."""
+        with patch("webpages.models.WebPage.get_all_hostnames") as mock_get_hostnames:
+            mock_get_hostnames.side_effect = Exception("Database error")
+
+            # Should check against static hosts when strategy is 'static_only'
+            result_allowed = self.middleware._check_database_hostnames("allowed.com")
+            self.assertTrue(result_allowed)
+
+            result_denied = self.middleware._check_database_hostnames("not-allowed.com")
+            self.assertFalse(result_denied)
+
+    @override_settings(DATABASE_FAILURE_FALLBACK="deny")
+    def test_database_failure_fallback_deny_strategy(self):
+        """Test database failure fallback with explicit 'deny' strategy."""
+        with patch("webpages.models.WebPage.get_all_hostnames") as mock_get_hostnames:
+            mock_get_hostnames.side_effect = Exception("Database error")
+
+            # Should deny all hosts when strategy is 'deny'
+            result = self.middleware._check_database_hostnames("any-host.com")
+            self.assertFalse(result)
+
+    @override_settings(DATABASE_FAILURE_FALLBACK="invalid_strategy")
+    def test_database_failure_fallback_invalid_strategy_defaults_to_deny(self):
+        """Test database failure fallback with invalid strategy defaults to 'deny'."""
+        with patch("webpages.models.WebPage.get_all_hostnames") as mock_get_hostnames:
+            mock_get_hostnames.side_effect = Exception("Database error")
+
+            # Should default to deny for invalid strategy
+            result = self.middleware._check_database_hostnames("any-host.com")
             self.assertFalse(result)
 
     def test_non_root_page_hostnames_validation(self):
