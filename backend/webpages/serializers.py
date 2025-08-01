@@ -198,6 +198,7 @@ class WebPageDetailSerializer(serializers.ModelSerializer):
     # Computed fields
     absolute_url = serializers.SerializerMethodField()
     is_published = serializers.SerializerMethodField()
+    current_published_version = serializers.SerializerMethodField()
     breadcrumbs = serializers.SerializerMethodField()
     effective_layout = serializers.SerializerMethodField()
     effective_theme = serializers.SerializerMethodField()
@@ -244,6 +245,7 @@ class WebPageDetailSerializer(serializers.ModelSerializer):
             "last_modified_by",
             "absolute_url",
             "is_published",
+            "current_published_version",
             "breadcrumbs",
             "effective_layout",
             "effective_theme",
@@ -268,6 +270,20 @@ class WebPageDetailSerializer(serializers.ModelSerializer):
 
     def get_is_published(self, obj):
         return obj.is_published()
+
+    def get_current_published_version(self, obj):
+        """Get the current published version using new date-based logic"""
+        current_version = obj.get_current_published_version()
+        if current_version:
+            return {
+                "id": current_version.id,
+                "version_number": current_version.version_number,
+                "effective_date": current_version.effective_date,
+                "expiry_date": current_version.expiry_date,
+                "publication_status": current_version.get_publication_status(),
+                "description": current_version.description,
+            }
+        return None
 
     def get_breadcrumbs(self, obj):
         breadcrumbs = obj.get_breadcrumbs()
@@ -560,6 +576,11 @@ class PageVersionSerializer(serializers.ModelSerializer):
     page = WebPageTreeSerializer(read_only=True)
     created_by = UserSerializer(read_only=True)
     published_by = UserSerializer(read_only=True)
+    
+    # New date-based publishing fields (computed)
+    is_published = serializers.SerializerMethodField()
+    is_current_published = serializers.SerializerMethodField()
+    publication_status = serializers.SerializerMethodField()
 
     class Meta:
         model = PageVersion
@@ -569,24 +590,47 @@ class PageVersionSerializer(serializers.ModelSerializer):
             "version_number",
             "page_data",
             "widgets",
+            # New date-based publishing fields
+            "effective_date",
+            "expiry_date",
+            "is_published",
+            "is_current_published", 
+            "publication_status",
+            # Legacy fields (marked for removal in Phase 3)
             "status",
-            "description",
-            "change_summary",
             "is_current",
             "published_at",
             "published_by",
+            # Metadata
+            "description",
+            "change_summary",
             "created_at",
             "created_by",
         ]
         read_only_fields = [
             "id",
             "version_number",
-            "is_current",
-            "published_at",
-            "published_by",
+            "is_published",
+            "is_current_published",
+            "publication_status",
+            "is_current",  # Legacy
+            "published_at",  # Legacy
+            "published_by",  # Legacy
             "created_at",
             "created_by",
         ]
+
+    def get_is_published(self, obj):
+        """Check if this version is currently published based on dates"""
+        return obj.is_published()
+
+    def get_is_current_published(self, obj):
+        """Check if this is the current published version for its page"""
+        return obj.is_current_published()
+
+    def get_publication_status(self, obj):
+        """Get human-readable publication status based on dates"""
+        return obj.get_publication_status()
 
 
 class PageVersionListSerializer(serializers.ModelSerializer):
@@ -594,20 +638,39 @@ class PageVersionListSerializer(serializers.ModelSerializer):
 
     created_by = UserSerializer(read_only=True)
     published_by = UserSerializer(read_only=True)
+    
+    # New date-based publishing fields (computed)
+    is_published = serializers.SerializerMethodField()
+    publication_status = serializers.SerializerMethodField()
 
     class Meta:
         model = PageVersion
         fields = [
             "id",
             "version_number",
+            # New date-based publishing fields
+            "effective_date",
+            "expiry_date", 
+            "is_published",
+            "publication_status",
+            # Legacy fields (marked for removal in Phase 3)
             "status",
-            "description",
             "is_current",
             "published_at",
             "published_by",
+            # Metadata
+            "description",
             "created_at",
             "created_by",
         ]
+
+    def get_is_published(self, obj):
+        """Check if this version is currently published based on dates"""
+        return obj.is_published()
+
+    def get_publication_status(self, obj):
+        """Get human-readable publication status based on dates"""
+        return obj.get_publication_status()
 
 
 class PageVersionComparisonSerializer(serializers.Serializer):
