@@ -66,6 +66,12 @@ STATIC_ALLOWED_HOSTS = _extended_hosts
 # - 'static_only': Explicitly only check STATIC_ALLOWED_HOSTS (same as 'deny' but clearer)
 DATABASE_FAILURE_FALLBACK = "deny"
 
+# Wildcard hostname security control
+# WARNING: Setting this to True allows "*" wildcard in database hostnames, which accepts ALL hosts
+# This significantly reduces security and should only be used in development environments
+# Production deployments should use specific hostnames instead of wildcards
+ALLOW_WILDCARD_HOSTNAMES = False
+
 # Hostname cache security configuration
 # Prefix for hostname cache keys (used with SECRET_KEY hash for security)
 # Changing this will invalidate existing hostname cache entries

@@ -229,10 +229,11 @@ class WebPage(models.Model):
                 bracket_end = hostname.find("]")
                 ipv6_part = hostname[1:bracket_end]
 
-                # Validate IPv6 address
+                # Validate IPv6 address (but preserve original case)
                 import ipaddress
 
-                ipv6_addr = ipaddress.ip_address(ipv6_part)
+                # Validate without modifying case
+                ipaddress.ip_address(ipv6_part)
 
                 # Check for port after bracket
                 remaining = hostname[bracket_end + 1 :]
@@ -243,12 +244,12 @@ class WebPage(models.Model):
                         port = int(port_part)
                         if not (1 <= port <= 65535):
                             raise ValueError(f"Invalid port: {port}")
-                        return f"[{ipv6_addr}]:{port}"
+                        return f"[{ipv6_part}]:{port}"  # Preserve original case
                     else:
                         # Just brackets with colon but no port
-                        return f"[{ipv6_addr}]"
+                        return f"[{ipv6_part}]"  # Preserve original case
                 else:
-                    return f"[{ipv6_addr}]"
+                    return f"[{ipv6_part}]"  # Preserve original case
 
             # Check if this could be a bare IPv6 address (no brackets)
             elif ":" in hostname and hostname.count(":") > 1:
@@ -256,8 +257,10 @@ class WebPage(models.Model):
                 try:
                     import ipaddress
 
-                    ipv6_addr = ipaddress.ip_address(hostname)
-                    return f"[{ipv6_addr}]"  # Normalize to bracketed form
+                    # Validate it's a valid IPv6 address
+                    ipaddress.ip_address(hostname)
+                    # Return with original case preserved
+                    return f"[{hostname}]"  # Normalize to bracketed form, preserve case
                 except ValueError:
                     # Not a valid IPv6, continue with regular processing
                     pass
@@ -275,10 +278,17 @@ class WebPage(models.Model):
                     logger.warning(f"Failed to encode IDN hostname: {hostname}")
 
             # Regular hostname processing (IPv4 or domain name with optional port)
-            hostname = hostname.lower().strip()
+            # Only lowercase domain names, not IPv6 addresses
+            if ":" in hostname and hostname.count(":") > 1:
+                # Likely IPv6 address - preserve case for hex digits
+                hostname = hostname.strip()
+            else:
+                # Regular domain name - safe to lowercase
+                hostname = hostname.lower().strip()
 
             # Validate port if present in regular hostname:port format
-            if ":" in hostname:
+            if ":" in hostname and hostname.count(":") == 1:
+                # Standard host:port format (not IPv6)
                 host_part, port_part = hostname.rsplit(":", 1)
                 if port_part:
                     try:
@@ -697,6 +707,16 @@ class WebPage(models.Model):
                 if not normalized_hostname:
                     raise ValidationError(f"Invalid hostname format: {hostname}")
 
+                # Warn about wildcard hostname usage
+                if normalized_hostname == "*":
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.warning(
+                        f"SECURITY WARNING: Page '{self.title}' (ID: {self.id}) contains wildcard hostname (*). "
+                        f"This allows access from ANY domain and significantly reduces security. "
+                        f"Consider using specific hostnames for production environments."
+                    )
+                
                 if normalized_hostname not in ["*", "default"]:
                     # Hostname validation supporting domains, IPv6, and optional ports
                     import re

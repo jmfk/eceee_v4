@@ -134,11 +134,32 @@ class DynamicHostValidationMiddleware(MiddlewareMixin):
             normalized_host = WebPage.normalize_hostname(host)
 
             # Check if host matches any database hostname
+            wildcard_found = False
             for db_host in allowed_hosts:
                 if db_host == "*":  # Wildcard match
-                    return True
+                    wildcard_found = True
+                    # Log wildcard usage for security monitoring
+                    logger.warning(
+                        f"SECURITY WARNING: Wildcard hostname (*) is active, allowing ALL hosts including '{host}'. "
+                        f"This significantly reduces security. Consider using specific hostnames instead."
+                    )
+                    # Check if wildcard usage is explicitly allowed
+                    if self._is_wildcard_allowed():
+                        return True
+                    else:
+                        logger.error(
+                            f"SECURITY BLOCK: Wildcard hostname (*) found but ALLOW_WILDCARD_HOSTNAMES=False. "
+                            f"Denying host '{host}' for security."
+                        )
+                        continue
                 if normalized_host == db_host:
                     return True
+
+            # Additional logging if wildcard was found but blocked
+            if wildcard_found:
+                logger.info(
+                    f"Host '{host}' denied despite wildcard presence due to security settings"
+                )
 
             return False
 
@@ -157,6 +178,15 @@ class DynamicHostValidationMiddleware(MiddlewareMixin):
             logger.error(f"Error loading hostnames from database: {e}")
             return "_DATABASE_ERROR_"  # Special marker to indicate database error
 
+    def _is_wildcard_allowed(self):
+        """
+        Check if wildcard hostname usage is explicitly allowed.
+
+        Returns:
+            bool: True if wildcard hostnames are allowed, False otherwise
+        """
+        return getattr(settings, "ALLOW_WILDCARD_HOSTNAMES", False)
+
     def _handle_database_failure_fallback(self, host):
         """
         Handle database failure with configurable secure fallback behavior.
@@ -172,9 +202,11 @@ class DynamicHostValidationMiddleware(MiddlewareMixin):
         fallback_strategy = getattr(settings, "DATABASE_FAILURE_FALLBACK", "deny")
 
         if fallback_strategy == "allow":
-            logger.warning(
-                f"Database failure fallback: ALLOWING host '{host}' due to "
-                f"DATABASE_FAILURE_FALLBACK='allow' setting. This reduces security."
+            # Enhanced warning for security bypass
+            logger.critical(
+                f"SECURITY RISK: Database failure fallback ALLOWING host '{host}' due to "
+                f"DATABASE_FAILURE_FALLBACK='allow' setting. All hostname validation is bypassed! "
+                f"Consider using 'static_only' for better security during outages."
             )
             return True
         elif fallback_strategy == "static_only":
