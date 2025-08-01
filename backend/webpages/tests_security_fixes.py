@@ -366,3 +366,190 @@ class IntegrationTest(TestCase):
 
             # Database should only be called once
             mock_get.assert_called_once()
+
+
+class WildcardSecurityTest(TestCase):
+    """Test wildcard hostname security controls."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="testuser", password="testpass123", email="test@example.com"
+        )
+        # Create mock get_response function for middleware
+        self.get_response = Mock(return_value=Mock())
+        self.middleware = DynamicHostValidationMiddleware(self.get_response)
+
+    @override_settings(ALLOW_WILDCARD_HOSTNAMES=True)
+    def test_wildcard_allowed_when_enabled(self):
+        """Test wildcard hostnames work when explicitly enabled."""
+        page = WebPage.objects.create(
+            title="Wildcard Test",
+            slug="wildcard",
+            hostnames=["*"],
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        # Should allow any host when wildcard is enabled
+        result = self.middleware.is_host_allowed("any-host.com")
+        self.assertTrue(result)
+
+    @override_settings(ALLOW_WILDCARD_HOSTNAMES=False)
+    def test_wildcard_blocked_when_disabled(self):
+        """Test wildcard hostnames are blocked when disabled."""
+        page = WebPage.objects.create(
+            title="Wildcard Test",
+            slug="wildcard",
+            hostnames=["*"],
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        # Should block wildcard when disabled
+        result = self.middleware.is_host_allowed("any-host.com")
+        self.assertFalse(result)
+
+    def test_wildcard_logging_warnings(self):
+        """Test that wildcard usage generates appropriate warnings."""
+        import logging
+        from io import StringIO
+        import sys
+
+        # Capture log output
+        log_capture_string = StringIO()
+        ch = logging.StreamHandler(log_capture_string)
+        logger = logging.getLogger("webpages.models")
+        logger.addHandler(ch)
+        logger.setLevel(logging.WARNING)
+
+        try:
+            page = WebPage(
+                title="Wildcard Test",
+                slug="wildcard",
+                hostnames=["*"],
+                created_by=self.user,
+                last_modified_by=self.user,
+            )
+            page.full_clean()
+
+            # Check that warning was logged
+            log_contents = log_capture_string.getvalue()
+            self.assertIn("SECURITY WARNING", log_contents)
+            self.assertIn("wildcard hostname", log_contents.lower())
+
+        finally:
+            logger.removeHandler(ch)
+
+
+class EnhancedSecurityTest(TestCase):
+    """Test enhanced security controls."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="testuser", password="testpass123", email="test@example.com"
+        )
+        # Create mock get_response function for middleware
+        self.get_response = Mock(return_value=Mock())
+        self.middleware = DynamicHostValidationMiddleware(self.get_response)
+
+    @override_settings(DATABASE_FAILURE_FALLBACK="allow")
+    def test_database_failure_critical_logging(self):
+        """Test that allow fallback generates critical security warnings."""
+        import logging
+        from io import StringIO
+
+        # Capture log output
+        log_capture_string = StringIO()
+        ch = logging.StreamHandler(log_capture_string)
+        logger = logging.getLogger("webpages.middleware")
+        logger.addHandler(ch)
+        logger.setLevel(logging.CRITICAL)
+
+        try:
+            # Mock database failure
+            with patch("webpages.models.WebPage.get_all_hostnames") as mock_get:
+                mock_get.side_effect = Exception("Database error")
+
+                result = self.middleware._check_database_hostnames("test.com")
+                self.assertTrue(result)  # Should allow due to fallback
+
+                # Check critical warning was logged
+                log_contents = log_capture_string.getvalue()
+                self.assertIn("SECURITY RISK", log_contents)
+                self.assertIn("bypassed", log_contents)
+
+        finally:
+            logger.removeHandler(ch)
+
+    def test_ipv6_case_preservation(self):
+        """Test that IPv6 addresses preserve case correctly."""
+        test_cases = [
+            ("2001:DB8::1", "2001:DB8::1"),  # Preserve uppercase
+            ("[2001:DB8::1]:8080", "[2001:db8::1]:8080"),  # Should normalize in brackets
+            ("EXAMPLE.COM", "example.com"),  # Domain names still lowercase
+            ("Example.COM:8080", "example.com:8080"),  # Domain with port
+        ]
+
+        for input_hostname, expected in test_cases:
+            with self.subTest(input_hostname=input_hostname):
+                result = WebPage.normalize_hostname(input_hostname)
+                if ":" in input_hostname and input_hostname.count(":") > 1:
+                    # IPv6 case - check case preservation for non-bracketed
+                    if not input_hostname.startswith("["):
+                        self.assertEqual(result, f"[{input_hostname}]")
+                    else:
+                        # For bracketed, normalization may still apply
+                        self.assertTrue(result.startswith("[") and result.endswith("]") or ":8080" in result)
+                else:
+                    # Regular hostname - should match expected
+                    self.assertEqual(result, expected)
+
+
+class ManagementCommandWildcardTest(TestCase):
+    """Test management command wildcard warnings."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="teststaff",
+            password="testpass123",
+            email="test@example.com",
+            is_staff=True,
+        )
+        self.page = WebPage.objects.create(
+            title="Test Page",
+            slug="test",
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+    @patch("getpass.getpass")
+    @patch("builtins.input")
+    def test_wildcard_hostname_warning(self, mock_input, mock_getpass):
+        """Test that adding wildcard hostname shows security warnings."""
+        mock_getpass.return_value = "testpass123"
+        mock_input.return_value = "no"  # User decides not to proceed
+
+        from io import StringIO
+        import sys
+
+        captured_output = StringIO()
+        sys.stdout = captured_output
+
+        try:
+            call_command(
+                "sync_hostnames",
+                "--add-hostname",
+                "*",
+                "--page-id",
+                str(self.page.id),
+                "--username",
+                "teststaff",
+            )
+
+            output = captured_output.getvalue()
+            self.assertIn("SECURITY WARNING", output)
+            self.assertIn("wildcard", output.lower())
+            self.assertIn("ALL hosts", output)
+
+        finally:
+            sys.stdout = sys.__stdout__

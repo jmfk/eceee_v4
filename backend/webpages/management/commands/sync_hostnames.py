@@ -267,13 +267,32 @@ class Command(BaseCommand):
         if not page.is_root_page():
             raise CommandError("Only root pages can have hostnames")
 
-        # Confirm the action
-        if not self.confirm_action(
-            f'This will add hostname "{hostname}" to page "{page.title}" (ID: {page_id}). '
-            f"This affects site security and access control.",
-            unsafe,
-        ):
-            return
+        # Special warning for wildcard hostnames
+        if hostname == "*":
+            self.stdout.write(
+                self.style.ERROR(
+                    "⚠ SECURITY WARNING: You are adding a wildcard hostname (*) which allows ALL hosts!"
+                )
+            )
+            self.stdout.write(
+                self.style.ERROR(
+                    "This significantly reduces security and should only be used in development."
+                )
+            )
+            if not self.confirm_action(
+                f"Adding wildcard (*) hostname to page \"{page.title}\" will allow access from ANY domain. "
+                f"This is a significant security risk in production environments.",
+                unsafe,
+            ):
+                return
+        else:
+            # Confirm the action
+            if not self.confirm_action(
+                f'This will add hostname "{hostname}" to page "{page.title}" (ID: {page_id}). '
+                f"This affects site security and access control.",
+                unsafe,
+            ):
+                return
 
         try:
             page.add_hostname(hostname)
