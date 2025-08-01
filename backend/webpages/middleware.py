@@ -7,6 +7,7 @@ This middleware provides secure fallback behavior during database outages:
 - Logs all fallback decisions for security monitoring
 """
 
+import hashlib
 import logging
 from django.core.cache import cache
 from django.http import HttpResponseBadRequest
@@ -25,8 +26,17 @@ class DynamicHostValidationMiddleware(MiddlewareMixin):
     hostnames registered in the WebPage model's hostnames field.
     """
 
-    CACHE_KEY = "webpages_allowed_hosts"
     CACHE_TIMEOUT = 300  # 5 minutes
+
+    @property
+    def CACHE_KEY(self):
+        """
+        Generate a secure, unpredictable cache key to prevent cache poisoning attacks.
+        
+        Uses application SECRET_KEY and a base identifier to create a unique hash
+        that's specific to this Django instance and harder to predict.
+        """
+        return self._generate_cache_key()
 
     def __init__(self, get_response=None):
         self.get_response = get_response
@@ -181,9 +191,18 @@ class DynamicHostValidationMiddleware(MiddlewareMixin):
             return False
 
     @classmethod
+    def _generate_cache_key(cls):
+        """Generate the secure cache key. Helper method for class-level operations."""
+        cache_prefix = getattr(settings, 'HOSTNAME_CACHE_KEY_PREFIX', 'webpages_hosts')
+        key_material = f"{cache_prefix}:{settings.SECRET_KEY}:allowed_hosts"
+        cache_key_hash = hashlib.sha256(key_material.encode('utf-8')).hexdigest()[:16]
+        return f"dhv_{cache_key_hash}"
+
+    @classmethod
     def clear_hostname_cache(cls):
         """Clear the hostname cache. Call this when hostnames are updated."""
-        cache.delete(cls.CACHE_KEY)
+        cache_key = cls._generate_cache_key()
+        cache.delete(cache_key)
         logger.info("Cleared hostname cache")
 
 
