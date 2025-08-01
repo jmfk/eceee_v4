@@ -22,8 +22,8 @@ from datetime import timedelta
 import json
 from io import StringIO
 
-from .models import WebPage, PageVersion, PageTheme
-from .publishing import PublishingService, PublicationSchedule
+from webpages.models import WebPage, PageVersion, PageTheme
+from webpages.publishing import PublishingService, PublicationSchedule
 
 
 class PublishingServiceTests(TestCase):

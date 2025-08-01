@@ -13,9 +13,9 @@ from django.test import TestCase
 from django.contrib.auth.models import User
 from unittest.mock import patch, MagicMock
 
-from .models import WebPage, PageTheme
-from .css_validation import CSSValidator, CSSInjectionManager, CSSSecurityError
-from .widget_registry import WidgetTypeRegistry
+from webpages.models import WebPage, PageTheme
+from webpages.css_validation import CSSValidator, CSSInjectionManager, CSSSecurityError
+from webpages.widget_registry import WidgetTypeRegistry
 
 
 class CSSValidatorTestCase(TestCase):
