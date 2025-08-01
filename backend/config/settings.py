@@ -34,11 +34,21 @@ _static_hosts = config(
     "ALLOWED_HOSTS", default="localhost,127.0.0.1,backend,frontend"
 ).split(",")
 
+# Add common ports for backend and frontend services
+_extended_hosts = []
+for host in _static_hosts:
+    _extended_hosts.append(host)
+    # Add common development ports
+    if host in ["backend", "localhost", "127.0.0.1"]:
+        _extended_hosts.extend([f"{host}:8000", f"{host}:8080"])
+    elif host in ["frontend"]:
+        _extended_hosts.extend([f"{host}:3000", f"{host}:5173"])
+
 # Allow all hosts at Django level - our middleware handles validation
 ALLOWED_HOSTS = ["*"]
 
 # Store static hosts for middleware validation
-STATIC_ALLOWED_HOSTS = _static_hosts
+STATIC_ALLOWED_HOSTS = _extended_hosts
 
 # Note: The DynamicHostValidationMiddleware handles all host validation
 # using both STATIC_ALLOWED_HOSTS and database hostnames from WebPage.hostnames.
