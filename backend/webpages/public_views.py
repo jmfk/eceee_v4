@@ -22,17 +22,32 @@ from .serializers import WebPageDetailSerializer, PageHierarchySerializer
 
 
 class PublishedPageMixin:
-    """Mixin to filter only published pages"""
+    """Mixin to filter only published pages using date-based logic"""
 
     def get_queryset(self):
+        """
+        NEW: Filter pages that have currently published versions.
+        
+        A page is published if it has at least one version with:
+        - effective_date <= now
+        - expiry_date is null OR expiry_date > now
+        """
+        # We need to filter pages that have published versions
+        # This requires a subquery to check versions
         now = timezone.now()
-        return (
-            WebPage.objects.filter(
-                publication_status="published", effective_date__lte=now
-            )
-            .filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
-            .select_related("parent", "theme")
-        )
+        
+        from .models import PageVersion
+        
+        # Get pages that have at least one published version
+        published_page_ids = PageVersion.objects.filter(
+            effective_date__lte=now
+        ).filter(
+            Q(expiry_date__isnull=True) | Q(expiry_date__gt=now)
+        ).values_list('page_id', flat=True).distinct()
+        
+        return WebPage.objects.filter(
+            id__in=published_page_ids
+        ).select_related("parent", "theme")
 
 
 class PageDetailView(PublishedPageMixin, DetailView):
@@ -66,13 +81,8 @@ class PageDetailView(PublishedPageMixin, DetailView):
             except WebPage.DoesNotExist:
                 raise Http404(f"Page not found: {'/'.join(slug_parts)}")
 
-        # Check if page is published and effective
-        now = timezone.now()
-        if (
-            current_page.publication_status != "published"
-            or (current_page.effective_date and current_page.effective_date > now)
-            or (current_page.expiry_date and current_page.expiry_date <= now)
-        ):
+        # Check if page is published using new date-based logic
+        if not current_page.is_published():
             raise Http404("Page not available")
 
         return current_page
@@ -150,18 +160,22 @@ class PageListView(PublishedPageMixin, ListView):
     paginate_by = 20
 
     def get_queryset(self):
-        """Get published root pages"""
+        """Get published root pages using date-based logic"""
         now = timezone.now()
-        return (
-            WebPage.objects.filter(
-                parent__isnull=True,
-                publication_status="published",
-                effective_date__lte=now,
-            )
-            .filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
-            .select_related("theme")
-            .order_by("sort_order", "title")
-        )
+        
+        from .models import PageVersion
+        
+        # Get root pages that have at least one published version
+        published_page_ids = PageVersion.objects.filter(
+            effective_date__lte=now
+        ).filter(
+            Q(expiry_date__isnull=True) | Q(expiry_date__gt=now)
+        ).values_list('page_id', flat=True).distinct()
+        
+        return WebPage.objects.filter(
+            parent__isnull=True,
+            id__in=published_page_ids
+        ).select_related("theme").order_by("sort_order", "title")
 
 
 class ObjectDetailView(DetailView):
@@ -200,11 +214,21 @@ class ObjectDetailView(DetailView):
         context["object_type"] = self.object_type
         context["canonical_url"] = obj.get_absolute_url()
 
-        # Check if this object is linked to any pages
+        # Check if this object is linked to any published pages
+        from .models import PageVersion
+        
+        # Get pages that have published versions
+        now = timezone.now()
+        published_page_ids = PageVersion.objects.filter(
+            effective_date__lte=now
+        ).filter(
+            Q(expiry_date__isnull=True) | Q(expiry_date__gt=now)
+        ).values_list('page_id', flat=True).distinct()
+        
         linked_pages = WebPage.objects.filter(
             linked_object_type=self.object_type,
             linked_object_id=obj.id,
-            publication_status="published",
+            id__in=published_page_ids,
         )
         context["linked_pages"] = linked_pages
 
@@ -277,15 +301,22 @@ class MemberDetailView(ObjectDetailView):
 
 def page_sitemap_view(request):
     """
-    XML sitemap for published pages.
+    XML sitemap for published pages using date-based logic.
     """
     now = timezone.now()
-    pages = (
-        WebPage.objects.filter(publication_status="published", effective_date__lte=now)
-        .filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
-        .select_related("theme")
-        .order_by("sort_order", "title")
-    )
+    
+    from .models import PageVersion
+    
+    # Get pages that have published versions
+    published_page_ids = PageVersion.objects.filter(
+        effective_date__lte=now
+    ).filter(
+        Q(expiry_date__isnull=True) | Q(expiry_date__gt=now)
+    ).values_list('page_id', flat=True).distinct()
+    
+    pages = WebPage.objects.filter(
+        id__in=published_page_ids
+    ).select_related("theme").order_by("sort_order", "title")
 
     xml_content = ['<?xml version="1.0" encoding="UTF-8"?>']
     xml_content.append('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">')
@@ -307,19 +338,24 @@ def page_sitemap_view(request):
 
 def page_hierarchy_api(request):
     """
-    JSON API endpoint returning the complete page hierarchy.
+    JSON API endpoint returning the complete page hierarchy using date-based logic.
     Only includes published pages.
     """
     now = timezone.now()
-    root_pages = (
-        WebPage.objects.filter(
-            parent__isnull=True, publication_status="published", effective_date__lte=now
-        )
-        .filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
-        .select_related("parent", "theme")
-        .prefetch_related("children")
-        .order_by("sort_order", "title")
-    )
+    
+    from .models import PageVersion
+    
+    # Get root pages that have published versions
+    published_page_ids = PageVersion.objects.filter(
+        effective_date__lte=now
+    ).filter(
+        Q(expiry_date__isnull=True) | Q(expiry_date__gt=now)
+    ).values_list('page_id', flat=True).distinct()
+    
+    root_pages = WebPage.objects.filter(
+        parent__isnull=True,
+        id__in=published_page_ids
+    ).select_related("parent", "theme").prefetch_related("children").order_by("sort_order", "title")
 
     serializer = PageHierarchySerializer(
         root_pages, many=True, context={"request": request}
@@ -330,7 +366,7 @@ def page_hierarchy_api(request):
 
 def page_search_view(request):
     """
-    JSON API endpoint for searching published pages.
+    JSON API endpoint for searching published pages using date-based logic.
     Supports query parameter 'q' for search term.
     """
     query = request.GET.get("q", "").strip()
@@ -338,18 +374,23 @@ def page_search_view(request):
         return JsonResponse({"error": "Query too short", "results": []})
 
     now = timezone.now()
-    pages = (
-        WebPage.objects.filter(
-            Q(title__icontains=query)
-            | Q(description__icontains=query)
-            | Q(meta_title__icontains=query)
-            | Q(meta_description__icontains=query),
-            publication_status="published",
-            effective_date__lte=now,
-        )
-        .filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
-        .select_related("theme")[:20]
-    )
+    
+    from .models import PageVersion
+    
+    # Get pages that have published versions
+    published_page_ids = PageVersion.objects.filter(
+        effective_date__lte=now
+    ).filter(
+        Q(expiry_date__isnull=True) | Q(expiry_date__gt=now)
+    ).values_list('page_id', flat=True).distinct()
+    
+    pages = WebPage.objects.filter(
+        Q(title__icontains=query)
+        | Q(description__icontains=query)
+        | Q(meta_title__icontains=query)
+        | Q(meta_description__icontains=query),
+        id__in=published_page_ids,
+    ).select_related("theme")[:20]
 
     results = []
     for page in pages:
@@ -598,19 +639,8 @@ class HostnamePageView(View):
         return render(request, template_name, context)
 
     def _is_page_accessible(self, page):
-        """Check if page is published and currently accessible"""
-        now = timezone.now()
-
-        if page.publication_status != "published":
-            return False
-
-        if page.effective_date and page.effective_date > now:
-            return False
-
-        if page.expiry_date and page.expiry_date <= now:
-            return False
-
-        return True
+        """Check if page is published and currently accessible using date-based logic"""
+        return page.is_published()
 
     def get_context_data(self, **kwargs):
         """Add layout, theme, widgets, hostname info, and object content to context"""
