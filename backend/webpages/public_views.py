@@ -483,10 +483,11 @@ class HostnamePageView(View):
         slug_parts = (
             [part for part in slug_path.split("/") if part] if slug_path else []
         )
+        print(f"hostname: {hostname}")
         print(f"slug_parts: {slug_parts}")
         # Find the root page for this hostname
         root_page = WebPage.get_root_page_for_hostname(hostname)
-
+        print(f"root_page: {root_page}")
         if not root_page:
             raise Http404(f"No site configured for hostname: {hostname}")
 
@@ -517,6 +518,7 @@ class HostnamePageView(View):
         if not slug_parts:
             current_page = root_page
         else:
+            print("slug_parts", slug_parts)
             # First check if the first slug is a direct child of root_page
             first_slug = slug_parts[0]
             if not WebPage.objects.filter(slug=first_slug, parent=root_page).exists():
@@ -550,7 +552,9 @@ class HostnamePageView(View):
                     current_page = WebPage.objects.select_related(
                         "theme", "parent"
                     ).get(slug=slug, parent=current_page)
+                    print(slug, "current_page", current_page)
                     content = current_page.get_latest_published_version()
+                    print(slug, "content", content)
                     widgets = content.widgets
                     page_data = content.page_data
                     context["current_page"] = current_page
@@ -571,6 +575,7 @@ class HostnamePageView(View):
         if not self._is_page_accessible(current_page):
             raise Http404("Page not available")
 
+        print("current_page", current_page)
         effective_layout = current_page.get_effective_layout()
         print("current_page effective_layout", effective_layout)
         template_name = (
@@ -587,6 +592,8 @@ class HostnamePageView(View):
             context["slots"] = effective_layout.slot_configuration["slots"]
         else:
             context["slots"] = []
+
+        print("template_name", template_name)
 
         return render(request, template_name, context)
 
