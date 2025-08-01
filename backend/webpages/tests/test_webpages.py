@@ -14,10 +14,11 @@ from django.utils import timezone
 from django.test import override_settings
 import json
 
-from .models import WebPage, PageTheme, PageVersion
-from .widget_registry import widget_type_registry
+from webpages.models import WebPage, PageTheme, PageVersion
+from webpages.widget_registry import widget_type_registry
+
 try:
-    from .widgets import TextBlockWidget, ImageWidget, ButtonWidget
+    from webpages.widgets import TextBlockWidget, ImageWidget, ButtonWidget
 except ImportError:
     # Handle case where core_widgets is not installed
     TextBlockWidget = ImageWidget = ButtonWidget = None
@@ -242,7 +243,7 @@ class PageVersionTest(TestCase):
 
     def test_widget_validation_in_page_version(self):
         """Test that widget configurations can be validated"""
-        from .json_models import PageWidgetData
+        from webpages.json_models import PageWidgetData
 
         # Valid widget data
         widget_data = {
@@ -322,7 +323,7 @@ class PageThemeTest(TestCase):
 
     def test_theme_css_validation(self):
         """Test CSS variables validation"""
-        from .json_models import CSSVariables
+        from webpages.json_models import CSSVariables
 
         # Valid CSS variables
         valid_css = {"--primary-color": "#007bff", "--font-size": "16px"}
@@ -351,7 +352,7 @@ class LayoutIntegrationTest(TestCase):
         self.assertEqual(page.code_layout, "single_column")
 
         # Should be able to get layout from registry
-        from .layout_registry import layout_registry
+        from webpages.layout_registry import layout_registry
 
         layout = layout_registry.get_layout("single_column")
         self.assertIsNotNone(layout)

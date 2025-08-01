@@ -8,8 +8,11 @@ from django.http import HttpRequest, HttpResponseBadRequest
 from django.contrib.auth.models import User
 from unittest.mock import patch, Mock
 
-from .models import WebPage
-from .middleware import DynamicHostValidationMiddleware, get_dynamic_allowed_hosts
+from webpages.models import WebPage
+from webpages.middleware import (
+    DynamicHostValidationMiddleware,
+    get_dynamic_allowed_hosts,
+)
 
 
 class DynamicHostValidationTest(TestCase):
@@ -442,8 +445,8 @@ class AdminIntegrationTest(TestCase):
 
     def test_admin_mixin_integration(self):
         """Test that admin uses HostnameUpdateMixin."""
-        from .admin import WebPageAdmin
-        from .middleware import HostnameUpdateMixin
+        from webpages.admin import WebPageAdmin
+        from webpages.middleware import HostnameUpdateMixin
 
         # Check that WebPageAdmin inherits from HostnameUpdateMixin
         self.assertTrue(issubclass(WebPageAdmin, HostnameUpdateMixin))
