@@ -225,17 +225,18 @@ class WebPage(models.Model):
         # Handle different hostname formats
         try:
             # Handle IPv6 addresses in brackets: [::1]:8080 or [::1]
-            if hostname.startswith('[') and ']' in hostname:
-                bracket_end = hostname.find(']')
+            if hostname.startswith("[") and "]" in hostname:
+                bracket_end = hostname.find("]")
                 ipv6_part = hostname[1:bracket_end]
-                
+
                 # Validate IPv6 address
                 import ipaddress
+
                 ipv6_addr = ipaddress.ip_address(ipv6_part)
-                
+
                 # Check for port after bracket
-                remaining = hostname[bracket_end + 1:]
-                if remaining.startswith(':'):
+                remaining = hostname[bracket_end + 1 :]
+                if remaining.startswith(":"):
                     port_part = remaining[1:]
                     if port_part:
                         # Validate port
@@ -248,35 +249,37 @@ class WebPage(models.Model):
                         return f"[{ipv6_addr}]"
                 else:
                     return f"[{ipv6_addr}]"
-            
+
             # Check if this could be a bare IPv6 address (no brackets)
-            elif ':' in hostname and hostname.count(':') > 1:
+            elif ":" in hostname and hostname.count(":") > 1:
                 # Multiple colons might indicate IPv6
                 try:
                     import ipaddress
+
                     ipv6_addr = ipaddress.ip_address(hostname)
                     return f"[{ipv6_addr}]"  # Normalize to bracketed form
                 except ValueError:
                     # Not a valid IPv6, continue with regular processing
                     pass
-            
+
             # Handle internationalized domain names (IDN)
             if any(ord(char) > 127 for char in hostname):
                 # Convert IDN to ASCII (punycode)
                 try:
-                    hostname = hostname.encode('idna').decode('ascii')
+                    hostname = hostname.encode("idna").decode("ascii")
                 except (UnicodeError, UnicodeDecodeError):
                     # If IDN encoding fails, keep original but log warning
                     import logging
+
                     logger = logging.getLogger(__name__)
                     logger.warning(f"Failed to encode IDN hostname: {hostname}")
-            
+
             # Regular hostname processing (IPv4 or domain name with optional port)
             hostname = hostname.lower().strip()
-            
+
             # Validate port if present in regular hostname:port format
-            if ':' in hostname:
-                host_part, port_part = hostname.rsplit(':', 1)
+            if ":" in hostname:
+                host_part, port_part = hostname.rsplit(":", 1)
                 if port_part:
                     try:
                         port = int(port_part)
@@ -285,54 +288,56 @@ class WebPage(models.Model):
                         return f"{host_part}:{port}"
                     except ValueError:
                         # Port part is not a valid number, treat as part of hostname
-                        # This handles edge cases like "my:host:name" 
+                        # This handles edge cases like "my:host:name"
                         pass
-            
+
             return hostname
-            
+
         except Exception as e:
             # If normalization fails, log the error and return basic normalization
             import logging
+
             logger = logging.getLogger(__name__)
             logger.warning(f"Hostname normalization failed for '{hostname}': {e}")
-            
+
             # Fallback to basic normalization
             return hostname.lower().strip()
 
     def _extract_port_from_hostname(self, hostname):
         """
         Extract port from hostname, handling IPv6 addresses correctly.
-        
+
         Returns:
             int or None: Port number if present, None if no port specified
-            
+
         Raises:
             ValidationError: If port format is invalid
         """
         if not hostname:
             return None
-            
+
         try:
             # Handle IPv6 addresses in brackets: [::1]:8080
-            if hostname.startswith('['):
-                if ']:' in hostname:
-                    bracket_end = hostname.find(']:')
-                    port_str = hostname[bracket_end + 2:]
+            if hostname.startswith("["):
+                if "]:" in hostname:
+                    bracket_end = hostname.find("]:")
+                    port_str = hostname[bracket_end + 2 :]
                     if port_str:
                         return int(port_str)
                 return None
-            
+
             # Handle regular hostnames: example.com:8080
-            if ':' in hostname:
+            if ":" in hostname:
                 # Make sure this isn't an IPv6 address without brackets
-                parts = hostname.split(':')
-                
+                parts = hostname.split(":")
+
                 # If more than 2 parts, likely IPv6 without brackets (invalid but handle gracefully)
                 if len(parts) > 2:
                     # Could be IPv6 like ::1 or 2001:db8::1
                     # If it's a valid IPv6, no port is specified
                     try:
                         import ipaddress
+
                         ipaddress.ip_address(hostname)
                         return None  # Valid IPv6 address, no port
                     except ValueError:
@@ -340,14 +345,14 @@ class WebPage(models.Model):
                         raise ValidationError(
                             f"Invalid hostname format (possible IPv6 without brackets): {hostname}"
                         )
-                
+
                 # Standard host:port format
                 host_part, port_str = parts
                 if port_str:
                     return int(port_str)
-                    
+
             return None
-            
+
         except ValueError as e:
             raise ValidationError(
                 f"Invalid port format in hostname: {hostname} - {str(e)}"
@@ -699,13 +704,15 @@ class WebPage(models.Model):
                     # Pattern allows:
                     # - Domain names: example.com, localhost:8000, sub.domain.com:3000
                     # - IPv6 addresses: [::1], [::1]:8080, [2001:db8::1]:443
-                    ipv6_pattern = r"\[[0-9a-fA-F:]+\](:[0-9]{1,5})?"  # IPv6 with optional port
+                    ipv6_pattern = (
+                        r"\[[0-9a-fA-F:]+\](:[0-9]{1,5})?"  # IPv6 with optional port
+                    )
                     domain_pattern = (
                         r"[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?"  # First part
                         r"(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*"  # Domain parts
                         r"(:[0-9]{1,5})?"  # Optional port number (1-5 digits)
                     )
-                    
+
                     hostname_pattern = f"^({ipv6_pattern}|{domain_pattern})$"
 
                     if not re.match(hostname_pattern, normalized_hostname):

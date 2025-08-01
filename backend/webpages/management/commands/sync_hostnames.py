@@ -98,11 +98,21 @@ class Command(BaseCommand):
             elif options["add_hostname"]:
                 # Require authentication for hostname modification
                 user = self.authenticate_user(options.get("username"))
-                self.add_hostname(options["add_hostname"], options.get("page_id"), user, options.get("unsafe", False))
+                self.add_hostname(
+                    options["add_hostname"],
+                    options.get("page_id"),
+                    user,
+                    options.get("unsafe", False),
+                )
             elif options["remove_hostname"]:
                 # Require authentication for hostname modification
                 user = self.authenticate_user(options.get("username"))
-                self.remove_hostname(options["remove_hostname"], options.get("page_id"), user, options.get("unsafe", False))
+                self.remove_hostname(
+                    options["remove_hostname"],
+                    options.get("page_id"),
+                    user,
+                    options.get("unsafe", False),
+                )
             elif options["stats"]:
                 self.show_stats()
             else:
@@ -132,27 +142,25 @@ class Command(BaseCommand):
 
         # Prompt for password
         password = getpass.getpass(f"Password for {username}: ")
-        
+
         if not check_password(password, user.password):
             raise CommandError("Authentication failed: Invalid password")
 
-        self.stdout.write(
-            self.style.SUCCESS(f"✓ Authenticated as {username}")
-        )
+        self.stdout.write(self.style.SUCCESS(f"✓ Authenticated as {username}"))
         return user
 
     def confirm_action(self, message, unsafe=False):
         """Confirm potentially dangerous actions."""
         if unsafe:
             return True
-            
+
         self.stdout.write(self.style.WARNING(f"⚠ {message}"))
         response = input("Are you sure? (yes/no): ").lower().strip()
-        
-        if response not in ['yes', 'y']:
+
+        if response not in ["yes", "y"]:
             self.stdout.write(self.style.ERROR("Operation cancelled"))
             return False
-            
+
         return True
 
     def list_all_hostnames(self):
@@ -262,8 +270,8 @@ class Command(BaseCommand):
         # Confirm the action
         if not self.confirm_action(
             f'This will add hostname "{hostname}" to page "{page.title}" (ID: {page_id}). '
-            f'This affects site security and access control.',
-            unsafe
+            f"This affects site security and access control.",
+            unsafe,
         ):
             return
 
@@ -277,14 +285,14 @@ class Command(BaseCommand):
             )
             self.stdout.write(
                 self.style.SUCCESS(
-                    f'  Action performed by: {user.username} ({user.email})'
+                    f"  Action performed by: {user.username} ({user.email})"
                 )
             )
-            
+
             # Clear cache to ensure immediate effect
             DynamicHostValidationMiddleware.clear_hostname_cache()
             self.stdout.write(self.style.SUCCESS("  Hostname cache cleared"))
-            
+
         except Exception as e:
             raise CommandError(f"Failed to add hostname: {str(e)}")
 
@@ -300,13 +308,15 @@ class Command(BaseCommand):
 
         # Verify hostname exists on this page
         if hostname not in (page.hostnames or []):
-            raise CommandError(f'Hostname "{hostname}" not found on page "{page.title}"')
+            raise CommandError(
+                f'Hostname "{hostname}" not found on page "{page.title}"'
+            )
 
         # Confirm the action
         if not self.confirm_action(
             f'This will remove hostname "{hostname}" from page "{page.title}" (ID: {page_id}). '
-            f'This may make the site inaccessible via this hostname.',
-            unsafe
+            f"This may make the site inaccessible via this hostname.",
+            unsafe,
         ):
             return
 
@@ -320,14 +330,14 @@ class Command(BaseCommand):
             )
             self.stdout.write(
                 self.style.SUCCESS(
-                    f'  Action performed by: {user.username} ({user.email})'
+                    f"  Action performed by: {user.username} ({user.email})"
                 )
             )
-            
+
             # Clear cache to ensure immediate effect
             DynamicHostValidationMiddleware.clear_hostname_cache()
             self.stdout.write(self.style.SUCCESS("  Hostname cache cleared"))
-            
+
         except Exception as e:
             raise CommandError(f"Failed to remove hostname: {str(e)}")
 
