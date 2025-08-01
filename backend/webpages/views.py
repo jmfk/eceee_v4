@@ -9,6 +9,7 @@ from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.filters import SearchFilter, OrderingFilter
+from rest_framework.throttling import UserRateThrottle
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Q
 from django.utils import timezone
@@ -362,7 +363,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
 
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
     # Rate limiting for hostname management security
-    throttle_classes = ["rest_framework.throttling.UserRateThrottle"]
+    throttle_classes = [UserRateThrottle]
     throttle_scope = "webpage_modifications"
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_class = WebPageFilter

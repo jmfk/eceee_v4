@@ -45,6 +45,11 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
+      '/csrf-token': {
+        target: 'http://backend:8000',
+        changeOrigin: true,
+        secure: false,
+      },
     },
     watch: {
       usePolling: true, // Required for Docker on some systems
