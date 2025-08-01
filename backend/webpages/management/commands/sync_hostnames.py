@@ -1,15 +1,26 @@
 """
 Management command to sync and manage dynamic hostnames.
+
+Security Features:
+- Authentication required for hostname modification operations
+- Requires --unsafe flag for dangerous operations without confirmation
+- Comprehensive logging of all hostname modifications
 """
 
+import getpass
+import sys
 from django.core.management.base import BaseCommand, CommandError
 from django.core.cache import cache
 from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.contrib.auth.hashers import check_password
 from webpages.models import WebPage
 from webpages.middleware import (
     DynamicHostValidationMiddleware,
     get_dynamic_allowed_hosts,
 )
+
+User = get_user_model()
 
 
 class Command(BaseCommand):
@@ -44,12 +55,12 @@ class Command(BaseCommand):
         parser.add_argument(
             "--add-hostname",
             type=str,
-            help="Add hostname to a root page (requires --page-id)",
+            help="Add hostname to a root page (requires --page-id and authentication)",
         )
         parser.add_argument(
             "--remove-hostname",
             type=str,
-            help="Remove hostname from a root page (requires --page-id)",
+            help="Remove hostname from a root page (requires --page-id and authentication)",
         )
         parser.add_argument(
             "--page-id",
@@ -60,6 +71,16 @@ class Command(BaseCommand):
             "--stats",
             action="store_true",
             help="Show hostname statistics",
+        )
+        parser.add_argument(
+            "--username",
+            type=str,
+            help="Username for authentication (required for add/remove operations)",
+        )
+        parser.add_argument(
+            "--unsafe",
+            action="store_true",
+            help="Skip interactive confirmation prompts (USE WITH CAUTION)",
         )
 
     def handle(self, *args, **options):
@@ -75,9 +96,13 @@ class Command(BaseCommand):
             elif options["validate"]:
                 self.validate_hostname(options["validate"])
             elif options["add_hostname"]:
-                self.add_hostname(options["add_hostname"], options.get("page_id"))
+                # Require authentication for hostname modification
+                user = self.authenticate_user(options.get("username"))
+                self.add_hostname(options["add_hostname"], options.get("page_id"), user, options.get("unsafe", False))
             elif options["remove_hostname"]:
-                self.remove_hostname(options["remove_hostname"], options.get("page_id"))
+                # Require authentication for hostname modification
+                user = self.authenticate_user(options.get("username"))
+                self.remove_hostname(options["remove_hostname"], options.get("page_id"), user, options.get("unsafe", False))
             elif options["stats"]:
                 self.show_stats()
             else:
@@ -87,6 +112,48 @@ class Command(BaseCommand):
 
         except Exception as e:
             raise CommandError(f"Error: {str(e)}")
+
+    def authenticate_user(self, username):
+        """Authenticate user for sensitive operations."""
+        if not username:
+            raise CommandError(
+                "Username required for hostname modification operations. Use --username <username>"
+            )
+
+        try:
+            user = User.objects.get(username=username)
+        except User.DoesNotExist:
+            raise CommandError(f"User '{username}' not found")
+
+        if not user.is_staff:
+            raise CommandError(
+                f"User '{username}' must be staff to perform hostname operations"
+            )
+
+        # Prompt for password
+        password = getpass.getpass(f"Password for {username}: ")
+        
+        if not check_password(password, user.password):
+            raise CommandError("Authentication failed: Invalid password")
+
+        self.stdout.write(
+            self.style.SUCCESS(f"✓ Authenticated as {username}")
+        )
+        return user
+
+    def confirm_action(self, message, unsafe=False):
+        """Confirm potentially dangerous actions."""
+        if unsafe:
+            return True
+            
+        self.stdout.write(self.style.WARNING(f"⚠ {message}"))
+        response = input("Are you sure? (yes/no): ").lower().strip()
+        
+        if response not in ['yes', 'y']:
+            self.stdout.write(self.style.ERROR("Operation cancelled"))
+            return False
+            
+        return True
 
     def list_all_hostnames(self):
         """List all hostnames (static + database)."""
@@ -179,8 +246,8 @@ class Command(BaseCommand):
                 self.style.ERROR(f'✗ Hostname "{hostname}" is NOT ALLOWED')
             )
 
-    def add_hostname(self, hostname, page_id):
-        """Add hostname to a root page."""
+    def add_hostname(self, hostname, page_id, user, unsafe=False):
+        """Add hostname to a root page with authentication and confirmation."""
         if not page_id:
             raise CommandError("--page-id is required when adding hostname")
 
@@ -192,18 +259,37 @@ class Command(BaseCommand):
         if not page.is_root_page():
             raise CommandError("Only root pages can have hostnames")
 
+        # Confirm the action
+        if not self.confirm_action(
+            f'This will add hostname "{hostname}" to page "{page.title}" (ID: {page_id}). '
+            f'This affects site security and access control.',
+            unsafe
+        ):
+            return
+
         try:
             page.add_hostname(hostname)
+            # Log the action
             self.stdout.write(
                 self.style.SUCCESS(
-                    f'Successfully added hostname "{hostname}" to page "{page.title}"'
+                    f'✓ Successfully added hostname "{hostname}" to page "{page.title}"'
                 )
             )
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f'  Action performed by: {user.username} ({user.email})'
+                )
+            )
+            
+            # Clear cache to ensure immediate effect
+            DynamicHostValidationMiddleware.clear_hostname_cache()
+            self.stdout.write(self.style.SUCCESS("  Hostname cache cleared"))
+            
         except Exception as e:
             raise CommandError(f"Failed to add hostname: {str(e)}")
 
-    def remove_hostname(self, hostname, page_id):
-        """Remove hostname from a root page."""
+    def remove_hostname(self, hostname, page_id, user, unsafe=False):
+        """Remove hostname from a root page with authentication and confirmation."""
         if not page_id:
             raise CommandError("--page-id is required when removing hostname")
 
@@ -212,13 +298,36 @@ class Command(BaseCommand):
         except WebPage.DoesNotExist:
             raise CommandError(f"Page with ID {page_id} not found")
 
+        # Verify hostname exists on this page
+        if hostname not in (page.hostnames or []):
+            raise CommandError(f'Hostname "{hostname}" not found on page "{page.title}"')
+
+        # Confirm the action
+        if not self.confirm_action(
+            f'This will remove hostname "{hostname}" from page "{page.title}" (ID: {page_id}). '
+            f'This may make the site inaccessible via this hostname.',
+            unsafe
+        ):
+            return
+
         try:
             page.remove_hostname(hostname)
+            # Log the action
             self.stdout.write(
                 self.style.SUCCESS(
-                    f'Successfully removed hostname "{hostname}" from page "{page.title}"'
+                    f'✓ Successfully removed hostname "{hostname}" from page "{page.title}"'
                 )
             )
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f'  Action performed by: {user.username} ({user.email})'
+                )
+            )
+            
+            # Clear cache to ensure immediate effect
+            DynamicHostValidationMiddleware.clear_hostname_cache()
+            self.stdout.write(self.style.SUCCESS("  Hostname cache cleared"))
+            
         except Exception as e:
             raise CommandError(f"Failed to remove hostname: {str(e)}")
 

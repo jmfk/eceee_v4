@@ -114,17 +114,21 @@ class DynamicHostValidationMiddleware(MiddlewareMixin):
         return validate_host(host, static_hosts)
 
     def _check_database_hostnames(self, host):
-        """Check against database-registered hostnames with caching."""
+        """Check against database-registered hostnames with atomic caching."""
         try:
-            # Try to get from cache first
-            allowed_hosts = cache.get(self.CACHE_KEY)
-
-            if allowed_hosts is None:
-                allowed_hosts = self._load_database_hostnames()
+            # Use atomic get_or_set to prevent race conditions
+            def load_hostnames():
+                hostnames = self._load_database_hostnames()
                 # Check if loading failed (indicated by special error marker)
-                if allowed_hosts == "_DATABASE_ERROR_":
+                if hostnames == "_DATABASE_ERROR_":
                     raise Exception("Database error loading hostnames")
-                cache.set(self.CACHE_KEY, allowed_hosts, self.CACHE_TIMEOUT)
+                return hostnames
+
+            allowed_hosts = cache.get_or_set(
+                self.CACHE_KEY, 
+                load_hostnames, 
+                self.CACHE_TIMEOUT
+            )
 
             # Normalize host for comparison
             from webpages.models import WebPage
