@@ -86,13 +86,15 @@ class PageVersionInline(admin.TabularInline):
         "version_number",
         "created_at",
         "created_by",
-        "is_current",
         "admin_link",
+        "publication_status_display",
     ]
     fields = [
         "version_number",
         "description",
-        "is_current",
+        "effective_date",
+        "expiry_date",
+        "publication_status_display",
         "admin_link",
     ]
 
@@ -111,6 +113,22 @@ class PageVersionInline(admin.TabularInline):
 
     admin_link.short_description = "Admin Link"
 
+    def publication_status_display(self, obj):
+        """Display publication status for inline"""
+        if not obj.pk:
+            return "-"
+        status = obj.get_publication_status()
+        if status == "published":
+            return format_html('<span style="color: green;">✓ Published</span>')
+        elif status == "scheduled":
+            return format_html('<span style="color: orange;">⏰ Scheduled</span>')
+        elif status == "expired":
+            return format_html('<span style="color: red;">❌ Expired</span>')
+        else:
+            return format_html('<span style="color: gray;">📝 Draft</span>')
+
+    publication_status_display.short_description = "Status"
+
 
 @admin.register(WebPage)
 class WebPageAdmin(HostnameUpdateMixin, admin.ModelAdmin):
@@ -119,9 +137,8 @@ class WebPageAdmin(HostnameUpdateMixin, admin.ModelAdmin):
         "slug",
         "parent",
         "get_hostnames_display",
-        "publication_status",
-        "effective_date",
         "is_published_display",
+        "current_version_status_display",
         "version_count_display",
         "sort_order",
         "created_at",
@@ -132,7 +149,6 @@ class WebPageAdmin(HostnameUpdateMixin, admin.ModelAdmin):
         return super().get_queryset(request).prefetch_related("versions")
 
     list_filter = [
-        "publication_status",
         HasHostnamesFilter,
         "created_at",
         "updated_at",
@@ -216,17 +232,36 @@ class WebPageAdmin(HostnameUpdateMixin, admin.ModelAdmin):
     )
 
     def is_published_display(self, obj):
-        """Display publication status with color coding"""
+        """Display publication status with color coding using date-based logic"""
         if obj.is_published():
             return format_html('<span style="color: green;">✓ Published</span>')
-        elif obj.publication_status == "scheduled":
-            return format_html('<span style="color: orange;">⏰ Scheduled</span>')
-        elif obj.publication_status == "expired":
-            return format_html('<span style="color: red;">❌ Expired</span>')
         else:
-            return format_html('<span style="color: gray;">⏸ Unpublished</span>')
+            return format_html('<span style="color: gray;">⏸ Not Published</span>')
 
-    is_published_display.short_description = "Status"
+    is_published_display.short_description = "Published"
+
+    def current_version_status_display(self, obj):
+        """Display current version status with detailed information"""
+        current_version = obj.get_current_published_version()
+        if current_version:
+            status = current_version.get_publication_status()
+            if status == "published":
+                return format_html('<span style="color: green;">✓ Published (v{})</span>', current_version.version_number)
+            elif status == "scheduled":
+                return format_html('<span style="color: orange;">⏰ Scheduled (v{})</span>', current_version.version_number)
+            elif status == "expired":
+                return format_html('<span style="color: red;">❌ Expired (v{})</span>', current_version.version_number)
+        
+        # Check if there are any versions with future effective dates
+        from django.utils import timezone
+        now = timezone.now()
+        future_versions = obj.versions.filter(effective_date__gt=now).order_by('effective_date').first()
+        if future_versions:
+            return format_html('<span style="color: orange;">⏰ Scheduled (v{})</span>', future_versions.version_number)
+        
+        return format_html('<span style="color: gray;">No published version</span>')
+
+    current_version_status_display.short_description = "Current Version"
 
     def get_hostnames_display(self, obj):
         """Display hostnames with styling"""
@@ -458,19 +493,24 @@ class PageVersionAdmin(admin.ModelAdmin):
         "page",
         "version_number",
         "description",
-        "is_current",
+        "publication_status_display",
+        "effective_date",
         "created_at",
         "created_by",
         "page_admin_link",
     ]
-    list_filter = ["is_current", "created_at", "page"]
+    list_filter = ["effective_date", "expiry_date", "created_at", "page"]
     search_fields = ["page__title", "description"]
     readonly_fields = ["created_at", "version_number", "page_admin_link"]
 
     fieldsets = (
         (
             "Version Information",
-            {"fields": ("page", "version_number", "is_current", "page_admin_link")},
+            {"fields": ("page", "version_number", "page_admin_link")},
+        ),
+        (
+            "Publishing",
+            {"fields": ("effective_date", "expiry_date")},
         ),
         (
             "Content",
@@ -520,6 +560,26 @@ class PageVersionAdmin(admin.ModelAdmin):
         return "-"
 
     page_admin_link.short_description = "Parent Page"
+
+    def publication_status_display(self, obj):
+        """Display publication status with color coding using date-based logic"""
+        status = obj.get_publication_status()
+        if status == "published":
+            icon = "✓"
+            color = "green"
+        elif status == "scheduled":
+            icon = "⏰"
+            color = "orange"
+        elif status == "expired":
+            icon = "❌"
+            color = "red"
+        else:  # draft
+            icon = "📝"
+            color = "gray"
+        
+        return format_html('<span style="color: {};">{} {}</span>', color, icon, status.title())
+
+    publication_status_display.short_description = "Publication Status"
 
     actions = ["restore_version"]
 
