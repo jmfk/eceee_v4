@@ -32,7 +32,7 @@ class DynamicHostValidationMiddleware(MiddlewareMixin):
     def CACHE_KEY(self):
         """
         Generate a secure, unpredictable cache key to prevent cache poisoning attacks.
-        
+
         Uses application SECRET_KEY and a base identifier to create a unique hash
         that's specific to this Django instance and harder to predict.
         """
@@ -193,9 +193,9 @@ class DynamicHostValidationMiddleware(MiddlewareMixin):
     @classmethod
     def _generate_cache_key(cls):
         """Generate the secure cache key. Helper method for class-level operations."""
-        cache_prefix = getattr(settings, 'HOSTNAME_CACHE_KEY_PREFIX', 'webpages_hosts')
+        cache_prefix = getattr(settings, "HOSTNAME_CACHE_KEY_PREFIX", "webpages_hosts")
         key_material = f"{cache_prefix}:{settings.SECRET_KEY}:allowed_hosts"
-        cache_key_hash = hashlib.sha256(key_material.encode('utf-8')).hexdigest()[:16]
+        cache_key_hash = hashlib.sha256(key_material.encode("utf-8")).hexdigest()[:16]
         return f"dhv_{cache_key_hash}"
 
     @classmethod
