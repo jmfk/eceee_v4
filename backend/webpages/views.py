@@ -362,8 +362,8 @@ class WebPageViewSet(viewsets.ModelViewSet):
 
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
     # Rate limiting for hostname management security
-    throttle_classes = ['rest_framework.throttling.UserRateThrottle']
-    throttle_scope = 'webpage_modifications'
+    throttle_classes = ["rest_framework.throttling.UserRateThrottle"]
+    throttle_scope = "webpage_modifications"
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_class = WebPageFilter
     search_fields = ["title", "slug", "description", "meta_title", "meta_description"]

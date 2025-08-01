@@ -74,15 +74,15 @@ HOSTNAME_CACHE_KEY_PREFIX = "webpages_hosts"
 # Rate limiting configuration for API security
 REST_FRAMEWORK = {
     # Add to existing REST_FRAMEWORK settings if any
-    'DEFAULT_THROTTLE_CLASSES': [
-        'rest_framework.throttling.AnonRateThrottle',
-        'rest_framework.throttling.UserRateThrottle',
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
     ],
-    'DEFAULT_THROTTLE_RATES': {
-        'anon': '100/hour',  # Anonymous users
-        'user': '1000/hour', # Authenticated users
-        'webpage_modifications': '50/hour',  # Webpage/hostname changes
-    }
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "100/hour",  # Anonymous users
+        "user": "1000/hour",  # Authenticated users
+        "webpage_modifications": "50/hour",  # Webpage/hostname changes
+    },
 }
 
 # Application definition

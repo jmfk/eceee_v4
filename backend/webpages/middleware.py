@@ -125,9 +125,7 @@ class DynamicHostValidationMiddleware(MiddlewareMixin):
                 return hostnames
 
             allowed_hosts = cache.get_or_set(
-                self.CACHE_KEY, 
-                load_hostnames, 
-                self.CACHE_TIMEOUT
+                self.CACHE_KEY, load_hostnames, self.CACHE_TIMEOUT
             )
 
             # Normalize host for comparison
