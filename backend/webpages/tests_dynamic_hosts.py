@@ -232,6 +232,62 @@ class DynamicHostValidationTest(TestCase):
             result = self.middleware._check_database_hostnames("any-host.com")
             self.assertFalse(result)
 
+    def test_secure_cache_key_generation(self):
+        """Test that cache keys are secure and unpredictable."""
+        # Get cache key from middleware instance
+        cache_key = self.middleware.CACHE_KEY
+        
+        # Should be prefixed with 'dhv_' 
+        self.assertTrue(cache_key.startswith('dhv_'))
+        
+        # Should not contain predictable strings
+        self.assertNotIn('webpages_allowed_hosts', cache_key)
+        self.assertNotIn('hostnames', cache_key.lower())
+        
+        # Should be consistent for same SECRET_KEY
+        cache_key2 = self.middleware.CACHE_KEY
+        self.assertEqual(cache_key, cache_key2)
+
+    @override_settings(HOSTNAME_CACHE_KEY_PREFIX="custom_prefix")  
+    def test_configurable_cache_key_prefix(self):
+        """Test that cache key prefix is configurable."""
+        cache_key = self.middleware.CACHE_KEY
+        
+        # Should still be secure format
+        self.assertTrue(cache_key.startswith('dhv_'))
+        
+        # Changing prefix should change the key
+        with override_settings(HOSTNAME_CACHE_KEY_PREFIX="different_prefix"):
+            different_key = self.middleware.CACHE_KEY
+            self.assertNotEqual(cache_key, different_key)
+
+    def test_cache_key_uses_secret_key(self):
+        """Test that cache key changes with SECRET_KEY for security."""
+        original_cache_key = self.middleware.CACHE_KEY
+        
+        # Mock a different SECRET_KEY
+        with override_settings(SECRET_KEY="different-secret-key-for-testing"):
+            different_cache_key = self.middleware.CACHE_KEY
+            
+        # Keys should be different with different SECRET_KEY
+        self.assertNotEqual(original_cache_key, different_cache_key)
+
+    def test_clear_hostname_cache_with_secure_key(self):
+        """Test that clear_hostname_cache works with the new secure cache key."""
+        # Populate cache manually
+        cache_key = self.middleware.CACHE_KEY
+        test_hostnames = ['test.com', 'example.com']
+        cache.set(cache_key, test_hostnames, 300)
+        
+        # Verify cache is populated
+        self.assertEqual(cache.get(cache_key), test_hostnames)
+        
+        # Clear cache using the class method
+        DynamicHostValidationMiddleware.clear_hostname_cache()
+        
+        # Verify cache is cleared
+        self.assertIsNone(cache.get(cache_key))
+
     def test_non_root_page_hostnames_validation(self):
         """Test that non-root pages cannot have hostnames."""
         # Create root page

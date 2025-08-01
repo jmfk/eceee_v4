@@ -66,6 +66,11 @@ STATIC_ALLOWED_HOSTS = _extended_hosts
 # - 'static_only': Explicitly only check STATIC_ALLOWED_HOSTS (same as 'deny' but clearer)
 DATABASE_FAILURE_FALLBACK = "deny"
 
+# Hostname cache security configuration
+# Prefix for hostname cache keys (used with SECRET_KEY hash for security)
+# Changing this will invalidate existing hostname cache entries
+HOSTNAME_CACHE_KEY_PREFIX = "webpages_hosts"
+
 # Application definition
 DJANGO_APPS = [
     "django.contrib.admin",
