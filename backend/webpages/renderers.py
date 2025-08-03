@@ -378,7 +378,7 @@ class WebPageRenderer:
             "page_version": page_version,
             "page_data": page_version.page_data,
             "version_number": page_version.version_number,
-            "status": page_version.status,
+            "publication_status": page_version.get_publication_status(),
                             "is_current_published": page_version.is_current_published(),
             "published_at": page_version.published_at,
             "published_by": page_version.published_by,
