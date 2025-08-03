@@ -144,8 +144,8 @@ const StatusBar = ({
                                 )}
 
                                 {/* Published version option */}
-                                                        {availableVersions.find(v => v.is_current_published) && (
-                            <option value={availableVersions.find(v => v.is_current_published).id}>
+                                {availableVersions.find(v => v.is_current_published) && (
+                                    <option value={availableVersions.find(v => v.is_current_published).id}>
                                         ✓ Published
                                     </option>
                                 )}
