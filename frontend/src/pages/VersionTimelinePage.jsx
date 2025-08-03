@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Calendar, Clock, Eye, Settings, Plus, Edit3, ExternalLink } from 'lucide-react';
-import { getPageVersionsList, scheduleVersion, publishVersionNow } from '../api/versions.js';
+import { ArrowLeft, Calendar, Clock, Eye, Settings, Plus, Edit3, ExternalLink, Edit2, Check, X } from 'lucide-react';
+import { getPageVersionsList, scheduleVersion, publishVersionNow, updateVersion } from '../api/versions.js';
 import { getPage } from '../api/pages.js';
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext';
 
@@ -29,6 +29,10 @@ const VersionTimelinePage = () => {
     });
     const [pageTitle, setPageTitle] = useState('');
     const [pageData, setPageData] = useState(null);
+    
+    // Inline editing state
+    const [editingVersionId, setEditingVersionId] = useState(null);
+    const [editingDescription, setEditingDescription] = useState('');
 
     // Load versions when component mounts
     useEffect(() => {
@@ -116,6 +120,30 @@ const VersionTimelinePage = () => {
             console.error('Failed to publish version:', error);
             addNotification('Failed to publish version', 'error');
         }
+    };
+
+    // Inline editing functions
+    const handleStartEditDescription = (version) => {
+        setEditingVersionId(version.id);
+        setEditingDescription(version.description || '');
+    };
+
+    const handleSaveDescription = async (versionId) => {
+        try {
+            await updateVersion(versionId, { description: editingDescription });
+            addNotification('Version description updated successfully', 'success');
+            setEditingVersionId(null);
+            setEditingDescription('');
+            await loadVersions(); // Refresh the list
+        } catch (error) {
+            console.error('Failed to update version description:', error);
+            addNotification('Failed to update version description', 'error');
+        }
+    };
+
+    const handleCancelEditDescription = () => {
+        setEditingVersionId(null);
+        setEditingDescription('');
     };
 
     const getVersionStatusInfo = (version) => {
@@ -351,10 +379,50 @@ const VersionTimelinePage = () => {
                                         <div className="flex-1">
                                             <div className="flex items-center space-x-4 mb-3">
                                                 <div className="flex-1">
-                                                    <h3 className="text-xl font-semibold text-gray-900">
-                                                        {version.description || `Version ${version.version_number}`}
-                                                    </h3>
-                                                    {version.description && (
+                                                    {editingVersionId === version.id ? (
+                                                        <div className="flex items-center space-x-2">
+                                                            <input
+                                                                type="text"
+                                                                value={editingDescription}
+                                                                onChange={(e) => setEditingDescription(e.target.value)}
+                                                                className="text-xl font-semibold text-gray-900 border border-gray-300 rounded-md px-3 py-1 flex-1 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                                placeholder={`Version ${version.version_number}`}
+                                                                autoFocus
+                                                                onKeyDown={(e) => {
+                                                                    if (e.key === 'Enter') {
+                                                                        handleSaveDescription(version.id);
+                                                                    } else if (e.key === 'Escape') {
+                                                                        handleCancelEditDescription();
+                                                                    }
+                                                                }}
+                                                            />
+                                                            <button
+                                                                onClick={() => handleSaveDescription(version.id)}
+                                                                className="p-1 text-green-600 hover:text-green-700 hover:bg-green-50 rounded transition-colors"
+                                                                title="Save description"
+                                                            >
+                                                                <Check className="w-4 h-4" />
+                                                            </button>
+                                                            <button
+                                                                onClick={handleCancelEditDescription}
+                                                                className="p-1 text-gray-600 hover:text-gray-700 hover:bg-gray-50 rounded transition-colors"
+                                                                title="Cancel editing"
+                                                            >
+                                                                <X className="w-4 h-4" />
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <div 
+                                                            className="flex items-center space-x-2 group cursor-pointer"
+                                                            onClick={() => handleStartEditDescription(version)}
+                                                        >
+                                                            <h3 className="text-xl font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
+                                                                {version.description || `Version ${version.version_number}`}
+                                                            </h3>
+                                                            <Edit2 className="w-4 h-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                        </div>
+                                                    )}
+                                                    {version.description && editingVersionId !== version.id && (
                                                         <p className="text-sm text-gray-600 mt-1">
                                                             Version {version.version_number}
                                                         </p>
