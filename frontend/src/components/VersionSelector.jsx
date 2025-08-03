@@ -103,12 +103,10 @@ const VersionSelector = ({
     }
 
     const handleVersionSelect = (versionId) => {
-        console.log('VersionSelector: handleVersionSelect called with versionId:', versionId, 'type:', typeof versionId)
         setIsOpen(false)
         if (onVersionChange) {
             // Convert to number to match original select behavior 
             const numericId = parseInt(versionId)
-            console.log('VersionSelector: calling onVersionChange with numericId:', numericId, 'type:', typeof numericId)
             onVersionChange(numericId)
         } else {
             console.warn('VersionSelector: onVersionChange is not defined')
@@ -127,7 +125,6 @@ const VersionSelector = ({
             {/* Current version display */}
             <button
                 onClick={() => {
-                    console.log('VersionSelector: Toggle button clicked, isOpen:', isOpen)
                     setIsOpen(!isOpen)
                 }}
                 className="flex items-center space-x-2 px-3 py-2 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent min-w-0"

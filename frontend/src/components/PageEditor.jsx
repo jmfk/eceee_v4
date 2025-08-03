@@ -118,8 +118,9 @@ const PageEditor = () => {
     const { data: page, isLoading } = useQuery({
         queryKey: ['page', pageId],
         queryFn: async () => {
-            const response = await api.get(`/api/v1/webpages/pages/${pageId}/`)
-            return response.data
+            // Use getPage function which supports version_id parameter
+            // Always get the latest version initially
+            return await getPage(pageId)
         },
         enabled: !isNewPage
     })
@@ -286,7 +287,7 @@ const PageEditor = () => {
         }
     }, [pageData?.id, isNewPage, showError]);
 
-        // Load versions but preserve current version selection
+    // Load versions but preserve current version selection
     const loadVersionsPreserveCurrent = useCallback(async () => {
         if (!pageData?.id || isNewPage) {
             return;
@@ -294,7 +295,7 @@ const PageEditor = () => {
         try {
             const versionsData = await getPageVersionsList(pageData.id);
             setAvailableVersions(versionsData.versions || []);
-            
+
             // Only set current version if not already set
             if (!currentVersion && versionsData.versions && versionsData.versions.length > 0) {
                 // Find the version with the highest version number (last saved)

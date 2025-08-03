@@ -800,7 +800,7 @@ class LayoutRenderer {
       if (icon.startsWith('svg:')) {
         button.innerHTML = this.createSVGIcon(icon.replace('svg:', ''));
       } else {
-        button.innerHTML = `<span style="font-family: Arial, sans-serif; font-weight: bold;">${this.templateRenderer.escapeHtml(icon)}</span>`;
+        button.innerHTML = `<span style="font-family: Arial, sans-serif; font-weight: bold;">${icon}</span>`;
       }
     } else {
       // Fallback to plus icon if no icon provided
@@ -2258,7 +2258,7 @@ class LayoutRenderer {
       widget.appendChild(header);
     }
 
-        // Add widget content - pass full widgetInstance for template_json access
+    // Add widget content - pass full widgetInstance for template_json access
     const content = await this.renderWidgetContent(type, config, widgetInstance);
     widget.appendChild(content);
 
@@ -2448,7 +2448,7 @@ class LayoutRenderer {
   renderTextWidget(config) {
     const element = document.createElement('div');
     element.className = `text-${config.fontSize || 'medium'} text-${config.alignment || 'left'}`;
-    element.innerHTML = this.templateRenderer.escapeHtml(config.content || 'Enter your text here...');
+    element.textContent = config.content || 'Enter your text here...';
     return element;
   }
 
@@ -4903,7 +4903,7 @@ class LayoutRenderer {
     try {
       const element = document.createElement('div');
       element.className = 'widget-error border border-red-300 bg-red-50 rounded p-3 mb-2';
-      element.innerHTML = `<div class="text-sm text-red-700">Widget Error: ${this.templateRenderer.escapeHtml(message)}</div>`;
+      element.innerHTML = `<div class="text-sm text-red-700">Widget Error: ${message}</div>`;
       return element;
     } catch (error) {
       console.error('LayoutRenderer: Error creating error widget element', error);

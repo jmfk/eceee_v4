@@ -421,8 +421,8 @@ class WebPageViewSet(viewsets.ModelViewSet):
         page_data = serializer.data
 
         # Check if a specific version is requested
-        version_id = request.query_params.get('version_id')
-        
+        version_id = request.query_params.get("version_id")
+
         if version_id:
             try:
                 # Get the specific version
