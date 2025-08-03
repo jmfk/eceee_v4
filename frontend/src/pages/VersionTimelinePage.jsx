@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Calendar, Clock, Eye, Settings, Plus, Edit3 } from 'lucide-react';
 import { getPageVersionsList, scheduleVersion, publishVersionNow } from '../api/versions.js';
+import { getPage } from '../api/pages.js';
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext';
 
 /**
@@ -27,6 +28,7 @@ const VersionTimelinePage = () => {
         expiry_date: ''
     });
     const [pageTitle, setPageTitle] = useState('');
+    const [pageData, setPageData] = useState(null);
 
     // Load versions when component mounts
     useEffect(() => {
@@ -38,9 +40,15 @@ const VersionTimelinePage = () => {
 
         try {
             setIsLoading(true);
-            const versionsData = await getPageVersionsList(pageId);
+            // Load both versions and page data
+            const [versionsData, pageResponse] = await Promise.all([
+                getPageVersionsList(pageId),
+                getPage(pageId)
+            ]);
+            
             setVersions(versionsData.versions || []);
-            setPageTitle(versionsData.page_title || 'Page');
+            setPageTitle(versionsData.page_title || pageResponse.title || 'Page');
+            setPageData(pageResponse);
         } catch (error) {
             console.error('Failed to load versions:', error);
             addNotification('Failed to load versions', 'error');
@@ -179,6 +187,21 @@ const VersionTimelinePage = () => {
                                 <p className="text-sm text-gray-600 mt-1">
                                     {pageTitle} - Schedule and manage when different versions go live
                                 </p>
+                                {pageData && (
+                                    <div className="flex items-center text-xs text-gray-500 mt-2 space-x-2">
+                                        <span className="font-medium">Page URL:</span>
+                                        <a 
+                                            href={buildFullPagePath()} 
+                                            target="_blank" 
+                                            rel="noopener noreferrer"
+                                            className="text-blue-600 hover:text-blue-800 underline font-mono"
+                                        >
+                                            {buildFullPagePath()}
+                                        </a>
+                                        <span className="text-gray-400">•</span>
+                                        <span>ID: {pageData.id}</span>
+                                    </div>
+                                )}
                             </div>
                         </div>
                         <div className="text-sm text-gray-600">
