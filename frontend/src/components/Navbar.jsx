@@ -1,10 +1,12 @@
 import { Link, useLocation } from 'react-router-dom'
+import { useAuth } from '../contexts/AuthContext'
 import { Menu, X, Code, Cpu, Settings } from 'lucide-react'
 import { useState } from 'react'
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false)
   const location = useLocation()
+  const { logout } = useAuth()
 
   const navigation = [
     { name: 'Home', href: '/', icon: Code },
@@ -48,6 +50,14 @@ const Navbar = () => {
                 <span>{item.name}</span>
               </Link>
             ))}
+
+            {/* Logout button */}
+            <button
+              onClick={logout}
+              className="text-gray-600 hover:text-red-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+            >
+              Logout
+            </button>
           </div>
 
           {/* Mobile menu button */}
@@ -83,6 +93,17 @@ const Navbar = () => {
                   <span>{item.name}</span>
                 </Link>
               ))}
+
+              {/* Mobile logout button */}
+              <button
+                onClick={() => {
+                  logout();
+                  setIsOpen(false);
+                }}
+                className="flex items-center space-x-2 px-3 py-2 rounded-md text-base font-medium text-gray-600 hover:text-red-600 transition-colors w-full text-left"
+              >
+                <span>Logout</span>
+              </button>
             </div>
           </div>
         )}
