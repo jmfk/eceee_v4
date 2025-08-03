@@ -45,7 +45,7 @@ const VersionTimelinePage = () => {
                 getPageVersionsList(pageId),
                 getPage(pageId)
             ]);
-            
+
             setVersions(versionsData.versions || []);
             setPageTitle(versionsData.page_title || pageResponse.title || 'Page');
             setPageData(pageResponse);
@@ -60,7 +60,7 @@ const VersionTimelinePage = () => {
     // Helper function to convert ISO datetime to datetime-local format
     const formatForDatetimeLocal = (isoDateString) => {
         if (!isoDateString) return '';
-        
+
         try {
             const date = new Date(isoDateString);
             // Convert to local time and format as YYYY-MM-DDTHH:MM
@@ -69,7 +69,7 @@ const VersionTimelinePage = () => {
             const day = String(date.getDate()).padStart(2, '0');
             const hours = String(date.getHours()).padStart(2, '0');
             const minutes = String(date.getMinutes()).padStart(2, '0');
-            
+
             return `${year}-${month}-${day}T${hours}:${minutes}`;
         } catch (error) {
             console.error('Error formatting date for datetime-local:', error);
@@ -95,7 +95,7 @@ const VersionTimelinePage = () => {
                 effective_date: scheduleData.effective_date ? new Date(scheduleData.effective_date).toISOString() : null,
                 expiry_date: scheduleData.expiry_date ? new Date(scheduleData.expiry_date).toISOString() : null
             };
-            
+
             await scheduleVersion(selectedVersion.id, apiData);
             addNotification('Version scheduled successfully', 'success');
             setShowScheduleDialog(false);
@@ -153,7 +153,7 @@ const VersionTimelinePage = () => {
         // At this point, the version has effective_date <= now and is not expired
         // Check if this version is the currently active published version
         const currentlyPublishedVersion = getCurrentlyPublishedVersion();
-        
+
         if (currentlyPublishedVersion && currentlyPublishedVersion.id === version.id) {
             return {
                 status: 'published',
@@ -186,30 +186,25 @@ const VersionTimelinePage = () => {
     // Helper function to find the currently active published version
     const getCurrentlyPublishedVersion = () => {
         const now = new Date();
-        
-        // Find all versions that are currently "live" (effective_date <= now, not expired)
-        const liveVersions = versions.filter(version => {
-            const effectiveDate = version.effective_date ? new Date(version.effective_date) : null;
-            const expiryDate = version.expiry_date ? new Date(version.expiry_date) : null;
-            
-            // Must have effective date and be active
-            if (!effectiveDate || effectiveDate > now) return false;
-            
-            // Must not be expired
-            if (expiryDate && expiryDate <= now) return false;
-            
-            return true;
-        });
 
-        // Among live versions, return the one with the most recent effective_date
-        if (liveVersions.length === 0) return null;
-        
-        return liveVersions.reduce((latest, current) => {
-            const latestEffective = new Date(latest.effective_date);
-            const currentEffective = new Date(current.effective_date);
-            
-            return currentEffective > latestEffective ? current : latest;
-        });
+        // Find the latest version (by version_number) that is currently published
+        const publishedVersions = versions
+            .filter(version => {
+                const effectiveDate = version.effective_date ? new Date(version.effective_date) : null;
+                const expiryDate = version.expiry_date ? new Date(version.expiry_date) : null;
+
+                // Must have effective date and be active
+                if (!effectiveDate || effectiveDate > now) return false;
+
+                // Must not be expired
+                if (expiryDate && expiryDate <= now) return false;
+
+                return true;
+            })
+            .sort((a, b) => b.version_number - a.version_number); // Sort by version number descending
+
+        // Return the latest version (highest version_number) that's currently published
+        return publishedVersions.length > 0 ? publishedVersions[0] : null;
     };
 
     const formatDate = (dateString) => {
@@ -220,14 +215,14 @@ const VersionTimelinePage = () => {
     // Build full URL path for the page
     const buildFullPagePath = () => {
         if (!pageData) return '';
-        
+
         // Get hostname from root page (inherited context)
         const hostname = getEffectiveHostname(pageData);
-        
+
         // Build the full URL
         const protocol = hostname.includes('localhost') ? 'http://' : 'https://';
         const slug = buildFullSlugPath(pageData);
-        
+
         return `${protocol}${hostname}${slug}`;
     };
 
@@ -237,12 +232,12 @@ const VersionTimelinePage = () => {
         if (page.hostnames && page.hostnames.length > 0) {
             return page.hostnames[0];
         }
-        
+
         // If it has a parent, walk up to find the root page with hostname
         if (page.parent) {
             return getEffectiveHostname(page.parent);
         }
-        
+
         // Fallback if no hostname found anywhere in the hierarchy
         return 'localhost:8000';
     };
@@ -251,7 +246,7 @@ const VersionTimelinePage = () => {
     const buildFullSlugPath = (page) => {
         const slugParts = [];
         let currentPage = page;
-        
+
         // Walk up the hierarchy to build complete path
         while (currentPage) {
             // Include slug only if it's not the root page (has a parent)
@@ -260,12 +255,12 @@ const VersionTimelinePage = () => {
             }
             currentPage = currentPage.parent;
         }
-        
+
         // If no slug parts (root page itself), return root path
         if (slugParts.length === 0) {
             return '/';
         }
-        
+
         // Join with slashes and ensure it starts with /
         return '/' + slugParts.join('/');
     };
@@ -297,9 +292,9 @@ const VersionTimelinePage = () => {
                                 {pageData && (
                                     <div className="flex items-center text-xs text-gray-500 mt-2 space-x-2">
                                         <span className="font-medium">Page URL:</span>
-                                        <a 
-                                            href={buildFullPagePath()} 
-                                            target="_blank" 
+                                        <a
+                                            href={buildFullPagePath()}
+                                            target="_blank"
                                             rel="noopener noreferrer"
                                             className="text-blue-600 hover:text-blue-800 underline font-mono flex items-center space-x-1"
                                         >
