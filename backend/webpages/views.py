@@ -415,32 +415,47 @@ class WebPageViewSet(viewsets.ModelViewSet):
         WebPage.normalize_sort_orders(page.parent_id)
 
     def retrieve(self, request, pk=None):
-        """Override retrieve to include last saved version data with widgets"""
+        """Override retrieve to include version data with widgets"""
         instance = self.get_object()
         serializer = self.get_serializer(instance)
         page_data = serializer.data
 
-        # Get the last saved version (most recent regardless of status)
-        last_saved_version = instance.versions.order_by("-version_number").first()
-        if last_saved_version:
-            # Add last saved version data to the response
-            page_data["widgets"] = last_saved_version.widgets or {}
-            page_data["page_data"] = last_saved_version.page_data or {}
+        # Check if a specific version is requested
+        version_id = request.query_params.get('version_id')
+        
+        if version_id:
+            try:
+                # Get the specific version
+                target_version = instance.versions.get(id=version_id)
+                version_data = target_version
+            except instance.versions.model.DoesNotExist:
+                # If the specified version doesn't exist, fall back to last saved version
+                target_version = instance.versions.order_by("-version_number").first()
+                version_data = target_version
+        else:
+            # Get the last saved version (most recent regardless of status)
+            target_version = instance.versions.order_by("-version_number").first()
+            version_data = target_version
+
+        if target_version:
+            # Add version data to the response
+            page_data["widgets"] = target_version.widgets or {}
+            page_data["page_data"] = target_version.page_data or {}
             page_data["last_saved_version"] = {
-                "version_id": last_saved_version.id,
-                "version_number": last_saved_version.version_number,
-                "is_current_published": last_saved_version.is_current_published(),
-                "publication_status": last_saved_version.get_publication_status(),
-                "description": last_saved_version.description,
-                "created_at": last_saved_version.created_at,
+                "version_id": target_version.id,
+                "version_number": target_version.version_number,
+                "is_current_published": target_version.is_current_published(),
+                "publication_status": target_version.get_publication_status(),
+                "description": target_version.description,
+                "created_at": target_version.created_at,
                 "created_by": (
-                    last_saved_version.created_by.username
-                    if last_saved_version.created_by
+                    target_version.created_by.username
+                    if target_version.created_by
                     else None
                 ),
-                "effective_date": last_saved_version.effective_date,
-                "expiry_date": last_saved_version.expiry_date,
-                "change_summary": last_saved_version.change_summary or {},
+                "effective_date": target_version.effective_date,
+                "expiry_date": target_version.expiry_date,
+                "change_summary": target_version.change_summary or {},
             }
         else:
             # No versions exist yet
