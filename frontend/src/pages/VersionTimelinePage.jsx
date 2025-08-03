@@ -141,7 +141,7 @@ const VersionTimelinePage = () => {
             };
         }
 
-        if (expiryDate && expiryDate < now) {
+        if (expiryDate && expiryDate <= now) {
             return {
                 status: 'expired',
                 label: 'Expired',
@@ -150,12 +150,54 @@ const VersionTimelinePage = () => {
             };
         }
 
+        // Check if this version is the currently active published version
+        const currentlyPublishedVersion = getCurrentlyPublishedVersion();
+        
+        if (currentlyPublishedVersion && currentlyPublishedVersion.id === version.id) {
+            return {
+                status: 'published',
+                label: 'Published',
+                color: 'bg-green-100 text-green-800',
+                description: 'Currently live'
+            };
+        }
+
+        // If it's published but not the current one, it's been superseded
         return {
-            status: 'published',
-            label: 'Published',
-            color: 'bg-green-100 text-green-800',
-            description: 'Currently live'
+            status: 'superseded',
+            label: 'Superseded',
+            color: 'bg-orange-100 text-orange-800',
+            description: 'Published but replaced by newer version'
         };
+    };
+
+    // Helper function to find the currently active published version
+    const getCurrentlyPublishedVersion = () => {
+        const now = new Date();
+        
+        // Find all versions that are currently "live" (effective_date <= now, not expired)
+        const liveVersions = versions.filter(version => {
+            const effectiveDate = version.effective_date ? new Date(version.effective_date) : null;
+            const expiryDate = version.expiry_date ? new Date(version.expiry_date) : null;
+            
+            // Must have effective date and be active
+            if (!effectiveDate || effectiveDate > now) return false;
+            
+            // Must not be expired
+            if (expiryDate && expiryDate <= now) return false;
+            
+            return true;
+        });
+
+        // Among live versions, return the one with the most recent effective_date
+        if (liveVersions.length === 0) return null;
+        
+        return liveVersions.reduce((latest, current) => {
+            const latestEffective = new Date(latest.effective_date);
+            const currentEffective = new Date(current.effective_date);
+            
+            return currentEffective > latestEffective ? current : latest;
+        });
     };
 
     const formatDate = (dateString) => {
