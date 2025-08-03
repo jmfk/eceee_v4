@@ -1,5 +1,6 @@
 import { ChevronLeft, ChevronRight, Trash2, Clock } from 'lucide-react'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
+import VersionSelector from './VersionSelector'
 
 const StatusBar = ({
     showAutoSave = false,
@@ -122,66 +123,22 @@ const StatusBar = ({
                         </>
                     )}
 
-                    {/* Version selector */}
+                                        {/* Version selector */}
                     {availableVersions.length > 0 && (
                         <>
                             <div className="w-px h-4 bg-gray-300 mx-2" />
                             <span className="text-xs text-gray-500">Version:</span>
-                            <select
-                                value={currentVersion?.id || ''}
-                                onChange={(e) => onVersionChange && onVersionChange(parseInt(e.target.value))}
-                                className="text-xs border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-0"
-                            >
-                                {availableVersions.length === 0 && (
-                                    <option value="" disabled>Loading...</option>
-                                )}
-
-                                {/* Latest saved option */}
-                                {availableVersions[0] && (
-                                    <option value={availableVersions[0].id}>
-                                        🚧 {availableVersions[0].description || `Version ${availableVersions[0].version_number}`} {availableVersions[0].description ? `(v${availableVersions[0].version_number})` : ''}
-                                    </option>
-                                )}
-
-                                {/* Published version option */}
-                                {availableVersions.find(v => v.is_current_published) && (
-                                    <option value={availableVersions.find(v => v.is_current_published).id}>
-                                        ✓ {availableVersions.find(v => v.is_current_published).description || `Version ${availableVersions.find(v => v.is_current_published).version_number}`} {availableVersions.find(v => v.is_current_published).description ? `(v${availableVersions.find(v => v.is_current_published).version_number})` : ''}
-                                    </option>
-                                )}
-
-                                {/* Other versions */}
-                                {availableVersions.slice(1).map(version => {
-                                    const publishedVersion = availableVersions.find(v => v.is_current_published);
-                                    if (publishedVersion && version.id === publishedVersion.id) {
-                                        return null; // Skip already added published version
-                                    }
-
-                                    const statusIcon = version.status === 'published' ? '✓' : version.status === 'draft' ? '📝' : '📋';
-                                    const versionName = version.description || `Version ${version.version_number}`;
-                                    const versionNumber = version.description ? ` (v${version.version_number})` : '';
-                                    
-                                    return (
-                                        <option key={version.id} value={version.id}>
-                                            {statusIcon} {versionName}{versionNumber}
-                                        </option>
-                                    );
-                                })}
-                            </select>
-
-                            {currentVersion && (
-                                <span className={`text-xs px-1.5 py-0.5 rounded text-xs ${currentVersion.status === 'published'
-                                    ? 'bg-green-100 text-green-600'
-                                    : 'bg-orange-100 text-orange-600'
-                                    }`}>
-                                    {currentVersion.status === 'published' ? '✓' : '⚠'} {currentVersion.status}
-                                </span>
-                            )}
+                            <VersionSelector
+                                currentVersion={currentVersion}
+                                availableVersions={availableVersions}
+                                onVersionChange={onVersionChange}
+                                className="min-w-48"
+                            />
 
                             {onRefreshVersions && (
                                 <button
                                     onClick={onRefreshVersions}
-                                    className="text-xs text-gray-500 hover:text-gray-700 p-1 rounded hover:bg-gray-100"
+                                    className="text-xs text-gray-500 hover:text-gray-700 p-1 rounded hover:bg-gray-100 ml-2"
                                     title="Refresh versions"
                                 >
                                     ↻
