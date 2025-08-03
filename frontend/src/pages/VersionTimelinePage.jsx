@@ -255,6 +255,7 @@ const VersionTimelinePage = () => {
                         <div className="text-sm text-gray-600">
                             {sortedVersions.filter(v => getVersionStatusInfo(v).status === 'published').length} published • {' '}
                             {sortedVersions.filter(v => getVersionStatusInfo(v).status === 'scheduled').length} scheduled • {' '}
+                            {sortedVersions.filter(v => getVersionStatusInfo(v).status === 'superseded').length} superseded • {' '}
                             {sortedVersions.filter(v => getVersionStatusInfo(v).status === 'draft').length} drafts
                         </div>
                     </div>
