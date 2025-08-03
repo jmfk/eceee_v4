@@ -5088,7 +5088,7 @@ class LayoutRenderer {
     select.appendChild(latestOption);
 
     // Add published version option
-    const publishedVersion = this.pageVersions.find(v => v.status === 'published' && v.is_current);
+                const publishedVersion = this.pageVersions.find(v => v.is_current_published);
     if (publishedVersion) {
       const publishedOption = document.createElement('option');
       publishedOption.value = publishedVersion.id;

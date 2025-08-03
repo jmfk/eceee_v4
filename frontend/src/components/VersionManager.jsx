@@ -172,7 +172,7 @@ const VersionManager = ({ pageId, onClose }) => {
     }
 
     const VersionCard = ({ version }) => (
-        <div className={`border rounded-lg p-4 ${version.is_current ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}>
+                        <div className={`border rounded-lg p-4 ${version.is_current_published ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}>
             <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center space-x-3">
                     <span className="text-lg font-semibold">v{version.version_number}</span>
@@ -182,7 +182,7 @@ const VersionManager = ({ pageId, onClose }) => {
                         }`}>
                         {version.statusBadge.text}
                     </span>
-                    {version.is_current && (
+                    {version.is_current_published && (
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                             Current
                         </span>

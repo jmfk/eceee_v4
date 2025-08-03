@@ -808,7 +808,7 @@ class PageVersionSerializer(serializers.ModelSerializer):
             "publication_status",
             # Legacy fields (marked for removal in Phase 3)
             # "status", - REMOVED: This field no longer exists on PageVersion model
-            "is_current",
+            # "is_current", - REMOVED: This field no longer exists on PageVersion model
             "published_at",
             "published_by",
             # Metadata
@@ -823,7 +823,7 @@ class PageVersionSerializer(serializers.ModelSerializer):
             "is_published",
             "is_current_published",
             "publication_status",
-            "is_current",  # Legacy
+            # "is_current",  # Legacy - REMOVED: This field no longer exists on PageVersion model
             "published_at",  # Legacy
             "published_by",  # Legacy
             "created_at",
@@ -865,7 +865,7 @@ class PageVersionListSerializer(serializers.ModelSerializer):
             "publication_status",
             # Legacy fields (marked for removal in Phase 3)
             # "status", - REMOVED: This field no longer exists on PageVersion model
-            "is_current",
+            # "is_current", - REMOVED: This field no longer exists on PageVersion model
             "published_at",
             "published_by",
             # Metadata
