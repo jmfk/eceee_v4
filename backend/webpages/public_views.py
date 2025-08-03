@@ -27,7 +27,7 @@ class PublishedPageMixin:
     def get_queryset(self):
         """
         NEW: Filter pages that have currently published versions.
-        
+
         A page is published if it has at least one version with:
         - effective_date <= now
         - expiry_date is null OR expiry_date > now
@@ -35,19 +35,20 @@ class PublishedPageMixin:
         # We need to filter pages that have published versions
         # This requires a subquery to check versions
         now = timezone.now()
-        
+
         from .models import PageVersion
-        
+
         # Get pages that have at least one published version
-        published_page_ids = PageVersion.objects.filter(
-            effective_date__lte=now
-        ).filter(
-            Q(expiry_date__isnull=True) | Q(expiry_date__gt=now)
-        ).values_list('page_id', flat=True).distinct()
-        
-        return WebPage.objects.filter(
-            id__in=published_page_ids
-        ).select_related("parent", "theme")
+        published_page_ids = (
+            PageVersion.objects.filter(effective_date__lte=now)
+            .filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
+            .values_list("page_id", flat=True)
+            .distinct()
+        )
+
+        return WebPage.objects.filter(id__in=published_page_ids).select_related(
+            "parent", "theme"
+        )
 
 
 class PageDetailView(PublishedPageMixin, DetailView):
@@ -162,20 +163,22 @@ class PageListView(PublishedPageMixin, ListView):
     def get_queryset(self):
         """Get published root pages using date-based logic"""
         now = timezone.now()
-        
+
         from .models import PageVersion
-        
+
         # Get root pages that have at least one published version
-        published_page_ids = PageVersion.objects.filter(
-            effective_date__lte=now
-        ).filter(
-            Q(expiry_date__isnull=True) | Q(expiry_date__gt=now)
-        ).values_list('page_id', flat=True).distinct()
-        
-        return WebPage.objects.filter(
-            parent__isnull=True,
-            id__in=published_page_ids
-        ).select_related("theme").order_by("sort_order", "title")
+        published_page_ids = (
+            PageVersion.objects.filter(effective_date__lte=now)
+            .filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
+            .values_list("page_id", flat=True)
+            .distinct()
+        )
+
+        return (
+            WebPage.objects.filter(parent__isnull=True, id__in=published_page_ids)
+            .select_related("theme")
+            .order_by("sort_order", "title")
+        )
 
 
 class ObjectDetailView(DetailView):
@@ -216,15 +219,16 @@ class ObjectDetailView(DetailView):
 
         # Check if this object is linked to any published pages
         from .models import PageVersion
-        
+
         # Get pages that have published versions
         now = timezone.now()
-        published_page_ids = PageVersion.objects.filter(
-            effective_date__lte=now
-        ).filter(
-            Q(expiry_date__isnull=True) | Q(expiry_date__gt=now)
-        ).values_list('page_id', flat=True).distinct()
-        
+        published_page_ids = (
+            PageVersion.objects.filter(effective_date__lte=now)
+            .filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
+            .values_list("page_id", flat=True)
+            .distinct()
+        )
+
         linked_pages = WebPage.objects.filter(
             linked_object_type=self.object_type,
             linked_object_id=obj.id,
@@ -304,19 +308,22 @@ def page_sitemap_view(request):
     XML sitemap for published pages using date-based logic.
     """
     now = timezone.now()
-    
+
     from .models import PageVersion
-    
+
     # Get pages that have published versions
-    published_page_ids = PageVersion.objects.filter(
-        effective_date__lte=now
-    ).filter(
-        Q(expiry_date__isnull=True) | Q(expiry_date__gt=now)
-    ).values_list('page_id', flat=True).distinct()
-    
-    pages = WebPage.objects.filter(
-        id__in=published_page_ids
-    ).select_related("theme").order_by("sort_order", "title")
+    published_page_ids = (
+        PageVersion.objects.filter(effective_date__lte=now)
+        .filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
+        .values_list("page_id", flat=True)
+        .distinct()
+    )
+
+    pages = (
+        WebPage.objects.filter(id__in=published_page_ids)
+        .select_related("theme")
+        .order_by("sort_order", "title")
+    )
 
     xml_content = ['<?xml version="1.0" encoding="UTF-8"?>']
     xml_content.append('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">')
@@ -342,20 +349,23 @@ def page_hierarchy_api(request):
     Only includes published pages.
     """
     now = timezone.now()
-    
+
     from .models import PageVersion
-    
+
     # Get root pages that have published versions
-    published_page_ids = PageVersion.objects.filter(
-        effective_date__lte=now
-    ).filter(
-        Q(expiry_date__isnull=True) | Q(expiry_date__gt=now)
-    ).values_list('page_id', flat=True).distinct()
-    
-    root_pages = WebPage.objects.filter(
-        parent__isnull=True,
-        id__in=published_page_ids
-    ).select_related("parent", "theme").prefetch_related("children").order_by("sort_order", "title")
+    published_page_ids = (
+        PageVersion.objects.filter(effective_date__lte=now)
+        .filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
+        .values_list("page_id", flat=True)
+        .distinct()
+    )
+
+    root_pages = (
+        WebPage.objects.filter(parent__isnull=True, id__in=published_page_ids)
+        .select_related("parent", "theme")
+        .prefetch_related("children")
+        .order_by("sort_order", "title")
+    )
 
     serializer = PageHierarchySerializer(
         root_pages, many=True, context={"request": request}
@@ -374,16 +384,17 @@ def page_search_view(request):
         return JsonResponse({"error": "Query too short", "results": []})
 
     now = timezone.now()
-    
+
     from .models import PageVersion
-    
+
     # Get pages that have published versions
-    published_page_ids = PageVersion.objects.filter(
-        effective_date__lte=now
-    ).filter(
-        Q(expiry_date__isnull=True) | Q(expiry_date__gt=now)
-    ).values_list('page_id', flat=True).distinct()
-    
+    published_page_ids = (
+        PageVersion.objects.filter(effective_date__lte=now)
+        .filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
+        .values_list("page_id", flat=True)
+        .distinct()
+    )
+
     pages = WebPage.objects.filter(
         Q(title__icontains=query)
         | Q(description__icontains=query)
@@ -550,10 +561,10 @@ class HostnamePageView(View):
             "widgets": widgets,
             "page_data": page_data,
             "version_number": content.version_number,
-            "status": content.status,
-            "is_current": content.is_current,
-            "published_at": content.published_at,
-            "published_by": content.published_by,
+            "status": content.get_publication_status(),
+            "is_current": content.is_current_published(),
+            "published_at": content.effective_date,
+            "published_by": content.created_by,
         }
 
         if not slug_parts:
@@ -602,10 +613,10 @@ class HostnamePageView(View):
                     context["widgets"] = widgets
                     context["page_data"] = page_data
                     context["version_number"] = content.version_number
-                    context["status"] = content.status
-                    context["is_current"] = content.is_current
-                    context["published_at"] = content.published_at
-                    context["published_by"] = content.published_by
+                    context["status"] = content.get_publication_status()
+                    context["is_current"] = content.is_current_published()
+                    context["published_at"] = content.effective_date
+                    context["published_by"] = content.created_by
                     context["layout"] = current_page.get_effective_layout()
                     context["theme"] = current_page.theme
                     context["parent"] = current_page.parent

@@ -102,15 +102,13 @@ class WebPageFilter(django_filters.FilterSet):
     def filter_is_published(self, queryset, name, value):
         """Filter pages based on current publication status using date-based logic"""
         from django.db.models import Exists, OuterRef
+
         now = timezone.now()
 
         # Subquery to check if page has published versions
         published_version_exists = PageVersion.objects.filter(
-            page=OuterRef('pk'),
-            effective_date__lte=now
-        ).filter(
-            Q(expiry_date__isnull=True) | Q(expiry_date__gt=now)
-        )
+            page=OuterRef("pk"), effective_date__lte=now
+        ).filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
 
         if value:
             return queryset.filter(Exists(published_version_exists))
@@ -123,11 +121,8 @@ class WebPageFilter(django_filters.FilterSet):
 
         # Subquery to check if page has versions active on the specified date
         active_version_exists = PageVersion.objects.filter(
-            page=OuterRef('pk'),
-            effective_date__lte=value
-        ).filter(
-            Q(expiry_date__isnull=True) | Q(expiry_date__gt=value)
-        )
+            page=OuterRef("pk"), effective_date__lte=value
+        ).filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=value))
 
         return queryset.filter(Exists(active_version_exists))
 
@@ -189,19 +184,7 @@ class PageVersionFilter(django_filters.FilterSet):
         field_name="version_number", lookup_expr="lte"
     )
 
-    # Publication filters (date-based)
-    effective_date_after = django_filters.DateTimeFilter(
-        field_name="effective_date", lookup_expr="gte"
-    )
-    effective_date_before = django_filters.DateTimeFilter(
-        field_name="effective_date", lookup_expr="lte"
-    )
-    expiry_date_after = django_filters.DateTimeFilter(
-        field_name="expiry_date", lookup_expr="gte"
-    )
-    expiry_date_before = django_filters.DateTimeFilter(
-        field_name="expiry_date", lookup_expr="lte"
-    )
+    # Publication filters (removed - effective_date and expiry_date are on PageVersion, not WebPage)
 
     # Date filters
     created_after = django_filters.DateTimeFilter(
@@ -287,17 +270,13 @@ class PageVersionFilter(django_filters.FilterSet):
     def filter_is_published(self, queryset, name, value):
         """Filter versions that are published or not using date-based logic"""
         now = timezone.now()
-        
+
         if value:
-            return queryset.filter(
-                effective_date__lte=now
-            ).filter(
+            return queryset.filter(effective_date__lte=now).filter(
                 Q(expiry_date__isnull=True) | Q(expiry_date__gt=now)
             )
         else:
-            return queryset.exclude(
-                effective_date__lte=now
-            ).exclude(
+            return queryset.exclude(effective_date__lte=now).exclude(
                 Q(expiry_date__isnull=True) | Q(expiry_date__gt=now)
             )
 
@@ -322,9 +301,7 @@ class PageVersionFilter(django_filters.FilterSet):
         """Filter to show only published versions using date-based logic"""
         if value:
             now = timezone.now()
-            return queryset.filter(
-                effective_date__lte=now
-            ).filter(
+            return queryset.filter(effective_date__lte=now).filter(
                 Q(expiry_date__isnull=True) | Q(expiry_date__gt=now)
             )
         return queryset
@@ -336,16 +313,16 @@ class PageVersionFilter(django_filters.FilterSet):
             # Get the latest published version for each page
             # This is complex with queryset filtering, so we'll use a simpler approach
             current_version_ids = []
-            
-            for version in queryset.filter(
-                effective_date__lte=now
-            ).filter(
-                Q(expiry_date__isnull=True) | Q(expiry_date__gt=now)
-            ).select_related('page'):
+
+            for version in (
+                queryset.filter(effective_date__lte=now)
+                .filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
+                .select_related("page")
+            ):
                 current_published = version.page.get_current_published_version(now)
                 if current_published and current_published.id == version.id:
                     current_version_ids.append(version.id)
-            
+
             return queryset.filter(id__in=current_version_ids)
         return queryset
 

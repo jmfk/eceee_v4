@@ -145,6 +145,9 @@ class WebPageTreeSerializer(serializers.ModelSerializer):
     """Lightweight serializer for page tree views"""
 
     children_count = serializers.SerializerMethodField()
+    publication_status = serializers.SerializerMethodField()
+    effective_date = serializers.SerializerMethodField()
+    expiry_date = serializers.SerializerMethodField()
 
     class Meta:
         model = WebPage
@@ -163,6 +166,48 @@ class WebPageTreeSerializer(serializers.ModelSerializer):
 
     def get_children_count(self, obj):
         return obj.children.count()
+
+    def get_publication_status(self, obj):
+        """Get the publication status for this page based on its current published version"""
+        current_version = obj.get_current_published_version()
+        if current_version:
+            return current_version.get_publication_status()
+
+        # If no published version exists, check if there are any versions at all
+        latest_version = obj.get_latest_version()
+        if latest_version:
+            return latest_version.get_publication_status()
+
+        # No versions exist
+        return "draft"
+
+    def get_effective_date(self, obj):
+        """Get the effective date from the current published version"""
+        current_version = obj.get_current_published_version()
+        if current_version:
+            return current_version.effective_date
+        return None
+
+    def get_expiry_date(self, obj):
+        """Get the expiry date from the current published version"""
+        current_version = obj.get_current_published_version()
+        if current_version:
+            return current_version.expiry_date
+        return None
+
+    def get_effective_date(self, obj):
+        """Get the effective date from the current published version"""
+        current_version = obj.get_current_published_version()
+        if current_version:
+            return current_version.effective_date
+        return None
+
+    def get_expiry_date(self, obj):
+        """Get the expiry date from the current published version"""
+        current_version = obj.get_current_published_version()
+        if current_version:
+            return current_version.expiry_date
+        return None
 
 
 class WebPageDetailSerializer(serializers.ModelSerializer):
@@ -206,6 +251,9 @@ class WebPageDetailSerializer(serializers.ModelSerializer):
     layout_inheritance_info = serializers.SerializerMethodField()
     available_code_layouts = serializers.SerializerMethodField()
     children_count = serializers.SerializerMethodField()
+    publication_status = serializers.SerializerMethodField()
+    effective_date = serializers.SerializerMethodField()
+    expiry_date = serializers.SerializerMethodField()
 
     # Enhanced CSS injection fields
     effective_css_data = serializers.SerializerMethodField()
@@ -353,6 +401,48 @@ class WebPageDetailSerializer(serializers.ModelSerializer):
     def get_children_count(self, obj):
         return obj.children.count()
 
+    def get_publication_status(self, obj):
+        """Get the publication status for this page based on its current published version"""
+        current_version = obj.get_current_published_version()
+        if current_version:
+            return current_version.get_publication_status()
+
+        # If no published version exists, check if there are any versions at all
+        latest_version = obj.get_latest_version()
+        if latest_version:
+            return latest_version.get_publication_status()
+
+        # No versions exist
+        return "draft"
+
+    def get_effective_date(self, obj):
+        """Get the effective date from the current published version"""
+        current_version = obj.get_current_published_version()
+        if current_version:
+            return current_version.effective_date
+        return None
+
+    def get_expiry_date(self, obj):
+        """Get the expiry date from the current published version"""
+        current_version = obj.get_current_published_version()
+        if current_version:
+            return current_version.expiry_date
+        return None
+
+    def get_effective_date(self, obj):
+        """Get the effective date from the current published version"""
+        current_version = obj.get_current_published_version()
+        if current_version:
+            return current_version.effective_date
+        return None
+
+    def get_expiry_date(self, obj):
+        """Get the expiry date from the current published version"""
+        current_version = obj.get_current_published_version()
+        if current_version:
+            return current_version.expiry_date
+        return None
+
     def get_effective_css_data(self, obj):
         """Get all CSS data for this page"""
         try:
@@ -432,7 +522,7 @@ class WebPageDetailSerializer(serializers.ModelSerializer):
         data = super().to_representation(instance)
 
         # For reading, get widgets from current version
-        current_version = instance.get_current_version()
+        current_version = instance.get_current_published_version()
         data["widgets"] = current_version.widgets if current_version else {}
 
         return data
@@ -450,7 +540,7 @@ class WebPageDetailSerializer(serializers.ModelSerializer):
         # Update page metadata (existing logic)
         updated_instance = super().update(instance, validated_data)
 
-        # Always create a version when data is updated
+        # Handle version creation/update based on options
         # Prefer version_options, fall back to legacy fields
         description = (
             version_options.get("description")
@@ -462,11 +552,20 @@ class WebPageDetailSerializer(serializers.ModelSerializer):
             if version_options
             else legacy_auto_publish if legacy_auto_publish is not None else False
         )
+        create_new_version = version_options.get(
+            "create_new_version", True
+        )  # Default to creating new version
 
-        # Create new version with both page_data and widgets (if any)
-        self._create_unified_version(
-            updated_instance, widgets_data or {}, description, auto_publish
-        )
+        if create_new_version:
+            # Create new version with both page_data and widgets (if any)
+            self._create_unified_version(
+                updated_instance, widgets_data or {}, description, auto_publish
+            )
+        else:
+            # Update existing draft version instead of creating new one
+            self._update_current_version(
+                updated_instance, widgets_data or {}, description, auto_publish
+            )
 
         return updated_instance
 
@@ -485,7 +584,6 @@ class WebPageDetailSerializer(serializers.ModelSerializer):
             "page_css_variables",
             "page_custom_css",
             "enable_css_injection",
-            "publication_status",
             "effective_date",
             "expiry_date",
             "meta_title",
@@ -509,16 +607,82 @@ class WebPageDetailSerializer(serializers.ModelSerializer):
         version = page.create_version(
             user=self.context["request"].user,
             description=description,
-            status="published" if auto_publish else "draft",
-            auto_publish=auto_publish,
         )
 
         # Update version with unified data
         version.page_data = current_page_data
         version.widgets = widgets_data
+
+        # Handle auto_publish - set effective_date to now to make it published
+        if auto_publish:
+            from django.utils import timezone
+
+            version.effective_date = timezone.now()
+
         version.save()
 
         return version
+
+    def _update_current_version(self, page, widgets_data, description, auto_publish):
+        """Update existing draft version instead of creating new one"""
+        from django.utils import timezone
+
+        # Find the latest draft version for this page
+        latest_version = (
+            page.versions.filter(
+                effective_date__isnull=True  # Draft versions have no effective_date
+            )
+            .order_by("-version_number")
+            .first()
+        )
+
+        if not latest_version:
+            # If no draft version exists, create a new one
+            return self._create_unified_version(
+                page, widgets_data, description, auto_publish
+            )
+
+        # Get current page data (same logic as _create_unified_version)
+        page_data_fields = [
+            "title",
+            "slug",
+            "description",
+            "code_layout",
+            "linked_object_type",
+            "linked_object_id",
+            "sort_order",
+            "enable_css_injection",
+            "page_custom_css",
+            "page_css_variables",
+            "meta_title",
+            "meta_description",
+            "meta_keywords",
+        ]
+
+        current_page_data = {}
+        for field in page_data_fields:
+            value = getattr(page, field, None)
+            if value is not None:
+                # Handle datetime fields
+                if field in ["effective_date", "expiry_date"] and hasattr(
+                    value, "isoformat"
+                ):
+                    current_page_data[field] = value.isoformat()
+                else:
+                    current_page_data[field] = value
+
+        # Update existing version
+        latest_version.page_data = current_page_data
+        latest_version.widgets = widgets_data
+        latest_version.description = description
+
+        # Handle auto_publish - set effective_date to now to make it published
+        if auto_publish:
+            latest_version.effective_date = timezone.now()
+
+        latest_version.save()
+
+        return latest_version
 
 
 class WebPageListSerializer(serializers.ModelSerializer):
@@ -531,6 +695,9 @@ class WebPageListSerializer(serializers.ModelSerializer):
     children_count = serializers.SerializerMethodField()
     layout = serializers.SerializerMethodField()
     theme = serializers.SerializerMethodField()
+    publication_status = serializers.SerializerMethodField()
+    effective_date = serializers.SerializerMethodField()
+    expiry_date = serializers.SerializerMethodField()
 
     class Meta:
         model = WebPage
@@ -553,6 +720,7 @@ class WebPageListSerializer(serializers.ModelSerializer):
             "children_count",
             "layout",
             "theme",
+            "publication_status",
         ]
 
     def get_is_published(self, obj):
@@ -569,6 +737,48 @@ class WebPageListSerializer(serializers.ModelSerializer):
         theme = obj.get_effective_theme()
         return PageThemeSerializer(theme).data if theme else None
 
+    def get_publication_status(self, obj):
+        """Get the publication status for this page based on its current published version"""
+        current_version = obj.get_current_published_version()
+        if current_version:
+            return current_version.get_publication_status()
+
+        # If no published version exists, check if there are any versions at all
+        latest_version = obj.get_latest_version()
+        if latest_version:
+            return latest_version.get_publication_status()
+
+        # No versions exist
+        return "draft"
+
+    def get_effective_date(self, obj):
+        """Get the effective date from the current published version"""
+        current_version = obj.get_current_published_version()
+        if current_version:
+            return current_version.effective_date
+        return None
+
+    def get_expiry_date(self, obj):
+        """Get the expiry date from the current published version"""
+        current_version = obj.get_current_published_version()
+        if current_version:
+            return current_version.expiry_date
+        return None
+
+    def get_effective_date(self, obj):
+        """Get the effective date from the current published version"""
+        current_version = obj.get_current_published_version()
+        if current_version:
+            return current_version.effective_date
+        return None
+
+    def get_expiry_date(self, obj):
+        """Get the expiry date from the current published version"""
+        current_version = obj.get_current_published_version()
+        if current_version:
+            return current_version.expiry_date
+        return None
+
 
 class PageVersionSerializer(serializers.ModelSerializer):
     """Serializer for page versions with enhanced workflow support"""
@@ -576,7 +786,7 @@ class PageVersionSerializer(serializers.ModelSerializer):
     page = WebPageTreeSerializer(read_only=True)
     created_by = UserSerializer(read_only=True)
     published_by = UserSerializer(read_only=True)
-    
+
     # New date-based publishing fields (computed)
     is_published = serializers.SerializerMethodField()
     is_current_published = serializers.SerializerMethodField()
@@ -594,7 +804,7 @@ class PageVersionSerializer(serializers.ModelSerializer):
             "effective_date",
             "expiry_date",
             "is_published",
-            "is_current_published", 
+            "is_current_published",
             "publication_status",
             # Legacy fields (marked for removal in Phase 3)
             "status",
@@ -638,7 +848,7 @@ class PageVersionListSerializer(serializers.ModelSerializer):
 
     created_by = UserSerializer(read_only=True)
     published_by = UserSerializer(read_only=True)
-    
+
     # New date-based publishing fields (computed)
     is_published = serializers.SerializerMethodField()
     publication_status = serializers.SerializerMethodField()
@@ -650,7 +860,7 @@ class PageVersionListSerializer(serializers.ModelSerializer):
             "version_number",
             # New date-based publishing fields
             "effective_date",
-            "expiry_date", 
+            "expiry_date",
             "is_published",
             "publication_status",
             # Legacy fields (marked for removal in Phase 3)
@@ -688,6 +898,9 @@ class PageHierarchySerializer(serializers.ModelSerializer):
     """Recursive serializer for complete page hierarchy"""
 
     children = serializers.SerializerMethodField()
+    publication_status = serializers.SerializerMethodField()
+    effective_date = serializers.SerializerMethodField()
+    expiry_date = serializers.SerializerMethodField()
 
     class Meta:
         model = WebPage
@@ -704,7 +917,39 @@ class PageHierarchySerializer(serializers.ModelSerializer):
         ]
 
     def get_children(self, obj):
-        children = obj.children.filter(publication_status="published").order_by(
-            "sort_order", "title"
-        )
-        return PageHierarchySerializer(children, many=True, context=self.context).data
+        # Filter children that are published based on their versions
+        published_children = []
+        for child in obj.children.order_by("sort_order", "title"):
+            if child.is_published():
+                published_children.append(child)
+        return PageHierarchySerializer(
+            published_children, many=True, context=self.context
+        ).data
+
+    def get_publication_status(self, obj):
+        """Get the publication status for this page based on its current published version"""
+        current_version = obj.get_current_published_version()
+        if current_version:
+            return current_version.get_publication_status()
+
+        # If no published version exists, check if there are any versions at all
+        latest_version = obj.get_latest_version()
+        if latest_version:
+            return latest_version.get_publication_status()
+
+        # No versions exist
+        return "draft"
+
+    def get_effective_date(self, obj):
+        """Get the effective date from the current published version"""
+        current_version = obj.get_current_published_version()
+        if current_version:
+            return current_version.effective_date
+        return None
+
+    def get_expiry_date(self, obj):
+        """Get the expiry date from the current published version"""
+        current_version = obj.get_current_published_version()
+        if current_version:
+            return current_version.expiry_date
+        return None
