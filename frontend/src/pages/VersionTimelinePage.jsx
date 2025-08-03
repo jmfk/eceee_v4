@@ -163,6 +163,22 @@ const VersionTimelinePage = () => {
         return new Date(dateString).toLocaleString();
     };
 
+    // Build full URL path for the page
+    const buildFullPagePath = () => {
+        if (!pageData) return '';
+        
+        // Get hostname (first one if multiple)
+        const hostname = pageData.hostnames && pageData.hostnames.length > 0 
+            ? pageData.hostnames[0] 
+            : 'localhost:8000';
+            
+        // Build the full URL
+        const protocol = hostname.includes('localhost') ? 'http://' : 'https://';
+        const slug = pageData.slug || '';
+        
+        return `${protocol}${hostname}/${slug}`;
+    };
+
     // Sort versions by version number (newest first)
     const sortedVersions = [...versions].sort((a, b) => b.version_number - a.version_number);
 
