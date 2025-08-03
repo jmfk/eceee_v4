@@ -49,11 +49,31 @@ const VersionTimelinePage = () => {
         }
     };
 
+    // Helper function to convert ISO datetime to datetime-local format
+    const formatForDatetimeLocal = (isoDateString) => {
+        if (!isoDateString) return '';
+        
+        try {
+            const date = new Date(isoDateString);
+            // Convert to local time and format as YYYY-MM-DDTHH:MM
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            
+            return `${year}-${month}-${day}T${hours}:${minutes}`;
+        } catch (error) {
+            console.error('Error formatting date for datetime-local:', error);
+            return '';
+        }
+    };
+
     const handleScheduleVersion = (version) => {
         setSelectedVersion(version);
         setScheduleData({
-            effective_date: version.effective_date || '',
-            expiry_date: version.expiry_date || ''
+            effective_date: formatForDatetimeLocal(version.effective_date),
+            expiry_date: formatForDatetimeLocal(version.expiry_date)
         });
         setShowScheduleDialog(true);
     };
@@ -62,7 +82,13 @@ const VersionTimelinePage = () => {
         if (!selectedVersion) return;
 
         try {
-            await scheduleVersion(selectedVersion.id, scheduleData);
+            // Convert datetime-local values to ISO format for API
+            const apiData = {
+                effective_date: scheduleData.effective_date ? new Date(scheduleData.effective_date).toISOString() : null,
+                expiry_date: scheduleData.expiry_date ? new Date(scheduleData.expiry_date).toISOString() : null
+            };
+            
+            await scheduleVersion(selectedVersion.id, apiData);
             addNotification('Version scheduled successfully', 'success');
             setShowScheduleDialog(false);
             setSelectedVersion(null);
