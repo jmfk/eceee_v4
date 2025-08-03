@@ -144,12 +144,14 @@ class PublishingService:
         from .models import PageVersion
 
         # Find versions that should be published but aren't yet
-        versions_to_publish = PageVersion.objects.filter(
-            effective_date__lte=now
-        ).filter(
-            # Not currently the published version for their page
-            # We'll check this in the loop for efficiency
-        ).select_related("page", "created_by")
+        versions_to_publish = (
+            PageVersion.objects.filter(effective_date__lte=now)
+            .filter(
+                # Not currently the published version for their page
+                # We'll check this in the loop for efficiency
+            )
+            .select_related("page", "created_by")
+        )
 
         published_count = 0
         errors = []
@@ -160,55 +162,20 @@ class PublishingService:
                 if version.is_published(now) and not version.is_current_published(now):
                     # This version should become the current published version
                     # We don't need complex publishing logic - just update effective_date if needed
-                    
+
                     self.logger.info(
                         f"Version {version.version_number} of page '{version.page.title}' "
                         f"is now published (effective: {version.effective_date})"
                     )
                     published_count += 1
-                    
+
                     # Note: In the new system, versions become published automatically
                     # based on their dates - no manual state changes needed
-                    
+
             except Exception as e:
                 error_msg = f"Failed to process version {version.version_number} of {version.page.title}: {str(e)}"
                 errors.append(error_msg)
                 self.logger.error(error_msg)
-
-        return published_count, errors
-
-    def process_scheduled_publications_legacy(
-        self, now: Optional[timezone.datetime] = None
-    ) -> Tuple[int, List[str]]:
-        """
-        LEGACY: Process pages using old publication_status logic.
-        Will be removed in Phase 3.
-        """
-        if now is None:
-            now = timezone.now()
-
-        from .models import WebPage
-
-        pages_to_publish = WebPage.objects.filter(
-            publication_status="scheduled"
-        ).select_related("created_by", "last_modified_by")
-
-        published_count = 0
-        errors = []
-
-        for page in pages_to_publish:
-            if page.should_be_published_now(now):
-                try:
-                    if page.publish(
-                        self.user,
-                        f'Automatically published at {now.strftime("%Y-%m-%d %H:%M")}',
-                    ):
-                        published_count += 1
-                        self.logger.info(f"Published page: {page.title} (/{page.slug})")
-                except Exception as e:
-                    error_msg = f"Failed to publish {page.title}: {str(e)}"
-                    errors.append(error_msg)
-                    self.logger.error(error_msg)
 
         return published_count, errors
 
@@ -231,8 +198,7 @@ class PublishingService:
 
         # Find versions that should be expired
         versions_to_expire = PageVersion.objects.filter(
-            expiry_date__lte=now,
-            expiry_date__isnull=False
+            expiry_date__lte=now, expiry_date__isnull=False
         ).select_related("page", "created_by")
 
         expired_count = 0
@@ -243,56 +209,20 @@ class PublishingService:
                 # Check if this version was published but is now expired
                 if not version.is_published(now) and version.expiry_date:
                     # This version has expired
-                    
+
                     self.logger.info(
                         f"Version {version.version_number} of page '{version.page.title}' "
                         f"has expired (expiry: {version.expiry_date})"
                     )
                     expired_count += 1
-                    
+
                     # Note: In the new system, versions expire automatically
                     # based on their dates - no manual state changes needed
-                    
+
             except Exception as e:
                 error_msg = f"Failed to process expired version {version.version_number} of {version.page.title}: {str(e)}"
                 errors.append(error_msg)
                 self.logger.error(error_msg)
-
-        return expired_count, errors
-
-    def process_expired_pages_legacy(
-        self, now: Optional[timezone.datetime] = None
-    ) -> Tuple[int, List[str]]:
-        """
-        LEGACY: Process pages using old publication_status logic.
-        Will be removed in Phase 3.
-        """
-        if now is None:
-            now = timezone.now()
-
-        from .models import WebPage
-
-        pages_to_expire = WebPage.objects.filter(
-            publication_status="published"
-        ).select_related("created_by", "last_modified_by")
-
-        expired_count = 0
-        errors = []
-
-        for page in pages_to_expire:
-            if page.should_be_expired_now(now):
-                try:
-                    expiry_note = (
-                        f'Automatically expired at {now.strftime("%Y-%m-%d %H:%M")} '
-                        f'(expiry date: {page.expiry_date.strftime("%Y-%m-%d %H:%M")})'
-                    )
-                    if page.expire(self.user, expiry_note):
-                        expired_count += 1
-                        self.logger.info(f"Expired page: {page.title} (/{page.slug})")
-                except Exception as e:
-                    error_msg = f"Failed to expire {page.title}: {str(e)}"
-                    errors.append(error_msg)
-                    self.logger.error(error_msg)
 
         return expired_count, errors
 
@@ -317,24 +247,24 @@ class PublishingService:
         for page in pages:
             try:
                 # Get or create the latest version for this page
-                latest_version = page.versions.order_by('-version_number').first()
-                
+                latest_version = page.versions.order_by("-version_number").first()
+
                 if not latest_version:
                     # Create a new version if none exists
                     latest_version = page.create_version(
-                        self.user, 
-                        change_summary,
-                        status="draft"  # Legacy field
+                        self.user, change_summary, status="draft"  # Legacy field
                     )
-                
+
                 # Set effective_date to now to publish immediately
                 latest_version.effective_date = timezone.now()
                 # Don't set expiry_date - let it remain null for indefinite publishing
-                latest_version.save(update_fields=['effective_date'])
-                
+                latest_version.save(update_fields=["effective_date"])
+
                 published_count += 1
-                self.logger.info(f"Bulk published page: {page.title} (version {latest_version.version_number})")
-                
+                self.logger.info(
+                    f"Bulk published page: {page.title} (version {latest_version.version_number})"
+                )
+
             except Exception as e:
                 error_msg = f"Failed to bulk publish {page.title}: {str(e)}"
                 errors.append(error_msg)
@@ -394,27 +324,25 @@ class PublishingService:
         for page in pages:
             try:
                 # Get or create the latest version for this page
-                latest_version = page.versions.order_by('-version_number').first()
-                
+                latest_version = page.versions.order_by("-version_number").first()
+
                 if not latest_version:
                     # Create a new version if none exists
                     latest_version = page.create_version(
-                        self.user, 
-                        change_summary,
-                        status="draft"  # Legacy field
+                        self.user, change_summary, status="draft"  # Legacy field
                     )
-                
+
                 # Set the schedule dates
                 latest_version.effective_date = schedule.effective_date
                 latest_version.expiry_date = schedule.expiry_date
-                latest_version.save(update_fields=['effective_date', 'expiry_date'])
-                
+                latest_version.save(update_fields=["effective_date", "expiry_date"])
+
                 scheduled_count += 1
                 self.logger.info(
                     f"Bulk scheduled page: {page.title} (version {latest_version.version_number}) "
                     f"from {schedule.effective_date} to {schedule.expiry_date or 'indefinite'}"
                 )
-                
+
             except Exception as e:
                 error_msg = f"Failed to bulk schedule {page.title}: {str(e)}"
                 errors.append(error_msg)
