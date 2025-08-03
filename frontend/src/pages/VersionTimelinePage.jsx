@@ -33,7 +33,7 @@ const VersionTimelinePage = () => {
     // Inline editing state
     const [editingVersionId, setEditingVersionId] = useState(null);
     const [editingDescription, setEditingDescription] = useState('');
-    
+
     // Pack dialog state
     const [showPackDialog, setShowPackDialog] = useState(false);
     const [packType, setPackType] = useState(null); // 'aggressive' or 'drafts'
@@ -167,17 +167,17 @@ const VersionTimelinePage = () => {
         }
 
         let versionsToDelete = [];
-        
+
         if (type === 'aggressive') {
             // Remove all superseded and draft versions older than current published
-            versionsToDelete = sortedVersions.filter(v => 
-                v.version_number < currentPublished.version_number && 
+            versionsToDelete = sortedVersions.filter(v =>
+                v.version_number < currentPublished.version_number &&
                 v.id !== currentPublished.id
             );
         } else if (type === 'drafts') {
             // Remove only draft versions older than current published
-            versionsToDelete = sortedVersions.filter(v => 
-                v.version_number < currentPublished.version_number && 
+            versionsToDelete = sortedVersions.filter(v =>
+                v.version_number < currentPublished.version_number &&
                 v.id !== currentPublished.id &&
                 !v.effective_date  // Draft versions have no effective_date
             );
@@ -408,7 +408,7 @@ const VersionTimelinePage = () => {
                                 {sortedVersions.filter(v => getVersionStatusInfo(v).status === 'superseded').length} superseded • {' '}
                                 {sortedVersions.filter(v => getVersionStatusInfo(v).status === 'draft').length} drafts
                             </div>
-                            
+
                             {/* Pack Actions */}
                             <div className="flex items-center space-x-2">
                                 <button
@@ -608,12 +608,12 @@ const VersionTimelinePage = () => {
                                 <>
                                     <div className="mb-4">
                                         <p className="text-sm text-gray-600 mb-3">
-                                            {packType === 'aggressive' 
+                                            {packType === 'aggressive'
                                                 ? 'This will permanently delete all superseded and draft versions older than the current published version.'
                                                 : 'This will permanently delete all draft versions older than the current published version.'
                                             }
                                         </p>
-                                        
+
                                         <div className="bg-green-50 border border-green-200 rounded-md p-3 mb-3">
                                             <div className="flex items-center space-x-2 text-sm font-medium text-green-800">
                                                 <CheckCircle className="w-4 h-4" />
