@@ -522,7 +522,14 @@ class LayoutRenderer {
             widget.slotName = slotName;
             const widgetElement = await this.renderWidgetInstance(widget);
             if (widgetElement) {
-              container.appendChild(widgetElement);
+              // Debug: Check if widgetElement is a valid DOM node
+              if (widgetElement instanceof Node) {
+                container.appendChild(widgetElement);
+              } else {
+                console.error(`LayoutRenderer: widgetElement is not a DOM node:`, widgetElement);
+                const errorElement = this.createErrorWidgetElement(`Widget ${index + 1}: Invalid widget element type`);
+                container.appendChild(errorElement);
+              }
             }
           } catch (error) {
             console.error(`LayoutRenderer: Error rendering widget ${index} in slot ${slotName}`, error);
@@ -2260,7 +2267,15 @@ class LayoutRenderer {
 
     // Add widget content - pass full widgetInstance for template_json access
     const content = await this.renderWidgetContent(type, config, widgetInstance);
-    widget.appendChild(content);
+    
+    // Debug: Check if content is a valid DOM node
+    if (content instanceof Node) {
+      widget.appendChild(content);
+    } else {
+      console.error(`LayoutRenderer: renderWidgetContent returned non-DOM node:`, content);
+      const errorElement = this.createErrorWidgetElement(`Widget content error: Invalid content type`);
+      widget.appendChild(errorElement);
+    }
 
     return widget;
   }
