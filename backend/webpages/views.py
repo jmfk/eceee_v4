@@ -429,19 +429,21 @@ class WebPageViewSet(viewsets.ModelViewSet):
                 target_version = instance.versions.get(id=version_id)
                 version_data = target_version
             except instance.versions.model.DoesNotExist:
-                # If the specified version doesn't exist, fall back to last saved version
-                target_version = instance.versions.order_by("-version_number").first()
+                # If the specified version doesn't exist, fall back to active version
+                target_version = self._get_active_version(instance)
                 version_data = target_version
         else:
-            # Get the last saved version (most recent regardless of status)
-            target_version = instance.versions.order_by("-version_number").first()
+            # No version_id provided - determine the active version
+            target_version = self._get_active_version(instance)
             version_data = target_version
 
         if target_version:
             # Add version data to the response
             page_data["widgets"] = target_version.widgets or {}
             page_data["page_data"] = target_version.page_data or {}
-            page_data["last_saved_version"] = {
+
+            # Include both active version info and last saved version info
+            page_data["active_version"] = {
                 "version_id": target_version.id,
                 "version_number": target_version.version_number,
                 "is_current_published": target_version.is_current_published(),
@@ -457,11 +459,16 @@ class WebPageViewSet(viewsets.ModelViewSet):
                 "expiry_date": target_version.expiry_date,
                 "change_summary": target_version.change_summary or {},
             }
+
+            # Maintain backward compatibility
+            page_data["last_saved_version"] = page_data["active_version"]
         else:
             # No versions exist yet
             page_data["widgets"] = {}
             page_data["page_data"] = {}
-            page_data["last_saved_version"] = {
+
+            # Create empty version info
+            empty_version_info = {
                 "version_id": None,
                 "version_number": 0,
                 "is_current_published": False,
@@ -474,7 +481,37 @@ class WebPageViewSet(viewsets.ModelViewSet):
                 "change_summary": {},
             }
 
+            page_data["active_version"] = empty_version_info
+            page_data["last_saved_version"] = empty_version_info
+
         return Response(page_data)
+
+    def _get_active_version(self, instance):
+        """
+        Determine the active version for a page.
+        Priority:
+        1. Currently published version (if exists and active)
+        2. Latest draft version (most recent by version_number)
+        3. None if no versions exist
+        """
+        from django.utils import timezone
+
+        now = timezone.now()
+
+        # First, try to find the currently published version
+        published_version = (
+            instance.versions.filter(effective_date__lte=now)
+            .filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
+            .order_by("-version_number")
+            .first()
+        )
+
+        if published_version:
+            return published_version
+
+        # If no published version, get the latest draft version
+        latest_version = instance.versions.order_by("-version_number").first()
+        return latest_version
 
     def perform_update(self, serializer):
         """Enhanced to handle unified saves (page data + widgets)"""

@@ -57,6 +57,20 @@ export const getPage = async (pageId, versionId = null) => {
     return response.data
 }
 
+// Get a page with explicit active version (current published or latest draft)
+export const getPageActiveVersion = async (pageId) => {
+    // Call without version_id to get the active version as determined by backend
+    return await getPage(pageId)
+}
+
+// Get a page with a specific version
+export const getPageVersion = async (pageId, versionId) => {
+    if (!versionId) {
+        throw new Error('versionId is required for getPageVersion')
+    }
+    return await getPage(pageId, versionId)
+}
+
 
 
 // Create a new page
@@ -152,12 +166,12 @@ export const searchAllPages = async (query, filters = {}) => {
 export const getPagePath = async (pageId) => {
     // This would need to be implemented on the backend
     // For now, we'll build it client-side by walking up the parent chain
-    const page = await getPage(pageId)
+    const page = await getPageActiveVersion(pageId)
     const path = [page]
 
     let current = page
     while (current.parent) {
-        current = await getPage(current.parent.id)
+        current = await getPageActiveVersion(current.parent.id)
         path.unshift(current)
     }
 
