@@ -139,14 +139,14 @@ const StatusBar = ({
                                 {/* Latest saved option */}
                                 {availableVersions[0] && (
                                     <option value={availableVersions[0].id}>
-                                        🚧 Latest
+                                        🚧 {availableVersions[0].description || `Version ${availableVersions[0].version_number}`} {availableVersions[0].description ? `(v${availableVersions[0].version_number})` : ''}
                                     </option>
                                 )}
 
                                 {/* Published version option */}
                                 {availableVersions.find(v => v.is_current_published) && (
                                     <option value={availableVersions.find(v => v.is_current_published).id}>
-                                        ✓ Published
+                                        ✓ {availableVersions.find(v => v.is_current_published).description || `Version ${availableVersions.find(v => v.is_current_published).version_number}`} {availableVersions.find(v => v.is_current_published).description ? `(v${availableVersions.find(v => v.is_current_published).version_number})` : ''}
                                     </option>
                                 )}
 
@@ -158,9 +158,12 @@ const StatusBar = ({
                                     }
 
                                     const statusIcon = version.status === 'published' ? '✓' : version.status === 'draft' ? '📝' : '📋';
+                                    const versionName = version.description || `Version ${version.version_number}`;
+                                    const versionNumber = version.description ? ` (v${version.version_number})` : '';
+                                    
                                     return (
                                         <option key={version.id} value={version.id}>
-                                            {statusIcon} v{version.version_number}
+                                            {statusIcon} {versionName}{versionNumber}
                                         </option>
                                     );
                                 })}
