@@ -43,7 +43,7 @@ class CodeLayoutViewSet(viewsets.ViewSet):
     Provides API endpoints for layout discovery, validation, and management.
     """
 
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    permission_classes = [permissions.IsAuthenticated]
 
     def _get_api_version(self, request):
         """Get API version from request headers or query params"""
@@ -274,7 +274,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
 
     queryset = PageTheme.objects.all()
     serializer_class = PageThemeSerializer
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ["is_active", "created_by"]
     search_fields = ["name", "description"]
@@ -295,7 +295,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
 class WidgetTypeViewSet(viewsets.ViewSet):
     """ViewSet for code-based widget types."""
 
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    permission_classes = [permissions.IsAuthenticated]
 
     def list(self, request):
         """List all registered widget types"""
@@ -361,7 +361,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
         .all()
     )
 
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    permission_classes = [permissions.IsAuthenticated]
     # Rate limiting for hostname management security
     throttle_classes = [UserRateThrottle]
     throttle_scope = "webpage_modifications"
@@ -374,7 +374,6 @@ class WebPageViewSet(viewsets.ModelViewSet):
         "sort_order",
         "created_at",
         "updated_at",
-        "effective_date",
     ]
     ordering = ["sort_order", "title"]
 
@@ -394,9 +393,15 @@ class WebPageViewSet(viewsets.ModelViewSet):
             # For public endpoints, only show published pages to non-staff users
             if not self.request.user.is_staff:
                 now = timezone.now()
-                queryset = queryset.filter(
-                    publication_status="published", effective_date__lte=now
-                ).filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
+                # Get pages that have published versions
+                published_page_ids = (
+                    PageVersion.objects.filter(effective_date__lte=now)
+                    .filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
+                    .values_list("page_id", flat=True)
+                    .distinct()
+                )
+
+                queryset = queryset.filter(id__in=published_page_ids)
 
         return queryset
 
@@ -424,8 +429,8 @@ class WebPageViewSet(viewsets.ModelViewSet):
             page_data["last_saved_version"] = {
                 "version_id": last_saved_version.id,
                 "version_number": last_saved_version.version_number,
-                "is_current": last_saved_version.is_current,
-                "status": last_saved_version.status,
+                "is_current_published": last_saved_version.is_current_published(),
+                "publication_status": last_saved_version.get_publication_status(),
                 "description": last_saved_version.description,
                 "created_at": last_saved_version.created_at,
                 "created_by": (
@@ -433,12 +438,8 @@ class WebPageViewSet(viewsets.ModelViewSet):
                     if last_saved_version.created_by
                     else None
                 ),
-                "published_at": last_saved_version.published_at,
-                "published_by": (
-                    last_saved_version.published_by.username
-                    if last_saved_version.published_by
-                    else None
-                ),
+                "effective_date": last_saved_version.effective_date,
+                "expiry_date": last_saved_version.expiry_date,
                 "change_summary": last_saved_version.change_summary or {},
             }
         else:
@@ -448,13 +449,13 @@ class WebPageViewSet(viewsets.ModelViewSet):
             page_data["last_saved_version"] = {
                 "version_id": None,
                 "version_number": 0,
-                "is_current": False,
-                "status": None,
+                "is_current_published": False,
+                "publication_status": "draft",
                 "description": None,
                 "created_at": None,
                 "created_by": None,
-                "published_at": None,
-                "published_by": None,
+                "effective_date": None,
+                "expiry_date": None,
                 "change_summary": {},
             }
 
@@ -492,11 +493,15 @@ class WebPageViewSet(viewsets.ModelViewSet):
     def published(self, request):
         """Get only published pages"""
         now = timezone.now()
-        published_pages = (
-            self.get_queryset()
-            .filter(publication_status="published", effective_date__lte=now)
+        # Get pages that have published versions
+        published_page_ids = (
+            PageVersion.objects.filter(effective_date__lte=now)
             .filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
+            .values_list("page_id", flat=True)
+            .distinct()
         )
+
+        published_pages = self.get_queryset().filter(id__in=published_page_ids)
 
         page = self.paginate_queryset(published_pages)
         if page is not None:
@@ -512,23 +517,24 @@ class WebPageViewSet(viewsets.ModelViewSet):
         page = self.get_object()
         now = timezone.now()
 
-        page.publication_status = "published"
-        page.effective_date = now
-        page.expiry_date = None
-        page.last_modified_by = request.user
+        # Handle anonymous user for development
+        user = request.user if request.user.is_authenticated else None
+        if user:
+            page.last_modified_by = user
         page.save()
 
         # Create published version
-        page.create_version(
-            request.user, "Published via API", status="published", auto_publish=True
-        )
+        version = page.create_version(user, "Published via API")
+        # Set effective_date to publish immediately
+        version.effective_date = now
+        version.save()
 
         serializer = self.get_serializer(page)
         return Response(
             {
                 "message": "Page published successfully",
-                "effective_date": page.effective_date,
-                "expiry_date": page.expiry_date,
+                "effective_date": version.effective_date,
+                "expiry_date": version.expiry_date,
             },
             status=status.HTTP_200_OK,
         )
@@ -539,21 +545,21 @@ class WebPageViewSet(viewsets.ModelViewSet):
         page = self.get_object()
         now = timezone.now()
 
-        page.publication_status = "unpublished"
-        page.effective_date = None
-        page.expiry_date = now
-        page.last_modified_by = request.user
+        # Handle anonymous user for development
+        user = request.user if request.user.is_authenticated else None
+        if user:
+            page.last_modified_by = user
         page.save()
 
-        # Create version
-        page.create_version(request.user, "Unpublished via API")
+        # Create unpublished version (no effective_date means it's a draft)
+        version = page.create_version(user, "Unpublished via API")
 
         serializer = self.get_serializer(page)
         return Response(
             {
                 "message": "Page unpublished successfully",
-                "effective_date": page.effective_date,
-                "expiry_date": page.expiry_date,
+                "effective_date": version.effective_date,
+                "expiry_date": version.expiry_date,
             },
             status=status.HTTP_200_OK,
         )
@@ -562,7 +568,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
     def versions(self, request, pk=None):
         """Get all versions for this page"""
         page = self.get_object()
-        versions = page.versions.select_related("created_by", "published_by").order_by(
+        versions = page.versions.select_related("created_by").order_by(
             "-version_number"
         )
 
@@ -573,16 +579,15 @@ class WebPageViewSet(viewsets.ModelViewSet):
                     "id": version.id,
                     "version_number": version.version_number,
                     "description": version.description,
-                    "status": version.status,
-                    "is_current": version.is_current,
+                    "publication_status": version.get_publication_status(),
+                    "is_current_published": version.is_current_published(),
                     "created_at": version.created_at,
                     "created_by": (
                         version.created_by.username if version.created_by else None
                     ),
-                    "published_at": version.published_at,
-                    "published_by": (
-                        version.published_by.username if version.published_by else None
-                    ),
+                    "effective_date": version.effective_date,
+                    "expiry_date": version.expiry_date,
+                    "publication_status": version.get_publication_status(),
                     "has_widgets": bool(version.widgets),
                     "widgets_count": len(version.widgets) if version.widgets else 0,
                 }
@@ -593,8 +598,8 @@ class WebPageViewSet(viewsets.ModelViewSet):
                 "page_id": page.id,
                 "page_title": page.title,
                 "current_version": (
-                    page.get_current_version().id
-                    if page.get_current_version()
+                    page.get_current_published_version().id
+                    if page.get_current_published_version()
                     else None
                 ),
                 "total_versions": len(version_data),
@@ -609,9 +614,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
 
         # Validate that the version belongs to this page
         try:
-            version = page.versions.select_related("created_by", "published_by").get(
-                id=version_id
-            )
+            version = page.versions.select_related("created_by").get(id=version_id)
         except PageVersion.DoesNotExist:
             return Response(
                 {"error": f"Version {version_id} not found for page {page.id}"},
@@ -627,17 +630,16 @@ class WebPageViewSet(viewsets.ModelViewSet):
                 "page_title": version.page.title,
                 "widgets": version.widgets or {},
                 "page_data": version.page_data or {},
-                "is_current": version.is_current,
-                "status": version.status,
+                "is_current_published": version.is_current_published(),
+                "publication_status": version.get_publication_status(),
                 "description": version.description,
                 "created_at": version.created_at,
                 "created_by": (
                     version.created_by.username if version.created_by else None
                 ),
-                "published_at": version.published_at,
-                "published_by": (
-                    version.published_by.username if version.published_by else None
-                ),
+                "effective_date": version.effective_date,
+                "expiry_date": version.expiry_date,
+                "publication_status": version.get_publication_status(),
                 "change_summary": version.change_summary or {},
             }
         )
@@ -646,11 +648,9 @@ class WebPageViewSet(viewsets.ModelViewSet):
 class PageVersionViewSet(viewsets.ModelViewSet):
     """ViewSet for page versions with workflow support."""
 
-    queryset = PageVersion.objects.select_related(
-        "page", "created_by", "published_by"
-    ).all()
+    queryset = PageVersion.objects.select_related("page", "created_by").all()
     serializer_class = PageVersionSerializer
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_class = PageVersionFilter
     search_fields = ["title", "description", "change_summary"]
@@ -673,14 +673,16 @@ class PageVersionViewSet(viewsets.ModelViewSet):
         """Publish this version"""
         version = self.get_object()
 
-        if version.status == "published":
+        if version.get_publication_status() == "published":
             return Response(
                 {"error": "Version is already published"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         try:
-            version.publish(request.user)
+            # Handle anonymous user for development
+            user = request.user if request.user.is_authenticated else None
+            version.publish(user)
             serializer = self.get_serializer(version)
             return Response(
                 {
@@ -726,8 +728,8 @@ class PageVersionViewSet(viewsets.ModelViewSet):
                 "page_id": version.page.id,
                 "widgets": version.widgets or {},
                 "page_data": version.page_data or {},
-                "is_current": version.is_current,
-                "status": version.status,
+                "is_current_published": version.is_current_published(),
+                "publication_status": version.get_publication_status(),
                 "description": version.description,
                 "created_at": version.created_at,
                 "created_by": (
@@ -738,7 +740,7 @@ class PageVersionViewSet(viewsets.ModelViewSet):
 
 
 @api_view(["GET"])
-@permission_classes([permissions.IsAuthenticatedOrReadOnly])
+@permission_classes([permissions.IsAuthenticated])
 def layout_json(request, layout_name):
     """
     Return JSON representation of a layout template
@@ -803,7 +805,7 @@ def layout_json(request, layout_name):
 
 
 @api_view(["GET"])
-@permission_classes([permissions.IsAuthenticatedOrReadOnly])
+@permission_classes([permissions.IsAuthenticated])
 def render_page_backend(request, page_id, version_id=None):
     """
     Render a complete WebPage using the backend renderer.
@@ -844,7 +846,10 @@ def render_page_backend(request, page_id, version_id=None):
         if version_id:
             page_version = get_object_or_404(PageVersion, id=version_id, page=page)
             # Check if user can access this version
-            if page_version.status != "published" and not request.user.is_authenticated:
+            if (
+                page_version.get_publication_status() != "published"
+                and not request.user.is_authenticated
+            ):
                 return Response(
                     {"error": "Version not found or not accessible"},
                     status=status.HTTP_404_NOT_FOUND,
@@ -947,7 +952,7 @@ def render_page_preview(request):
         page = get_object_or_404(WebPage, id=page_id)
 
         # Create a mock PageVersion with the provided widget data
-        current_version = page.get_current_version()
+        current_version = page.get_current_published_version()
         if not current_version:
             return Response(
                 {"error": "No current version found for page"},
@@ -961,10 +966,8 @@ def render_page_preview(request):
                 for attr in [
                     "id",
                     "version_number",
-                    "status",
-                    "is_current",
-                    "published_at",
-                    "published_by",
+                    "effective_date",
+                    "expiry_date",
                 ]:
                     setattr(self, attr, getattr(original_version, attr, None))
 
