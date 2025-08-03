@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Calendar, Clock, Eye, Settings, Plus, Edit3, ExternalLink, Edit2, Check, X } from 'lucide-react';
-import { getPageVersionsList, scheduleVersion, publishVersionNow, updateVersion } from '../api/versions.js';
+import { ArrowLeft, Calendar, Clock, Eye, Settings, Plus, Edit3, ExternalLink, Edit2, Check, X, Package, Trash2, AlertTriangle, CheckCircle } from 'lucide-react';
+import { getPageVersionsList, scheduleVersion, publishVersionNow, updateVersion, packVersionsAggressive, packVersionsDrafts } from '../api/versions.js';
 import { getPage } from '../api/pages.js';
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext';
 
@@ -29,10 +29,15 @@ const VersionTimelinePage = () => {
     });
     const [pageTitle, setPageTitle] = useState('');
     const [pageData, setPageData] = useState(null);
-    
+
     // Inline editing state
     const [editingVersionId, setEditingVersionId] = useState(null);
     const [editingDescription, setEditingDescription] = useState('');
+    
+    // Pack dialog state
+    const [showPackDialog, setShowPackDialog] = useState(false);
+    const [packType, setPackType] = useState(null); // 'aggressive' or 'drafts'
+    const [packPreview, setPackPreview] = useState(null);
 
     // Load versions when component mounts
     useEffect(() => {
@@ -144,6 +149,67 @@ const VersionTimelinePage = () => {
     const handleCancelEditDescription = () => {
         setEditingVersionId(null);
         setEditingDescription('');
+    };
+
+    // Pack/cleanup functions
+    const handleShowPackDialog = (type) => {
+        setPackType(type);
+        generatePackPreview(type);
+        setShowPackDialog(true);
+    };
+
+    const generatePackPreview = (type) => {
+        // Find current published version
+        const currentPublished = getCurrentlyPublishedVersion();
+        if (!currentPublished) {
+            setPackPreview({ error: "No currently published version found" });
+            return;
+        }
+
+        let versionsToDelete = [];
+        
+        if (type === 'aggressive') {
+            // Remove all superseded and draft versions older than current published
+            versionsToDelete = sortedVersions.filter(v => 
+                v.version_number < currentPublished.version_number && 
+                v.id !== currentPublished.id
+            );
+        } else if (type === 'drafts') {
+            // Remove only draft versions older than current published
+            versionsToDelete = sortedVersions.filter(v => 
+                v.version_number < currentPublished.version_number && 
+                v.id !== currentPublished.id &&
+                !v.effective_date  // Draft versions have no effective_date
+            );
+        }
+
+        setPackPreview({
+            currentPublished,
+            versionsToDelete,
+            type
+        });
+    };
+
+    const handleExecutePack = async () => {
+        if (!packPreview || packPreview.error) return;
+
+        try {
+            let result;
+            if (packType === 'aggressive') {
+                result = await packVersionsAggressive(pageId);
+            } else if (packType === 'drafts') {
+                result = await packVersionsDrafts(pageId);
+            }
+
+            addNotification(`${result.message}`, 'success');
+            setShowPackDialog(false);
+            setPackType(null);
+            setPackPreview(null);
+            await loadVersions(); // Refresh the list
+        } catch (error) {
+            console.error('Failed to pack versions:', error);
+            addNotification('Failed to pack versions', 'error');
+        }
     };
 
     const getVersionStatusInfo = (version) => {
@@ -335,11 +401,33 @@ const VersionTimelinePage = () => {
                                 )}
                             </div>
                         </div>
-                        <div className="text-sm text-gray-600">
-                            {sortedVersions.filter(v => getVersionStatusInfo(v).status === 'published').length} published • {' '}
-                            {sortedVersions.filter(v => getVersionStatusInfo(v).status === 'scheduled').length} scheduled • {' '}
-                            {sortedVersions.filter(v => getVersionStatusInfo(v).status === 'superseded').length} superseded • {' '}
-                            {sortedVersions.filter(v => getVersionStatusInfo(v).status === 'draft').length} drafts
+                        <div className="flex items-center space-x-6">
+                            <div className="text-sm text-gray-600">
+                                {sortedVersions.filter(v => getVersionStatusInfo(v).status === 'published').length} published • {' '}
+                                {sortedVersions.filter(v => getVersionStatusInfo(v).status === 'scheduled').length} scheduled • {' '}
+                                {sortedVersions.filter(v => getVersionStatusInfo(v).status === 'superseded').length} superseded • {' '}
+                                {sortedVersions.filter(v => getVersionStatusInfo(v).status === 'draft').length} drafts
+                            </div>
+                            
+                            {/* Pack Actions */}
+                            <div className="flex items-center space-x-2">
+                                <button
+                                    onClick={() => handleShowPackDialog('drafts')}
+                                    className="flex items-center space-x-1 px-3 py-1 text-xs font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
+                                    title="Remove old draft versions"
+                                >
+                                    <Package className="w-3 h-3" />
+                                    <span>Pack Drafts</span>
+                                </button>
+                                <button
+                                    onClick={() => handleShowPackDialog('aggressive')}
+                                    className="flex items-center space-x-1 px-3 py-1 text-xs font-medium text-orange-700 bg-orange-100 rounded-md hover:bg-orange-200 transition-colors"
+                                    title="Remove all old versions (drafts and superseded)"
+                                >
+                                    <Trash2 className="w-3 h-3" />
+                                    <span>Pack All</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -412,7 +500,7 @@ const VersionTimelinePage = () => {
                                                             </button>
                                                         </div>
                                                     ) : (
-                                                        <div 
+                                                        <div
                                                             className="flex items-center space-x-2 group cursor-pointer"
                                                             onClick={() => handleStartEditDescription(version)}
                                                         >
@@ -499,6 +587,95 @@ const VersionTimelinePage = () => {
                     </div>
                 )}
             </div>
+
+            {/* Pack Confirmation Dialog */}
+            {showPackDialog && packPreview && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4">
+                        <div className="p-6">
+                            <div className="flex items-center space-x-3 mb-4">
+                                <AlertTriangle className="w-6 h-6 text-orange-600" />
+                                <h3 className="text-lg font-medium text-gray-900">
+                                    {packType === 'aggressive' ? 'Pack All Old Versions' : 'Pack Old Drafts'}
+                                </h3>
+                            </div>
+
+                            {packPreview.error ? (
+                                <div className="text-red-600 mb-4">
+                                    {packPreview.error}
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="mb-4">
+                                        <p className="text-sm text-gray-600 mb-3">
+                                            {packType === 'aggressive' 
+                                                ? 'This will permanently delete all superseded and draft versions older than the current published version.'
+                                                : 'This will permanently delete all draft versions older than the current published version.'
+                                            }
+                                        </p>
+                                        
+                                        <div className="bg-green-50 border border-green-200 rounded-md p-3 mb-3">
+                                            <div className="flex items-center space-x-2 text-sm font-medium text-green-800">
+                                                <CheckCircle className="w-4 h-4" />
+                                                <span>Will Keep (Current Published):</span>
+                                            </div>
+                                            <div className="text-sm text-green-700 ml-6">
+                                                v{packPreview.currentPublished.version_number}: {packPreview.currentPublished.description || 'No description'}
+                                            </div>
+                                        </div>
+
+                                        {packPreview.versionsToDelete.length > 0 ? (
+                                            <div className="bg-red-50 border border-red-200 rounded-md p-3">
+                                                <div className="flex items-center space-x-2 text-sm font-medium text-red-800 mb-2">
+                                                    <Trash2 className="w-4 h-4" />
+                                                    <span>Will Delete ({packPreview.versionsToDelete.length} versions):</span>
+                                                </div>
+                                                <div className="space-y-1 ml-6 max-h-32 overflow-y-auto">
+                                                    {packPreview.versionsToDelete.map(version => {
+                                                        const statusInfo = getVersionStatusInfo(version);
+                                                        return (
+                                                            <div key={version.id} className="text-sm text-red-700 flex items-center space-x-2">
+                                                                <span className={`px-2 py-0.5 text-xs rounded-full ${statusInfo.color}`}>
+                                                                    {statusInfo.label}
+                                                                </span>
+                                                                <span>
+                                                                    v{version.version_number}: {version.description || 'No description'}
+                                                                </span>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="bg-gray-50 border border-gray-200 rounded-md p-3">
+                                                <div className="text-sm text-gray-600">
+                                                    No versions to delete with the selected criteria.
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="flex items-center justify-end space-x-3">
+                                        <button
+                                            onClick={() => setShowPackDialog(false)}
+                                            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={handleExecutePack}
+                                            disabled={packPreview.versionsToDelete.length === 0}
+                                            className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+                                        >
+                                            {packType === 'aggressive' ? 'Delete All Old Versions' : 'Delete Old Drafts'}
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Schedule Dialog */}
             {showScheduleDialog && selectedVersion && (

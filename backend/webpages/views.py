@@ -738,6 +738,147 @@ class PageVersionViewSet(viewsets.ModelViewSet):
             }
         )
 
+    @action(detail=False, methods=["post"], url_path="pack-aggressive")
+    def pack_aggressive(self, request):
+        """Remove all superseded and draft versions older than current published"""
+        page_id = request.data.get('page_id')
+        if not page_id:
+            return Response(
+                {"error": "page_id is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            page = WebPage.objects.get(id=page_id)
+            
+            # Find the current published version
+            current_published = None
+            for version in page.versions.all():
+                if version.is_current_published():
+                    current_published = version
+                    break
+            
+            if not current_published:
+                return Response(
+                    {"error": "No currently published version found"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            
+            # Find versions to delete (superseded and drafts older than current published)
+            versions_to_delete = page.versions.filter(
+                version_number__lt=current_published.version_number
+            ).exclude(
+                id=current_published.id
+            )
+            
+            # Count for response
+            deleted_count = versions_to_delete.count()
+            deleted_versions = [
+                {
+                    'id': v.id,
+                    'version_number': v.version_number,
+                    'description': v.description,
+                    'status': v.get_publication_status()
+                }
+                for v in versions_to_delete
+            ]
+            
+            # Delete the versions
+            versions_to_delete.delete()
+            
+            return Response({
+                "message": f"Successfully removed {deleted_count} old versions",
+                "deleted_count": deleted_count,
+                "deleted_versions": deleted_versions,
+                "kept_current_published": {
+                    'id': current_published.id,
+                    'version_number': current_published.version_number,
+                    'description': current_published.description
+                }
+            })
+            
+        except WebPage.DoesNotExist:
+            return Response(
+                {"error": "Page not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        except Exception as e:
+            return Response(
+                {"error": f"Pack operation failed: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+    @action(detail=False, methods=["post"], url_path="pack-drafts")
+    def pack_drafts(self, request):
+        """Remove only draft versions older than current published"""
+        page_id = request.data.get('page_id')
+        if not page_id:
+            return Response(
+                {"error": "page_id is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            page = WebPage.objects.get(id=page_id)
+            
+            # Find the current published version
+            current_published = None
+            for version in page.versions.all():
+                if version.is_current_published():
+                    current_published = version
+                    break
+            
+            if not current_published:
+                return Response(
+                    {"error": "No currently published version found"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            
+            # Find draft versions to delete (only drafts older than current published)
+            versions_to_delete = page.versions.filter(
+                version_number__lt=current_published.version_number,
+                effective_date__isnull=True  # Draft versions have no effective_date
+            ).exclude(
+                id=current_published.id
+            )
+            
+            # Count for response
+            deleted_count = versions_to_delete.count()
+            deleted_versions = [
+                {
+                    'id': v.id,
+                    'version_number': v.version_number,
+                    'description': v.description,
+                    'status': v.get_publication_status()
+                }
+                for v in versions_to_delete
+            ]
+            
+            # Delete the versions
+            versions_to_delete.delete()
+            
+            return Response({
+                "message": f"Successfully removed {deleted_count} old draft versions",
+                "deleted_count": deleted_count,
+                "deleted_versions": deleted_versions,
+                "kept_current_published": {
+                    'id': current_published.id,
+                    'version_number': current_published.version_number,
+                    'description': current_published.description
+                }
+            })
+            
+        except WebPage.DoesNotExist:
+            return Response(
+                {"error": "Page not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        except Exception as e:
+            return Response(
+                {"error": f"Pack operation failed: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
 
 @api_view(["GET"])
 @permission_classes([permissions.IsAuthenticated])
