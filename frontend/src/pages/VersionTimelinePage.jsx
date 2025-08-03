@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Calendar, Clock, Eye, Settings, Plus, Edit3 } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, Eye, Settings, Plus, Edit3, ExternalLink } from 'lucide-react';
 import { getPageVersionsList, scheduleVersion, publishVersionNow } from '../api/versions.js';
 import { getPage } from '../api/pages.js';
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext';
@@ -210,9 +210,10 @@ const VersionTimelinePage = () => {
                                             href={buildFullPagePath()} 
                                             target="_blank" 
                                             rel="noopener noreferrer"
-                                            className="text-blue-600 hover:text-blue-800 underline font-mono"
+                                            className="text-blue-600 hover:text-blue-800 underline font-mono flex items-center space-x-1"
                                         >
-                                            {buildFullPagePath()}
+                                            <span>{buildFullPagePath()}</span>
+                                            <ExternalLink className="w-3 h-3" />
                                         </a>
                                         <span className="text-gray-400">•</span>
                                         <span>ID: {pageData.id}</span>
