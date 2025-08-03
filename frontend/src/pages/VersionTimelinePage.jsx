@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Calendar, Clock, Eye, Settings, Plus, Edit3, ExternalLink, Edit2, Check, X, Package, Trash2, AlertTriangle, CheckCircle } from 'lucide-react';
 import { getPageVersionsList, scheduleVersion, publishVersionNow, updateVersion, packVersionsAggressive, packVersionsDrafts } from '../api/versions.js';
-import { getPage } from '../api/pages.js';
+import { getPage, getPageActiveVersion } from '../api/pages.js';
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext';
 
 /**
@@ -52,7 +52,7 @@ const VersionTimelinePage = () => {
             // Load both versions and page data
             const [versionsData, pageResponse] = await Promise.all([
                 getPageVersionsList(pageId),
-                getPage(pageId)
+                getPageActiveVersion(pageId)
             ]);
 
             setVersions(versionsData.versions || []);

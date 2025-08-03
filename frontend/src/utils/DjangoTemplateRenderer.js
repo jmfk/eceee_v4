@@ -226,6 +226,21 @@ class DjangoTemplateRenderer {
                     const val = value || '';
                     return String(Array.isArray(val) ? val.length : String(val).length);
 
+                case 'yesno':
+                    // Django yesno filter: returns "yes", "no", or custom values based on truthiness
+                    // Usage: {{ value|yesno:"yes,no,maybe" }} or {{ value|yesno }}
+                    const yesnoMapping = filterArg ? filterArg.split(',') : ['yes', 'no'];
+                    const isTruthy = Boolean(value);
+                    const isNull = value === null || value === undefined;
+
+                    if (yesnoMapping.length >= 3 && isNull) {
+                        return yesnoMapping[2]; // "maybe" value for null/undefined
+                    } else if (isTruthy) {
+                        return yesnoMapping[0] || 'yes'; // "yes" value
+                    } else {
+                        return yesnoMapping[1] || 'no'; // "no" value
+                    }
+
                 default:
                     if (this.debug) {
                         console.warn(`DjangoTemplateRenderer: Unhandled template filter: ${filterName}`);

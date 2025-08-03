@@ -225,6 +225,27 @@ class TemplateParser:
                 }
             return None
 
+        # Handle script tags - remove and replace with error message
+        if element.name == "script":
+            script_content = element.get_text().strip()
+            logger.warning(
+                f"Script tag detected and removed from template. Content preview: {script_content[:100]}..."
+            )
+            return {
+                "type": "element",
+                "tag": "div",
+                "classes": "error-message script-blocked",
+                "attributes": {
+                    "style": "background-color: #ffe6e6; border: 1px solid #ff9999; padding: 10px; margin: 5px 0; border-radius: 4px; color: #cc0000;"
+                },
+                "children": [
+                    {
+                        "type": "text",
+                        "content": "⚠️ Script tag was removed for security reasons",
+                    }
+                ],
+            }
+
         # Regular HTML element
         node = {"type": "element", "tag": element.name}
 
@@ -429,20 +450,22 @@ class WidgetTemplateParser:
             # Parse the attribute content to extract attribute name and value
             # Handle cases like: target="_blank" rel="noopener noreferrer"
             # or single attributes like: disabled
-            
+
             # Validate attribute content structure before processing
             if not self._validate_attribute_content(attribute_content):
                 logger.warning(
                     f"Invalid attribute content in inline conditional: {attribute_content[:50]}"
                 )
                 return f"<!-- Invalid attribute content: {escape(attribute_content[:30])} -->"
-            
+
             # Use double escaping for security - escaped once here, validated before decoding in frontend
             escaped_condition = escape(condition)
             escaped_content = escape(attribute_content)
-            
+
             # Add validation marker to help frontend verify content integrity
-            content_hash = hash(f"{condition}|{attribute_content}") & 0x7FFFFFFF  # Positive hash
+            content_hash = (
+                hash(f"{condition}|{attribute_content}") & 0x7FFFFFFF
+            )  # Positive hash
             return f'data-conditional-attrs="{escaped_condition}|{escaped_content}" data-conditional-hash="{content_hash}"'
 
         # Apply transformations - process inline conditionals first, then block conditionals
@@ -531,19 +554,19 @@ class WidgetTemplateParser:
     def _validate_attribute_content(self, attribute_content: str) -> bool:
         """
         Validate that attribute content is safe and well-formed
-        
+
         Args:
             attribute_content: The attribute content to validate
-            
+
         Returns:
             True if content is safe, False otherwise
         """
         if not attribute_content or len(attribute_content) > 300:  # Reasonable limit
             return False
-            
+
         # Strip whitespace for validation
         content = attribute_content.strip()
-        
+
         # Check for dangerous patterns
         dangerous_patterns = [
             "<script",  # Script tags
@@ -558,18 +581,18 @@ class WidgetTemplateParser:
             "eval(",  # JavaScript eval
             "\\",  # Backslash escapes
         ]
-        
+
         content_lower = content.lower()
         for pattern in dangerous_patterns:
             if pattern in content_lower:
                 return False
-        
+
         # Validate attribute structure: either key="value" pairs or simple attribute names
         # Allow: target="_blank", rel="noopener", disabled, data-test="value"
         attribute_pattern = re.compile(
             r'^[a-zA-Z][\w-]*(?:\s*=\s*"[^"<>]*")?(?:\s+[a-zA-Z][\w-]*(?:\s*=\s*"[^"<>]*")?)*$'
         )
-        
+
         return bool(attribute_pattern.match(content))
 
     def parse_widget_template(self, template_name: str) -> Dict[str, Any]:
@@ -684,6 +707,27 @@ class WidgetTemplateParser:
                 "type": "style",
                 "css": escape(css_content),
                 "variables": self.template_variable_pattern.findall(css_content),
+            }
+
+        # Handle script tags - remove and replace with error message
+        if element.name == "script":
+            script_content = element.get_text().strip()
+            logger.warning(
+                f"Script tag detected and removed from widget template. Content preview: {script_content[:100]}..."
+            )
+            return {
+                "type": "element",
+                "tag": "div",
+                "classes": "error-message script-blocked",
+                "attributes": {
+                    "style": "background-color: #ffe6e6; border: 1px solid #ff9999; padding: 10px; margin: 5px 0; border-radius: 4px; color: #cc0000;"
+                },
+                "children": [
+                    {
+                        "type": "text",
+                        "content": "⚠️ Script tag was removed for security reasons",
+                    }
+                ],
             }
 
         # Handle template-conditional elements (converted from {% if %} blocks)

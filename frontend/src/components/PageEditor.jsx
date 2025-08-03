@@ -19,14 +19,14 @@ import {
     Calendar
 } from 'lucide-react'
 import { api } from '../api/client.js'
-import { savePageWithWidgets, getPage } from '../api/pages.js'
+import { savePageWithWidgets, getPage, getPageActiveVersion, getPageVersion } from '../api/pages.js'
 import { useNotificationContext } from './NotificationManager'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import ContentEditor from './ContentEditor'
 import LayoutSelector from './LayoutSelector'
 import StatusBar from './StatusBar'
 import SaveOptionsModal from './SaveOptionsModal'
-import { getPageVersion, getPageVersionsList } from '../api/versions.js'
+import { getPageVersionsList } from '../api/versions.js'
 
 /**
  * PageEditor - Unified Page State Architecture
@@ -118,9 +118,8 @@ const PageEditor = () => {
     const { data: page, isLoading } = useQuery({
         queryKey: ['page', pageId],
         queryFn: async () => {
-            // Use getPage function which supports version_id parameter
-            // Always get the latest version initially
-            return await getPage(pageId)
+            // Get the active version (current published or latest draft)
+            return await getPageActiveVersion(pageId)
         },
         enabled: !isNewPage
     })
@@ -310,7 +309,7 @@ const PageEditor = () => {
                 });
             } else if (currentVersion) {
                 // If we have a current version, reload the page data with that version
-                const newPage = await getPage(pageData.id, currentVersion.id);
+                const newPage = await getPageVersion(pageData.id, currentVersion.id);
                 setPageData(prev => {
                     return { ...prev, ...newPage };
                 });
