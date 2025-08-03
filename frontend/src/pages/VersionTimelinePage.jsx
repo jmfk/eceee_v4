@@ -223,9 +223,16 @@ const VersionTimelinePage = () => {
                                     <div className="flex items-start justify-between">
                                         <div className="flex-1">
                                             <div className="flex items-center space-x-4 mb-3">
-                                                <h3 className="text-xl font-semibold text-gray-900">
-                                                    Version {version.version_number}
-                                                </h3>
+                                                <div className="flex-1">
+                                                    <h3 className="text-xl font-semibold text-gray-900">
+                                                        {version.description || `Version ${version.version_number}`}
+                                                    </h3>
+                                                    {version.description && (
+                                                        <p className="text-sm text-gray-600 mt-1">
+                                                            Version {version.version_number}
+                                                        </p>
+                                                    )}
+                                                </div>
                                                 <span className={`px-3 py-1 text-sm font-medium rounded-full ${statusInfo.color}`}>
                                                     {statusInfo.label}
                                                 </span>
@@ -235,12 +242,6 @@ const VersionTimelinePage = () => {
                                                     </span>
                                                 )}
                                             </div>
-
-                                            {version.description && (
-                                                <p className="text-gray-700 mb-4 text-lg">
-                                                    "{version.description}"
-                                                </p>
-                                            )}
 
                                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-4">
                                                 <div>
@@ -310,7 +311,12 @@ const VersionTimelinePage = () => {
                     <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
                         <div className="p-6">
                             <h3 className="text-lg font-medium text-gray-900 mb-4">
-                                Schedule Version {selectedVersion.version_number}
+                                Schedule {selectedVersion.description || `Version ${selectedVersion.version_number}`}
+                                {selectedVersion.description && (
+                                    <span className="text-sm text-gray-600 block font-normal mt-1">
+                                        Version {selectedVersion.version_number}
+                                    </span>
+                                )}
                             </h3>
 
                             <div className="space-y-4">
