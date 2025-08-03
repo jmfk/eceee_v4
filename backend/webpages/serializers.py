@@ -555,6 +555,7 @@ class WebPageDetailSerializer(serializers.ModelSerializer):
         create_new_version = version_options.get(
             "create_new_version", True
         )  # Default to creating new version
+        current_version_id = version_options.get("current_version_id", None)
 
         if create_new_version:
             # Create new version with both page_data and widgets (if any)
@@ -562,9 +563,9 @@ class WebPageDetailSerializer(serializers.ModelSerializer):
                 updated_instance, widgets_data or {}, description, auto_publish
             )
         else:
-            # Update existing draft version instead of creating new one
+            # Update existing version instead of creating new one
             self._update_current_version(
-                updated_instance, widgets_data or {}, description, auto_publish
+                updated_instance, widgets_data or {}, description, auto_publish, current_version_id
             )
 
         return updated_instance
@@ -623,20 +624,31 @@ class WebPageDetailSerializer(serializers.ModelSerializer):
 
         return version
 
-    def _update_current_version(self, page, widgets_data, description, auto_publish):
-        """Update existing draft version instead of creating new one"""
+    def _update_current_version(self, page, widgets_data, description, auto_publish, current_version_id=None):
+        """Update existing version instead of creating new one"""
         from django.utils import timezone
 
-        # Find the latest draft version for this page
-        latest_version = (
-            page.versions.filter(
-                effective_date__isnull=True  # Draft versions have no effective_date
-            )
-            .order_by("-version_number")
-            .first()
-        )
+        # If a specific version ID is provided, use that version
+        if current_version_id:
+            try:
+                target_version = page.versions.get(id=current_version_id)
+            except page.versions.model.DoesNotExist:
+                # If the specified version doesn't exist, fall back to latest draft
+                target_version = None
+        else:
+            target_version = None
 
-        if not latest_version:
+        # If no specific version or it doesn't exist, find the latest draft version
+        if not target_version:
+            target_version = (
+                page.versions.filter(
+                    effective_date__isnull=True  # Draft versions have no effective_date
+                )
+                .order_by("-version_number")
+                .first()
+            )
+
+        if not target_version:
             # If no draft version exists, create a new one
             return self._create_unified_version(
                 page, widgets_data, description, auto_publish
@@ -672,17 +684,17 @@ class WebPageDetailSerializer(serializers.ModelSerializer):
                     current_page_data[field] = value
 
         # Update existing version
-        latest_version.page_data = current_page_data
-        latest_version.widgets = widgets_data
-        latest_version.description = description
+        target_version.page_data = current_page_data
+        target_version.widgets = widgets_data
+        target_version.description = description
 
         # Handle auto_publish - set effective_date to now to make it published
         if auto_publish:
-            latest_version.effective_date = timezone.now()
+            target_version.effective_date = timezone.now()
 
-        latest_version.save()
+        target_version.save()
 
-        return latest_version
+        return target_version
 
 
 class WebPageListSerializer(serializers.ModelSerializer):

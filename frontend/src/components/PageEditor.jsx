@@ -401,7 +401,8 @@ const PageEditor = () => {
                 {
                     description: saveOptions.description || 'Unified save from page editor',
                     autoPublish: false,
-                    createNewVersion: saveOptions.option === 'new'
+                    createNewVersion: saveOptions.option === 'new',  // Only create new version if user chose 'new'
+                    currentVersionId: saveOptions.option === 'update' ? currentVersion?.id : null  // Pass current version ID for updates
                 }
             );
             // Update UI state with response - preserve widgets and version data structure
