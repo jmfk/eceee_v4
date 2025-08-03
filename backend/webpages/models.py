@@ -1440,7 +1440,8 @@ class PageVersion(models.Model):
 
         # Apply the stored page data to the page
         self._apply_version_data()
-        self.page.last_modified_by = user
+        if user:  # Only set last_modified_by if user is provided
+            self.page.last_modified_by = user
         self.page.save()
 
         return self
