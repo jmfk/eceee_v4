@@ -15,7 +15,8 @@ import {
     Palette,
     ChevronLeft,
     ChevronRight,
-    Trash2
+    Trash2,
+    Calendar
 } from 'lucide-react'
 import { api } from '../api/client.js'
 import { savePageWithWidgets } from '../api/pages.js'
@@ -24,18 +25,32 @@ import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import ContentEditor from './ContentEditor'
 import LayoutSelector from './LayoutSelector'
 import StatusBar from './StatusBar'
+import SaveOptionsModal from './SaveOptionsModal'
+import { getPageVersion, getPageVersionsList } from '../api/versions.js'
 
 /**
  * PageEditor - Unified Page State Architecture
  * 
  * Data Structure:
- * - pageData: Complete current page state (metadata + widgets + version_data)
- * - availableVersions: List of available version metadata
+ * - pageData: Unified page state with flat structure:
+ *   {
+ *     id: number,
+ *     title: string,
+ *     slug: string,
+ *     description: string,
+ *     code_layout: string,
+ *     widgets: { slot_name: [widget_objects] },
+ *     version_id: number,        // Current version being viewed
+ *     version_number: number,    // Version number for display
+ *     publication_status: string, // draft/published/scheduled/expired
+ *     // ... other page metadata
+ *   }
+ * - availableVersions: List of version metadata for dropdown
  * 
  * Version Management:
- * - When switching versions: Load complete version data and merge into pageData
- * - When saving: Collect all data and create new version, update both pageData
- * - ContentEditor always uses pageData as single source of truth
+ * - Initial load: Regular page API populates pageData
+ * - Switching versions: Version API response gets transformed and merged into pageData
+ * - ContentEditor always uses pageData.widgets as single source of truth
  */
 const PageEditor = () => {
     const { pageId, tab } = useParams()
@@ -72,6 +87,9 @@ const PageEditor = () => {
 
     // Auto-save management state
     const [autoSaveEnabled, setAutoSaveEnabled] = useState(true)
+
+    // Save options modal state
+    const [showSaveOptionsModal, setShowSaveOptionsModal] = useState(false)
 
     const queryClient = useQueryClient()
     const { showError, showConfirm } = useNotificationContext()
@@ -149,23 +167,45 @@ const PageEditor = () => {
         }
     }, [page, isNewPage])
 
-    // Fetch layout data when page has a code_layout
+    // Fetch layout data when page has a code_layout, with fallback support
     useEffect(() => {
         const fetchLayoutData = async () => {
-            if (!pageData?.code_layout) {
-                setLayoutData(null)
-                return
+            setIsLoadingLayout(true)
+
+            // Determine which layout to load
+            let layoutToLoad = pageData?.code_layout;
+            let isUsingFallback = false;
+
+            if (!layoutToLoad) {
+                // Use fallback layout for versions without layout
+                layoutToLoad = 'single_column'; // Default fallback layout
+                isUsingFallback = true;
             }
 
-            setIsLoadingLayout(true)
             try {
-                addNotification(`Loading layout: ${pageData.code_layout}`, 'info', 'layout-load')
-                const response = await api.get(`/api/v1/webpages/layouts/${pageData.code_layout}/json/`)
+                if (isUsingFallback) {
+                    addNotification(`Using fallback layout: ${layoutToLoad}`, 'info', 'layout-load')
+                } else {
+                    addNotification(`Loading layout: ${layoutToLoad}`, 'info', 'layout-load')
+                }
+
+                const response = await api.get(`/api/v1/webpages/layouts/${layoutToLoad}/json/`)
                 setLayoutData(response.data)
-                addNotification(`Layout "${pageData.code_layout}" loaded successfully`, 'success', 'layout-load')
+
+                if (isUsingFallback) {
+                    addNotification(`Fallback layout "${layoutToLoad}" loaded for preview`, 'success', 'layout-load')
+                } else {
+                    addNotification(`Layout "${layoutToLoad}" loaded successfully`, 'success', 'layout-load')
+                }
             } catch (error) {
                 console.error('Failed to load layout:', error)
-                addNotification(`Failed to load layout: ${pageData.code_layout}`, 'error', 'layout-load')
+
+                if (isUsingFallback) {
+                    addNotification(`Failed to load fallback layout: ${layoutToLoad}`, 'error', 'layout-load')
+                } else {
+                    addNotification(`Failed to load layout: ${layoutToLoad}`, 'error', 'layout-load')
+                }
+
                 showError(error, 'Failed to load layout data')
                 setLayoutData(null)
             } finally {
@@ -173,8 +213,11 @@ const PageEditor = () => {
             }
         }
 
-        fetchLayoutData()
-    }, [pageData?.code_layout, addNotification, showError])
+        // Only fetch if we have pageData (avoid loading on initial mount)
+        if (pageData) {
+            fetchLayoutData()
+        }
+    }, [pageData?.code_layout, pageData?.id, addNotification, showError])
 
 
     // Publish page mutation
@@ -216,29 +259,12 @@ const PageEditor = () => {
         navigate(previousView)
     }
 
-    // Handle quick publish (only for existing pages)
-    const handleQuickPublish = () => {
-        if (isNewPage) return
-
-        addNotification('Publishing page...', 'info', 'page-publish')
-        setIsPublishing(true)
-        publishPageMutation.mutate()
-        setIsPublishing(false)
-    }
-
-    // Handle page data updates
-    const updatePageData = (updates) => {
-        setPageData(prev => ({ ...prev, ...updates }))
-        setIsDirty(true)
-    }
-
     // Version management functions
     const loadVersions = useCallback(async () => {
         if (!pageData?.id || isNewPage) {
             return;
         }
         try {
-            const { getPageVersionsList, getPageVersion } = await import('../api/versions.js');
             const versionsData = await getPageVersionsList(pageData.id);
             setAvailableVersions(versionsData.versions || []);
             // Set current version if not already set - default to last saved version (highest version number)
@@ -260,28 +286,43 @@ const PageEditor = () => {
         }
     }, [pageData?.id, isNewPage, showError]);
 
-    const switchToVersion = useCallback(async (versionId) => {
-        if (!versionId) return;
+    // Navigate to version timeline page
+    const handleShowVersionTimeline = () => {
+        navigate(`/pages/${pageData?.id}/versions`);
+    }
 
+    // Handle page data updates
+    const updatePageData = (updates) => {
+        setPageData(prev => ({ ...prev, ...updates }))
+        setIsDirty(true)
+    }
+
+    const switchToVersion = useCallback(async (versionId) => {
+        if (!versionId || !pageData?.id) return;
         try {
-            const { getPageVersion } = await import('../api/versions.js');
-            const pageData = await getPageVersion(pageData.id, versionId);
+            const versionPageData = await getPageVersion(pageData.id, versionId);
             const versionData = availableVersions.find(version => version.id === versionId);
             setCurrentVersion(versionData);
-            // Merge version-specific data (including widgets) into pageData
-            setPageData(prev => {
-                return pageData;
-            });
+            // Set the version data as pageData (already in flat structure from API)
+            setPageData(versionPageData);
+
+            // Handle layout fallback for versions without valid layouts
+            if (!versionPageData.code_layout) {
+                addNotification({
+                    type: 'warning',
+                    message: `Version ${versionPageData.version_number} has no layout. Using fallback layout for preview.`
+                });
+            }
 
             addNotification({
                 type: 'info',
-                message: `Switched to version ${pageData.version_number}`
+                message: `Switched to version ${versionPageData.version_number}`
             });
         } catch (error) {
             console.error('PageEditor: Error switching to version', error);
             showError(`Failed to load version: ${error.message}`);
         }
-    }, [showError, addNotification]);
+    }, [pageData, availableVersions, showError, addNotification]);
 
     // Load versions when page data is available
     useEffect(() => {
@@ -296,8 +337,13 @@ const PageEditor = () => {
         }
     }, [autoSaveEnabled, layoutData]); // layoutData dependency ensures this runs after ContentEditor is mounted
 
-    // UNIFIED SAVE: StatusBar -> PageEditor -> Single API Call
-    const handleSaveFromStatusBar = useCallback(async () => {
+    // Show save options modal when save is triggered
+    const handleSaveFromStatusBar = useCallback(() => {
+        setShowSaveOptionsModal(true);
+    }, []);
+
+    // UNIFIED SAVE: Actual save logic with options
+    const handleActualSave = useCallback(async (saveOptions = {}) => {
         try {
             // Collect all data from editors (no saving yet)
             const collectedData = {};
@@ -353,8 +399,9 @@ const PageEditor = () => {
                 unifiedPageData,
                 collectedData.widgets,
                 {
-                    description: 'Unified save from page editor',
-                    autoPublish: false
+                    description: saveOptions.description || 'Unified save from page editor',
+                    autoPublish: false,
+                    createNewVersion: saveOptions.option === 'new'
                 }
             );
             // Update UI state with response - preserve widgets and version data structure
@@ -371,10 +418,14 @@ const PageEditor = () => {
             }
 
             // Show success notification
+            const versionAction = saveOptions.option === 'new' ? 'created' : 'updated';
             addNotification({
                 type: 'success',
-                message: 'All changes saved successfully! (Unified Save)'
+                message: `Version ${versionAction} successfully! ${saveOptions.description ? `"${saveOptions.description}"` : ''}`
             });
+
+            // Reload versions to show the new/updated version
+            await loadVersions();
 
             // Invalidate queries to refresh data
             queryClient.invalidateQueries(['page', pageData.id]);
@@ -388,7 +439,17 @@ const PageEditor = () => {
             });
             showError(`Save failed: ${error.message}`);
         }
-    }, [addNotification, showError, pageData?.id, queryClient]);
+    }, [addNotification, showError, pageData?.id, queryClient, loadVersions]);
+
+    // Handle save options from modal
+    const handleSaveOptions = useCallback(async (saveOptions) => {
+        try {
+            await handleActualSave(saveOptions);
+        } catch (error) {
+            // Error handling is already done in handleActualSave
+            throw error;
+        }
+    }, [handleActualSave]);
 
     // Auto-save toggle handler
     const handleAutoSaveToggle = useCallback((enabled) => {
@@ -507,12 +568,11 @@ const PageEditor = () => {
 
 
                             <button
-                                onClick={handleQuickPublish}
-                                disabled={pageData?.publication_status === 'published' || isPublishing}
-                                className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                onClick={handleShowVersionTimeline}
+                                className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                             >
-                                <Share2 className="w-4 h-4 mr-2" />
-                                {isPublishing ? 'Publishing...' : 'Publish'}
+                                <Calendar className="w-4 h-4 mr-2" />
+                                Manage Publishing
                             </button>
 
                             <div className="relative">
@@ -563,6 +623,23 @@ const PageEditor = () => {
                 <div className="h-full">
                     {activeTab === 'content' && (
                         <>
+                            {/* Layout fallback warning */}
+                            {!pageData?.code_layout && (
+                                <div className="bg-amber-50 border-l-4 border-amber-400 p-4 mb-4">
+                                    <div className="flex">
+                                        <div className="flex-shrink-0">
+                                            <svg className="h-5 w-5 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
+                                                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                            </svg>
+                                        </div>
+                                        <div className="ml-3">
+                                            <p className="text-sm text-amber-700">
+                                                <strong>No layout specified for this version.</strong> Using fallback single-column layout for preview.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                             {isLoadingLayout ? (
                                 <div className="h-full flex items-center justify-center bg-gray-50">
                                     <div className="text-center">
@@ -572,6 +649,7 @@ const PageEditor = () => {
                                 </div>
                             ) : (
                                 <ContentEditor
+                                    key={`${pageData?.id}-${pageData?.version_id || 'current'}`}
                                     ref={contentEditorRef}
                                     pageData={pageData}
                                     onUpdate={updatePageData}
@@ -617,7 +695,6 @@ const PageEditor = () => {
             <StatusBar
                 showAutoSave={true}
                 isDirty={isDirty}
-                showVersionSelector={!isNewPage && !!pageData?.id}
                 currentVersion={currentVersion}
                 availableVersions={availableVersions}
                 onVersionChange={switchToVersion}
@@ -636,6 +713,17 @@ const PageEditor = () => {
                                 {pageData?.publication_status || 'unpublished'}
                             </span>
                         </span>
+
+                        {!isNewPage && (
+                            <button
+                                onClick={handleShowVersionTimeline}
+                                className="text-xs px-3 py-1 rounded-md font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors flex items-center space-x-1"
+                            >
+                                <Calendar className="w-3 h-3" />
+                                <span>Manage Publishing</span>
+                            </button>
+                        )}
+
                         {pageData?.last_modified && (
                             <span>
                                 Last modified: {new Date(pageData.last_modified).toLocaleString()}
@@ -643,6 +731,15 @@ const PageEditor = () => {
                         )}
                     </div>
                 }
+            />
+
+            {/* Save Options Modal */}
+            <SaveOptionsModal
+                isOpen={showSaveOptionsModal}
+                onClose={() => setShowSaveOptionsModal(false)}
+                onSave={handleSaveOptions}
+                currentVersion={currentVersion}
+                isNewPage={isNewPage}
             />
         </div>
     )
@@ -728,21 +825,7 @@ const SettingsEditor = forwardRef(({ pageData, onUpdate, isNewPage }, ref) => {
                             />
                         </div>
 
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Publication Status
-                            </label>
-                            <select
-                                value={pageData?.publication_status || 'unpublished'}
-                                onChange={(e) => onUpdate({ publication_status: e.target.value })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            >
-                                <option value="unpublished">Unpublished</option>
-                                <option value="scheduled">Scheduled</option>
-                                <option value="published">Published</option>
-                                <option value="expired">Expired</option>
-                            </select>
-                        </div>
+
                     </div>
                 </div>
             </div>

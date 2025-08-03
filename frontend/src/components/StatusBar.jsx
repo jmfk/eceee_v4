@@ -7,7 +7,6 @@ const StatusBar = ({
     customStatusContent = null,
     className = "",
     // Version management props
-    showVersionSelector = false,
     currentVersion = null,
     availableVersions = [],
     onVersionChange = null,
@@ -124,7 +123,7 @@ const StatusBar = ({
                     )}
 
                     {/* Version selector */}
-                    {showVersionSelector && availableVersions.length > 0 && (
+                    {availableVersions.length > 0 && (
                         <>
                             <div className="w-px h-4 bg-gray-300 mx-2" />
                             <span className="text-xs text-gray-500">Version:</span>
