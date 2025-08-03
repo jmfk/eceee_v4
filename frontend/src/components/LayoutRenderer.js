@@ -522,14 +522,7 @@ class LayoutRenderer {
             widget.slotName = slotName;
             const widgetElement = await this.renderWidgetInstance(widget);
             if (widgetElement) {
-              // Debug: Check if widgetElement is a valid DOM node
-              if (widgetElement instanceof Node) {
-                container.appendChild(widgetElement);
-              } else {
-                console.error(`LayoutRenderer: widgetElement is not a DOM node:`, widgetElement);
-                const errorElement = this.createErrorWidgetElement(`Widget ${index + 1}: Invalid widget element type`);
-                container.appendChild(errorElement);
-              }
+              container.appendChild(widgetElement);
             }
           } catch (error) {
             console.error(`LayoutRenderer: Error rendering widget ${index} in slot ${slotName}`, error);
@@ -2265,17 +2258,9 @@ class LayoutRenderer {
       widget.appendChild(header);
     }
 
-    // Add widget content - pass full widgetInstance for template_json access
+        // Add widget content - pass full widgetInstance for template_json access
     const content = await this.renderWidgetContent(type, config, widgetInstance);
-    
-    // Debug: Check if content is a valid DOM node
-    if (content instanceof Node) {
-      widget.appendChild(content);
-    } else {
-      console.error(`LayoutRenderer: renderWidgetContent returned non-DOM node:`, content);
-      const errorElement = this.createErrorWidgetElement(`Widget content error: Invalid content type`);
-      widget.appendChild(errorElement);
-    }
+    widget.appendChild(content);
 
     return widget;
   }
@@ -5103,7 +5088,7 @@ class LayoutRenderer {
     select.appendChild(latestOption);
 
     // Add published version option
-                const publishedVersion = this.pageVersions.find(v => v.is_current_published);
+    const publishedVersion = this.pageVersions.find(v => v.is_current_published);
     if (publishedVersion) {
       const publishedOption = document.createElement('option');
       publishedOption.value = publishedVersion.id;
