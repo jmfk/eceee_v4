@@ -144,15 +144,15 @@ const StatusBar = ({
                                 )}
 
                                 {/* Published version option */}
-                                {availableVersions.find(v => v.status === 'published' && v.is_current) && (
-                                    <option value={availableVersions.find(v => v.status === 'published' && v.is_current).id}>
+                                                        {availableVersions.find(v => v.is_current_published) && (
+                            <option value={availableVersions.find(v => v.is_current_published).id}>
                                         ✓ Published
                                     </option>
                                 )}
 
                                 {/* Other versions */}
                                 {availableVersions.slice(1).map(version => {
-                                    const publishedVersion = availableVersions.find(v => v.status === 'published' && v.is_current);
+                                    const publishedVersion = availableVersions.find(v => v.is_current_published);
                                     if (publishedVersion && version.id === publishedVersion.id) {
                                         return null; // Skip already added published version
                                     }

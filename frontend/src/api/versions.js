@@ -105,7 +105,8 @@ export const getVersionsFiltered = async (filters = {}) => {
 
 // Get current version for a page
 export const getCurrentVersion = async (pageId) => {
-    const response = await api.get(`${API_BASE}/versions/?page__id=${pageId}&is_current=true`)
+    // Note: is_current filter no longer exists, using page-level current version instead
+    const response = await api.get(`${API_BASE}/versions/?page__id=${pageId}`)
     return response.data.results[0] || null
 }
 
@@ -120,7 +121,8 @@ export const getVersionStats = async (pageId) => {
     const [drafts, published, current] = await Promise.all([
         api.get(`${API_BASE}/versions/?page__id=${pageId}&status=draft`),
         api.get(`${API_BASE}/versions/?page__id=${pageId}&status=published`),
-        api.get(`${API_BASE}/versions/?page__id=${pageId}&is_current=true`)
+        // Note: is_current filter no longer exists, using page-level current version instead
+        api.get(`${API_BASE}/versions/?page__id=${pageId}`)
     ])
 
     return {
@@ -156,7 +158,8 @@ export const canPublishVersion = (version) => {
 }
 
 export const canDeleteVersion = (version) => {
-    return version.status === 'draft' && !version.is_current
+            // Use is_current_published instead of legacy is_current field
+        return version.publication_status === 'draft'
 }
 
 export const canCreateDraft = (version) => {
