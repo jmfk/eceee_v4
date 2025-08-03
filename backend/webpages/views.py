@@ -367,15 +367,21 @@ class WebPageViewSet(viewsets.ModelViewSet):
     throttle_scope = "webpage_modifications"
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_class = WebPageFilter
-    search_fields = ["title", "slug", "description", "meta_title", "meta_description"]
+    search_fields = [
+        "slug",
+        "meta_title",
+        "meta_description",
+    ]  # title and description now in page_data
     ordering_fields = [
-        "title",
         "slug",
         "sort_order",
         "created_at",
         "updated_at",
     ]
-    ordering = ["sort_order", "title"]
+    ordering = [
+        "sort_order",
+        "id",
+    ]  # Use id instead of title since title is now a property
 
     def get_serializer_class(self):
         """Use different serializers based on action"""

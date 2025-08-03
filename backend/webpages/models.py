@@ -70,9 +70,8 @@ class WebPage(models.Model):
     """
 
     # Basic page information
-    title = models.CharField(max_length=255)
     slug = models.SlugField(max_length=255, unique=False, null=True, blank=True)
-    description = models.TextField(blank=True)
+    # Note: title and description are now stored in PageVersion.page_data
 
     # Hierarchy support
     parent = models.ForeignKey(
@@ -141,11 +140,60 @@ class WebPage(models.Model):
     )
 
     class Meta:
-        ordering = ["sort_order", "title"]
+        ordering = [
+            "sort_order",
+            "id",
+        ]  # Use id instead of title since title is now a property
         indexes = [
             models.Index(fields=["slug"], name="webpages_slug_idx"),
             GinIndex(fields=["hostnames"], name="webpages_hostnames_gin_idx"),
         ]
+
+    @property
+    def title(self):
+        """Get title from latest version's page_data"""
+        latest_version = self.get_latest_version()
+        if (
+            latest_version
+            and latest_version.page_data
+            and "title" in latest_version.page_data
+        ):
+            return latest_version.page_data["title"]
+        return f"Page {self.id}"  # Fallback for pages without versions
+
+    @property
+    def description(self):
+        """Get description from latest version's page_data"""
+        latest_version = self.get_latest_version()
+        if (
+            latest_version
+            and latest_version.page_data
+            and "description" in latest_version.page_data
+        ):
+            return latest_version.page_data["description"]
+        return ""  # Fallback to empty string
+
+    def get_latest_version(self):
+        """Get the latest version of this page"""
+        return self.versions.order_by("-version_number").first()
+
+    def set_title(self, title):
+        """Set title in the latest version's page_data"""
+        latest_version = self.get_latest_version()
+        if latest_version:
+            if not latest_version.page_data:
+                latest_version.page_data = {}
+            latest_version.page_data["title"] = title
+            latest_version.save(update_fields=["page_data"])
+
+    def set_description(self, description):
+        """Set description in the latest version's page_data"""
+        latest_version = self.get_latest_version()
+        if latest_version:
+            if not latest_version.page_data:
+                latest_version.page_data = {}
+            latest_version.page_data["description"] = description
+            latest_version.save(update_fields=["page_data"])
 
     def __str__(self):
         return self.title
@@ -1548,7 +1596,6 @@ class PageVersion(models.Model):
         return {
             "id": self.id,
             "page_id": self.page_id,
-            "page_title": self.page.title,
             "version_number": self.version_number,
             "page_data": self.page_data,
             "widgets": self.widgets,
