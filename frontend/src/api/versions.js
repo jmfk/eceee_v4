@@ -158,8 +158,8 @@ export const canPublishVersion = (version) => {
 }
 
 export const canDeleteVersion = (version) => {
-            // Use is_current_published instead of legacy is_current field
-        return version.publication_status === 'draft'
+    // Use is_current_published instead of legacy is_current field
+    return version.publication_status === 'draft'
 }
 
 export const canCreateDraft = (version) => {
