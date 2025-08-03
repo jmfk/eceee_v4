@@ -19,7 +19,7 @@ import {
     Calendar
 } from 'lucide-react'
 import { api } from '../api/client.js'
-import { savePageWithWidgets } from '../api/pages.js'
+import { savePageWithWidgets, getPage } from '../api/pages.js'
 import { useNotificationContext } from './NotificationManager'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import ContentEditor from './ContentEditor'
@@ -286,7 +286,7 @@ const PageEditor = () => {
         }
     }, [pageData?.id, isNewPage, showError]);
 
-    // Load versions but preserve current version selection
+        // Load versions but preserve current version selection
     const loadVersionsPreserveCurrent = useCallback(async () => {
         if (!pageData?.id || isNewPage) {
             return;
@@ -304,6 +304,12 @@ const PageEditor = () => {
                 setCurrentVersion(lastSavedVersion);
                 // Load the complete version data including widgets
                 const newPage = await getPageVersion(pageData.id, lastSavedVersion.id);
+                setPageData(prev => {
+                    return { ...prev, ...newPage };
+                });
+            } else if (currentVersion) {
+                // If we have a current version, reload the page data with that version
+                const newPage = await getPage(pageData.id, currentVersion.id);
                 setPageData(prev => {
                     return { ...prev, ...newPage };
                 });

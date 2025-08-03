@@ -47,8 +47,13 @@ export const getPageTree = async () => {
 }
 
 // Get a specific page
-export const getPage = async (pageId) => {
-    const response = await api.get(`${API_BASE}/pages/${pageId}/`)
+export const getPage = async (pageId, versionId = null) => {
+    const params = new URLSearchParams()
+    if (versionId) {
+        params.append('version_id', versionId)
+    }
+    const url = `${API_BASE}/pages/${pageId}/${params.toString() ? '?' + params.toString() : ''}`
+    const response = await api.get(url)
     return response.data
 }
 
