@@ -40,9 +40,34 @@ export const publishVersion = async (versionId) => {
 }
 
 // Get complete data for a specific version of a page (NEW ENDPOINT)
+// Returns data in flat pageData structure for PageEditor
 export const getPageVersion = async (pageId, versionId) => {
     const response = await api.get(`${API_BASE}/pages/${pageId}/versions/${versionId}/`)
-    return response.data
+    const versionData = response.data
+
+    // Transform nested API response to flat pageData structure
+    return {
+        // Page metadata from nested page_data
+        ...versionData.page_data,
+
+        // Add page ID and widgets at root level
+        id: versionData.page_id,
+        widgets: versionData.widgets,
+
+        // Add version metadata
+        version_id: versionData.version_id,
+        version_number: versionData.version_number,
+        publication_status: versionData.publication_status,
+        is_current_published: versionData.is_current_published,
+        effective_date: versionData.effective_date,
+        expiry_date: versionData.expiry_date,
+
+        // Add version-specific fields
+        description: versionData.description,
+        created_at: versionData.created_at,
+        created_by: versionData.created_by,
+        change_summary: versionData.change_summary
+    }
 }
 
 // Get all versions for a page
@@ -368,6 +393,28 @@ export const toggleWidgetVisibility = async (pageId, widgetId, description = 'To
         widget: updatedWidget,
         version: updatedVersion
     }
+}
+
+// Version scheduling and publishing functions
+export const scheduleVersion = async (versionId, scheduleData) => {
+    const response = await api.patch(`${API_BASE}/versions/${versionId}/`, {
+        effective_date: scheduleData.effective_date || null,
+        expiry_date: scheduleData.expiry_date || null
+    })
+    return response.data
+}
+
+export const publishVersionNow = async (versionId) => {
+    const response = await api.post(`${API_BASE}/versions/${versionId}/publish/`)
+    return response.data
+}
+
+export const unpublishVersion = async (versionId) => {
+    const response = await api.patch(`${API_BASE}/versions/${versionId}/`, {
+        effective_date: null,
+        expiry_date: null
+    })
+    return response.data
 }
 
 // Widget helper functions for compatibility
