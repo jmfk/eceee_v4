@@ -156,8 +156,8 @@ class WebPageAdmin(HostnameUpdateMixin, admin.ModelAdmin):
         "parent",
         ("parent", admin.RelatedOnlyFieldListFilter),
     ]
-    search_fields = ["title", "slug", "description", "meta_title"]
-    prepopulated_fields = {"slug": ("title",)}
+    search_fields = ["slug", "meta_title"]
+    # Note: title and description are now in PageVersion.page_data so can't be searched directly
     readonly_fields = [
         "created_at",
         "updated_at",
@@ -172,7 +172,7 @@ class WebPageAdmin(HostnameUpdateMixin, admin.ModelAdmin):
     fieldsets = (
         (
             "Basic Information",
-            {"fields": ("title", "slug", "description", "parent", "sort_order")},
+            {"fields": ("slug", "parent", "sort_order")},
         ),
         (
             "Multi-Site Configuration",
@@ -246,19 +246,36 @@ class WebPageAdmin(HostnameUpdateMixin, admin.ModelAdmin):
         if current_version:
             status = current_version.get_publication_status()
             if status == "published":
-                return format_html('<span style="color: green;">✓ Published (v{})</span>', current_version.version_number)
+                return format_html(
+                    '<span style="color: green;">✓ Published (v{})</span>',
+                    current_version.version_number,
+                )
             elif status == "scheduled":
-                return format_html('<span style="color: orange;">⏰ Scheduled (v{})</span>', current_version.version_number)
+                return format_html(
+                    '<span style="color: orange;">⏰ Scheduled (v{})</span>',
+                    current_version.version_number,
+                )
             elif status == "expired":
-                return format_html('<span style="color: red;">❌ Expired (v{})</span>', current_version.version_number)
-        
+                return format_html(
+                    '<span style="color: red;">❌ Expired (v{})</span>',
+                    current_version.version_number,
+                )
+
         # Check if there are any versions with future effective dates
         from django.utils import timezone
+
         now = timezone.now()
-        future_versions = obj.versions.filter(effective_date__gt=now).order_by('effective_date').first()
+        future_versions = (
+            obj.versions.filter(effective_date__gt=now)
+            .order_by("effective_date")
+            .first()
+        )
         if future_versions:
-            return format_html('<span style="color: orange;">⏰ Scheduled (v{})</span>', future_versions.version_number)
-        
+            return format_html(
+                '<span style="color: orange;">⏰ Scheduled (v{})</span>',
+                future_versions.version_number,
+            )
+
         return format_html('<span style="color: gray;">No published version</span>')
 
     current_version_status_display.short_description = "Current Version"
@@ -500,7 +517,10 @@ class PageVersionAdmin(admin.ModelAdmin):
         "page_admin_link",
     ]
     list_filter = ["effective_date", "expiry_date", "created_at", "page"]
-    search_fields = ["page__title", "description"]
+    search_fields = [
+        "page__slug",
+        "description",
+    ]  # Can't search page title anymore since it's in page_data
     readonly_fields = ["created_at", "version_number", "page_admin_link"]
 
     fieldsets = (
@@ -576,8 +596,10 @@ class PageVersionAdmin(admin.ModelAdmin):
         else:  # draft
             icon = "📝"
             color = "gray"
-        
-        return format_html('<span style="color: {};">{} {}</span>', color, icon, status.title())
+
+        return format_html(
+            '<span style="color: {};">{} {}</span>', color, icon, status.title()
+        )
 
     publication_status_display.short_description = "Publication Status"
 

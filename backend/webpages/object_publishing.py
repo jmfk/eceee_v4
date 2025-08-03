@@ -188,8 +188,8 @@ class ObjectPublishingService:
         self.page.linked_object_id = object_id
 
         # Update page metadata from object (always sync core metadata when linking)
-        self.page.title = linked_object.title
-        self.page.description = linked_object.description
+        self.page.set_title(linked_object.title)
+        self.page.set_description(linked_object.description)
 
         # Only update slug if not already set (to prevent URL changes)
         if not self.page.slug:
@@ -253,8 +253,8 @@ class ObjectPublishingService:
             return False
 
         # Update page fields from object
-        self.page.title = linked_object.title
-        self.page.description = linked_object.description
+        self.page.set_title(linked_object.title)
+        self.page.set_description(linked_object.description)
 
         if hasattr(linked_object, "meta_title") and linked_object.meta_title:
             self.page.meta_title = linked_object.meta_title
