@@ -78,10 +78,11 @@ export const savePageWithWidgets = async (pageId, pageData = {}, widgets = null,
     }
 
     // Add version options if widgets are being saved
-    if (widgets !== null || options.description || options.autoPublish !== undefined) {
+    if (widgets !== null || options.description || options.autoPublish !== undefined || options.createNewVersion !== undefined) {
         payload.version_options = {
             description: options.description || 'Unified save from frontend',
-            auto_publish: options.autoPublish || false
+            auto_publish: options.autoPublish || false,
+            create_new_version: options.createNewVersion || false
         };
     }
     // console.log("savePageWithWidgets")
