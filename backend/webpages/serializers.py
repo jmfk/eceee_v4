@@ -785,7 +785,7 @@ class PageVersionSerializer(serializers.ModelSerializer):
 
     page = WebPageTreeSerializer(read_only=True)
     created_by = UserSerializer(read_only=True)
-    published_by = UserSerializer(read_only=True)
+    # published_by = UserSerializer(read_only=True) - REMOVED: Field no longer exists
 
     # New date-based publishing fields (computed)
     is_published = serializers.SerializerMethodField()
@@ -809,8 +809,8 @@ class PageVersionSerializer(serializers.ModelSerializer):
             # Legacy fields (marked for removal in Phase 3)
             # "status", - REMOVED: This field no longer exists on PageVersion model
             # "is_current", - REMOVED: This field no longer exists on PageVersion model
-            "published_at",
-            "published_by",
+            # "published_at", - REMOVED: This field no longer exists on PageVersion model
+            # "published_by", - REMOVED: This field no longer exists on PageVersion model
             # Metadata
             "description",
             "change_summary",
@@ -824,8 +824,8 @@ class PageVersionSerializer(serializers.ModelSerializer):
             "is_current_published",
             "publication_status",
             # "is_current",  # Legacy - REMOVED: This field no longer exists on PageVersion model
-            "published_at",  # Legacy
-            "published_by",  # Legacy
+            # "published_at",  # Legacy - REMOVED: This field no longer exists on PageVersion model
+            # "published_by",  # Legacy - REMOVED: This field no longer exists on PageVersion model
             "created_at",
             "created_by",
         ]
@@ -847,7 +847,7 @@ class PageVersionListSerializer(serializers.ModelSerializer):
     """Lightweight serializer for version lists (without page_data)"""
 
     created_by = UserSerializer(read_only=True)
-    published_by = UserSerializer(read_only=True)
+    # published_by = UserSerializer(read_only=True) - REMOVED: Field no longer exists
 
     # New date-based publishing fields (computed)
     is_published = serializers.SerializerMethodField()
@@ -866,8 +866,8 @@ class PageVersionListSerializer(serializers.ModelSerializer):
             # Legacy fields (marked for removal in Phase 3)
             # "status", - REMOVED: This field no longer exists on PageVersion model
             # "is_current", - REMOVED: This field no longer exists on PageVersion model
-            "published_at",
-            "published_by",
+            # "published_at", - REMOVED: This field no longer exists on PageVersion model
+            # "published_by", - REMOVED: This field no longer exists on PageVersion model
             # Metadata
             "description",
             "created_at",
