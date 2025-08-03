@@ -435,4 +435,19 @@ export const createWidgetHelper = (widget, widgetType) => {
         canEdit: () => !widget.inherited_from || widget.override_parent,
         getInheritanceBehavior: () => widget.inheritance_behavior || 'inherit'
     }
+}
+
+// Version packing/cleanup operations
+export const packVersionsAggressive = async (pageId) => {
+    const response = await api.post(`${API_BASE}/versions/pack-aggressive/`, {
+        page_id: pageId
+    })
+    return response.data
+}
+
+export const packVersionsDrafts = async (pageId) => {
+    const response = await api.post(`${API_BASE}/versions/pack-drafts/`, {
+        page_id: pageId
+    })
+    return response.data
 } 
