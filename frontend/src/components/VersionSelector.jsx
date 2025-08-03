@@ -1,11 +1,11 @@
 import { useState, useRef, useEffect } from 'react'
 import { ChevronDown, CheckCircle, FileText, Clock, AlertCircle } from 'lucide-react'
 
-const VersionSelector = ({ 
-    currentVersion, 
-    availableVersions = [], 
-    onVersionChange, 
-    className = "" 
+const VersionSelector = ({
+    currentVersion,
+    availableVersions = [],
+    onVersionChange,
+    className = ""
 }) => {
     const [isOpen, setIsOpen] = useState(false)
     const dropdownRef = useRef(null)
@@ -32,12 +32,12 @@ const VersionSelector = ({
                 label: 'Published'
             }
         }
-        
+
         // Check for superseded - version has effective_date but another version is currently published
         const hasEffectiveDate = version.effective_date && new Date(version.effective_date) <= new Date()
         const hasExpiryDate = version.expiry_date && new Date(version.expiry_date) <= new Date()
         const currentlyPublished = availableVersions.find(v => v.is_current_published)
-        
+
         if (hasEffectiveDate && !hasExpiryDate && currentlyPublished && currentlyPublished.id !== version.id) {
             return {
                 icon: AlertCircle,
@@ -118,9 +118,8 @@ const VersionSelector = ({
                             <button
                                 key={version.id}
                                 onClick={() => handleVersionSelect(version.id)}
-                                className={`w-full px-3 py-2 text-left hover:bg-gray-50 focus:outline-none focus:bg-gray-50 border-b border-gray-100 last:border-b-0 ${
-                                    isSelected ? status.bgColor : ''
-                                }`}
+                                className={`w-full px-3 py-2 text-left hover:bg-gray-50 focus:outline-none focus:bg-gray-50 border-b border-gray-100 last:border-b-0 ${isSelected ? status.bgColor : ''
+                                    }`}
                             >
                                 <div className="flex items-center space-x-3">
                                     <StatusIcon className={`w-4 h-4 flex-shrink-0 ${status.color}`} />
