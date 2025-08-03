@@ -132,7 +132,7 @@ const StatusBar = ({
                                 currentVersion={currentVersion}
                                 availableVersions={availableVersions}
                                 onVersionChange={onVersionChange}
-                                className="min-w-48"
+                                className="min-w-0 w-48"
                             />
 
                             {onRefreshVersions && (
