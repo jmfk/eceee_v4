@@ -556,6 +556,9 @@ class WebPageDetailSerializer(serializers.ModelSerializer):
             "create_new_version", True
         )  # Default to creating new version
         current_version_id = version_options.get("current_version_id", None)
+        
+        # Debug logging
+        print(f"DEBUG: create_new_version={create_new_version}, current_version_id={current_version_id}")
 
         if create_new_version:
             # Create new version with both page_data and widgets (if any)
@@ -565,7 +568,11 @@ class WebPageDetailSerializer(serializers.ModelSerializer):
         else:
             # Update existing version instead of creating new one
             self._update_current_version(
-                updated_instance, widgets_data or {}, description, auto_publish, current_version_id
+                updated_instance,
+                widgets_data or {},
+                description,
+                auto_publish,
+                current_version_id,
             )
 
         return updated_instance
@@ -624,7 +631,9 @@ class WebPageDetailSerializer(serializers.ModelSerializer):
 
         return version
 
-    def _update_current_version(self, page, widgets_data, description, auto_publish, current_version_id=None):
+    def _update_current_version(
+        self, page, widgets_data, description, auto_publish, current_version_id=None
+    ):
         """Update existing version instead of creating new one"""
         from django.utils import timezone
 
@@ -632,10 +641,13 @@ class WebPageDetailSerializer(serializers.ModelSerializer):
         if current_version_id:
             try:
                 target_version = page.versions.get(id=current_version_id)
+                print(f"DEBUG: Found target version {target_version.id} (v{target_version.version_number})")
             except page.versions.model.DoesNotExist:
                 # If the specified version doesn't exist, fall back to latest draft
+                print(f"DEBUG: Version {current_version_id} not found, falling back to latest draft")
                 target_version = None
         else:
+            print(f"DEBUG: No current_version_id provided, will use latest draft")
             target_version = None
 
         # If no specific version or it doesn't exist, find the latest draft version

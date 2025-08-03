@@ -286,6 +286,34 @@ const PageEditor = () => {
         }
     }, [pageData?.id, isNewPage, showError]);
 
+    // Load versions but preserve current version selection
+    const loadVersionsPreserveCurrent = useCallback(async () => {
+        if (!pageData?.id || isNewPage) {
+            return;
+        }
+        try {
+            const versionsData = await getPageVersionsList(pageData.id);
+            setAvailableVersions(versionsData.versions || []);
+            
+            // Only set current version if not already set
+            if (!currentVersion && versionsData.versions && versionsData.versions.length > 0) {
+                // Find the version with the highest version number (last saved)
+                const lastSavedVersion = versionsData.versions.reduce((latest, current) => {
+                    return (current.version_number > latest.version_number) ? current : latest;
+                });
+                setCurrentVersion(lastSavedVersion);
+                // Load the complete version data including widgets
+                const newPage = await getPageVersion(pageData.id, lastSavedVersion.id);
+                setPageData(prev => {
+                    return { ...prev, ...newPage };
+                });
+            }
+        } catch (error) {
+            console.error('PageEditor: Error loading versions', error);
+            showError('Failed to load page versions');
+        }
+    }, [pageData?.id, isNewPage, currentVersion, showError]);
+
     // Navigate to version timeline page
     const handleShowVersionTimeline = () => {
         navigate(`/pages/${pageData?.id}/versions`);
@@ -425,8 +453,8 @@ const PageEditor = () => {
                 message: `Version ${versionAction} successfully! ${saveOptions.description ? `"${saveOptions.description}"` : ''}`
             });
 
-            // Reload versions to show the new/updated version
-            await loadVersions();
+            // Reload versions to show the new/updated version, but preserve current version selection
+            await loadVersionsPreserveCurrent();
 
             // Invalidate queries to refresh data
             queryClient.invalidateQueries(['page', pageData.id]);
@@ -440,7 +468,7 @@ const PageEditor = () => {
             });
             showError(`Save failed: ${error.message}`);
         }
-    }, [addNotification, showError, pageData?.id, queryClient, loadVersions]);
+    }, [addNotification, showError, pageData?.id, queryClient, loadVersionsPreserveCurrent]);
 
     // Handle save options from modal
     const handleSaveOptions = useCallback(async (saveOptions) => {
