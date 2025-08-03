@@ -82,7 +82,8 @@ export const savePageWithWidgets = async (pageId, pageData = {}, widgets = null,
         payload.version_options = {
             description: options.description || 'Unified save from frontend',
             auto_publish: options.autoPublish || false,
-            create_new_version: options.createNewVersion || false
+            create_new_version: options.createNewVersion || false,
+            current_version_id: options.currentVersionId || null  // Pass the current version ID
         };
     }
     // console.log("savePageWithWidgets")
