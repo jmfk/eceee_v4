@@ -167,16 +167,47 @@ const VersionTimelinePage = () => {
     const buildFullPagePath = () => {
         if (!pageData) return '';
         
-        // Get hostname (first one if multiple)
-        const hostname = pageData.hostnames && pageData.hostnames.length > 0 
-            ? pageData.hostnames[0] 
-            : 'localhost:8000';
-            
+        // Get hostname from root page (inherited context)
+        const hostname = getEffectiveHostname(pageData);
+        
         // Build the full URL
         const protocol = hostname.includes('localhost') ? 'http://' : 'https://';
-        const slug = pageData.slug || '';
+        const slug = buildFullSlugPath(pageData);
         
-        return `${protocol}${hostname}/${slug}`;
+        return `${protocol}${hostname}${slug}`;
+    };
+
+    // Get effective hostname by walking up the parent hierarchy
+    const getEffectiveHostname = (page) => {
+        // If this page has hostnames (root page), use it
+        if (page.hostnames && page.hostnames.length > 0) {
+            return page.hostnames[0];
+        }
+        
+        // If it has a parent, walk up to find the root page with hostname
+        if (page.parent) {
+            return getEffectiveHostname(page.parent);
+        }
+        
+        // Fallback if no hostname found anywhere in the hierarchy
+        return 'localhost:8000';
+    };
+
+    // Build full slug path including parent slugs
+    const buildFullSlugPath = (page) => {
+        const slugParts = [];
+        let currentPage = page;
+        
+        // Walk up the hierarchy to build complete path
+        while (currentPage) {
+            if (currentPage.slug) {
+                slugParts.unshift(currentPage.slug);
+            }
+            currentPage = currentPage.parent;
+        }
+        
+        // Join with slashes and ensure it starts with /
+        return '/' + slugParts.join('/');
     };
 
     // Sort versions by version number (newest first)
