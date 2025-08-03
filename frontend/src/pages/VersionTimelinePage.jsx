@@ -150,6 +150,7 @@ const VersionTimelinePage = () => {
             };
         }
 
+        // At this point, the version has effective_date <= now and is not expired
         // Check if this version is the currently active published version
         const currentlyPublishedVersion = getCurrentlyPublishedVersion();
         
@@ -162,12 +163,23 @@ const VersionTimelinePage = () => {
             };
         }
 
-        // If it's published but not the current one, it's been superseded
+        // If we have a current published version and this isn't it, then this one is superseded
+        if (currentlyPublishedVersion) {
+            return {
+                status: 'superseded',
+                label: 'Superseded',
+                color: 'bg-orange-100 text-orange-800',
+                description: 'Published but replaced by newer version'
+            };
+        }
+
+        // If there's no current published version but this has effective_date <= now,
+        // it should be published (shouldn't happen, but fallback)
         return {
-            status: 'superseded',
-            label: 'Superseded',
-            color: 'bg-orange-100 text-orange-800',
-            description: 'Published but replaced by newer version'
+            status: 'published',
+            label: 'Published',
+            color: 'bg-green-100 text-green-800',
+            description: 'Currently live'
         };
     };
 
