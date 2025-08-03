@@ -1,0 +1,344 @@
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { ArrowLeft, Calendar, Clock, Eye, Settings, Plus, Edit3 } from 'lucide-react';
+import { getPageVersionsList, scheduleVersion, publishVersionNow } from '../api/versions.js';
+import { useGlobalNotifications } from '../contexts/GlobalNotificationContext';
+
+/**
+ * VersionTimelinePage - Dedicated page for version management and publishing
+ * 
+ * Features:
+ * - Timeline view of all versions with effective/expiry dates
+ * - Ability to schedule different versions for different time periods
+ * - Visual indication of current live version
+ * - Scheduling UI for setting effective/expiry dates
+ */
+const VersionTimelinePage = () => {
+    const { pageId } = useParams();
+    const navigate = useNavigate();
+    const { addNotification } = useGlobalNotifications();
+
+    const [versions, setVersions] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [selectedVersion, setSelectedVersion] = useState(null);
+    const [showScheduleDialog, setShowScheduleDialog] = useState(false);
+    const [scheduleData, setScheduleData] = useState({
+        effective_date: '',
+        expiry_date: ''
+    });
+    const [pageTitle, setPageTitle] = useState('');
+
+    // Load versions when component mounts
+    useEffect(() => {
+        loadVersions();
+    }, [pageId]);
+
+    const loadVersions = async () => {
+        if (!pageId) return;
+
+        try {
+            setIsLoading(true);
+            const versionsData = await getPageVersionsList(pageId);
+            setVersions(versionsData.versions || []);
+            setPageTitle(versionsData.page_title || 'Page');
+        } catch (error) {
+            console.error('Failed to load versions:', error);
+            addNotification('Failed to load versions', 'error');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleScheduleVersion = (version) => {
+        setSelectedVersion(version);
+        setScheduleData({
+            effective_date: version.effective_date || '',
+            expiry_date: version.expiry_date || ''
+        });
+        setShowScheduleDialog(true);
+    };
+
+    const handleSaveSchedule = async () => {
+        if (!selectedVersion) return;
+
+        try {
+            await scheduleVersion(selectedVersion.id, scheduleData);
+            addNotification('Version scheduled successfully', 'success');
+            setShowScheduleDialog(false);
+            setSelectedVersion(null);
+            await loadVersions(); // Reload to show updated dates
+        } catch (error) {
+            console.error('Failed to schedule version:', error);
+            addNotification('Failed to schedule version', 'error');
+        }
+    };
+
+    const handlePublishNow = async (version) => {
+        try {
+            await publishVersionNow(version.id);
+            addNotification('Version published successfully', 'success');
+            await loadVersions(); // Reload to show updated status
+        } catch (error) {
+            console.error('Failed to publish version:', error);
+            addNotification('Failed to publish version', 'error');
+        }
+    };
+
+    const getVersionStatusInfo = (version) => {
+        const now = new Date();
+        const effectiveDate = version.effective_date ? new Date(version.effective_date) : null;
+        const expiryDate = version.expiry_date ? new Date(version.expiry_date) : null;
+
+        if (!effectiveDate) {
+            return {
+                status: 'draft',
+                label: 'Draft',
+                color: 'bg-gray-100 text-gray-800',
+                description: 'Not scheduled for publishing'
+            };
+        }
+
+        if (effectiveDate > now) {
+            return {
+                status: 'scheduled',
+                label: 'Scheduled',
+                color: 'bg-blue-100 text-blue-800',
+                description: `Will be published ${effectiveDate.toLocaleDateString()}`
+            };
+        }
+
+        if (expiryDate && expiryDate < now) {
+            return {
+                status: 'expired',
+                label: 'Expired',
+                color: 'bg-red-100 text-red-800',
+                description: `Expired ${expiryDate.toLocaleDateString()}`
+            };
+        }
+
+        return {
+            status: 'published',
+            label: 'Published',
+            color: 'bg-green-100 text-green-800',
+            description: 'Currently live'
+        };
+    };
+
+    const formatDate = (dateString) => {
+        if (!dateString) return 'Not set';
+        return new Date(dateString).toLocaleString();
+    };
+
+    // Sort versions by version number (newest first)
+    const sortedVersions = [...versions].sort((a, b) => b.version_number - a.version_number);
+
+    return (
+        <div className="min-h-screen bg-gray-50">
+            {/* Header */}
+            <div className="bg-white border-b border-gray-200">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div className="flex items-center justify-between py-6">
+                        <div className="flex items-center space-x-4">
+                            <button
+                                onClick={() => navigate(`/pages/${pageId}/edit/content`)}
+                                className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
+                            >
+                                <ArrowLeft className="w-5 h-5 mr-2" />
+                                Back to Editor
+                            </button>
+                            <div>
+                                <h1 className="text-2xl font-bold text-gray-900">
+                                    Version Timeline & Publishing
+                                </h1>
+                                <p className="text-sm text-gray-600 mt-1">
+                                    {pageTitle} - Schedule and manage when different versions go live
+                                </p>
+                            </div>
+                        </div>
+                        <div className="text-sm text-gray-600">
+                            {sortedVersions.filter(v => getVersionStatusInfo(v).status === 'published').length} published • {' '}
+                            {sortedVersions.filter(v => getVersionStatusInfo(v).status === 'scheduled').length} scheduled • {' '}
+                            {sortedVersions.filter(v => getVersionStatusInfo(v).status === 'draft').length} drafts
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Content */}
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                {isLoading ? (
+                    <div className="text-center py-12">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                        <p className="text-gray-600">Loading versions...</p>
+                    </div>
+                ) : sortedVersions.length === 0 ? (
+                    <div className="text-center py-12">
+                        <div className="text-gray-400 mb-4">
+                            <Calendar className="w-16 h-16 mx-auto" />
+                        </div>
+                        <h3 className="text-xl font-medium text-gray-900 mb-2">No versions found</h3>
+                        <p className="text-gray-600 mb-6">Create content first to manage versions and publishing.</p>
+                        <button
+                            onClick={() => navigate(`/pages/${pageId}/edit/content`)}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                        >
+                            Go to Editor
+                        </button>
+                    </div>
+                ) : (
+                    <div className="space-y-6">
+                        {sortedVersions.map((version) => {
+                            const statusInfo = getVersionStatusInfo(version);
+                            return (
+                                <div
+                                    key={version.id}
+                                    className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow"
+                                >
+                                    <div className="flex items-start justify-between">
+                                        <div className="flex-1">
+                                            <div className="flex items-center space-x-4 mb-3">
+                                                <h3 className="text-xl font-semibold text-gray-900">
+                                                    Version {version.version_number}
+                                                </h3>
+                                                <span className={`px-3 py-1 text-sm font-medium rounded-full ${statusInfo.color}`}>
+                                                    {statusInfo.label}
+                                                </span>
+                                                {statusInfo.status === 'published' && (
+                                                    <span className="text-sm bg-green-500 text-white px-3 py-1 rounded-full font-medium">
+                                                        LIVE
+                                                    </span>
+                                                )}
+                                            </div>
+
+                                            {version.description && (
+                                                <p className="text-gray-700 mb-4 text-lg">
+                                                    "{version.description}"
+                                                </p>
+                                            )}
+
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-4">
+                                                <div>
+                                                    <span className="text-sm font-semibold text-gray-700 block mb-1">Created:</span>
+                                                    <div className="text-gray-900">
+                                                        {formatDate(version.created_at)}
+                                                    </div>
+                                                    {version.created_by && (
+                                                        <div className="text-gray-500 text-sm mt-1">
+                                                            by {version.created_by}
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                <div>
+                                                    <span className="text-sm font-semibold text-gray-700 block mb-1">Effective Date:</span>
+                                                    <div className="text-gray-900">
+                                                        {formatDate(version.effective_date)}
+                                                    </div>
+                                                </div>
+
+                                                <div>
+                                                    <span className="text-sm font-semibold text-gray-700 block mb-1">Expiry Date:</span>
+                                                    <div className="text-gray-900">
+                                                        {formatDate(version.expiry_date)}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-md">
+                                                {statusInfo.description}
+                                            </p>
+                                        </div>
+
+                                        {/* Actions */}
+                                        <div className="flex flex-col space-y-3 ml-6">
+                                            {statusInfo.status === 'draft' && (
+                                                <button
+                                                    onClick={() => handlePublishNow(version)}
+                                                    className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition-colors"
+                                                    disabled={isLoading}
+                                                >
+                                                    Publish Now
+                                                </button>
+                                            )}
+
+                                            <button
+                                                onClick={() => handleScheduleVersion(version)}
+                                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors flex items-center space-x-2"
+                                                disabled={isLoading}
+                                            >
+                                                <Calendar className="w-4 h-4" />
+                                                <span>Schedule</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
+
+            {/* Schedule Dialog */}
+            {showScheduleDialog && selectedVersion && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+                        <div className="p-6">
+                            <h3 className="text-lg font-medium text-gray-900 mb-4">
+                                Schedule Version {selectedVersion.version_number}
+                            </h3>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Effective Date (When to publish)
+                                    </label>
+                                    <input
+                                        type="datetime-local"
+                                        value={scheduleData.effective_date}
+                                        onChange={(e) => setScheduleData(prev => ({
+                                            ...prev,
+                                            effective_date: e.target.value
+                                        }))}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Expiry Date (When to expire) - Optional
+                                    </label>
+                                    <input
+                                        type="datetime-local"
+                                        value={scheduleData.expiry_date}
+                                        onChange={(e) => setScheduleData(prev => ({
+                                            ...prev,
+                                            expiry_date: e.target.value
+                                        }))}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="flex items-center justify-end space-x-3 mt-6">
+                                <button
+                                    onClick={() => setShowScheduleDialog(false)}
+                                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleSaveSchedule}
+                                    className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+                                >
+                                    Save Schedule
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+export default VersionTimelinePage;
