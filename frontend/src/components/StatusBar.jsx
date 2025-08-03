@@ -123,7 +123,7 @@ const StatusBar = ({
                         </>
                     )}
 
-                                        {/* Version selector */}
+                    {/* Version selector */}
                     {availableVersions.length > 0 && (
                         <>
                             <div className="w-px h-4 bg-gray-300 mx-2" />
