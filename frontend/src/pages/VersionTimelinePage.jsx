@@ -235,17 +235,23 @@ const VersionTimelinePage = () => {
         return 'localhost:8000';
     };
 
-    // Build full slug path including parent slugs
+    // Build full slug path including parent slugs (excluding root page slug)
     const buildFullSlugPath = (page) => {
         const slugParts = [];
         let currentPage = page;
         
         // Walk up the hierarchy to build complete path
         while (currentPage) {
-            if (currentPage.slug) {
+            // Include slug only if it's not the root page (has a parent)
+            if (currentPage.slug && currentPage.parent) {
                 slugParts.unshift(currentPage.slug);
             }
             currentPage = currentPage.parent;
+        }
+        
+        // If no slug parts (root page itself), return root path
+        if (slugParts.length === 0) {
+            return '/';
         }
         
         // Join with slashes and ensure it starts with /
