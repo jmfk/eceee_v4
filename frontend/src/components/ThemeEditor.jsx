@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { api } from '../api/client.js'
+import { themesApi } from '../api'
 import { extractErrorMessage } from '../utils/errorHandling.js'
 import { useNotificationContext } from './NotificationManager'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
@@ -32,8 +32,7 @@ const ThemeEditor = () => {
     const { data: themes = [], isLoading } = useQuery({
         queryKey: ['themes'],
         queryFn: async () => {
-            const response = await api.get('/api/v1/webpages/themes/')
-            return response.data
+            return await themesApi.list()
         }
     })
 
@@ -219,9 +218,9 @@ const ThemeForm = ({ theme = null, onSave, onCancel }) => {
     const mutation = useMutation({
         mutationFn: async (data) => {
             if (theme) {
-                return api.put(`/api/v1/webpages/themes/${theme.id}/`, data)
+                return await themesApi.update(theme.id, data)
             } else {
-                return api.post('/api/v1/webpages/themes/', data)
+                return await themesApi.create(data)
             }
         },
         onSuccess: () => {
@@ -607,7 +606,7 @@ const ThemeEditPanel = ({ theme, onUpdate, onCancel, showPreview, onTogglePrevie
 
     const deleteMutation = useMutation({
         mutationFn: async () => {
-            return api.delete(`/api/v1/webpages/themes/${theme.id}/`)
+            return await themesApi.delete(theme.id)
         },
         onSuccess: () => {
             addNotification('Theme deleted successfully', 'success', 'theme-delete')

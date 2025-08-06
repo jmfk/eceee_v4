@@ -13,15 +13,7 @@ import {
     X,
     Save
 } from 'lucide-react'
-import {
-    getRootPages,
-    getPageChildren,
-    movePage,
-    deletePage,
-    pageTreeUtils,
-    searchAllPages
-} from '../api/pages'
-import { api } from '../api/client.js'
+import { pagesApi } from '../api'
 import PageTreeNode from './PageTreeNode'
 import Tooltip from './Tooltip'
 import { useNotificationContext } from './NotificationManager'
@@ -88,8 +80,7 @@ const TreePageManager = () => {
     // Create page mutation
     const createPageMutation = useMutation({
         mutationFn: async (pageData) => {
-            const response = await api.post('/api/v1/webpages/pages/', pageData)
-            return response.data
+            return await pagesApi.create(pageData)
         },
         onMutate: () => {
             addNotification('Creating page...', 'info', 'page-create')
@@ -111,8 +102,7 @@ const TreePageManager = () => {
     // Create root page mutation
     const createRootPageMutation = useMutation({
         mutationFn: async (pageData) => {
-            const response = await api.post('/api/v1/webpages/pages/', pageData)
-            return response.data
+            return await pagesApi.create(pageData)
         },
         onMutate: () => {
             addNotification('Creating root page...', 'info', 'page-create-root')
@@ -142,7 +132,7 @@ const TreePageManager = () => {
             const filters = {}
             if (debouncedSearchTerm) filters.search = debouncedSearchTerm
             if (statusFilter !== 'all') filters.publication_status = statusFilter
-            return getRootPages(filters)
+            return pagesApi.getRootPages(filters)
         },
         enabled: !debouncedSearchTerm, // Only fetch root pages when not searching
         staleTime: 30000, // Cache for 30 seconds
@@ -260,7 +250,7 @@ const TreePageManager = () => {
             const pagesWithChildren = rootPagesData.results.filter(page => page.children_count > 0)
             pagesWithChildren.forEach(async (page) => {
                 try {
-                    const childrenData = await getPageChildren(page.id)
+                    const childrenData = await pagesApi.getPageChildren(page.id)
 
                     // Check if childrenData has the expected structure
                     if (!childrenData || !childrenData.results) {
@@ -307,7 +297,7 @@ const TreePageManager = () => {
     // Helper function to refresh child pages for a specific parent
     const refreshChildPages = useCallback(async (parentId) => {
         try {
-            const childrenData = await getPageChildren(parentId)
+                            const childrenData = await pagesApi.getPageChildren(parentId)
             const children = childrenData.results.map(child => pageTreeUtils.formatPageForTree(child))
 
             // Update the parent page with refreshed children
@@ -359,7 +349,7 @@ const TreePageManager = () => {
     // Load children for a specific page
     const loadChildren = useCallback(async (pageId) => {
         try {
-            const childrenData = await getPageChildren(pageId)
+            const childrenData = await pagesApi.getPageChildren(pageId)
             const children = childrenData.results.map(child => pageTreeUtils.formatPageForTree(child))
 
             // Update only the specific page node with its children
