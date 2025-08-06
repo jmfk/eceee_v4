@@ -1,453 +1,164 @@
+/**
+ * Versions API Module
+ * 
+ * Centralized API functions for version management with draft/published workflow
+ */
+
 import { api } from './client.js'
-
-const API_BASE = '/api/v1/webpages'
-
-/**
- * Version Management API
- * Provides functions for managing page versions with draft/published workflow
- */
-
-// Create a new version
-export const createVersion = async (pageId, versionData) => {
-    const response = await api.post(`${API_BASE}/versions/`, {
-        page: pageId,
-        ...versionData
-    })
-    return response.data
-}
-
-// Get a specific version
-export const getVersion = async (versionId) => {
-    const response = await api.get(`${API_BASE}/versions/${versionId}/`)
-    return response.data
-}
-
-// Update a version (only drafts can be updated)
-export const updateVersion = async (versionId, versionData) => {
-    const response = await api.patch(`${API_BASE}/versions/${versionId}/`, versionData)
-    return response.data
-}
-
-// Delete a version (only drafts can be deleted)
-export const deleteVersion = async (versionId) => {
-    await api.delete(`${API_BASE}/versions/${versionId}/`)
-}
-
-// Publish a version
-export const publishVersion = async (versionId) => {
-    const response = await api.post(`${API_BASE}/versions/${versionId}/publish/`)
-    return response.data
-}
-
-// Get complete data for a specific version of a page (NEW ENDPOINT)
-// Returns data in flat pageData structure for PageEditor
-export const getPageVersion = async (pageId, versionId) => {
-    const response = await api.get(`${API_BASE}/pages/${pageId}/versions/${versionId}/`)
-    const versionData = response.data
-
-    // Transform nested API response to flat pageData structure
-    return {
-        // Page metadata from nested page_data
-        ...versionData.page_data,
-
-        // Add page ID and widgets at root level
-        id: versionData.page_id,
-        widgets: versionData.widgets,
-
-        // Add version metadata
-        version_id: versionData.version_id,
-        version_number: versionData.version_number,
-        publication_status: versionData.publication_status,
-        is_current_published: versionData.is_current_published,
-        effective_date: versionData.effective_date,
-        expiry_date: versionData.expiry_date,
-
-        // Add version-specific fields
-        description: versionData.description,
-        created_at: versionData.created_at,
-        created_by: versionData.created_by,
-        change_summary: versionData.change_summary
-    }
-}
-
-// Get all versions for a page
-export const getPageVersionsList = async (pageId) => {
-    const response = await api.get(`${API_BASE}/pages/${pageId}/versions/`)
-    return response.data
-}
-
-// Create a draft from a published version
-export const createDraftFromPublished = async (versionId, description = '') => {
-    const response = await api.post(`${API_BASE}/versions/${versionId}/create_draft/`, {
-        description
-    })
-    return response.data
-}
-
-// Restore a version as current
-export const restoreVersion = async (versionId) => {
-    const response = await api.post(`${API_BASE}/versions/${versionId}/restore/`)
-    return response.data
-}
-
-// Compare two versions
-export const compareVersions = async (version1Id, version2Id) => {
-    const response = await api.get(`${API_BASE}/versions/compare/?version1=${version1Id}&version2=${version2Id}`)
-    return response.data
-}
-
-// Get filtered versions
-export const getVersionsFiltered = async (filters = {}) => {
-    const params = new URLSearchParams(filters)
-    const response = await api.get(`${API_BASE}/versions/?${params}`)
-    return response.data
-}
-
-// Get current version for a page
-export const getCurrentVersion = async (pageId) => {
-    // Note: is_current filter no longer exists, using page-level current version instead
-    const response = await api.get(`${API_BASE}/versions/?page__id=${pageId}`)
-    return response.data.results[0] || null
-}
-
-// Get latest draft for a page
-export const getLatestDraft = async (pageId) => {
-    const response = await api.get(`${API_BASE}/versions/?page__id=${pageId}&status=draft&ordering=-version_number`)
-    return response.data.results[0] || null
-}
-
-// Get version statistics for a page
-export const getVersionStats = async (pageId) => {
-    const [drafts, published, current] = await Promise.all([
-        api.get(`${API_BASE}/versions/?page__id=${pageId}&status=draft`),
-        api.get(`${API_BASE}/versions/?page__id=${pageId}&status=published`),
-        // Note: is_current filter no longer exists, using page-level current version instead
-        api.get(`${API_BASE}/versions/?page__id=${pageId}`)
-    ])
-
-    return {
-        total_drafts: drafts.data.count || 0,
-        total_published: published.data.count || 0,
-        has_current: current.data.count > 0,
-        current_version: current.data.results[0] || null
-    }
-}
-
-// Batch operations
-export const batchPublishDrafts = async (versionIds) => {
-    const results = await Promise.allSettled(
-        versionIds.map(id => publishVersion(id))
-    )
-    return results
-}
-
-export const batchDeleteDrafts = async (versionIds) => {
-    const results = await Promise.allSettled(
-        versionIds.map(id => deleteVersion(id))
-    )
-    return results
-}
-
-// Version workflow helpers
-export const canEditVersion = (version) => {
-    return version.status === 'draft'
-}
-
-export const canPublishVersion = (version) => {
-    return version.status === 'draft'
-}
-
-export const canDeleteVersion = (version) => {
-    // Use is_current_published instead of legacy is_current field
-    return version.publication_status === 'draft'
-}
-
-export const canCreateDraft = (version) => {
-    return version.status === 'published'
-}
-
-// Format version for display
-export const formatVersionForDisplay = (version) => {
-    return {
-        ...version,
-        displayName: `v${version.version_number} - ${version.status}`,
-        formattedDate: new Date(version.created_at).toLocaleDateString(),
-        formattedPublishDate: version.published_at ? new Date(version.published_at).toLocaleDateString() : null,
-        statusBadge: {
-            draft: { color: 'yellow', text: 'Draft' },
-            published: { color: 'green', text: 'Published' },
-            archived: { color: 'gray', text: 'Archived' }
-        }[version.status] || { color: 'gray', text: version.status }
-    }
-}
+import { endpoints } from './endpoints.js'
+import { wrapApiCall, buildQueryParams } from './utils.js'
 
 /**
- * Widget Management API
- * Functions for managing widgets as JSON data within PageVersion
+ * Version API operations
  */
-
-// Get widgets for a page (from current version)
-export const getPageWidgets = async (pageId) => {
-    const currentVersion = await getCurrentVersion(pageId)
-    if (!currentVersion) {
-        return { widgets: [], version: null }
-    }
-
-    return {
-        widgets: currentVersion.widgets || [],
-        version: currentVersion
-    }
-}
-
-// Add a widget to a page (creates new version)
-export const addWidget = async (pageId, widgetData, description = 'Added widget') => {
-    // Get current version or latest draft
-    let version = await getLatestDraft(pageId)
-    if (!version) {
-        version = await getCurrentVersion(pageId)
-        if (version) {
-            // Create a draft from published version
-            version = await createDraftFromPublished(version.id, 'Draft for widget changes')
-        } else {
-            throw new Error('No version found for page')
-        }
-    }
-
-    // Add widget to version's widgets array
-    const currentWidgets = version.widgets || []
-    const newWidget = {
-        ...widgetData,
-        id: Date.now(), // Temporary ID for frontend
-        created_at: new Date().toISOString()
-    }
-
-    const updatedWidgets = [...currentWidgets, newWidget]
-
-    // Update the version
-    const updatedVersion = await updateVersion(version.id, {
-        widgets: updatedWidgets,
-        description: description
-    })
-
-    return {
-        widget: newWidget,
-        version: updatedVersion
-    }
-}
-
-// Update a widget in a page (modifies existing version)
-export const updateWidget = async (pageId, widgetId, widgetData, description = 'Updated widget') => {
-    // Get latest draft
-    let version = await getLatestDraft(pageId)
-    if (!version) {
-        version = await getCurrentVersion(pageId)
-        if (version) {
-            // Create a draft from published version
-            version = await createDraftFromPublished(version.id, 'Draft for widget changes')
-        } else {
-            throw new Error('No version found for page')
-        }
-    }
-
-    // Update widget in widgets array
-    const currentWidgets = version.widgets || []
-    const updatedWidgets = currentWidgets.map(widget =>
-        widget.id === widgetId ? { ...widget, ...widgetData } : widget
-    )
-
-    // Update the version
-    const updatedVersion = await updateVersion(version.id, {
-        widgets: updatedWidgets,
-        description: description
-    })
-
-    const updatedWidget = updatedWidgets.find(w => w.id === widgetId)
-    return {
-        widget: updatedWidget,
-        version: updatedVersion
-    }
-}
-
-// Delete a widget from a page
-export const deleteWidget = async (pageId, widgetId, description = 'Deleted widget') => {
-    // Get latest draft
-    let version = await getLatestDraft(pageId)
-    if (!version) {
-        version = await getCurrentVersion(pageId)
-        if (version) {
-            // Create a draft from published version
-            version = await createDraftFromPublished(version.id, 'Draft for widget changes')
-        } else {
-            throw new Error('No version found for page')
-        }
-    }
-
-    // Remove widget from widgets array
-    const currentWidgets = version.widgets || []
-    const updatedWidgets = currentWidgets.filter(widget => widget.id !== widgetId)
-
-    // Update the version
-    const updatedVersion = await updateVersion(version.id, {
-        widgets: updatedWidgets,
-        description: description
-    })
-
-    return {
-        version: updatedVersion
-    }
-}
-
-// Reorder widgets in a slot
-export const reorderWidgets = async (pageId, slotName, widgetOrders, description = 'Reordered widgets') => {
-    // Get latest draft
-    let version = await getLatestDraft(pageId)
-    if (!version) {
-        version = await getCurrentVersion(pageId)
-        if (version) {
-            // Create a draft from published version
-            version = await createDraftFromPublished(version.id, 'Draft for widget changes')
-        } else {
-            throw new Error('No version found for page')
-        }
-    }
-
-    // Update sort orders for widgets in the slot
-    const currentWidgets = version.widgets || []
-    const updatedWidgets = currentWidgets.map(widget => {
-        if (widget.slot_name === slotName) {
-            const orderData = widgetOrders.find(order => order.widget_id === widget.id)
-            if (orderData) {
-                return {
-                    ...widget,
-                    sort_order: orderData.sort_order,
-                    priority: orderData.priority || widget.priority || 0
-                }
-            }
-        }
-        return widget
-    })
-
-    // Update the version
-    const updatedVersion = await updateVersion(version.id, {
-        widgets: updatedWidgets,
-        description: description
-    })
-
-    return {
-        version: updatedVersion
-    }
-}
-
-// Get widgets organized by slot
-export const getWidgetsBySlot = async (pageId) => {
-    const { widgets } = await getPageWidgets(pageId)
-
-    const widgetsBySlot = {}
-    widgets.forEach(widget => {
-        const slotName = widget.slot_name || 'default'
-        if (!widgetsBySlot[slotName]) {
-            widgetsBySlot[slotName] = []
-        }
-        widgetsBySlot[slotName].push(widget)
-    })
-
-    // Sort widgets within each slot by priority and sort_order
-    Object.keys(widgetsBySlot).forEach(slotName => {
-        widgetsBySlot[slotName].sort((a, b) => {
-            const priorityDiff = (b.priority || 0) - (a.priority || 0)
-            if (priorityDiff !== 0) return priorityDiff
-            return (a.sort_order || 0) - (b.sort_order || 0)
+export const versionsApi = {
+    /**
+     * Create a new version
+     * @param {number} pageId - Page ID
+     * @param {Object} versionData - Version data
+     * @returns {Promise<Object>} Created version
+     */
+    create: wrapApiCall(async (pageId, versionData) => {
+        return api.post(endpoints.versions.list, {
+            page: pageId,
+            ...versionData
         })
-    })
+    }, 'versions.create'),
 
-    return widgetsBySlot
-}
+    /**
+     * Get a specific version
+     * @param {number} versionId - Version ID
+     * @returns {Promise<Object>} Version data
+     */
+    get: wrapApiCall(async (versionId) => {
+        return api.get(endpoints.versions.detail(versionId))
+    }, 'versions.get'),
 
-// Toggle widget visibility
-export const toggleWidgetVisibility = async (pageId, widgetId, description = 'Toggled widget visibility') => {
-    // Get latest draft
-    let version = await getLatestDraft(pageId)
-    if (!version) {
-        version = await getCurrentVersion(pageId)
-        if (version) {
-            // Create a draft from published version
-            version = await createDraftFromPublished(version.id, 'Draft for widget changes')
-        } else {
-            throw new Error('No version found for page')
+    /**
+     * Update a version (only drafts can be updated)
+     * @param {number} versionId - Version ID
+     * @param {Object} versionData - Updated version data
+     * @returns {Promise<Object>} Updated version
+     */
+    update: wrapApiCall(async (versionId, versionData) => {
+        return api.patch(endpoints.versions.detail(versionId), versionData)
+    }, 'versions.update'),
+
+    /**
+     * Delete a version (only drafts can be deleted)
+     * @param {number} versionId - Version ID
+     * @returns {Promise<void>}
+     */
+    delete: wrapApiCall(async (versionId) => {
+        return api.delete(endpoints.versions.detail(versionId))
+    }, 'versions.delete'),
+
+    /**
+     * Publish a version
+     * @param {number} versionId - Version ID
+     * @returns {Promise<Object>} Publish result
+     */
+    publish: wrapApiCall(async (versionId) => {
+        return api.post(endpoints.versions.publish(versionId))
+    }, 'versions.publish'),
+
+    /**
+     * Get complete data for a specific version of a page
+     * @param {number} pageId - Page ID
+     * @param {number} versionId - Version ID
+     * @returns {Promise<Object>} Page version data in flat structure
+     */
+    getPageVersion: wrapApiCall(async (pageId, versionId) => {
+        const response = await api.get(endpoints.pages.versionDetail(pageId, versionId))
+        const versionData = response.data || response
+
+        // Transform nested API response to flat pageData structure
+        return {
+            // Page metadata from nested page_data
+            ...versionData.page_data,
+
+            // Add page ID and widgets at root level
+            id: versionData.page_id,
+            widgets: versionData.widgets,
+
+            // Add version metadata
+            version_id: versionData.version_id,
+            version_number: versionData.version_number,
+            publication_status: versionData.publication_status,
+            is_current_published: versionData.is_current_published,
+            effective_date: versionData.effective_date,
+            expiry_date: versionData.expiry_date,
+
+            // Add version-specific fields
+            description: versionData.description,
+            created_at: versionData.created_at,
+            created_by: versionData.created_by,
+            change_summary: versionData.change_summary
         }
-    }
+    }, 'versions.getPageVersion'),
 
-    // Toggle visibility for the specific widget
-    const currentWidgets = version.widgets || []
-    const updatedWidgets = currentWidgets.map(widget =>
-        widget.id === widgetId
-            ? { ...widget, is_visible: !widget.is_visible }
-            : widget
-    )
+    /**
+     * Get all versions for a page
+     * @param {number} pageId - Page ID
+     * @returns {Promise<Object>} Page versions list
+     */
+    getPageVersionsList: wrapApiCall(async (pageId) => {
+        return api.get(endpoints.pages.versions(pageId))
+    }, 'versions.getPageVersionsList'),
 
-    // Update the version
-    const updatedVersion = await updateVersion(version.id, {
-        widgets: updatedWidgets,
-        description: description
-    })
+    /**
+     * Create a draft from a published version
+     * @param {number} versionId - Version ID
+     * @param {string} description - Draft description
+     * @returns {Promise<Object>} Created draft
+     */
+    createDraftFromPublished: wrapApiCall(async (versionId, description = '') => {
+        return api.post(endpoints.versions.createDraft(versionId), { description })
+    }, 'versions.createDraftFromPublished'),
 
-    const updatedWidget = updatedWidgets.find(w => w.id === widgetId)
-    return {
-        widget: updatedWidget,
-        version: updatedVersion
-    }
+    /**
+     * Restore a version as current
+     * @param {number} versionId - Version ID
+     * @returns {Promise<Object>} Restore result
+     */
+    restore: wrapApiCall(async (versionId) => {
+        return api.post(endpoints.versions.restore(versionId))
+    }, 'versions.restore'),
+
+    /**
+     * Compare two versions
+     * @param {number} version1Id - First version ID
+     * @param {number} version2Id - Second version ID
+     * @returns {Promise<Object>} Comparison result
+     */
+    compare: wrapApiCall(async (version1Id, version2Id) => {
+        const params = { version1: version1Id, version2: version2Id }
+        const queryString = buildQueryParams(params)
+        return api.get(`${endpoints.versions.compare}${queryString}`)
+    }, 'versions.compare'),
+
+    /**
+     * Get filtered versions
+     * @param {Object} filters - Filter parameters
+     * @returns {Promise<Object>} Filtered versions
+     */
+    getFiltered: wrapApiCall(async (filters = {}) => {
+        const queryString = buildQueryParams(filters)
+        return api.get(`${endpoints.versions.list}${queryString}`)
+    }, 'versions.getFiltered')
 }
 
-// Version scheduling and publishing functions
-export const scheduleVersion = async (versionId, scheduleData) => {
-    const response = await api.patch(`${API_BASE}/versions/${versionId}/`, {
-        effective_date: scheduleData.effective_date || null,
-        expiry_date: scheduleData.expiry_date || null
-    })
-    return response.data
-}
+// Legacy exports for backward compatibility
+export const createVersion = versionsApi.create
+export const getVersion = versionsApi.get
+export const updateVersion = versionsApi.update
+export const deleteVersion = versionsApi.delete
+export const publishVersion = versionsApi.publish
+export const getPageVersion = versionsApi.getPageVersion
+export const getPageVersionsList = versionsApi.getPageVersionsList
+export const createDraftFromPublished = versionsApi.createDraftFromPublished
+export const restoreVersion = versionsApi.restore
+export const compareVersions = versionsApi.compare
+export const getVersionsFiltered = versionsApi.getFiltered
 
-export const publishVersionNow = async (versionId) => {
-    const response = await api.post(`${API_BASE}/versions/${versionId}/publish/`)
-    return response.data
-}
-
-export const unpublishVersion = async (versionId) => {
-    const response = await api.patch(`${API_BASE}/versions/${versionId}/`, {
-        effective_date: null,
-        expiry_date: null
-    })
-    return response.data
-}
-
-// Widget helper functions for compatibility
-export const createWidgetHelper = (widget, widgetType) => {
-    return {
-        getId: () => widget.id,
-        getSlotName: () => widget.slot_name || 'default',
-        getConfiguration: () => widget.configuration || {},
-        isVisible: () => widget.is_visible !== false,
-        isInherited: () => widget.inherited_from !== undefined,
-        getInheritedFrom: () => widget.inherited_from,
-        getPriority: () => widget.priority || 0,
-        getSortOrder: () => widget.sort_order || 0,
-        getWidgetType: () => widgetType,
-        canEdit: () => !widget.inherited_from || widget.override_parent,
-        getInheritanceBehavior: () => widget.inheritance_behavior || 'inherit'
-    }
-}
-
-// Version packing/cleanup operations
-export const packVersionsAggressive = async (pageId) => {
-    const response = await api.post(`${API_BASE}/versions/pack-aggressive/`, {
-        page_id: pageId
-    })
-    return response.data
-}
-
-export const packVersionsDrafts = async (pageId) => {
-    const response = await api.post(`${API_BASE}/versions/pack-drafts/`, {
-        page_id: pageId
-    })
-    return response.data
-} 
+export default versionsApi

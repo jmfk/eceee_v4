@@ -1,6 +1,12 @@
-import { api } from './client.js'
+/**
+ * Pages API Module
+ * 
+ * Centralized API functions for page operations with hierarchical management
+ */
 
-const API_BASE = '/api/v1/webpages'
+import { api } from './client.js'
+import { endpoints } from './endpoints.js'
+import { wrapApiCall, buildQueryParams } from './utils.js'
 
 /**
  * Page Tree Management API
@@ -14,223 +20,220 @@ const API_BASE = '/api/v1/webpages'
  * @typedef {import('../types/api').PageFilters} PageFilters
  */
 
-// Get root pages (pages without parent)
 /**
- * @param {PageFilters} filters - Query filters
- * @returns {Promise<PaginatedResponse<WebPageTreeResponse>>}
+ * Pages API operations
  */
-export const getRootPages = async (filters = {}) => {
-    const params = new URLSearchParams({
-        parent_isnull: 'true',
-        ordering: 'sort_order,title',
-        ...filters
-    })
-    const response = await api.get(`${API_BASE}/pages/?${params}`)
-    return response.data
-}
-
-// Get children of a specific page
-export const getPageChildren = async (pageId, filters = {}) => {
-    const params = new URLSearchParams({
-        parent: pageId,
-        ordering: 'sort_order,title',
-        ...filters
-    })
-    const response = await api.get(`${API_BASE}/pages/?${params}`)
-    return response.data
-}
-
-// Get complete page tree (for small hierarchies)
-export const getPageTree = async () => {
-    const response = await api.get(`${API_BASE}/pages/tree/`)
-    return response.data
-}
-
-// Get a specific page
-export const getPage = async (pageId, versionId = null) => {
-    const params = new URLSearchParams()
-    if (versionId) {
-        params.append('version_id', versionId)
-    }
-    const url = `${API_BASE}/pages/${pageId}/${params.toString() ? '?' + params.toString() : ''}`
-    const response = await api.get(url)
-    return response.data
-}
-
-// Get a page with explicit active version (current published or latest draft)
-export const getPageActiveVersion = async (pageId) => {
-    // Call without version_id to get the active version as determined by backend
-    return await getPage(pageId)
-}
-
-// Get a page with a specific version
-export const getPageVersion = async (pageId, versionId) => {
-    if (!versionId) {
-        throw new Error('versionId is required for getPageVersion')
-    }
-    return await getPage(pageId, versionId)
-}
-
-
-
-// Create a new page
-export const createPage = async (pageData) => {
-    const response = await api.post(`${API_BASE}/pages/`, pageData)
-    return response.data
-}
-
-// Update a page version
-export const updatePage = async (pageId, versionId, pageData) => {
-    const response = await api.patch(`${API_BASE}/pages/${pageId}/versions/${versionId}/`, pageData)
-    return response.data
-}
-
-// NEW: Unified save function (page data + widgets in one call) - now uses versioned endpoint
-export const savePageWithWidgets = async (pageId, versionId, pageData = {}, widgets = null, options = {}) => {
-    const payload = {
-        ...pageData,  // page metadata (title, slug, description, etc.)
-    };
-
-    // Add widgets if provided
-    if (widgets !== null) {
-        payload.widgets = widgets;
-    }
-
-    // Add version options if widgets are being saved
-    if (widgets !== null || options.description || options.autoPublish !== undefined || options.createNewVersion !== undefined) {
-        payload.version_options = {
-            description: options.description || 'Unified save from frontend',
-            auto_publish: options.autoPublish || false,
-            create_new_version: options.createNewVersion || false,
-            current_version_id: options.currentVersionId || null  // Pass the current version ID
-        };
-    }
-    // console.log("savePageWithWidgets")
-    // console.log('🔄 API: Unified save payload:', payload);
-    const response = await api.patch(`${API_BASE}/pages/${pageId}/versions/${versionId}/`, payload);
-    // console.log('✅ API: Unified save response:', response.data);
-    return response.data;
-};
-
-// Delete a page
-export const deletePage = async (pageId) => {
-    const response = await api.delete(`${API_BASE}/pages/${pageId}/`)
-    return response.data
-}
-
-// Move a page to a different parent and/or sort order
-export const movePage = async (pageId, parentId = null, sortOrder = 0) => {
-    const response = await api.post(`${API_BASE}/pages/${pageId}/move/`, {
-        parent_id: parentId,
-        sort_order: sortOrder
-    })
-    return response.data
-}
-
-// Get page with children count for tree display
-export const getPageWithChildrenCount = async (pageId) => {
-    const response = await api.get(`${API_BASE}/pages/${pageId}/`)
-    return response.data
-}
-
-// Bulk operations
-export const bulkUpdatePages = async (updates) => {
-    const promises = updates.map(update =>
-        updatePage(update.id, update.data)
-    )
-    return Promise.all(promises)
-}
-
-// Search pages
-export const searchPages = async (query, filters = {}) => {
-    const params = new URLSearchParams({
-        search: query,
-        ...filters
-    })
-    const response = await api.get(`${API_BASE}/pages/?${params}`)
-    return response.data
-}
-
-// Comprehensive search across all pages with hierarchy context
-export const searchAllPages = async (query, filters = {}) => {
-    const params = new URLSearchParams({
-        search: query,
-        include_hierarchy: 'true', // Request hierarchy information
-        ...filters
-    })
-    const response = await api.get(`${API_BASE}/pages/search_all/?${params}`)
-    return response.data
-}
-
-// Get page hierarchy path (breadcrumbs)
-export const getPagePath = async (pageId) => {
-    // This would need to be implemented on the backend
-    // For now, we'll build it client-side by walking up the parent chain
-    const page = await getPageActiveVersion(pageId)
-    const path = [page]
-
-    let current = page
-    while (current.parent) {
-        current = await getPageActiveVersion(current.parent.id)
-        path.unshift(current)
-    }
-
-    return path
-}
-
-// Utility functions for tree management
-export const pageTreeUtils = {
-    // Check if a page has children (based on children_count)
-    hasChildren: (page) => {
-        return page.children_count > 0
-    },
-
-    // Check if a page can be moved to another parent (prevent circular references)
-    canMoveTo: (pageId, targetParentId) => {
-        // This is a simplified check - full validation should be done on backend
-        return pageId !== targetParentId
-    },
-
-    // Calculate new sort order for inserting between items
-    calculateSortOrder: (items, insertIndex) => {
-        if (insertIndex === 0) {
-            return items.length > 0 ? items[0].sort_order - 1 : 0
-        }
-        if (insertIndex >= items.length) {
-            return items.length > 0 ? items[items.length - 1].sort_order + 1 : 0
-        }
-
-        const before = items[insertIndex - 1]
-        const after = items[insertIndex]
-        return Math.floor((before.sort_order + after.sort_order) / 2)
-    },
-
-    // Calculate sort order for pasting above a specific page
-    calculateSortOrderAbove: (siblings, targetPage) => {
-        // Simple hint: use target's sort_order - 1
-        // Backend will normalize to proper spacing
-        return targetPage.sort_order - 1
-    },
-
-    // Calculate sort order for pasting below a specific page
-    calculateSortOrderBelow: (siblings, targetPage) => {
-        // Simple hint: use target's sort_order + 1
-        // Backend will normalize to proper spacing
-        return targetPage.sort_order + 1
-    },
-
-    // Format page for tree display
+export const pagesApi = {
     /**
-     * @param {WebPageTreeResponse} page - Raw page data from API
-     * @returns {WebPageTreeResponse} Formatted page for tree display
+     * Get root pages (pages without parent)
+     * @param {PageFilters} filters - Query filters
+     * @returns {Promise<PaginatedResponse<WebPageTreeResponse>>}
      */
-    formatPageForTree: (page) => ({
-        ...page,
-        // Ensure hostnames is always an array
-        hostnames: Array.isArray(page.hostnames) ? page.hostnames : [],
-        isExpanded: false,
-        isLoading: false,
-        children: [],
-        childrenLoaded: false
-    })
-} 
+    getRootPages: wrapApiCall(async (filters = {}) => {
+        const params = {
+            parent_isnull: 'true',
+            ordering: 'sort_order,title',
+            ...filters
+        }
+        const queryString = buildQueryParams(params)
+        return api.get(`${endpoints.pages.list}${queryString}`)
+    }, 'pages.getRootPages'),
+
+    /**
+     * Get children of a specific page
+     * @param {number} pageId - Parent page ID
+     * @param {PageFilters} filters - Query filters
+     * @returns {Promise<PaginatedResponse<WebPageTreeResponse>>}
+     */
+    getPageChildren: wrapApiCall(async (pageId, filters = {}) => {
+        const params = {
+            parent: pageId,
+            ordering: 'sort_order,title',
+            ...filters
+        }
+        const queryString = buildQueryParams(params)
+        return api.get(`${endpoints.pages.list}${queryString}`)
+    }, 'pages.getPageChildren'),
+
+    /**
+     * Get complete page tree (for small hierarchies)
+     * @returns {Promise<Array<WebPageTreeResponse>>}
+     */
+    getPageTree: wrapApiCall(async () => {
+        return api.get(`${endpoints.pages.base}/tree/`)
+    }, 'pages.getPageTree'),
+
+    /**
+     * Get all pages with optional filtering
+     * @param {PageFilters} filters - Query filters
+     * @returns {Promise<PaginatedResponse<WebPageTreeResponse>>}
+     */
+    list: wrapApiCall(async (filters = {}) => {
+        const queryString = buildQueryParams(filters)
+        return api.get(`${endpoints.pages.list}${queryString}`)
+    }, 'pages.list'),
+
+    /**
+     * Get a specific page
+     * @param {number} pageId - Page ID
+     * @param {number|null} versionId - Optional version ID
+     * @returns {Promise<WebPageDetailResponse>}
+     */
+    get: wrapApiCall(async (pageId, versionId = null) => {
+        const params = versionId ? { version_id: versionId } : {}
+        const queryString = buildQueryParams(params)
+        return api.get(`${endpoints.pages.detail(pageId)}${queryString}`)
+    }, 'pages.get'),
+
+    /**
+     * Get a page with explicit active version (current published or latest draft)
+     * @param {number} pageId - Page ID
+     * @returns {Promise<WebPageDetailResponse>}
+     */
+    getActiveVersion: wrapApiCall(async (pageId) => {
+        return api.get(endpoints.pages.detail(pageId))
+    }, 'pages.getActiveVersion'),
+
+    /**
+     * Get a page with a specific version
+     * @param {number} pageId - Page ID
+     * @param {number} versionId - Version ID
+     * @returns {Promise<WebPageDetailResponse>}
+     */
+    getVersion: wrapApiCall(async (pageId, versionId) => {
+        if (!versionId) {
+            throw new Error('versionId is required for getVersion')
+        }
+        return api.get(endpoints.pages.versionDetail(pageId, versionId))
+    }, 'pages.getVersion'),
+
+    /**
+     * Create a new page
+     * @param {CreatePageRequest} pageData - Page creation data
+     * @returns {Promise<WebPageDetailResponse>}
+     */
+    create: wrapApiCall(async (pageData) => {
+        return api.post(endpoints.pages.list, pageData)
+    }, 'pages.create'),
+
+    /**
+     * Update a page
+     * @param {number} pageId - Page ID
+     * @param {UpdatePageRequest} pageData - Updated page data
+     * @returns {Promise<WebPageDetailResponse>}
+     */
+    update: wrapApiCall(async (pageId, pageData) => {
+        return api.patch(endpoints.pages.detail(pageId), pageData)
+    }, 'pages.update'),
+
+    /**
+     * Update a specific page version
+     * @param {number} pageId - Page ID
+     * @param {number} versionId - Version ID
+     * @param {UpdatePageRequest} pageData - Updated page data
+     * @returns {Promise<WebPageDetailResponse>}
+     */
+    updateVersion: wrapApiCall(async (pageId, versionId, pageData) => {
+        return api.patch(endpoints.pages.versionDetail(pageId, versionId), pageData)
+    }, 'pages.updateVersion'),
+
+    /**
+     * Delete a page
+     * @param {number} pageId - Page ID
+     * @returns {Promise<void>}
+     */
+    delete: wrapApiCall(async (pageId) => {
+        return api.delete(endpoints.pages.detail(pageId))
+    }, 'pages.delete'),
+
+    /**
+     * Unified save function (page data + widgets in one call)
+     * @param {number} pageId - Page ID
+     * @param {number} versionId - Version ID
+     * @param {Object} pageData - Page metadata
+     * @param {Array|null} widgets - Widgets data
+     * @param {Object} options - Save options
+     * @returns {Promise<Object>}
+     */
+    saveWithWidgets: wrapApiCall(async (pageId, versionId, pageData = {}, widgets = null, options = {}) => {
+        const payload = { ...pageData }
+
+        // Add widgets if provided
+        if (widgets !== null) {
+            payload.widgets = widgets
+        }
+
+        // Add version options if widgets are being saved
+        if (widgets !== null || options.description || options.autoPublish !== undefined || options.createNewVersion !== undefined) {
+            payload.version_options = {
+                description: options.description || 'Auto-save',
+                auto_publish: options.autoPublish || false,
+                create_new_version: options.createNewVersion || false
+            }
+        }
+
+        return api.patch(endpoints.pages.versionDetail(pageId, versionId), payload)
+    }, 'pages.saveWithWidgets'),
+
+    /**
+     * Publish a page
+     * @param {number} pageId - Page ID
+     * @returns {Promise<Object>}
+     */
+    publish: wrapApiCall(async (pageId) => {
+        return api.post(endpoints.pages.publish(pageId))
+    }, 'pages.publish'),
+
+    /**
+     * Unpublish a page
+     * @param {number} pageId - Page ID
+     * @returns {Promise<Object>}
+     */
+    unpublish: wrapApiCall(async (pageId) => {
+        return api.post(endpoints.pages.unpublish(pageId))
+    }, 'pages.unpublish'),
+
+    /**
+     * Link an object to a page
+     * @param {number} pageId - Page ID
+     * @param {Object} linkData - Link data
+     * @returns {Promise<Object>}
+     */
+    linkObject: wrapApiCall(async (pageId, linkData) => {
+        return api.post(endpoints.pages.linkObject(pageId), linkData)
+    }, 'pages.linkObject'),
+
+    /**
+     * Unlink an object from a page
+     * @param {number} pageId - Page ID
+     * @param {Object} unlinkData - Unlink data
+     * @returns {Promise<Object>}
+     */
+    unlinkObject: wrapApiCall(async (pageId, unlinkData) => {
+        return api.post(endpoints.pages.unlinkObject(pageId), unlinkData)
+    }, 'pages.unlinkObject'),
+
+    /**
+     * Sync a page with its linked object
+     * @param {number} pageId - Page ID
+     * @param {Object} syncData - Sync data
+     * @returns {Promise<Object>}
+     */
+    syncObject: wrapApiCall(async (pageId, syncData) => {
+        return api.post(endpoints.pages.syncObject(pageId), syncData)
+    }, 'pages.syncObject')
+}
+
+// Legacy exports for backward compatibility
+export const getRootPages = pagesApi.getRootPages
+export const getPageChildren = pagesApi.getPageChildren
+export const getPageTree = pagesApi.getPageTree
+export const getPage = pagesApi.get
+export const getPageActiveVersion = pagesApi.getActiveVersion
+export const getPageVersion = pagesApi.getVersion
+export const createPage = pagesApi.create
+export const updatePage = pagesApi.update
+export const deletePage = pagesApi.delete
+export const savePageWithWidgets = pagesApi.saveWithWidgets
+
+export default pagesApi

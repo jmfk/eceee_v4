@@ -1,4 +1,5 @@
 import { api } from './client.js'
+import { wrapApiCall, buildQueryParams } from './utils.js'
 
 /**
  * Namespace API client
@@ -9,78 +10,72 @@ export const namespacesApi = {
     /**
      * Get all namespaces with optional filtering
      */
-    list: async (params = {}) => {
-        const response = await api.get('/api/v1/namespaces/', { params })
-        return response.data
-    },
+    list: wrapApiCall(async (params = {}) => {
+        const queryString = buildQueryParams(params)
+        return api.get(`/api/v1/namespaces/${queryString}`)
+    }, 'namespaces.list'),
 
     /**
      * Get a single namespace by ID
      */
-    get: async (id) => {
-        const response = await api.get(`/api/v1/namespaces/${id}/`)
-        return response.data
-    },
+    get: wrapApiCall(async (id) => {
+        return api.get(`/api/v1/namespaces/${id}/`)
+    }, 'namespaces.get'),
 
     /**
      * Create a new namespace
      */
-    create: async (namespaceData) => {
-        const response = await api.post('/api/v1/namespaces/', namespaceData)
-        return response.data
-    },
+    create: wrapApiCall(async (namespaceData) => {
+        return api.post('/api/v1/namespaces/', namespaceData)
+    }, 'namespaces.create'),
 
     /**
      * Update an existing namespace
      */
-    update: async (id, namespaceData) => {
-        const response = await api.patch(`/api/v1/namespaces/${id}/`, namespaceData)
-        return response.data
-    },
+    update: wrapApiCall(async (id, namespaceData) => {
+        return api.patch(`/api/v1/namespaces/${id}/`, namespaceData)
+    }, 'namespaces.update'),
 
     /**
      * Delete a namespace
      */
-    delete: async (id) => {
-        const response = await api.delete(`/api/v1/namespaces/${id}/`)
-        return response.data
-    },
+    delete: wrapApiCall(async (id) => {
+        return api.delete(`/api/v1/namespaces/${id}/`)
+    }, 'namespaces.delete'),
 
     /**
      * Set a namespace as default
      */
-    setAsDefault: async (id) => {
-        const response = await api.post(`/api/v1/namespaces/${id}/set_as_default/`)
-        return response.data
-    },
+    setAsDefault: wrapApiCall(async (id) => {
+        return api.post(`/api/v1/namespaces/${id}/set_as_default/`)
+    }, 'namespaces.setAsDefault'),
 
     /**
      * Get content summary for a namespace
      */
-    getContentSummary: async (id) => {
-        const response = await api.post(`/api/v1/namespaces/${id}/get_content_summary/`)
-        return response.data
-    },
+    getContentSummary: wrapApiCall(async (id) => {
+        return api.post(`/api/v1/namespaces/${id}/get_content_summary/`)
+    }, 'namespaces.getContentSummary'),
 
     /**
      * Get the default namespace
      */
-    getDefault: async () => {
-        const response = await api.get('/api/v1/namespaces/', {
-            params: { is_default: true }
-        })
-        return response.data.results?.[0] || null
-    },
+    getDefault: wrapApiCall(async () => {
+        const params = { is_default: true }
+        const queryString = buildQueryParams(params)
+        const response = await api.get(`/api/v1/namespaces/${queryString}`)
+        const data = response.data || response
+        return data.results?.[0] || null
+    }, 'namespaces.getDefault'),
 
     /**
      * Get active namespaces only
      */
-    getActive: async () => {
-        const response = await api.get('/api/v1/namespaces/', {
-            params: { is_active: true }
-        })
-        return response.data
-    }
+    getActive: wrapApiCall(async () => {
+        const params = { is_active: true }
+        const queryString = buildQueryParams(params)
+        return api.get(`/api/v1/namespaces/${queryString}`)
+    }, 'namespaces.getActive')
 }
 
 export default namespacesApi 
