@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { api } from '../api/client.js';
+import { pagesApi, contentApi } from '../api';
 
 const useObjectPublisher = (pageId) => {
     const [selectedObjectType, setSelectedObjectType] = useState('');
@@ -21,8 +21,8 @@ const useObjectPublisher = (pageId) => {
         if (!pageId) return;
 
         try {
-            const response = await api.get(`/api/v1/webpages/pages/${pageId}/`);
-            setCurrentPage(response.data);
+            const pageData = await pagesApi.get(pageId);
+            setCurrentPage(pageData);
         } catch (error) {
             console.error('Error loading page data:', error);
         }
@@ -32,13 +32,10 @@ const useObjectPublisher = (pageId) => {
     const loadObjects = async (objectType = '') => {
         setLoading(true);
         try {
-            let url = `/api/v1/content/all/`;
-            if (objectType) {
-                url = `/api/v1/content/${objectType}/`;
-            }
-
-            const response = await api.get(url);
-            const data = response.data;
+            const data = objectType 
+                ? await contentApi.getByType(objectType)
+                : await contentApi.getAll();
+            
             setObjects(data.results || data);
         } catch (error) {
             console.error('Error loading objects:', error);
@@ -52,12 +49,11 @@ const useObjectPublisher = (pageId) => {
     const linkObject = async (objectType, objectId, onSuccess, onError) => {
         setLinking(true);
         try {
-            const response = await api.post(`/api/v1/webpages/pages/${pageId}/link-object/`, {
+            const data = await pagesApi.linkObject(pageId, {
                 object_type: objectType,
                 object_id: objectId
             });
 
-            const data = response.data;
             await loadPageData(); // Reload page data
             onSuccess?.(data);
         } catch (error) {
@@ -72,7 +68,7 @@ const useObjectPublisher = (pageId) => {
     const unlinkObject = async (onSuccess, onError) => {
         setLinking(true);
         try {
-            const response = await api.post(`/api/v1/webpages/pages/${pageId}/unlink-object/`);
+            await pagesApi.unlinkObject(pageId, {});
 
             await loadPageData(); // Reload page data
             onSuccess?.();
@@ -88,7 +84,7 @@ const useObjectPublisher = (pageId) => {
     const syncWithObject = async (onSuccess, onError) => {
         setLinking(true);
         try {
-            const response = await api.post(`/api/v1/webpages/pages/${pageId}/sync-object/`);
+            await pagesApi.syncObject(pageId, {});
 
             await loadPageData(); // Reload page data
             onSuccess?.();
@@ -103,8 +99,7 @@ const useObjectPublisher = (pageId) => {
     // Load object content for preview
     const loadObjectContent = async (objectType, objectId) => {
         try {
-            const response = await api.get(`/api/v1/content/${objectType}/${objectId}/`);
-            const data = response.data;
+            const data = await contentApi.get(objectType, objectId);
             setObjectContent(data);
             setShowObjectContent(true);
         } catch (error) {

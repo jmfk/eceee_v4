@@ -16,7 +16,7 @@ import {
     FileText,
     ImageIcon
 } from 'lucide-react'
-import { api } from '../api/client'
+import { widgetsApi } from '../api'
 
 const WidgetLibrary = ({ onSelectWidget, selectedWidgetTypes = [] }) => {
     const [searchTerm, setSearchTerm] = useState('')
@@ -26,9 +26,9 @@ const WidgetLibrary = ({ onSelectWidget, selectedWidgetTypes = [] }) => {
     const { data: widgetTypes, isLoading, error } = useQuery({
         queryKey: ['widget-types'],
         queryFn: async () => {
-            const response = await api.get('/api/v1/webpages/widget-types/')
+            const response = await widgetsApi.getTypes()
             // New API returns direct array, filter active ones
-            return response.data?.filter(widget => widget.is_active) || []
+            return response?.filter(widget => widget.is_active) || []
         }
     })
 

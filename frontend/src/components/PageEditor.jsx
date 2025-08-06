@@ -18,15 +18,14 @@ import {
     Trash2,
     Calendar
 } from 'lucide-react'
-import { api } from '../api/client.js'
-import { savePageWithWidgets, getPage, getPageActiveVersion, getPageVersion } from '../api/pages.js'
+import { pagesApi, layoutsApi, versionsApi } from '../api'
 import { useNotificationContext } from './NotificationManager'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import ContentEditor from './ContentEditor'
 import LayoutSelector from './LayoutSelector'
 import StatusBar from './StatusBar'
 import SaveOptionsModal from './SaveOptionsModal'
-import { getPageVersionsList } from '../api/versions.js'
+
 
 /**
  * PageEditor - Unified Page State Architecture
@@ -134,7 +133,7 @@ const PageEditor = () => {
         queryKey: ['page', pageId],
         queryFn: async () => {
             // Get the active version (current published or latest draft)
-            return await getPageActiveVersion(pageId)
+            return await pagesApi.getActiveVersion(pageId)
         },
         enabled: !isNewPage
     })
@@ -204,8 +203,8 @@ const PageEditor = () => {
                     addNotification(`Loading layout: ${layoutToLoad}`, 'info', 'layout-load')
                 }
 
-                const response = await api.get(`/api/v1/webpages/layouts/${layoutToLoad}/json/`)
-                setLayoutData(response.data)
+                const layoutData = await layoutsApi.getJson(layoutToLoad)
+                setLayoutData(layoutData)
 
                 if (isUsingFallback) {
                     addNotification(`Fallback layout "${layoutToLoad}" loaded for preview`, 'success', 'layout-load')
@@ -238,10 +237,9 @@ const PageEditor = () => {
     // Publish page mutation
     const publishPageMutation = useMutation({
         mutationFn: async () => {
-            const response = await api.patch(`/api/v1/webpages/pages/${pageId}/`, {
+            return await pagesApi.update(pageId, {
                 publication_status: 'published'
             })
-            return response.data
         },
         onSuccess: (updatedPage) => {
             addNotification('Page published successfully', 'success', 'page-publish')
@@ -280,7 +278,7 @@ const PageEditor = () => {
             return;
         }
         try {
-            const versionsData = await getPageVersionsList(pageData.id);
+            const versionsData = await versionsApi.getPageVersionsList(pageData.id);
             setAvailableVersions(versionsData.versions || []);
 
             let targetVersion = null;
@@ -305,7 +303,7 @@ const PageEditor = () => {
             if (targetVersion) {
                 setCurrentVersion(targetVersion);
                 // Load the complete version data including widgets
-                const newPage = await getPageVersion(pageData.id, targetVersion.id);
+                const newPage = await versionsApi.getPageVersion(pageData.id, targetVersion.id);
                 setPageData(prev => {
                     return { ...prev, ...newPage };
                 });
@@ -322,7 +320,7 @@ const PageEditor = () => {
             return;
         }
         try {
-            const versionsData = await getPageVersionsList(pageData.id);
+            const versionsData = await versionsApi.getPageVersionsList(pageData.id);
             setAvailableVersions(versionsData.versions || []);
 
             // Only set current version if not already set
@@ -333,13 +331,13 @@ const PageEditor = () => {
                 });
                 setCurrentVersion(lastSavedVersion);
                 // Load the complete version data including widgets
-                const newPage = await getPageVersion(pageData.id, lastSavedVersion.id);
+                const newPage = await versionsApi.getPageVersion(pageData.id, lastSavedVersion.id);
                 setPageData(prev => {
                     return { ...prev, ...newPage };
                 });
             } else if (currentVersion) {
                 // If we have a current version, reload the page data with that version
-                const newPage = await getPageVersion(pageData.id, currentVersion.id);
+                const newPage = await versionsApi.getPageVersion(pageData.id, currentVersion.id);
                 setPageData(prev => {
                     return { ...prev, ...newPage };
                 });
@@ -366,7 +364,7 @@ const PageEditor = () => {
     const switchToVersion = useCallback(async (versionId) => {
         if (!versionId || !pageData?.id) return;
         try {
-            const versionPageData = await getPageVersion(pageData.id, versionId);
+            const versionPageData = await versionsApi.getPageVersion(pageData.id, versionId);
             const versionData = availableVersions.find(version => version.id === versionId);
             setCurrentVersion(versionData);
             // Set the version data as pageData (already in flat structure from API)
@@ -465,7 +463,7 @@ const PageEditor = () => {
             };
 
             // Single API call for everything!
-            const response = await savePageWithWidgets(
+            const response = await pagesApi.saveWithWidgets(
                 pageData.id,
                 currentVersion?.id || pageData.version_id,  // Use current version ID
                 unifiedPageData,

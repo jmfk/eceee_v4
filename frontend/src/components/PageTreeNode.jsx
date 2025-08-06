@@ -19,9 +19,7 @@ import {
     Save,
     Search,
 } from 'lucide-react'
-import { getPageChildren, movePage, deletePage } from '../api/pages'
-import { pageTreeUtils } from '../api/pages'
-import { api } from '../api/client.js'
+import { pagesApi, publishingApi } from '../api'
 import { getPageDisplayUrl, isRootPage, sanitizePageData } from '../utils/apiValidation.js'
 import Tooltip from './Tooltip'
 import { useNotificationContext } from './NotificationManager'
@@ -313,8 +311,7 @@ const PageTreeNode = memo(({
     // Update page hostnames mutation
     const updateHostnamesMutation = useMutation({
         mutationFn: async (hostnamesData) => {
-            const response = await api.patch(`/api/v1/webpages/pages/${page.id}/`, hostnamesData)
-            return response.data
+            return await pagesApi.update(page.id, hostnamesData)
         },
         onSuccess: (updatedPage) => {
             setShowHostnameModal(false)
@@ -331,8 +328,7 @@ const PageTreeNode = memo(({
     // Update page title mutation
     const updateTitleMutation = useMutation({
         mutationFn: async (titleData) => {
-            const response = await api.patch(`/api/v1/webpages/pages/${page.id}/`, titleData)
-            return response.data
+            return await pagesApi.update(page.id, titleData)
         },
         onSuccess: (updatedPage) => {
             setIsEditingTitle(false)
@@ -350,8 +346,7 @@ const PageTreeNode = memo(({
     // Update page slug mutation
     const updateSlugMutation = useMutation({
         mutationFn: async (slugData) => {
-            const response = await api.patch(`/api/v1/webpages/pages/${page.id}/`, slugData)
-            return response.data
+            return await pagesApi.update(page.id, slugData)
         },
         onSuccess: (updatedPage) => {
             setIsEditingSlug(false)
@@ -369,8 +364,7 @@ const PageTreeNode = memo(({
     // Publish page mutation
     const publishPageMutation = useMutation({
         mutationFn: async () => {
-            const response = await api.post(`/api/v1/webpages/pages/${page.id}/publish/`)
-            return response.data
+            return await publishingApi.publishPage(page.id)
         },
         onSuccess: (updatedPage) => {
             setIsTogglingPublication(false)
@@ -388,8 +382,7 @@ const PageTreeNode = memo(({
     // Unpublish page mutation
     const unpublishPageMutation = useMutation({
         mutationFn: async () => {
-            const response = await api.post(`/api/v1/webpages/pages/${page.id}/unpublish/`)
-            return response.data
+            return await publishingApi.unpublishPage(page.id)
         },
         onSuccess: (updatedPage) => {
             setIsTogglingPublication(false)
