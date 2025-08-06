@@ -745,7 +745,6 @@ const PageCreationModal = ({ positioningParams, onSave, onCancel, isLoading }) =
     const [formData, setFormData] = useState({
         title: '',
         slug: '',
-        description: '',
         publication_status: 'unpublished'
     })
 
@@ -833,20 +832,6 @@ const PageCreationModal = ({ positioningParams, onSave, onCancel, isLoading }) =
                     </div>
 
                     <div>
-                        <label htmlFor="page-description" className="block text-sm font-medium text-gray-700 mb-1">
-                            Description
-                        </label>
-                        <textarea
-                            id="page-description"
-                            value={formData.description}
-                            onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                            placeholder="Enter page description"
-                            rows={3}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                    </div>
-
-                    <div>
                         <label htmlFor="publication-status" className="block text-sm font-medium text-gray-700 mb-1">
                             Publication Status
                         </label>
@@ -898,7 +883,6 @@ const PageCreationModal = ({ positioningParams, onSave, onCancel, isLoading }) =
 const RootPageCreationModal = ({ onSave, onCancel, isLoading }) => {
     const [formData, setFormData] = useState({
         title: '',
-        description: '',
         hostnames: '',
         publication_status: 'unpublished'
     })
@@ -935,7 +919,6 @@ const RootPageCreationModal = ({ onSave, onCancel, isLoading }) => {
         const pageData = {
             title: formData.title,
             slug: slug,
-            description: formData.description,
             publication_status: formData.publication_status,
             hostnames: hostnamesArray,
             parent_id: null // Root pages have no parent
@@ -994,20 +977,6 @@ const RootPageCreationModal = ({ onSave, onCancel, isLoading }) => {
                         <p className="text-xs text-gray-500 mt-1">
                             Enter hostnames separated by commas. Root pages need at least one hostname.
                         </p>
-                    </div>
-
-                    <div>
-                        <label htmlFor="root-page-description" className="block text-sm font-medium text-gray-700 mb-1">
-                            Description
-                        </label>
-                        <textarea
-                            id="root-page-description"
-                            value={formData.description}
-                            onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                            placeholder="Enter page description"
-                            rows={3}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        />
                     </div>
 
                     <div>

@@ -223,7 +223,6 @@ const SettingsManager = () => {
             const duplicateData = {
                 title: `${page.title} (Copy)`,
                 slug: `${page.slug}-copy-${Date.now()}`,
-                description: page.description,
                 publication_status: 'unpublished', // Always create duplicates as unpublished
                 layout: page.layout?.id || null,
                 theme: page.theme?.id || null,
@@ -520,7 +519,6 @@ const PageForm = ({ page = null, onSave, onCancel, isLoading = false }) => {
     const [formData, setFormData] = useState({
         title: page?.title || '',
         slug: page?.slug || '',
-        description: page?.description || '',
         publication_status: page?.publication_status || 'unpublished'
     })
 
@@ -603,20 +601,6 @@ const PageForm = ({ page = null, onSave, onCancel, isLoading = false }) => {
                             required
                         />
                     </div>
-                </div>
-
-                <div>
-                    <label htmlFor="page-description" className="block text-sm font-medium text-gray-700 mb-1">
-                        Description
-                    </label>
-                    <textarea
-                        id="page-description"
-                        value={formData.description}
-                        onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                        placeholder="Enter page description"
-                        rows={3}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
                 </div>
 
                 <div>

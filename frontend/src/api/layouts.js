@@ -92,13 +92,13 @@ export const layoutsApi = {
 
     // Page operations with code layout support
     pages: {
-        // Update page layout (code-based only)
-        updateLayout: async (pageId, layoutName) => {
+        // Update page layout (code-based only) - now uses versioned endpoint
+        updateLayout: async (pageId, versionId, layoutName) => {
             const data = {
                 code_layout: layoutName || ''
             }
 
-            const response = await axios.patch(`${API_BASE}/pages/${pageId}/`, data)
+            const response = await axios.patch(`${API_BASE}/pages/${pageId}/versions/${versionId}/`, data)
             return response.data
         }
     }

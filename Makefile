@@ -29,6 +29,13 @@ migrate:
 createsuperuser:
 	docker-compose exec backend python manage.py createsuperuser
 
+changepassword:
+	docker-compose exec backend python manage.py changepassword -u admin -p admin
+
+shell:
+	docker-compose exec backend bash
+
+
 # Run backend tests
 backend-test:
 	docker-compose exec backend python manage.py test
