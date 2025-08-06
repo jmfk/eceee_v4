@@ -8,7 +8,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { api } from '../api/client.js';
+import { pagesApi, publishingApi } from '../api';
 import { extractErrorMessage } from '../utils/errorHandling.js';
 import { CheckCircle, AlertTriangle } from 'lucide-react';
 import SearchAndFilter from './bulk-publishing/SearchAndFilter';
@@ -35,8 +35,7 @@ const BulkPublishingOperations = () => {
     const fetchPages = async () => {
         try {
             setLoading(true);
-            const response = await api.get('/api/v1/webpages/pages/');
-            const data = response.data;
+            const data = await pagesApi.list();
             setPages(data.results || data);
         } catch (err) {
             setError(err.message);
@@ -87,8 +86,6 @@ const BulkPublishingOperations = () => {
             setSuccess(null);
 
             const pageIds = Array.from(selectedPages);
-            const endpoint = operation === 'publish' ? '/api/webpages/bulk_publish/' : '/api/webpages/bulk_schedule/';
-
             const requestData = {
                 page_ids: pageIds,
                 ...(operation === 'schedule' && {
@@ -97,8 +94,10 @@ const BulkPublishingOperations = () => {
                 })
             };
 
-            const response = await api.post(endpoint, requestData);
-            const result = response.data;
+            const result = operation === 'publish'
+                ? await publishingApi.bulkPublish(requestData)
+                : await publishingApi.bulkSchedule(requestData);
+
             setSuccess(result.message);
             setSelectedPages(new Set());
 

@@ -99,13 +99,10 @@ class LayoutRenderer {
     }
 
     try {
-      this.widgetTypesPromise = fetch('/api/v1/webpages/widget-types/?include_template_json=true')
-        .then(response => {
-          if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-          }
-          return response.json();
-        })
+      // Import widgetsApi at the top of the file or load it dynamically
+      const { widgetsApi } = await import('../api');
+
+      this.widgetTypesPromise = widgetsApi.getTypes(true) // includeTemplateJson = true
         .then(apiWidgets => {
           // Transform API response to widget card format
           const transformedWidgets = this.transformApiWidgetsToCardFormat(apiWidgets);
