@@ -1,4 +1,4 @@
-import { api } from '../api/client.js'
+import { widgetsApi } from '../api'
 import { extractErrorMessage } from './errorHandling.js'
 
 /**
@@ -7,7 +7,7 @@ import { extractErrorMessage } from './errorHandling.js'
  */
 
 class WidgetCommand {
-    constructor(apiClient = api, notificationHandler = null) {
+    constructor(apiClient = widgetsApi, notificationHandler = null) {
         this.apiClient = apiClient
         this.notificationHandler = notificationHandler
     }
@@ -44,7 +44,7 @@ export class AddWidgetCommand extends WidgetCommand {
 
     async execute() {
         try {
-            const response = await this.apiClient.post('/api/v1/webpages/widgets/', {
+            const data = await this.apiClient.create({
                 page: this.pageId,
                 widget_type: this.widgetTypeName,
                 slot_name: this.slotName,
@@ -53,7 +53,7 @@ export class AddWidgetCommand extends WidgetCommand {
             })
 
             this.handleSuccess('Widget added successfully')
-            return response.data
+            return data
         } catch (error) {
             this.handleError(error, 'Failed to add widget')
         }
@@ -77,13 +77,13 @@ export class UpdateWidgetCommand extends WidgetCommand {
     async execute() {
         try {
             // Store previous state for undo
-            const currentWidget = await this.apiClient.get(`/api/v1/webpages/widgets/${this.widgetId}/`)
-            this.previousState = currentWidget.data
+            const currentWidget = await this.apiClient.get(this.widgetId)
+            this.previousState = currentWidget
 
-            const response = await this.apiClient.patch(`/api/v1/webpages/widgets/${this.widgetId}/`, this.updates)
+            const data = await this.apiClient.update(this.widgetId, this.updates)
 
             this.handleSuccess('Widget updated successfully')
-            return response.data
+            return data
         } catch (error) {
             this.handleError(error, 'Failed to update widget')
         }
@@ -95,9 +95,9 @@ export class UpdateWidgetCommand extends WidgetCommand {
         }
 
         try {
-            const response = await this.apiClient.patch(`/api/v1/webpages/widgets/${this.widgetId}/`, this.previousState)
+            const data = await this.apiClient.update(this.widgetId, this.previousState)
             this.handleSuccess('Widget update undone')
-            return response.data
+            return data
         } catch (error) {
             this.handleError(error, 'Failed to undo widget update')
         }
@@ -114,10 +114,10 @@ export class DeleteWidgetCommand extends WidgetCommand {
     async execute() {
         try {
             // Store widget data for potential undo
-            const widget = await this.apiClient.get(`/api/v1/webpages/widgets/${this.widgetId}/`)
-            this.deletedWidget = widget.data
+            const widget = await this.apiClient.get(this.widgetId)
+            this.deletedWidget = widget
 
-            await this.apiClient.delete(`/api/v1/webpages/widgets/${this.widgetId}/`)
+            await this.apiClient.delete(this.widgetId)
 
             this.handleSuccess('Widget deleted successfully')
             return { deleted: true, widgetId: this.widgetId }
@@ -134,10 +134,10 @@ export class DeleteWidgetCommand extends WidgetCommand {
         try {
             // Recreate the widget
             const { id, created_at, updated_at, ...widgetData } = this.deletedWidget
-            const response = await this.apiClient.post('/api/v1/webpages/widgets/', widgetData)
+            const data = await this.apiClient.create(widgetData)
 
             this.handleSuccess('Widget deletion undone')
-            return response.data
+            return data
         } catch (error) {
             this.handleError(error, 'Failed to undo widget deletion')
         }
@@ -153,11 +153,11 @@ export class ReorderWidgetCommand extends WidgetCommand {
 
     async execute() {
         try {
-            const response = await this.apiClient.post(`/api/v1/webpages/widgets/${this.widgetId}/reorder/`, {
+            const data = await this.apiClient.reorder(this.widgetId, {
                 sort_order: this.newSortOrder
             })
 
-            return response.data
+            return data
         } catch (error) {
             this.handleError(error, 'Failed to reorder widget')
         }
