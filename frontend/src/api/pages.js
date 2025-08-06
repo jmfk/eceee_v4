@@ -79,14 +79,14 @@ export const createPage = async (pageData) => {
     return response.data
 }
 
-// Update a page
-export const updatePage = async (pageId, pageData) => {
-    const response = await api.patch(`${API_BASE}/pages/${pageId}/`, pageData)
+// Update a page version
+export const updatePage = async (pageId, versionId, pageData) => {
+    const response = await api.patch(`${API_BASE}/pages/${pageId}/versions/${versionId}/`, pageData)
     return response.data
 }
 
-// NEW: Unified save function (page data + widgets in one call)
-export const savePageWithWidgets = async (pageId, pageData = {}, widgets = null, options = {}) => {
+// NEW: Unified save function (page data + widgets in one call) - now uses versioned endpoint
+export const savePageWithWidgets = async (pageId, versionId, pageData = {}, widgets = null, options = {}) => {
     const payload = {
         ...pageData,  // page metadata (title, slug, description, etc.)
     };
@@ -107,7 +107,7 @@ export const savePageWithWidgets = async (pageId, pageData = {}, widgets = null,
     }
     // console.log("savePageWithWidgets")
     // console.log('🔄 API: Unified save payload:', payload);
-    const response = await api.patch(`${API_BASE}/pages/${pageId}/`, payload);
+    const response = await api.patch(`${API_BASE}/pages/${pageId}/versions/${versionId}/`, payload);
     // console.log('✅ API: Unified save response:', response.data);
     return response.data;
 };

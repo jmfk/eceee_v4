@@ -57,18 +57,33 @@ const PageEditor = () => {
     const navigate = useNavigate()
     const location = useLocation()
 
+    // Extract version from URL search parameters
+    const urlParams = new URLSearchParams(location.search)
+    const versionFromUrl = urlParams.get('version')
+
     // Determine previous view from location state or default to /pages
     const previousView = location.state?.previousView || '/pages'
     const isNewPage = pageId === 'new' || !pageId
     const activeTab = tab || 'content'
 
+    // Helper function to construct URL with current version parameter
+    const buildUrlWithVersion = (path, version = versionFromUrl) => {
+        if (version && !isNewPage) {
+            const params = new URLSearchParams()
+            params.set('version', version)
+            return `${path}?${params.toString()}`
+        }
+        return path
+    }
+
     // Redirect to content tab if no tab is specified
     useEffect(() => {
         if (!tab) {
-            const defaultPath = isNewPage ? `/pages/new/content` : `/pages/${pageId}/edit/content`
+            const basePath = isNewPage ? `/pages/new/content` : `/pages/${pageId}/edit/content`
+            const defaultPath = buildUrlWithVersion(basePath)
             navigate(defaultPath, { replace: true, state: { previousView } })
         }
-    }, [tab, isNewPage, pageId, navigate, previousView])
+    }, [tab, isNewPage, pageId, navigate, previousView, versionFromUrl])
     const [pageData, setPageData] = useState(null)
     const [isDirty, setIsDirty] = useState(false)
     const [isPublishing, setIsPublishing] = useState(false)
@@ -267,15 +282,30 @@ const PageEditor = () => {
         try {
             const versionsData = await getPageVersionsList(pageData.id);
             setAvailableVersions(versionsData.versions || []);
-            // Set current version if not already set - default to last saved version (highest version number)
-            if (versionsData.versions && versionsData.versions.length > 0) {
-                // Find the version with the highest version number (last saved)
-                const lastSavedVersion = versionsData.versions.reduce((latest, current) => {
+
+            let targetVersion = null;
+
+            // First priority: Use version from URL if specified and valid
+            if (versionFromUrl && versionsData.versions) {
+                targetVersion = versionsData.versions.find(v => v.id.toString() === versionFromUrl);
+                if (!targetVersion) {
+                    // Version ID from URL is invalid, remove it from URL
+                    const currentPath = location.pathname;
+                    navigate(currentPath, { replace: true, state: { previousView } });
+                }
+            }
+
+            // Second priority: Use highest version number (last saved) if no URL version or URL version is invalid
+            if (!targetVersion && versionsData.versions && versionsData.versions.length > 0) {
+                targetVersion = versionsData.versions.reduce((latest, current) => {
                     return (current.version_number > latest.version_number) ? current : latest;
                 });
-                setCurrentVersion(lastSavedVersion);
+            }
+
+            if (targetVersion) {
+                setCurrentVersion(targetVersion);
                 // Load the complete version data including widgets
-                const newPage = await getPageVersion(pageData.id, lastSavedVersion.id);
+                const newPage = await getPageVersion(pageData.id, targetVersion.id);
                 setPageData(prev => {
                     return { ...prev, ...newPage };
                 });
@@ -284,7 +314,7 @@ const PageEditor = () => {
             console.error('PageEditor: Error loading versions', error);
             showError('Failed to load page versions');
         }
-    }, [pageData?.id, isNewPage, showError]);
+    }, [pageData?.id, isNewPage, versionFromUrl, location.pathname, navigate, previousView, showError]);
 
     // Load versions but preserve current version selection
     const loadVersionsPreserveCurrent = useCallback(async () => {
@@ -322,7 +352,9 @@ const PageEditor = () => {
 
     // Navigate to version timeline page
     const handleShowVersionTimeline = () => {
-        navigate(`/pages/${pageData?.id}/versions`);
+        const timelineUrl = `/pages/${pageData?.id}/versions`;
+        const versionParam = currentVersion ? `?currentVersion=${currentVersion.id}` : '';
+        navigate(`${timelineUrl}${versionParam}`);
     }
 
     // Handle page data updates
@@ -340,6 +372,11 @@ const PageEditor = () => {
             // Set the version data as pageData (already in flat structure from API)
             setPageData(versionPageData);
 
+            // Update URL to include version parameter
+            const currentPath = location.pathname;
+            const newUrl = buildUrlWithVersion(currentPath, versionId);
+            navigate(newUrl, { replace: true, state: { previousView } });
+
             // Handle layout fallback for versions without valid layouts
             if (!versionPageData.code_layout) {
                 addNotification({
@@ -356,7 +393,7 @@ const PageEditor = () => {
             console.error('PageEditor: Error switching to version', error);
             showError(`Failed to load version: ${error.message}`);
         }
-    }, [pageData, availableVersions, showError, addNotification]);
+    }, [pageData, availableVersions, showError, addNotification, location.pathname, navigate, buildUrlWithVersion, previousView]);
 
     // Load versions when page data is available
     useEffect(() => {
@@ -430,6 +467,7 @@ const PageEditor = () => {
             // Single API call for everything!
             const response = await savePageWithWidgets(
                 pageData.id,
+                currentVersion?.id || pageData.version_id,  // Use current version ID
                 unifiedPageData,
                 collectedData.widgets,
                 {
@@ -700,6 +738,7 @@ const PageEditor = () => {
                     )}
                     {activeTab === 'settings' && (
                         <SettingsEditor
+                            key={`settings-${pageData?.version_id || 'new'}`}
                             ref={settingsEditorRef}
                             pageData={pageData}
                             onUpdate={updatePageData}
@@ -708,6 +747,7 @@ const PageEditor = () => {
                     )}
                     {activeTab === 'metadata' && (
                         <MetadataEditor
+                            key={`metadata-${pageData?.version_id || 'new'}`}
                             ref={metadataEditorRef}
                             pageData={pageData}
                             onUpdate={updatePageData}
@@ -790,7 +830,6 @@ const SettingsEditor = forwardRef(({ pageData, onUpdate, isNewPage }, ref) => {
             const currentSettings = {
                 title: pageData?.title || '',
                 slug: pageData?.slug || '',
-                description: pageData?.description || '',
                 code_layout: pageData?.code_layout || '',
                 publication_status: pageData?.publication_status || 'unpublished'
             };
@@ -837,19 +876,6 @@ const SettingsEditor = forwardRef(({ pageData, onUpdate, isNewPage }, ref) => {
                             />
                         </div>
 
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Description
-                            </label>
-                            <textarea
-                                value={pageData?.description || ''}
-                                onChange={(e) => onUpdate({ description: e.target.value })}
-                                rows={4}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                placeholder="Enter page description"
-                            />
-                        </div>
-
                         {/* Page Layout Selection */}
                         <div>
                             <LayoutSelector
@@ -880,7 +906,7 @@ const MetadataEditor = forwardRef(({ pageData, onUpdate, isNewPage }, ref) => {
             // This method confirms the current state is saved
             const currentMetadata = {
                 meta_title: pageData?.meta_title || pageData?.title || '',
-                meta_description: pageData?.meta_description || pageData?.description || '',
+                meta_description: pageData?.meta_description || '',
                 hostnames: pageData?.hostnames || []
             };
 
@@ -918,7 +944,7 @@ const MetadataEditor = forwardRef(({ pageData, onUpdate, isNewPage }, ref) => {
                                 Meta Description
                             </label>
                             <textarea
-                                value={pageData?.meta_description || pageData?.description || ''}
+                                value={pageData?.meta_description || ''}
                                 onChange={(e) => onUpdate({ meta_description: e.target.value })}
                                 rows={3}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -1054,6 +1080,7 @@ const PagePreview = ({ pageData, isLoadingLayout, layoutData }) => {
                     <div className="h-full p-4">
                         <div className="bg-white shadow-lg rounded-lg w-full h-full overflow-auto">
                             <ContentEditor
+                                key={`preview-${pageData?.id}-${pageData?.version_id || 'current'}`}
                                 layoutJson={layoutData}
                                 pageData={pageData}
                                 editable={false}
@@ -1096,6 +1123,7 @@ const PagePreview = ({ pageData, isLoadingLayout, layoutData }) => {
                                     {/* Device content area with natural scrolling */}
                                     <div className="w-full">
                                         <ContentEditor
+                                            key={`mobile-preview-${pageData?.id}-${pageData?.version_id || 'current'}`}
                                             layoutJson={layoutData}
                                             pageData={pageData}
                                             editable={false}

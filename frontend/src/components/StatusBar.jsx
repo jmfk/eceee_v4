@@ -127,12 +127,11 @@ const StatusBar = ({
                     {availableVersions.length > 0 && (
                         <>
                             <div className="w-px h-4 bg-gray-300 mx-2" />
-                            <span className="text-xs text-gray-500">Version:</span>
                             <VersionSelector
                                 currentVersion={currentVersion}
                                 availableVersions={availableVersions}
                                 onVersionChange={onVersionChange}
-                                className="min-w-0 w-48"
+                                className="min-w-0 w-32"
                             />
 
                             {onRefreshVersions && (

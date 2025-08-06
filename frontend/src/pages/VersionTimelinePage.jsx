@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, Calendar, Clock, Eye, Settings, Plus, Edit3, ExternalLink, Edit2, Check, X, Package, Trash2, AlertTriangle, CheckCircle } from 'lucide-react';
 import { getPageVersionsList, scheduleVersion, publishVersionNow, updateVersion, packVersionsAggressive, packVersionsDrafts } from '../api/versions.js';
 import { getPage, getPageActiveVersion } from '../api/pages.js';
@@ -17,7 +17,21 @@ import { useGlobalNotifications } from '../contexts/GlobalNotificationContext';
 const VersionTimelinePage = () => {
     const { pageId } = useParams();
     const navigate = useNavigate();
+    const location = useLocation();
     const { addNotification } = useGlobalNotifications();
+
+    // Extract current version from URL parameters
+    const urlParams = new URLSearchParams(location.search);
+    const currentVersionFromUrl = urlParams.get('currentVersion');
+
+    // Helper function to build editor URL with version parameter
+    const buildEditorUrl = (versionId = currentVersionFromUrl) => {
+        const baseUrl = `/pages/${pageId}/edit/content`;
+        if (versionId) {
+            return `${baseUrl}?version=${versionId}`;
+        }
+        return baseUrl;
+    };
 
     const [versions, setVersions] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -370,7 +384,7 @@ const VersionTimelinePage = () => {
                     <div className="flex items-center justify-between py-6">
                         <div className="flex items-center space-x-4">
                             <button
-                                onClick={() => navigate(`/pages/${pageId}/edit/content`)}
+                                onClick={() => navigate(buildEditorUrl())}
                                 className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
                             >
                                 <ArrowLeft className="w-5 h-5 mr-2" />
@@ -448,7 +462,7 @@ const VersionTimelinePage = () => {
                         <h3 className="text-xl font-medium text-gray-900 mb-2">No versions found</h3>
                         <p className="text-gray-600 mb-6">Create content first to manage versions and publishing.</p>
                         <button
-                            onClick={() => navigate(`/pages/${pageId}/edit/content`)}
+                            onClick={() => navigate(buildEditorUrl())}
                             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
                         >
                             Go to Editor
@@ -458,10 +472,15 @@ const VersionTimelinePage = () => {
                     <div className="space-y-6">
                         {sortedVersions.map((version) => {
                             const statusInfo = getVersionStatusInfo(version);
+                            const isCurrentVersionFromEditor = currentVersionFromUrl && version.id.toString() === currentVersionFromUrl;
+
                             return (
                                 <div
                                     key={version.id}
-                                    className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow"
+                                    className={`bg-white border rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow ${isCurrentVersionFromEditor
+                                            ? 'border-blue-300 ring-2 ring-blue-100'
+                                            : 'border-gray-200'
+                                        }`}
                                 >
                                     <div className="flex items-start justify-between">
                                         <div className="flex-1">
@@ -522,6 +541,11 @@ const VersionTimelinePage = () => {
                                                 {statusInfo.status === 'published' && (
                                                     <span className="text-sm bg-green-500 text-white px-3 py-1 rounded-full font-medium">
                                                         LIVE
+                                                    </span>
+                                                )}
+                                                {isCurrentVersionFromEditor && (
+                                                    <span className="text-sm bg-blue-500 text-white px-3 py-1 rounded-full font-medium">
+                                                        EDITING
                                                     </span>
                                                 )}
                                             </div>
