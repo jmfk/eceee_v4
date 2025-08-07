@@ -278,7 +278,7 @@ const PageEditor = () => {
             return;
         }
         try {
-            const versionsData = await versionsApi.getPageVersionsList(pageData.id);
+            const versionsData = await versionsApi.getPageVersionsList(pageData.id || pageId);
             setAvailableVersions(versionsData.versions || []);
 
             let targetVersion = null;
@@ -303,7 +303,7 @@ const PageEditor = () => {
             if (targetVersion) {
                 setCurrentVersion(targetVersion);
                 // Load the complete version data including widgets
-                const newPage = await versionsApi.getPageVersion(pageData.id, targetVersion.id);
+                const newPage = await versionsApi.getPageVersion(pageData.id || pageId, targetVersion.id);
                 setPageData(prev => {
                     return { ...prev, ...newPage };
                 });
@@ -320,7 +320,7 @@ const PageEditor = () => {
             return;
         }
         try {
-            const versionsData = await versionsApi.getPageVersionsList(pageData.id);
+            const versionsData = await versionsApi.getPageVersionsList(pageData.id || pageId);
             setAvailableVersions(versionsData.versions || []);
 
             // Only set current version if not already set
@@ -331,13 +331,13 @@ const PageEditor = () => {
                 });
                 setCurrentVersion(lastSavedVersion);
                 // Load the complete version data including widgets
-                const newPage = await versionsApi.getPageVersion(pageData.id, lastSavedVersion.id);
+                const newPage = await versionsApi.getPageVersion(pageData.id || pageId, lastSavedVersion.id);
                 setPageData(prev => {
                     return { ...prev, ...newPage };
                 });
             } else if (currentVersion) {
                 // If we have a current version, reload the page data with that version
-                const newPage = await versionsApi.getPageVersion(pageData.id, currentVersion.id);
+                const newPage = await versionsApi.getPageVersion(pageData.id || pageId, currentVersion.id);
                 setPageData(prev => {
                     return { ...prev, ...newPage };
                 });
@@ -364,7 +364,7 @@ const PageEditor = () => {
     const switchToVersion = useCallback(async (versionId) => {
         if (!versionId || !pageData?.id) return;
         try {
-            const versionPageData = await versionsApi.getPageVersion(pageData.id, versionId);
+            const versionPageData = await versionsApi.getPageVersion(pageData.id || pageId, versionId);
             const versionData = availableVersions.find(version => version.id === versionId);
             setCurrentVersion(versionData);
             // Set the version data as pageData (already in flat structure from API)
@@ -464,7 +464,7 @@ const PageEditor = () => {
 
             // Single API call for everything!
             const response = await pagesApi.saveWithWidgets(
-                pageData.id,
+                pageData.id || pageId || pageId,  // Fallback to pageId from URL if pageData.id || pageId is undefined
                 currentVersion?.id || pageData.version_id,  // Use current version ID
                 unifiedPageData,
                 collectedData.widgets,
@@ -499,7 +499,7 @@ const PageEditor = () => {
             await loadVersionsPreserveCurrent();
 
             // Invalidate queries to refresh data
-            queryClient.invalidateQueries(['page', pageData.id]);
+            queryClient.invalidateQueries(['page', pageData.id || pageId]);
             queryClient.invalidateQueries(['pages', 'root']);
 
         } catch (error) {

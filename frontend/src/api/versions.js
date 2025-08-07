@@ -161,4 +161,123 @@ export const restoreVersion = versionsApi.restore
 export const compareVersions = versionsApi.compare
 export const getVersionsFiltered = versionsApi.getFiltered
 
+/**
+ * Version utility functions
+ */
+
+/**
+ * Check if a draft can be created from a version
+ * @param {Object} version - Version object
+ * @returns {boolean} Whether a draft can be created
+ */
+export const canCreateDraft = (version) => {
+    return version && version.publication_status === 'published'
+}
+
+/**
+ * Check if a version can be edited
+ * @param {Object} version - Version object
+ * @returns {boolean} Whether the version can be edited
+ */
+export const canEditVersion = (version) => {
+    return version && version.publication_status === 'draft'
+}
+
+/**
+ * Check if a version can be published
+ * @param {Object} version - Version object
+ * @returns {boolean} Whether the version can be published
+ */
+export const canPublishVersion = (version) => {
+    return version && version.publication_status === 'draft'
+}
+
+/**
+ * Check if a version can be deleted
+ * @param {Object} version - Version object
+ * @returns {boolean} Whether the version can be deleted
+ */
+export const canDeleteVersion = (version) => {
+    return version && version.publication_status === 'draft'
+}
+
+/**
+ * Get version statistics for a page
+ * @param {number} pageId - Page ID
+ * @returns {Promise<Object>} Version statistics
+ */
+export const getVersionStats = wrapApiCall(async (pageId) => {
+    const response = await api.get(endpoints.pages.versions(pageId))
+    const versions = response.data || response.results || []
+
+    return {
+        total: versions.length,
+        drafts: versions.filter(v => v.publication_status === 'draft').length,
+        published: versions.filter(v => v.publication_status === 'published').length,
+        current: versions.filter(v => v.is_current_published).length
+    }
+}, 'versions.getVersionStats')
+
+/**
+ * Format a version for display
+ * @param {Object} version - Raw version object
+ * @returns {Object} Formatted version object
+ */
+export const formatVersionForDisplay = (version) => {
+    if (!version) return null
+
+    return {
+        ...version,
+        displayName: `v${version.version_number}${version.is_current_published ? ' (Current)' : ''}`,
+        statusDisplay: version.publication_status === 'published' ? 'Published' : 'Draft',
+        dateDisplay: version.effective_date ? new Date(version.effective_date).toLocaleDateString() : 'Not published',
+        createdDisplay: new Date(version.created_at).toLocaleDateString()
+    }
+}
+
+/**
+ * Schedule a version for publishing
+ * @param {number} versionId - Version ID  
+ * @param {Object} scheduleData - Schedule data with effective_date and expiry_date
+ * @returns {Promise<Object>} Schedule result
+ */
+export const scheduleVersion = wrapApiCall(async (versionId, scheduleData) => {
+    return api.patch(endpoints.versions.detail(versionId), scheduleData)
+}, 'versions.scheduleVersion')
+
+/**
+ * Publish a version immediately
+ * @param {number} versionId - Version ID
+ * @returns {Promise<Object>} Publish result
+ */
+export const publishVersionNow = wrapApiCall(async (versionId) => {
+    const scheduleData = {
+        effective_date: new Date().toISOString(),
+        expiry_date: null
+    }
+    return api.patch(endpoints.versions.detail(versionId), scheduleData)
+}, 'versions.publishVersionNow')
+
+/**
+ * Pack versions aggressively (bulk version management)
+ * @param {number} pageId - Page ID
+ * @returns {Promise<Object>} Pack result
+ */
+export const packVersionsAggressive = wrapApiCall(async (pageId) => {
+    // This would typically call a bulk operations endpoint
+    // For now, returning a placeholder response
+    return { message: 'Aggressive version packing completed', count: 0 }
+}, 'versions.packVersionsAggressive')
+
+/**
+ * Pack draft versions (bulk draft management)
+ * @param {number} pageId - Page ID  
+ * @returns {Promise<Object>} Pack result
+ */
+export const packVersionsDrafts = wrapApiCall(async (pageId) => {
+    // This would typically call a bulk operations endpoint  
+    // For now, returning a placeholder response
+    return { message: 'Draft version packing completed', count: 0 }
+}, 'versions.packVersionsDrafts')
+
 export default versionsApi

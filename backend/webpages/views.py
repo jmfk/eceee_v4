@@ -704,9 +704,13 @@ class WebPageViewSet(viewsets.ModelViewSet):
             }
         )
 
-    @action(detail=True, methods=["patch"], url_path="versions/(?P<version_id>[^/.]+)")
-    def update_version(self, request, pk=None, version_id=None):
-        """Update a specific version of this page"""
+    @action(
+        detail=True,
+        methods=["get", "patch"],
+        url_path="versions/(?P<version_id>[^/.]+)",
+    )
+    def version_detail(self, request, pk=None, version_id=None):
+        """Get or update a specific version of this page"""
         page = self.get_object()
         version = page.versions.filter(id=version_id).first()
         if not version:
@@ -715,31 +719,37 @@ class WebPageViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        # Use PageVersionSerializer for PageVersion objects
-        serializer = PageVersionSerializer(version, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
+        if request.method == "GET":
+            # Return version details
+            serializer = PageVersionSerializer(version)
+            return Response(serializer.data)
+        elif request.method == "PATCH":
+            # Update version (existing logic)
+            # Use PageVersionSerializer for PageVersion objects
+            serializer = PageVersionSerializer(version, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
 
-        # Return the same format as version_detail for consistency
-        return Response(
-            {
-                "version_id": version.id,
-                "version_number": version.version_number,
-                "page_id": version.page.id,
-                "widgets": version.widgets or {},
-                "page_data": version.page_data or {},
-                "is_current_published": version.is_current_published(),
-                "publication_status": version.get_publication_status(),
-                "description": version.description,
-                "created_at": version.created_at,
-                "created_by": (
-                    version.created_by.username if version.created_by else None
-                ),
-                "effective_date": version.effective_date,
-                "expiry_date": version.expiry_date,
-                "change_summary": version.change_summary or {},
-            }
-        )
+            # Return the same format as version_detail for consistency
+            return Response(
+                {
+                    "version_id": version.id,
+                    "version_number": version.version_number,
+                    "page_id": version.page.id,
+                    "widgets": version.widgets or {},
+                    "page_data": version.page_data or {},
+                    "is_current_published": version.is_current_published(),
+                    "publication_status": version.get_publication_status(),
+                    "description": version.description,
+                    "created_at": version.created_at,
+                    "created_by": (
+                        version.created_by.username if version.created_by else None
+                    ),
+                    "effective_date": version.effective_date,
+                    "expiry_date": version.expiry_date,
+                    "change_summary": version.change_summary or {},
+                }
+            )
 
 
 class PageVersionViewSet(viewsets.ModelViewSet):
