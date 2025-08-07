@@ -434,6 +434,11 @@ class WebPageViewSet(viewsets.ModelViewSet):
             try:
                 # Get the specific version
                 target_version = instance.versions.get(id=version_id)
+
+                # Security: Check if user has permission to access this version
+                if not self._can_access_version(request.user, target_version):
+                    # Unauthorized users can only access published versions
+                    target_version = self._get_active_version(instance)
                 version_data = target_version
             except instance.versions.model.DoesNotExist:
                 # If the specified version doesn't exist, fall back to active version
@@ -538,6 +543,32 @@ class WebPageViewSet(viewsets.ModelViewSet):
         page = self.get_object()
         serializer = WebPageDetailSerializer(page, context={"request": request})
         return Response(serializer.data)
+
+    def _can_access_version(self, user, version):
+        """
+        Check if user can access a specific page version.
+
+        Security: Non-staff users can only access published versions.
+        Staff users can access all versions.
+        """
+        # Staff users can access all versions
+        if user.is_staff:
+            return True
+
+        # Non-staff users can only access published versions that are currently active
+        if not version.is_published:
+            return False
+
+        from django.utils import timezone
+        now = timezone.now()
+
+        # Check if version is within its effective date range
+        if version.effective_date and version.effective_date > now:
+            return False
+        if version.expiry_date and version.expiry_date <= now:
+            return False
+
+        return True
 
     def _get_active_version(self, instance):
         """
@@ -1067,9 +1098,14 @@ def layout_json(request, layout_name):
         # Return generic error message to prevent information disclosure
         error_msg = "Layout serialization failed"
 
-        # In debug mode, provide more details for development
+        # In debug mode, provide more details for development but sanitize the error message
         if settings.DEBUG:
-            error_msg = f"Error serializing layout: {str(e)}"
+            # Sanitize error message to avoid leaking sensitive paths or internal details
+            error_str = str(e)
+            # Remove potential file paths and sensitive information
+            import re
+            sanitized_error = re.sub(r'/[^\s]*/', '/<path>/', error_str)
+            error_msg = f"Error serializing layout: {sanitized_error}"
 
         return Response(
             {"error": error_msg}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
