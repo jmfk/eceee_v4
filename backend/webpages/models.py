@@ -111,7 +111,7 @@ class WebPage(models.Model):
         return self.versions.order_by("-version_number").first()
 
     def __str__(self):
-        return self.title
+        return self.slug
 
     def get_absolute_url(self):
         """Generate the public URL for this page"""
@@ -122,6 +122,35 @@ class WebPage(models.Model):
     def is_root_page(self):
         """Check if this is a root page (no parent)"""
         return self.parent is None
+
+    @property
+    def title(self):
+        """Get title from current published version or latest version"""
+        current_version = self.get_current_published_version()
+        if not current_version:
+            current_version = self.get_latest_version()
+
+        if current_version:
+            # Try to get title from page_data first, then from version title field
+            if current_version.page_data and current_version.page_data.get("title"):
+                return current_version.page_data["title"]
+            elif hasattr(current_version, "title") and current_version.title:
+                return current_version.title
+
+        # Fallback to slug
+        return self.slug or f"Page {self.id}"
+
+    @property
+    def description(self):
+        """Get description from current published version or latest version"""
+        current_version = self.get_current_published_version()
+        if not current_version:
+            current_version = self.get_latest_version()
+
+        if current_version and current_version.page_data:
+            return current_version.page_data.get("description", "")
+
+        return ""
 
     @classmethod
     def normalize_hostname(cls, hostname):
@@ -355,7 +384,7 @@ class WebPage(models.Model):
         )
 
         if pages.exists():
-            return pages.select_related("theme", "parent").first()
+            return pages.select_related("parent").first()
 
         # Fallback: look for wildcard or default patterns using array overlap
         wildcard_pages = cls.objects.filter(
@@ -363,7 +392,7 @@ class WebPage(models.Model):
         )
 
         if wildcard_pages.exists():
-            return wildcard_pages.select_related("theme", "parent").first()
+            return wildcard_pages.select_related("parent").first()
 
         return None
 
@@ -387,17 +416,36 @@ class WebPage(models.Model):
         # Import here to avoid circular imports
         from .layout_registry import layout_registry
 
-        # Check for code-based layout
-        if self.code_layout:
-            code_layout_instance = layout_registry.get_layout(self.code_layout)
+        # Check for code-based layout from current version
+        current_version = self.get_current_published_version()
+        if not current_version:
+            current_version = self.get_latest_version()
+
+        if current_version and current_version.code_layout:
+            code_layout_instance = layout_registry.get_layout(
+                current_version.code_layout
+            )
             if code_layout_instance:
                 return code_layout_instance
             # If code layout is specified but not found, log warning
             import logging
 
             logger = logging.getLogger(__name__)
+            # Get title for logging (fallback to slug if no version data)
+            title = "Unknown"
+            if (
+                current_version
+                and current_version.page_data
+                and current_version.page_data.get("title")
+            ):
+                title = current_version.page_data["title"]
+            elif hasattr(current_version, "title") and current_version.title:
+                title = current_version.title
+            elif self.slug:
+                title = self.slug
+
             logger.warning(
-                f"Code layout '{self.code_layout}' not found for page '{self.title}'."
+                f"Code layout '{current_version.code_layout}' not found for page '{title}'."
             )
 
         # Inherit from parent
@@ -419,10 +467,15 @@ class WebPage(models.Model):
 
     def get_layout_type(self):
         """Get the type of layout being used: 'code' or 'inherited'"""
-        if self.code_layout:
+        # Get code_layout from current version
+        current_version = self.get_current_published_version()
+        if not current_version:
+            current_version = self.get_latest_version()
+
+        if current_version and current_version.code_layout:
             from .layout_registry import layout_registry
 
-            if layout_registry.is_registered(self.code_layout):
+            if layout_registry.is_registered(current_version.code_layout):
                 return "code"
         if self.parent:
             return "inherited"
@@ -430,8 +483,10 @@ class WebPage(models.Model):
 
     def get_effective_theme(self):
         """Get the theme for this page, inheriting from parent if needed"""
-        if self.theme:
-            return self.theme
+        # Get theme from current published version
+        current_version = self.get_current_published_version()
+        if current_version and current_version.theme:
+            return current_version.theme
         elif self.parent:
             return self.parent.get_effective_theme()
         return None
@@ -575,11 +630,18 @@ class WebPage(models.Model):
         # Find where the effective layout comes from
         current = self
         while current:
+            # Get code_layout from current page's current version
+            current_version = current.get_current_published_version()
+            if not current_version:
+                current_version = current.get_latest_version()
+
+            page_code_layout = current_version.code_layout if current_version else None
+
             # Check what layout this page has
             page_layout_info = {
                 "page": current,
-                "code_layout": current.code_layout,
-                "is_override": bool(current.code_layout),
+                "code_layout": page_code_layout,
+                "is_override": bool(page_code_layout),
             }
 
             inheritance_info["inheritance_chain"].append(page_layout_info)
@@ -588,8 +650,8 @@ class WebPage(models.Model):
             effective_layout = None
             layout_type = None
 
-            if current.code_layout:
-                code_layout_instance = layout_registry.get_layout(current.code_layout)
+            if page_code_layout:
+                code_layout_instance = layout_registry.get_layout(page_code_layout)
                 if code_layout_instance:
                     effective_layout = code_layout_instance
                     layout_type = "code"
@@ -787,17 +849,13 @@ class WebPage(models.Model):
 
     def apply_inheritance_override(self, override_type, override_value=None):
         """Apply an inheritance override for layout, theme, or widgets"""
-        if override_type == "layout":
-            self.code_layout = override_value
-        elif override_type == "theme":
-            self.theme = override_value
-        elif override_type == "clear_layout":
-            self.code_layout = ""
-        elif override_type == "clear_theme":
-            self.theme = None
-
-        self.save()
-        return True
+        # TODO: Update this method to work with PageVersion model
+        # Since theme and code_layout are now stored in PageVersion,
+        # this method needs to create a new version with the override
+        # For now, disable functionality to prevent errors
+        raise NotImplementedError(
+            "apply_inheritance_override needs to be updated to work with PageVersion model"
+        )
 
     def get_canonical_url(self):
         """Get the canonical URL for this page"""
@@ -1202,6 +1260,7 @@ class PageVersion(models.Model):
     version_title = models.TextField(
         blank=True, help_text="Description of changes in this version"
     )
+
     change_summary = models.JSONField(
         default=dict,
         blank=True,
@@ -1270,7 +1329,7 @@ class PageVersion(models.Model):
         unique_together = ["page", "version_number"]
 
     def __str__(self):
-        return f"{self.page.title} v{self.version_number}"
+        return f"{self.version_title} v{self.version_number}"
 
     def clean(self):
         """Validate the version data"""
@@ -1477,14 +1536,12 @@ class PageVersion(models.Model):
             "enable_css_injection": self.enable_css_injection,
             "effective_date": self.effective_date,
             "expiry_date": self.expiry_date,
-            "status": self.status,
-            "is_current": self.is_current,
+            # New date-based publishing status
+            "publication_status": self.get_publication_status(),
+            "is_published": self.is_published(),
+            "is_current_published": self.is_current_published(),
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "created_by": self.created_by.username if self.created_by else None,
-            "published_at": (
-                self.published_at.isoformat() if self.published_at else None
-            ),
-            "published_by": self.published_by.username if self.published_by else None,
             "page_data": self.page_data,
             "widgets": self.widgets,
         }
