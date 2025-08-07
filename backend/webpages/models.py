@@ -69,15 +69,14 @@ class WebPage(models.Model):
     Root pages (without parent) can be associated with hostnames for multi-site support.
     """
 
-    # Basic page information
-    slug = models.SlugField(max_length=255, unique=False, null=True, blank=True)
-    # Note: title and description are now stored in PageVersion.page_data
-
     # Hierarchy support
     parent = models.ForeignKey(
         "self", null=True, blank=True, on_delete=models.CASCADE, related_name="children"
     )
     sort_order = models.IntegerField(default=0)
+
+    # Basic page information
+    slug = models.SlugField(max_length=255, unique=False, null=True, blank=True)
 
     # Multi-site support for root pages
     hostnames = ArrayField(
@@ -86,40 +85,6 @@ class WebPage(models.Model):
         blank=True,
         help_text="List of hostnames this root page serves (only for pages without parent)",
     )
-
-    # Layout and theme (with inheritance)
-    # Code-based layout
-    code_layout = models.CharField(
-        max_length=255,
-        blank=True,
-        help_text="Name of code-based layout class. Leave blank to inherit from parent",
-    )
-
-    theme = models.ForeignKey(
-        PageTheme,
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL,
-        help_text="Leave blank to inherit from parent",
-    )
-
-    # Enhanced CSS injection system
-    page_css_variables = models.JSONField(
-        default=dict,
-        blank=True,
-        help_text="Page-specific CSS variables that override theme variables",
-    )
-    page_custom_css = models.TextField(
-        blank=True, help_text="Page-specific custom CSS injected after theme CSS"
-    )
-    enable_css_injection = models.BooleanField(
-        default=True, help_text="Whether to enable dynamic CSS injection for this page"
-    )
-
-    # SEO and metadata
-    meta_title = models.CharField(max_length=255, blank=True)
-    meta_description = models.TextField(blank=True)
-    meta_keywords = models.CharField(max_length=500, blank=True)
 
     # Timestamps and ownership
     created_at = models.DateTimeField(auto_now_add=True)
@@ -141,51 +106,9 @@ class WebPage(models.Model):
             GinIndex(fields=["hostnames"], name="webpages_hostnames_gin_idx"),
         ]
 
-    @property
-    def title(self):
-        """Get title from latest version's page_data"""
-        latest_version = self.get_latest_version()
-        if (
-            latest_version
-            and latest_version.page_data
-            and "title" in latest_version.page_data
-        ):
-            return latest_version.page_data["title"]
-        return f"Page {self.id}"  # Fallback for pages without versions
-
-    @property
-    def description(self):
-        """Get description from latest version's page_data"""
-        latest_version = self.get_latest_version()
-        if (
-            latest_version
-            and latest_version.page_data
-            and "description" in latest_version.page_data
-        ):
-            return latest_version.page_data["description"]
-        return ""  # Fallback to empty string
-
     def get_latest_version(self):
         """Get the latest version of this page"""
         return self.versions.order_by("-version_number").first()
-
-    def set_title(self, title):
-        """Set title in the latest version's page_data"""
-        latest_version = self.get_latest_version()
-        if latest_version:
-            if not latest_version.page_data:
-                latest_version.page_data = {}
-            latest_version.page_data["title"] = title
-            latest_version.save(update_fields=["page_data"])
-
-    def set_description(self, description):
-        """Set description in the latest version's page_data"""
-        latest_version = self.get_latest_version()
-        if latest_version:
-            if not latest_version.page_data:
-                latest_version.page_data = {}
-            latest_version.page_data["description"] = description
-            latest_version.save(update_fields=["page_data"])
 
     def __str__(self):
         return self.title
@@ -880,7 +803,7 @@ class WebPage(models.Model):
         """Get the canonical URL for this page"""
         return self.get_absolute_url()
 
-    def create_version(self, user, description=""):
+    def create_version(self, user, version_title=""):
         """Create a new version snapshot of the current page state"""
         from django.utils import timezone
         from django.db import transaction
@@ -896,19 +819,7 @@ class WebPage(models.Model):
             )
 
             # Serialize current page state (excluding widgets and publishing dates)
-            page_data = {
-                "title": self.title,
-                "slug": self.slug,
-                "description": self.description,
-                "hostnames": self.hostnames,
-                "layout": self.code_layout,
-                "theme_id": self.theme.id if self.theme else None,
-                "meta_title": self.meta_title,
-                "meta_description": self.meta_description,
-                "meta_keywords": self.meta_keywords,
-                "parent_id": self.parent_id,
-                "sort_order": self.sort_order,
-            }
+            page_data = {}
 
             # Get widgets from the most recent version with widgets (preserve widgets by default)
             widgets_data = {}
@@ -938,9 +849,9 @@ class WebPage(models.Model):
             version = PageVersion.objects.create(
                 page=self,
                 version_number=version_number,
-                page_data=page_data,
+                version_title=version_title,
+                page_data={},
                 widgets=widgets_data,
-                description=description,
                 created_by=user,
             )
             return version
@@ -1288,6 +1199,16 @@ class PageVersion(models.Model):
 
     page = models.ForeignKey(WebPage, on_delete=models.CASCADE, related_name="versions")
     version_number = models.PositiveIntegerField()
+    version_title = models.TextField(
+        blank=True, help_text="Description of changes in this version"
+    )
+    change_summary = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Summary of specific changes made in this version",
+    )
+
+    title = models.TextField(blank=True, help_text="Page Title")
 
     # Snapshot of page data at this version
     page_data = models.JSONField(help_text="Serialized page data (excluding widgets)")
@@ -1296,6 +1217,34 @@ class PageVersion(models.Model):
     widgets = models.JSONField(
         default=dict,
         help_text="Widget configuration data for this version (slot_name -> widgets array)",
+    )
+
+    # Code-based layout
+    code_layout = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Name of code-based layout class. Leave blank to inherit from parent",
+    )
+
+    theme = models.ForeignKey(
+        PageTheme,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        help_text="Leave blank to inherit from parent",
+    )
+
+    # Enhanced CSS injection system
+    page_css_variables = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Page-specific CSS variables that override theme variables",
+    )
+    page_custom_css = models.TextField(
+        blank=True, help_text="Page-specific custom CSS injected after theme CSS"
+    )
+    enable_css_injection = models.BooleanField(
+        default=True, help_text="Whether to enable dynamic CSS injection for this page"
     )
 
     # Publishing dates (new date-based system)
@@ -1310,16 +1259,6 @@ class PageVersion(models.Model):
         blank=True,
         help_text="When this version should no longer be live",
         db_index=True,
-    )
-
-    # Version metadata
-    description = models.TextField(
-        blank=True, help_text="Description of changes in this version"
-    )
-    change_summary = models.JSONField(
-        default=dict,
-        blank=True,
-        help_text="Summary of specific changes made in this version",
     )
 
     # Timestamps and ownership
@@ -1499,7 +1438,7 @@ class PageVersion(models.Model):
 
         return changes
 
-    def create_draft_from_published(self, user, description=""):
+    def create_draft_from_published(self, user, version_title=""):
         """Create a new draft version based on this published version"""
         if not self.is_published():
             raise ValueError("Can only create drafts from published versions")
@@ -1512,9 +1451,10 @@ class PageVersion(models.Model):
         draft = PageVersion.objects.create(
             page=self.page,
             version_number=version_number,
+            version_title=version_title
+            or f"Draft based on version {self.version_number}",
             page_data=self.page_data.copy(),
             widgets=self.widgets.copy() if self.widgets else {},
-            description=description or f"Draft based on version {self.version_number}",
             created_by=user,
         )
 
@@ -1526,16 +1466,25 @@ class PageVersion(models.Model):
             "id": self.id,
             "page_id": self.page_id,
             "version_number": self.version_number,
-            "page_data": self.page_data,
-            "widgets": self.widgets,
+            "version_title": self.version_title,
+            "change_summary": self.change_summary,
+            "slug": self.page.slug,
+            "hostnames": self.page.hostnames,
+            "code_layout": self.code_layout,
+            "theme": self.theme,
+            "page_css_variables": self.page_css_variables,
+            "page_custom_css": self.page_custom_css,
+            "enable_css_injection": self.enable_css_injection,
+            "effective_date": self.effective_date,
+            "expiry_date": self.expiry_date,
             "status": self.status,
             "is_current": self.is_current,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "created_by": self.created_by.username if self.created_by else None,
             "published_at": (
                 self.published_at.isoformat() if self.published_at else None
             ),
             "published_by": self.published_by.username if self.published_by else None,
-            "description": self.description,
-            "change_summary": self.change_summary,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-            "created_by": self.created_by.username if self.created_by else None,
+            "page_data": self.page_data,
+            "widgets": self.widgets,
         }

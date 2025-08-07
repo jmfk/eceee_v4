@@ -13,25 +13,25 @@ from .models import WebPage, PageVersion, PageTheme
 from .middleware import HostnameUpdateMixin
 
 
-class HasHostnamesFilter(admin.SimpleListFilter):
-    title = "has hostnames"
-    parameter_name = "has_hostnames"
+# class HasHostnamesFilter(admin.SimpleListFilter):
+#     title = "has hostnames"
+#     parameter_name = "has_hostnames"
 
-    def lookups(self, request, model_admin):
-        return (
-            ("yes", "Has hostnames"),
-            ("no", "No hostnames"),
-            ("root", "Root pages only"),
-        )
+#     def lookups(self, request, model_admin):
+#         return (
+#             ("yes", "Has hostnames"),
+#             ("no", "No hostnames"),
+#             ("root", "Root pages only"),
+#         )
 
-    def queryset(self, request, queryset):
-        if self.value() == "yes":
-            return queryset.exclude(hostnames=[])
-        elif self.value() == "no":
-            return queryset.filter(hostnames=[])
-        elif self.value() == "root":
-            return queryset.filter(parent__isnull=True)
-        return queryset
+#     def queryset(self, request, queryset):
+#         if self.value() == "yes":
+#             return queryset.exclude(hostnames=[])
+#         elif self.value() == "no":
+#             return queryset.filter(hostnames=[])
+#         elif self.value() == "root":
+#             return queryset.filter(parent__isnull=True)
+#         return queryset
 
 
 # PageLayoutAdmin removed - now using code-based layouts only
@@ -133,8 +133,8 @@ class PageVersionInline(admin.TabularInline):
 @admin.register(WebPage)
 class WebPageAdmin(HostnameUpdateMixin, admin.ModelAdmin):
     list_display = [
-        "title",
-        "slug",
+        "get_title",
+        "get_slug",
         "parent",
         "get_hostnames_display",
         "is_published_display",
@@ -149,15 +149,14 @@ class WebPageAdmin(HostnameUpdateMixin, admin.ModelAdmin):
         return super().get_queryset(request).prefetch_related("versions")
 
     list_filter = [
-        HasHostnamesFilter,
+        # HasHostnamesFilter,
         "created_at",
         "updated_at",
-        "theme",
         "parent",
         ("parent", admin.RelatedOnlyFieldListFilter),
     ]
-    search_fields = ["slug", "meta_title"]
-    # Note: title and description are now in PageVersion.page_data so can't be searched directly
+    search_fields = ["slug"]
+    # Note: title, description, and meta fields are now in PageVersion.page_data so can't be searched directly
     readonly_fields = [
         "created_at",
         "updated_at",
@@ -172,13 +171,12 @@ class WebPageAdmin(HostnameUpdateMixin, admin.ModelAdmin):
     fieldsets = (
         (
             "Basic Information",
-            {"fields": ("slug", "parent", "sort_order")},
+            {"fields": ("get_slug", "parent", "sort_order")},
         ),
         (
             "Multi-Site Configuration",
             {
                 "fields": (
-                    "hostnames",
                     "is_root_page_display",
                     "get_hostnames_display",
                 ),
@@ -203,7 +201,8 @@ class WebPageAdmin(HostnameUpdateMixin, admin.ModelAdmin):
         (
             "SEO & Metadata",
             {
-                "fields": ("meta_title", "meta_description", "meta_keywords"),
+                "fields": (),
+                "description": "Meta fields are now managed per version in PageVersion.page_data",
                 "classes": ("collapse",),
             },
         ),
@@ -222,6 +221,22 @@ class WebPageAdmin(HostnameUpdateMixin, admin.ModelAdmin):
             },
         ),
     )
+
+    def get_version(self, obj):
+        """Display hostnames"""
+        current_version = obj.get_current_published_version()
+        latest_version = obj.get_latest_version()
+        return current_version or latest_version or None
+
+    def get_title(self, obj):
+        """Display page title"""
+        version = self.get_version(obj)
+        return version.title if version else "No version"
+
+    def get_slug(self, obj):
+        """Display page slug"""
+        version = self.get_version(obj)
+        return version.slug if version else "No version"
 
     def is_published_display(self, obj):
         """Display publication status with color coding using date-based logic"""
@@ -279,15 +294,15 @@ class WebPageAdmin(HostnameUpdateMixin, admin.ModelAdmin):
                 '<span style="color: gray; font-style: italic;">Child page</span>'
             )
 
-        if not obj.hostnames:
+        version = self.get_version(obj)
+
+        if not version or not version.hostnames:
             return format_html('<span style="color: orange;">No hostnames</span>')
 
-        if len(obj.hostnames) <= 3:
-            hostnames_text = ", ".join(obj.hostnames)
+        if len(version.hostnames) <= 3:
+            hostnames_text = ", ".join(version.hostnames)
         else:
-            hostnames_text = (
-                f"{', '.join(obj.hostnames[:3])}... (+{len(obj.hostnames) - 3} more)"
-            )
+            hostnames_text = f"{', '.join(version.hostnames[:3])}... (+{len(version.hostnames) - 3} more)"
 
         return format_html('<span style="color: green;">🌐 {}</span>', hostnames_text)
 
@@ -345,54 +360,54 @@ class WebPageAdmin(HostnameUpdateMixin, admin.ModelAdmin):
         if change and any(
             field in form.changed_data
             for field in [
-                "title",
-                "description",
-                "code_layout",
-                "theme",
+                # "title",
+                # "description",
+                # "code_layout",
+                # "theme",
                 "publication_status",
-                "hostnames",
+                # "hostnames",
             ]
         ):
             obj.create_version(request.user, "Admin update")
 
-    actions = ["clear_hostnames", "show_hostname_summary", "compact_page_versions"]
+    actions = ["compact_page_versions"]  # "clear_hostnames", "show_hostname_summary",
 
-    def clear_hostnames(self, request, queryset):
-        """Clear hostnames from selected root pages"""
-        root_pages = queryset.filter(parent__isnull=True)
-        updated_count = 0
-        for page in root_pages:
-            if page.hostnames:
-                page.hostnames = []
-                page.save()
-                updated_count += 1
+    # def clear_hostnames(self, request, queryset):
+    #     """Clear hostnames from selected root pages"""
+    #     root_pages = queryset.filter(parent__isnull=True)
+    #     updated_count = 0
+    #     for page in root_pages:
+    #         if page.hostnames:
+    #             page.hostnames = []
+    #             page.save()
+    #             updated_count += 1
 
-        self.message_user(
-            request,
-            f"Cleared hostnames from {updated_count} root page(s). "
-            f"Skipped {queryset.count() - updated_count} child pages.",
-        )
+    #     self.message_user(
+    #         request,
+    #         f"Cleared hostnames from {updated_count} root page(s). "
+    #         f"Skipped {queryset.count() - updated_count} child pages.",
+    #     )
 
-    clear_hostnames.short_description = "Clear hostnames from selected root pages"
+    # clear_hostnames.short_description = "Clear hostnames from selected root pages"
 
-    def show_hostname_summary(self, request, queryset):
-        """Show hostname summary for selected pages"""
-        root_pages = queryset.filter(parent__isnull=True)
-        all_hostnames = set()
+    # def show_hostname_summary(self, request, queryset):
+    #     """Show hostname summary for selected pages"""
+    #     root_pages = queryset.filter(parent__isnull=True)
+    #     all_hostnames = set()
 
-        for page in root_pages:
-            if page.hostnames:
-                all_hostnames.update(page.hostnames)
+    #     for page in root_pages:
+    #         if page.hostnames:
+    #             all_hostnames.update(page.hostnames)
 
-        if all_hostnames:
-            hostname_list = ", ".join(sorted(all_hostnames))
-            message = f"Hostnames in selected pages: {hostname_list}"
-        else:
-            message = "No hostnames found in selected root pages."
+    #     if all_hostnames:
+    #         hostname_list = ", ".join(sorted(all_hostnames))
+    #         message = f"Hostnames in selected pages: {hostname_list}"
+    #     else:
+    #         message = "No hostnames found in selected root pages."
 
-        self.message_user(request, message)
+    #     self.message_user(request, message)
 
-    show_hostname_summary.short_description = "Show hostname summary"
+    # show_hostname_summary.short_description = "Show hostname summary"
 
     def compact_page_versions(self, request, queryset):
         """Compact page versions by keeping only the latest published version"""
@@ -501,7 +516,7 @@ class PageVersionAdmin(admin.ModelAdmin):
     list_display = [
         "page",
         "version_number",
-        "description",
+        "version_title",
         "publication_status_display",
         "effective_date",
         "created_at",
@@ -510,8 +525,7 @@ class PageVersionAdmin(admin.ModelAdmin):
     ]
     list_filter = ["effective_date", "expiry_date", "created_at", "page"]
     search_fields = [
-        "page__slug",
-        "description",
+        "version_title",
     ]  # Can't search page title anymore since it's in page_data
     readonly_fields = ["created_at", "version_number", "page_admin_link"]
 
@@ -527,7 +541,7 @@ class PageVersionAdmin(admin.ModelAdmin):
         (
             "Content",
             {
-                "fields": ("description", "page_data", "widgets"),
+                "fields": ("version_title", "page_data", "widgets"),
                 "description": "JSON fields can be edited manually. Ensure valid JSON format.",
             },
         ),
