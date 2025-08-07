@@ -31,7 +31,7 @@ import { useNotificationContext } from '../components/NotificationManager'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import LayoutEditor from '../components/LayoutEditor'
 import ThemeEditor from '../components/ThemeEditor'
-import SlotManager from '../components/SlotManager'
+
 import VersionManager from '../components/VersionManager'
 
 import PublicationStatusDashboard from '../components/PublicationStatusDashboard'
@@ -126,12 +126,7 @@ const SettingsManager = () => {
             icon: Palette,
             description: 'Customize colors and styling'
         },
-        {
-            id: 'widgets',
-            label: 'Widgets',
-            icon: Layers,
-            description: 'Manage page widgets and content'
-        },
+
         {
             id: 'versions',
             label: 'Versions',
@@ -249,43 +244,7 @@ const SettingsManager = () => {
 
 
 
-    const renderWidgetManagement = () => {
-        if (!selectedPage) {
-            return (
-                <div className="bg-white rounded-lg shadow p-8">
-                    <div className="text-center text-gray-500">
-                        <Layers className="w-8 h-8 mx-auto mb-2" />
-                        <p>Select a page from the Pages tab to manage its widgets</p>
-                    </div>
-                </div>
-            )
-        }
 
-        if (!selectedPage.layout) {
-            return (
-                <div className="bg-white rounded-lg shadow p-8">
-                    <div className="text-center text-gray-500">
-                        <Grid3X3 className="w-8 h-8 mx-auto mb-2" />
-                        <p>This page has no layout assigned</p>
-                        <p className="text-sm mt-1">
-                            Assign a layout to this page before managing widgets
-                        </p>
-                    </div>
-                </div>
-            )
-        }
-
-        return (
-            <SlotManager
-                pageId={selectedPage.id}
-                layout={selectedPage.layout}
-                onWidgetChange={() => {
-                    // Refresh page data when widgets change
-                    // This will be handled by React Query cache invalidation
-                }}
-            />
-        )
-    }
 
     const renderVersionManagement = () => {
         if (!selectedPage) {
@@ -396,8 +355,7 @@ const SettingsManager = () => {
                 return <LayoutEditor />
             case 'themes':
                 return <ThemeEditor />
-            case 'widgets':
-                return renderWidgetManagement()
+
             case 'versions':
                 return renderVersionManagement()
 
