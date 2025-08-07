@@ -545,6 +545,11 @@ class HostnamePageView(View):
 
         # If no path specified, return the root page
         content = root_page.get_latest_published_version()
+
+        # Handle case where no published version exists
+        if not content:
+            raise Http404(f"No published content available for this site")
+
         widgets = content.widgets
         page_data = content.page_data
         print("widgets", widgets)
@@ -607,6 +612,13 @@ class HostnamePageView(View):
                     print(slug, "current_page", current_page)
                     content = current_page.get_latest_published_version()
                     print(slug, "content", content)
+
+                    # Handle case where no published version exists
+                    if not content:
+                        raise Http404(
+                            f"No published content available for page: {slug}"
+                        )
+
                     widgets = content.widgets
                     page_data = content.page_data
                     context["current_page"] = current_page
