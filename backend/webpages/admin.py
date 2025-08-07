@@ -442,9 +442,7 @@ class WebPageAdmin(HostnameUpdateMixin, admin.ModelAdmin):
                         # Create a log entry for this compaction (widgets will be preserved automatically)
                         page.create_version(
                             user=request.user,
-                            description=f"Admin compaction: deleted {deleted_count} old versions",
-                            status="published",
-                            auto_publish=True,
+                            version_title=f"Admin compaction: deleted {deleted_count} old versions",
                         )
 
             except Exception as e:
