@@ -31,6 +31,7 @@ import {
     restoreVersion,
     compareVersions,
     getVersionStats,
+    getPageVersionsList,
     canEditVersion,
     canPublishVersion,
     canDeleteVersion,
@@ -47,6 +48,13 @@ const VersionManager = ({ pageId, onClose }) => {
     const queryClient = useQueryClient()
     const { showConfirm, showPrompt } = useNotificationContext()
     const { addNotification } = useGlobalNotifications()
+
+    // Fetch page versions
+    const { data: versionsData, isLoading: versionsLoading } = useQuery({
+        queryKey: ['page-versions', pageId],
+        queryFn: () => getPageVersionsList(pageId),
+        enabled: !!pageId
+    })
 
     // Fetch version statistics
     const { data: versionStats } = useQuery({
@@ -172,7 +180,7 @@ const VersionManager = ({ pageId, onClose }) => {
     }
 
     const VersionCard = ({ version }) => (
-                        <div className={`border rounded-lg p-4 ${version.is_current_published ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}>
+        <div className={`border rounded-lg p-4 ${version.is_current_published ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}>
             <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center space-x-3">
                     <span className="text-lg font-semibold">v{version.version_number}</span>

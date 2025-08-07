@@ -26,7 +26,7 @@ import {
     FolderOpen
 } from 'lucide-react'
 import { api } from '../api/client.js'
-import { layoutsApi, layoutUtils } from '../api/layouts'
+import { layoutsApi } from '../api/layouts'
 import { useNotificationContext } from '../components/NotificationManager'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import LayoutEditor from '../components/LayoutEditor'

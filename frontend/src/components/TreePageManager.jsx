@@ -14,10 +14,12 @@ import {
     Save
 } from 'lucide-react'
 import { pagesApi } from '../api'
+import { deletePage } from '../api/pages'
 import PageTreeNode from './PageTreeNode'
 import Tooltip from './Tooltip'
 import { useNotificationContext } from './NotificationManager'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
+import pageTreeUtils from '../utils/pageTreeUtils'
 
 // Debounce hook for search
 const useDebounce = (value, delay) => {
@@ -297,7 +299,7 @@ const TreePageManager = () => {
     // Helper function to refresh child pages for a specific parent
     const refreshChildPages = useCallback(async (parentId) => {
         try {
-                            const childrenData = await pagesApi.getPageChildren(parentId)
+            const childrenData = await pagesApi.getPageChildren(parentId)
             const children = childrenData.results.map(child => pageTreeUtils.formatPageForTree(child))
 
             // Update the parent page with refreshed children

@@ -93,10 +93,6 @@ vi.mock('../../api/layouts', () => ({
         combined: {
             listAll: vi.fn()
         }
-    },
-    layoutUtils: {
-        getPageLayoutType: vi.fn(),
-        getEffectiveLayoutName: vi.fn()
     }
 }))
 

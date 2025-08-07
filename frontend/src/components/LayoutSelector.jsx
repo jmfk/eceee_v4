@@ -7,7 +7,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ChevronDown, Code, Search, X } from 'lucide-react'
-import { layoutsApi, layoutUtils } from '../api/layouts'
+import { layoutsApi } from '../api/layouts'
 
 const LayoutSelector = ({
     value = '',

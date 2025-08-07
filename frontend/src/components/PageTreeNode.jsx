@@ -23,6 +23,7 @@ import { pagesApi, publishingApi } from '../api'
 import { getPageDisplayUrl, isRootPage, sanitizePageData } from '../utils/apiValidation.js'
 import Tooltip from './Tooltip'
 import { useNotificationContext } from './NotificationManager'
+import pageTreeUtils from '../utils/pageTreeUtils'
 
 // Separate component for publication status icon that only re-renders when status changes
 const PublicationStatusIcon = memo(({
