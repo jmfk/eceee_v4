@@ -47,7 +47,7 @@ class PublishedPageMixin:
         )
 
         return WebPage.objects.filter(id__in=published_page_ids).select_related(
-            "parent", "theme"
+            "parent"
         )
 
 
@@ -174,11 +174,9 @@ class PageListView(PublishedPageMixin, ListView):
             .distinct()
         )
 
-        return (
-            WebPage.objects.filter(parent__isnull=True, id__in=published_page_ids)
-            .select_related("theme")
-            .order_by("sort_order", "title")
-        )
+        return WebPage.objects.filter(
+            parent__isnull=True, id__in=published_page_ids
+        ).order_by("sort_order")
 
 
 class ObjectDetailView(DetailView):
@@ -319,11 +317,7 @@ def page_sitemap_view(request):
         .distinct()
     )
 
-    pages = (
-        WebPage.objects.filter(id__in=published_page_ids)
-        .select_related("theme")
-        .order_by("sort_order", "title")
-    )
+    pages = WebPage.objects.filter(id__in=published_page_ids).order_by("sort_order")
 
     xml_content = ['<?xml version="1.0" encoding="UTF-8"?>']
     xml_content.append('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">')
@@ -362,9 +356,9 @@ def page_hierarchy_api(request):
 
     root_pages = (
         WebPage.objects.filter(parent__isnull=True, id__in=published_page_ids)
-        .select_related("parent", "theme")
+        .select_related("parent")
         .prefetch_related("children")
-        .order_by("sort_order", "title")
+        .order_by("sort_order")
     )
 
     serializer = PageHierarchySerializer(
@@ -396,12 +390,9 @@ def page_search_view(request):
     )
 
     pages = WebPage.objects.filter(
-        Q(title__icontains=query)
-        | Q(description__icontains=query)
-        | Q(meta_title__icontains=query)
-        | Q(meta_description__icontains=query),
+        Q(title__icontains=query) | Q(description__icontains=query),
         id__in=published_page_ids,
-    ).select_related("theme")[:20]
+    )[:20]
 
     results = []
     for page in pages:
@@ -606,9 +597,9 @@ class HostnamePageView(View):
             print(f"context: {context}")
             for slug in slug_parts:
                 try:
-                    current_page = WebPage.objects.select_related(
-                        "theme", "parent"
-                    ).get(slug=slug, parent=current_page)
+                    current_page = WebPage.objects.select_related("parent").get(
+                        slug=slug, parent=current_page
+                    )
                     print(slug, "current_page", current_page)
                     content = current_page.get_latest_published_version()
                     print(slug, "content", content)
@@ -630,7 +621,7 @@ class HostnamePageView(View):
                     context["published_at"] = content.effective_date
                     context["published_by"] = content.created_by
                     context["layout"] = current_page.get_effective_layout()
-                    context["theme"] = current_page.theme
+                    context["theme"] = current_page.get_effective_theme()
                     context["parent"] = current_page.parent
                 except WebPage.DoesNotExist:
                     raise Http404(f"Page not found: /{'/'.join(slug_parts)}/")

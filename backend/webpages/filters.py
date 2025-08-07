@@ -123,21 +123,49 @@ class WebPageFilter(django_filters.FilterSet):
 
     def filter_has_meta_title(self, queryset, name, value):
         """Filter pages that have or don't have meta titles"""
+        from django.db.models import Exists, OuterRef
+
         if value:
-            return queryset.exclude(meta_title="").exclude(meta_title__isnull=True)
+            # Pages with non-empty meta_title in their latest version
+            has_meta_title = (
+                PageVersion.objects.filter(page=OuterRef("pk"))
+                .order_by("-version_number")
+                .filter(page_data__meta_title__isnull=False)
+                .exclude(page_data__meta_title="")[:1]
+            )
+            return queryset.filter(Exists(has_meta_title))
         else:
-            return queryset.filter(Q(meta_title="") | Q(meta_title__isnull=True))
+            # Pages without meta_title or with empty meta_title
+            has_meta_title = (
+                PageVersion.objects.filter(page=OuterRef("pk"))
+                .order_by("-version_number")
+                .filter(page_data__meta_title__isnull=False)
+                .exclude(page_data__meta_title="")[:1]
+            )
+            return queryset.exclude(Exists(has_meta_title))
 
     def filter_has_meta_description(self, queryset, name, value):
         """Filter pages that have or don't have meta descriptions"""
+        from django.db.models import Exists, OuterRef
+
         if value:
-            return queryset.exclude(meta_description="").exclude(
-                meta_description__isnull=True
+            # Pages with non-empty meta_description in their latest version
+            has_meta_description = (
+                PageVersion.objects.filter(page=OuterRef("pk"))
+                .order_by("-version_number")
+                .filter(page_data__meta_description__isnull=False)
+                .exclude(page_data__meta_description="")[:1]
             )
+            return queryset.filter(Exists(has_meta_description))
         else:
-            return queryset.filter(
-                Q(meta_description="") | Q(meta_description__isnull=True)
+            # Pages without meta_description or with empty meta_description
+            has_meta_description = (
+                PageVersion.objects.filter(page=OuterRef("pk"))
+                .order_by("-version_number")
+                .filter(page_data__meta_description__isnull=False)
+                .exclude(page_data__meta_description="")[:1]
             )
+            return queryset.exclude(Exists(has_meta_description))
 
 
 class PageVersionFilter(django_filters.FilterSet):
