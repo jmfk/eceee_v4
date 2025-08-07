@@ -121,14 +121,6 @@ class WebPage(models.Model):
     meta_description = models.TextField(blank=True)
     meta_keywords = models.CharField(max_length=500, blank=True)
 
-    # Object publishing support
-    linked_object_type = models.CharField(
-        max_length=50, blank=True, help_text="Content type for object-based pages"
-    )
-    linked_object_id = models.PositiveIntegerField(
-        null=True, blank=True, help_text="ID of the linked object"
-    )
-
     # Timestamps and ownership
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -884,70 +876,9 @@ class WebPage(models.Model):
         self.save()
         return True
 
-    # Object Publishing Methods
-
-    def is_object_page(self):
-        """Check if this page is linked to an object"""
-        return bool(self.linked_object_type and self.linked_object_id)
-
-    def get_linked_object(self):
-        """Get the linked object instance"""
-        if not self.is_object_page():
-            return None
-
-        from .object_publishing import ObjectPublishingService
-
-        service = ObjectPublishingService(self)
-        return service.get_linked_object()
-
-    def get_object_content(self):
-        """Get content from the linked object for display"""
-        from .object_publishing import ObjectPublishingService
-
-        service = ObjectPublishingService(self)
-        return service.get_formatted_content()
-
-    def link_to_object(self, object_type, object_id, user=None):
-        """Link this page to an object"""
-        from .object_publishing import ObjectPublishingService
-
-        service = ObjectPublishingService(self)
-        return service.link_object(object_type, object_id, user)
-
-    def unlink_object(self, user=None):
-        """Remove the object link from this page"""
-        from .object_publishing import ObjectPublishingService
-
-        service = ObjectPublishingService(self)
-        return service.unlink_object(user)
-
     def get_canonical_url(self):
-        """Get the canonical URL for this page, considering object links"""
-        if self.is_object_page():
-            # For object pages, use the object's canonical URL
-            linked_object = self.get_linked_object()
-            if linked_object and hasattr(linked_object, "get_absolute_url"):
-                return linked_object.get_absolute_url()
-
-        # Use the page's normal URL
+        """Get the canonical URL for this page"""
         return self.get_absolute_url()
-
-    @classmethod
-    def get_supported_object_types(cls):
-        """Get list of supported object types for publishing"""
-        return [
-            {"value": "news", "label": "News Article"},
-            {"value": "event", "label": "Event"},
-            {"value": "libraryitem", "label": "Library Item"},
-            {"value": "member", "label": "Member Profile"},
-        ]
-
-    def sync_with_object(self, user=None):
-        """Sync page metadata with the linked object"""
-        from .object_publishing import ObjectPublishingService
-
-        service = ObjectPublishingService(self)
-        return service.sync_with_object(user)
 
     def create_version(self, user, description=""):
         """Create a new version snapshot of the current page state"""
@@ -975,8 +906,6 @@ class WebPage(models.Model):
                 "meta_title": self.meta_title,
                 "meta_description": self.meta_description,
                 "meta_keywords": self.meta_keywords,
-                "linked_object_type": self.linked_object_type,
-                "linked_object_id": self.linked_object_id,
                 "parent_id": self.parent_id,
                 "sort_order": self.sort_order,
             }

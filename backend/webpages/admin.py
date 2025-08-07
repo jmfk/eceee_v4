@@ -208,14 +208,6 @@ class WebPageAdmin(HostnameUpdateMixin, admin.ModelAdmin):
             },
         ),
         (
-            "Object Publishing",
-            {
-                "fields": ("linked_object_type", "linked_object_id"),
-                "classes": ("collapse",),
-                "description": "For pages that display content from other objects",
-            },
-        ),
-        (
             "System Information",
             {
                 "fields": (

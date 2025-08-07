@@ -60,10 +60,6 @@ class WebPageFilter(django_filters.FilterSet):
         field_name="last_modified_by__username", lookup_expr="icontains"
     )
 
-    # Object publishing filters
-    linked_object_type = django_filters.CharFilter(lookup_expr="iexact")
-    has_linked_object = django_filters.BooleanFilter(method="filter_has_linked_object")
-
     # SEO filters
     has_meta_title = django_filters.BooleanFilter(method="filter_has_meta_title")
     has_meta_description = django_filters.BooleanFilter(
@@ -74,7 +70,6 @@ class WebPageFilter(django_filters.FilterSet):
         model = WebPage
         fields = {
             "sort_order": ["exact", "lt", "lte", "gt", "gte"],
-            "linked_object_id": ["exact", "isnull"],
         }
 
     def filter_has_children(self, queryset, name, value):
@@ -125,24 +120,6 @@ class WebPageFilter(django_filters.FilterSet):
         ).filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=value))
 
         return queryset.filter(Exists(active_version_exists))
-
-    def filter_has_linked_object(self, queryset, name, value):
-        """Filter pages that have or don't have linked objects"""
-        if value:
-            return (
-                queryset.filter(
-                    linked_object_type__isnull=False, linked_object_id__isnull=False
-                )
-                .exclude(linked_object_type="")
-                .exclude(linked_object_id=0)
-            )
-        else:
-            return queryset.filter(
-                Q(linked_object_type__isnull=True)
-                | Q(linked_object_type="")
-                | Q(linked_object_id__isnull=True)
-                | Q(linked_object_id=0)
-            )
 
     def filter_has_meta_title(self, queryset, name, value):
         """Filter pages that have or don't have meta titles"""
