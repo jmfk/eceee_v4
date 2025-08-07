@@ -369,9 +369,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
     filterset_class = WebPageFilter
     search_fields = [
         "slug",
-        "meta_title",
-        "meta_description",
-    ]  # title and description now in page_data
+    ]
     ordering_fields = [
         "slug",
         "sort_order",
@@ -560,6 +558,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
             return False
 
         from django.utils import timezone
+
         now = timezone.now()
 
         # Check if version is within its effective date range
@@ -1104,7 +1103,8 @@ def layout_json(request, layout_name):
             error_str = str(e)
             # Remove potential file paths and sensitive information
             import re
-            sanitized_error = re.sub(r'/[^\s]*/', '/<path>/', error_str)
+
+            sanitized_error = re.sub(r"/[^\s]*/", "/<path>/", error_str)
             error_msg = f"Error serializing layout: {sanitized_error}"
 
         return Response(

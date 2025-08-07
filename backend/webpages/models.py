@@ -156,7 +156,7 @@ class WebPage(models.Model):
     def normalize_hostname(cls, hostname):
         """
         Normalize hostname with support for IPv6, IDN, and proper port handling.
-        
+
         Security: Validates input length and format to prevent ReDoS attacks.
 
         Examples:
@@ -177,8 +177,9 @@ class WebPage(models.Model):
 
         # Security: Basic character validation to prevent injection
         import re
+
         # Allow protocol prefixes, alphanumeric chars, dots, dashes, brackets, colons, slashes, query params
-        if not re.match(r'^[a-zA-Z0-9\[\]:._\-/\?#%]+$', hostname):
+        if not re.match(r"^[a-zA-Z0-9\[\]:._\-/\?#%]+$", hostname):
             return ""
 
         # Convert to lowercase for protocol detection
@@ -379,10 +380,15 @@ class WebPage(models.Model):
             except (ValueError, TypeError) as e:
                 # Handle array corruption gracefully
                 import logging
+
                 logger = logging.getLogger(__name__)
-                logger.warning(f"Hostname array corruption detected for page {self.id}: {e}")
+                logger.warning(
+                    f"Hostname array corruption detected for page {self.id}: {e}"
+                )
                 # Clean and rebuild the hostnames array
-                self.hostnames = [h for h in self.hostnames if h and h != normalized_hostname]
+                self.hostnames = [
+                    h for h in self.hostnames if h and h != normalized_hostname
+                ]
                 self.save()
         return True
 
@@ -544,9 +550,6 @@ class WebPage(models.Model):
                 if current == self:
                     raise ValidationError("A page cannot be its own ancestor.")
                 current = current.parent
-
-        # Note: Effective and expiry date validation is now handled at the PageVersion level
-        # since these fields were moved from WebPage to PageVersion in the refactoring
 
         # Validate hostname assignment
         if self.hostnames and self.parent is not None:

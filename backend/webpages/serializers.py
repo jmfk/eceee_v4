@@ -552,20 +552,6 @@ class WebPageDetailSerializer(serializers.ModelSerializer):
             return current_version.expiry_date
         return None
 
-    def get_effective_date(self, obj):
-        """Get the effective date from the current published version"""
-        current_version = obj.get_current_published_version()
-        if current_version:
-            return current_version.effective_date
-        return None
-
-    def get_expiry_date(self, obj):
-        """Get the expiry date from the current published version"""
-        current_version = obj.get_current_published_version()
-        if current_version:
-            return current_version.expiry_date
-        return None
-
     def get_effective_css_data(self, obj):
         """Get all CSS data for this page"""
         try:
@@ -898,20 +884,6 @@ class WebPageListSerializer(serializers.ModelSerializer):
 
         # No versions exist
         return "draft"
-
-    def get_effective_date(self, obj):
-        """Get the effective date from the current published version"""
-        current_version = obj.get_current_published_version()
-        if current_version:
-            return current_version.effective_date
-        return None
-
-    def get_expiry_date(self, obj):
-        """Get the expiry date from the current published version"""
-        current_version = obj.get_current_published_version()
-        if current_version:
-            return current_version.expiry_date
-        return None
 
     def get_effective_date(self, obj):
         """Get the effective date from the current published version"""
