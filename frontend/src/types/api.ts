@@ -63,8 +63,7 @@ export interface WebPageDetailResponse {
   meta_title?: string;
   meta_description?: string;
   meta_keywords?: string;
-  linked_object_type?: string;
-  linked_object_id?: number | null;
+
   created_at: string;
   updated_at: string;
   created_by: UserResponse;

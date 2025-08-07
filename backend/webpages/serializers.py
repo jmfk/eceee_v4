@@ -666,8 +666,6 @@ class WebPageDetailSerializer(serializers.ModelSerializer):
             "slug",
             "description",
             "code_layout",
-            "linked_object_type",
-            "linked_object_id",
             "sort_order",
             "enable_css_injection",
             "page_custom_css",

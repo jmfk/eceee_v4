@@ -89,8 +89,7 @@ class WebPageDetailResponse(BaseModel):
     meta_title: Optional[str] = None
     meta_description: Optional[str] = None
     meta_keywords: Optional[str] = None
-    linked_object_type: Optional[str] = None
-    linked_object_id: Optional[int] = None
+
     created_at: datetime
     updated_at: datetime
     created_by: UserResponse
