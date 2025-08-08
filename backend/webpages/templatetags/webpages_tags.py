@@ -78,16 +78,26 @@ def page_hierarchy(context, root_only=True):
     from ..models import WebPage, PageVersion
     from django.db import models
     from django.utils import timezone
+    from django.core.cache import cache
 
     now = timezone.now()
-    published_page_ids = (
-        PageVersion.objects.filter(effective_date__lte=now)
-        .filter(models.Q(expiry_date__isnull=True) | models.Q(expiry_date__gt=now))
-        .values_list("page_id", flat=True)
-        .distinct()
-    )
 
-    queryset = WebPage.objects.filter(id__in=published_page_ids)
+    # Cache key for published page IDs (cache for 5 minutes)
+    cache_key = f"published_page_ids_{now.strftime('%Y%m%d_%H%M')}"
+    published_page_ids = cache.get(cache_key)
+
+    if published_page_ids is None:
+        published_page_ids = list(
+            PageVersion.objects.filter(effective_date__lte=now)
+            .filter(models.Q(expiry_date__isnull=True) | models.Q(expiry_date__gt=now))
+            .values_list("page_id", flat=True)
+            .distinct()
+        )
+        cache.set(cache_key, published_page_ids, 300)  # 5 minutes
+
+    queryset = WebPage.objects.filter(id__in=published_page_ids).select_related(
+        "parent"
+    )
     if root_only:
         queryset = queryset.filter(parent__isnull=True)
 
