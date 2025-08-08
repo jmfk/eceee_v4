@@ -134,9 +134,7 @@ class Command(BaseCommand):
                     )
             else:
                 self.stdout.write(
-                    self.style.ERROR(
-                        f"  - ❌ No widgets found in any previous versions"
-                    )
+                    self.style.ERROR(f"  - ❌ No widgets found in any previous versions")
                 )
 
         # Summary

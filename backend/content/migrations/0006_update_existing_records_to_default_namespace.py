@@ -37,7 +37,6 @@ def reverse_update_namespace(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("content", "0005_add_namespace_fields_nullable"),
     ]

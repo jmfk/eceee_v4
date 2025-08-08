@@ -280,7 +280,7 @@ class Command(BaseCommand):
                 )
             )
             if not self.confirm_action(
-                f"Adding wildcard (*) hostname to page \"{page.title}\" will allow access from ANY domain. "
+                f'Adding wildcard (*) hostname to page "{page.title}" will allow access from ANY domain. '
                 f"This is a significant security risk in production environments.",
                 unsafe,
             ):

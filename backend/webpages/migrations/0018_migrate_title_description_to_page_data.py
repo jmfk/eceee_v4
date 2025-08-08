@@ -54,7 +54,6 @@ def reverse_migrate_title_description_from_page_data(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("webpages", "0017_remove_legacy_publishing_fields"),
     ]

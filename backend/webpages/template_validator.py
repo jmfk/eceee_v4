@@ -859,10 +859,12 @@ class ComprehensiveTemplateValidator:
 
             # CSS validation
             if options["css_validation"] and css_content:
-                css_is_valid, css_errors, css_warnings = (
-                    self.css_validator.validate_css(
-                        css_content, template_file or "template"
-                    )
+                (
+                    css_is_valid,
+                    css_errors,
+                    css_warnings,
+                ) = self.css_validator.validate_css(
+                    css_content, template_file or "template"
                 )
 
                 for error in css_errors:

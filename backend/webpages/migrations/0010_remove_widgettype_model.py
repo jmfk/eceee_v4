@@ -4,7 +4,6 @@ from django.db import migrations
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("webpages", "0009_remove_pagelayout_model"),
     ]

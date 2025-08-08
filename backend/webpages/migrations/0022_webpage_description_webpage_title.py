@@ -4,7 +4,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("webpages", "0021_rename_description_pageversion_version_title_and_more"),
     ]

@@ -5,7 +5,6 @@ import django.db.models.deletion
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("webpages", "0007_remove_pagewidget_add_version_widgets"),
     ]

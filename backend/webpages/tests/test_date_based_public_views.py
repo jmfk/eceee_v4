@@ -104,7 +104,12 @@ class PublishedPageMixinTestCase(TestCase):
 
     def test_individual_page_publication_status(self):
         """Test individual page publication status"""
-        pages = [self.published_page, self.draft_page, self.scheduled_page, self.expired_page]
+        pages = [
+            self.published_page,
+            self.draft_page,
+            self.scheduled_page,
+            self.expired_page,
+        ]
         expected_statuses = [True, False, False, False]
 
         for page, expected in zip(pages, expected_statuses):
@@ -195,7 +200,9 @@ class TimeBasedVersionSelectionTestCase(TestCase):
 
         # Test which version is current
         current = self.time_test_page.get_current_published_version()
-        self.assertEqual(current, v2, "Version 2 should be the current published version")
+        self.assertEqual(
+            current, v2, "Version 2 should be the current published version"
+        )
 
         # Test individual version status
         self.assertTrue(v1.is_published())

@@ -8,12 +8,30 @@ in the modular architecture.
 from django.test import TestCase, override_settings
 from webpages.widget_registry import widget_type_registry
 from .widgets import (
-    TextBlockWidget, ImageWidget, ButtonWidget, SpacerWidget, HTMLBlockWidget,
-    NewsWidget, EventsWidget, CalendarWidget, FormsWidget, GalleryWidget, DefaultWidget
+    TextBlockWidget,
+    ImageWidget,
+    ButtonWidget,
+    SpacerWidget,
+    HTMLBlockWidget,
+    NewsWidget,
+    EventsWidget,
+    CalendarWidget,
+    FormsWidget,
+    GalleryWidget,
+    DefaultWidget,
 )
 from .widget_models import (
-    TextBlockConfig, ImageConfig, ButtonConfig, SpacerConfig, HTMLBlockConfig,
-    NewsConfig, EventConfig, CalendarConfig, FormsConfig, GalleryConfig, DefaultConfig
+    TextBlockConfig,
+    ImageConfig,
+    ButtonConfig,
+    SpacerConfig,
+    HTMLBlockConfig,
+    NewsConfig,
+    EventConfig,
+    CalendarConfig,
+    FormsConfig,
+    GalleryConfig,
+    DefaultConfig,
 )
 from pydantic import ValidationError
 import datetime
@@ -25,15 +43,27 @@ class CoreWidgetsRegistrationTest(TestCase):
     def test_all_core_widgets_registered(self):
         """Test that all expected core widgets are registered"""
         expected_widgets = [
-            "Text Block", "Image", "Button", "Spacer", "HTML Block",
-            "News", "Events", "Calendar", "Forms", "Gallery", "Default"
+            "Text Block",
+            "Image",
+            "Button",
+            "Spacer",
+            "HTML Block",
+            "News",
+            "Events",
+            "Calendar",
+            "Forms",
+            "Gallery",
+            "Default",
         ]
-        
+
         registered_names = widget_type_registry.get_widget_names()
-        
+
         for widget_name in expected_widgets:
-            self.assertIn(widget_name, registered_names, 
-                         f"Widget '{widget_name}' not found in registered widgets")
+            self.assertIn(
+                widget_name,
+                registered_names,
+                f"Widget '{widget_name}' not found in registered widgets",
+            )
 
     def test_widget_instances_are_correct_types(self):
         """Test that registered widgets are instances of expected classes"""
@@ -50,22 +80,36 @@ class CoreWidgetsRegistrationTest(TestCase):
             "Gallery": GalleryWidget,
             "Default": DefaultWidget,
         }
-        
+
         for widget_name, expected_class in widget_class_mapping.items():
             widget_instance = widget_type_registry.get_widget_type(widget_name)
-            self.assertIsInstance(widget_instance, expected_class,
-                                f"Widget '{widget_name}' is not instance of {expected_class.__name__}")
+            self.assertIsInstance(
+                widget_instance,
+                expected_class,
+                f"Widget '{widget_name}' is not instance of {expected_class.__name__}",
+            )
 
     def test_widgets_are_active(self):
         """Test that all core widgets are active by default"""
         widget_names = [
-            "Text Block", "Image", "Button", "Spacer", "HTML Block",
-            "News", "Events", "Calendar", "Forms", "Gallery", "Default"
+            "Text Block",
+            "Image",
+            "Button",
+            "Spacer",
+            "HTML Block",
+            "News",
+            "Events",
+            "Calendar",
+            "Forms",
+            "Gallery",
+            "Default",
         ]
-        
+
         for widget_name in widget_names:
             widget = widget_type_registry.get_widget_type(widget_name)
-            self.assertTrue(widget.is_active, f"Widget '{widget_name}' should be active")
+            self.assertTrue(
+                widget.is_active, f"Widget '{widget_name}' should be active"
+            )
 
 
 class TextBlockWidgetTest(TestCase):
@@ -79,9 +123,9 @@ class TextBlockWidgetTest(TestCase):
         valid_config = {
             "content": "Hello World",
             "alignment": "center",
-            "style": "bold"
+            "style": "bold",
         }
-        
+
         is_valid, errors = self.widget.validate_configuration(valid_config)
         self.assertTrue(is_valid)
         self.assertEqual(errors, [])
@@ -89,7 +133,7 @@ class TextBlockWidgetTest(TestCase):
     def test_minimal_valid_configuration(self):
         """Test minimal valid configuration (only required fields)"""
         minimal_config = {"content": "Hello World"}
-        
+
         is_valid, errors = self.widget.validate_configuration(minimal_config)
         self.assertTrue(is_valid)
         self.assertEqual(errors, [])
@@ -97,18 +141,15 @@ class TextBlockWidgetTest(TestCase):
     def test_invalid_configuration_missing_content(self):
         """Test invalid configuration with missing required content"""
         invalid_config = {"alignment": "center"}
-        
+
         is_valid, errors = self.widget.validate_configuration(invalid_config)
         self.assertFalse(is_valid)
         self.assertTrue(len(errors) > 0)
 
     def test_invalid_alignment_value(self):
         """Test invalid alignment value"""
-        invalid_config = {
-            "content": "Hello World",
-            "alignment": "invalid_alignment"
-        }
-        
+        invalid_config = {"content": "Hello World", "alignment": "invalid_alignment"}
+
         is_valid, errors = self.widget.validate_configuration(invalid_config)
         self.assertFalse(is_valid)
         self.assertTrue(len(errors) > 0)
@@ -116,7 +157,7 @@ class TextBlockWidgetTest(TestCase):
     def test_configuration_defaults(self):
         """Test default configuration values"""
         defaults = self.widget.get_configuration_defaults()
-        
+
         self.assertEqual(defaults.get("alignment"), "left")
         self.assertEqual(defaults.get("style"), "normal")
 
@@ -142,9 +183,9 @@ class ImageWidgetTest(TestCase):
             "alt_text": "Example image",
             "caption": "This is an example",
             "size": "large",
-            "alignment": "center"
+            "alignment": "center",
         }
-        
+
         is_valid, errors = self.widget.validate_configuration(valid_config)
         self.assertTrue(is_valid)
         self.assertEqual(errors, [])
@@ -153,20 +194,17 @@ class ImageWidgetTest(TestCase):
         """Test minimal valid configuration"""
         minimal_config = {
             "image_url": "https://example.com/image.jpg",
-            "alt_text": "Example image"
+            "alt_text": "Example image",
         }
-        
+
         is_valid, errors = self.widget.validate_configuration(minimal_config)
         self.assertTrue(is_valid)
         self.assertEqual(errors, [])
 
     def test_invalid_url(self):
         """Test invalid URL format"""
-        invalid_config = {
-            "image_url": "not-a-valid-url",
-            "alt_text": "Example image"
-        }
-        
+        invalid_config = {"image_url": "not-a-valid-url", "alt_text": "Example image"}
+
         is_valid, errors = self.widget.validate_configuration(invalid_config)
         self.assertFalse(is_valid)
         self.assertTrue(len(errors) > 0)
@@ -174,7 +212,7 @@ class ImageWidgetTest(TestCase):
     def test_configuration_defaults(self):
         """Test default configuration values"""
         defaults = self.widget.get_configuration_defaults()
-        
+
         self.assertEqual(defaults.get("size"), "medium")
         self.assertEqual(defaults.get("alignment"), "center")
 
@@ -192,9 +230,9 @@ class ButtonWidgetTest(TestCase):
             "url": "https://example.com",
             "style": "primary",
             "size": "large",
-            "open_in_new_tab": True
+            "open_in_new_tab": True,
         }
-        
+
         is_valid, errors = self.widget.validate_configuration(valid_config)
         self.assertTrue(is_valid)
         self.assertEqual(errors, [])
@@ -220,9 +258,9 @@ class NewsWidgetTest(TestCase):
             "content": "This is the news content",
             "author": "John Doe",
             "publication_date": "2024-01-15",
-            "category": "technology"
+            "category": "technology",
         }
-        
+
         is_valid, errors = self.widget.validate_configuration(valid_config)
         self.assertTrue(is_valid)
         self.assertEqual(errors, [])
@@ -231,9 +269,9 @@ class NewsWidgetTest(TestCase):
         """Test minimal valid news configuration"""
         minimal_config = {
             "title": "Breaking News",
-            "content": "This is the news content"
+            "content": "This is the news content",
         }
-        
+
         is_valid, errors = self.widget.validate_configuration(minimal_config)
         self.assertTrue(is_valid)
         self.assertEqual(errors, [])
@@ -255,9 +293,9 @@ class EventsWidgetTest(TestCase):
             "registration_url": "https://example.com/register",
             "price": "$299",
             "capacity": 500,
-            "event_type": "conference"
+            "event_type": "conference",
         }
-        
+
         is_valid, errors = self.widget.validate_configuration(valid_config)
         self.assertTrue(is_valid)
         self.assertEqual(errors, [])
@@ -266,9 +304,9 @@ class EventsWidgetTest(TestCase):
         """Test minimal valid event configuration"""
         minimal_config = {
             "event_title": "Tech Conference 2024",
-            "start_date": "2024-06-15T09:00:00Z"
+            "start_date": "2024-06-15T09:00:00Z",
         }
-        
+
         is_valid, errors = self.widget.validate_configuration(minimal_config)
         self.assertTrue(is_valid)
         self.assertEqual(errors, [])
@@ -290,13 +328,13 @@ class CalendarWidgetTest(TestCase):
                     "title": "Meeting",
                     "date": "2024-01-15",
                     "time": "10:00 AM",
-                    "description": "Team meeting"
+                    "description": "Team meeting",
                 }
             ],
             "show_navigation": True,
-            "highlight_today": True
+            "highlight_today": True,
         }
-        
+
         is_valid, errors = self.widget.validate_configuration(valid_config)
         self.assertTrue(is_valid)
         self.assertEqual(errors, [])
@@ -304,7 +342,7 @@ class CalendarWidgetTest(TestCase):
     def test_empty_configuration(self):
         """Test empty calendar configuration (should be valid with defaults)"""
         empty_config = {}
-        
+
         is_valid, errors = self.widget.validate_configuration(empty_config)
         self.assertTrue(is_valid)
         self.assertEqual(errors, [])
@@ -327,23 +365,23 @@ class FormsWidgetTest(TestCase):
                     "name": "name",
                     "label": "Full Name",
                     "type": "text",
-                    "required": True
+                    "required": True,
                 },
                 {
                     "name": "email",
                     "label": "Email Address",
                     "type": "email",
-                    "required": True
+                    "required": True,
                 },
                 {
                     "name": "message",
                     "label": "Message",
                     "type": "textarea",
-                    "required": True
-                }
-            ]
+                    "required": True,
+                },
+            ],
         }
-        
+
         is_valid, errors = self.widget.validate_configuration(valid_config)
         self.assertTrue(is_valid)
         self.assertEqual(errors, [])
@@ -365,18 +403,18 @@ class GalleryWidgetTest(TestCase):
                 {
                     "url": "https://example.com/image1.jpg",
                     "alt_text": "Image 1",
-                    "caption": "First image"
+                    "caption": "First image",
                 },
                 {
                     "url": "https://example.com/image2.jpg",
                     "alt_text": "Image 2",
-                    "caption": "Second image"
-                }
+                    "caption": "Second image",
+                },
             ],
             "show_captions": True,
-            "enable_lightbox": True
+            "enable_lightbox": True,
         }
-        
+
         is_valid, errors = self.widget.validate_configuration(valid_config)
         self.assertTrue(is_valid)
         self.assertEqual(errors, [])
@@ -395,8 +433,7 @@ class WidgetConfigurationModelsTest(TestCase):
     def test_image_config_model(self):
         """Test ImageConfig model"""
         config = ImageConfig(
-            image_url="https://example.com/image.jpg",
-            alt_text="Test image"
+            image_url="https://example.com/image.jpg", alt_text="Test image"
         )
         self.assertEqual(str(config.image_url), "https://example.com/image.jpg")
         self.assertEqual(config.alt_text, "Test image")
@@ -404,12 +441,11 @@ class WidgetConfigurationModelsTest(TestCase):
 
     def test_button_config_model(self):
         """Test ButtonConfig model"""
-        config = ButtonConfig(
-            text="Click Me",
-            url="https://example.com"
-        )
+        config = ButtonConfig(text="Click Me", url="https://example.com")
         self.assertEqual(config.text, "Click Me")
-        self.assertTrue(str(config.url).startswith("https://example.com"))  # Account for trailing slash
+        self.assertTrue(
+            str(config.url).startswith("https://example.com")
+        )  # Account for trailing slash
         self.assertEqual(config.style, "primary")  # default
         self.assertFalse(config.open_in_new_tab)  # default
 
@@ -417,6 +453,6 @@ class WidgetConfigurationModelsTest(TestCase):
         """Test that invalid configurations raise ValidationError"""
         with self.assertRaises(ValidationError):
             TextBlockConfig()  # Missing required content field
-            
+
         with self.assertRaises(ValidationError):
             ImageConfig(image_url="invalid-url", alt_text="Test")  # Invalid URL

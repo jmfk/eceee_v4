@@ -485,7 +485,10 @@ class EnhancedSecurityTest(TestCase):
         """Test that IPv6 addresses preserve case correctly."""
         test_cases = [
             ("2001:DB8::1", "2001:DB8::1"),  # Preserve uppercase
-            ("[2001:DB8::1]:8080", "[2001:db8::1]:8080"),  # Should normalize in brackets
+            (
+                "[2001:DB8::1]:8080",
+                "[2001:db8::1]:8080",
+            ),  # Should normalize in brackets
             ("EXAMPLE.COM", "example.com"),  # Domain names still lowercase
             ("Example.COM:8080", "example.com:8080"),  # Domain with port
         ]
@@ -499,7 +502,11 @@ class EnhancedSecurityTest(TestCase):
                         self.assertEqual(result, f"[{input_hostname}]")
                     else:
                         # For bracketed, normalization may still apply
-                        self.assertTrue(result.startswith("[") and result.endswith("]") or ":8080" in result)
+                        self.assertTrue(
+                            result.startswith("[")
+                            and result.endswith("]")
+                            or ":8080" in result
+                        )
                 else:
                     # Regular hostname - should match expected
                     self.assertEqual(result, expected)

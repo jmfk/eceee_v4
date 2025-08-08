@@ -672,7 +672,9 @@ class WebPageDetailSerializer(serializers.ModelSerializer):
         auto_publish = (
             version_options.get("auto_publish", False)
             if version_options
-            else legacy_auto_publish if legacy_auto_publish is not None else False
+            else legacy_auto_publish
+            if legacy_auto_publish is not None
+            else False
         )
         create_new_version = version_options.get(
             "create_new_version", True
