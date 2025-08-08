@@ -682,9 +682,9 @@ class WebPage(models.Model):
             current = current.parent
 
         # Get available code layouts for override
-        inheritance_info["override_options"][
-            "code_layouts"
-        ] = layout_registry.list_layouts(active_only=True)
+        inheritance_info["override_options"]["code_layouts"] = (
+            layout_registry.list_layouts(active_only=True)
+        )
 
         return inheritance_info
 
@@ -1593,3 +1593,93 @@ class PageVersion(models.Model):
             "page_data": self.page_data,
             "widgets": self.widgets,
         }
+
+
+class PageDataSchema(models.Model):
+    """
+    Stores JSON Schema definitions for validating and driving page_data forms.
+
+    Two scopes are supported:
+    - system: Default schema applied to all pages
+    - layout: Schema applied only when a specific code-based layout is active
+    """
+
+    SCOPE_SYSTEM = "system"
+    SCOPE_LAYOUT = "layout"
+    SCOPE_CHOICES = (
+        (SCOPE_SYSTEM, "System"),
+        (SCOPE_LAYOUT, "Layout"),
+    )
+
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    scope = models.CharField(max_length=20, choices=SCOPE_CHOICES, default=SCOPE_SYSTEM)
+    layout_name = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Name of the code-based layout this schema applies to (scope=layout)",
+    )
+    schema = models.JSONField(help_text="JSON Schema draft-07+ definition")
+    is_active = models.BooleanField(default=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT)
+
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=["scope", "layout_name", "is_active"],
+                name="pds_scope_layout_active_idx",
+            ),
+            models.Index(fields=["is_active"], name="pds_active_idx"),
+        ]
+        ordering = ["-updated_at", "name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["scope", "layout_name", "name"],
+                name="unique_schema_per_scope_layout_name",
+            )
+        ]
+
+    def __str__(self):
+        scope_label = self.scope
+        if self.scope == self.SCOPE_LAYOUT:
+            scope_label = f"layout:{self.layout_name or 'unknown'}"
+        return f"{self.name} ({scope_label})"
+
+    @classmethod
+    def get_effective_schema_for_layout(cls, layout_name: str | None):
+        """
+        Compute the effective JSON Schema for a given layout name.
+        Returns None if no schemas exist.
+
+        Precedence: combine system-level (if active) with layout-level (if active)
+        using allOf, so layout can extend/override via JSON Schema mechanisms.
+        """
+        from django.db.models import Q
+
+        # Get the latest active system schema (by updated_at)
+        system_schema_obj = (
+            cls.objects.filter(scope=cls.SCOPE_SYSTEM, is_active=True)
+            .order_by("-updated_at")
+            .first()
+        )
+
+        layout_schema_obj = None
+        if layout_name:
+            layout_schema_obj = (
+                cls.objects.filter(
+                    scope=cls.SCOPE_LAYOUT, layout_name=layout_name, is_active=True
+                )
+                .order_by("-updated_at")
+                .first()
+            )
+
+        if system_schema_obj and layout_schema_obj:
+            return {"allOf": [system_schema_obj.schema, layout_schema_obj.schema]}
+        if layout_schema_obj:
+            return layout_schema_obj.schema
+        if system_schema_obj:
+            return system_schema_obj.schema
+        return None

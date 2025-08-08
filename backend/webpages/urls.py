@@ -105,6 +105,14 @@ Widgets:
 - GET /api/widgets/by_page/?page_id={id} - Get widgets for specific page
 - POST /api/widgets/{id}/reorder/ - Reorder widget
 
+Page Data Schemas:
+- GET /api/page-data-schemas/ - List schemas
+- POST /api/page-data-schemas/ - Create schema
+- GET /api/page-data-schemas/{id}/ - Get schema
+- PATCH /api/page-data-schemas/{id}/ - Update schema
+- DELETE /api/page-data-schemas/{id}/ - Delete schema
+- GET /api/page-data-schemas/effective/?layout_name={name} - Effective schema for a layout
+
 Query Parameters for Filtering:
 Pages:
 - ?title=search - Filter by title (case insensitive)

@@ -39,6 +39,7 @@ import PublicationTimeline from '../components/PublicationTimeline'
 import BulkPublishingOperations from '../components/BulkPublishingOperations'
 import NamespaceManager from '../components/NamespaceManager'
 import { extractErrorMessage } from '../utils/errorHandling.js'
+import SchemaManager from '../components/SchemaManager'
 
 const SettingsManager = () => {
     const navigate = useNavigate()
@@ -145,6 +146,13 @@ const SettingsManager = () => {
             label: 'Namespaces',
             icon: FolderOpen,
             description: 'Manage website namespaces'
+        }
+        ,
+        {
+            id: 'schemas',
+            label: 'Schemas',
+            icon: Code,
+            description: 'Manage JSON Schemas for page data'
         }
     ]
 
@@ -363,6 +371,8 @@ const SettingsManager = () => {
                 return renderPublishingWorkflow()
             case 'namespaces':
                 return renderNamespaceManagement()
+            case 'schemas':
+                return <SchemaManager />
             default:
                 return null
         }

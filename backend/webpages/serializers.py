@@ -7,7 +7,7 @@ including hierarchical relationships and inheritance logic.
 
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import WebPage, PageVersion, PageTheme
+from .models import WebPage, PageVersion, PageTheme, PageDataSchema
 from django.utils import timezone
 
 
@@ -672,9 +672,7 @@ class WebPageDetailSerializer(serializers.ModelSerializer):
         auto_publish = (
             version_options.get("auto_publish", False)
             if version_options
-            else legacy_auto_publish
-            if legacy_auto_publish is not None
-            else False
+            else legacy_auto_publish if legacy_auto_publish is not None else False
         )
         create_new_version = version_options.get(
             "create_new_version", True
@@ -1012,6 +1010,54 @@ class PageVersionSerializer(serializers.ModelSerializer):
     def get_publication_status(self, obj):
         """Get human-readable publication status based on dates"""
         return obj.get_publication_status()
+
+
+class PageDataSchemaSerializer(serializers.ModelSerializer):
+    """Serializer for page data JSON Schemas (system and layout scopes)."""
+
+    created_by = UserSerializer(read_only=True)
+
+    class Meta:
+        model = PageDataSchema
+        fields = [
+            "id",
+            "name",
+            "description",
+            "scope",
+            "layout_name",
+            "schema",
+            "is_active",
+            "created_at",
+            "updated_at",
+            "created_by",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at", "created_by"]
+
+    def validate(self, data):
+        # Validate basic constraints: layout_name must be present for layout scope
+        scope = data.get("scope", getattr(self.instance, "scope", None))
+        layout_name = data.get("layout_name", getattr(self.instance, "layout_name", ""))
+        if scope == PageDataSchema.SCOPE_LAYOUT and not layout_name:
+            raise serializers.ValidationError(
+                "layout_name is required for layout scope"
+            )
+
+        # Validate JSON Schema correctness using jsonschema library
+        try:
+            from jsonschema import Draft202012Validator, Draft7Validator
+
+            schema = data.get("schema", getattr(self.instance, "schema", {}))
+            # Try latest first, fall back to draft-07
+            try:
+                Draft202012Validator.check_schema(schema)
+            except Exception:
+                Draft7Validator.check_schema(schema)
+        except Exception as e:
+            raise serializers.ValidationError(
+                {"schema": f"Invalid JSON Schema: {str(e)}"}
+            )
+
+        return data
 
 
 class PageVersionListSerializer(serializers.ModelSerializer):

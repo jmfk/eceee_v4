@@ -17,7 +17,7 @@ import logging
 import time
 from django.core.cache import cache
 
-from .models import WebPage, PageVersion, PageTheme
+from .models import WebPage, PageVersion, PageTheme, PageDataSchema
 from .serializers import (
     WebPageDetailSerializer,
     WebPageSimpleSerializer,
@@ -30,6 +30,7 @@ from .serializers import (
     LayoutSerializer,
     PageThemeSerializer,
     PageHierarchySerializer,
+    PageDataSchemaSerializer,
 )
 from .filters import WebPageFilter, PageVersionFilter
 from .utils.template_parser import LayoutSerializer as TemplateLayoutSerializer
@@ -670,6 +671,56 @@ class WebPageViewSet(viewsets.ModelViewSet):
         # Save the page data (including widgets if present)
         # The serializer's update method will handle both page fields, widgets, and version creation
         # Version options (auto_publish, version_description) are passed through the request data
+        # If page_data provided in request, validate against effective schema
+        try:
+            incoming_page_data = self.request.data.get("page_data") or {
+                # For unified API we accept top-level fields; construct minimal page_data
+                key: self.request.data[key]
+                for key in [
+                    "title",
+                    "slug",
+                    "description",
+                    "meta_title",
+                    "meta_description",
+                ]
+                if key in self.request.data
+            }
+        except Exception:
+            incoming_page_data = None
+
+        if incoming_page_data:
+            # Determine layout from target version or provided code_layout
+            layout_name = self.request.data.get("code_layout")
+            if not layout_name:
+                # Try active version
+                instance = serializer.instance
+                latest_or_published = (
+                    instance.get_current_published_version()
+                    or instance.get_latest_version()
+                )
+                layout_name = getattr(latest_or_published, "code_layout", None)
+
+            effective_schema = PageDataSchema.get_effective_schema_for_layout(
+                layout_name
+            )
+            if effective_schema:
+                from jsonschema import validate, Draft202012Validator, Draft7Validator
+
+                try:
+                    try:
+                        Draft202012Validator.check_schema(effective_schema)
+                        Draft202012Validator(effective_schema).validate(
+                            incoming_page_data
+                        )
+                    except Exception:
+                        Draft7Validator.check_schema(effective_schema)
+                        Draft7Validator(effective_schema).validate(incoming_page_data)
+                except Exception as e:
+                    return Response(
+                        {"error": f"page_data validation failed: {str(e)}"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
         serializer.save(**save_kwargs)
 
         # Note: Version creation is now handled by the serializer's update method
@@ -838,8 +889,35 @@ class WebPageViewSet(viewsets.ModelViewSet):
                 }
             )
         elif request.method == "PATCH":
-            # Update version (existing logic)
-            # Use PageVersionSerializer for PageVersion objects
+            # Validate page_data against effective schema when provided
+            incoming_page_data = request.data.get("page_data")
+            if incoming_page_data is not None:
+                # Determine target layout for this version after update: prefer incoming code_layout, else current
+                layout_name = request.data.get("code_layout") or version.code_layout
+                effective_schema = PageDataSchema.get_effective_schema_for_layout(
+                    layout_name
+                )
+                if effective_schema:
+                    from jsonschema import Draft202012Validator, Draft7Validator
+
+                    try:
+                        try:
+                            Draft202012Validator.check_schema(effective_schema)
+                            Draft202012Validator(effective_schema).validate(
+                                incoming_page_data
+                            )
+                        except Exception:
+                            Draft7Validator.check_schema(effective_schema)
+                            Draft7Validator(effective_schema).validate(
+                                incoming_page_data
+                            )
+                    except Exception as e:
+                        return Response(
+                            {"error": f"page_data validation failed: {str(e)}"},
+                            status=status.HTTP_400_BAD_REQUEST,
+                        )
+
+            # Update version using serializer after validation
             serializer = PageVersionSerializer(version, data=request.data, partial=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
@@ -916,6 +994,29 @@ class PageVersionViewSet(viewsets.ModelViewSet):
                 {"error": f"Publishing failed: {str(e)}"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+
+class PageDataSchemaViewSet(viewsets.ModelViewSet):
+    """CRUD for page data JSON Schemas with filter support."""
+
+    queryset = PageDataSchema.objects.all()
+    serializer_class = PageDataSchemaSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ["scope", "layout_name", "is_active", "name"]
+    search_fields = ["name", "description", "layout_name"]
+    ordering_fields = ["updated_at", "created_at", "name"]
+    ordering = ["-updated_at"]
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
+
+    @action(detail=False, methods=["get"], url_path="effective")
+    def effective(self, request):
+        """Return the effective schema for a given layout name (query param: layout_name)."""
+        layout_name = request.query_params.get("layout_name")
+        schema = PageDataSchema.get_effective_schema_for_layout(layout_name)
+        return Response({"layout_name": layout_name, "schema": schema})
 
     @action(detail=True, methods=["post"])
     def restore(self, request, pk=None):

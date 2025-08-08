@@ -22,6 +22,7 @@ import { pagesApi, layoutsApi, versionsApi } from '../api'
 import { useNotificationContext } from './NotificationManager'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import ContentEditor from './ContentEditor'
+import SchemaDrivenForm from './SchemaDrivenForm'
 import LayoutSelector from './LayoutSelector'
 import StatusBar from './StatusBar'
 import SaveOptionsModal from './SaveOptionsModal'
@@ -547,6 +548,7 @@ const PageEditor = () => {
     // Tab navigation (main tabs only - Settings and Metadata moved to more menu)
     const tabs = [
         { id: 'content', label: 'Content', icon: Layout },
+        { id: 'data', label: 'Data', icon: FileText },
         { id: 'preview', label: 'Preview', icon: Eye },
     ]
 
@@ -768,6 +770,14 @@ const PageEditor = () => {
                             pageData={pageData}
                             onUpdate={updatePageData}
                             isNewPage={isNewPage}
+                        />
+                    )}
+                    {activeTab === 'data' && (
+                        <SchemaDrivenForm
+                            key={`data-${pageData?.version_id || 'new'}`}
+                            pageData={pageData}
+                            codeLayout={pageData?.code_layout}
+                            onChange={(data) => updatePageData({ ...pageData, ...data })}
                         />
                     )}
                     {activeTab === 'preview' && (

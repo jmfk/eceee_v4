@@ -13,6 +13,7 @@ from .views import (
     CodeLayoutViewSet,
     PageThemeViewSet,
     WidgetTypeViewSet,
+    PageDataSchemaViewSet,
     layout_json,
     render_page_backend,
     render_page_preview,
@@ -28,6 +29,7 @@ router.register(
 )  # Unified endpoint for all layout operations
 router.register(r"themes", PageThemeViewSet, basename="pagetheme")
 router.register(r"widget-types", WidgetTypeViewSet, basename="widgettype")
+router.register(r"page-data-schemas", PageDataSchemaViewSet, basename="pagedataschema")
 
 # API URLs without app_name to avoid namespace conflicts when included in main API
 urlpatterns = [

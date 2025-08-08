@@ -27,6 +27,7 @@ export { widgetsApi } from './widgets.js'
 export { themesApi } from './themes.js'
 export { contentApi } from './content.js'
 export { publishingApi } from './publishing.js'
+export { pageDataSchemasApi } from './pageDataSchemas.js'
 
 // Utility functions
 export { buildEndpoint, handleApiError } from './utils.js'
@@ -40,6 +41,7 @@ import { widgetsApi } from './widgets.js'
 import { themesApi } from './themes.js'
 import { contentApi } from './content.js'
 import { publishingApi } from './publishing.js'
+import { pageDataSchemasApi } from './pageDataSchemas.js'
 
 export default {
     pages: pagesApi,
@@ -49,5 +51,6 @@ export default {
     widgets: widgetsApi,
     themes: themesApi,
     content: contentApi,
-    publishing: publishingApi
+    publishing: publishingApi,
+    pageDataSchemas: pageDataSchemasApi
 }
