@@ -1166,7 +1166,12 @@ def layout_json(request, layout_name):
             # Remove potential file paths and sensitive information
             import re
 
-            sanitized_error = re.sub(r"/[^\s]*/", "/<path>/", error_str)
+            # More comprehensive path sanitization
+            sanitized_error = re.sub(r"[/\\][^\s]*[/\\][^\s]*", "/<path>/", error_str)
+            sanitized_error = re.sub(
+                r'File "([^"]+)"', 'File "<path>"', sanitized_error
+            )
+            sanitized_error = re.sub(r"'[/\\][^']*'", "'<path>'", sanitized_error)
             error_msg = f"Error serializing layout: {sanitized_error}"
 
         return Response(
