@@ -102,6 +102,10 @@ class PageDetailView(PublishedPageMixin, DetailView):
         current_version = getattr(page, "get_current_published_version", lambda: None)()
         if not current_version:
             current_version = page.get_latest_published_version()
+
+        # Ensure we have a valid version
+        if not current_version:
+            raise Http404("No published version available for this page")
         if current_version:
             renderer = WebPageRenderer(request=self.request)
             base_context = renderer._build_base_context(page, current_version, {})
@@ -504,19 +508,25 @@ class HostnamePageView(View):
         - example.com/about/ -> 'about' page under example.com's root
         - example.com/about/team/ -> 'team' page under 'about' under example.com's root
         """
-        
-        # Get hostname from request
+
+        # Get hostname from request with validation
         hostname = self.request.get_host().lower()
+
+        # Validate hostname format to prevent host header injection
+        import re
+
+        if not re.match(r"^[a-z0-9.-]+$", hostname) or ".." in hostname:
+            raise Http404("Invalid hostname format")
 
         # Get the path from the URL
         slug_path = getattr(self, "kwargs", {}).get("slug_path", "")
         slug_parts = (
             [part for part in slug_path.split("/") if part] if slug_path else []
         )
-        
+
         # Find the root page for this hostname
         root_page = WebPage.get_root_page_for_hostname(hostname)
-        
+
         if not root_page:
             raise Http404(f"No site configured for hostname: {hostname}")
 
@@ -529,7 +539,6 @@ class HostnamePageView(View):
 
         widgets = content.widgets
         page_data = content.page_data
-        
 
         context = {
             "root_page": root_page,
@@ -552,7 +561,6 @@ class HostnamePageView(View):
         if not slug_parts:
             current_page = root_page
         else:
-            
             # First check if the first slug is a direct child of root_page
             first_slug = slug_parts[0]
             if not WebPage.objects.filter(slug=first_slug, parent=root_page).exists():
@@ -580,7 +588,7 @@ class HostnamePageView(View):
             #     }
             # else:
             #     context["is_object_page"] = False
-            
+
             for slug in slug_parts:
                 try:
                     current_page = WebPage.objects.select_related("parent").get(
@@ -609,13 +617,13 @@ class HostnamePageView(View):
                     context["parent"] = current_page.parent
                 except WebPage.DoesNotExist:
                     raise Http404(f"Page not found: /{'/'.join(slug_parts)}/")
-        
+
         # Check if page is published and effective
         if not self._is_page_accessible(current_page):
             raise Http404("Page not available")
 
         effective_layout = current_page.get_effective_layout()
-        
+
         template_name = (
             effective_layout.template_name
             if effective_layout
@@ -683,7 +691,7 @@ class HostnamePageView(View):
 
     def _get_site_root_page(self, page):
         """Get the root page for the current site"""
-        
+
         if page.is_root_page():
             return page
 
@@ -695,7 +703,7 @@ class HostnamePageView(View):
 
     def _get_widgets_by_slot(self, page):
         """Get widgets organized by slot, considering inheritance"""
-        
+
         # Use renderer + PageVersion JSON to build rendered widgets
         renderer = WebPageRenderer(request=self.request)
         current_version = (
@@ -715,7 +723,7 @@ class HostnamePageView(View):
         4. Page-specific template
         5. Default template
         """
-        
+
         page = self.object
         hostname = self.request.get_host().lower()
         template_names = []
