@@ -1599,9 +1599,9 @@ class PageDataSchema(models.Model):
     """
     Stores JSON Schema definitions for validating and driving page_data forms.
 
-    Two scopes are supported:
-    - system: Default schema applied to all pages
-    - layout: Schema applied only when a specific code-based layout is active
+    Two types:
+    - system: Single base schema applied to all pages (singleton, no name needed)
+    - layout: Additional schema fields for specific layouts (extends system schema)
     """
 
     SCOPE_SYSTEM = "system"
@@ -1611,7 +1611,8 @@ class PageDataSchema(models.Model):
         (SCOPE_LAYOUT, "Layout"),
     )
 
-    name = models.CharField(max_length=255)
+    # name is only used for layout schemas, system schema doesn't need a name
+    name = models.CharField(max_length=255, blank=True)
     description = models.TextField(blank=True)
     scope = models.CharField(max_length=20, choices=SCOPE_CHOICES, default=SCOPE_SYSTEM)
     layout_name = models.CharField(
@@ -1636,33 +1637,53 @@ class PageDataSchema(models.Model):
         ]
         ordering = ["-updated_at", "name"]
         constraints = [
+            # Only one active system schema allowed
             models.UniqueConstraint(
-                fields=["scope", "layout_name", "name"],
-                name="unique_schema_per_scope_layout_name",
-            )
+                fields=["scope"],
+                condition=models.Q(scope="system", is_active=True),
+                name="unique_active_system_schema",
+            ),
+            # Only one active layout schema per layout
+            models.UniqueConstraint(
+                fields=["scope", "layout_name"],
+                condition=models.Q(scope="layout", is_active=True),
+                name="unique_active_layout_schema",
+            ),
         ]
 
+    def clean(self):
+        super().clean()
+        if self.scope == self.SCOPE_SYSTEM:
+            # System schema doesn't need name or layout_name
+            self.name = ""
+            self.layout_name = ""
+        elif self.scope == self.SCOPE_LAYOUT:
+            # Layout schema requires layout_name
+            if not self.layout_name:
+                raise ValidationError("Layout schema must specify a layout_name")
+            if not self.name:
+                self.name = f"{self.layout_name} Schema"
+
     def __str__(self):
-        scope_label = self.scope
         if self.scope == self.SCOPE_LAYOUT:
-            scope_label = f"layout:{self.layout_name or 'unknown'}"
-        return f"{self.name} ({scope_label})"
+            return f"{self.layout_name} Layout Schema"
+        return "System Schema"
 
     @classmethod
     def get_effective_schema_for_layout(cls, layout_name: str | None):
         """
         Compute the effective JSON Schema for a given layout name.
-        Returns None if no schemas exist.
-
-        Precedence: combine system-level (if active) with layout-level (if active)
-        using allOf, so layout can extend/override via JSON Schema mechanisms.
+        
+        The system schema is the base, and layout schemas extend it.
+        System schema fields are mandatory and cannot be removed.
+        
+        Returns the merged schema or just system schema if no layout-specific schema exists.
         """
         from django.db.models import Q
 
-        # Get the latest active system schema (by updated_at)
+        # Get the single active system schema
         system_schema_obj = (
             cls.objects.filter(scope=cls.SCOPE_SYSTEM, is_active=True)
-            .order_by("-updated_at")
             .first()
         )
 
@@ -1672,14 +1693,50 @@ class PageDataSchema(models.Model):
                 cls.objects.filter(
                     scope=cls.SCOPE_LAYOUT, layout_name=layout_name, is_active=True
                 )
-                .order_by("-updated_at")
                 .first()
             )
 
-        if system_schema_obj and layout_schema_obj:
-            return {"allOf": [system_schema_obj.schema, layout_schema_obj.schema]}
-        if layout_schema_obj:
-            return layout_schema_obj.schema
-        if system_schema_obj:
-            return system_schema_obj.schema
-        return None
+        if not system_schema_obj:
+            # If no system schema, return layout schema if available
+            return layout_schema_obj.schema if layout_schema_obj else None
+
+        system_schema = system_schema_obj.schema
+        
+        if not layout_schema_obj:
+            # Just return system schema
+            return system_schema
+
+        # Merge system schema (base) with layout schema (extensions)
+        layout_schema = layout_schema_obj.schema
+        
+        # Create merged schema
+        merged_properties = {}
+        merged_required = []
+        
+        # Start with system schema properties (these are mandatory)
+        if system_schema.get('properties'):
+            merged_properties.update(system_schema['properties'])
+        if system_schema.get('required'):
+            merged_required.extend(system_schema['required'])
+            
+        # Add layout-specific properties (cannot override system properties)
+        if layout_schema.get('properties'):
+            for prop_name, prop_def in layout_schema['properties'].items():
+                if prop_name not in merged_properties:  # Don't allow override of system fields
+                    merged_properties[prop_name] = prop_def
+                    
+        # Add layout-specific required fields
+        if layout_schema.get('required'):
+            for req_field in layout_schema['required']:
+                if req_field not in merged_required:
+                    merged_required.append(req_field)
+        
+        merged_schema = {
+            "type": "object",
+            "properties": merged_properties
+        }
+        
+        if merged_required:
+            merged_schema["required"] = merged_required
+            
+        return merged_schema

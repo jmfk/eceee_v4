@@ -1,18 +1,23 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { pageDataSchemasApi } from '../api'
+import { pageDataSchemasApi, layoutsApi } from '../api'
 import VisualSchemaEditor from './VisualSchemaEditor'
 
 export default function SchemaManager() {
     const [schemas, setSchemas] = useState([])
+    const [layouts, setLayouts] = useState([])
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
     const [editingSchema, setEditingSchema] = useState(null)
-    const [editorMode, setEditorMode] = useState('visual') // 'visual' or 'json'
+    const [activeTab, setActiveTab] = useState('system') // 'system' or 'layout'
 
-    const [form, setForm] = useState({
-        name: '',
-        description: '',
+    const [systemForm, setSystemForm] = useState({
         scope: 'system',
+        schema: { type: 'object', properties: {} },
+        is_active: true,
+    })
+    
+    const [layoutForm, setLayoutForm] = useState({
+        scope: 'layout',
         layout_name: '',
         schema: { type: 'object', properties: {} },
         is_active: true,
@@ -20,39 +25,47 @@ export default function SchemaManager() {
     
     const [validationErrors, setValidationErrors] = useState({})
 
-    const fetchSchemas = async () => {
+    const fetchData = async () => {
         setLoading(true)
         try {
-            const res = await pageDataSchemasApi.list({ ordering: '-updated_at' })
-            setSchemas(res?.data?.results || res?.data || res || [])
+            const [schemasRes, layoutsRes] = await Promise.all([
+                pageDataSchemasApi.list({ ordering: '-updated_at' }),
+                layoutsApi.list({ active_only: true })
+            ])
+            
+            const allSchemas = schemasRes?.data?.results || schemasRes?.data || schemasRes || []
+            setSchemas(allSchemas)
+            setLayouts(layoutsRes?.data?.results || layoutsRes?.data || layoutsRes || [])
+            
+            // Auto-populate forms with existing schemas
+            const systemSchema = allSchemas.find(s => s.scope === 'system')
+            if (systemSchema) {
+                setSystemForm({
+                    scope: 'system',
+                    schema: systemSchema.schema,
+                    is_active: systemSchema.is_active,
+                })
+            }
+            
         } catch (e) {
-            setError(typeof e?.message === 'string' ? e.message : 'Failed to load schemas')
+            setError(typeof e?.message === 'string' ? e.message : 'Failed to load data')
         } finally {
             setLoading(false)
         }
     }
 
-    useEffect(() => { fetchSchemas() }, [])
+    useEffect(() => { fetchData() }, [])
 
-    const validateForm = () => {
+    const validateForm = (formData, isLayout = false) => {
         const errors = {}
         
-        if (!form.name.trim()) {
-            errors.name = 'Name is required'
+        if (isLayout && !formData.layout_name?.trim()) {
+            errors.layout_name = 'Layout selection is required'
         }
         
-        if (form.scope === 'layout' && !form.layout_name.trim()) {
-            errors.layout_name = 'Layout name is required for layout scope'
-        }
-        
-        // Validate schema has at least one property
-        if (!form.schema?.properties || Object.keys(form.schema.properties).length === 0) {
-            errors.schema = 'Schema must have at least one property'
-        }
-        
-        // Validate property keys are valid identifiers
-        if (form.schema?.properties) {
-            const invalidKeys = Object.keys(form.schema.properties).filter(key => 
+        // Validate schema has at least one property (for now we'll allow empty schemas)
+        if (formData.schema?.properties) {
+            const invalidKeys = Object.keys(formData.schema.properties).filter(key => 
                 !key || !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(key)
             )
             if (invalidKeys.length > 0) {
@@ -60,38 +73,40 @@ export default function SchemaManager() {
             }
         }
         
-        setValidationErrors(errors)
-        return Object.keys(errors).length === 0
+        return errors
     }
 
-    const handleSubmit = async (e) => {
-        e.preventDefault()
+    const handleSubmit = async (isLayout = false) => {
         setError('')
+        const formData = isLayout ? layoutForm : systemForm
+        const errors = validateForm(formData, isLayout)
         
-        if (!validateForm()) {
+        setValidationErrors(errors)
+        if (Object.keys(errors).length > 0) {
             return
         }
         
         try {
-            if (editingSchema) {
-                await pageDataSchemasApi.update(editingSchema.id, form)
-                setEditingSchema(null)
+            const existingSchema = schemas.find(s => 
+                isLayout ? (s.scope === 'layout' && s.layout_name === formData.layout_name) 
+                         : s.scope === 'system'
+            )
+            
+            if (existingSchema) {
+                await pageDataSchemasApi.update(existingSchema.id, formData)
             } else {
-                await pageDataSchemasApi.create(form)
+                await pageDataSchemasApi.create(formData)
             }
-            setForm({ name: '', description: '', scope: 'system', layout_name: '', schema: { type: 'object', properties: {} }, is_active: true })
+            
             setValidationErrors({})
-            fetchSchemas()
+            fetchData()
         } catch (e) {
             const errorData = e?.response?.data
             if (typeof errorData === 'object' && errorData) {
-                // Handle field-specific errors
-                if (errorData.name) setValidationErrors(prev => ({ ...prev, name: errorData.name[0] }))
                 if (errorData.layout_name) setValidationErrors(prev => ({ ...prev, layout_name: errorData.layout_name[0] }))
                 if (errorData.schema) setValidationErrors(prev => ({ ...prev, schema: errorData.schema[0] }))
                 
-                // Show general error if no field-specific errors
-                if (!errorData.name && !errorData.layout_name && !errorData.schema) {
+                if (!errorData.layout_name && !errorData.schema) {
                     setError(JSON.stringify(errorData))
                 }
             } else {
@@ -100,170 +115,185 @@ export default function SchemaManager() {
         }
     }
 
-    const handleEdit = (schema) => {
-        setEditingSchema(schema)
-        setForm({
-            name: schema.name,
-            description: schema.description,
-            scope: schema.scope,
-            layout_name: schema.layout_name || '',
-            schema: schema.schema,
-            is_active: schema.is_active
-        })
+    const handleSystemSchemaChange = (newSchema) => {
+        setSystemForm(f => ({ ...f, schema: newSchema }))
     }
 
-    const handleCancel = () => {
-        setEditingSchema(null)
-        setForm({ name: '', description: '', scope: 'system', layout_name: '', schema: { type: 'object', properties: {} }, is_active: true })
-        setValidationErrors({})
-        setError('')
+    const handleLayoutSchemaChange = (newSchema) => {
+        setLayoutForm(f => ({ ...f, schema: newSchema }))
     }
 
-    const handleSchemaChange = (newSchema) => {
-        setForm(f => ({ ...f, schema: newSchema }))
-    }
+    const systemSchema = schemas.find(s => s.scope === 'system')
+    const layoutSchemas = schemas.filter(s => s.scope === 'layout')
 
     return (
         <div className="space-y-6">
-            <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-lg font-semibold">
-                        {editingSchema ? 'Edit Schema' : 'Create Schema'}
-                    </h2>
-                    {editingSchema && (
+            {/* Tab Navigation */}
+            <div className="bg-white rounded-lg shadow">
+                <div className="border-b border-gray-200">
+                    <nav className="-mb-px flex">
                         <button
-                            type="button"
-                            onClick={handleCancel}
-                            className="text-gray-500 hover:text-gray-700"
+                            onClick={() => setActiveTab('system')}
+                            className={`py-4 px-6 border-b-2 font-medium text-sm ${
+                                activeTab === 'system'
+                                    ? 'border-blue-500 text-blue-600'
+                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                            }`}
                         >
-                            Cancel Edit
+                            System Schema
+                            <span className="ml-2 text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded-full">
+                                Base
+                            </span>
                         </button>
-                    )}
+                        <button
+                            onClick={() => setActiveTab('layout')}
+                            className={`py-4 px-6 border-b-2 font-medium text-sm ${
+                                activeTab === 'layout'
+                                    ? 'border-blue-500 text-blue-600'
+                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                            }`}
+                        >
+                            Layout Extensions
+                            <span className="ml-2 text-xs bg-green-100 text-green-600 px-2 py-1 rounded-full">
+                                Optional
+                            </span>
+                        </button>
+                    </nav>
                 </div>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium">Name</label>
-                        <input 
-                            className={`w-full border rounded px-3 py-2 ${validationErrors.name ? 'border-red-500' : ''}`} 
-                            value={form.name} 
-                            onChange={e => {
-                                setForm(f => ({ ...f, name: e.target.value }))
-                                if (validationErrors.name) {
-                                    setValidationErrors(prev => ({ ...prev, name: '' }))
-                                }
-                            }} 
-                            required 
-                        />
-                        {validationErrors.name && (
-                            <div className="text-red-500 text-sm mt-1">{validationErrors.name}</div>
-                        )}
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium">Description</label>
-                        <input className="w-full border rounded px-3 py-2" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium">Scope</label>
-                            <select className="w-full border rounded px-3 py-2" value={form.scope} onChange={e => setForm(f => ({ ...f, scope: e.target.value }))}>
-                                <option value="system">System</option>
-                                <option value="layout">Layout</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium">Layout Name (for layout scope)</label>
-                            <input 
-                                className={`w-full border rounded px-3 py-2 ${validationErrors.layout_name ? 'border-red-500' : ''}`} 
-                                value={form.layout_name} 
-                                onChange={e => {
-                                    setForm(f => ({ ...f, layout_name: e.target.value }))
-                                    if (validationErrors.layout_name) {
-                                        setValidationErrors(prev => ({ ...prev, layout_name: '' }))
-                                    }
-                                }} 
-                                placeholder="single_column" 
-                            />
-                            {validationErrors.layout_name && (
-                                <div className="text-red-500 text-sm mt-1">{validationErrors.layout_name}</div>
-                            )}
-                        </div>
-                        <div className="flex items-center space-x-2">
-                            <input id="active" type="checkbox" checked={form.is_active} onChange={e => setForm(f => ({ ...f, is_active: e.target.checked }))} />
-                            <label htmlFor="active" className="text-sm">Active</label>
-                        </div>
-                    </div>
-                    
-                    {/* Visual Schema Editor */}
-                    <div>
-                        <VisualSchemaEditor
-                            schema={form.schema}
-                            onChange={handleSchemaChange}
-                        />
-                        {validationErrors.schema && (
-                            <div className="text-red-500 text-sm mt-2">{validationErrors.schema}</div>
-                        )}
-                    </div>
-                    <div className="flex space-x-3">
-                        <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
-                            {editingSchema ? 'Update Schema' : 'Create Schema'}
-                        </button>
-                        {editingSchema && (
-                            <button 
-                                type="button" 
-                                onClick={handleCancel}
-                                className="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400"
-                            >
-                                Cancel
-                            </button>
-                        )}
-                    </div>
-                </form>
-            </div>
 
-            <div className="bg-white rounded-lg shadow p-6">
-                <h2 className="text-lg font-semibold mb-4">Existing Schemas</h2>
-                {loading ? (
-                    <div>Loading…</div>
-                ) : (
-                    <div className="space-y-3">
-                        {(schemas?.results || schemas).map((s) => (
-                            <div key={s.id} className="border rounded p-3">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex-1">
-                                        <div className="font-medium">{s.name}</div>
-                                        <div className="text-sm text-gray-600">{s.description}</div>
-                                        <div className="text-xs text-gray-500 mt-1">
-                                            {s.scope}{s.layout_name ? `:${s.layout_name}` : ''} 
-                                            {s.is_active ? (
-                                                <span className="ml-2 text-green-600">• Active</span>
-                                            ) : (
-                                                <span className="ml-2 text-red-600">• Inactive</span>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center space-x-2">
-                                        <button
-                                            onClick={() => handleEdit(s)}
-                                            className="text-blue-600 hover:bg-blue-50 px-2 py-1 rounded text-sm"
+                <div className="p-6">
+                    {activeTab === 'system' && (
+                        <div className="space-y-6">
+                            <div>
+                                <h2 className="text-lg font-semibold mb-2">System Schema</h2>
+                                <p className="text-gray-600 text-sm mb-4">
+                                    Define the base fields that will be available on all pages. These fields are mandatory and cannot be removed by layout schemas.
+                                </p>
+                            </div>
+
+                            <VisualSchemaEditor
+                                schema={systemForm.schema}
+                                onChange={handleSystemSchemaChange}
+                            />
+                            {validationErrors.schema && (
+                                <div className="text-red-500 text-sm mt-2">{validationErrors.schema}</div>
+                            )}
+
+                            <div className="flex space-x-3">
+                                <button 
+                                    onClick={() => handleSubmit(false)}
+                                    className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                                >
+                                    {systemSchema ? 'Update System Schema' : 'Create System Schema'}
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'layout' && (
+                        <div className="space-y-6">
+                            <div>
+                                <h2 className="text-lg font-semibold mb-2">Layout Schema Extensions</h2>
+                                <p className="text-gray-600 text-sm mb-4">
+                                    Add additional fields specific to certain layouts. These fields extend the system schema and are only available for the selected layout.
+                                </p>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium mb-2">Layout</label>
+                                <select 
+                                    className={`w-full max-w-md border rounded-lg px-3 py-2 ${validationErrors.layout_name ? 'border-red-500' : ''}`}
+                                    value={layoutForm.layout_name}
+                                    onChange={e => {
+                                        const newLayoutName = e.target.value
+                                        setLayoutForm(f => ({ ...f, layout_name: newLayoutName }))
+                                        
+                                        // Load existing layout schema if available
+                                        const existingLayoutSchema = layoutSchemas.find(s => s.layout_name === newLayoutName)
+                                        if (existingLayoutSchema) {
+                                            setLayoutForm(f => ({
+                                                ...f,
+                                                schema: existingLayoutSchema.schema,
+                                                is_active: existingLayoutSchema.is_active
+                                            }))
+                                        } else {
+                                            setLayoutForm(f => ({
+                                                ...f,
+                                                schema: { type: 'object', properties: {} },
+                                                is_active: true
+                                            }))
+                                        }
+                                        
+                                        if (validationErrors.layout_name) {
+                                            setValidationErrors(prev => ({ ...prev, layout_name: '' }))
+                                        }
+                                    }}
+                                >
+                                    <option value="">Select a layout...</option>
+                                    {layouts.map(layout => (
+                                        <option key={layout.name} value={layout.name}>
+                                            {layout.name} - {layout.description}
+                                        </option>
+                                    ))}
+                                </select>
+                                {validationErrors.layout_name && (
+                                    <div className="text-red-500 text-sm mt-1">{validationErrors.layout_name}</div>
+                                )}
+                            </div>
+
+                            {layoutForm.layout_name && (
+                                <>
+                                    <VisualSchemaEditor
+                                        schema={layoutForm.schema}
+                                        onChange={handleLayoutSchemaChange}
+                                    />
+                                    {validationErrors.schema && (
+                                        <div className="text-red-500 text-sm mt-2">{validationErrors.schema}</div>
+                                    )}
+
+                                    <div className="flex space-x-3">
+                                        <button 
+                                            onClick={() => handleSubmit(true)}
+                                            className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors"
                                         >
-                                            Edit
+                                            {layoutSchemas.find(s => s.layout_name === layoutForm.layout_name) 
+                                                ? 'Update Layout Schema' 
+                                                : 'Create Layout Schema'}
                                         </button>
                                     </div>
+                                </>
+                            )}
+
+                            {/* Show existing layout schemas */}
+                            {layoutSchemas.length > 0 && (
+                                <div className="mt-8 pt-6 border-t">
+                                    <h3 className="text-md font-medium mb-4">Existing Layout Schemas</h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {layoutSchemas.map(schema => (
+                                            <div key={schema.id} className="border rounded-lg p-4">
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <h4 className="font-medium">{schema.layout_name}</h4>
+                                                    <span className={`text-xs px-2 py-1 rounded ${
+                                                        schema.is_active ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-600'
+                                                    }`}>
+                                                        {schema.is_active ? 'Active' : 'Inactive'}
+                                                    </span>
+                                                </div>
+                                                <div className="text-sm text-gray-600">
+                                                    {Object.keys(schema.schema?.properties || {}).length} additional field(s)
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
-                                <details className="mt-3">
-                                    <summary className="text-sm text-gray-500 cursor-pointer hover:text-gray-700">
-                                        View Schema JSON
-                                    </summary>
-                                    <pre className="mt-2 text-xs bg-gray-50 p-2 rounded overflow-auto">{JSON.stringify(s.schema, null, 2)}</pre>
-                                </details>
-                            </div>
-                        ))}
-                    </div>
-                )}
+                            )}
+                        </div>
+                    )}
+                </div>
             </div>
 
             {error && (
-                <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded">{error}</div>
+                <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg">{error}</div>
             )}
         </div>
     )
