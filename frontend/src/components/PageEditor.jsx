@@ -99,6 +99,11 @@ const PageEditor = () => {
     const [currentVersion, setCurrentVersion] = useState(null)
     const [availableVersions, setAvailableVersions] = useState([])
 
+    // Guard: only consider layout/rendering ready once the intended version is resolved
+    const isVersionReady = isNewPage || (
+        Boolean(currentVersion?.id) && Boolean(pageData?.version_id) && currentVersion.id === pageData.version_id
+    )
+
     // Auto-save management state
     const [autoSaveEnabled, setAutoSaveEnabled] = useState(true)
 
@@ -183,6 +188,8 @@ const PageEditor = () => {
 
     // Fetch layout data when page has a code_layout, with fallback support
     useEffect(() => {
+        if (!pageData) return;
+        if (!isVersionReady) return;
         const fetchLayoutData = async () => {
             setIsLoadingLayout(true)
 
@@ -231,7 +238,7 @@ const PageEditor = () => {
         if (pageData) {
             fetchLayoutData()
         }
-    }, [pageData?.code_layout, pageData?.id, addNotification, showError])
+    }, [pageData?.code_layout, pageData?.id, isVersionReady, addNotification, showError])
 
 
     // Publish page mutation
@@ -694,43 +701,54 @@ const PageEditor = () => {
                 <div className="h-full">
                     {activeTab === 'content' && (
                         <>
-                            {/* Layout fallback warning */}
-                            {!pageData?.code_layout && (
-                                <div className="bg-amber-50 border-l-4 border-amber-400 p-4 mb-4">
-                                    <div className="flex">
-                                        <div className="flex-shrink-0">
-                                            <svg className="h-5 w-5 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
-                                                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                                            </svg>
-                                        </div>
-                                        <div className="ml-3">
-                                            <p className="text-sm text-amber-700">
-                                                <strong>No layout specified for this version.</strong> Using fallback single-column layout for preview.
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-                            {isLoadingLayout ? (
+                            {!isVersionReady ? (
                                 <div className="h-full flex items-center justify-center bg-gray-50">
                                     <div className="text-center">
                                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-                                        <p className="text-gray-600">Loading layout data...</p>
+                                        <p className="text-gray-600">Loading version data...</p>
                                     </div>
                                 </div>
                             ) : (
-                                <ContentEditor
-                                    key={`${pageData?.id}-${pageData?.version_id || 'current'}`}
-                                    ref={contentEditorRef}
-                                    pageData={pageData}
-                                    onUpdate={updatePageData}
-                                    isNewPage={isNewPage}
-                                    layoutJson={layoutData}
-                                    editable={true}
-                                    onDirtyChange={(isDirty, reason) => {
-                                        setIsDirty(isDirty);
-                                    }}
-                                />
+                                <>
+                                    {/* Layout fallback warning */}
+                                    {!pageData?.code_layout && (
+                                        <div className="bg-amber-50 border-l-4 border-amber-400 p-4 mb-4">
+                                            <div className="flex">
+                                                <div className="flex-shrink-0">
+                                                    <svg className="h-5 w-5 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
+                                                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                                    </svg>
+                                                </div>
+                                                <div className="ml-3">
+                                                    <p className="text-sm text-amber-700">
+                                                        <strong>No layout specified for this version.</strong> Using fallback single-column layout for preview.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                    {isLoadingLayout ? (
+                                        <div className="h-full flex items-center justify-center bg-gray-50">
+                                            <div className="text-center">
+                                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                                                <p className="text-gray-600">Loading layout data...</p>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <ContentEditor
+                                            key={`${pageData?.id}-${pageData?.version_id || 'current'}`}
+                                            ref={contentEditorRef}
+                                            pageData={pageData}
+                                            onUpdate={updatePageData}
+                                            isNewPage={isNewPage}
+                                            layoutJson={layoutData}
+                                            editable={true}
+                                            onDirtyChange={(isDirty, reason) => {
+                                                setIsDirty(isDirty);
+                                            }}
+                                        />
+                                    )}
+                                </>
                             )}
                         </>
                     )}
@@ -754,11 +772,20 @@ const PageEditor = () => {
                     )}
                     {activeTab === 'preview' && (
                         <div className="h-full bg-white">
-                            <PagePreview
-                                pageData={pageData}
-                                isLoadingLayout={isLoadingLayout}
-                                layoutData={layoutData}
-                            />
+                            {!isVersionReady ? (
+                                <div className="h-full flex items-center justify-center bg-gray-50">
+                                    <div className="text-center">
+                                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                                        <p className="text-gray-600">Loading version data...</p>
+                                    </div>
+                                </div>
+                            ) : (
+                                <PagePreview
+                                    pageData={pageData}
+                                    isLoadingLayout={isLoadingLayout}
+                                    layoutData={layoutData}
+                                />
+                            )}
                         </div>
                     )}
                 </div>
