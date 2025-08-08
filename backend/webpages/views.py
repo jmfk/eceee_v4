@@ -349,9 +349,7 @@ class WidgetTypeViewSet(viewsets.ViewSet):
         include_template_json = (
             request.query_params.get("include_template_json", "true").lower() == "true"
         )
-        data = widget_type.to_dict()
-        if not include_template_json and "template_json" in data:
-            data.pop("template_json", None)
+        data = widget_type.to_dict(include_template_json=include_template_json)
         return Response(data)
 
     @action(detail=False, methods=["get"])

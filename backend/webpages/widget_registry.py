@@ -121,8 +121,13 @@ class BaseWidget(ABC):
         """
         return self.configuration_model(**configuration)
 
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert widget type to dictionary representation"""
+    def to_dict(self, include_template_json: bool = True) -> Dict[str, Any]:
+        """Convert widget type to dictionary representation.
+
+        Args:
+            include_template_json: When True, include the parsed template JSON. When False,
+                omit it to reduce payload size and avoid parsing overhead.
+        """
         result = {
             "type": self.type,  # Unique type id
             "name": self.name,
@@ -132,10 +137,11 @@ class BaseWidget(ABC):
             "configuration_schema": self.configuration_model.model_json_schema(),
         }
 
-        # Include template JSON
-        template_json = self.get_template_json()
-        if template_json:
-            result["template_json"] = template_json
+        # Include template JSON only when requested
+        if include_template_json:
+            template_json = self.get_template_json()
+            if template_json:
+                result["template_json"] = template_json
 
         return result
 
@@ -290,10 +296,8 @@ class WidgetTypeRegistry:
         widgets = self.list_widget_types(active_only=active_only)
         results: List[Dict[str, Any]] = []
         for widget in widgets:
-            d = widget.to_dict()
-            if not include_template_json and "template_json" in d:
-                # Drop potentially large template JSON when not requested
-                d = {k: v for k, v in d.items() if k != "template_json"}
+            # Delegate the include_template_json behavior to the widget to avoid unnecessary parsing
+            d = widget.to_dict(include_template_json=include_template_json)
             results.append(d)
         return results
 
