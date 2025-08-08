@@ -682,9 +682,9 @@ class WebPage(models.Model):
             current = current.parent
 
         # Get available code layouts for override
-        inheritance_info["override_options"]["code_layouts"] = (
-            layout_registry.list_layouts(active_only=True)
-        )
+        inheritance_info["override_options"][
+            "code_layouts"
+        ] = layout_registry.list_layouts(active_only=True)
 
         return inheritance_info
 
@@ -1033,17 +1033,22 @@ class WebPage(models.Model):
                 if version_page_custom_css is not None
                 else (self.page_custom_css or "")
             ),
+            # CSS injection priority: version-level setting > page-level setting
             "enable_css_injection": (
                 version_enable_css_injection
                 if version_enable_css_injection is not None
-                else self.enable_css_injection
+                else (
+                    self.enable_css_injection
+                    if self.enable_css_injection is not None
+                    else True
+                )
             ),
             "layout_css": "",
             "widgets_css": {},
             "css_dependencies": [],
         }
 
-        # Page-level explicit disable should always win as a safety override
+        # Safety override: explicit page-level disable always wins
         if self.enable_css_injection is False:
             css_data["enable_css_injection"] = False
 
@@ -1223,13 +1228,15 @@ class WebPage(models.Model):
                 css_data = widget_info["css_data"]
                 if css_data.get("widget_css"):
                     if include_scoping and css_data.get("scope") != "global":
-                        is_valid, scoped_css, _ = (
-                            css_injection_manager.validate_and_inject_css(
-                                css_data["widget_css"],
-                                css_data.get("scope_id"),
-                                css_data.get("scope", "widget"),
-                                f"Widget: {widget_info['widget_type']}",
-                            )
+                        (
+                            is_valid,
+                            scoped_css,
+                            _,
+                        ) = css_injection_manager.validate_and_inject_css(
+                            css_data["widget_css"],
+                            css_data.get("scope_id"),
+                            css_data.get("scope", "widget"),
+                            f"Widget: {widget_info['widget_type']}",
                         )
                         if is_valid:
                             css_parts.append(
