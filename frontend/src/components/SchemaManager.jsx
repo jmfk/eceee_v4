@@ -17,6 +17,8 @@ export default function SchemaManager() {
         schema: { type: 'object', properties: {} },
         is_active: true,
     })
+    
+    const [validationErrors, setValidationErrors] = useState({})
 
     const fetchSchemas = async () => {
         setLoading(true)
@@ -32,8 +34,44 @@ export default function SchemaManager() {
 
     useEffect(() => { fetchSchemas() }, [])
 
+    const validateForm = () => {
+        const errors = {}
+        
+        if (!form.name.trim()) {
+            errors.name = 'Name is required'
+        }
+        
+        if (form.scope === 'layout' && !form.layout_name.trim()) {
+            errors.layout_name = 'Layout name is required for layout scope'
+        }
+        
+        // Validate schema has at least one property
+        if (!form.schema?.properties || Object.keys(form.schema.properties).length === 0) {
+            errors.schema = 'Schema must have at least one property'
+        }
+        
+        // Validate property keys are valid identifiers
+        if (form.schema?.properties) {
+            const invalidKeys = Object.keys(form.schema.properties).filter(key => 
+                !key || !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(key)
+            )
+            if (invalidKeys.length > 0) {
+                errors.schema = `Invalid property keys: ${invalidKeys.join(', ')}. Use letters, numbers, and underscores only.`
+            }
+        }
+        
+        setValidationErrors(errors)
+        return Object.keys(errors).length === 0
+    }
+
     const handleSubmit = async (e) => {
         e.preventDefault()
+        setError('')
+        
+        if (!validateForm()) {
+            return
+        }
+        
         try {
             if (editingSchema) {
                 await pageDataSchemasApi.update(editingSchema.id, form)
@@ -42,9 +80,23 @@ export default function SchemaManager() {
                 await pageDataSchemasApi.create(form)
             }
             setForm({ name: '', description: '', scope: 'system', layout_name: '', schema: { type: 'object', properties: {} }, is_active: true })
+            setValidationErrors({})
             fetchSchemas()
         } catch (e) {
-            setError(typeof e?.response?.data === 'object' ? JSON.stringify(e.response.data) : (e?.message || 'Save failed'))
+            const errorData = e?.response?.data
+            if (typeof errorData === 'object' && errorData) {
+                // Handle field-specific errors
+                if (errorData.name) setValidationErrors(prev => ({ ...prev, name: errorData.name[0] }))
+                if (errorData.layout_name) setValidationErrors(prev => ({ ...prev, layout_name: errorData.layout_name[0] }))
+                if (errorData.schema) setValidationErrors(prev => ({ ...prev, schema: errorData.schema[0] }))
+                
+                // Show general error if no field-specific errors
+                if (!errorData.name && !errorData.layout_name && !errorData.schema) {
+                    setError(JSON.stringify(errorData))
+                }
+            } else {
+                setError(e?.message || 'Save failed')
+            }
         }
     }
 
@@ -63,6 +115,8 @@ export default function SchemaManager() {
     const handleCancel = () => {
         setEditingSchema(null)
         setForm({ name: '', description: '', scope: 'system', layout_name: '', schema: { type: 'object', properties: {} }, is_active: true })
+        setValidationErrors({})
+        setError('')
     }
 
     const handleSchemaChange = (newSchema) => {
@@ -89,7 +143,20 @@ export default function SchemaManager() {
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
                         <label className="block text-sm font-medium">Name</label>
-                        <input className="w-full border rounded px-3 py-2" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required />
+                        <input 
+                            className={`w-full border rounded px-3 py-2 ${validationErrors.name ? 'border-red-500' : ''}`} 
+                            value={form.name} 
+                            onChange={e => {
+                                setForm(f => ({ ...f, name: e.target.value }))
+                                if (validationErrors.name) {
+                                    setValidationErrors(prev => ({ ...prev, name: '' }))
+                                }
+                            }} 
+                            required 
+                        />
+                        {validationErrors.name && (
+                            <div className="text-red-500 text-sm mt-1">{validationErrors.name}</div>
+                        )}
                     </div>
                     <div>
                         <label className="block text-sm font-medium">Description</label>
@@ -105,7 +172,20 @@ export default function SchemaManager() {
                         </div>
                         <div>
                             <label className="block text-sm font-medium">Layout Name (for layout scope)</label>
-                            <input className="w-full border rounded px-3 py-2" value={form.layout_name} onChange={e => setForm(f => ({ ...f, layout_name: e.target.value }))} placeholder="single_column" />
+                            <input 
+                                className={`w-full border rounded px-3 py-2 ${validationErrors.layout_name ? 'border-red-500' : ''}`} 
+                                value={form.layout_name} 
+                                onChange={e => {
+                                    setForm(f => ({ ...f, layout_name: e.target.value }))
+                                    if (validationErrors.layout_name) {
+                                        setValidationErrors(prev => ({ ...prev, layout_name: '' }))
+                                    }
+                                }} 
+                                placeholder="single_column" 
+                            />
+                            {validationErrors.layout_name && (
+                                <div className="text-red-500 text-sm mt-1">{validationErrors.layout_name}</div>
+                            )}
                         </div>
                         <div className="flex items-center space-x-2">
                             <input id="active" type="checkbox" checked={form.is_active} onChange={e => setForm(f => ({ ...f, is_active: e.target.checked }))} />
@@ -119,6 +199,9 @@ export default function SchemaManager() {
                             schema={form.schema}
                             onChange={handleSchemaChange}
                         />
+                        {validationErrors.schema && (
+                            <div className="text-red-500 text-sm mt-2">{validationErrors.schema}</div>
+                        )}
                     </div>
                     <div className="flex space-x-3">
                         <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
