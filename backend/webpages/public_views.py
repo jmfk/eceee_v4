@@ -18,6 +18,7 @@ from django.contrib.sitemaps import Sitemap
 import json
 
 from .models import WebPage
+from .renderers import WebPageRenderer
 from .serializers import WebPageDetailSerializer, PageHierarchySerializer
 
 
@@ -75,9 +76,9 @@ class PageDetailView(PublishedPageMixin, DetailView):
 
         for slug in slug_parts:
             try:
-                current_page = WebPage.objects.select_related(
-                    "layout", "theme", "parent"
-                ).get(slug=slug, parent=parent)
+                current_page = WebPage.objects.select_related("parent").get(
+                    slug=slug, parent=parent
+                )
                 parent = current_page
             except WebPage.DoesNotExist:
                 raise Http404(f"Page not found: {'/'.join(slug_parts)}")
@@ -97,19 +98,18 @@ class PageDetailView(PublishedPageMixin, DetailView):
         context["effective_layout"] = page.get_effective_layout()
         context["effective_theme"] = page.get_effective_theme()
 
-        # Get widgets organized by slot
-        widgets = PageWidget.objects.filter(page=page).select_related("widget_type")
-        context["widgets_by_slot"] = {}
-
-        for widget in widgets:
-            slot_name = widget.slot_name
-            if slot_name not in context["widgets_by_slot"]:
-                context["widgets_by_slot"][slot_name] = []
-            context["widgets_by_slot"][slot_name].append(widget)
-
-        # Sort widgets by order within each slot
-        for slot_widgets in context["widgets_by_slot"].values():
-            slot_widgets.sort(key=lambda w: w.order)
+        # Render widgets organized by slot using new PageVersion JSON + renderer
+        current_version = getattr(page, "get_current_published_version", lambda: None)()
+        if not current_version:
+            current_version = page.get_latest_published_version()
+        if current_version:
+            renderer = WebPageRenderer(request=self.request)
+            base_context = renderer._build_base_context(page, current_version, {})
+            context["widgets_by_slot"] = renderer._render_widgets_by_slot(
+                page, current_version, base_context
+            )
+        else:
+            context["widgets_by_slot"] = {}
 
         # Get breadcrumbs
         context["breadcrumbs"] = page.get_breadcrumbs()
@@ -421,21 +421,8 @@ def render_widget(request, widget_id):
     Render a specific widget by ID.
     Returns HTML fragment that can be used via HTMX or AJAX.
     """
-    widget = get_object_or_404(PageWidget, id=widget_id)
-
-    # Check if the widget's page is published
-    if not widget.page.is_published():
-        raise Http404("Widget's page is not published")
-
-    try:
-        html = render_to_string(
-            widget.widget_type.template_name,
-            {"widget": widget, "config": widget.configuration},
-            request=request,
-        )
-        return HttpResponse(html)
-    except Exception as e:
-        return HttpResponse(f"Error rendering widget: {str(e)}", status=500)
+    # Deprecated after refactor: widgets are stored in PageVersion JSON, not DB
+    raise Http404("Widget rendering by numeric ID is no longer supported")
 
 
 # Object List Views
@@ -550,7 +537,7 @@ class HostnamePageView(View):
             "current_page": root_page,
             "widgets": widgets,
             "layout": root_page.get_effective_layout(),
-            "theme": root_page.theme,
+            "theme": root_page.get_effective_theme(),
             "parent": root_page.parent,
             "slug_parts": slug_parts,
             "request": request,
@@ -639,9 +626,17 @@ class HostnamePageView(View):
             else "webpages/page_detail.html"
         )
 
-        # widgets = context["widgets"].all()
-        # context["widgets"] = current_page.widgets
-        # context["layout"] = current_page.get_effective_layout()
+        # Ensure effective layout, theme, and widgets_by_slot are present in context
+        context["effective_layout"] = effective_layout
+        context["effective_theme"] = current_page.get_effective_theme()
+
+        # Build widgets_by_slot via renderer (new system)
+        renderer = WebPageRenderer(request=request)
+        base_context = renderer._build_base_context(current_page, content, {})
+        context["widgets_by_slot"] = renderer._render_widgets_by_slot(
+            current_page, content, base_context
+        )
+
         if effective_layout:
             print("slots", effective_layout.slot_configuration)
             context["slots"] = effective_layout.slot_configuration["slots"]
@@ -706,13 +701,15 @@ class HostnamePageView(View):
     def _get_widgets_by_slot(self, page):
         """Get widgets organized by slot, considering inheritance"""
         print("_get_widgets_by_slot")
-        widgets_by_slot = PageWidget.get_effective_widgets_for_page(page)
-
-        # Sort widgets within each slot
-        for slot_widgets in widgets_by_slot.values():
-            slot_widgets.sort(key=lambda w: (-w.priority, w.sort_order))
-
-        return widgets_by_slot
+        # Use renderer + PageVersion JSON to build rendered widgets
+        renderer = WebPageRenderer(request=self.request)
+        current_version = (
+            page.get_current_published_version() or page.get_latest_published_version()
+        )
+        if not current_version:
+            return {}
+        base_context = renderer._build_base_context(page, current_version, {})
+        return renderer._render_widgets_by_slot(page, current_version, base_context)
 
     def get_template_names(self):
         """

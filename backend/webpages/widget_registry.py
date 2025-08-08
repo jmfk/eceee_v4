@@ -142,9 +142,9 @@ class BaseWidget(ABC):
     @property
     def type(self):
         module = self.__class__.__module__
-        app_label = module.split('.')[0]
+        app_label = module.split(".")[0]
         class_id = self.__class__.__name__
-        return f'{app_label}.{class_id}'
+        return f"{app_label}.{class_id}"
 
     def get_css_for_injection(
         self, widget_instance=None, scope_id: str = None
@@ -276,10 +276,26 @@ class WidgetTypeRegistry:
         widgets = self.list_widget_types(active_only=active_only)
         return [widget.name for widget in widgets]
 
-    def to_dict(self, active_only: bool = True) -> List[Dict[str, Any]]:
-        """Get all widget types as dictionary representations."""
+    def to_dict(
+        self,
+        active_only: bool = True,
+        include_template_json: bool = True,
+    ) -> List[Dict[str, Any]]:
+        """Get all widget types as dictionary representations.
+
+        Args:
+            active_only: Whether to include only active widgets
+            include_template_json: Whether to include parsed template JSON in each dict
+        """
         widgets = self.list_widget_types(active_only=active_only)
-        return [widget.to_dict() for widget in widgets]
+        results: List[Dict[str, Any]] = []
+        for widget in widgets:
+            d = widget.to_dict()
+            if not include_template_json and "template_json" in d:
+                # Drop potentially large template JSON when not requested
+                d = {k: v for k, v in d.items() if k != "template_json"}
+            results.append(d)
+        return results
 
 
 # Global registry instance

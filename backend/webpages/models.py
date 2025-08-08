@@ -77,6 +77,19 @@ class WebPage(models.Model):
 
     # Basic page information
     slug = models.SlugField(max_length=255, unique=False, null=True, blank=True)
+    # Page-level CSS injection controls (kept for backward compatibility and manual overrides)
+    enable_css_injection = models.BooleanField(
+        default=True,
+        help_text="Whether to enable dynamic CSS injection for this page",
+    )
+    page_css_variables = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Page-specific CSS variables that override theme variables",
+    )
+    page_custom_css = models.TextField(
+        blank=True, help_text="Page-specific custom CSS injected after theme CSS"
+    )
 
     # Multi-site support for root pages
     hostnames = ArrayField(
@@ -123,34 +136,9 @@ class WebPage(models.Model):
         """Check if this is a root page (no parent)"""
         return self.parent is None
 
-    @property
-    def title(self):
-        """Get title from current published version or latest version"""
-        current_version = self.get_current_published_version()
-        if not current_version:
-            current_version = self.get_latest_version()
+    title = models.CharField(max_length=255, default="")
 
-        if current_version:
-            # Try to get title from page_data first, then from version title field
-            if current_version.page_data and current_version.page_data.get("title"):
-                return current_version.page_data["title"]
-            elif hasattr(current_version, "title") and current_version.title:
-                return current_version.title
-
-        # Fallback to slug
-        return self.slug or f"Page {self.id}"
-
-    @property
-    def description(self):
-        """Get description from current published version or latest version"""
-        current_version = self.get_current_published_version()
-        if not current_version:
-            current_version = self.get_latest_version()
-
-        if current_version and current_version.page_data:
-            return current_version.page_data.get("description", "")
-
-        return ""
+    description = models.TextField(blank=True, default="")
 
     @classmethod
     def normalize_hostname(cls, hostname):
@@ -1017,16 +1005,47 @@ class WebPage(models.Model):
         Returns:
             Dictionary with all CSS data needed for injection
         """
+        # Prefer current published version data; fall back to latest version; then to page fields
+        current_version = self.get_current_published_version()
+        if not current_version:
+            current_version = self.get_latest_version()
+
+        version_page_css_variables = (
+            getattr(current_version, "page_css_variables", None) or {}
+        )
+        version_page_custom_css = getattr(current_version, "page_custom_css", None)
+        version_enable_css_injection = (
+            getattr(current_version, "enable_css_injection", None)
+            if current_version is not None
+            else None
+        )
+
         css_data = {
             "theme_css_variables": {},
             "theme_custom_css": "",
-            "page_css_variables": self.page_css_variables or {},
-            "page_custom_css": self.page_custom_css or "",
-            "enable_css_injection": self.enable_css_injection,
+            "page_css_variables": (
+                version_page_css_variables
+                if version_page_css_variables
+                else (self.page_css_variables or {})
+            ),
+            "page_custom_css": (
+                version_page_custom_css
+                if version_page_custom_css is not None
+                else (self.page_custom_css or "")
+            ),
+            "enable_css_injection": (
+                version_enable_css_injection
+                if version_enable_css_injection is not None
+                else self.enable_css_injection
+            ),
             "layout_css": "",
             "widgets_css": {},
             "css_dependencies": [],
         }
+
+        # Page-level explicit disable should always win as a safety override
+        if self.enable_css_injection is False:
+            css_data["enable_css_injection"] = False
 
         # Get theme CSS
         effective_theme = self.get_effective_theme()
