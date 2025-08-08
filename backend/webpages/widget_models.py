@@ -12,6 +12,7 @@ except ImportError:
     # core_widgets app is not installed/enabled
     # This allows the system to work without core widget models
     import logging
+
     logger = logging.getLogger(__name__)
     logger.info("core_widgets app not available - no built-in widget models loaded")
     pass

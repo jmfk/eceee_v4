@@ -95,7 +95,6 @@ def migrate_widgets_to_pageversion(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("webpages", "0006_pagelayout_template_name"),
     ]

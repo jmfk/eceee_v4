@@ -11,7 +11,7 @@ from webpages.widget_registry import BaseWidget, register_widget_type
 
 class TestimonialConfig(BaseModel):
     """Configuration for Testimonial widget"""
-    
+
     quote: str = Field(..., description="The testimonial quote")
     author: str = Field(..., description="Name of the person giving the testimonial")
     title: Optional[str] = Field(None, description="Job title or description")
@@ -22,7 +22,7 @@ class TestimonialConfig(BaseModel):
 
 class CallToActionConfig(BaseModel):
     """Configuration for Call to Action widget"""
-    
+
     headline: str = Field(..., description="Main headline text")
     subtext: Optional[str] = Field(None, description="Supporting text")
     button_text: str = Field("Learn More", description="Button text")
@@ -34,11 +34,11 @@ class CallToActionConfig(BaseModel):
 @register_widget_type
 class TestimonialWidget(BaseWidget):
     """Customer testimonial widget with photo and rating"""
-    
+
     name = "Testimonial"
     description = "Customer testimonial with photo, rating, and company details"
     template_name = "example_custom_widgets/testimonial.html"
-    
+
     # Custom CSS for this widget
     widget_css = """
     .testimonial-widget {
@@ -84,7 +84,7 @@ class TestimonialWidget(BaseWidget):
         margin-top: 0.5rem;
     }
     """
-    
+
     css_variables = {
         "testimonial-bg": "#f8f9fa",
         "testimonial-radius": "0.5rem",
@@ -93,9 +93,9 @@ class TestimonialWidget(BaseWidget):
         "photo-size": "48px",
         "rating-color": "#fbbf24",
     }
-    
+
     css_scope = "widget"
-    
+
     @property
     def configuration_model(self) -> Type[BaseModel]:
         return TestimonialConfig
@@ -104,11 +104,11 @@ class TestimonialWidget(BaseWidget):
 @register_widget_type
 class CallToActionWidget(BaseWidget):
     """Call to action banner with customizable styling"""
-    
+
     name = "Call to Action"
     description = "Eye-catching call to action banner with customizable colors"
     template_name = "example_custom_widgets/call_to_action.html"
-    
+
     widget_css = """
     .cta-widget {
         text-align: center;
@@ -149,16 +149,16 @@ class CallToActionWidget(BaseWidget):
         box-shadow: 0 4px 12px rgba(0,0,0,0.15);
     }
     """
-    
+
     css_variables = {
         "cta-padding": "3rem 2rem",
         "cta-headline-size": "2rem",
         "cta-subtext-size": "1.125rem",
         "cta-button-padding": "0.75rem 2rem",
     }
-    
+
     css_scope = "widget"
-    
+
     @property
     def configuration_model(self) -> Type[BaseModel]:
         return CallToActionConfig

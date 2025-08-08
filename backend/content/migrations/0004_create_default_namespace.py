@@ -48,7 +48,6 @@ def reverse_default_namespace(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("content", "0003_create_namespace_model"),
     ]

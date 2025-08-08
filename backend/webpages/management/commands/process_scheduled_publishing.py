@@ -107,9 +107,10 @@ class Command(BaseCommand):
 
         Uses service object to handle business logic.
         """
-        published_count, publish_errors = (
-            publishing_service.process_scheduled_publications(now)
-        )
+        (
+            published_count,
+            publish_errors,
+        ) = publishing_service.process_scheduled_publications(now)
         expired_count, expire_errors = publishing_service.process_expired_pages(now)
 
         # Log any errors

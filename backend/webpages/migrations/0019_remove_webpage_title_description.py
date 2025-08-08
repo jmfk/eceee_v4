@@ -4,7 +4,6 @@ from django.db import migrations
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("webpages", "0018_migrate_title_description_to_page_data"),
     ]

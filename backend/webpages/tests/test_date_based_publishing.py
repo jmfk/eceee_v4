@@ -220,9 +220,7 @@ class PublicationScheduleTestCase(TestCase):
 
     def test_valid_schedule_no_expiry(self):
         """Test valid schedule with no expiry date"""
-        schedule = PublicationSchedule(
-            effective_date=timezone.now(), expiry_date=None
-        )
+        schedule = PublicationSchedule(effective_date=timezone.now(), expiry_date=None)
 
         self.assertTrue(schedule.is_valid())
 

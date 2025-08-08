@@ -4,7 +4,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("webpages", "0012_alter_webpage_unique_together_alter_webpage_slug"),
     ]

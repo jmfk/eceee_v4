@@ -5,7 +5,6 @@ import django.db.models.deletion
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("content", "0006_update_existing_records_to_default_namespace"),
     ]

@@ -46,7 +46,9 @@ class PageVersionSerializerTestCase(TestCase):
 
     def test_published_version_serialization(self):
         """Test serialization of published version"""
-        published_version = self.test_page.create_version(self.user, "Published version")
+        published_version = self.test_page.create_version(
+            self.user, "Published version"
+        )
         published_version.effective_date = self.now - timedelta(hours=1)
         published_version.save()
 
@@ -61,7 +63,9 @@ class PageVersionSerializerTestCase(TestCase):
 
     def test_scheduled_version_serialization(self):
         """Test serialization of scheduled version"""
-        scheduled_version = self.test_page.create_version(self.user, "Scheduled version")
+        scheduled_version = self.test_page.create_version(
+            self.user, "Scheduled version"
+        )
         scheduled_version.effective_date = self.now + timedelta(days=1)
         scheduled_version.expiry_date = self.now + timedelta(days=7)
         scheduled_version.save()
@@ -161,7 +165,9 @@ class WebPageDetailSerializerTestCase(TestCase):
 
     def test_page_with_published_version(self):
         """Test page serialization when it has a published version"""
-        published_version = self.test_page.create_version(self.user, "Published version")
+        published_version = self.test_page.create_version(
+            self.user, "Published version"
+        )
         published_version.effective_date = timezone.now() - timedelta(hours=1)
         published_version.save()
 
@@ -169,11 +175,13 @@ class WebPageDetailSerializerTestCase(TestCase):
         data = serializer.data
 
         self.assertTrue(data.get("is_published"))
-        
+
         current_version_data = data.get("current_published_version")
         self.assertIsNotNone(current_version_data)
         self.assertEqual(current_version_data["id"], published_version.id)
-        self.assertEqual(current_version_data["version_number"], published_version.version_number)
+        self.assertEqual(
+            current_version_data["version_number"], published_version.version_number
+        )
         self.assertEqual(current_version_data["publication_status"], "published")
 
     def test_page_without_published_version(self):
@@ -193,12 +201,14 @@ class WebPageDetailSerializerTestCase(TestCase):
 
         # Create multiple versions
         draft = self.test_page.create_version(self.user, "Draft")
-        
+
         old_published = self.test_page.create_version(self.user, "Old published")
         old_published.effective_date = now - timedelta(days=2)
         old_published.save()
 
-        current_published = self.test_page.create_version(self.user, "Current published")
+        current_published = self.test_page.create_version(
+            self.user, "Current published"
+        )
         current_published.effective_date = now - timedelta(hours=1)
         current_published.save()
 
@@ -210,12 +220,14 @@ class WebPageDetailSerializerTestCase(TestCase):
         data = serializer.data
 
         self.assertTrue(data.get("is_published"))
-        
+
         current_version_data = data.get("current_published_version")
         self.assertIsNotNone(current_version_data)
         # Should be the most recent published version
         self.assertEqual(current_version_data["id"], current_published.id)
-        self.assertEqual(current_version_data["version_number"], current_published.version_number)
+        self.assertEqual(
+            current_version_data["version_number"], current_published.version_number
+        )
 
     def test_page_serializer_model_consistency(self):
         """Test that page serializer data matches model methods"""
@@ -236,11 +248,13 @@ class WebPageDetailSerializerTestCase(TestCase):
 
         current_version = self.test_page.get_current_published_version()
         current_data = data.get("current_published_version")
-        
+
         if current_version:
             self.assertIsNotNone(current_data)
             self.assertEqual(current_data["id"], current_version.id)
-            self.assertEqual(current_data["version_number"], current_version.version_number)
+            self.assertEqual(
+                current_data["version_number"], current_version.version_number
+            )
         else:
             self.assertIsNone(current_data)
 
@@ -306,7 +320,9 @@ class PublicationStatusLogicTestCase(TestCase):
 
         for i, case in enumerate(test_cases, 1):
             with self.subTest(case=case["name"]):
-                test_version = self.test_page.create_version(self.user, f"Test case {i}")
+                test_version = self.test_page.create_version(
+                    self.user, f"Test case {i}"
+                )
                 test_version.effective_date = case["effective"]
                 test_version.expiry_date = case["expiry"]
                 test_version.save()

@@ -5,7 +5,6 @@ import django.db.models.deletion
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("content", "0008_alter_event_namespace_alter_libraryitem_namespace_and_more"),
     ]
