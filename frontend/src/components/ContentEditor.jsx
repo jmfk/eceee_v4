@@ -8,6 +8,7 @@
 import React, { useRef, useEffect, useCallback, useState, useMemo, forwardRef, useImperativeHandle } from 'react';
 import LayoutRenderer from './LayoutRenderer';
 import { WIDGET_ACTIONS } from '../utils/widgetConstants';
+import { useNotificationContext } from './NotificationManager';
 
 const ContentEditor = forwardRef(({
   layoutJson,
@@ -27,6 +28,9 @@ const ContentEditor = forwardRef(({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [selectedSlot, setSelectedSlot] = useState(null);
+
+  // Get notification context for confirmation dialogs
+  const { showConfirm } = useNotificationContext();
 
   // Early return if critical props are missing
   if (pageData === undefined) {
@@ -154,9 +158,22 @@ const ContentEditor = forwardRef(({
       }
       rendererRef.current = new LayoutRenderer({ editable });
       rendererRef.current.setWidgetRenderer(createWidgetElement);
+
+      // Set up confirmation dialog callback for widget removal
+      rendererRef.current.showConfirmDialog = async (title, message, onConfirm) => {
+        const confirmed = await showConfirm({
+          title: 'Remove Widget',
+          message: title,
+          confirmText: 'Remove',
+          confirmButtonStyle: 'danger'
+        });
+        if (confirmed) {
+          onConfirm();
+        }
+      };
     }
     return rendererRef.current;
-  }, [createWidgetElement, editable]);
+  }, [createWidgetElement, editable, showConfirm]);
 
 
 
@@ -224,6 +241,7 @@ const ContentEditor = forwardRef(({
 
           case WIDGET_ACTIONS.REMOVE:
             // Remove widget by ID from slot array
+            // Note: widgetData is just the widgetId string for REMOVE action
             if (updatedWidgets[slotName]) {
               updatedWidgets[slotName] = updatedWidgets[slotName].filter(
                 widget => widget.id !== widgetData

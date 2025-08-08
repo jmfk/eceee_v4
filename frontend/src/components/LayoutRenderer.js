@@ -946,7 +946,7 @@ class LayoutRenderer {
         label: 'Slot Info',
         action: () => {
           // Note: Callback removed - slot info is display-only
-          console.log(`Slot info requested: ${slotName}`);
+
         },
         className: 'text-gray-700 hover:bg-gray-50'
       });
@@ -1270,7 +1270,7 @@ class LayoutRenderer {
       }
     } else {
       // Log removed callbacks for debugging
-      console.log(`LayoutRenderer: Ignoring removed callback: ${callbackName}`);
+
     }
   }
 
@@ -1507,9 +1507,7 @@ class LayoutRenderer {
     }
 
     // Start fetching in background without waiting
-    this.fetchWidgetTypes().catch(error => {
-      console.log('LayoutRenderer: Background widget preload failed (this is non-critical):', error);
-    });
+    this.fetchWidgetTypes().catch(() => { });
   }
 
   /**
@@ -2349,7 +2347,15 @@ class LayoutRenderer {
 
     // Add remove menu item  
     const removeItem = this.createMenuItem(WIDGET_ICONS.TRASH, 'Remove', () => {
-      if (confirm(`Remove ${name} widget?`)) {
+      // Use React confirmation dialog instead of browser confirm
+      if (this.showConfirmDialog) {
+        this.showConfirmDialog(
+          `Remove ${name} widget?`,
+          'This action cannot be undone.',
+          () => this.removeWidgetFromSlot(id)
+        );
+      } else {
+        // Fallback to direct removal if no confirmation dialog is available
         this.removeWidgetFromSlot(id);
       }
       this.hideWidgetMenu(id);
@@ -2677,16 +2683,21 @@ class LayoutRenderer {
  * @param {string} widgetId - ID of the widget to remove
  */
   removeWidgetFromSlot(widgetId) {
-    const widgetElement = document.querySelector(`[data-widget-id="${widgetId}"]`);
+    const widgetElement = document.querySelector(`.rendered-widget[data-widget-id="${widgetId}"]`);
+
     if (widgetElement) {
       const slotElement = widgetElement.closest('[data-slot-name]');
+
       const slotName = slotElement?.getAttribute('data-slot-name');
       const widgetType = widgetElement.getAttribute('data-widget-type');
       const widgetName = widgetElement.querySelector('.widget-header span')?.textContent || 'Unknown Widget';
 
+
       // NEW: Notify parent component to update pageData.widgets instead of directly removing from DOM
       this.executeWidgetDataCallback(WIDGET_ACTIONS.REMOVE, slotName, widgetId);
 
+    } else {
+      console.warn('LayoutRenderer: No widget element found for widgetId:', widgetId);
     }
   }
 
@@ -4780,7 +4791,7 @@ class LayoutRenderer {
             const widgetId = styleElement.getAttribute('data-widget-id');
             if (widgetId) {
               // Check if the widget still exists in DOM
-              const widgetElement = document.querySelector(`[data-widget-id="${widgetId}"]`);
+              const widgetElement = document.querySelector(`.rendered-widget[data-widget-id="${widgetId}"]`);
               if (!widgetElement) {
                 // Widget was removed but style wasn't cleaned up
                 styleElement.remove();
@@ -4795,9 +4806,7 @@ class LayoutRenderer {
           this.injectedStyles.delete(styleId);
         });
 
-        if (orphanedStyles.length > 0) {
-          console.log(`LayoutRenderer: Cleaned up ${orphanedStyles.length} orphaned styles`);
-        }
+
       }
     } catch (error) {
       console.error('LayoutRenderer: Error during style cleanup', error);
