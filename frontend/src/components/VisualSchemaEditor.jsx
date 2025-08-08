@@ -203,8 +203,15 @@ function PropertyConfig({ property, onUpdate, onDelete }) {
                 type={property.type === 'string' ? 'text' : 'number'}
                 className="w-full border rounded px-3 py-2 text-sm"
                 value={property.default || ''}
-                onChange={(e) => handleChange('default', e.target.value)}
+                onChange={(e) => {
+                  if (property.type === 'string') {
+                    handleChange('default', e.target.value)
+                  } else {
+                    handleChange('default', e.target.value ? parseFloat(e.target.value) : null)
+                  }
+                }}
                 placeholder="Default value"
+                step={property.type === 'integer' ? '1' : 'any'}
               />
             </div>
           )}
@@ -232,6 +239,7 @@ function PropertyConfig({ property, onUpdate, onDelete }) {
                   value={property.minLength || ''}
                   onChange={(e) => handleChange('minLength', e.target.value ? parseInt(e.target.value) : null)}
                   placeholder="0"
+                  min="0"
                 />
               </div>
               <div>
@@ -242,6 +250,7 @@ function PropertyConfig({ property, onUpdate, onDelete }) {
                   value={property.maxLength || ''}
                   onChange={(e) => handleChange('maxLength', e.target.value ? parseInt(e.target.value) : null)}
                   placeholder="255"
+                  min="0"
                 />
               </div>
               <div>
@@ -272,6 +281,7 @@ function PropertyConfig({ property, onUpdate, onDelete }) {
                   value={property.minimum || ''}
                   onChange={(e) => handleChange('minimum', e.target.value ? parseFloat(e.target.value) : null)}
                   placeholder="0"
+                  step={property.type === 'integer' ? '1' : 'any'}
                 />
               </div>
               <div>
@@ -282,6 +292,7 @@ function PropertyConfig({ property, onUpdate, onDelete }) {
                   value={property.maximum || ''}
                   onChange={(e) => handleChange('maximum', e.target.value ? parseFloat(e.target.value) : null)}
                   placeholder="100"
+                  step={property.type === 'integer' ? '1' : 'any'}
                 />
               </div>
               <div>
@@ -292,6 +303,8 @@ function PropertyConfig({ property, onUpdate, onDelete }) {
                   value={property.multipleOf || ''}
                   onChange={(e) => handleChange('multipleOf', e.target.value ? parseFloat(e.target.value) : null)}
                   placeholder="1"
+                  step={property.type === 'integer' ? '1' : 'any'}
+                  min="0"
                 />
               </div>
             </div>
@@ -436,6 +449,38 @@ export default function VisualSchemaEditor({ schema, onChange }) {
 
   const [viewMode, setViewMode] = useState('visual') // 'visual' or 'json'
 
+  // Clean up property to remove null/empty values
+  const cleanProperty = (prop) => {
+    const cleaned = {}
+    
+    Object.entries(prop).forEach(([key, value]) => {
+      // Skip null values and undefined
+      if (value === null || value === undefined) {
+        return
+      }
+      
+      // Skip empty strings for numeric fields
+      if (typeof value === 'string' && value === '' && 
+          ['minLength', 'maxLength', 'minimum', 'maximum', 'multipleOf'].includes(key)) {
+        return
+      }
+      
+      // Skip empty arrays for enum
+      if (Array.isArray(value) && value.length === 0 && key === 'enum') {
+        return
+      }
+      
+      // Skip empty strings for non-required string fields
+      if (typeof value === 'string' && value === '' && key !== 'default') {
+        return
+      }
+      
+      cleaned[key] = value
+    })
+    
+    return cleaned
+  }
+
   // Update parent schema when properties change
   const updateSchema = useCallback((newProperties) => {
     const newSchema = {
@@ -447,7 +492,7 @@ export default function VisualSchemaEditor({ schema, onChange }) {
     newProperties.forEach(prop => {
       const { key, required, uiType, ...schemaProp } = prop
       if (key) {
-        newSchema.properties[key] = schemaProp
+        newSchema.properties[key] = cleanProperty(schemaProp)
         if (required) {
           newSchema.required.push(key)
         }
