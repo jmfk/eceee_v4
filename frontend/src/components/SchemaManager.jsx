@@ -33,9 +33,31 @@ export default function SchemaManager() {
                 layoutsApi.list({ active_only: true })
             ])
             
-            const allSchemas = schemasRes?.data?.results || schemasRes?.data || schemasRes || []
+            // Handle different possible response structures
+            let allSchemas = []
+            if (Array.isArray(schemasRes)) {
+                allSchemas = schemasRes
+            } else if (schemasRes?.data) {
+                if (Array.isArray(schemasRes.data)) {
+                    allSchemas = schemasRes.data
+                } else if (schemasRes.data.results && Array.isArray(schemasRes.data.results)) {
+                    allSchemas = schemasRes.data.results
+                }
+            }
+            
+            let allLayouts = []
+            if (Array.isArray(layoutsRes)) {
+                allLayouts = layoutsRes
+            } else if (layoutsRes?.data) {
+                if (Array.isArray(layoutsRes.data)) {
+                    allLayouts = layoutsRes.data
+                } else if (layoutsRes.data.results && Array.isArray(layoutsRes.data.results)) {
+                    allLayouts = layoutsRes.data.results
+                }
+            }
+            
             setSchemas(allSchemas)
-            setLayouts(layoutsRes?.data?.results || layoutsRes?.data || layoutsRes || [])
+            setLayouts(allLayouts)
             
             // Auto-populate forms with existing schemas
             const systemSchema = allSchemas.find(s => s.scope === 'system')
@@ -55,6 +77,9 @@ export default function SchemaManager() {
     }
 
     useEffect(() => { fetchData() }, [])
+
+    // Ensure schemas is always an array
+    const schemasArray = Array.isArray(schemas) ? schemas : []
 
     const validateForm = (formData, isLayout = false) => {
         const errors = {}
@@ -87,7 +112,7 @@ export default function SchemaManager() {
         }
         
         try {
-            const existingSchema = schemas.find(s => 
+            const existingSchema = schemasArray.find(s => 
                 isLayout ? (s.scope === 'layout' && s.layout_name === formData.layout_name) 
                          : s.scope === 'system'
             )
@@ -123,8 +148,8 @@ export default function SchemaManager() {
         setLayoutForm(f => ({ ...f, schema: newSchema }))
     }
 
-    const systemSchema = schemas.find(s => s.scope === 'system')
-    const layoutSchemas = schemas.filter(s => s.scope === 'layout')
+    const systemSchema = schemasArray.find(s => s.scope === 'system')
+    const layoutSchemas = schemasArray.filter(s => s.scope === 'layout')
 
     return (
         <div className="space-y-6">
