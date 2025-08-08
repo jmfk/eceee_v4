@@ -304,7 +304,12 @@ class WidgetTypeViewSet(viewsets.ViewSet):
         from .widget_registry import widget_type_registry
 
         active_only = request.query_params.get("active", "true").lower() == "true"
-        widget_types = widget_type_registry.to_dict(active_only=active_only)
+        include_template_json = (
+            request.query_params.get("include_template_json", "true").lower() == "true"
+        )
+        widget_types = widget_type_registry.to_dict(
+            active_only=active_only, include_template_json=include_template_json
+        )
 
         # Apply search filter if provided
         search = request.query_params.get("search")
@@ -341,15 +346,72 @@ class WidgetTypeViewSet(viewsets.ViewSet):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        return Response(widget_type.to_dict())
+        include_template_json = (
+            request.query_params.get("include_template_json", "true").lower() == "true"
+        )
+        data = widget_type.to_dict()
+        if not include_template_json and "template_json" in data:
+            data.pop("template_json", None)
+        return Response(data)
 
     @action(detail=False, methods=["get"])
     def active(self, request):
         """Get only active widget types"""
         from .widget_registry import widget_type_registry
 
-        active_types = widget_type_registry.to_dict(active_only=True)
+        include_template_json = (
+            request.query_params.get("include_template_json", "true").lower() == "true"
+        )
+        active_types = widget_type_registry.to_dict(
+            active_only=True, include_template_json=include_template_json
+        )
         return Response(active_types)
+
+    @action(detail=True, methods=["post"], url_path="validate-configuration")
+    def validate_configuration(self, request, pk=None):
+        """Validate widget configuration payload for a specific widget type"""
+        from .widget_registry import widget_type_registry
+
+        widget_type = widget_type_registry.get_widget_type(pk)
+        if not widget_type:
+            return Response(
+                {"error": f"Widget type '{pk}' not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        configuration = request.data.get("configuration", {})
+        is_valid, errors = widget_type.validate_configuration(configuration)
+        return Response({"is_valid": is_valid, "errors": errors})
+
+    @action(detail=True, methods=["get"], url_path="configuration-defaults")
+    def configuration_defaults(self, request, pk=None):
+        """Return default configuration values and schema for a widget type"""
+        from .widget_registry import widget_type_registry
+
+        widget_type = widget_type_registry.get_widget_type(pk)
+        if not widget_type:
+            return Response(
+                {"error": f"Widget type '{pk}' not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        defaults = widget_type.get_configuration_defaults()
+        schema = widget_type.configuration_schema
+        return Response({"defaults": defaults, "schema": schema})
+
+    @action(detail=True, methods=["get"], url_path="schema")
+    def schema(self, request, pk=None):
+        """Return JSON schema for a widget type configuration"""
+        from .widget_registry import widget_type_registry
+
+        widget_type = widget_type_registry.get_widget_type(pk)
+        if not widget_type:
+            return Response(
+                {"error": f"Widget type '{pk}' not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        return Response(widget_type.configuration_schema)
 
 
 class WebPageViewSet(viewsets.ModelViewSet):

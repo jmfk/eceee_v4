@@ -467,14 +467,19 @@ class CSSIntegrationTestCase(TestCase):
         self.page = WebPage.objects.create(
             title="Integration Page",
             slug="integration-page",
-            theme=self.theme,
-            page_css_variables={"accent": "#10b981"},
-            page_custom_css=".integration-page { background: var(--accent); }",
-            enable_css_injection=True,
-            publication_status="published",
             created_by=self.user,
             last_modified_by=self.user,
         )
+        # Create a published version carrying theme and CSS data (new model)
+        from django.utils import timezone
+
+        version = self.page.create_version(self.user, "Initial")
+        version.theme = self.theme
+        version.page_css_variables = {"accent": "#10b981"}
+        version.page_custom_css = ".integration-page { background: var(--accent); }"
+        version.enable_css_injection = True
+        version.effective_date = timezone.now()
+        version.save()
 
     def test_complete_css_system_integration(self):
         """Test the complete CSS system working together"""

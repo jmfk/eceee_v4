@@ -73,21 +73,25 @@ def widget_config(widget, key):
 @register.simple_tag(takes_context=True)
 def page_hierarchy(context, root_only=True):
     """
-    Get page hierarchy for navigation
+    Get page hierarchy for navigation using date-based publishing via PageVersion.
     """
-    from ..models import WebPage
+    from ..models import WebPage, PageVersion
+    from django.db import models
     from django.utils import timezone
-    from django.db.models import Q
 
     now = timezone.now()
-    queryset = WebPage.objects.filter(
-        publication_status="published", effective_date__lte=now
-    ).filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
+    published_page_ids = (
+        PageVersion.objects.filter(effective_date__lte=now)
+        .filter(models.Q(expiry_date__isnull=True) | models.Q(expiry_date__gt=now))
+        .values_list("page_id", flat=True)
+        .distinct()
+    )
 
+    queryset = WebPage.objects.filter(id__in=published_page_ids)
     if root_only:
         queryset = queryset.filter(parent__isnull=True)
 
-    return queryset.order_by("sort_order", "title")
+    return queryset.order_by("sort_order", "id")
 
 
 @register.inclusion_tag("webpages/includes/breadcrumbs.html", takes_context=True)
@@ -104,10 +108,23 @@ def page_breadcrumbs(context, page):
 @register.inclusion_tag("webpages/includes/child_navigation.html")
 def child_pages_nav(page, limit=None):
     """
-    Render navigation for child pages
+    Render navigation for child pages using date-based publishing via PageVersion.
     """
-    children = page.children.filter(publication_status="published").order_by(
-        "sort_order", "title"
+    from ..models import PageVersion
+    from django.db import models
+    from django.utils import timezone
+    from django.db import models
+
+    now = timezone.now()
+    published_page_ids = (
+        PageVersion.objects.filter(effective_date__lte=now)
+        .filter(models.Q(expiry_date__isnull=True) | models.Q(expiry_date__gt=now))
+        .values_list("page_id", flat=True)
+        .distinct()
+    )
+
+    children = page.children.filter(id__in=published_page_ids).order_by(
+        "sort_order", "id"
     )
 
     if limit:
