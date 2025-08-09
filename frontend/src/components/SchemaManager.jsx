@@ -11,6 +11,7 @@ export default function SchemaManager() {
     const [activeTab, setActiveTab] = useState('system') // 'system' or 'layout'
 
     const [systemForm, setSystemForm] = useState({
+        id: null, // Include ID for updates
         scope: 'system',
         schema: { type: 'object', properties: {} },
         is_active: true,
@@ -62,11 +63,15 @@ export default function SchemaManager() {
             // Auto-populate forms with existing schemas
             const systemSchema = allSchemas.find(s => s.scope === 'system')
             if (systemSchema) {
+                console.log('Loading existing system schema:', systemSchema)
                 setSystemForm({
+                    id: systemSchema.id,
                     scope: 'system',
-                    schema: systemSchema.schema,
+                    schema: systemSchema.schema || { type: 'object', properties: {} },
                     is_active: systemSchema.is_active,
                 })
+            } else {
+                console.log('No existing system schema found')
             }
             
         } catch (e) {
@@ -112,15 +117,21 @@ export default function SchemaManager() {
         }
         
         try {
-            const existingSchema = schemasArray.find(s => 
-                isLayout ? (s.scope === 'layout' && s.layout_name === formData.layout_name) 
-                         : s.scope === 'system'
-            )
-            
-            if (existingSchema) {
-                await pageDataSchemasApi.update(existingSchema.id, formData)
+            // For system schema, use the ID from the form if available
+            if (!isLayout && formData.id) {
+                await pageDataSchemasApi.update(formData.id, formData)
             } else {
-                await pageDataSchemasApi.create(formData)
+                // For layout schemas or new system schema, check if one exists
+                const existingSchema = schemasArray.find(s => 
+                    isLayout ? (s.scope === 'layout' && s.layout_name === formData.layout_name) 
+                             : s.scope === 'system'
+                )
+                
+                if (existingSchema) {
+                    await pageDataSchemasApi.update(existingSchema.id, formData)
+                } else {
+                    await pageDataSchemasApi.create(formData)
+                }
             }
             
             setValidationErrors({})
@@ -190,13 +201,21 @@ export default function SchemaManager() {
                     {activeTab === 'system' && (
                         <div className="space-y-6">
                             <div>
-                                <h2 className="text-lg font-semibold mb-2">System Schema</h2>
+                                <div className="flex items-center justify-between mb-2">
+                                    <h2 className="text-lg font-semibold">System Schema</h2>
+                                    {systemSchema && (
+                                        <span className="text-xs bg-green-100 text-green-600 px-2 py-1 rounded-full">
+                                            Existing • ID: {systemSchema.id}
+                                        </span>
+                                    )}
+                                </div>
                                 <p className="text-gray-600 text-sm mb-4">
                                     Define the base fields that will be available on all pages. These fields are mandatory and cannot be removed by layout schemas.
                                 </p>
                             </div>
 
                             <VisualSchemaEditor
+                                key={`system-${systemForm.id || 'new'}`}
                                 schema={systemForm.schema}
                                 onChange={handleSystemSchemaChange}
                             />
@@ -268,7 +287,16 @@ export default function SchemaManager() {
 
                             {layoutForm.layout_name && (
                                 <>
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h3 className="text-md font-medium">Additional Fields for {layoutForm.layout_name}</h3>
+                                        {layoutSchemas.find(s => s.layout_name === layoutForm.layout_name) && (
+                                            <span className="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded-full">
+                                                Existing Schema
+                                            </span>
+                                        )}
+                                    </div>
                                     <VisualSchemaEditor
+                                        key={`layout-${layoutForm.layout_name}`}
                                         schema={layoutForm.schema}
                                         onChange={handleLayoutSchemaChange}
                                     />
