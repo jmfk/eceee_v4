@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, Trash2, GripVertical, Eye, Settings, Send } from 'lucide-react'
+import { Plus, Trash2, GripVertical, Settings, Send } from 'lucide-react'
 import BaseWidgetEditor from './BaseWidgetEditor'
 
 /**
@@ -14,7 +14,6 @@ import BaseWidgetEditor from './BaseWidgetEditor'
  * - Validation rules management
  */
 const FormsEditor = ({ config, onChange, errors, widgetType }) => {
-    const [showPreview, setShowPreview] = useState(false)
     const [editingField, setEditingField] = useState(null)
 
     const fieldTypes = [
@@ -452,34 +451,20 @@ const FormsEditor = ({ config, onChange, errors, widgetType }) => {
                         })}
                     </div>
 
-                    {/* Live Preview Toggle */}
-                    <div className="flex items-center justify-between">
-                        <label className="block text-sm font-medium text-gray-700">
-                            Form Preview
-                        </label>
-                        <button
-                            type="button"
-                            onClick={() => setShowPreview(!showPreview)}
-                            className="flex items-center space-x-1 text-xs text-gray-600 hover:text-gray-800"
-                        >
-                            <Eye className="w-3 h-3" />
-                            <span>{showPreview ? 'Hide' : 'Show'} Preview</span>
-                        </button>
-                    </div>
-
                     {/* Form Preview */}
-                    {showPreview && (
-                        <div className="space-y-2">
-                            <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                                {renderFormPreview()}
-                            </div>
-                            <div className="text-xs text-gray-500 space-y-1">
-                                <p>• Preview shows how the form will appear to users</p>
-                                <p>• Fields are disabled in preview mode</p>
-                                <p>• Required fields are marked with a red asterisk</p>
-                            </div>
+                    <div className="space-y-2">
+                        <label className="block text-sm font-medium text-gray-700">
+                            Form Preview nfdlshdflfhs
+                        </label>
+                        <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                            {renderFormPreview()}
                         </div>
-                    )}
+                        <div className="text-xs text-gray-500 space-y-1">
+                            <p>• Preview shows how the form will appear to users</p>
+                            <p>• Fields are disabled in preview mode</p>
+                            <p>• Required fields are marked with a red asterisk</p>
+                        </div>
+                    </div>
 
                     {/* Form Tips */}
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">

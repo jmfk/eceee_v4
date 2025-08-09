@@ -1,12 +1,12 @@
 import React, { useState, useCallback } from 'react'
-import { 
-  Plus, 
-  Trash2, 
-  Edit, 
-  Type, 
-  Hash, 
-  ToggleLeft, 
-  List, 
+import {
+  Plus,
+  Trash2,
+  Edit,
+  Type,
+  Hash,
+  ToggleLeft,
+  List,
   Calendar,
   Mail,
   Link,
@@ -107,7 +107,7 @@ const PROPERTY_TYPES = {
 function PropertyConfig({ property, onUpdate, onDelete }) {
   const [isExpanded, setIsExpanded] = useState(false)
   const [localProperty, setLocalProperty] = useState(property)
-  
+
   const handleChange = useCallback((field, value) => {
     const updated = { ...localProperty, [field]: value }
     setLocalProperty(updated)
@@ -119,7 +119,7 @@ function PropertyConfig({ property, onUpdate, onDelete }) {
 
   return (
     <div className="border border-gray-200 rounded-xl bg-white shadow-sm hover:shadow-md transition-shadow">
-      <div 
+      <div
         className="flex items-center justify-between p-5 cursor-pointer hover:bg-gray-50 rounded-t-xl"
         onClick={() => setIsExpanded(!isExpanded)}
       >
@@ -159,9 +159,8 @@ function PropertyConfig({ property, onUpdate, onDelete }) {
               <label className="block text-sm font-medium mb-1">Property Key</label>
               <input
                 type="text"
-                className={`w-full border rounded px-3 py-2 text-sm ${
-                  property.key && !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(property.key) ? 'border-red-500' : ''
-                }`}
+                className={`w-full border rounded px-3 py-2 text-sm ${property.key && !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(property.key) ? 'border-red-500' : ''
+                  }`}
                 value={property.key || ''}
                 onChange={(e) => handleChange('key', e.target.value)}
                 placeholder="property_name"
@@ -438,7 +437,7 @@ export default function VisualSchemaEditor({ schema, onChange }) {
     // Convert schema properties to internal format
     const schemaProps = schema?.properties || {}
     const required = schema?.required || []
-    
+
     return Object.entries(schemaProps).map(([key, prop]) => ({
       ...prop,
       key,
@@ -452,32 +451,32 @@ export default function VisualSchemaEditor({ schema, onChange }) {
   // Clean up property to remove null/empty values
   const cleanProperty = (prop) => {
     const cleaned = {}
-    
+
     Object.entries(prop).forEach(([key, value]) => {
       // Skip null values and undefined
       if (value === null || value === undefined) {
         return
       }
-      
+
       // Skip empty strings for numeric fields
-      if (typeof value === 'string' && value === '' && 
-          ['minLength', 'maxLength', 'minimum', 'maximum', 'multipleOf'].includes(key)) {
+      if (typeof value === 'string' && value === '' &&
+        ['minLength', 'maxLength', 'minimum', 'maximum', 'multipleOf'].includes(key)) {
         return
       }
-      
+
       // Skip empty arrays for enum
       if (Array.isArray(value) && value.length === 0 && key === 'enum') {
         return
       }
-      
+
       // Skip empty strings for non-required string fields
       if (typeof value === 'string' && value === '' && key !== 'default') {
         return
       }
-      
+
       cleaned[key] = value
     })
-    
+
     return cleaned
   }
 
@@ -536,18 +535,16 @@ export default function VisualSchemaEditor({ schema, onChange }) {
         <div className="flex items-center space-x-2">
           <button
             onClick={() => setViewMode('visual')}
-            className={`flex items-center space-x-1 px-3 py-1 rounded ${
-              viewMode === 'visual' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'
-            }`}
+            className={`flex items-center space-x-1 px-3 py-1 rounded ${viewMode === 'visual' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'
+              }`}
           >
             <Edit className="w-4 h-4" />
             <span>Visual</span>
           </button>
           <button
             onClick={() => setViewMode('json')}
-            className={`flex items-center space-x-1 px-3 py-1 rounded ${
-              viewMode === 'json' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'
-            }`}
+            className={`flex items-center space-x-1 px-3 py-1 rounded ${viewMode === 'json' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'
+              }`}
           >
             <Code className="w-4 h-4" />
             <span>JSON</span>
@@ -582,11 +579,6 @@ export default function VisualSchemaEditor({ schema, onChange }) {
               {/* Add property button */}
               <div className="flex justify-center">
                 <PropertyTypeSelector onAddProperty={handleAddProperty} />
-              </div>
-
-              {/* Form Preview */}
-              <div className="mt-8">
-                <SchemaFormPreview schema={schema} />
               </div>
             </>
           )}
