@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { Menu, X, Code, Cpu, Settings } from 'lucide-react'
+import { Menu, X, Code, Cpu, Settings, Grid3X3, ChevronDown } from 'lucide-react'
 import { useState } from 'react'
 
 const Navbar = () => {
@@ -12,8 +12,10 @@ const Navbar = () => {
     { name: 'Home', href: '/', icon: Code },
     { name: 'About', href: '/about', icon: Cpu },
     { name: 'Pages', href: '/pages', icon: Settings },
-    { name: 'Settings', href: '/settings?tab=schemas', icon: Settings },
+    { name: 'Settings', href: '/settings', icon: Settings },
   ]
+
+  const isSchemasActive = location.pathname.startsWith('/schemas')
 
   const isActive = (path) => {
     return location.pathname === path
@@ -50,6 +52,39 @@ const Navbar = () => {
                 <span>{item.name}</span>
               </Link>
             ))}
+
+            {/* Schemas dropdown */}
+            <div className="relative"
+              onMouseEnter={() => setIsOpen('schemas')}
+              onMouseLeave={() => setIsOpen(false)}>
+              <button
+                className={`flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${isSchemasActive
+                  ? 'text-primary-600 bg-primary-50'
+                  : 'text-gray-600 hover:text-primary-600 hover:bg-gray-50'}`}
+              >
+                <Code className="w-4 h-4" />
+                <span>Schemas</span>
+                <ChevronDown className="w-4 h-4 ml-1" />
+              </button>
+              {isOpen === 'schemas' && (
+                <div className="absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50">
+                  <div className="py-1">
+                    <Link
+                      to="/schemas/system"
+                      className={`block px-4 py-2 text-sm ${location.pathname === '/schemas/system' ? 'text-primary-600 bg-primary-50' : 'text-gray-700 hover:bg-gray-100'}`}
+                    >
+                      System Schema
+                    </Link>
+                    <Link
+                      to="/schemas/layout"
+                      className={`block px-4 py-2 text-sm ${location.pathname === '/schemas/layout' ? 'text-primary-600 bg-primary-50' : 'text-gray-700 hover:bg-gray-100'}`}
+                    >
+                      Layout Schemas
+                    </Link>
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Logout button */}
             <button
@@ -93,6 +128,31 @@ const Navbar = () => {
                   <span>{item.name}</span>
                 </Link>
               ))}
+
+              {/* Mobile Schemas section */}
+              <div className="pt-2">
+                <div className="px-3 text-xs uppercase tracking-wide text-gray-500">Schemas</div>
+                <Link
+                  to="/schemas/system"
+                  onClick={() => setIsOpen(false)}
+                  className={`flex items-center space-x-2 px-3 py-2 rounded-md text-base font-medium transition-colors ${location.pathname === '/schemas/system'
+                    ? 'text-primary-600 bg-primary-50'
+                    : 'text-gray-600 hover:text-primary-600 hover:bg-gray-50'}`}
+                >
+                  <Code className="w-5 h-5" />
+                  <span>System Schema</span>
+                </Link>
+                <Link
+                  to="/schemas/layout"
+                  onClick={() => setIsOpen(false)}
+                  className={`flex items-center space-x-2 px-3 py-2 rounded-md text-base font-medium transition-colors ${location.pathname === '/schemas/layout'
+                    ? 'text-primary-600 bg-primary-50'
+                    : 'text-gray-600 hover:text-primary-600 hover:bg-gray-50'}`}
+                >
+                  <Grid3X3 className="w-5 h-5" />
+                  <span>Layout Schemas</span>
+                </Link>
+              </div>
 
               {/* Mobile logout button */}
               <button
