@@ -6,6 +6,8 @@ import Navbar from '@components/Navbar'
 import HomePage from '@pages/HomePage'
 import AboutPage from '@pages/AboutPage'
 import SettingsManager from '@pages/SettingsManager'
+import SystemSchemaPage from '@pages/SystemSchemaPage'
+import LayoutSchemaPage from '@pages/LayoutSchemaPage'
 import TreePageManager from '@components/TreePageManager'
 import PageEditor from '@components/PageEditor'
 import VersionTimelinePage from '@pages/VersionTimelinePage'
@@ -97,6 +99,34 @@ function App() {
                         </div>
                       </main>
                       <StatusBar customStatusContent={<span>Settings - Ready</span>} />
+                    </div>
+                  </PrivateRoute>
+                } />
+
+                {/* Dedicated schema routes */}
+                <Route path="/schemas/system" element={
+                  <PrivateRoute>
+                    <div className="fixed inset-0 bg-gray-50 flex flex-col">
+                      <Navbar />
+                      <main className="flex-1 overflow-hidden">
+                        <div className="h-full overflow-y-auto">
+                          <SystemSchemaPage />
+                        </div>
+                      </main>
+                      <StatusBar customStatusContent={<span>System Schema - Ready</span>} />
+                    </div>
+                  </PrivateRoute>
+                } />
+                <Route path="/schemas/layout" element={
+                  <PrivateRoute>
+                    <div className="fixed inset-0 bg-gray-50 flex flex-col">
+                      <Navbar />
+                      <main className="flex-1 overflow-hidden">
+                        <div className="h-full overflow-y-auto">
+                          <LayoutSchemaPage />
+                        </div>
+                      </main>
+                      <StatusBar customStatusContent={<span>Layout Schemas - Ready</span>} />
                     </div>
                   </PrivateRoute>
                 } />

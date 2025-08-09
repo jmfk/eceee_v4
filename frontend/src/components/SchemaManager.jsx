@@ -68,13 +68,13 @@ const getSchemaWithoutDefaults = (schema) => {
     }
 }
 
-export default function SchemaManager() {
+export default function SchemaManager({ initialTab = 'system', hideTabNav = false }) {
     const [schemas, setSchemas] = useState([])
     const [layouts, setLayouts] = useState([])
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
     const [editingSchema, setEditingSchema] = useState(null)
-    const [activeTab, setActiveTab] = useState('system') // 'system' or 'layout'
+    const [activeTab, setActiveTab] = useState(initialTab) // 'system' or 'layout'
 
     const [systemForm, setSystemForm] = useState({
         id: null, // Include ID for updates
@@ -144,6 +144,8 @@ export default function SchemaManager() {
     }
 
     useEffect(() => { fetchData() }, [])
+    // Keep active tab in sync when used in routed views
+    useEffect(() => { setActiveTab(initialTab) }, [initialTab])
 
     // Ensure schemas is always an array
     const schemasArray = Array.isArray(schemas) ? schemas : []
@@ -263,36 +265,38 @@ export default function SchemaManager() {
 
     return (
         <div className="space-y-6">
-            {/* Tab Navigation */}
+            {/* Tab Navigation (can be hidden when rendered by dedicated routes) */}
             <div className="bg-white rounded-lg shadow">
-                <div className="border-b border-gray-200">
-                    <nav className="-mb-px flex">
-                        <button
-                            onClick={() => setActiveTab('system')}
-                            className={`py-4 px-6 border-b-2 font-medium text-sm ${activeTab === 'system'
-                                ? 'border-blue-500 text-blue-600'
-                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                }`}
-                        >
-                            System Schema
-                            <span className="ml-2 text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded-full">
-                                Base
-                            </span>
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('layout')}
-                            className={`py-4 px-6 border-b-2 font-medium text-sm ${activeTab === 'layout'
-                                ? 'border-blue-500 text-blue-600'
-                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                }`}
-                        >
-                            Layout Extensions
-                            <span className="ml-2 text-xs bg-green-100 text-green-600 px-2 py-1 rounded-full">
-                                Optional
-                            </span>
-                        </button>
-                    </nav>
-                </div>
+                {!hideTabNav && (
+                    <div className="border-b border-gray-200">
+                        <nav className="-mb-px flex">
+                            <button
+                                onClick={() => setActiveTab('system')}
+                                className={`py-4 px-6 border-b-2 font-medium text-sm ${activeTab === 'system'
+                                    ? 'border-blue-500 text-blue-600'
+                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                    }`}
+                            >
+                                System Schema
+                                <span className="ml-2 text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded-full">
+                                    Base
+                                </span>
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('layout')}
+                                className={`py-4 px-6 border-b-2 font-medium text-sm ${activeTab === 'layout'
+                                    ? 'border-blue-500 text-blue-600'
+                                    : 'border-transparent text-gray-500 hover:text-gray-300 hover:border-gray-300'
+                                    }`}
+                            >
+                                Layout Extensions
+                                <span className="ml-2 text-xs bg-green-100 text-green-600 px-2 py-1 rounded-full">
+                                    Optional
+                                </span>
+                            </button>
+                        </nav>
+                    </div>
+                )}
 
                 <div className="p-6">
                     {activeTab === 'system' && (
@@ -412,7 +416,7 @@ export default function SchemaManager() {
                                                     </span>
                                                 )}
                                             </div>
-                                            
+
                                             <VisualSchemaEditor
                                                 key={`layout-${layoutForm.layout_name}`}
                                                 schema={layoutForm.schema}
@@ -444,7 +448,7 @@ export default function SchemaManager() {
                                                 <div className="mb-3 p-2 bg-green-50 rounded text-sm text-green-700">
                                                     <strong>Includes:</strong> Default fields + System schema + Layout fields
                                                 </div>
-                                                <SchemaFormPreview 
+                                                <SchemaFormPreview
                                                     schema={mergeWithDefaults({
                                                         type: 'object',
                                                         properties: {
@@ -460,7 +464,7 @@ export default function SchemaManager() {
                                                 <div className="mb-3 p-2 bg-blue-50 rounded text-sm text-blue-700">
                                                     <strong>Shows:</strong> Default fields + System schema (select layout to see extensions)
                                                 </div>
-                                                <SchemaFormPreview 
+                                                <SchemaFormPreview
                                                     schema={mergeWithDefaults(systemSchema?.schema || { type: 'object', properties: {} })}
                                                     title="Complete Schema Preview"
                                                 />
@@ -469,58 +473,6 @@ export default function SchemaManager() {
                                     </div>
                                 </div>
                             </div>
-                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                    <div>
-                                        <div className="flex items-center justify-between mb-4">
-                                            <h3 className="text-md font-medium">Additional Fields for {layoutForm.layout_name}</h3>
-                                            {layoutSchemas.find(s => s.layout_name === layoutForm.layout_name) && (
-                                                <span className="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded-full">
-                                                    Existing Schema
-                                                </span>
-                                            )}
-                                        </div>
-
-                                        <VisualSchemaEditor
-                                            key={`layout-${layoutForm.layout_name}`}
-                                            schema={layoutForm.schema}
-                                            onChange={handleLayoutSchemaChange}
-                                        />
-                                        {validationErrors.schema && (
-                                            <div className="text-red-500 text-sm mt-2">{validationErrors.schema}</div>
-                                        )}
-
-                                        <div className="flex space-x-3 mt-6">
-                                            <button
-                                                onClick={() => handleSubmit(true)}
-                                                className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors"
-                                            >
-                                                {layoutSchemas.find(s => s.layout_name === layoutForm.layout_name)
-                                                    ? 'Update Layout Schema'
-                                                    : 'Create Layout Schema'}
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <h3 className="text-md font-medium mb-4">Complete Form Preview</h3>
-                                        <div className="bg-white border rounded-lg p-4">
-                                            <div className="mb-3 p-2 bg-green-50 rounded text-sm text-green-700">
-                                                <strong>Includes:</strong> Default fields + System schema + Layout fields
-                                            </div>
-                                            <SchemaFormPreview
-                                                schema={mergeWithDefaults({
-                                                    type: 'object',
-                                                    properties: {
-                                                        ...(systemSchema?.schema?.properties || {}),
-                                                        ...(layoutForm.schema?.properties || {})
-                                                    }
-                                                })}
-                                                title="Complete Schema Preview"
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
 
                             {/* Show existing layout schemas */}
                             {layoutSchemas.length > 0 && (
