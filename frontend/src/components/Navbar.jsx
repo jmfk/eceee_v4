@@ -12,7 +12,7 @@ const Navbar = () => {
     { name: 'Home', href: '/', icon: Code },
     { name: 'About', href: '/about', icon: Cpu },
     { name: 'Pages', href: '/pages', icon: Settings },
-    { name: 'Settings', href: '/settings', icon: Settings },
+    { name: 'Settings', href: '/settings?tab=schemas', icon: Settings },
   ]
 
   const isActive = (path) => {
