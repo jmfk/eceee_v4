@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
     FileText,
@@ -43,11 +43,16 @@ import SchemaManager from '../components/SchemaManager'
 
 const SettingsManager = () => {
     const navigate = useNavigate()
-    const [activeTab, setActiveTab] = useState('layouts')
+    const location = useLocation()
+    const [searchParams, setSearchParams] = useSearchParams()
+    
+    // Get tab from URL search params, default to 'layouts'
+    const activeTab = searchParams.get('tab') || 'layouts'
     const [selectedPage, setSelectedPage] = useState(null)
     const [searchTerm, setSearchTerm] = useState('')
     const [showVersionManager, setShowVersionManager] = useState(false)
-    const [publishingView, setPublishingView] = useState('dashboard') // 'dashboard', 'timeline', 'bulk'
+    // Get publishing sub-tab from URL, default to 'dashboard'
+    const publishingView = searchParams.get('publishingView') || 'dashboard'
     const [isCreating, setIsCreating] = useState(false)
     const [isEditing, setIsEditing] = useState(false)
     const [statusFilter, setStatusFilter] = useState('all')
@@ -329,7 +334,11 @@ const SettingsManager = () => {
                             return (
                                 <button
                                     key={tab.id}
-                                    onClick={() => setPublishingView(tab.id)}
+                                    onClick={() => {
+                                        const newSearchParams = new URLSearchParams(searchParams)
+                                        newSearchParams.set('publishingView', tab.id)
+                                        setSearchParams(newSearchParams)
+                                    }}
                                     className={`inline-flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${isActive
                                         ? 'bg-blue-600 text-white'
                                         : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
@@ -399,7 +408,11 @@ const SettingsManager = () => {
                             return (
                                 <button
                                     key={tab.id}
-                                    onClick={() => setActiveTab(tab.id)}
+                                    onClick={() => {
+                                        const newSearchParams = new URLSearchParams(searchParams)
+                                        newSearchParams.set('tab', tab.id)
+                                        setSearchParams(newSearchParams)
+                                    }}
                                     className={`group inline-flex items-center py-4 px-1 border-b-2 font-medium text-sm transition-colors ${isActive
                                         ? 'border-blue-500 text-blue-600'
                                         : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
