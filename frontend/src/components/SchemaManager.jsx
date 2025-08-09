@@ -13,6 +13,8 @@ export default function SchemaManager() {
     const [systemForm, setSystemForm] = useState({
         id: null, // Include ID for updates
         scope: 'system',
+        layout_name: '', // Initialize to avoid undefined
+        name: '', // Initialize to avoid undefined
         schema: { type: 'object', properties: {} },
         is_active: true,
     })
@@ -33,7 +35,7 @@ export default function SchemaManager() {
                 pageDataSchemasApi.list({ ordering: '-updated_at' }),
                 layoutsApi.list({ active_only: true })
             ])
-            
+
             console.log('Raw API responses:', { schemasRes, layoutsRes })
 
             // Handle different possible response structures
@@ -59,12 +61,12 @@ export default function SchemaManager() {
                 }
             }
 
-                        setSchemas(allSchemas)
+            setSchemas(allSchemas)
             setLayouts(allLayouts)
-            
+
             console.log('Processed schemas:', allSchemas)
             console.log('Looking for system schema...')
-            
+
             // Auto-populate forms with existing schemas
             const systemSchema = allSchemas.find(s => s.scope === 'system')
             if (systemSchema) {
@@ -121,21 +123,35 @@ export default function SchemaManager() {
             return
         }
 
-        try {
+                try {
+            // Clean up form data for submission
+            const cleanFormData = { ...formData }
+            
+            // For system schemas, remove layout_name and name fields
+            if (!isLayout) {
+                delete cleanFormData.layout_name
+                delete cleanFormData.name
+            }
+            
+            console.log('Submitting schema data:', cleanFormData)
+            
             // For system schema, use the ID from the form if available
             if (!isLayout && formData.id) {
-                await pageDataSchemasApi.update(formData.id, formData)
+                console.log('Updating existing system schema with ID:', formData.id)
+                await pageDataSchemasApi.update(formData.id, cleanFormData)
             } else {
                 // For layout schemas or new system schema, check if one exists
-                const existingSchema = schemasArray.find(s =>
-                    isLayout ? (s.scope === 'layout' && s.layout_name === formData.layout_name)
-                        : s.scope === 'system'
+                const existingSchema = schemasArray.find(s => 
+                    isLayout ? (s.scope === 'layout' && s.layout_name === formData.layout_name) 
+                             : s.scope === 'system'
                 )
-
+                
                 if (existingSchema) {
-                    await pageDataSchemasApi.update(existingSchema.id, formData)
+                    console.log('Updating existing schema with ID:', existingSchema.id)
+                    await pageDataSchemasApi.update(existingSchema.id, cleanFormData)
                 } else {
-                    await pageDataSchemasApi.create(formData)
+                    console.log('Creating new schema')
+                    await pageDataSchemasApi.create(cleanFormData)
                 }
             }
 
