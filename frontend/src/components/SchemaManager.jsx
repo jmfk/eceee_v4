@@ -33,7 +33,7 @@ const DEFAULT_SCHEMA_FIELDS = {
 // Helper function to merge default fields with a schema
 const mergeWithDefaults = (schema) => {
     const mergedProperties = { ...DEFAULT_SCHEMA_FIELDS }
-    
+
     // Add user-defined properties, but don't allow overriding defaults
     if (schema?.properties) {
         Object.entries(schema.properties).forEach(([key, value]) => {
@@ -42,7 +42,7 @@ const mergeWithDefaults = (schema) => {
             }
         })
     }
-    
+
     return {
         type: 'object',
         properties: mergedProperties,
@@ -53,14 +53,14 @@ const mergeWithDefaults = (schema) => {
 // Helper function to get schema without default fields (for editing)
 const getSchemaWithoutDefaults = (schema) => {
     if (!schema?.properties) return { type: 'object', properties: {} }
-    
+
     const userProperties = {}
     Object.entries(schema.properties).forEach(([key, value]) => {
         if (!DEFAULT_SCHEMA_FIELDS[key]) {
             userProperties[key] = value
         }
     })
-    
+
     return {
         type: 'object',
         properties: userProperties,
@@ -178,16 +178,16 @@ export default function SchemaManager() {
             return
         }
 
-                try {
+        try {
             // Clean up form data for submission
             const cleanFormData = { ...formData }
-            
+
             // For system schemas, remove layout_name and name fields
             if (!isLayout) {
                 delete cleanFormData.layout_name
                 delete cleanFormData.name
             }
-            
+
             // Merge user-defined schema with default fields
             cleanFormData.schema = mergeWithDefaults(formData.schema)
 
@@ -311,7 +311,7 @@ export default function SchemaManager() {
                                 </p>
                             </div>
 
-                                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                 <div>
                                     <h3 className="text-md font-medium mb-4">Schema Definition</h3>
                                     <VisualSchemaEditor
@@ -324,7 +324,7 @@ export default function SchemaManager() {
                                     )}
 
                                     <div className="flex space-x-3 mt-6">
-                                        <button 
+                                        <button
                                             onClick={() => handleSubmit(false)}
                                             className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
                                         >
@@ -332,16 +332,16 @@ export default function SchemaManager() {
                                         </button>
                                     </div>
                                 </div>
-                                
+
                                 <div>
                                     <h3 className="text-md font-medium mb-4">Complete Form Preview</h3>
                                     <div className="bg-white border rounded-lg p-4">
                                         <div className="mb-3 p-2 bg-blue-50 rounded text-sm text-blue-700">
-                                            <strong>Includes default fields:</strong> title, description, featured_image
+                                            <strong>Includes:</strong> Default fields + System schema fields
                                         </div>
-                                        <SchemaFormPreview 
+                                        <SchemaFormPreview
                                             schema={mergeWithDefaults(systemForm.schema)}
-                                            title="System Schema Preview"
+                                            title="Complete Schema Preview"
                                         />
                                     </div>
                                 </div>
@@ -358,49 +358,117 @@ export default function SchemaManager() {
                                 </p>
                             </div>
 
-                            <div>
-                                <label className="block text-sm font-medium mb-2">Layout</label>
-                                <select
-                                    className={`w-full max-w-md border rounded-lg px-3 py-2 ${validationErrors.layout_name ? 'border-red-500' : ''}`}
-                                    value={layoutForm.layout_name}
-                                    onChange={e => {
-                                        const newLayoutName = e.target.value
-                                        setLayoutForm(f => ({ ...f, layout_name: newLayoutName }))
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                <div className="space-y-6">
+                                    <div>
+                                        <label className="block text-sm font-medium mb-2">Layout</label>
+                                        <select
+                                            className={`w-full max-w-md border rounded-lg px-3 py-2 ${validationErrors.layout_name ? 'border-red-500' : ''}`}
+                                            value={layoutForm.layout_name}
+                                            onChange={e => {
+                                                const newLayoutName = e.target.value
+                                                setLayoutForm(f => ({ ...f, layout_name: newLayoutName }))
 
-                                        // Load existing layout schema if available
-                                        const existingLayoutSchema = layoutSchemas.find(s => s.layout_name === newLayoutName)
-                                        if (existingLayoutSchema) {
-                                            setLayoutForm(f => ({
-                                                ...f,
-                                                schema: getSchemaWithoutDefaults(existingLayoutSchema.schema),
-                                                is_active: existingLayoutSchema.is_active
-                                            }))
-                                        } else {
-                                            setLayoutForm(f => ({
-                                                ...f,
-                                                schema: { type: 'object', properties: {} },
-                                                is_active: true
-                                            }))
-                                        }
+                                                // Load existing layout schema if available
+                                                const existingLayoutSchema = layoutSchemas.find(s => s.layout_name === newLayoutName)
+                                                if (existingLayoutSchema) {
+                                                    setLayoutForm(f => ({
+                                                        ...f,
+                                                        schema: getSchemaWithoutDefaults(existingLayoutSchema.schema),
+                                                        is_active: existingLayoutSchema.is_active
+                                                    }))
+                                                } else {
+                                                    setLayoutForm(f => ({
+                                                        ...f,
+                                                        schema: { type: 'object', properties: {} },
+                                                        is_active: true
+                                                    }))
+                                                }
 
-                                        if (validationErrors.layout_name) {
-                                            setValidationErrors(prev => ({ ...prev, layout_name: '' }))
-                                        }
-                                    }}
-                                >
-                                    <option value="">Select a layout...</option>
-                                    {layouts.map(layout => (
-                                        <option key={layout.name} value={layout.name}>
-                                            {layout.name} - {layout.description}
-                                        </option>
-                                    ))}
-                                </select>
-                                {validationErrors.layout_name && (
-                                    <div className="text-red-500 text-sm mt-1">{validationErrors.layout_name}</div>
-                                )}
+                                                if (validationErrors.layout_name) {
+                                                    setValidationErrors(prev => ({ ...prev, layout_name: '' }))
+                                                }
+                                            }}
+                                        >
+                                            <option value="">Select a layout...</option>
+                                            {layouts.map(layout => (
+                                                <option key={layout.name} value={layout.name}>
+                                                    {layout.name} - {layout.description}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        {validationErrors.layout_name && (
+                                            <div className="text-red-500 text-sm mt-1">{validationErrors.layout_name}</div>
+                                        )}
+                                    </div>
+
+                                    {layoutForm.layout_name && (
+                                        <>
+                                            <div className="flex items-center justify-between mb-4">
+                                                <h3 className="text-md font-medium">Additional Fields for {layoutForm.layout_name}</h3>
+                                                {layoutSchemas.find(s => s.layout_name === layoutForm.layout_name) && (
+                                                    <span className="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded-full">
+                                                        Existing Schema
+                                                    </span>
+                                                )}
+                                            </div>
+                                            
+                                            <VisualSchemaEditor
+                                                key={`layout-${layoutForm.layout_name}`}
+                                                schema={layoutForm.schema}
+                                                onChange={handleLayoutSchemaChange}
+                                            />
+                                            {validationErrors.schema && (
+                                                <div className="text-red-500 text-sm mt-2">{validationErrors.schema}</div>
+                                            )}
+
+                                            <div className="flex space-x-3 mt-6">
+                                                <button
+                                                    onClick={() => handleSubmit(true)}
+                                                    className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors"
+                                                >
+                                                    {layoutSchemas.find(s => s.layout_name === layoutForm.layout_name)
+                                                        ? 'Update Layout Schema'
+                                                        : 'Create Layout Schema'}
+                                                </button>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+
+                                <div>
+                                    <h3 className="text-md font-medium mb-4">Complete Form Preview</h3>
+                                    <div className="bg-white border rounded-lg p-4">
+                                        {layoutForm.layout_name ? (
+                                            <>
+                                                <div className="mb-3 p-2 bg-green-50 rounded text-sm text-green-700">
+                                                    <strong>Includes:</strong> Default fields + System schema + Layout fields
+                                                </div>
+                                                <SchemaFormPreview 
+                                                    schema={mergeWithDefaults({
+                                                        type: 'object',
+                                                        properties: {
+                                                            ...(systemSchema?.schema?.properties || {}),
+                                                            ...(layoutForm.schema?.properties || {})
+                                                        }
+                                                    })}
+                                                    title="Complete Schema Preview"
+                                                />
+                                            </>
+                                        ) : (
+                                            <>
+                                                <div className="mb-3 p-2 bg-blue-50 rounded text-sm text-blue-700">
+                                                    <strong>Shows:</strong> Default fields + System schema (select layout to see extensions)
+                                                </div>
+                                                <SchemaFormPreview 
+                                                    schema={mergeWithDefaults(systemSchema?.schema || { type: 'object', properties: {} })}
+                                                    title="Complete Schema Preview"
+                                                />
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
-
-                            {layoutForm.layout_name && (
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                     <div>
                                         <div className="flex items-center justify-between mb-4">
@@ -411,7 +479,7 @@ export default function SchemaManager() {
                                                 </span>
                                             )}
                                         </div>
-                                        
+
                                         <VisualSchemaEditor
                                             key={`layout-${layoutForm.layout_name}`}
                                             schema={layoutForm.schema}
@@ -432,14 +500,14 @@ export default function SchemaManager() {
                                             </button>
                                         </div>
                                     </div>
-                                    
+
                                     <div>
                                         <h3 className="text-md font-medium mb-4">Complete Form Preview</h3>
                                         <div className="bg-white border rounded-lg p-4">
                                             <div className="mb-3 p-2 bg-green-50 rounded text-sm text-green-700">
-                                                <strong>Inherits:</strong> Default fields + System schema + Layout fields
+                                                <strong>Includes:</strong> Default fields + System schema + Layout fields
                                             </div>
-                                            <SchemaFormPreview 
+                                            <SchemaFormPreview
                                                 schema={mergeWithDefaults({
                                                     type: 'object',
                                                     properties: {
@@ -447,7 +515,7 @@ export default function SchemaManager() {
                                                         ...(layoutForm.schema?.properties || {})
                                                     }
                                                 })}
-                                                title="Complete Layout Schema Preview"
+                                                title="Complete Schema Preview"
                                             />
                                         </div>
                                     </div>
