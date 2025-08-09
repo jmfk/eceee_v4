@@ -3,7 +3,6 @@ import { Eye, EyeOff } from 'lucide-react'
 
 // Mini form renderer to preview how the schema will look as a form
 export default function SchemaFormPreview({ schema }) {
-  const [isVisible, setIsVisible] = useState(false)
   const [formData, setFormData] = useState({})
 
   if (!schema?.properties || Object.keys(schema.properties).length === 0) {
@@ -46,12 +45,12 @@ export default function SchemaFormPreview({ schema }) {
             />
           )
         } else {
-          const inputType = property.format === 'email' ? 'email' : 
-                           property.format === 'uri' ? 'url' :
-                           property.format === 'date' ? 'date' :
-                           property.format === 'date-time' ? 'datetime-local' :
-                           property.format === 'time' ? 'time' : 'text'
-          
+          const inputType = property.format === 'email' ? 'email' :
+            property.format === 'uri' ? 'url' :
+              property.format === 'date' ? 'date' :
+                property.format === 'date-time' ? 'datetime-local' :
+                  property.format === 'time' ? 'time' : 'text'
+
           return (
             <input
               type={inputType}
@@ -111,45 +110,33 @@ export default function SchemaFormPreview({ schema }) {
   }
 
   return (
-    <div className="border rounded-lg bg-gray-50">
-      <button
-        onClick={() => setIsVisible(!isVisible)}
-        className="w-full flex items-center justify-between p-3 text-left hover:bg-gray-100"
-      >
-        <span className="font-medium text-sm">Form Preview</span>
-        {isVisible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-      </button>
+    <div className="rounded-lg bg-gray-50">
+      <div className="space-y-4">
+        {Object.entries(schema.properties).map(([key, property]) => {
+          const isRequired = schema.required?.includes(key)
 
-      {isVisible && (
-        <div className="p-4 border-t bg-white">
-          <div className="space-y-4">
-            {Object.entries(schema.properties).map(([key, property]) => {
-              const isRequired = schema.required?.includes(key)
-              
-              return (
-                <div key={key}>
-                  <label className="block text-sm font-medium mb-1">
-                    {property.title || key}
-                    {isRequired && <span className="text-red-500 ml-1">*</span>}
-                  </label>
-                  {property.description && (
-                    <div className="text-xs text-gray-500 mb-2">{property.description}</div>
-                  )}
-                  {renderField(key, property)}
-                </div>
-              )
-            })}
-          </div>
+          return (
+            <div key={key}>
+              <label className="block text-sm font-medium mb-1">
+                {property.title || key}
+                {isRequired && <span className="text-red-500 ml-1">*</span>}
+              </label>
+              {property.description && (
+                <div className="text-xs text-gray-500 mb-2">{property.description}</div>
+              )}
+              {renderField(key, property)}
+            </div>
+          )
+        })}
+      </div>
 
-          {Object.keys(formData).length > 0 && (
-            <details className="mt-4 pt-4 border-t">
-              <summary className="text-sm font-medium cursor-pointer">Form Data (JSON)</summary>
-              <pre className="mt-2 text-xs bg-gray-100 p-2 rounded overflow-auto">
-                {JSON.stringify(formData, null, 2)}
-              </pre>
-            </details>
-          )}
-        </div>
+      {Object.keys(formData).length > 0 && (
+        <details className="mt-4 pt-4 border-t">
+          <summary className="text-sm font-medium cursor-pointer">Form Data (JSON)</summary>
+          <pre className="mt-2 text-xs bg-gray-100 p-2 rounded overflow-auto">
+            {JSON.stringify(formData, null, 2)}
+          </pre>
+        </details>
       )}
     </div>
   )
