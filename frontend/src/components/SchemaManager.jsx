@@ -38,27 +38,20 @@ export default function SchemaManager() {
 
             console.log('Raw API responses:', { schemasRes, layoutsRes })
 
-            // Handle different possible response structures
+                        // Extract schemas from API response (processResponse already extracted .data)
             let allSchemas = []
             if (Array.isArray(schemasRes)) {
                 allSchemas = schemasRes
-            } else if (schemasRes?.data) {
-                if (Array.isArray(schemasRes.data)) {
-                    allSchemas = schemasRes.data
-                } else if (schemasRes.data.results && Array.isArray(schemasRes.data.results)) {
-                    allSchemas = schemasRes.data.results
-                }
+            } else if (schemasRes?.results && Array.isArray(schemasRes.results)) {
+                allSchemas = schemasRes.results
             }
-
+            
+            // Extract layouts from API response
             let allLayouts = []
             if (Array.isArray(layoutsRes)) {
                 allLayouts = layoutsRes
-            } else if (layoutsRes?.data) {
-                if (Array.isArray(layoutsRes.data)) {
-                    allLayouts = layoutsRes.data
-                } else if (layoutsRes.data.results && Array.isArray(layoutsRes.data.results)) {
-                    allLayouts = layoutsRes.data.results
-                }
+            } else if (layoutsRes?.results && Array.isArray(layoutsRes.results)) {
+                allLayouts = layoutsRes.results
             }
 
             setSchemas(allSchemas)
@@ -123,29 +116,29 @@ export default function SchemaManager() {
             return
         }
 
-                try {
+        try {
             // Clean up form data for submission
             const cleanFormData = { ...formData }
-            
+
             // For system schemas, remove layout_name and name fields
             if (!isLayout) {
                 delete cleanFormData.layout_name
                 delete cleanFormData.name
             }
-            
+
             console.log('Submitting schema data:', cleanFormData)
-            
+
             // For system schema, use the ID from the form if available
             if (!isLayout && formData.id) {
                 console.log('Updating existing system schema with ID:', formData.id)
                 await pageDataSchemasApi.update(formData.id, cleanFormData)
             } else {
                 // For layout schemas or new system schema, check if one exists
-                const existingSchema = schemasArray.find(s => 
-                    isLayout ? (s.scope === 'layout' && s.layout_name === formData.layout_name) 
-                             : s.scope === 'system'
+                const existingSchema = schemasArray.find(s =>
+                    isLayout ? (s.scope === 'layout' && s.layout_name === formData.layout_name)
+                        : s.scope === 'system'
                 )
-                
+
                 if (existingSchema) {
                     console.log('Updating existing schema with ID:', existingSchema.id)
                     await pageDataSchemasApi.update(existingSchema.id, cleanFormData)
