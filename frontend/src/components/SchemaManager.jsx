@@ -16,14 +16,14 @@ export default function SchemaManager() {
         schema: { type: 'object', properties: {} },
         is_active: true,
     })
-    
+
     const [layoutForm, setLayoutForm] = useState({
         scope: 'layout',
         layout_name: '',
         schema: { type: 'object', properties: {} },
         is_active: true,
     })
-    
+
     const [validationErrors, setValidationErrors] = useState({})
 
     const fetchData = async () => {
@@ -34,6 +34,8 @@ export default function SchemaManager() {
                 layoutsApi.list({ active_only: true })
             ])
             
+            console.log('Raw API responses:', { schemasRes, layoutsRes })
+
             // Handle different possible response structures
             let allSchemas = []
             if (Array.isArray(schemasRes)) {
@@ -45,7 +47,7 @@ export default function SchemaManager() {
                     allSchemas = schemasRes.data.results
                 }
             }
-            
+
             let allLayouts = []
             if (Array.isArray(layoutsRes)) {
                 allLayouts = layoutsRes
@@ -56,9 +58,12 @@ export default function SchemaManager() {
                     allLayouts = layoutsRes.data.results
                 }
             }
-            
-            setSchemas(allSchemas)
+
+                        setSchemas(allSchemas)
             setLayouts(allLayouts)
+            
+            console.log('Processed schemas:', allSchemas)
+            console.log('Looking for system schema...')
             
             // Auto-populate forms with existing schemas
             const systemSchema = allSchemas.find(s => s.scope === 'system')
@@ -71,9 +76,9 @@ export default function SchemaManager() {
                     is_active: systemSchema.is_active,
                 })
             } else {
-                console.log('No existing system schema found')
+                console.log('No existing system schema found in:', allSchemas)
             }
-            
+
         } catch (e) {
             setError(typeof e?.message === 'string' ? e.message : 'Failed to load data')
         } finally {
@@ -88,21 +93,21 @@ export default function SchemaManager() {
 
     const validateForm = (formData, isLayout = false) => {
         const errors = {}
-        
+
         if (isLayout && !formData.layout_name?.trim()) {
             errors.layout_name = 'Layout selection is required'
         }
-        
+
         // Validate schema has at least one property (for now we'll allow empty schemas)
         if (formData.schema?.properties) {
-            const invalidKeys = Object.keys(formData.schema.properties).filter(key => 
+            const invalidKeys = Object.keys(formData.schema.properties).filter(key =>
                 !key || !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(key)
             )
             if (invalidKeys.length > 0) {
                 errors.schema = `Invalid property keys: ${invalidKeys.join(', ')}. Use letters, numbers, and underscores only.`
             }
         }
-        
+
         return errors
     }
 
@@ -110,30 +115,30 @@ export default function SchemaManager() {
         setError('')
         const formData = isLayout ? layoutForm : systemForm
         const errors = validateForm(formData, isLayout)
-        
+
         setValidationErrors(errors)
         if (Object.keys(errors).length > 0) {
             return
         }
-        
+
         try {
             // For system schema, use the ID from the form if available
             if (!isLayout && formData.id) {
                 await pageDataSchemasApi.update(formData.id, formData)
             } else {
                 // For layout schemas or new system schema, check if one exists
-                const existingSchema = schemasArray.find(s => 
-                    isLayout ? (s.scope === 'layout' && s.layout_name === formData.layout_name) 
-                             : s.scope === 'system'
+                const existingSchema = schemasArray.find(s =>
+                    isLayout ? (s.scope === 'layout' && s.layout_name === formData.layout_name)
+                        : s.scope === 'system'
                 )
-                
+
                 if (existingSchema) {
                     await pageDataSchemasApi.update(existingSchema.id, formData)
                 } else {
                     await pageDataSchemasApi.create(formData)
                 }
             }
-            
+
             setValidationErrors({})
             fetchData()
         } catch (e) {
@@ -141,7 +146,7 @@ export default function SchemaManager() {
             if (typeof errorData === 'object' && errorData) {
                 if (errorData.layout_name) setValidationErrors(prev => ({ ...prev, layout_name: errorData.layout_name[0] }))
                 if (errorData.schema) setValidationErrors(prev => ({ ...prev, schema: errorData.schema[0] }))
-                
+
                 if (!errorData.layout_name && !errorData.schema) {
                     setError(JSON.stringify(errorData))
                 }
@@ -170,11 +175,10 @@ export default function SchemaManager() {
                     <nav className="-mb-px flex">
                         <button
                             onClick={() => setActiveTab('system')}
-                            className={`py-4 px-6 border-b-2 font-medium text-sm ${
-                                activeTab === 'system'
-                                    ? 'border-blue-500 text-blue-600'
-                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                            }`}
+                            className={`py-4 px-6 border-b-2 font-medium text-sm ${activeTab === 'system'
+                                ? 'border-blue-500 text-blue-600'
+                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                }`}
                         >
                             System Schema
                             <span className="ml-2 text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded-full">
@@ -183,11 +187,10 @@ export default function SchemaManager() {
                         </button>
                         <button
                             onClick={() => setActiveTab('layout')}
-                            className={`py-4 px-6 border-b-2 font-medium text-sm ${
-                                activeTab === 'layout'
-                                    ? 'border-blue-500 text-blue-600'
-                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                            }`}
+                            className={`py-4 px-6 border-b-2 font-medium text-sm ${activeTab === 'layout'
+                                ? 'border-blue-500 text-blue-600'
+                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                }`}
                         >
                             Layout Extensions
                             <span className="ml-2 text-xs bg-green-100 text-green-600 px-2 py-1 rounded-full">
@@ -224,7 +227,7 @@ export default function SchemaManager() {
                             )}
 
                             <div className="flex space-x-3">
-                                <button 
+                                <button
                                     onClick={() => handleSubmit(false)}
                                     className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
                                 >
@@ -245,13 +248,13 @@ export default function SchemaManager() {
 
                             <div>
                                 <label className="block text-sm font-medium mb-2">Layout</label>
-                                <select 
+                                <select
                                     className={`w-full max-w-md border rounded-lg px-3 py-2 ${validationErrors.layout_name ? 'border-red-500' : ''}`}
                                     value={layoutForm.layout_name}
                                     onChange={e => {
                                         const newLayoutName = e.target.value
                                         setLayoutForm(f => ({ ...f, layout_name: newLayoutName }))
-                                        
+
                                         // Load existing layout schema if available
                                         const existingLayoutSchema = layoutSchemas.find(s => s.layout_name === newLayoutName)
                                         if (existingLayoutSchema) {
@@ -267,7 +270,7 @@ export default function SchemaManager() {
                                                 is_active: true
                                             }))
                                         }
-                                        
+
                                         if (validationErrors.layout_name) {
                                             setValidationErrors(prev => ({ ...prev, layout_name: '' }))
                                         }
@@ -305,12 +308,12 @@ export default function SchemaManager() {
                                     )}
 
                                     <div className="flex space-x-3">
-                                        <button 
+                                        <button
                                             onClick={() => handleSubmit(true)}
                                             className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors"
                                         >
-                                            {layoutSchemas.find(s => s.layout_name === layoutForm.layout_name) 
-                                                ? 'Update Layout Schema' 
+                                            {layoutSchemas.find(s => s.layout_name === layoutForm.layout_name)
+                                                ? 'Update Layout Schema'
                                                 : 'Create Layout Schema'}
                                         </button>
                                     </div>
@@ -326,9 +329,8 @@ export default function SchemaManager() {
                                             <div key={schema.id} className="border rounded-lg p-4">
                                                 <div className="flex items-center justify-between mb-2">
                                                     <h4 className="font-medium">{schema.layout_name}</h4>
-                                                    <span className={`text-xs px-2 py-1 rounded ${
-                                                        schema.is_active ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-600'
-                                                    }`}>
+                                                    <span className={`text-xs px-2 py-1 rounded ${schema.is_active ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-600'
+                                                        }`}>
                                                         {schema.is_active ? 'Active' : 'Inactive'}
                                                     </span>
                                                 </div>
