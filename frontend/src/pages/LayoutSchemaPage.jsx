@@ -1,14 +1,19 @@
 import React from 'react'
-import SchemaManager from '../components/SchemaManager'
+import SettingsTabs from '../components/SettingsTabs'
+import LayoutSchemaManager from '../components/LayoutSchemaManager'
 
 const LayoutSchemaPage = () => {
+
     return (
-        <div className="container mx-auto px-4 py-8">
-            <div className="mb-6">
-                <h1 className="text-2xl font-semibold">Layout Schemas</h1>
-                <p className="text-gray-600 mt-1">Extend the system schema with layout-specific fields.</p>
+        <div className="container mx-auto px-4 py-8 space-y-6">
+            <SettingsTabs />
+            <div className="bg-white rounded-lg shadow p-6">
+                <div className="mb-4">
+                    <h1 className="text-2xl font-semibold">Layout Schemas</h1>
+                    <p className="text-gray-600 mt-1">Select a layout to create or edit its schema extensions.</p>
+                </div>
+                <LayoutSchemaManager />
             </div>
-            <SchemaManager initialTab="layout" hideTabNav />
         </div>
     )
 }
