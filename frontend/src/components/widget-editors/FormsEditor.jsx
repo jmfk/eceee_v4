@@ -454,7 +454,7 @@ const FormsEditor = ({ config, onChange, errors, widgetType }) => {
                     {/* Form Preview */}
                     <div className="space-y-2">
                         <label className="block text-sm font-medium text-gray-700">
-                            Form Preview nfdlshdflfhs
+                            Form Preview
                         </label>
                         <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
                             {renderFormPreview()}

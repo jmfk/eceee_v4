@@ -30,6 +30,7 @@ import { layoutsApi } from '../api/layouts'
 import { useNotificationContext } from '../components/NotificationManager'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import LayoutEditor from '../components/LayoutEditor'
+import SettingsTabs from '../components/SettingsTabs'
 import ThemeEditor from '../components/ThemeEditor'
 
 import VersionManager from '../components/VersionManager'
@@ -39,13 +40,13 @@ import PublicationTimeline from '../components/PublicationTimeline'
 import BulkPublishingOperations from '../components/BulkPublishingOperations'
 import NamespaceManager from '../components/NamespaceManager'
 import { extractErrorMessage } from '../utils/errorHandling.js'
-import SchemaManager from '../components/SchemaManager'
+// Schema managers are no longer embedded in Settings; use dedicated pages under /schemas
 
 const SettingsManager = () => {
     const navigate = useNavigate()
     const location = useLocation()
     const [searchParams, setSearchParams] = useSearchParams()
-    
+
     // Get tab from URL search params, default to 'layouts'
     const activeTab = searchParams.get('tab') || 'layouts'
     const [selectedPage, setSelectedPage] = useState(null)
@@ -119,47 +120,7 @@ const SettingsManager = () => {
 
     const availableLayoutOptions = getAvailableLayoutsForFilter()
 
-    const tabs = [
-        {
-            id: 'layouts',
-            label: 'Layouts',
-            icon: Grid3X3,
-            description: 'Design page layouts and slots'
-        },
-        {
-            id: 'themes',
-            label: 'Themes',
-            icon: Palette,
-            description: 'Customize colors and styling'
-        },
-
-        {
-            id: 'versions',
-            label: 'Versions',
-            icon: Settings,
-            description: 'Page version control and history'
-        },
-
-        {
-            id: 'publishing',
-            label: 'Publishing Workflow',
-            icon: Calendar,
-            description: 'Manage publication scheduling and status'
-        },
-        {
-            id: 'namespaces',
-            label: 'Namespaces',
-            icon: FolderOpen,
-            description: 'Manage website namespaces'
-        }
-        ,
-        {
-            id: 'schemas',
-            label: 'Schemas',
-            icon: Code,
-            description: 'Manage JSON Schemas for page data'
-        }
-    ]
+    // Note: schemas tab has been removed. Use /schemas pages.
 
     // Add these mutations for creating and updating pages
     const createPageMutation = useMutation({
@@ -380,12 +341,17 @@ const SettingsManager = () => {
                 return renderPublishingWorkflow()
             case 'namespaces':
                 return renderNamespaceManagement()
-            case 'schemas':
-                return <SchemaManager />
             default:
                 return null
         }
     }
+
+    // Redirect legacy /settings?tab=schemas to dedicated schema page
+    useEffect(() => {
+        if (activeTab === 'schemas') {
+            navigate('/schemas/system', { replace: true })
+        }
+    }, [activeTab, navigate])
 
     return (
         <div className="space-y-6">
@@ -397,45 +363,11 @@ const SettingsManager = () => {
                 </p>
             </div>
 
-            {/* Navigation Tabs */}
+            {/* Navigation Tabs - shared between Settings and Schema pages */}
+            <SettingsTabs />
+
+            {/* Tab Content */}
             <div className="bg-white rounded-lg shadow">
-                <div className="border-b border-gray-200">
-                    <nav className="flex space-x-8 px-6" aria-label="Tabs">
-                        {tabs.map((tab) => {
-                            const Icon = tab.icon
-                            const isActive = activeTab === tab.id
-
-                            return (
-                                <button
-                                    key={tab.id}
-                                    onClick={() => {
-                                        const newSearchParams = new URLSearchParams(searchParams)
-                                        newSearchParams.set('tab', tab.id)
-                                        setSearchParams(newSearchParams)
-                                    }}
-                                    className={`group inline-flex items-center py-4 px-1 border-b-2 font-medium text-sm transition-colors ${isActive
-                                        ? 'border-blue-500 text-blue-600'
-                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                        }`}
-                                >
-                                    <Icon className={`mr-2 w-5 h-5 ${isActive ? 'text-blue-500' : 'text-gray-400 group-hover:text-gray-500'
-                                        }`} />
-                                    {tab.label}
-                                </button>
-                            )
-                        })}
-                    </nav>
-
-                    {/* Tab Description */}
-                    <div className="px-6 py-3 bg-gray-50 border-b border-gray-200">
-                        <p className="text-sm text-gray-600">
-                            {tabs.find(tab => tab.id === activeTab)?.description}
-                        </p>
-                    </div>
-
-                </div>
-
-                {/* Tab Content */}
                 <div>
                     {renderTabContent()}
                 </div>
