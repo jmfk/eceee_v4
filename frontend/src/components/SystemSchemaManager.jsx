@@ -2,64 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { pageDataSchemasApi } from '../api'
 import VisualSchemaEditor from './VisualSchemaEditor'
 import SchemaFormPreview from './SchemaFormPreview'
-
-// Default fields that are always present in all schemas
-const DEFAULT_SCHEMA_FIELDS = {
-    title: {
-        type: 'string',
-        title: 'Page Title',
-        description: 'The main title of this page',
-        default: '',
-        minLength: 1,
-        maxLength: 200,
-    },
-    description: {
-        type: 'string',
-        title: 'Page Description',
-        description: 'A brief description of this page for SEO and previews',
-        format: 'textarea',
-        default: '',
-        maxLength: 500,
-    },
-    featured_image: {
-        type: 'string',
-        title: 'Featured Image URL',
-        description: 'URL of the main image for this page',
-        format: 'url',
-        default: '',
-    },
-}
-
-const mergeWithDefaults = (schema) => {
-    const mergedProperties = { ...DEFAULT_SCHEMA_FIELDS }
-    if (schema?.properties) {
-        Object.entries(schema.properties).forEach(([key, value]) => {
-            if (!DEFAULT_SCHEMA_FIELDS[key]) {
-                mergedProperties[key] = value
-            }
-        })
-    }
-    return {
-        type: 'object',
-        properties: mergedProperties,
-        required: ['title', ...(schema?.required || []).filter((field) => field !== 'title')],
-    }
-}
-
-const getSchemaWithoutDefaults = (schema) => {
-    if (!schema?.properties) return { type: 'object', properties: {} }
-    const userProperties = {}
-    Object.entries(schema.properties).forEach(([key, value]) => {
-        if (!DEFAULT_SCHEMA_FIELDS[key]) {
-            userProperties[key] = value
-        }
-    })
-    return {
-        type: 'object',
-        properties: userProperties,
-        required: (schema.required || []).filter((field) => !DEFAULT_SCHEMA_FIELDS[field]),
-    }
-}
+import { mergeWithDefaults, getSchemaWithoutDefaults, validateFieldName } from '../utils/schemaValidation'
 
 export default function SystemSchemaManager() {
     const [loading, setLoading] = useState(false)
@@ -102,7 +45,7 @@ export default function SystemSchemaManager() {
         const errors = {}
         if (formData.schema?.properties) {
             const invalidKeys = Object.keys(formData.schema.properties).filter(
-                (key) => !key || !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(key)
+                (key) => !key || !validateFieldName(key)
             )
             if (invalidKeys.length > 0) {
                 errors.schema = `Invalid property keys: ${invalidKeys.join(', ')}. Use letters, numbers, and underscores only.`

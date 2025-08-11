@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react'
+import { validateFieldName, validateSchemaShape } from '../utils/schemaValidation'
 import {
   Plus,
   Trash2,
@@ -447,6 +448,7 @@ export default function VisualSchemaEditor({ schema, onChange }) {
   })
 
   const [viewMode, setViewMode] = useState('visual') // 'visual' or 'json'
+  const [jsonError, setJsonError] = useState('')
 
   // Clean up property to remove null/empty values
   const cleanProperty = (prop) => {
@@ -490,7 +492,7 @@ export default function VisualSchemaEditor({ schema, onChange }) {
 
     newProperties.forEach(prop => {
       const { key, required, uiType, ...schemaProp } = prop
-      if (key) {
+      if (key && validateFieldName(key)) {
         newSchema.properties[key] = cleanProperty(schemaProp)
         if (required) {
           newSchema.required.push(key)
@@ -593,6 +595,12 @@ export default function VisualSchemaEditor({ schema, onChange }) {
               onChange={(e) => {
                 try {
                   const parsed = JSON.parse(e.target.value)
+                  const { valid, reason } = validateSchemaShape(parsed)
+                  if (!valid) {
+                    setJsonError(reason || 'Invalid schema shape')
+                    return
+                  }
+                  setJsonError('')
                   onChange(parsed)
                   // Re-sync properties from schema
                   const schemaProps = parsed?.properties || {}
@@ -604,11 +612,14 @@ export default function VisualSchemaEditor({ schema, onChange }) {
                     uiType: prop.enum ? 'enum' : (prop.format === 'textarea' ? 'textarea' : prop.type)
                   })))
                 } catch (err) {
-                  // Invalid JSON, ignore for now
+                  setJsonError('Invalid JSON')
                 }
               }}
               placeholder="Enter JSON Schema..."
             />
+            {jsonError && (
+              <div className="text-red-600 text-sm mt-2">{jsonError}</div>
+            )}
           </div>
         </div>
       )}
