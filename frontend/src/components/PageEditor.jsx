@@ -22,10 +22,92 @@ import { pagesApi, layoutsApi, versionsApi } from '../api'
 import { useNotificationContext } from './NotificationManager'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import ContentEditor from './ContentEditor'
+import ErrorTodoSidebar from './ErrorTodoSidebar'
 import SchemaDrivenForm from './SchemaDrivenForm'
 import LayoutSelector from './LayoutSelector'
 import StatusBar from './StatusBar'
 import SaveOptionsModal from './SaveOptionsModal'
+
+// Helpers: error parsing and merging for To-Do items
+function mergeTodoItems(existing, incoming) {
+    const byId = new Map(existing.map(i => [i.id, i]))
+    incoming.forEach(item => {
+        if (byId.has(item.id)) {
+            const prev = byId.get(item.id)
+            byId.set(item.id, { ...prev, ...item, checked: prev.checked && item.checked })
+        } else {
+            byId.set(item.id, item)
+        }
+    })
+    return Array.from(byId.values())
+}
+
+function hashString(str) {
+    let h = 0
+    const s = String(str || '')
+    for (let i = 0; i < s.length; i++) {
+        h = ((h << 5) - h) + s.charCodeAt(i)
+        h |= 0
+    }
+    return Math.abs(h).toString(36)
+}
+
+function mapFieldToTarget(field) {
+    if (!field) return { type: 'data' }
+    const settingsFields = new Set(['title', 'slug', 'code_layout'])
+    const metadataFields = new Set(['meta_title', 'meta_description', 'hostnames'])
+    if (settingsFields.has(field)) return { type: 'settings' }
+    if (metadataFields.has(field)) return { type: 'metadata' }
+    return { type: 'data' }
+}
+
+function deriveTodoItemsFromError(errorString) {
+    const items = []
+    const s = String(errorString || '')
+
+    // Common jsonschema error patterns
+    const requiredMatch = s.match(/'(.*?)' is a required property/)
+    if (requiredMatch) {
+        const field = requiredMatch[1]
+        const target = mapFieldToTarget(field)
+        items.push({
+            id: `required:${field}`,
+            title: `Missing required field: ${field}`,
+            detail: s,
+            hint: `Provide a valid value for '${field}'.`,
+            target,
+            checked: false
+        })
+    }
+
+    const typeMatch = s.match(/'(.*?)' is not of type '(.*?)'/)
+    if (typeMatch) {
+        const field = typeMatch[1]
+        const expected = typeMatch[2]
+        const target = mapFieldToTarget(field)
+        items.push({
+            id: `type:${field}`,
+            title: `Field '${field}' must be of type ${expected}`,
+            detail: s,
+            hint: `Change the value of '${field}' to a ${expected}.`,
+            target,
+            checked: false
+        })
+    }
+
+    // Fallback single item if nothing matched
+    if (items.length === 0) {
+        items.push({
+            id: `error:${hashString(s)}`,
+            title: 'Validation error',
+            detail: s,
+            hint: 'Review the error and update the related fields.',
+            target: { type: 'data', path: null },
+            checked: false
+        })
+    }
+    return items
+}
 
 
 /**
@@ -86,7 +168,6 @@ const PageEditor = () => {
     }, [tab, isNewPage, pageId, navigate, previousView, versionFromUrl])
     const [pageData, setPageData] = useState(null)
     const [isDirty, setIsDirty] = useState(false)
-    const [isPublishing, setIsPublishing] = useState(false)
     const [layoutData, setLayoutData] = useState(null)
     const [isLoadingLayout, setIsLoadingLayout] = useState(false)
     const contentEditorRef = useRef(null)
@@ -111,6 +192,9 @@ const PageEditor = () => {
     // Save options modal state
     const [showSaveOptionsModal, setShowSaveOptionsModal] = useState(false)
 
+    // Validation To-Do sidebar state
+    const [errorTodoItems, setErrorTodoItems] = useState([])
+
     const queryClient = useQueryClient()
     const { showError, showConfirm } = useNotificationContext()
     const { addNotification } = useGlobalNotifications()
@@ -129,7 +213,8 @@ const PageEditor = () => {
                 meta_title: '',
                 meta_description: '',
                 hostnames: [],
-                widgets: {} // Initialize empty widgets dict for new pages
+                pageData: {},
+                widgets: {}
             })
         }
     }, [isNewPage, pageData])
@@ -139,14 +224,10 @@ const PageEditor = () => {
         queryKey: ['page', pageId],
         queryFn: async () => {
             // Get the active version (current published or latest draft)
-            return await pagesApi.getActiveVersion(pageId)
+            return await pagesApi.versionCurrent(pageId)
         },
         enabled: !isNewPage
     })
-
-
-
-
 
     // Add loading notifications for page data
     useEffect(() => {
@@ -416,8 +497,16 @@ const PageEditor = () => {
 
     // Show save options modal when save is triggered
     const handleSaveFromStatusBar = useCallback(() => {
+        const unresolved = errorTodoItems.filter(i => !i.checked).length
+        if (unresolved > 0) {
+            addNotification({
+                type: 'error',
+                message: `Cannot save: resolve ${unresolved} issue${unresolved === 1 ? '' : 's'} in the To-Do sidebar`
+            })
+            return
+        }
         setShowSaveOptionsModal(true);
-    }, []);
+    }, [errorTodoItems, addNotification]);
 
     // UNIFIED SAVE: Actual save logic with options
     const handleActualSave = useCallback(async (saveOptions = {}) => {
@@ -491,6 +580,9 @@ const PageEditor = () => {
             }));
             setIsDirty(false);
 
+            // Clear To-Do items on success
+            setErrorTodoItems([])
+
             // Mark LayoutRenderer as clean after successful save
             if (contentEditorRef.current?.layoutRenderer) {
                 contentEditorRef.current.layoutRenderer.markAsClean();
@@ -517,6 +609,15 @@ const PageEditor = () => {
                 message: `Save failed: ${error.message}`
             });
             showError(`Save failed: ${error.message}`);
+
+            // Parse backend validation error and populate To-Do list
+            const backendError = error?.response?.data?.error || error?.response?.data?.detail || error?.message
+            if (backendError) {
+                const items = deriveTodoItemsFromError(backendError)
+                if (items && items.length > 0) {
+                    setErrorTodoItems(prev => mergeTodoItems(prev, items))
+                }
+            }
         }
     }, [addNotification, showError, pageData?.id, queryClient, loadVersionsPreserveCurrent]);
 
@@ -698,105 +799,115 @@ const PageEditor = () => {
                 </div>
             </div>
 
-            {/* Main Content Area */}
+            {/* Main Content Area with right error To-Do sidebar */}
             <div className="flex-1 overflow-hidden">
-                <div className="h-full">
-                    {activeTab === 'content' && (
-                        <>
-                            {!isVersionReady ? (
-                                <div className="h-full flex items-center justify-center bg-gray-50">
-                                    <div className="text-center">
-                                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-                                        <p className="text-gray-600">Loading version data...</p>
+                <div className="h-full flex">
+                    <div className="flex-1 min-w-0">
+                        {activeTab === 'content' && (
+                            <>
+                                {!isVersionReady ? (
+                                    <div className="h-full flex items-center justify-center bg-gray-50">
+                                        <div className="text-center">
+                                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                                            <p className="text-gray-600">Loading version data...</p>
+                                        </div>
                                     </div>
-                                </div>
-                            ) : (
-                                <>
-                                    {/* Layout fallback warning */}
-                                    {!pageData?.code_layout && (
-                                        <div className="bg-amber-50 border-l-4 border-amber-400 p-4 mb-4">
-                                            <div className="flex">
-                                                <div className="flex-shrink-0">
-                                                    <svg className="h-5 w-5 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
-                                                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                                                    </svg>
-                                                </div>
-                                                <div className="ml-3">
-                                                    <p className="text-sm text-amber-700">
-                                                        <strong>No layout specified for this version.</strong> Using fallback single-column layout for preview.
-                                                    </p>
+                                ) : (
+                                    <>
+                                        {/* Layout fallback warning */}
+                                        {!pageData?.code_layout && (
+                                            <div className="bg-amber-50 border-l-4 border-amber-400 p-4 mb-4">
+                                                <div className="flex">
+                                                    <div className="flex-shrink-0">
+                                                        <svg className="h-5 w-5 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
+                                                            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                                        </svg>
+                                                    </div>
+                                                    <div className="ml-3">
+                                                        <p className="text-sm text-amber-700">
+                                                            <strong>No layout specified for this version.</strong> Using fallback single-column layout for preview.
+                                                        </p>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    )}
-                                    {isLoadingLayout ? (
-                                        <div className="h-full flex items-center justify-center bg-gray-50">
-                                            <div className="text-center">
-                                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-                                                <p className="text-gray-600">Loading layout data...</p>
+                                        )}
+                                        {isLoadingLayout ? (
+                                            <div className="h-full flex items-center justify-center bg-gray-50">
+                                                <div className="text-center">
+                                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                                                    <p className="text-gray-600">Loading layout data...</p>
+                                                </div>
                                             </div>
+                                        ) : (
+                                            <ContentEditor
+                                                key={`${pageData?.id}-${pageData?.version_id || 'current'}`}
+                                                ref={contentEditorRef}
+                                                pageData={pageData}
+                                                onUpdate={updatePageData}
+                                                isNewPage={isNewPage}
+                                                layoutJson={layoutData}
+                                                editable={true}
+                                                onDirtyChange={(isDirty, reason) => {
+                                                    setIsDirty(isDirty);
+                                                }}
+                                            />
+                                        )}
+                                    </>
+                                )}
+                            </>
+                        )}
+                        {activeTab === 'settings' && (
+                            <SettingsEditor
+                                key={`settings-${pageData?.version_id || 'new'}`}
+                                ref={settingsEditorRef}
+                                pageData={pageData}
+                                onUpdate={updatePageData}
+                                isNewPage={isNewPage}
+                            />
+                        )}
+                        {activeTab === 'metadata' && (
+                            <MetadataEditor
+                                key={`metadata-${pageData?.version_id || 'new'}`}
+                                ref={metadataEditorRef}
+                                pageData={pageData}
+                                onUpdate={updatePageData}
+                                isNewPage={isNewPage}
+                            />
+                        )}
+                        {activeTab === 'data' && (
+                            <SchemaDrivenForm
+                                key={`data-${pageData?.version_id || 'new'}`}
+                                pageData={pageData}
+                                codeLayout={pageData?.code_layout}
+                                onChange={(data) => updatePageData({ ...pageData, ...data })}
+                            />
+                        )}
+                        {activeTab === 'preview' && (
+                            <div className="h-full bg-white">
+                                {!isVersionReady ? (
+                                    <div className="h-full flex items-center justify-center bg-gray-50">
+                                        <div className="text-center">
+                                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                                            <p className="text-gray-600">Loading version data...</p>
                                         </div>
-                                    ) : (
-                                        <ContentEditor
-                                            key={`${pageData?.id}-${pageData?.version_id || 'current'}`}
-                                            ref={contentEditorRef}
-                                            pageData={pageData}
-                                            onUpdate={updatePageData}
-                                            isNewPage={isNewPage}
-                                            layoutJson={layoutData}
-                                            editable={true}
-                                            onDirtyChange={(isDirty, reason) => {
-                                                setIsDirty(isDirty);
-                                            }}
-                                        />
-                                    )}
-                                </>
-                            )}
-                        </>
-                    )}
-                    {activeTab === 'settings' && (
-                        <SettingsEditor
-                            key={`settings-${pageData?.version_id || 'new'}`}
-                            ref={settingsEditorRef}
-                            pageData={pageData}
-                            onUpdate={updatePageData}
-                            isNewPage={isNewPage}
-                        />
-                    )}
-                    {activeTab === 'metadata' && (
-                        <MetadataEditor
-                            key={`metadata-${pageData?.version_id || 'new'}`}
-                            ref={metadataEditorRef}
-                            pageData={pageData}
-                            onUpdate={updatePageData}
-                            isNewPage={isNewPage}
-                        />
-                    )}
-                    {activeTab === 'data' && (
-                        <SchemaDrivenForm
-                            key={`data-${pageData?.version_id || 'new'}`}
-                            pageData={pageData}
-                            codeLayout={pageData?.code_layout}
-                            onChange={(data) => updatePageData({ ...pageData, ...data })}
-                        />
-                    )}
-                    {activeTab === 'preview' && (
-                        <div className="h-full bg-white">
-                            {!isVersionReady ? (
-                                <div className="h-full flex items-center justify-center bg-gray-50">
-                                    <div className="text-center">
-                                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-                                        <p className="text-gray-600">Loading version data...</p>
                                     </div>
-                                </div>
-                            ) : (
-                                <PagePreview
-                                    pageData={pageData}
-                                    isLoadingLayout={isLoadingLayout}
-                                    layoutData={layoutData}
-                                />
-                            )}
-                        </div>
+                                ) : (
+                                    <PagePreview
+                                        pageData={pageData}
+                                        isLoadingLayout={isLoadingLayout}
+                                        layoutData={layoutData}
+                                    />
+                                )}
+                            </div>
+                        )}
+                    </div>
+                    {/* Right Error To-Do Sidebar */}
+                    {errorTodoItems.length > 0 && (
+                        <ErrorTodoSidebar
+                            items={errorTodoItems}
+                            onToggle={(id, checked) => setErrorTodoItems(prev => prev.map(i => i.id === id ? { ...i, checked } : i))}
+                            onNavigate={(item) => navigateToFix({ item, navigate, pageId, isNewPage, currentVersion, previousView })}
+                        />
                     )}
                 </div>
             </div>
@@ -1183,4 +1294,16 @@ const PagePreview = ({ pageData, isLoadingLayout, layoutData }) => {
     );
 }
 
-export default PageEditor 
+export default PageEditor
+
+// Navigate user to the view that needs fixing based on item.target
+function navigateToFix({ item, navigate, pageId, isNewPage, currentVersion, previousView }) {
+    const targetType = item?.target?.type
+    if (!targetType) return
+    const base = isNewPage ? `/pages/new` : `/pages/${pageId}/edit`
+    let path = `${base}/data`
+    if (targetType === 'settings') path = `${base}/settings`
+    if (targetType === 'metadata') path = `${base}/metadata`
+    if (targetType === 'content') path = `${base}/content`
+    navigate(path, { state: { previousView } })
+}

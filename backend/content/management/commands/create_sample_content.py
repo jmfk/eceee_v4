@@ -32,7 +32,7 @@ class Command(BaseCommand):
             user = User.objects.create_user(
                 username="admin",
                 email="admin@example.com",
-                password="admin123",
+                password="blarg123!",
                 is_superuser=True,
                 is_staff=True,
             )

@@ -36,6 +36,7 @@ export const endpoints = {
         syncObject: (id) => `${BASE_PATH}/webpages/pages/${id}/sync-object/`,
         publicationStatus: `${BASE_PATH}/webpages/pages/publication_status/`,
         versions: (id) => `${BASE_PATH}/webpages/pages/${id}/versions/`,
+        versionCurrent: (pageId) => `${BASE_PATH}/webpages/pages/${pageId}/versions/current/`,
         versionDetail: (pageId, versionId) => `${BASE_PATH}/webpages/pages/${pageId}/versions/${versionId}/`
     },
 

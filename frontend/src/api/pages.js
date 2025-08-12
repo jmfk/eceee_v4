@@ -20,6 +20,7 @@ import { wrapApiCall, buildQueryParams } from './utils.js'
  * @typedef {import('../types/api').PageFilters} PageFilters
  */
 
+
 /**
  * Pages API operations
  */
@@ -94,6 +95,10 @@ export const pagesApi = {
         return api.get(endpoints.pages.detail(pageId))
     }, 'pages.getActiveVersion'),
 
+    versionCurrent: wrapApiCall(async (pageId) => {
+        return api.get(endpoints.pages.versionCurrent(pageId))
+    }, 'pages.versionCurrent'),
+
     /**
      * Get a page with a specific version
      * @param {number} pageId - Page ID
@@ -162,7 +167,9 @@ export const pagesApi = {
         const reservedKeys = new Set([
             'id', 'version_id', 'version_number', 'widgets', 'version_options', 'publication_status',
             'is_current_published', 'effective_date', 'expiry_date', 'created_at', 'created_by', 'change_summary',
-            'last_modified', 'active_version', 'last_saved_version'
+            'last_modified', 'active_version', 'last_saved_version',
+            // Explicitly exclude core metadata fields from page_data
+            'title', 'slug', 'code_layout'
         ])
         const pageDataJson = {}
         Object.entries(pageData || {}).forEach(([key, value]) => {

@@ -9,7 +9,7 @@ from django.utils import timezone
 from datetime import timedelta
 
 from webpages.models import WebPage, PageVersion
-from webpages.serializers import WebPageDetailSerializer, PageVersionSerializer
+from webpages.serializers import WebPageSimpleSerializer, PageVersionSerializer
 
 
 class PageVersionSerializerTestCase(TestCase):
@@ -147,7 +147,7 @@ class PageVersionSerializerTestCase(TestCase):
 
 
 class WebPageDetailSerializerTestCase(TestCase):
-    """Test WebPageDetailSerializer with date-based publishing"""
+    """Test page serialization with date-based publishing (using simple serializer with version info)"""
 
     def setUp(self):
         """Set up test data"""
@@ -171,7 +171,7 @@ class WebPageDetailSerializerTestCase(TestCase):
         published_version.effective_date = timezone.now() - timedelta(hours=1)
         published_version.save()
 
-        serializer = WebPageDetailSerializer(self.test_page)
+        serializer = WebPageSimpleSerializer(self.test_page, include_version_info=True)
         data = serializer.data
 
         self.assertTrue(data.get("is_published"))
@@ -189,7 +189,7 @@ class WebPageDetailSerializerTestCase(TestCase):
         # Create only a draft version
         draft_version = self.test_page.create_version(self.user, "Draft version")
 
-        serializer = WebPageDetailSerializer(self.test_page)
+        serializer = WebPageSimpleSerializer(self.test_page, include_version_info=True)
         data = serializer.data
 
         self.assertFalse(data.get("is_published"))
@@ -216,7 +216,7 @@ class WebPageDetailSerializerTestCase(TestCase):
         scheduled.effective_date = now + timedelta(days=1)
         scheduled.save()
 
-        serializer = WebPageDetailSerializer(self.test_page)
+        serializer = WebPageSimpleSerializer(self.test_page, include_version_info=True)
         data = serializer.data
 
         self.assertTrue(data.get("is_published"))
@@ -236,7 +236,7 @@ class WebPageDetailSerializerTestCase(TestCase):
         published_version.effective_date = timezone.now() - timedelta(hours=1)
         published_version.save()
 
-        serializer = WebPageDetailSerializer(self.test_page)
+        serializer = WebPageSimpleSerializer(self.test_page, include_version_info=True)
         data = serializer.data
 
         # Verify page-level data matches model methods

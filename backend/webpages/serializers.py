@@ -149,13 +149,18 @@ class WebPageTreeSerializer(serializers.ModelSerializer):
     publication_status = serializers.SerializerMethodField()
     effective_date = serializers.SerializerMethodField()
     expiry_date = serializers.SerializerMethodField()
+    title = serializers.SerializerMethodField()
+    # description = serializers.SerializerMethodField()
+    code_layout = serializers.SerializerMethodField()
 
     class Meta:
         model = WebPage
         fields = [
             "id",
-            "title",
             "slug",
+            "title",
+            "description",
+            "code_layout",
             "parent",
             "sort_order",
             "hostnames",
@@ -165,21 +170,25 @@ class WebPageTreeSerializer(serializers.ModelSerializer):
             "children_count",
         ]
 
-    def get_title(self, obj):
-        """Get title from current published version or latest version"""
+    def _get_current_version(self, obj):
         current_version = obj.get_current_published_version()
         if not current_version:
             current_version = obj.get_latest_version()
+        return current_version
 
+    def get_title(self, obj):
+        """Helper method to get title from a page's current version"""
+        current_version = self._get_current_version(obj)
         if current_version:
-            # Try to get title from page_data first, then from version title field
-            if current_version.page_data and current_version.page_data.get("title"):
-                return current_version.page_data["title"]
-            elif hasattr(current_version, "title") and current_version.title:
-                return current_version.title
+            return current_version.title
+        return obj.title
 
-        # Fallback to slug
-        return obj.slug or f"Page {obj.id}"
+    def get_code_layout(self, obj):
+        """Get code layout from the page"""
+        current_version = self._get_current_version(obj)
+        if current_version:
+            return current_version.code_layout
+        return ""
 
     def get_children_count(self, obj):
         return obj.children.count()
@@ -233,12 +242,16 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
     layout_inheritance_info = serializers.SerializerMethodField()
     available_code_layouts = serializers.SerializerMethodField()
     children_count = serializers.SerializerMethodField()
+    code_layout = serializers.SerializerMethodField()
 
     class Meta:
         model = WebPage
         fields = [
             "id",
             "slug",
+            "title",
+            "description",
+            "code_layout",
             "parent",
             "parent_id",
             "sort_order",
@@ -264,6 +277,27 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
             "last_modified_by",
         ]
 
+    def __init__(self, *args, **kwargs):
+        """Allow callers to include version info on demand.
+
+        If `include_version_info=True` is passed either as a kwarg or via
+        serializer context, two additional computed fields will be exposed:
+        - is_published
+        - current_published_version
+        """
+        include_version_info = kwargs.pop("include_version_info", None)
+        super().__init__(*args, **kwargs)
+
+        if include_version_info is None:
+            include_version_info = self.context.get("include_version_info", False)
+
+        if include_version_info:
+            # Add fields dynamically so the Meta.fields list remains unchanged
+            self.fields["is_published"] = serializers.SerializerMethodField()
+            self.fields["current_published_version"] = (
+                serializers.SerializerMethodField()
+            )
+
     def get_absolute_url(self, obj):
         return obj.get_absolute_url()
 
@@ -273,25 +307,44 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
     def get_breadcrumbs(self, obj):
         breadcrumbs = obj.get_breadcrumbs()
         return [
-            {"id": page.id, "title": self._get_page_title(page), "slug": page.slug}
+            {"id": page.id, "title": page.title, "slug": page.slug}
             for page in breadcrumbs
         ]
 
-    def _get_page_title(self, page):
-        """Helper method to get title from a page's current version"""
-        current_version = page.get_current_published_version()
-        if not current_version:
-            current_version = page.get_latest_version()
+    def get_current_published_version(self, obj):
+        """Get the current published version using date-based logic.
 
+        Mirrors the shape returned by the legacy detail serializer so that
+        consumers of the legacy `full` endpoint can be migrated seamlessly.
+        """
+        current_version = obj.get_current_published_version()
         if current_version:
-            # Try to get title from page_data first, then from version title field
-            if current_version.page_data and current_version.page_data.get("title"):
-                return current_version.page_data["title"]
-            elif hasattr(current_version, "title") and current_version.title:
-                return current_version.title
+            return {
+                "id": current_version.id,
+                "version_number": current_version.version_number,
+                "effective_date": current_version.effective_date,
+                "expiry_date": current_version.expiry_date,
+                "publication_status": current_version.get_publication_status(),
+                "description": current_version.version_title,
+            }
+        return None
 
-        # Fallback to slug
-        return page.slug or f"Page {page.id}"
+    def _get_current_version(self, obj):
+        # Be defensive: sometimes a PageVersion could be passed instead of WebPage
+        from .models import PageVersion as _PV
+
+        page_obj = obj.page if isinstance(obj, _PV) else obj
+        current_version = page_obj.get_current_published_version()
+        if not current_version:
+            current_version = page_obj.get_latest_version()
+        return current_version
+
+    def get_code_layout(self, obj):
+        """Get code layout from the page"""
+        current_version = self._get_current_version(obj)
+        if current_version:
+            return current_version.code_layout
+        return ""
 
     def get_effective_layout(self, obj):
         """Get the effective layout as a unified dictionary regardless of type"""
@@ -316,7 +369,7 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
             serialized_chain.append(
                 {
                     "page_id": page.id,
-                    "page_title": self._get_page_title(page),
+                    "page_title": page.title,
                     "code_layout": chain_item["code_layout"],
                     "is_override": chain_item["is_override"],
                 }
@@ -333,7 +386,7 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
             "inherited_from": (
                 {
                     "id": inheritance_info["inherited_from"].id,
-                    "title": self._get_page_title(inheritance_info["inherited_from"]),
+                    "title": obj.title,
                 }
                 if inheritance_info["inherited_from"]
                 else None
@@ -362,622 +415,43 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
         return obj.children.count()
 
 
-class WebPageDetailSerializer(serializers.ModelSerializer):
-    """Detailed serializer for individual page views - LEGACY, will be phased out"""
-
-    parent = WebPageTreeSerializer(read_only=True)
-    parent_id = serializers.IntegerField(
-        write_only=True, required=False, allow_null=True
-    )
-
-    # Legacy support fields
-    auto_publish = serializers.BooleanField(
-        write_only=True, required=False, default=False
-    )
-    slug = serializers.CharField()
-    hostnames = serializers.ListField(child=serializers.CharField())
-    sort_order = serializers.IntegerField(default=0)
-    created_at = serializers.DateTimeField(read_only=True)
-    updated_at = serializers.DateTimeField(read_only=True)
-    created_by = UserSerializer(read_only=True)
-    last_modified_by = UserSerializer(read_only=True)
-
-    # Computed fields
-    absolute_url = serializers.SerializerMethodField()
-    current_published_version = serializers.SerializerMethodField()
-    breadcrumbs = serializers.SerializerMethodField()
-    children_count = serializers.SerializerMethodField()
-
-    class Meta:
-        model = WebPage
-        fields = [
-            "id",
-            "slug",
-            "parent",
-            "parent_id",
-            "sort_order",
-            "hostnames",
-            "version_options",  # Unified API: Version options for saves
-            "auto_publish",  # Legacy version option
-            "created_at",
-            "updated_at",
-            "created_by",
-            "last_modified_by",
-            "absolute_url",
-            "is_published",
-            "current_published_version",
-            "breadcrumbs",
-            "effective_layout",
-            "effective_theme",
-            "available_code_layouts",
-            "children_count",
-        ]
-        read_only_fields = [
-            "id",
-            "created_at",
-            "updated_at",
-            "created_by",
-            "last_modified_by",
-        ]
-
-    def get_absolute_url(self, obj):
-        return obj.get_absolute_url()
-
-    def get_is_published(self, obj):
-        return obj.is_published()
-
-    def get_current_published_version(self, obj):
-        """Get the current published version using new date-based logic"""
-        current_version = obj.get_current_published_version()
-        if current_version:
-            return {
-                "id": current_version.id,
-                "version_number": current_version.version_number,
-                "effective_date": current_version.effective_date,
-                "expiry_date": current_version.expiry_date,
-                "publication_status": current_version.get_publication_status(),
-                "description": current_version.version_title,
-            }
-        return None
-
-    def get_breadcrumbs(self, obj):
-        breadcrumbs = obj.get_breadcrumbs()
-        return [
-            {"id": page.id, "title": self._get_page_title(page), "slug": page.slug}
-            for page in breadcrumbs
-        ]
-
-    def _get_page_title(self, page):
-        """Helper method to get title from a page's current version"""
-        current_version = page.get_current_published_version()
-        if not current_version:
-            current_version = page.get_latest_version()
-
-        if current_version:
-            # Try to get title from page_data first, then from version title field
-            if current_version.page_data and current_version.page_data.get("title"):
-                return current_version.page_data["title"]
-            elif hasattr(current_version, "title") and current_version.title:
-                return current_version.title
-
-        # Fallback to slug
-        return page.slug or f"Page {page.id}"
-
-    def get_effective_layout(self, obj):
-        """Get the effective layout as a unified dictionary regardless of type"""
-        return obj.get_effective_layout_dict()
-
-    def get_effective_theme(self, obj):
-        theme = obj.get_effective_theme()
-        return PageThemeSerializer(theme).data if theme else None
-
-    def get_layout_type(self, obj):
-        """Get the type of layout: 'code', 'database', 'inherited', or None"""
-        return obj.get_layout_type()
-
-    def get_layout_inheritance_info(self, obj):
-        """Get detailed layout inheritance information"""
-        inheritance_info = obj.get_layout_inheritance_info()
-
-        # Serialize the inheritance chain for API consumption
-        serialized_chain = []
-        for chain_item in inheritance_info["inheritance_chain"]:
-            page = chain_item["page"]
-            serialized_chain.append(
-                {
-                    "page_id": page.id,
-                    "page_title": self._get_page_title(page),
-                    "code_layout": chain_item["code_layout"],
-                    "is_override": chain_item["is_override"],
-                }
-            )
-
-        return {
-            "effective_layout": inheritance_info["effective_layout_dict"],
-            "layout_type": inheritance_info["layout_type"],
-            "inherited_from": (
-                {
-                    "id": inheritance_info["inherited_from"].id,
-                    "title": inheritance_info["inherited_from"].title,
-                }
-                if inheritance_info["inherited_from"]
-                else None
-            ),
-            "inheritance_chain": serialized_chain,
-            "override_options": {
-                "code_layouts": [
-                    layout.to_dict()
-                    for layout in inheritance_info["override_options"]["code_layouts"]
-                ],
-            },
-        }
-
-    def get_available_code_layouts(self, obj):
-        """Get available code-based layouts for selection"""
-        from .layout_registry import layout_registry
-
-        return [
-            layout.to_dict()
-            for layout in layout_registry.list_layouts(active_only=True)
-        ]
-
-    def get_children_count(self, obj):
-        return obj.children.count()
-
-    def get_publication_status(self, obj):
-        """Get the publication status for this page based on its current published version"""
-        current_version = obj.get_current_published_version()
-        if current_version:
-            return current_version.get_publication_status()
-
-        # If no published version exists, check if there are any versions at all
-        latest_version = obj.get_latest_version()
-        if latest_version:
-            return latest_version.get_publication_status()
-
-        # No versions exist
-        return "draft"
-
-    def get_effective_date(self, obj):
-        """Get the effective date from the current published version"""
-        current_version = obj.get_current_published_version()
-        if current_version:
-            return current_version.effective_date
-        return None
-
-    def get_expiry_date(self, obj):
-        """Get the expiry date from the current published version"""
-        current_version = obj.get_current_published_version()
-        if current_version:
-            return current_version.expiry_date
-        return None
-
-    def get_effective_css_data(self, obj):
-        """Get all CSS data for this page"""
-        try:
-            return obj.get_effective_css_data()
-        except Exception as e:
-            # Handle gracefully if CSS system isn't fully integrated
-            return {
-                "error": str(e),
-                "theme_css_variables": {},
-                "page_css_variables": obj.page_css_variables or {},
-                "enable_css_injection": obj.enable_css_injection,
-            }
-
-    def get_widget_css_data(self, obj):
-        """Get widget-specific CSS data"""
-        try:
-            return obj.get_widget_css_data()
-        except Exception as e:
-            return {"error": str(e), "widgets_css": {}, "css_dependencies": []}
-
-    def get_css_validation_status(self, obj):
-        """Get CSS validation status for this page"""
-        try:
-            is_valid, errors, warnings = obj.validate_page_css()
-            return {
-                "is_valid": is_valid,
-                "errors": errors,
-                "warnings": warnings,
-                "validated_at": timezone.now().isoformat(),
-            }
-        except Exception as e:
-            return {
-                "is_valid": False,
-                "errors": [f"Validation error: {str(e)}"],
-                "warnings": [],
-                "validated_at": timezone.now().isoformat(),
-            }
-
-    def validate_code_layout(self, value):
-        """Validate that the code layout exists if specified"""
-        if value:
-            from .layout_registry import layout_registry
-
-            if not layout_registry.is_registered(value):
-                raise serializers.ValidationError(
-                    f"Code layout '{value}' is not registered. "
-                    f"Available layouts: {', '.join(layout_registry.get_layout_choices())}"
-                )
-        return value
-
-    def validate(self, data):
-        """Validate the entire page data"""
-        # Validate parent relationship to prevent circular references
-        if "parent_id" in data and data["parent_id"]:
-            parent = WebPage.objects.get(id=data["parent_id"])
-            current = parent
-            while current:
-                if current.id == self.instance.id if self.instance else None:
-                    raise serializers.ValidationError(
-                        "A page cannot be its own ancestor."
-                    )
-                current = current.parent
-
-        # Validate effective and expiry dates
-        effective_date = data.get("effective_date")
-        expiry_date = data.get("expiry_date")
-        if effective_date and expiry_date and effective_date >= expiry_date:
-            raise serializers.ValidationError(
-                "Effective date must be before expiry date."
-            )
-
-        return data
-
-    # Unified API Methods
-    def to_representation(self, instance):
-        """Override to handle widgets field reading from current version"""
-        data = super().to_representation(instance)
-
-        # For reading, get widgets from current version
-        current_version = instance.get_current_published_version()
-        data["widgets"] = current_version.widgets if current_version else {}
-
-        return data
-
-    def update(self, instance, validated_data):
-        """Handle unified save: page_data + widgets"""
-        # Extract widgets and version options if present
-        widgets_data = validated_data.pop("widgets", None)
-        version_options = validated_data.pop("version_options", {})
-
-        # Extract legacy version options
-        legacy_auto_publish = validated_data.pop("auto_publish", None)
-        legacy_description = validated_data.pop("version_description", None)
-
-        # Extract meta fields that need special handling since they're now properties
-        meta_title = validated_data.pop("meta_title", None)
-        meta_description = validated_data.pop("meta_description", None)
-        meta_keywords = validated_data.pop("meta_keywords", None)
-
-        # Update page metadata (existing logic)
-        updated_instance = super().update(instance, validated_data)
-
-        # Handle meta fields via setter methods if they were provided
-        if meta_title is not None:
-            updated_instance.set_meta_title(meta_title)
-        if meta_description is not None:
-            updated_instance.set_meta_description(meta_description)
-        if meta_keywords is not None:
-            updated_instance.set_meta_keywords(meta_keywords)
-
-        # Handle version creation/update based on options
-        # Prefer version_options, fall back to legacy fields
-        description = (
-            version_options.get("description")
-            or legacy_description
-            or "Unified update via API"
-        )
-        auto_publish = (
-            version_options.get("auto_publish", False)
-            if version_options
-            else legacy_auto_publish if legacy_auto_publish is not None else False
-        )
-        create_new_version = version_options.get(
-            "create_new_version", True
-        )  # Default to creating new version
-        current_version_id = version_options.get("current_version_id", None)
-
-        if create_new_version:
-            # Create new version with both page_data and widgets (if any)
-            self._create_unified_version(
-                updated_instance, widgets_data or {}, description, auto_publish
-            )
-        else:
-            # Update existing version instead of creating new one
-            self._update_current_version(
-                updated_instance,
-                widgets_data or {},
-                description,
-                auto_publish,
-                current_version_id,
-            )
-
-        return updated_instance
-
-    def _create_unified_version(self, page, widgets_data, description, auto_publish):
-        """Create version with both page data and widgets"""
-        from django.utils import timezone
-
-        # Get current page data by serializing the page (exclude computed fields)
-        page_data_fields = [
-            "title",
-            "slug",
-            "sort_order",
-            "hostnames",
-        ]
-
-        current_page_data = {}
-        for field in page_data_fields:
-            value = getattr(page, field, None)
-            if value is not None:
-                # Handle datetime fields
-                if field in ["effective_date", "expiry_date"] and hasattr(
-                    value, "isoformat"
-                ):
-                    current_page_data[field] = value.isoformat()
-                else:
-                    current_page_data[field] = value
-
-        # Create new version
-        version = page.create_version(
-            user=self.context["request"].user,
-            version_title=description,
-        )
-
-        # Update version with unified data
-        version.page_data = current_page_data
-        version.widgets = widgets_data
-
-        # Handle auto_publish - set effective_date to now to make it published
-        if auto_publish:
-            from django.utils import timezone
-
-            version.effective_date = timezone.now()
-
-        version.save()
-
-        return version
-
-    def _update_current_version(
-        self, page, widgets_data, description, auto_publish, current_version_id=None
-    ):
-        """Update existing version instead of creating new one"""
-        from django.utils import timezone
-
-        # If a specific version ID is provided, use that version
-        if current_version_id:
-            try:
-                target_version = page.versions.get(id=current_version_id)
-            except page.versions.model.DoesNotExist:
-                # If the specified version doesn't exist, fall back to latest draft
-                target_version = None
-        else:
-            target_version = None
-
-        # If no specific version or it doesn't exist, find the latest draft version
-        if not target_version:
-            target_version = (
-                page.versions.filter(
-                    effective_date__isnull=True  # Draft versions have no effective_date
-                )
-                .order_by("-version_number")
-                .first()
-            )
-
-        if not target_version:
-            # If no draft version exists, create a new one
-            return self._create_unified_version(
-                page, widgets_data, description, auto_publish
-            )
-
-        # Get current page data (same logic as _create_unified_version)
-        page_data_fields = [
-            "slug",
-            "sort_order",
-        ]
-
-        current_page_data = {}
-        for field in page_data_fields:
-            value = getattr(page, field, None)
-            if value is not None:
-                # Handle datetime fields
-                if field in ["effective_date", "expiry_date"] and hasattr(
-                    value, "isoformat"
-                ):
-                    current_page_data[field] = value.isoformat()
-                else:
-                    current_page_data[field] = value
-
-        # Update existing version
-        target_version.page_data = current_page_data
-        target_version.widgets = widgets_data
-        target_version.version_title = description
-
-        # Handle auto_publish - set effective_date to now to make it published
-        if auto_publish:
-            target_version.effective_date = timezone.now()
-
-        target_version.save()
-
-        return target_version
-
-
-class WebPageListSerializer(serializers.ModelSerializer):
-    """Serializer for page lists with essential fields"""
-
-    parent = WebPageTreeSerializer(read_only=True)
-    created_by = UserSerializer(read_only=True)
-    last_modified_by = UserSerializer(read_only=True)
-    is_published = serializers.SerializerMethodField()
-    children_count = serializers.SerializerMethodField()
-
-    class Meta:
-        model = WebPage
-        fields = [
-            "id",
-            "title",
-            "slug",
-            "parent",
-            "sort_order",
-            "hostnames",
-            "is_published",
-            "last_modified_by",
-            "created_at",
-            "updated_at",
-            "created_by",
-            "children_count",
-        ]
-
-    def get_title(self, obj):
-        """Get title from current published version or latest version"""
-        current_version = obj.get_current_published_version()
-        if not current_version:
-            current_version = obj.get_latest_version()
-
-        if current_version:
-            # Try to get title from page_data first, then from version title field
-            if current_version.page_data and current_version.page_data.get("title"):
-                return current_version.page_data["title"]
-            elif hasattr(current_version, "title") and current_version.title:
-                return current_version.title
-
-        # Fallback to slug
-        return obj.slug or f"Page {obj.id}"
-
-    def get_description(self, obj):
-        """Get description from current published version or latest version"""
-        current_version = obj.get_current_published_version()
-        if not current_version:
-            current_version = obj.get_latest_version()
-
-        if current_version and current_version.page_data:
-            return current_version.page_data.get("description", "")
-
-        return ""
-
-    def get_is_published(self, obj):
-        return obj.is_published()
-
-    def get_children_count(self, obj):
-        return obj.children.count()
-
-    def get_layout(self, obj):
-        layout = obj.get_effective_layout()
-        return layout.to_dict() if layout else None
-
-    def get_theme(self, obj):
-        theme = obj.get_effective_theme()
-        return PageThemeSerializer(theme).data if theme else None
-
-    def get_publication_status(self, obj):
-        """Get the publication status for this page based on its current published version"""
-        current_version = obj.get_current_published_version()
-        if current_version:
-            return current_version.get_publication_status()
-
-        # If no published version exists, check if there are any versions at all
-        latest_version = obj.get_latest_version()
-        if latest_version:
-            return latest_version.get_publication_status()
-
-        # No versions exist
-        return "draft"
-
-    def get_effective_date(self, obj):
-        """Get the effective date from the current published version"""
-        current_version = obj.get_current_published_version()
-        if current_version:
-            return current_version.effective_date
-        return None
-
-    def get_expiry_date(self, obj):
-        """Get the expiry date from the current published version"""
-        current_version = obj.get_current_published_version()
-        if current_version:
-            return current_version.expiry_date
-        return None
-
-
-class PageVersionDetailSerializer(serializers.ModelSerializer):
-    """Detailed serializer for a specific page version - contains all version data"""
-
-    page = WebPageTreeSerializer(read_only=True)
-    created_by = UserSerializer(read_only=True)
-
-    # Computed fields for version status
-    is_published = serializers.SerializerMethodField()
-    is_current_published = serializers.SerializerMethodField()
-    publication_status = serializers.SerializerMethodField()
-
-    class Meta:
-        model = PageVersion
-        fields = [
-            "id",
-            "page",
-            "version_number",
-            "version_title",
-            "title",  # Direct field from PageVersion model
-            "page_data",
-            "widgets",
-            "code_layout",
-            "theme",
-            "page_css_variables",
-            "page_custom_css",
-            "enable_css_injection",
-            "effective_date",
-            "expiry_date",
-            "change_summary",
-            "is_published",
-            "is_current_published",
-            "publication_status",
-            "created_at",
-            "created_by",
-        ]
-        read_only_fields = [
-            "id",
-            "version_number",
-            "is_published",
-            "is_current_published",
-            "publication_status",
-            "created_at",
-            "created_by",
-        ]
-
-    def get_is_published(self, obj):
-        """Check if this version is currently published based on dates"""
-        return obj.is_published()
-
-    def get_is_current_published(self, obj):
-        """Check if this is the current published version"""
-        return obj.is_current_published()
-
-    def get_publication_status(self, obj):
-        """Get human-readable publication status"""
-        return obj.get_publication_status()
-
-
 class PageVersionSerializer(serializers.ModelSerializer):
     """Serializer for page versions with enhanced workflow support"""
 
-    page = WebPageTreeSerializer(read_only=True)
+    # page = WebPageTreeSerializer(read_only=True)
     created_by = UserSerializer(read_only=True)
 
     # New date-based publishing fields (computed)
     is_published = serializers.SerializerMethodField()
     is_current_published = serializers.SerializerMethodField()
     publication_status = serializers.SerializerMethodField()
+    hostnames = serializers.SerializerMethodField()
+    slug = serializers.SerializerMethodField()
+    id = serializers.SerializerMethodField()
+    version_id = serializers.SerializerMethodField()
+    title = serializers.SerializerMethodField()
+    description = serializers.SerializerMethodField()
 
     class Meta:
         model = PageVersion
         fields = [
             "id",
+            "version_id",
             "page",
             "version_number",
             "version_title",
+            "title",
+            "description",
+            "slug",
+            "hostnames",
+            "code_layout",
             "page_data",
             "widgets",
+            # Styling/config fields previously only in detail serializer
+            "theme",
+            "page_css_variables",
+            "page_custom_css",
+            "enable_css_injection",
             # New date-based publishing fields
             "effective_date",
             "expiry_date",
@@ -991,6 +465,7 @@ class PageVersionSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             "id",
+            "version_id",
             "version_number",
             "is_published",
             "is_current_published",
@@ -998,6 +473,14 @@ class PageVersionSerializer(serializers.ModelSerializer):
             "created_at",
             "created_by",
         ]
+
+    def get_id(self, obj):
+        """Page Id for this version"""
+        return obj.page.id
+
+    def get_version_id(self, obj):
+        """Version Id for this version"""
+        return obj.id
 
     def get_is_published(self, obj):
         """Check if this version is currently published based on dates"""
@@ -1010,6 +493,32 @@ class PageVersionSerializer(serializers.ModelSerializer):
     def get_publication_status(self, obj):
         """Get human-readable publication status based on dates"""
         return obj.get_publication_status()
+
+    def get_title(self, obj):
+        """Get title from the page"""
+        return obj.page.title
+
+    def get_description(self, obj):
+        """Get description from the page"""
+        return obj.page.description
+
+    def get_hostnames(self, obj):
+        """Get hostnames from the page"""
+        return obj.page.hostnames
+
+    def get_slug(self, obj):
+        """Get slug from the page"""
+        return obj.page.slug
+
+    def validate(self, attrs):
+        # Strip forbidden keys from page_data on write
+        page_data = attrs.get("page_data")
+        if isinstance(page_data, dict):
+            excluded_keys = {"title", "slug", "code_layout", "description", "hostnames"}
+            attrs["page_data"] = {
+                k: v for k, v in page_data.items() if k not in excluded_keys
+            }
+        return super().validate(attrs)
 
 
 class PageDataSchemaSerializer(serializers.ModelSerializer):
@@ -1180,4 +689,22 @@ class PageHierarchySerializer(serializers.ModelSerializer):
         current_version = obj.get_current_published_version()
         if current_version:
             return current_version.expiry_date
+        return None
+
+    def get_current_published_version(self, obj):
+        """Get the current published version using date-based logic.
+
+        Mirrors the shape returned by the legacy detail serializer so that
+        consumers of the legacy `full` endpoint can be migrated seamlessly.
+        """
+        current_version = obj.get_current_published_version()
+        if current_version:
+            return {
+                "id": current_version.id,
+                "version_number": current_version.version_number,
+                "effective_date": current_version.effective_date,
+                "expiry_date": current_version.expiry_date,
+                "publication_status": current_version.get_publication_status(),
+                "description": current_version.version_title,
+            }
         return None

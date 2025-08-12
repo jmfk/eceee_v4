@@ -19,12 +19,10 @@ from django.core.cache import cache
 
 from .models import WebPage, PageVersion, PageTheme, PageDataSchema
 from .serializers import (
-    WebPageDetailSerializer,
     WebPageSimpleSerializer,
-    WebPageListSerializer,
     WebPageTreeSerializer,
     PageVersionSerializer,
-    PageVersionDetailSerializer,
+    # PageVersionDetailSerializer,  # merged into PageVersionSerializer
     PageVersionListSerializer,
     PageVersionComparisonSerializer,
     LayoutSerializer,
@@ -169,6 +167,7 @@ class CodeLayoutViewSet(viewsets.ViewSet):
 
     def retrieve(self, request, pk=None):
         """Get a specific code-based layout by name"""
+
         from .layout_registry import layout_registry
 
         layout = layout_registry.get_layout(pk)
@@ -338,6 +337,7 @@ class WidgetTypeViewSet(viewsets.ViewSet):
 
     def retrieve(self, request, pk=None):
         """Get a specific widget type by name"""
+
         from .widget_registry import widget_type_registry
 
         widget_type = widget_type_registry.get_widget_type(pk)
@@ -440,13 +440,11 @@ class WebPageViewSet(viewsets.ModelViewSet):
     ordering = [
         "sort_order",
         "id",
-    ]  # Use id instead of title since title is now a property
+    ]
 
     def get_serializer_class(self):
         """Use different serializers based on action"""
-        if self.action == "list":
-            return WebPageListSerializer
-        elif self.action in ["tree", "hierarchy"]:
+        if self.action in ["tree", "hierarchy"]:
             return WebPageTreeSerializer
         # Use simplified serializer by default (no version data)
         return WebPageSimpleSerializer
@@ -484,78 +482,15 @@ class WebPageViewSet(viewsets.ModelViewSet):
         """Override retrieve to include version data with widgets"""
         instance = self.get_object()
         serializer = self.get_serializer(instance)
-        page_data = serializer.data
-
-        # Check if a specific version is requested
-        version_id = request.query_params.get("version_id")
-
-        if version_id:
-            try:
-                # Get the specific version
-                target_version = instance.versions.get(id=version_id)
-
-                # Security: Check if user has permission to access this version
-                if not self._can_access_version(request.user, target_version):
-                    # Unauthorized users can only access published versions
-                    target_version = self._get_active_version(instance)
-                version_data = target_version
-            except instance.versions.model.DoesNotExist:
-                # If the specified version doesn't exist, fall back to active version
-                target_version = self._get_active_version(instance)
-                version_data = target_version
-        else:
-            # No version_id provided - determine the active version
-            target_version = self._get_active_version(instance)
-            version_data = target_version
-
-        if target_version:
-            # Add version data to the response
-            page_data["widgets"] = target_version.widgets or {}
-            page_data["page_data"] = target_version.page_data or {}
-
-            # Include both active version info and last saved version info
-            page_data["active_version"] = {
-                "version_id": target_version.id,
-                "version_number": target_version.version_number,
-                "version_title": target_version.version_title,
-                "is_current_published": target_version.is_current_published(),
-                "publication_status": target_version.get_publication_status(),
-                "created_at": target_version.created_at,
-                "created_by": (
-                    target_version.created_by.username
-                    if target_version.created_by
-                    else None
-                ),
-                "effective_date": target_version.effective_date,
-                "expiry_date": target_version.expiry_date,
-                "change_summary": target_version.change_summary or {},
-            }
-
-            # Maintain backward compatibility
-            page_data["last_saved_version"] = page_data["active_version"]
-        else:
-            # No versions exist yet
-            page_data["widgets"] = {}
-            page_data["page_data"] = {}
-
-            # Create empty version info
-            empty_version_info = {
-                "version_id": None,
-                "version_number": 0,
-                "is_current_published": False,
-                "publication_status": "draft",
-                "description": None,
-                "created_at": None,
-                "created_by": None,
-                "effective_date": None,
-                "expiry_date": None,
-                "change_summary": {},
-            }
-
-            page_data["active_version"] = empty_version_info
-            page_data["last_saved_version"] = empty_version_info
-
-        return Response(page_data)
+        # page_data = serializer.data
+        return Response(serializer.data)
+        current_version = instance.get_current_published_version()
+        if not current_version:
+            current_version = instance.get_latest_version()
+        serializer = PageVersionSerializer(
+            current_version, context={"request": request}
+        )
+        return Response(serializer.data)
 
     @action(detail=True, methods=["get"], url_path="versions/current")
     def current_version(self, request, pk=None):
@@ -573,7 +508,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        serializer = PageVersionDetailSerializer(
+        serializer = PageVersionSerializer(
             current_version, context={"request": request}
         )
         return Response(serializer.data)
@@ -590,9 +525,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        serializer = PageVersionDetailSerializer(
-            latest_version, context={"request": request}
-        )
+        serializer = PageVersionSerializer(latest_version, context={"request": request})
         return Response(serializer.data)
 
     @action(detail=True, methods=["get"], url_path="full")
@@ -600,7 +533,9 @@ class WebPageViewSet(viewsets.ModelViewSet):
         """Get full page data including version content (LEGACY ENDPOINT)"""
         # This maintains backward compatibility with the old combined API
         page = self.get_object()
-        serializer = WebPageDetailSerializer(page, context={"request": request})
+        serializer = WebPageSimpleSerializer(
+            page, context={"request": request, "include_version_info": True}
+        )
         return Response(serializer.data)
 
     def _can_access_version(self, user, version):
@@ -677,9 +612,6 @@ class WebPageViewSet(viewsets.ModelViewSet):
                 # For unified API we accept top-level fields; construct minimal page_data
                 key: self.request.data[key]
                 for key in [
-                    "title",
-                    "slug",
-                    "description",
                     "meta_title",
                     "meta_description",
                 ]
@@ -689,6 +621,12 @@ class WebPageViewSet(viewsets.ModelViewSet):
             incoming_page_data = None
 
         if incoming_page_data:
+            # Remove forbidden keys that must not live in page_data
+            if isinstance(incoming_page_data, dict):
+                forbidden = {"title", "slug", "code_layout", "description", "hostnames"}
+                incoming_page_data = {
+                    k: v for k, v in incoming_page_data.items() if k not in forbidden
+                }
             # Determine layout from target version or provided code_layout
             layout_name = self.request.data.get("code_layout")
             if not layout_name:
@@ -817,7 +755,6 @@ class WebPageViewSet(viewsets.ModelViewSet):
         versions = page.versions.select_related("created_by").order_by(
             "-version_number"
         )
-
         version_data = []
         for version in versions:
             version_data.append(
@@ -868,32 +805,36 @@ class WebPageViewSet(viewsets.ModelViewSet):
             )
 
         if request.method == "GET":
-            # Return complete version data including widgets (same format as PageVersionViewSet.widgets)
-            return Response(
-                {
-                    "version_id": version.id,
-                    "version_number": version.version_number,
-                    "page_id": version.page.id,
-                    "widgets": version.widgets or {},
-                    "page_data": version.page_data or {},
-                    "is_current_published": version.is_current_published(),
-                    "publication_status": version.get_publication_status(),
-                    "version_title": version.version_title,
-                    "created_at": version.created_at,
-                    "created_by": (
-                        version.created_by.username if version.created_by else None
-                    ),
-                    "effective_date": version.effective_date,
-                    "expiry_date": version.expiry_date,
-                    "change_summary": version.change_summary or {},
-                }
-            )
+            serializer = PageVersionSerializer(version)
+
+            return Response(serializer.data)
         elif request.method == "PATCH":
             # Validate page_data against effective schema when provided
             incoming_page_data = request.data.get("page_data")
             if incoming_page_data is not None:
+                if isinstance(incoming_page_data, dict):
+                    forbidden = {
+                        "title",
+                        "slug",
+                        "code_layout",
+                        "page_data",
+                        "widgets",
+                        "page_css_variables",
+                        "theme",
+                        "is_published",
+                        "version_title",
+                        "page_custom_css",
+                        "page_css_variables",
+                        "enable_css_injection",
+                    }
+                    incoming_page_data = {
+                        k: v
+                        for k, v in incoming_page_data.items()
+                        if k not in forbidden
+                    }
                 # Determine target layout for this version after update: prefer incoming code_layout, else current
                 layout_name = request.data.get("code_layout") or version.code_layout
+
                 effective_schema = PageDataSchema.get_effective_schema_for_layout(
                     layout_name
                 )
@@ -918,30 +859,11 @@ class WebPageViewSet(viewsets.ModelViewSet):
                         )
 
             # Update version using serializer after validation
+
             serializer = PageVersionSerializer(version, data=request.data, partial=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
-
-            # Return the same format as version_detail for consistency
-            return Response(
-                {
-                    "version_id": version.id,
-                    "version_number": version.version_number,
-                    "page_id": version.page.id,
-                    "widgets": version.widgets or {},
-                    "page_data": version.page_data or {},
-                    "is_current_published": version.is_current_published(),
-                    "publication_status": version.get_publication_status(),
-                    "version_title": version.version_title,
-                    "created_at": version.created_at,
-                    "created_by": (
-                        version.created_by.username if version.created_by else None
-                    ),
-                    "effective_date": version.effective_date,
-                    "expiry_date": version.expiry_date,
-                    "change_summary": version.change_summary or {},
-                }
-            )
+            return Response(serializer.data)
 
 
 class PageVersionViewSet(viewsets.ModelViewSet):
@@ -1043,22 +965,7 @@ class PageDataSchemaViewSet(viewsets.ModelViewSet):
         """Get widget data for this specific version"""
         version = self.get_object()
 
-        return Response(
-            {
-                "version_id": version.id,
-                "version_number": version.version_number,
-                "page_id": version.page.id,
-                "widgets": version.widgets or {},
-                "page_data": version.page_data or {},
-                "is_current_published": version.is_current_published(),
-                "publication_status": version.get_publication_status(),
-                "version_title": version.version_title,
-                "created_at": version.created_at,
-                "created_by": (
-                    version.created_by.username if version.created_by else None
-                ),
-            }
-        )
+        return Response(version.to_dict())
 
     @action(detail=False, methods=["post"], url_path="pack-aggressive")
     def pack_aggressive(self, request):

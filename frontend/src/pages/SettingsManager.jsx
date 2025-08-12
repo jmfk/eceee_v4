@@ -83,12 +83,18 @@ const SettingsManager = () => {
 
     // Filter pages based on search and filters
     const filteredPages = pages.filter(page => {
-        const matchesSearch = page.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            page.slug.toLowerCase().includes(searchTerm.toLowerCase())
+        const normalizedSearchTerm = (searchTerm ?? '').toString().toLowerCase()
+        const normalizedTitle = (page?.title ?? '').toString().toLowerCase()
+        const normalizedSlug = (page?.slug ?? '').toString().toLowerCase()
+
+        const matchesSearch =
+            normalizedTitle.includes(normalizedSearchTerm) ||
+            normalizedSlug.includes(normalizedSearchTerm)
 
         const matchesStatus = statusFilter === 'all' || page.publication_status === statusFilter
 
-        const matchesLayout = layoutFilter === 'all' ||
+        const matchesLayout =
+            layoutFilter === 'all' ||
             (layoutFilter === 'none' && !page.code_layout) ||
             (layoutFilter.startsWith('code:') && page.code_layout === layoutFilter.split(':')[1])
 

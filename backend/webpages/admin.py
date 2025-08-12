@@ -6,10 +6,38 @@ widget types, and versions through the Django admin panel.
 """
 
 from django.contrib import admin
+from django import forms
 from django.utils.html import format_html
 from django.urls import reverse
 from django.utils.safestring import mark_safe
-from .models import WebPage, PageVersion, PageTheme
+from .models import WebPage, PageVersion, PageTheme, PageDataSchema
+import json
+
+
+class PrettyJSONWidget(admin.widgets.AdminTextareaWidget):
+    """Textarea widget that renders JSON with 2-space indentation without escaped newlines."""
+
+    def format_value(self, value):
+        if value is None:
+            return ""
+        # If value is already a Python object, pretty-print it
+        if isinstance(value, (dict, list)):
+            try:
+                return json.dumps(value, indent=2, ensure_ascii=False)
+            except Exception:
+                return str(value)
+        # If value is a string containing JSON, normalize it to pretty JSON
+        if isinstance(value, str):
+            try:
+                parsed = json.loads(value)
+                return json.dumps(parsed, indent=2, ensure_ascii=False)
+            except Exception:
+                # Not valid JSON; return as-is so user can correct it
+                return value
+        # Fallback
+        return str(value)
+
+
 from .middleware import HostnameUpdateMixin
 
 
@@ -133,7 +161,7 @@ class PageVersionInline(admin.TabularInline):
 @admin.register(WebPage)
 class WebPageAdmin(HostnameUpdateMixin, admin.ModelAdmin):
     list_display = [
-        "get_title",
+        "title",
         "slug",
         "parent",
         "get_hostnames_display",
@@ -172,7 +200,16 @@ class WebPageAdmin(HostnameUpdateMixin, admin.ModelAdmin):
     fieldsets = (
         (
             "Basic Information",
-            {"fields": ("slug", "parent", "sort_order")},
+            {
+                "fields": (
+                    "title",
+                    "description",
+                    "slug",
+                    "hostnames",
+                    "parent",
+                    "sort_order",
+                )
+            },
         ),
         (
             "Multi-Site Configuration",
@@ -472,7 +509,7 @@ class WebPageAdmin(HostnameUpdateMixin, admin.ModelAdmin):
 @admin.register(PageVersion)
 class PageVersionAdmin(admin.ModelAdmin):
     list_display = [
-        "get_title",
+        "title",
         "version_number",
         "version_title",
         "publication_status_display",
@@ -487,10 +524,39 @@ class PageVersionAdmin(admin.ModelAdmin):
     ]  # Can't search page title anymore since it's in page_data
     readonly_fields = ["created_at", "version_number", "page_admin_link"]
 
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj, **kwargs)
+        # Use PrettyJSONWidget for JSON fields for better readability without escapes
+        json_widget = PrettyJSONWidget(
+            attrs={
+                "rows": 20,
+                "cols": 80,
+                "style": "font-family: monospace; white-space: pre;",
+            }
+        )
+        for field_name in [
+            "page_data",
+            "widgets",
+            "change_summary",
+            "page_css_variables",
+        ]:
+            if field_name in form.base_fields:
+                form.base_fields[field_name].widget = json_widget
+        return form
+
     fieldsets = (
         (
             "Version Information",
-            {"fields": ("page", "version_number", "page_admin_link")},
+            {
+                "fields": (
+                    "page",
+                    "title",
+                    "description",
+                    "code_layout",
+                    "version_number",
+                    "page_admin_link",
+                )
+            },
         ),
         (
             "Publishing",
@@ -508,22 +574,6 @@ class PageVersionAdmin(admin.ModelAdmin):
             {"fields": ("created_at", "created_by"), "classes": ("collapse",)},
         ),
     )
-
-    def get_form(self, request, obj=None, **kwargs):
-        """Customize form to use textarea widgets for JSON fields"""
-        form = super().get_form(request, obj, **kwargs)
-
-        # Use textarea widgets for JSON fields to make editing easier
-        if "page_data" in form.base_fields:
-            form.base_fields["page_data"].widget = admin.widgets.AdminTextareaWidget(
-                attrs={"rows": 20, "cols": 80, "style": "font-family: monospace;"}
-            )
-        if "widgets" in form.base_fields:
-            form.base_fields["widgets"].widget = admin.widgets.AdminTextareaWidget(
-                attrs={"rows": 15, "cols": 80, "style": "font-family: monospace;"}
-            )
-
-        return form
 
     def has_add_permission(self, request):
         return False  # Versions are created automatically
@@ -578,6 +628,122 @@ class PageVersionAdmin(admin.ModelAdmin):
     def get_title(self, obj):
         """Display page title"""
         return obj.title or obj.page.slug or "No title"
+
+
+# PageDataSchema Admin
+@admin.register(PageDataSchema)
+class PageDataSchemaAdmin(admin.ModelAdmin):
+    list_display = [
+        "display_name",
+        "scope",
+        "layout_name",
+        "is_active",
+        "updated_at",
+        "created_by",
+    ]
+    list_filter = ["scope", "layout_name", "is_active", "updated_at", "created_by"]
+    search_fields = ["name", "layout_name", "description"]
+    readonly_fields = ["created_at", "updated_at", "created_by"]
+
+    def get_form(self, request, obj=None, **kwargs):
+        """Use a large monospace textarea for the JSON schema field with pretty JSON rendering."""
+        form = super().get_form(request, obj, **kwargs)
+        if "schema" in form.base_fields:
+            form.base_fields["schema"].widget = PrettyJSONWidget(
+                attrs={
+                    "rows": 24,
+                    "cols": 100,
+                    "style": "font-family: monospace; white-space: pre;",
+                }
+            )
+        return form
+
+    fieldsets = (
+        (
+            "Identification",
+            {
+                "fields": (
+                    "scope",
+                    "layout_name",
+                    "name",
+                    "description",
+                    "is_active",
+                )
+            },
+        ),
+        ("Schema", {"fields": ("schema",)}),
+        (
+            "Metadata",
+            {
+                "fields": ("created_at", "updated_at", "created_by"),
+                "classes": ("collapse",),
+            },
+        ),
+    )
+
+    actions = ["activate_selected", "deactivate_selected"]
+
+    def display_name(self, obj):
+        if obj.scope == PageDataSchema.SCOPE_LAYOUT:
+            return obj.name or f"{obj.layout_name} Schema"
+        return "System Schema"
+
+    display_name.short_description = "Name"
+
+    def save_model(self, request, obj, form, change):
+        """Ensure creator is set and enforce single active schema per scope/layout."""
+        from django.db import transaction
+
+        if not change:
+            obj.created_by = request.user
+
+        with transaction.atomic():
+            if obj.is_active:
+                if obj.scope == PageDataSchema.SCOPE_SYSTEM:
+                    PageDataSchema.objects.filter(
+                        scope=PageDataSchema.SCOPE_SYSTEM, is_active=True
+                    ).exclude(pk=obj.pk).update(is_active=False)
+                elif obj.scope == PageDataSchema.SCOPE_LAYOUT and obj.layout_name:
+                    PageDataSchema.objects.filter(
+                        scope=PageDataSchema.SCOPE_LAYOUT,
+                        layout_name=obj.layout_name,
+                        is_active=True,
+                    ).exclude(pk=obj.pk).update(is_active=False)
+
+            super().save_model(request, obj, form, change)
+
+    def activate_selected(self, request, queryset):
+        from django.db import transaction
+
+        updated = 0
+        with transaction.atomic():
+            for schema in queryset:
+                if schema.scope == PageDataSchema.SCOPE_SYSTEM:
+                    PageDataSchema.objects.filter(
+                        scope=PageDataSchema.SCOPE_SYSTEM, is_active=True
+                    ).exclude(pk=schema.pk).update(is_active=False)
+                elif schema.scope == PageDataSchema.SCOPE_LAYOUT and schema.layout_name:
+                    PageDataSchema.objects.filter(
+                        scope=PageDataSchema.SCOPE_LAYOUT,
+                        layout_name=schema.layout_name,
+                        is_active=True,
+                    ).exclude(pk=schema.pk).update(is_active=False)
+                schema.is_active = True
+                schema.save(update_fields=["is_active", "updated_at"])
+                updated += 1
+
+        self.message_user(
+            request,
+            f"Activated {updated} schema(s). Conflicting active schemas were deactivated.",
+        )
+
+    activate_selected.short_description = "Activate selected (deactivate conflicting)"
+
+    def deactivate_selected(self, request, queryset):
+        updated = queryset.update(is_active=False)
+        self.message_user(request, f"Deactivated {updated} schema(s)")
+
+    deactivate_selected.short_description = "Deactivate selected"
 
 
 # Customize admin site headers

@@ -189,7 +189,7 @@ python manage.py manage_layouts reload
 
 ### Page Serialization
 
-The `WebPageDetailSerializer` includes:
+The `WebPageSimpleSerializer` (with `include_version_info=True`) includes:
 
 ```json
 {

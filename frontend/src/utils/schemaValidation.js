@@ -2,15 +2,14 @@
 
 // Default fields that are always present in all schemas
 export const DEFAULT_SCHEMA_FIELDS = {
-    title: {
+    meta_title: {
         type: 'string',
-        title: 'Page Title',
+        title: 'Meta Title',
         description: 'The main title of this page',
         default: '',
-        minLength: 1,
         maxLength: 200,
     },
-    description: {
+    meta_description: {
         type: 'string',
         title: 'Page Description',
         description: 'A brief description of this page for SEO and previews',
@@ -77,11 +76,16 @@ export function mergeWithDefaults(schema) {
         }
     })
     const inputRequired = Array.isArray(schema?.required) ? schema.required : []
-    const filteredRequired = inputRequired.filter((field) => !isDefaultField(field))
+    // Remove default fields from required and avoid duplicating 'title'
+    const filteredRequired = inputRequired.filter(
+        (field) => !isDefaultField(field) && field !== 'title'
+    )
+    // Ensure 'required' contains unique values with 'title' enforced exactly once
+    const uniqueRequired = Array.from(new Set(['title', ...filteredRequired]))
     return {
         type: 'object',
         properties: mergedProperties,
-        required: ['title', ...filteredRequired],
+        required: uniqueRequired,
     }
 }
 
@@ -93,10 +97,14 @@ export function getSchemaWithoutDefaults(schema) {
             userProperties[key] = value
         }
     })
+    const rawRequired = Array.isArray(schema.required) ? schema.required : []
+    const cleanedRequired = rawRequired.filter((field) => !isDefaultField(field))
+    // Deduplicate any existing duplicates to keep schema valid if it already had them
+    const uniqueCleanedRequired = Array.from(new Set(cleanedRequired))
     return {
         type: 'object',
         properties: userProperties,
-        required: (schema.required || []).filter((field) => !isDefaultField(field)),
+        required: uniqueCleanedRequired,
     }
 }
 

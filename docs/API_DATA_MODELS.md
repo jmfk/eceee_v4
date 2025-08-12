@@ -10,10 +10,9 @@ The issue was that `hostnames` field was defined in the Django model but not inc
 
 ### 1. Backend Improvements
 
-#### Added `hostnames` to all page serializers:
+#### Added `hostnames` to page serializers:
 - `WebPageTreeSerializer` - for tree views
-- `WebPageDetailSerializer` - for detailed views  
-- `WebPageListSerializer` - for list views
+- `WebPageSimpleSerializer` - for detailed views (optionally include version info)  
 - `PageHierarchySerializer` - for hierarchy views
 
 #### Created Pydantic models in `backend/webpages/json_models.py`:

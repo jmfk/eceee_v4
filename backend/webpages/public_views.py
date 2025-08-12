@@ -19,7 +19,7 @@ import json
 
 from .models import WebPage
 from .renderers import WebPageRenderer
-from .serializers import WebPageDetailSerializer, PageHierarchySerializer
+from .serializers import PageHierarchySerializer
 
 
 class PublishedPageMixin:

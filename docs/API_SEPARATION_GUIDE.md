@@ -160,9 +160,8 @@ Maintains the old behavior by returning combined page + version data. Use this d
 ## Implementation Details
 
 ### New Serializers
-- `WebPageSimpleSerializer` - Page metadata only
+- `WebPageSimpleSerializer` - Page metadata; can include version info with `include_version_info`
 - `PageVersionDetailSerializer` - Complete version data
-- `WebPageDetailSerializer` - **LEGACY** - Combined data
 
 ### Performance Considerations
 - Page metadata can be cached longer (changes less frequently)

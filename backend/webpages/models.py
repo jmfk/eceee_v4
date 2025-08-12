@@ -76,6 +76,8 @@ class WebPage(models.Model):
     sort_order = models.IntegerField(default=0)
 
     # Basic page information
+    title = models.CharField(max_length=255, default="")
+    description = models.TextField(blank=True, default="")
     slug = models.SlugField(max_length=255, unique=False, null=True, blank=True)
     # Page-level CSS injection controls (kept for backward compatibility and manual overrides)
     enable_css_injection = models.BooleanField(
@@ -129,16 +131,15 @@ class WebPage(models.Model):
     def get_absolute_url(self):
         """Generate the public URL for this page"""
         if self.parent:
-            return f"{self.parent.get_absolute_url()}/{self.slug}/"
-        return f"/{self.slug}/"
+            parent_url = (self.parent.get_absolute_url() or "/").rstrip("/")
+            slug_part = (self.slug or "").strip("/")
+            return f"{parent_url}/{slug_part}/"
+        slug_part = (self.slug or "").strip("/")
+        return f"/{slug_part}/"
 
     def is_root_page(self):
         """Check if this is a root page (no parent)"""
         return self.parent is None
-
-    title = models.CharField(max_length=255, default="")
-
-    description = models.TextField(blank=True, default="")
 
     @classmethod
     def normalize_hostname(cls, hostname):
@@ -1316,6 +1317,12 @@ class PageVersion(models.Model):
     )
 
     title = models.TextField(blank=True, help_text="Page Title")
+    description = models.TextField(blank=True, default="")
+    code_layout = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Name of code-based layout class. Leave blank to inherit from parent",
+    )
 
     # Snapshot of page data at this version
     page_data = models.JSONField(help_text="Serialized page data (excluding widgets)")
@@ -1324,13 +1331,6 @@ class PageVersion(models.Model):
     widgets = models.JSONField(
         default=dict,
         help_text="Widget configuration data for this version (slot_name -> widgets array)",
-    )
-
-    # Code-based layout
-    code_layout = models.CharField(
-        max_length=255,
-        blank=True,
-        help_text="Name of code-based layout class. Leave blank to inherit from parent",
     )
 
     theme = models.ForeignKey(
@@ -1567,32 +1567,34 @@ class PageVersion(models.Model):
 
         return draft
 
-    def to_dict(self):
-        """Convert version to dictionary representation"""
-        return {
-            "id": self.id,
-            "page_id": self.page_id,
-            "version_number": self.version_number,
-            "version_title": self.version_title,
-            "change_summary": self.change_summary,
-            "slug": self.page.slug,
-            "hostnames": self.page.hostnames,
-            "code_layout": self.code_layout,
-            "theme": self.theme,
-            "page_css_variables": self.page_css_variables,
-            "page_custom_css": self.page_custom_css,
-            "enable_css_injection": self.enable_css_injection,
-            "effective_date": self.effective_date,
-            "expiry_date": self.expiry_date,
-            # New date-based publishing status
-            "publication_status": self.get_publication_status(),
-            "is_published": self.is_published(),
-            "is_current_published": self.is_current_published(),
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-            "created_by": self.created_by.username if self.created_by else None,
-            "page_data": self.page_data,
-            "widgets": self.widgets,
-        }
+    # def to_dict(self):
+    #     """Convert version to dictionary representation"""
+    #     return {
+    #         "id": self.id,
+    #         "page_id": self.page_id,
+    #         "version_number": self.version_number,
+    #         "version_title": self.version_title,
+    #         "change_summary": self.change_summary,
+    #         "title": self.title,
+    #         "description": self.description,
+    #         "slug": self.page.slug,
+    #         "hostnames": self.page.hostnames,
+    #         "code_layout": self.code_layout,
+    #         "theme": self.theme,
+    #         "page_css_variables": self.page_css_variables,
+    #         "page_custom_css": self.page_custom_css,
+    #         "enable_css_injection": self.enable_css_injection,
+    #         "effective_date": self.effective_date,
+    #         "expiry_date": self.expiry_date,
+    #         # New date-based publishing status
+    #         "publication_status": self.get_publication_status(),
+    #         "is_published": self.is_published(),
+    #         "is_current_published": self.is_current_published(),
+    #         "created_at": self.created_at.isoformat() if self.created_at else None,
+    #         "created_by": self.created_by.username if self.created_by else None,
+    #         "page_data": self.page_data,
+    #         "widgets": self.widgets,
+    #     }
 
 
 class PageDataSchema(models.Model):
@@ -1673,70 +1675,65 @@ class PageDataSchema(models.Model):
     def get_effective_schema_for_layout(cls, layout_name: str | None):
         """
         Compute the effective JSON Schema for a given layout name.
-        
+
         The system schema is the base, and layout schemas extend it.
         System schema fields are mandatory and cannot be removed.
-        
+
         Returns the merged schema or just system schema if no layout-specific schema exists.
         """
         from django.db.models import Q
 
         # Get the single active system schema
-        system_schema_obj = (
-            cls.objects.filter(scope=cls.SCOPE_SYSTEM, is_active=True)
-            .first()
-        )
+        system_schema_obj = cls.objects.filter(
+            scope=cls.SCOPE_SYSTEM, is_active=True
+        ).first()
 
         layout_schema_obj = None
         if layout_name:
-            layout_schema_obj = (
-                cls.objects.filter(
-                    scope=cls.SCOPE_LAYOUT, layout_name=layout_name, is_active=True
-                )
-                .first()
-            )
+            layout_schema_obj = cls.objects.filter(
+                scope=cls.SCOPE_LAYOUT, layout_name=layout_name, is_active=True
+            ).first()
 
         if not system_schema_obj:
             # If no system schema, return layout schema if available
             return layout_schema_obj.schema if layout_schema_obj else None
 
         system_schema = system_schema_obj.schema
-        
+
         if not layout_schema_obj:
             # Just return system schema
             return system_schema
 
         # Merge system schema (base) with layout schema (extensions)
         layout_schema = layout_schema_obj.schema
-        
+
         # Create merged schema
         merged_properties = {}
         merged_required = []
-        
+
         # Start with system schema properties (these are mandatory)
-        if system_schema.get('properties'):
-            merged_properties.update(system_schema['properties'])
-        if system_schema.get('required'):
-            merged_required.extend(system_schema['required'])
-            
+        if system_schema.get("properties"):
+            merged_properties.update(system_schema["properties"])
+        if system_schema.get("required"):
+            merged_required.extend(system_schema["required"])
+
         # Add layout-specific properties (cannot override system properties)
-        if layout_schema.get('properties'):
-            for prop_name, prop_def in layout_schema['properties'].items():
-                if prop_name not in merged_properties:  # Don't allow override of system fields
+        if layout_schema.get("properties"):
+            for prop_name, prop_def in layout_schema["properties"].items():
+                if (
+                    prop_name not in merged_properties
+                ):  # Don't allow override of system fields
                     merged_properties[prop_name] = prop_def
-                    
+
         # Add layout-specific required fields
-        if layout_schema.get('required'):
-            for req_field in layout_schema['required']:
+        if layout_schema.get("required"):
+            for req_field in layout_schema["required"]:
                 if req_field not in merged_required:
                     merged_required.append(req_field)
-        
-        merged_schema = {
-            "type": "object",
-            "properties": merged_properties
-        }
-        
+
+        merged_schema = {"type": "object", "properties": merged_properties}
+
         if merged_required:
             merged_schema["required"] = merged_required
-            
+
         return merged_schema
