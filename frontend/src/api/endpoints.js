@@ -35,12 +35,13 @@ export const endpoints = {
         unlinkObject: (id) => `${BASE_PATH}/webpages/pages/${id}/unlink-object/`,
         syncObject: (id) => `${BASE_PATH}/webpages/pages/${id}/sync-object/`,
         publicationStatus: `${BASE_PATH}/webpages/pages/publication_status/`,
-        versions: (id) => `${BASE_PATH}/webpages/pages/${id}/versions/`,
-        versionCurrent: (pageId) => `${BASE_PATH}/webpages/pages/${pageId}/versions/current/`,
-        versionDetail: (pageId, versionId) => `${BASE_PATH}/webpages/pages/${pageId}/versions/${versionId}/`
+        // DEPRECATED: Version-related endpoints moved to versions API
+        versions: (id) => `${BASE_PATH}/webpages/pages/${id}/versions/`, // Use versions.byPage(id) instead
+        versionCurrent: (pageId) => `${BASE_PATH}/webpages/pages/${pageId}/versions/current/`, // Use versions.currentForPage(pageId) instead  
+        versionDetail: (pageId, versionId) => `${BASE_PATH}/webpages/pages/${pageId}/versions/${versionId}/` // Use versions.detail(versionId) instead
     },
 
-    // Versions endpoints
+    // Versions endpoints (NEW SEPARATED API)
     versions: {
         base: `${BASE_PATH}/webpages/versions`,
         list: `${BASE_PATH}/webpages/versions/`,
@@ -50,8 +51,18 @@ export const endpoints = {
         restore: (id) => `${BASE_PATH}/webpages/versions/${id}/restore/`,
         compare: `${BASE_PATH}/webpages/versions/compare/`,
         search: `${BASE_PATH}/webpages/versions/search/`,
-        byPage: (pageId) => `${BASE_PATH}/webpages/pages/${pageId}/versions/`,
-        compact: (pageId) => `${BASE_PATH}/webpages/pages/${pageId}/versions/compact/`
+        // NEW: Direct version endpoints (replaces page-nested endpoints)
+        byPage: (pageId) => `${BASE_PATH}/webpages/versions/by-page/${pageId}/`,
+        forPage: (pageId) => `${BASE_PATH}/webpages/versions/?page=${pageId}`,
+        currentForPage: (pageId) => `${BASE_PATH}/webpages/versions/?page=${pageId}&current=true`,
+        latestForPage: (pageId) => `${BASE_PATH}/webpages/versions/?page=${pageId}&latest=true`,
+        // DEPRECATED: Legacy page-nested endpoints (will be removed)
+        legacy: {
+            byPage: (pageId) => `${BASE_PATH}/webpages/pages/${pageId}/versions/`,
+            current: (pageId) => `${BASE_PATH}/webpages/pages/${pageId}/versions/current/`,
+            latest: (pageId) => `${BASE_PATH}/webpages/pages/${pageId}/versions/latest/`,
+            detail: (pageId, versionId) => `${BASE_PATH}/webpages/pages/${pageId}/versions/${versionId}/`
+        }
     },
 
     // Layouts endpoints  

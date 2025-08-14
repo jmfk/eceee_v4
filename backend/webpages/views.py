@@ -492,9 +492,17 @@ class WebPageViewSet(viewsets.ModelViewSet):
         )
         return Response(serializer.data)
 
+    # DEPRECATED: Use PageVersionViewSet with ?page={id}&current=true instead
     @action(detail=True, methods=["get"], url_path="versions/current")
     def current_version(self, request, pk=None):
-        """Get the current version data for a page"""
+        """DEPRECATED: Get the current version data for a page. Use /api/v1/webpages/versions/?page={id}&current=true instead"""
+        import warnings
+        warnings.warn(
+            "WebPageViewSet.current_version is deprecated. Use PageVersionViewSet with ?page={id}&current=true instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        
         page = self.get_object()
 
         # Get current published version, fallback to latest
@@ -513,9 +521,17 @@ class WebPageViewSet(viewsets.ModelViewSet):
         )
         return Response(serializer.data)
 
+    # DEPRECATED: Use PageVersionViewSet with ?page={id}&latest=true instead
     @action(detail=True, methods=["get"], url_path="versions/latest")
     def latest_version(self, request, pk=None):
-        """Get the latest version data for a page (regardless of publication status)"""
+        """DEPRECATED: Get the latest version data for a page. Use /api/v1/webpages/versions/?page={id}&latest=true instead"""
+        import warnings
+        warnings.warn(
+            "WebPageViewSet.latest_version is deprecated. Use PageVersionViewSet with ?page={id}&latest=true instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        
         page = self.get_object()
 
         latest_version = page.get_latest_version()
@@ -748,9 +764,17 @@ class WebPageViewSet(viewsets.ModelViewSet):
             status=status.HTTP_200_OK,
         )
 
+    # DEPRECATED: Use PageVersionViewSet.by_page/{page_id} instead
     @action(detail=True, methods=["get"])
     def versions(self, request, pk=None):
-        """Get all versions for this page"""
+        """DEPRECATED: Get all versions for this page. Use /api/v1/webpages/versions/by-page/{page_id}/ instead"""
+        import warnings
+        warnings.warn(
+            "WebPageViewSet.versions is deprecated. Use PageVersionViewSet.by_page/{page_id}/ instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        
         page = self.get_object()
         versions = page.versions.select_related("created_by").order_by(
             "-version_number"
@@ -789,13 +813,20 @@ class WebPageViewSet(viewsets.ModelViewSet):
             }
         )
 
+    # DEPRECATED: Use PageVersionViewSet directly instead
     @action(
         detail=True,
         methods=["get", "patch"],
         url_path="versions/(?P<version_id>[^/.]+)",
     )
     def version_detail(self, request, pk=None, version_id=None):
-        """Get or update a specific version of this page"""
+        """DEPRECATED: Get or update a specific version. Use /api/v1/webpages/versions/{version_id}/ instead"""
+        import warnings
+        warnings.warn(
+            "WebPageViewSet.version_detail is deprecated. Use PageVersionViewSet directly instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
         page = self.get_object()
         version = page.versions.filter(id=version_id).first()
         if not version:
@@ -878,6 +909,47 @@ class PageVersionViewSet(viewsets.ModelViewSet):
     ordering_fields = ["created_at", "version_number", "version_title"]
     ordering = ["-created_at"]
 
+    def get_queryset(self):
+        """Enhanced queryset with special filtering for current and latest versions"""
+        queryset = super().get_queryset()
+        
+        # Handle special query parameters
+        page_id = self.request.query_params.get('page')
+        current = self.request.query_params.get('current', '').lower() == 'true'
+        latest = self.request.query_params.get('latest', '').lower() == 'true'
+        
+        # Filter by page if specified
+        if page_id:
+            queryset = queryset.filter(page_id=page_id)
+        
+        # Special handling for current published version
+        if current and page_id:
+            try:
+                from django.shortcuts import get_object_or_404
+                page = get_object_or_404(WebPage, id=page_id)
+                current_version = page.get_current_published_version()
+                if current_version:
+                    queryset = queryset.filter(id=current_version.id)
+                else:
+                    queryset = queryset.none()  # No current published version
+            except:
+                queryset = queryset.none()
+        
+        # Special handling for latest version
+        elif latest and page_id:
+            try:
+                from django.shortcuts import get_object_or_404
+                page = get_object_or_404(WebPage, id=page_id)
+                latest_version = page.get_latest_version()
+                if latest_version:
+                    queryset = queryset.filter(id=latest_version.id)
+                else:
+                    queryset = queryset.none()  # No versions
+            except:
+                queryset = queryset.none()
+        
+        return queryset
+
     def get_serializer_class(self):
         """Use different serializers based on action"""
         if self.action == "list":
@@ -916,6 +988,35 @@ class PageVersionViewSet(viewsets.ModelViewSet):
                 {"error": f"Publishing failed: {str(e)}"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+    @action(detail=False, methods=["get"], url_path="by-page/(?P<page_id>[^/.]+)")
+    def by_page(self, request, page_id=None):
+        """Get all versions for a specific page - replaces WebPageViewSet.versions"""
+        from django.shortcuts import get_object_or_404
+        
+        try:
+            page = get_object_or_404(WebPage, id=page_id)
+        except ValueError:
+            return Response(
+                {"error": "Invalid page ID"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        
+        versions = page.versions.select_related("created_by").order_by("-version_number")
+        
+        # Use list serializer for consistency
+        serializer = PageVersionListSerializer(versions, many=True, context={"request": request})
+        
+        current_published = page.get_current_published_version()
+        
+        return Response({
+            "page_id": page.id,
+            "page_title": page.title,
+            "page_slug": page.slug,
+            "current_version_id": current_published.id if current_published else None,
+            "total_versions": versions.count(),
+            "versions": serializer.data,
+        })
 
 
 class PageDataSchemaViewSet(viewsets.ModelViewSet):
