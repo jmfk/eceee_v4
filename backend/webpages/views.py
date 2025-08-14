@@ -456,16 +456,18 @@ class WebPageViewSet(viewsets.ModelViewSet):
         if self.action in ["list", "retrieve"]:
             # For public endpoints, only show published pages to non-staff users
             if not self.request.user.is_staff:
+                # Use database-level filtering to avoid N+1 queries
+                # This uses the same logic as WebPageFilter.filter_is_published
+                from django.db.models import Exists, OuterRef
+                
                 now = timezone.now()
-                # Get pages that have published versions
-                published_page_ids = (
-                    PageVersion.objects.filter(effective_date__lte=now)
-                    .filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
-                    .values_list("page_id", flat=True)
-                    .distinct()
-                )
-
-                queryset = queryset.filter(id__in=published_page_ids)
+                
+                # Subquery to check if page has published versions
+                published_version_exists = PageVersion.objects.filter(
+                    page=OuterRef("pk"), effective_date__lte=now
+                ).filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
+                
+                queryset = queryset.filter(Exists(published_version_exists))
 
         return queryset
 
@@ -479,17 +481,9 @@ class WebPageViewSet(viewsets.ModelViewSet):
         WebPage.normalize_sort_orders(page.parent_id)
 
     def retrieve(self, request, pk=None):
-        """Override retrieve to include version data with widgets"""
+        """Get WebPage data only - no version data included"""
         instance = self.get_object()
         serializer = self.get_serializer(instance)
-        # page_data = serializer.data
-        return Response(serializer.data)
-        current_version = instance.get_current_published_version()
-        if not current_version:
-            current_version = instance.get_latest_version()
-        serializer = PageVersionSerializer(
-            current_version, context={"request": request}
-        )
         return Response(serializer.data)
 
     # DEPRECATED: Use PageVersionViewSet with ?page={id}&current=true instead
@@ -497,12 +491,13 @@ class WebPageViewSet(viewsets.ModelViewSet):
     def current_version(self, request, pk=None):
         """DEPRECATED: Get the current version data for a page. Use /api/v1/webpages/versions/?page={id}&current=true instead"""
         import warnings
+
         warnings.warn(
             "WebPageViewSet.current_version is deprecated. Use PageVersionViewSet with ?page={id}&current=true instead.",
             DeprecationWarning,
-            stacklevel=2
+            stacklevel=2,
         )
-        
+
         page = self.get_object()
 
         # Get current published version, fallback to latest
@@ -526,12 +521,13 @@ class WebPageViewSet(viewsets.ModelViewSet):
     def latest_version(self, request, pk=None):
         """DEPRECATED: Get the latest version data for a page. Use /api/v1/webpages/versions/?page={id}&latest=true instead"""
         import warnings
+
         warnings.warn(
             "WebPageViewSet.latest_version is deprecated. Use PageVersionViewSet with ?page={id}&latest=true instead.",
             DeprecationWarning,
-            stacklevel=2
+            stacklevel=2,
         )
-        
+
         page = self.get_object()
 
         latest_version = page.get_latest_version()
@@ -554,131 +550,15 @@ class WebPageViewSet(viewsets.ModelViewSet):
         )
         return Response(serializer.data)
 
-    def _can_access_version(self, user, version):
-        """
-        Check if user can access a specific page version.
-
-        Security: Non-staff users can only access published versions.
-        Staff users can access all versions.
-        """
-        # Staff users can access all versions
-        if user.is_staff:
-            return True
-
-        # Non-staff users can only access published versions that are currently active
-        if not version.is_published:
-            return False
-
-        from django.utils import timezone
-
-        now = timezone.now()
-
-        # Check if version is within its effective date range
-        if version.effective_date and version.effective_date > now:
-            return False
-        if version.expiry_date and version.expiry_date <= now:
-            return False
-
-        return True
-
-    def _get_active_version(self, instance):
-        """
-        Determine the active version for a page.
-        Priority:
-        1. Currently published version (if exists and active)
-        2. Latest draft version (most recent by version_number)
-        3. None if no versions exist
-        """
-        from django.utils import timezone
-
-        now = timezone.now()
-
-        # First, try to find the currently published version
-        published_version = (
-            instance.versions.filter(effective_date__lte=now)
-            .filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
-            .order_by("-version_number")
-            .first()
-        )
-
-        if published_version:
-            return published_version
-
-        # If no published version, get the latest draft version
-        latest_version = instance.versions.order_by("-version_number").first()
-        return latest_version
+    # Version-related helper methods removed - use PageVersionViewSet instead
 
     def perform_update(self, serializer):
-        """Enhanced to handle unified saves (page data + widgets)"""
-        # Check if there's any data to save
-        has_data = bool(self.request.data)
-
-        if not has_data:
-            return
-
-        # Prepare validated data for unified save
-        save_kwargs = {"last_modified_by": self.request.user}
-
-        # Save the page data (including widgets if present)
-        # The serializer's update method will handle both page fields, widgets, and version creation
-        # Version options (auto_publish, version_description) are passed through the request data
-        # If page_data provided in request, validate against effective schema
-        try:
-            incoming_page_data = self.request.data.get("page_data") or {
-                # For unified API we accept top-level fields; construct minimal page_data
-                key: self.request.data[key]
-                for key in [
-                    "meta_title",
-                    "meta_description",
-                ]
-                if key in self.request.data
-            }
-        except Exception:
-            incoming_page_data = None
-
-        if incoming_page_data:
-            # Remove forbidden keys that must not live in page_data
-            if isinstance(incoming_page_data, dict):
-                forbidden = {"title", "slug", "code_layout", "description", "hostnames"}
-                incoming_page_data = {
-                    k: v for k, v in incoming_page_data.items() if k not in forbidden
-                }
-            # Determine layout from target version or provided code_layout
-            layout_name = self.request.data.get("code_layout")
-            if not layout_name:
-                # Try active version
-                instance = serializer.instance
-                latest_or_published = (
-                    instance.get_current_published_version()
-                    or instance.get_latest_version()
-                )
-                layout_name = getattr(latest_or_published, "code_layout", None)
-
-            effective_schema = PageDataSchema.get_effective_schema_for_layout(
-                layout_name
-            )
-            if effective_schema:
-                from jsonschema import validate, Draft202012Validator, Draft7Validator
-
-                try:
-                    try:
-                        Draft202012Validator.check_schema(effective_schema)
-                        Draft202012Validator(effective_schema).validate(
-                            incoming_page_data
-                        )
-                    except Exception:
-                        Draft7Validator.check_schema(effective_schema)
-                        Draft7Validator(effective_schema).validate(incoming_page_data)
-                except Exception as e:
-                    return Response(
-                        {"error": f"page_data validation failed: {str(e)}"},
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
-
-        serializer.save(**save_kwargs)
-
-        # Note: Version creation is now handled by the serializer's update method
-        # Version options are automatically extracted from validated_data in the serializer
+        """Update WebPage fields only - no version creation"""
+        # Save only WebPage fields, last_modified_by is updated automatically
+        serializer.save(last_modified_by=self.request.user)
+        
+        # Note: Version creation must now be handled explicitly via PageVersionViewSet
+        # This separation ensures clean boundaries between page and version management
 
     @action(detail=False, methods=["get"])
     def tree(self, request):
@@ -711,9 +591,17 @@ class WebPageViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(published_pages, many=True)
         return Response(serializer.data)
 
+    # DEPRECATED: Use PageVersionViewSet.publish() on a specific version instead
     @action(detail=True, methods=["post"])
     def publish(self, request, pk=None):
-        """Publish a page immediately"""
+        """DEPRECATED: Publish a page. Use PageVersionViewSet.publish() on a specific version instead"""
+        import warnings
+        warnings.warn(
+            "WebPageViewSet.publish is deprecated. Create a version via PageVersionViewSet then publish it.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        
         page = self.get_object()
         now = timezone.now()
 
@@ -739,9 +627,17 @@ class WebPageViewSet(viewsets.ModelViewSet):
             status=status.HTTP_200_OK,
         )
 
+    # DEPRECATED: Use PageVersionViewSet to manage version publishing instead
     @action(detail=True, methods=["post"])
     def unpublish(self, request, pk=None):
-        """Unpublish a page"""
+        """DEPRECATED: Unpublish a page. Use PageVersionViewSet to manage version publishing instead"""
+        import warnings
+        warnings.warn(
+            "WebPageViewSet.unpublish is deprecated. Manage version publishing via PageVersionViewSet.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        
         page = self.get_object()
         now = timezone.now()
 
@@ -769,12 +665,13 @@ class WebPageViewSet(viewsets.ModelViewSet):
     def versions(self, request, pk=None):
         """DEPRECATED: Get all versions for this page. Use /api/v1/webpages/versions/by-page/{page_id}/ instead"""
         import warnings
+
         warnings.warn(
             "WebPageViewSet.versions is deprecated. Use PageVersionViewSet.by_page/{page_id}/ instead.",
             DeprecationWarning,
-            stacklevel=2
+            stacklevel=2,
         )
-        
+
         page = self.get_object()
         versions = page.versions.select_related("created_by").order_by(
             "-version_number"
@@ -822,10 +719,11 @@ class WebPageViewSet(viewsets.ModelViewSet):
     def version_detail(self, request, pk=None, version_id=None):
         """DEPRECATED: Get or update a specific version. Use /api/v1/webpages/versions/{version_id}/ instead"""
         import warnings
+
         warnings.warn(
             "WebPageViewSet.version_detail is deprecated. Use PageVersionViewSet directly instead.",
             DeprecationWarning,
-            stacklevel=2
+            stacklevel=2,
         )
         page = self.get_object()
         version = page.versions.filter(id=version_id).first()
@@ -912,20 +810,21 @@ class PageVersionViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Enhanced queryset with special filtering for current and latest versions"""
         queryset = super().get_queryset()
-        
+
         # Handle special query parameters
-        page_id = self.request.query_params.get('page')
-        current = self.request.query_params.get('current', '').lower() == 'true'
-        latest = self.request.query_params.get('latest', '').lower() == 'true'
-        
+        page_id = self.request.query_params.get("page")
+        current = self.request.query_params.get("current", "").lower() == "true"
+        latest = self.request.query_params.get("latest", "").lower() == "true"
+
         # Filter by page if specified
         if page_id:
             queryset = queryset.filter(page_id=page_id)
-        
+
         # Special handling for current published version
         if current and page_id:
             try:
                 from django.shortcuts import get_object_or_404
+
                 page = get_object_or_404(WebPage, id=page_id)
                 current_version = page.get_current_published_version()
                 if current_version:
@@ -934,11 +833,12 @@ class PageVersionViewSet(viewsets.ModelViewSet):
                     queryset = queryset.none()  # No current published version
             except:
                 queryset = queryset.none()
-        
+
         # Special handling for latest version
         elif latest and page_id:
             try:
                 from django.shortcuts import get_object_or_404
+
                 page = get_object_or_404(WebPage, id=page_id)
                 latest_version = page.get_latest_version()
                 if latest_version:
@@ -947,7 +847,7 @@ class PageVersionViewSet(viewsets.ModelViewSet):
                     queryset = queryset.none()  # No versions
             except:
                 queryset = queryset.none()
-        
+
         return queryset
 
     def get_serializer_class(self):
@@ -993,7 +893,7 @@ class PageVersionViewSet(viewsets.ModelViewSet):
     def by_page(self, request, page_id=None):
         """Get all versions for a specific page - replaces WebPageViewSet.versions"""
         from django.shortcuts import get_object_or_404
-        
+
         try:
             page = get_object_or_404(WebPage, id=page_id)
         except ValueError:
@@ -1001,22 +901,30 @@ class PageVersionViewSet(viewsets.ModelViewSet):
                 {"error": "Invalid page ID"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        
-        versions = page.versions.select_related("created_by").order_by("-version_number")
-        
+
+        versions = page.versions.select_related("created_by").order_by(
+            "-version_number"
+        )
+
         # Use list serializer for consistency
-        serializer = PageVersionListSerializer(versions, many=True, context={"request": request})
-        
+        serializer = PageVersionListSerializer(
+            versions, many=True, context={"request": request}
+        )
+
         current_published = page.get_current_published_version()
-        
-        return Response({
-            "page_id": page.id,
-            "page_title": page.title,
-            "page_slug": page.slug,
-            "current_version_id": current_published.id if current_published else None,
-            "total_versions": versions.count(),
-            "versions": serializer.data,
-        })
+
+        return Response(
+            {
+                "page_id": page.id,
+                "page_title": page.title,
+                "page_slug": page.slug,
+                "current_version_id": (
+                    current_published.id if current_published else None
+                ),
+                "total_versions": versions.count(),
+                "versions": serializer.data,
+            }
+        )
 
 
 class PageDataSchemaViewSet(viewsets.ModelViewSet):
