@@ -170,55 +170,27 @@ class WebPageTreeSerializer(serializers.ModelSerializer):
             "children_count",
         ]
 
-    def _get_current_version(self, obj):
-        current_version = obj.get_current_published_version()
-        if not current_version:
-            current_version = obj.get_latest_version()
-        return current_version
-
     def get_title(self, obj):
-        """Helper method to get title from a page's current version"""
-        current_version = self._get_current_version(obj)
-        if current_version:
-            return current_version.title
+        """Get title from WebPage model - for version title use PageVersionSerializer"""
         return obj.title
 
     def get_code_layout(self, obj):
-        """Get code layout from the page"""
-        current_version = self._get_current_version(obj)
-        if current_version:
-            return current_version.code_layout
+        """DEPRECATED: Get code layout from PageVersionSerializer instead"""
         return ""
 
     def get_children_count(self, obj):
         return obj.children.count()
 
     def get_publication_status(self, obj):
-        """Get the publication status for this page based on its current published version"""
-        current_version = obj.get_current_published_version()
-        if current_version:
-            return current_version.get_publication_status()
-
-        # If no published version exists, check if there are any versions at all
-        latest_version = obj.get_latest_version()
-        if latest_version:
-            return latest_version.get_publication_status()
-
-        # No versions exist
-        return "draft"
+        """DEPRECATED: Get publication status from PageVersionSerializer instead"""
+        return "unknown"
 
     def get_effective_date(self, obj):
-        """Get the effective date from the current published version"""
-        current_version = obj.get_current_published_version()
-        if current_version:
-            return current_version.effective_date
+        """DEPRECATED: Get dates from PageVersionSerializer instead"""
         return None
 
     def get_expiry_date(self, obj):
-        """Get the expiry date from the current published version"""
-        current_version = obj.get_current_published_version()
-        if current_version:
-            return current_version.expiry_date
+        """DEPRECATED: Get dates from PageVersionSerializer instead"""
         return None
 
 
@@ -312,38 +284,15 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
         ]
 
     def get_current_published_version(self, obj):
-        """Get the current published version using date-based logic.
-
-        Mirrors the shape returned by the legacy detail serializer so that
-        consumers of the legacy `full` endpoint can be migrated seamlessly.
-        """
-        current_version = obj.get_current_published_version()
-        if current_version:
-            return {
-                "id": current_version.id,
-                "version_number": current_version.version_number,
-                "effective_date": current_version.effective_date,
-                "expiry_date": current_version.expiry_date,
-                "publication_status": current_version.get_publication_status(),
-                "description": current_version.version_title,
-            }
+        """DEPRECATED: Get version info via PageVersionViewSet instead"""
+        # For backward compatibility, return None
+        # To get actual version data, use the PageVersionViewSet API
         return None
 
-    def _get_current_version(self, obj):
-        # Be defensive: sometimes a PageVersion could be passed instead of WebPage
-        from .models import PageVersion as _PV
-
-        page_obj = obj.page if isinstance(obj, _PV) else obj
-        current_version = page_obj.get_current_published_version()
-        if not current_version:
-            current_version = page_obj.get_latest_version()
-        return current_version
-
     def get_code_layout(self, obj):
-        """Get code layout from the page"""
-        current_version = self._get_current_version(obj)
-        if current_version:
-            return current_version.code_layout
+        """Get code layout - NOTE: This field is deprecated, use PageVersionSerializer instead"""
+        # For backward compatibility, return empty string
+        # To get actual code_layout, query the PageVersion directly
         return ""
 
     def get_effective_layout(self, obj):
@@ -638,20 +587,8 @@ class PageHierarchySerializer(serializers.ModelSerializer):
         ]
 
     def get_title(self, obj):
-        """Get title from current published version or latest version"""
-        current_version = obj.get_current_published_version()
-        if not current_version:
-            current_version = obj.get_latest_version()
-
-        if current_version:
-            # Try to get title from page_data first, then from version title field
-            if current_version.page_data and current_version.page_data.get("title"):
-                return current_version.page_data["title"]
-            elif hasattr(current_version, "title") and current_version.title:
-                return current_version.title
-
-        # Fallback to slug
-        return obj.slug or f"Page {obj.id}"
+        """Get title from WebPage model - for version title use PageVersionSerializer"""
+        return obj.title or obj.slug or f"Page {obj.id}"
 
     def get_children(self, obj):
         # Filter children that are published based on their versions
@@ -664,47 +601,17 @@ class PageHierarchySerializer(serializers.ModelSerializer):
         ).data
 
     def get_publication_status(self, obj):
-        """Get the publication status for this page based on its current published version"""
-        current_version = obj.get_current_published_version()
-        if current_version:
-            return current_version.get_publication_status()
-
-        # If no published version exists, check if there are any versions at all
-        latest_version = obj.get_latest_version()
-        if latest_version:
-            return latest_version.get_publication_status()
-
-        # No versions exist
-        return "draft"
+        """DEPRECATED: Get publication status from PageVersionSerializer instead"""
+        return "unknown"
 
     def get_effective_date(self, obj):
-        """Get the effective date from the current published version"""
-        current_version = obj.get_current_published_version()
-        if current_version:
-            return current_version.effective_date
+        """DEPRECATED: Get dates from PageVersionSerializer instead"""
         return None
 
     def get_expiry_date(self, obj):
-        """Get the expiry date from the current published version"""
-        current_version = obj.get_current_published_version()
-        if current_version:
-            return current_version.expiry_date
+        """DEPRECATED: Get dates from PageVersionSerializer instead"""
         return None
 
     def get_current_published_version(self, obj):
-        """Get the current published version using date-based logic.
-
-        Mirrors the shape returned by the legacy detail serializer so that
-        consumers of the legacy `full` endpoint can be migrated seamlessly.
-        """
-        current_version = obj.get_current_published_version()
-        if current_version:
-            return {
-                "id": current_version.id,
-                "version_number": current_version.version_number,
-                "effective_date": current_version.effective_date,
-                "expiry_date": current_version.expiry_date,
-                "publication_status": current_version.get_publication_status(),
-                "description": current_version.version_title,
-            }
+        """DEPRECATED: Get version info via PageVersionViewSet instead"""
         return None
