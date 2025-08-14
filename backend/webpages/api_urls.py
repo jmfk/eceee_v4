@@ -33,7 +33,6 @@ router.register(r"page-data-schemas", PageDataSchemaViewSet, basename="pagedatas
 
 # API URLs without app_name to avoid namespace conflicts when included in main API
 urlpatterns = [
-    path("", include(router.urls)),
     path("layouts/<str:layout_name>/json/", layout_json, name="layout-json"),
     # Nested page-version endpoints (consistent path-based routing)
     path(
@@ -52,7 +51,7 @@ urlpatterns = [
         name="page-latest-version",
     ),
     path(
-        "pages/<int:page_id>/versions/<int:version_id>/",
+        "pages/<int:page_id>/versions/<int:pk>/",
         PageVersionViewSet.as_view(
             {
                 "get": "retrieve",
@@ -71,4 +70,5 @@ urlpatterns = [
         name="page-version-render",
     ),
     path("pages/preview/", render_page_preview, name="page-preview"),
+    path("", include(router.urls)),
 ]

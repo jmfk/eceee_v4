@@ -19,6 +19,8 @@ import {
     Calendar
 } from 'lucide-react'
 import { pagesApi, layoutsApi, versionsApi } from '../api'
+import { api } from '../api/client'
+import { endpoints } from '../api/endpoints'
 import { smartSave, analyzeChanges, determineSaveStrategy, generateChangeSummary } from '../utils/smartSaveUtils'
 import { useNotificationContext } from './NotificationManager'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
@@ -167,8 +169,11 @@ const PageEditor = () => {
             navigate(defaultPath, { replace: true, state: { previousView } })
         }
     }, [tab, isNewPage, pageId, navigate, previousView, versionFromUrl])
-    const [pageData, setPageData] = useState(null)
-    const [originalPageData, setOriginalPageData] = useState(null) // Track original for smart saving
+    // Separate WebPage and PageVersion data
+    const [webpageData, setWebpageData] = useState(null)
+    const [pageVersionData, setPageVersionData] = useState(null)
+    const [originalWebpageData, setOriginalWebpageData] = useState(null) // Track original for smart saving
+    const [originalPageVersionData, setOriginalPageVersionData] = useState(null) // Track original for smart saving
     const [isDirty, setIsDirty] = useState(false)
     const [layoutData, setLayoutData] = useState(null)
     const [isLoadingLayout, setIsLoadingLayout] = useState(false)
@@ -176,17 +181,19 @@ const PageEditor = () => {
     const settingsEditorRef = useRef(null)
     const metadataEditorRef = useRef(null)
 
+    // Note: pageData has been completely removed - use webpageData and pageVersionData directly
+
     // Version management state
-    // Note: With unified page state architecture:
-    // - pageData contains complete current state (metadata + widgets + version_data)
-    // - availableVersions contains list of available version metadata
     const [currentVersion, setCurrentVersion] = useState(null)
     const [availableVersions, setAvailableVersions] = useState([])
 
     // Guard: only consider layout/rendering ready once the intended version is resolved
+    // Note: API returns 'id' but we need to check against currentVersion.id
     const isVersionReady = isNewPage || (
-        Boolean(currentVersion?.id) && Boolean(pageData?.version_id) && currentVersion.id === pageData.version_id
+        Boolean(currentVersion?.id) && Boolean(pageVersionData?.id) && currentVersion.id === pageVersionData.id
     )
+
+
 
     // Auto-save management state
     const [autoSaveEnabled, setAutoSaveEnabled] = useState(true)
@@ -203,44 +210,61 @@ const PageEditor = () => {
 
 
 
-    // Initialize page data for new page
+    // Initialize data for new page
     useEffect(() => {
-        if (isNewPage && !pageData) {
-            setPageData({
+        if (isNewPage && !webpageData && !pageVersionData) {
+            // Initialize WebPage data
+            setWebpageData({
                 title: '',
                 slug: '',
                 description: '',
-                publication_status: 'unpublished',
-                code_layout: '',
-                meta_title: '',
-                meta_description: '',
                 hostnames: [],
+                enable_css_injection: false,
+                page_css_variables: {},
+                page_custom_css: ''
+            })
+
+            // Initialize PageVersion data
+            setPageVersionData({
                 pageData: {},
-                widgets: {}
+                widgets: {},
+                code_layout: '',
+                theme: null,
+                version_title: 'Initial version',
+                publication_status: 'unpublished'
             })
         }
-    }, [isNewPage, pageData])
+    }, [isNewPage, webpageData, pageVersionData])
 
-    // Fetch page data (skip if creating new page)
-    const { data: page, isLoading } = useQuery({
-        queryKey: ['page', pageId],
+    // Fetch webpage data (WebPage model data)
+    const { data: webpage, isLoading: isLoadingWebpage } = useQuery({
+        queryKey: ['webpage', pageId],
         queryFn: async () => {
-            // Get the active version (current published or latest draft)
+            return await pagesApi.get(pageId)
+        },
+        enabled: !isNewPage
+    })
+
+    // Fetch page version data (PageVersion model data)
+    const { data: pageVersion, isLoading: isLoadingPageVersion } = useQuery({
+        queryKey: ['pageVersion', pageId],
+        queryFn: async () => {
             return await pagesApi.versionCurrent(pageId)
         },
         enabled: !isNewPage
     })
 
+    // Combined loading state
+    const isLoading = isLoadingWebpage || isLoadingPageVersion
+
     // Add loading notifications for page data
     useEffect(() => {
         if (isLoading && !isNewPage) {
             addNotification(`Loading page data...`, 'info', 'page-load')
-        } else if (page && !isNewPage) {
-            addNotification(`Page "${page.title}" loaded successfully`, 'success', 'page-load')
+        } else if (webpage && pageVersion && !isNewPage) {
+            addNotification(`Page "${webpage.title}" loaded successfully`, 'success', 'page-load')
         }
-    }, [isLoading, page, isNewPage, addNotification])
-
-
+    }, [isLoading, webpage, pageVersion, isNewPage, addNotification])
 
     // Add notifications for tab navigation
     useEffect(() => {
@@ -263,23 +287,31 @@ const PageEditor = () => {
         }
     }, [isNewPage, pageId, addNotification])
 
-    // Set page data when loaded - initialize widgets array for new pages
+    // Process webpage data (WebPage model fields)
     useEffect(() => {
-        if (page && !isNewPage) {
-            setPageData(page)
-            setOriginalPageData(page) // Track original for smart saving
+        if (webpage && !isNewPage) {
+            setWebpageData(webpage)
+            setOriginalWebpageData(webpage) // Track original for smart saving
         }
-    }, [page, isNewPage])
+    }, [webpage, isNewPage])
+
+    // Process page version data (PageVersion model fields)
+    useEffect(() => {
+        if (pageVersion && !isNewPage) {
+            setPageVersionData(pageVersion)
+            setOriginalPageVersionData(pageVersion) // Track original for smart saving
+        }
+    }, [pageVersion, isNewPage])
 
     // Fetch layout data when page has a code_layout, with fallback support
     useEffect(() => {
-        if (!pageData) return;
+        if (!pageVersionData) return;
         if (!isVersionReady) return;
         const fetchLayoutData = async () => {
             setIsLoadingLayout(true)
 
             // Determine which layout to load
-            let layoutToLoad = pageData?.code_layout;
+            let layoutToLoad = pageVersionData?.code_layout;
             let isUsingFallback = false;
 
             if (!layoutToLoad) {
@@ -319,11 +351,11 @@ const PageEditor = () => {
             }
         }
 
-        // Only fetch if we have pageData (avoid loading on initial mount)
-        if (pageData) {
+        // Only fetch if we have pageVersionData (avoid loading on initial mount)
+        if (pageVersionData) {
             fetchLayoutData()
         }
-    }, [pageData?.code_layout, pageData?.id, isVersionReady, addNotification, showError])
+    }, [pageVersionData?.code_layout, webpageData?.id, isVersionReady, addNotification, showError])
 
 
     // Publish page mutation
@@ -335,7 +367,12 @@ const PageEditor = () => {
         },
         onSuccess: (updatedPage) => {
             addNotification('Page published successfully', 'success', 'page-publish')
-            setPageData(updatedPage)
+            // Update the appropriate data structure based on response
+            if (updatedPage.widgets) {
+                setPageVersionData(prev => ({ ...prev, ...updatedPage }))
+            } else {
+                setWebpageData(prev => ({ ...prev, ...updatedPage }))
+            }
             queryClient.invalidateQueries(['page', pageId])
             queryClient.invalidateQueries(['pages', 'root'])
         },
@@ -366,11 +403,11 @@ const PageEditor = () => {
 
     // Version management functions
     const loadVersions = useCallback(async () => {
-        if (!pageData?.id || isNewPage) {
+        if (!webpageData?.id || isNewPage) {
             return;
         }
         try {
-            const versionsData = await versionsApi.getPageVersionsList(pageData.id || pageId);
+            const versionsData = await versionsApi.getPageVersionsList(webpageData.id || pageId);
             setAvailableVersions(versionsData.versions || []);
 
             let targetVersion = null;
@@ -394,25 +431,24 @@ const PageEditor = () => {
 
             if (targetVersion) {
                 setCurrentVersion(targetVersion);
-                // Load the complete version data including widgets
-                const newPage = await versionsApi.getPageVersion(pageData.id || pageId, targetVersion.id);
-                setPageData(prev => {
-                    return { ...prev, ...newPage };
-                });
+                // Load the complete version data including widgets using raw API
+                const response = await api.get(endpoints.versions.pageVersionDetail(webpageData.id || pageId, targetVersion.id));
+                const newPage = response.data || response;
+                setPageVersionData(newPage);
             }
         } catch (error) {
             console.error('PageEditor: Error loading versions', error);
             showError('Failed to load page versions');
         }
-    }, [pageData?.id, isNewPage, versionFromUrl, location.pathname, navigate, previousView, showError]);
+    }, [webpageData?.id, isNewPage, versionFromUrl, location.pathname, navigate, previousView, showError]);
 
     // Load versions but preserve current version selection
     const loadVersionsPreserveCurrent = useCallback(async () => {
-        if (!pageData?.id || isNewPage) {
+        if (!webpageData?.id || isNewPage) {
             return;
         }
         try {
-            const versionsData = await versionsApi.getPageVersionsList(pageData.id || pageId);
+            const versionsData = await versionsApi.getPageVersionsList(webpageData.id || pageId);
             setAvailableVersions(versionsData.versions || []);
 
             // Only set current version if not already set
@@ -422,45 +458,73 @@ const PageEditor = () => {
                     return (current.version_number > latest.version_number) ? current : latest;
                 });
                 setCurrentVersion(lastSavedVersion);
-                // Load the complete version data including widgets
-                const newPage = await versionsApi.getPageVersion(pageData.id || pageId, lastSavedVersion.id);
-                setPageData(prev => {
-                    return { ...prev, ...newPage };
-                });
+                // Load the complete version data including widgets using raw API
+                const response = await api.get(endpoints.versions.pageVersionDetail(webpageData.id || pageId, lastSavedVersion.id));
+                const newPage = response.data || response;
+                setPageVersionData(newPage);
             } else if (currentVersion) {
-                // If we have a current version, reload the page data with that version
-                const newPage = await versionsApi.getPageVersion(pageData.id || pageId, currentVersion.id);
-                setPageData(prev => {
-                    return { ...prev, ...newPage };
-                });
+                // If we have a current version, reload the page data with that version using raw API
+                const response = await api.get(endpoints.versions.pageVersionDetail(webpageData.id || pageId, currentVersion.id));
+                const newPage = response.data || response;
+                setPageVersionData(newPage);
             }
         } catch (error) {
             console.error('PageEditor: Error loading versions', error);
             showError('Failed to load page versions');
         }
-    }, [pageData?.id, isNewPage, currentVersion, showError]);
+    }, [webpageData?.id, isNewPage, currentVersion, showError]);
 
     // Navigate to version timeline page
     const handleShowVersionTimeline = () => {
-        const timelineUrl = `/pages/${pageData?.id}/versions`;
+        const timelineUrl = `/pages/${webpageData?.id}/versions`;
         const versionParam = currentVersion ? `?currentVersion=${currentVersion.id}` : '';
         navigate(`${timelineUrl}${versionParam}`);
     }
 
-    // Handle page data updates
+    // Handle page data updates - route to appropriate data structure
     const updatePageData = (updates) => {
-        setPageData(prev => ({ ...prev, ...updates }))
+        // Define fields that belong to WebPage model (sync with PAGE_FIELDS in smartSaveUtils.js)
+        const webpageFields = [
+            'title', 'slug', 'description', 'parent', 'parent_id', 'sort_order',
+            'hostnames', 'enable_css_injection', 'page_css_variables', 'page_custom_css',
+            'meta_title', 'meta_description'
+        ]
+
+        // Separate updates into webpage and version updates
+        const webpageUpdates = {}
+        const versionUpdates = {}
+
+        Object.entries(updates).forEach(([key, value]) => {
+            if (webpageFields.includes(key)) {
+                webpageUpdates[key] = value
+            } else {
+                // Everything else goes to version data (widgets, code_layout, pageData, etc.)
+                versionUpdates[key] = value
+            }
+        })
+
+        // Apply updates to appropriate state
+        if (Object.keys(webpageUpdates).length > 0) {
+            setWebpageData(prev => ({ ...prev, ...webpageUpdates }))
+        }
+        if (Object.keys(versionUpdates).length > 0) {
+            setPageVersionData(prev => ({ ...prev, ...versionUpdates }))
+        }
+
         setIsDirty(true)
     }
 
     const switchToVersion = useCallback(async (versionId) => {
-        if (!versionId || !pageData?.id) return;
+        if (!versionId || !webpageData?.id) return;
         try {
-            const versionPageData = await versionsApi.getPageVersion(pageData.id || pageId, versionId);
+            // Use the raw API endpoint to get the proper data structure
+            const response = await api.get(endpoints.versions.pageVersionDetail(webpageData.id || pageId, versionId));
+            const versionPageData = response.data || response;
             const versionData = availableVersions.find(version => version.id === versionId);
             setCurrentVersion(versionData);
-            // Set the version data as pageData (already in flat structure from API)
-            setPageData(versionPageData);
+
+            // Set pageVersionData with the raw API response structure
+            setPageVersionData(versionPageData);
 
             // Update URL to include version parameter
             const currentPath = location.pathname;
@@ -471,19 +535,19 @@ const PageEditor = () => {
             if (!versionPageData.code_layout) {
                 addNotification({
                     type: 'warning',
-                    message: `Version ${versionPageData.version_number} has no layout. Using fallback layout for preview.`
+                    message: `Version ${versionData.version_number} has no layout. Using fallback layout for preview.`
                 });
             }
 
             addNotification({
                 type: 'info',
-                message: `Switched to version ${versionPageData.version_number}`
+                message: `Switched to version ${versionData.version_number}`
             });
         } catch (error) {
             console.error('PageEditor: Error switching to version', error);
             showError(`Failed to load version: ${error.message}`);
         }
-    }, [pageData, availableVersions, showError, addNotification, location.pathname, navigate, buildUrlWithVersion, previousView]);
+    }, [webpageData, availableVersions, showError, addNotification, location.pathname, navigate, buildUrlWithVersion, previousView]);
 
     // Load versions when page data is available
     useEffect(() => {
@@ -504,8 +568,8 @@ const PageEditor = () => {
             // Collect all data from editors (no saving yet)
             const collectedData = {};
 
-            // Collect current widget data (from pageData) and any unsaved changes from ContentEditor
-            collectedData.widgets = pageData.widgets || [];
+            // Collect current widget data (from pageVersionData) and any unsaved changes from ContentEditor
+            collectedData.widgets = pageVersionData?.widgets || {};
             if (contentEditorRef.current && contentEditorRef.current.saveWidgets) {
                 try {
                     const widgetResult = await contentEditorRef.current.saveWidgets({
@@ -542,39 +606,48 @@ const PageEditor = () => {
                 }
             }
 
-            // Combine all current page data (settings + metadata)
-            const currentData = {
-                ...pageData,
+            // Prepare data for smart save
+            const currentWebpageDataForSave = {
+                ...webpageData,
                 ...collectedData.settings,
                 ...collectedData.metadata
             };
 
-            // Use smart save to determine what to save
+            const currentVersionDataForSave = {
+                ...pageVersionData,
+                widgets: collectedData.widgets
+            };
+
+
+
+            // Use smart save with separated data
             const saveResult = await smartSave(
-                originalPageData || {},  // Original data for comparison
-                currentData,             // Current data
-                collectedData.widgets,   // Current widgets
-                { pagesApi, versionsApi }, // API functions
+                originalWebpageData || {},      // Original webpage data
+                currentWebpageDataForSave,      // Current webpage data
+                originalPageVersionData || {},  // Original version data
+                currentVersionDataForSave,      // Current version data
+                { pagesApi, versionsApi },      // API functions
                 {
                     description: saveOptions.description || 'Auto-save',
                     forceNewVersion: saveOptions.option === 'new'
                 }
             );
 
-            console.log('💾 Smart Save Result:', saveResult);
+
 
             // Update UI based on what was saved
-            let updatedPageData = currentData;
+            let updatedWebpageData = currentWebpageDataForSave;
+            let updatedVersionData = currentVersionDataForSave;
 
             if (saveResult.pageResult) {
-                // Page was updated - use the response
-                updatedPageData = { ...updatedPageData, ...saveResult.pageResult };
+                // Page was updated - merge the response into webpage data
+                updatedWebpageData = { ...updatedWebpageData, ...saveResult.pageResult };
             }
 
             if (saveResult.versionResult) {
                 // New version was created - use the version data
-                updatedPageData = {
-                    ...updatedPageData,
+                updatedVersionData = {
+                    ...updatedVersionData,
                     ...saveResult.versionResult,
                     widgets: collectedData.widgets // Preserve collected widgets
                 };
@@ -583,9 +656,11 @@ const PageEditor = () => {
                 setCurrentVersion(saveResult.versionResult);
             }
 
-            // Update page data and mark as clean
-            setPageData(updatedPageData);
-            setOriginalPageData(updatedPageData); // Update original for next comparison
+            // Update separated data states and mark as clean
+            setWebpageData(updatedWebpageData);
+            setPageVersionData(updatedVersionData);
+            setOriginalWebpageData(updatedWebpageData); // Update original for next comparison
+            setOriginalPageVersionData(updatedVersionData); // Update original for next comparison
             setIsDirty(false);
 
             // Clear To-Do items on success
@@ -613,7 +688,7 @@ const PageEditor = () => {
             }
 
             // Invalidate queries to refresh data
-            queryClient.invalidateQueries(['page', pageData.id || pageId]);
+            queryClient.invalidateQueries(['page', webpageData?.id || pageId]);
             queryClient.invalidateQueries(['pages', 'root']);
 
         } catch (error) {
@@ -633,7 +708,7 @@ const PageEditor = () => {
                 }
             }
         }
-    }, [addNotification, showError, pageData, originalPageData, queryClient, loadVersionsPreserveCurrent, currentVersion]);
+    }, [addNotification, showError, webpageData, pageVersionData, originalWebpageData, originalPageVersionData, queryClient, loadVersionsPreserveCurrent, currentVersion]);
 
     // Smart save - analyze changes first, then show modal only if needed
     const handleSaveFromStatusBar = useCallback(async () => {
@@ -651,7 +726,7 @@ const PageEditor = () => {
             const collectedData = {};
 
             // Collect current widget data
-            collectedData.widgets = pageData.widgets || [];
+            collectedData.widgets = pageVersionData?.widgets || {};
             if (contentEditorRef.current && contentEditorRef.current.saveWidgets) {
                 try {
                     const widgetResult = await contentEditorRef.current.saveWidgets({
@@ -687,29 +762,33 @@ const PageEditor = () => {
                 }
             }
 
-            // Combine current data
-            const currentData = {
-                ...pageData,
+            // Prepare data for save analysis
+            const currentWebpageDataForSave = {
+                ...webpageData,
                 ...collectedData.settings,
                 ...collectedData.metadata
             };
 
-            // Analyze what changed
-            const changes = analyzeChanges(originalPageData || {}, currentData, collectedData.widgets);
+            const currentVersionDataForSave = {
+                ...pageVersionData,
+                widgets: collectedData.widgets
+            };
+
+            // Analyze what changed using separated data
+            const changes = analyzeChanges(
+                originalWebpageData || {},
+                currentWebpageDataForSave,
+                originalPageVersionData || {},
+                currentVersionDataForSave
+            );
             const strategy = determineSaveStrategy(changes);
 
-            console.log('🔍 Save Analysis:', {
-                strategy: strategy.strategy,
-                hasPageChanges: changes.hasPageChanges,
-                hasVersionChanges: changes.hasVersionChanges,
-                pageFields: Object.keys(changes.pageFields),
-                versionFields: Object.keys(changes.versionFields)
-            });
+
 
             // Decision logic: Show modal only if version changes detected
             if (strategy.strategy === 'page-only') {
                 // Only page changes - save directly without modal
-                console.log('🚀 Page-only changes detected - saving directly');
+
                 await handleActualSave({ description: 'Page attributes updated' });
             } else if (strategy.strategy === 'none') {
                 // No changes - just show notification
@@ -719,7 +798,7 @@ const PageEditor = () => {
                 });
             } else {
                 // Version changes detected - show modal for user to choose options
-                console.log('📝 Version changes detected - showing save options modal');
+
                 setShowSaveOptionsModal(true);
             }
 
@@ -730,7 +809,7 @@ const PageEditor = () => {
                 message: `Save analysis failed: ${error.message}`
             });
         }
-    }, [errorTodoItems, addNotification, pageData, originalPageData, contentEditorRef, settingsEditorRef, metadataEditorRef, handleActualSave]);
+    }, [errorTodoItems, addNotification, webpageData, pageVersionData, originalWebpageData, originalPageVersionData, contentEditorRef, settingsEditorRef, metadataEditorRef, handleActualSave]);
 
     // Handle save options from modal
     const handleSaveOptions = useCallback(async (saveOptions) => {
@@ -803,6 +882,8 @@ const PageEditor = () => {
         )
     }
 
+
+
     return (
         <div className="fixed inset-0 bg-gray-50 z-50 flex flex-col">
             {/* Top Menu Bar */}
@@ -824,10 +905,10 @@ const PageEditor = () => {
 
                             <div>
                                 <h1 className="text-lg font-semibold text-gray-900 truncate">
-                                    {isNewPage ? 'New Page' : (pageData?.title || 'Untitled Page')}
+                                    {isNewPage ? 'New Page' : (webpageData?.title || 'Untitled Page')}
                                 </h1>
                                 <p className="text-sm text-gray-500">
-                                    /{isNewPage ? 'new-page-slug' : (pageData?.slug || 'page-slug')}
+                                    /{isNewPage ? 'new-page-slug' : (webpageData?.slug || 'page-slug')}
                                 </p>
                             </div>
                         </div>
@@ -926,7 +1007,7 @@ const PageEditor = () => {
                                 ) : (
                                     <>
                                         {/* Layout fallback warning */}
-                                        {!pageData?.code_layout && (
+                                        {!pageVersionData?.code_layout && (
                                             <div className="bg-amber-50 border-l-4 border-amber-400 p-4 mb-4">
                                                 <div className="flex">
                                                     <div className="flex-shrink-0">
@@ -951,9 +1032,10 @@ const PageEditor = () => {
                                             </div>
                                         ) : (
                                             <ContentEditor
-                                                key={`${pageData?.id}-${pageData?.version_id || 'current'}`}
+                                                key={`${webpageData?.id}-${pageVersionData?.version_id || 'current'}`}
                                                 ref={contentEditorRef}
-                                                pageData={pageData}
+                                                webpageData={webpageData}
+                                                pageVersionData={pageVersionData}
                                                 onUpdate={updatePageData}
                                                 isNewPage={isNewPage}
                                                 layoutJson={layoutData}
@@ -969,28 +1051,29 @@ const PageEditor = () => {
                         )}
                         {activeTab === 'settings' && (
                             <SettingsEditor
-                                key={`settings-${pageData?.version_id || 'new'}`}
+                                key={`settings-${pageVersionData?.version_id || 'new'}`}
                                 ref={settingsEditorRef}
-                                pageData={pageData}
+                                webpageData={webpageData}
+                                pageVersionData={pageVersionData}
                                 onUpdate={updatePageData}
                                 isNewPage={isNewPage}
                             />
                         )}
                         {activeTab === 'metadata' && (
                             <MetadataEditor
-                                key={`metadata-${pageData?.version_id || 'new'}`}
+                                key={`metadata-${pageVersionData?.version_id || 'new'}`}
                                 ref={metadataEditorRef}
-                                pageData={pageData}
+                                webpageData={webpageData}
                                 onUpdate={updatePageData}
                                 isNewPage={isNewPage}
                             />
                         )}
                         {activeTab === 'data' && (
                             <SchemaDrivenForm
-                                key={`data-${pageData?.version_id || 'new'}`}
-                                pageData={pageData}
-                                codeLayout={pageData?.code_layout}
-                                onChange={(data) => updatePageData({ ...pageData, ...data })}
+                                key={`data-${pageVersionData?.version_id || 'new'}`}
+                                pageData={pageVersionData?.pageData}
+                                codeLayout={pageVersionData?.code_layout}
+                                onChange={(data) => updatePageData({ pageData: data })}
                             />
                         )}
                         {activeTab === 'preview' && (
@@ -1004,7 +1087,8 @@ const PageEditor = () => {
                                     </div>
                                 ) : (
                                     <PagePreview
-                                        pageData={pageData}
+                                        webpageData={webpageData}
+                                        pageVersionData={pageVersionData}
                                         isLoadingLayout={isLoadingLayout}
                                         layoutData={layoutData}
                                     />
@@ -1034,15 +1118,16 @@ const PageEditor = () => {
                 onSaveClick={handleSaveFromStatusBar}
                 onAutoSaveToggle={handleAutoSaveToggle}
                 autoSaveEnabled={autoSaveEnabled}
-                pageData={pageData}
+                webpageData={webpageData}
+                pageVersionData={pageVersionData}
                 customStatusContent={
                     <div className="flex items-center space-x-4">
                         <span>
-                            Status: <span className={`font-medium ${pageData?.publication_status === 'published' ? 'text-green-600' :
-                                pageData?.publication_status === 'scheduled' ? 'text-blue-600' :
+                            Status: <span className={`font-medium ${pageVersionData?.publication_status === 'published' ? 'text-green-600' :
+                                pageVersionData?.publication_status === 'scheduled' ? 'text-blue-600' :
                                     'text-gray-600'
                                 }`}>
-                                {pageData?.publication_status || 'unpublished'}
+                                {pageVersionData?.publication_status || 'unpublished'}
                             </span>
                         </span>
 
@@ -1056,9 +1141,9 @@ const PageEditor = () => {
                             </button>
                         )}
 
-                        {pageData?.last_modified && (
+                        {webpageData?.last_modified && (
                             <span>
-                                Last modified: {new Date(pageData.last_modified).toLocaleString()}
+                                Last modified: {new Date(webpageData.last_modified).toLocaleString()}
                             </span>
                         )}
                     </div>
@@ -1078,17 +1163,27 @@ const PageEditor = () => {
 }
 
 // Settings Editor Tab
-const SettingsEditor = forwardRef(({ pageData, onUpdate, isNewPage }, ref) => {
+const SettingsEditor = forwardRef(({ webpageData, pageVersionData, onUpdate, isNewPage }, ref) => {
     // Expose save method to parent
     useImperativeHandle(ref, () => ({
         saveSettings: async () => {
             // Settings are already saved in real-time via onUpdate
             // This method confirms the current state is saved
+            // Settings are primarily WebPage fields, but code_layout is a PageVersion field
             const currentSettings = {
-                title: pageData?.title || '',
-                slug: pageData?.slug || '',
-                code_layout: pageData?.code_layout || '',
-                publication_status: pageData?.publication_status || 'unpublished'
+                // WebPage fields
+                title: webpageData?.title || '',
+                slug: webpageData?.slug || '',
+                description: webpageData?.description || '',
+                parent: webpageData?.parent,
+                parent_id: webpageData?.parent_id,
+                sort_order: webpageData?.sort_order,
+                hostnames: webpageData?.hostnames || [],
+                enable_css_injection: webpageData?.enable_css_injection || false,
+                page_css_variables: webpageData?.page_css_variables || {},
+                page_custom_css: webpageData?.page_custom_css || '',
+                // PageVersion field (code_layout affects version content)
+                code_layout: pageVersionData?.code_layout || ''
             };
 
             return {
@@ -1098,7 +1193,7 @@ const SettingsEditor = forwardRef(({ pageData, onUpdate, isNewPage }, ref) => {
                 timestamp: new Date().toISOString()
             };
         }
-    }), [pageData]);
+    }), [webpageData, pageVersionData]);
 
     return (
         <div className="h-full p-6 overflow-y-auto">
@@ -1113,7 +1208,7 @@ const SettingsEditor = forwardRef(({ pageData, onUpdate, isNewPage }, ref) => {
                             </label>
                             <input
                                 type="text"
-                                value={pageData?.title || ''}
+                                value={webpageData?.title || ''}
                                 onChange={(e) => onUpdate({ title: e.target.value })}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 placeholder="Enter page title"
@@ -1126,7 +1221,7 @@ const SettingsEditor = forwardRef(({ pageData, onUpdate, isNewPage }, ref) => {
                             </label>
                             <input
                                 type="text"
-                                value={pageData?.slug || ''}
+                                value={webpageData?.slug || ''}
                                 onChange={(e) => onUpdate({ slug: e.target.value })}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 placeholder="page-url-slug"
@@ -1136,7 +1231,7 @@ const SettingsEditor = forwardRef(({ pageData, onUpdate, isNewPage }, ref) => {
                         {/* Page Layout Selection */}
                         <div>
                             <LayoutSelector
-                                value={pageData?.code_layout || ''}
+                                value={pageVersionData?.code_layout || ''}
                                 onChange={(layout) => onUpdate({ code_layout: layout })}
                                 label="Page Layout"
                                 description="Choose the layout template for this page"
@@ -1155,16 +1250,18 @@ const SettingsEditor = forwardRef(({ pageData, onUpdate, isNewPage }, ref) => {
 SettingsEditor.displayName = 'SettingsEditor';
 
 // Metadata Editor Tab
-const MetadataEditor = forwardRef(({ pageData, onUpdate, isNewPage }, ref) => {
+const MetadataEditor = forwardRef(({ webpageData, onUpdate, isNewPage }, ref) => {
     // Expose save method to parent
     useImperativeHandle(ref, () => ({
         saveMetadata: async () => {
             // Metadata is already saved in real-time via onUpdate
             // This method confirms the current state is saved
+            // Note: meta_title and meta_description are WebPage fields, 
+            // but hostnames is already handled in settings
             const currentMetadata = {
-                meta_title: pageData?.meta_title || pageData?.title || '',
-                meta_description: pageData?.meta_description || '',
-                hostnames: pageData?.hostnames || []
+                meta_title: webpageData?.meta_title || webpageData?.title || '',
+                meta_description: webpageData?.meta_description || ''
+                // hostnames are handled in settings, not duplicated here
             };
 
             return {
@@ -1174,7 +1271,7 @@ const MetadataEditor = forwardRef(({ pageData, onUpdate, isNewPage }, ref) => {
                 timestamp: new Date().toISOString()
             };
         }
-    }), [pageData]);
+    }), [webpageData]);
 
     return (
         <div className="h-full p-6 overflow-y-auto">
@@ -1189,7 +1286,7 @@ const MetadataEditor = forwardRef(({ pageData, onUpdate, isNewPage }, ref) => {
                             </label>
                             <input
                                 type="text"
-                                value={pageData?.meta_title || pageData?.title || ''}
+                                value={webpageData?.meta_title || webpageData?.title || ''}
                                 onChange={(e) => onUpdate({ meta_title: e.target.value })}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 placeholder="SEO title for search engines"
@@ -1201,7 +1298,7 @@ const MetadataEditor = forwardRef(({ pageData, onUpdate, isNewPage }, ref) => {
                                 Meta Description
                             </label>
                             <textarea
-                                value={pageData?.meta_description || ''}
+                                value={webpageData?.meta_description || ''}
                                 onChange={(e) => onUpdate({ meta_description: e.target.value })}
                                 rows={3}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -1215,7 +1312,7 @@ const MetadataEditor = forwardRef(({ pageData, onUpdate, isNewPage }, ref) => {
                             </label>
                             <input
                                 type="text"
-                                value={pageData?.hostnames?.join(', ') || ''}
+                                value={webpageData?.hostnames?.join(', ') || ''}
                                 onChange={(e) => onUpdate({
                                     hostnames: e.target.value.split(',').map(h => h.trim()).filter(h => h)
                                 })}
@@ -1237,7 +1334,7 @@ const MetadataEditor = forwardRef(({ pageData, onUpdate, isNewPage }, ref) => {
 MetadataEditor.displayName = 'MetadataEditor';
 
 // Preview component that renders actual page content without editing controls
-const PagePreview = ({ pageData, isLoadingLayout, layoutData }) => {
+const PagePreview = ({ webpageData, pageVersionData, isLoadingLayout, layoutData }) => {
     const [viewportSize, setViewportSize] = useState('desktop');
 
     // Viewport configurations with realistic device dimensions
@@ -1247,7 +1344,7 @@ const PagePreview = ({ pageData, isLoadingLayout, layoutData }) => {
         mobile: { width: '390px', height: '844px', label: 'iPhone 14', icon: '📱' }
     };
 
-    if (!pageData) {
+    if (!webpageData || !pageVersionData) {
         return (
             <div className="h-full flex items-center justify-center bg-gray-50">
                 <div className="text-center text-gray-500">
@@ -1258,7 +1355,7 @@ const PagePreview = ({ pageData, isLoadingLayout, layoutData }) => {
         );
     }
 
-    if (!pageData.code_layout) {
+    if (!pageVersionData.code_layout) {
         return (
             <div className="h-full flex items-center justify-center bg-gray-50">
                 <div className="text-center text-gray-500">
@@ -1284,13 +1381,13 @@ const PagePreview = ({ pageData, isLoadingLayout, layoutData }) => {
     }
 
     // Show error state if layout data failed to load
-    if (!layoutData && pageData.code_layout) {
+    if (!layoutData && pageVersionData.code_layout) {
         return (
             <div className="h-full bg-gray-50 overflow-auto">
                 <div className="h-full p-4 flex items-center justify-center">
                     <div className="text-center text-red-500">
                         <p className="text-lg">Preview unavailable</p>
-                        <p className="text-sm">Failed to load layout: {pageData.code_layout}</p>
+                        <p className="text-sm">Failed to load layout: {pageVersionData.code_layout}</p>
                     </div>
                 </div>
             </div>
@@ -1337,9 +1434,10 @@ const PagePreview = ({ pageData, isLoadingLayout, layoutData }) => {
                     <div className="h-full p-4">
                         <div className="bg-white shadow-lg rounded-lg w-full h-full overflow-auto">
                             <ContentEditor
-                                key={`preview-${pageData?.id}-${pageData?.version_id || 'current'}`}
+                                key={`preview-${webpageData?.id}-${pageVersionData?.version_id || 'current'}`}
                                 layoutJson={layoutData}
-                                pageData={pageData}
+                                webpageData={webpageData}
+                                pageVersionData={pageVersionData}
                                 editable={false}
                                 className="h-full preview-mode"
                             />
@@ -1380,9 +1478,10 @@ const PagePreview = ({ pageData, isLoadingLayout, layoutData }) => {
                                     {/* Device content area with natural scrolling */}
                                     <div className="w-full">
                                         <ContentEditor
-                                            key={`mobile-preview-${pageData?.id}-${pageData?.version_id || 'current'}`}
+                                            key={`mobile-preview-${webpageData?.id}-${pageVersionData?.version_id || 'current'}`}
                                             layoutJson={layoutData}
-                                            pageData={pageData}
+                                            webpageData={webpageData}
+                                            pageVersionData={pageVersionData}
                                             editable={false}
                                             className="preview-mode device-content"
                                             style={{

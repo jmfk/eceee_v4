@@ -8,20 +8,22 @@
 // Fields that belong to the WebPage model (save via pages API)
 const PAGE_FIELDS = new Set([
     'title',
-    'description', 
+    'description',
     'slug',
     'parent',
     'parent_id',
     'sort_order',
     'hostnames',
     'enable_css_injection',
-    'page_css_variables', 
-    'page_custom_css'
+    'page_css_variables',
+    'page_custom_css',
+    'meta_title',
+    'meta_description'
 ]);
 
 // Fields that belong to the PageVersion model (save via versions API)
 const VERSION_FIELDS = new Set([
-    'page_data',
+    'pageData',
     'widgets',
     'code_layout',
     'theme',
@@ -35,7 +37,7 @@ const VERSION_FIELDS = new Set([
 // Fields that are metadata/computed (don't save)
 const METADATA_FIELDS = new Set([
     'id',
-    'version_id', 
+    'version_id',
     'version_number',
     'created_at',
     'updated_at',
@@ -51,12 +53,13 @@ const METADATA_FIELDS = new Set([
 
 /**
  * Analyze what has changed between original and current data
- * @param {Object} originalData - Original page/version data
- * @param {Object} currentData - Current page/version data  
- * @param {Array} currentWidgets - Current widgets data
+ * @param {Object} originalWebpageData - Original webpage data
+ * @param {Object} currentWebpageData - Current webpage data
+ * @param {Object} originalPageVersionData - Original page version data
+ * @param {Object} currentPageVersionData - Current page version data
  * @returns {Object} Analysis of what changed
  */
-export function analyzeChanges(originalData = {}, currentData = {}, currentWidgets = null) {
+export function analyzeChanges(originalWebpageData = {}, currentWebpageData = {}, originalPageVersionData = {}, currentPageVersionData = {}) {
     const changes = {
         pageFields: {},
         versionFields: {},
@@ -65,54 +68,50 @@ export function analyzeChanges(originalData = {}, currentData = {}, currentWidge
         changedFieldNames: []
     };
 
-    // Check page field changes
+
+
+    // Check webpage field changes
     for (const field of PAGE_FIELDS) {
-        if (originalData[field] !== currentData[field]) {
+        if (originalWebpageData[field] !== currentWebpageData[field]) {
             // Handle special cases for deep comparison
             if (field === 'hostnames' || field === 'page_css_variables') {
-                if (JSON.stringify(originalData[field]) !== JSON.stringify(currentData[field])) {
-                    changes.pageFields[field] = currentData[field];
+                if (JSON.stringify(originalWebpageData[field]) !== JSON.stringify(currentWebpageData[field])) {
+                    changes.pageFields[field] = currentWebpageData[field];
                     changes.hasPageChanges = true;
                     changes.changedFieldNames.push(field);
                 }
             } else {
-                changes.pageFields[field] = currentData[field];
+                changes.pageFields[field] = currentWebpageData[field];
                 changes.hasPageChanges = true;
                 changes.changedFieldNames.push(field);
             }
         }
     }
 
-    // Check version field changes  
+    // Check page version field changes  
     for (const field of VERSION_FIELDS) {
         if (field === 'widgets') {
-            // Special handling for widgets - compare with provided currentWidgets
-            if (currentWidgets !== null) {
-                const originalWidgets = originalData.widgets || {};
-                if (JSON.stringify(originalWidgets) !== JSON.stringify(currentWidgets)) {
-                    changes.versionFields.widgets = currentWidgets;
-                    changes.hasVersionChanges = true;
-                    changes.changedFieldNames.push('widgets');
-                }
-            }
-        } else if (field === 'page_data') {
-            // Build page_data from non-page fields in currentData
-            const pageDataFields = {};
-            Object.entries(currentData).forEach(([key, value]) => {
-                if (!PAGE_FIELDS.has(key) && !VERSION_FIELDS.has(key) && !METADATA_FIELDS.has(key)) {
-                    pageDataFields[key] = value;
-                }
-            });
-            
-            const originalPageData = originalData.page_data || {};
-            if (JSON.stringify(originalPageData) !== JSON.stringify(pageDataFields)) {
-                changes.versionFields.page_data = pageDataFields;
+            // Special handling for widgets - compare widgets from version data
+            const originalWidgets = originalPageVersionData.widgets || {};
+            const currentWidgets = currentPageVersionData.widgets || {};
+            if (JSON.stringify(originalWidgets) !== JSON.stringify(currentWidgets)) {
+                changes.versionFields.widgets = currentWidgets;
                 changes.hasVersionChanges = true;
-                changes.changedFieldNames.push('page_data');
+                changes.changedFieldNames.push('widgets');
+            }
+        } else if (field === 'pageData') {
+            // pageData is a specific field in PageVersion model containing form data
+            const originalFormData = originalPageVersionData.pageData || {};
+            const currentFormData = currentPageVersionData.pageData || {};
+            if (JSON.stringify(originalFormData) !== JSON.stringify(currentFormData)) {
+                changes.versionFields.pageData = currentFormData;
+                changes.hasVersionChanges = true;
+                changes.changedFieldNames.push('pageData');
             }
         } else {
-            if (originalData[field] !== currentData[field]) {
-                changes.versionFields[field] = currentData[field];
+            // Compare other version fields directly
+            if (originalPageVersionData[field] !== currentPageVersionData[field]) {
+                changes.versionFields[field] = currentPageVersionData[field];
                 changes.hasVersionChanges = true;
                 changes.changedFieldNames.push(field);
             }
@@ -146,7 +145,7 @@ export function determineSaveStrategy(changes) {
         };
     } else if (!hasPageChanges && hasVersionChanges) {
         return {
-            strategy: 'version-only', 
+            strategy: 'version-only',
             description: 'Create new version (page attributes unchanged)',
             needsPageSave: false,
             needsVersionSave: true
@@ -174,16 +173,16 @@ export function generateChangeSummary(changes) {
     }
 
     const pageChanges = changedFieldNames.filter(field => PAGE_FIELDS.has(field));
-    const versionChanges = changedFieldNames.filter(field => 
+    const versionChanges = changedFieldNames.filter(field =>
         VERSION_FIELDS.has(field) || (!PAGE_FIELDS.has(field) && !METADATA_FIELDS.has(field))
     );
 
     const parts = [];
-    
+
     if (pageChanges.length > 0) {
         parts.push(`Page: ${pageChanges.join(', ')}`);
     }
-    
+
     if (versionChanges.length > 0) {
         parts.push(`Content: ${versionChanges.join(', ')}`);
     }
@@ -193,28 +192,24 @@ export function generateChangeSummary(changes) {
 
 /**
  * Smart save function that uses the appropriate API based on what changed
- * @param {Object} originalData - Original page/version data
- * @param {Object} currentData - Current page/version data
- * @param {Array} currentWidgets - Current widgets data
+ * @param {Object} originalWebpageData - Original webpage data
+ * @param {Object} currentWebpageData - Current webpage data
+ * @param {Object} originalPageVersionData - Original page version data
+ * @param {Object} currentPageVersionData - Current page version data
  * @param {Object} apis - API functions { pagesApi, versionsApi }
  * @param {Object} options - Save options
  * @returns {Promise<Object>} Save result
  */
-export async function smartSave(originalData, currentData, currentWidgets, apis, options = {}) {
+export async function smartSave(originalWebpageData, currentWebpageData, originalPageVersionData, currentPageVersionData, apis, options = {}) {
     const { pagesApi, versionsApi } = apis;
-    const pageId = currentData.id || originalData.id;
-    const versionId = currentData.version_id || originalData.version_id;
+    const pageId = currentWebpageData.id || originalWebpageData.id;
+    const versionId = currentPageVersionData.version_id || originalPageVersionData.version_id;
 
     // Analyze what changed
-    const changes = analyzeChanges(originalData, currentData, currentWidgets);
+    const changes = analyzeChanges(originalWebpageData, currentWebpageData, originalPageVersionData, currentPageVersionData);
     const strategy = determineSaveStrategy(changes);
 
-    console.log('🔍 Smart Save Analysis:', {
-        strategy: strategy.strategy,
-        pageChanges: changes.pageFields,
-        versionChanges: changes.versionFields,
-        summary: generateChangeSummary(changes)
-    });
+
 
     // Force strategy override if user explicitly requests new version
     if (options.forceNewVersion) {
@@ -239,32 +234,32 @@ export async function smartSave(originalData, currentData, currentWidgets, apis,
     try {
         // Execute saves based on strategy
         if (strategy.strategy === 'page-only') {
-            console.log('💾 Saving page attributes only...');
+
             results.pageResult = await pagesApi.update(pageId, changes.pageFields);
-            
+
         } else if (strategy.strategy === 'version-only') {
-            console.log('📝 Creating new version only...');
+
             const versionData = {
                 ...changes.versionFields,
                 version_title: options.description || 'Content updated'
             };
             results.versionResult = await versionsApi.create(pageId, versionData);
-            
+
         } else if (strategy.strategy === 'both') {
-            console.log('💾📝 Saving page attributes and creating new version...');
-            
+
+
             // Save page first
             results.pageResult = await pagesApi.update(pageId, changes.pageFields);
-            
+
             // Then create new version  
             const versionData = {
                 ...changes.versionFields,
                 version_title: options.description || 'Page and content updated'
             };
             results.versionResult = await versionsApi.create(pageId, versionData);
-            
+
         } else {
-            console.log('⚡ No changes detected - skipping save');
+
         }
 
         return results;

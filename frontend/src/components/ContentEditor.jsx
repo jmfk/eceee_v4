@@ -16,7 +16,8 @@ const ContentEditor = forwardRef(({
   onSlotClick,
   onDirtyChange,
   className = '',
-  pageData,
+  webpageData,
+  pageVersionData,
   onUpdate,
   isNewPage
 }, ref) => {
@@ -32,9 +33,17 @@ const ContentEditor = forwardRef(({
   // Get notification context for confirmation dialogs
   const { showConfirm } = useNotificationContext();
 
+  // Get current widgets from pageVersionData (only source of widgets)
+  const currentWidgets = useMemo(() => {
+    return pageVersionData?.widgets || {};
+  }, [pageVersionData?.widgets]);
+
+  // Get page ID from webpageData (the main page record)
+  const pageId = webpageData?.id;
+
   // Early return if critical props are missing
-  if (pageData === undefined) {
-    console.warn("ContentEditor: pageData is undefined - component may not render properly");
+  if (!webpageData && !pageVersionData) {
+    console.warn("ContentEditor: No valid page data provided - component may not render properly");
   }
 
   // Create a widget DOM element with proper memory management
@@ -177,22 +186,25 @@ const ContentEditor = forwardRef(({
 
 
 
-  // Initialize version management when pageData is available
+  // Initialize version management when webpageData is available
   useEffect(() => {
-    if (!layoutRenderer || !pageData?.id || isNewPage || pageData === null) {
+    if (!layoutRenderer || !pageId || isNewPage) {
       return;
     }
 
-    // Initialize version management
-    layoutRenderer.initializeVersionManagement(pageData.id, null);
+    // Initialize version management using webpage ID
+    layoutRenderer.initializeVersionManagement(pageId, null);
 
     // Set up version callbacks
     layoutRenderer.setVersionCallback('version-changed', (versionData) => {
       // Optionally notify parent component about version change
-      if (onUpdate && pageData) {
+      if (onUpdate) {
         onUpdate({
-          ...pageData,
-          currentVersion: versionData
+          webpageData,
+          pageVersionData: {
+            ...pageVersionData,
+            currentVersion: versionData
+          }
         });
       }
     });
@@ -202,7 +214,7 @@ const ContentEditor = forwardRef(({
       setError(errorMessage);
     });
 
-  }, [layoutRenderer, pageData?.id, isNewPage, onUpdate, pageData]);
+  }, [layoutRenderer, pageId, isNewPage, onUpdate, webpageData, pageVersionData]);
 
 
   // Set up dirty state communication with LayoutRenderer
@@ -221,13 +233,12 @@ const ContentEditor = forwardRef(({
     // NEW: Set up widget data change callbacks for single source of truth
     layoutRenderer.setWidgetDataCallbacks({
       widgetDataChanged: (action, slotName, widgetData) => {
-        if (!onUpdate || !pageData) {
-          console.warn('ContentEditor: Cannot update widget data - missing onUpdate callback or pageData');
+        if (!onUpdate) {
+          console.warn('ContentEditor: Cannot update widget data - missing onUpdate callback');
           return;
         }
 
-        // Create updated pageData with modified widgets
-        const currentWidgets = pageData.widgets || {};
+        // Create updated widgets from current state
         let updatedWidgets = { ...currentWidgets };
 
         switch (action) {
@@ -256,7 +267,6 @@ const ContentEditor = forwardRef(({
 
           case WIDGET_ACTIONS.UPDATE:
             // Update existing widget in slot
-
             if (updatedWidgets[slotName]) {
               updatedWidgets[slotName] = updatedWidgets[slotName].map(
                 widget => widget.id === widgetData.id ? widgetData : widget
@@ -278,10 +288,13 @@ const ContentEditor = forwardRef(({
             return;
         }
 
-        // Update pageData through parent component
+        // Update pageVersionData with new widgets through parent component
         onUpdate({
-          ...pageData,
-          widgets: updatedWidgets
+          webpageData,
+          pageVersionData: {
+            ...pageVersionData,
+            widgets: updatedWidgets
+          }
         });
 
         // Mark as dirty since widgets changed
@@ -291,7 +304,7 @@ const ContentEditor = forwardRef(({
       }
     });
 
-  }, [layoutRenderer, onDirtyChange, onUpdate, pageData]);
+  }, [layoutRenderer, onDirtyChange, onUpdate, currentWidgets, webpageData, pageVersionData]);
 
   // Cleanup function for event listeners
   const cleanupEventListeners = useCallback(() => {
@@ -421,10 +434,10 @@ const ContentEditor = forwardRef(({
 
   // Update widgets when widgets prop changes (with proper React state management)
   const widgetsRef = useRef(null);
-  const widgetsJsonString = JSON.stringify(pageData?.widgets);
+  const widgetsJsonString = JSON.stringify(currentWidgets);
 
   useEffect(() => {
-    if (!layoutRenderer || !pageData?.widgets) {
+    if (!layoutRenderer || !currentWidgets) {
       return;
     }
 
@@ -435,8 +448,8 @@ const ContentEditor = forwardRef(({
 
     widgetsRef.current = widgetsJsonString;
 
-    // Add fallback test widgets if no widgets data exists
-    let widgetsToLoad = pageData?.widgets;
+    // Use current widgets directly
+    let widgetsToLoad = currentWidgets;
 
     // Use React's scheduling to batch widget updates
     const updateSlots = () => {
@@ -458,7 +471,7 @@ const ContentEditor = forwardRef(({
     return () => {
       clearTimeout(timeoutId);
     };
-  }, [widgetsJsonString, layoutRenderer]);
+  }, [widgetsJsonString, layoutRenderer, currentWidgets]);
 
   // Inject CSS styles for slot interactivity with proper cleanup
   useEffect(() => {
@@ -584,23 +597,22 @@ const ContentEditor = forwardRef(({
     };
   }, [cleanupEventListeners]);
 
-  // NEW: Return current widget data from pageData (single source of truth)
+  // NEW: Return current widget data from currentWidgets (single source of truth)
   const saveWidgets = useCallback((options = {}) => {
 
-    if (!pageData?.widgets) {
-      console.warn("⚠️ SAVE SIGNAL: pageData.widgets not available");
+    if (!currentWidgets) {
+      console.warn("⚠️ SAVE SIGNAL: currentWidgets not available");
       return {};
     }
 
     try {
-      // Simply return the current pageData.widgets - no DOM collection needed
-      const currentWidgets = pageData.widgets;
+      // Simply return the current widgets - no DOM collection needed
       return currentWidgets;
     } catch (error) {
       console.error("❌ SAVE SIGNAL: ContentEditor save failed", error);
       throw error;
     }
-  }, [pageData?.widgets]);
+  }, [currentWidgets]);
 
   // Enable auto-save functionality
   const enableAutoSave = useCallback((enabled = false, delay = 5000) => {
@@ -618,7 +630,7 @@ const ContentEditor = forwardRef(({
 
   // Set up auto-save when editing is enabled AND widgets are loaded
   useEffect(() => {
-    if (editable && layoutRenderer && pageData?.widgets) {
+    if (editable && layoutRenderer && currentWidgets) {
       // Delay auto-save activation to ensure widgets are loaded first
       const autoSaveTimeoutId = setTimeout(() => {
         enableAutoSave(true, 10000);
@@ -629,7 +641,7 @@ const ContentEditor = forwardRef(({
       // Disable auto-save for non-editable mode or when no widgets
       enableAutoSave(false);
     }
-  }, [editable, layoutRenderer, pageData?.widgets, enableAutoSave]);
+  }, [editable, layoutRenderer, currentWidgets, enableAutoSave]);
 
   // Expose methods for external use
   const api = useMemo(() => ({
