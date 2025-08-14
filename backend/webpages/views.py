@@ -487,59 +487,37 @@ class WebPageViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
 
-    # DEPRECATED: Use PageVersionViewSet with ?page={id}&current=true instead
-    @action(detail=True, methods=["get"], url_path="versions/current")
-    def current_version(self, request, pk=None):
-        """DEPRECATED: Get the current version data for a page. Use /api/v1/webpages/versions/?page={id}&current=true instead"""
-        import warnings
+    # @action(detail=True, methods=["get"], url_path="versions/current")
+    # def current_version(self, request, pk=None):
+    #     page = self.get_object()
 
-        warnings.warn(
-            "WebPageViewSet.current_version is deprecated. Use PageVersionViewSet with ?page={id}&current=true instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
+    #     # Get current published version, fallback to latest
+    #     current_version = page.get_current_published_version()
+    #     if not current_version:
+    #         current_version = page.get_latest_version()
 
-        page = self.get_object()
+    #     if not current_version:
+    #         return Response(
+    #             {"detail": "No versions found for this page"},
+    #             status=status.HTTP_404_NOT_FOUND,
+    #         )
 
-        # Get current published version, fallback to latest
-        current_version = page.get_current_published_version()
-        if not current_version:
-            current_version = page.get_latest_version()
+    #     serializer = PageVersionSerializer(
+    #         current_version, context={"request": request}
+    #     )
+    #     return Response(serializer.data)
 
-        if not current_version:
-            return Response(
-                {"detail": "No versions found for this page"},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
-        serializer = PageVersionSerializer(
-            current_version, context={"request": request}
-        )
-        return Response(serializer.data)
-
-    # DEPRECATED: Use PageVersionViewSet with ?page={id}&latest=true instead
-    @action(detail=True, methods=["get"], url_path="versions/latest")
-    def latest_version(self, request, pk=None):
-        """DEPRECATED: Get the latest version data for a page. Use /api/v1/webpages/versions/?page={id}&latest=true instead"""
-        import warnings
-
-        warnings.warn(
-            "WebPageViewSet.latest_version is deprecated. Use PageVersionViewSet with ?page={id}&latest=true instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
-        page = self.get_object()
-
-        latest_version = page.get_latest_version()
-        if not latest_version:
-            return Response(
-                {"detail": "No versions found for this page"},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
-        serializer = PageVersionSerializer(latest_version, context={"request": request})
-        return Response(serializer.data)
+    # @action(detail=True, methods=["get"], url_path="versions/latest")
+    # def latest_version(self, request, pk=None):
+    #     page = self.get_object()
+    #     latest_version = page.get_latest_version()
+    #     if not latest_version:
+    #         return Response(
+    #             {"detail": "No versions found for this page"},
+    #             status=status.HTTP_404_NOT_FOUND,
+    #         )
+    #     serializer = PageVersionSerializer(latest_version, context={"request": request})
+    #     return Response(serializer.data)
 
     @action(detail=True, methods=["get"], url_path="full")
     def full_data(self, request, pk=None):
@@ -592,18 +570,8 @@ class WebPageViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(published_pages, many=True)
         return Response(serializer.data)
 
-    # DEPRECATED: Use PageVersionViewSet.publish() on a specific version instead
     @action(detail=True, methods=["post"])
     def publish(self, request, pk=None):
-        """DEPRECATED: Publish a page. Use PageVersionViewSet.publish() on a specific version instead"""
-        import warnings
-
-        warnings.warn(
-            "WebPageViewSet.publish is deprecated. Create a version via PageVersionViewSet then publish it.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
         page = self.get_object()
         now = timezone.now()
 
@@ -629,18 +597,8 @@ class WebPageViewSet(viewsets.ModelViewSet):
             status=status.HTTP_200_OK,
         )
 
-    # DEPRECATED: Use PageVersionViewSet to manage version publishing instead
     @action(detail=True, methods=["post"])
     def unpublish(self, request, pk=None):
-        """DEPRECATED: Unpublish a page. Use PageVersionViewSet to manage version publishing instead"""
-        import warnings
-
-        warnings.warn(
-            "WebPageViewSet.unpublish is deprecated. Manage version publishing via PageVersionViewSet.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
         page = self.get_object()
         now = timezone.now()
 
@@ -663,139 +621,122 @@ class WebPageViewSet(viewsets.ModelViewSet):
             status=status.HTTP_200_OK,
         )
 
-    # DEPRECATED: Use PageVersionViewSet.by_page/{page_id} instead
-    @action(detail=True, methods=["get"])
-    def versions(self, request, pk=None):
-        """DEPRECATED: Get all versions for this page. Use /api/v1/webpages/versions/by-page/{page_id}/ instead"""
-        import warnings
+    # @action(detail=True, methods=["get"])
+    # def versions(self, request, pk=None):
+    #     page = self.get_object()
+    #     versions = page.versions.select_related("created_by").order_by(
+    #         "-version_number"
+    #     )
+    #     version_data = []
+    #     for version in versions:
+    #         version_data.append(
+    #             {
+    #                 "id": version.id,
+    #                 "version_number": version.version_number,
+    #                 "version_title": version.version_title,
+    #                 "publication_status": version.get_publication_status(),
+    #                 "is_current_published": version.is_current_published(),
+    #                 "created_at": version.created_at,
+    #                 "created_by": (
+    #                     version.created_by.username if version.created_by else None
+    #                 ),
+    #                 "effective_date": version.effective_date,
+    #                 "expiry_date": version.expiry_date,
+    #                 "publication_status": version.get_publication_status(),
+    #                 "has_widgets": bool(version.widgets),
+    #                 "widgets_count": len(version.widgets) if version.widgets else 0,
+    #             }
+    #         )
 
-        warnings.warn(
-            "WebPageViewSet.versions is deprecated. Use PageVersionViewSet.by_page/{page_id}/ instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
+    #     return Response(
+    #         {
+    #             "page_id": page.id,
+    #             "current_version": (
+    #                 page.get_current_published_version().id
+    #                 if page.get_current_published_version()
+    #                 else None
+    #             ),
+    #             "total_versions": len(version_data),
+    #             "versions": version_data,
+    #         }
+    #     )
 
-        page = self.get_object()
-        versions = page.versions.select_related("created_by").order_by(
-            "-version_number"
-        )
-        version_data = []
-        for version in versions:
-            version_data.append(
-                {
-                    "id": version.id,
-                    "version_number": version.version_number,
-                    "version_title": version.version_title,
-                    "publication_status": version.get_publication_status(),
-                    "is_current_published": version.is_current_published(),
-                    "created_at": version.created_at,
-                    "created_by": (
-                        version.created_by.username if version.created_by else None
-                    ),
-                    "effective_date": version.effective_date,
-                    "expiry_date": version.expiry_date,
-                    "publication_status": version.get_publication_status(),
-                    "has_widgets": bool(version.widgets),
-                    "widgets_count": len(version.widgets) if version.widgets else 0,
-                }
-            )
+    # @action(
+    #     detail=False,
+    #     methods=["get", "patch"],
+    #     url_path="versions/(?P<version_id>[^/.]+)",
+    # )
+    # def version_detail(self, request, page_id=None, version_id=None):
+    #     # page = self.get_object()
+    #     page = WebPage.objects.get(id=page_id)
+    #     version = page.versions.filter(id=version_id).first()
+    #     if not version:
+    #         return Response(
+    #             {"error": f"Version {version_id} not found for page {page.id}"},
+    #             status=status.HTTP_404_NOT_FOUND,
+    #         )
+    #     if request.method == "GET":
+    #         print("version_detail::GET")
+    #         serializer = PageVersionSerializer(version)
+    #         print("version_detail::GET::serializer.data", serializer.data)
+    #         return Response(serializer.data)
+    #     elif request.method == "PATCH":
+    #         print("version_detail::PATCH")
+    #         # Validate page_data against effective schema when provided
+    #         incoming_page_data = request.data.get("page_data")
+    #         if incoming_page_data is not None:
+    #             if isinstance(incoming_page_data, dict):
+    #                 forbidden = {
+    #                     "title",
+    #                     "slug",
+    #                     "code_layout",
+    #                     "page_data",
+    #                     "widgets",
+    #                     "page_css_variables",
+    #                     "theme",
+    #                     "is_published",
+    #                     "version_title",
+    #                     "page_custom_css",
+    #                     "page_css_variables",
+    #                     "enable_css_injection",
+    #                 }
+    #                 incoming_page_data = {
+    #                     k: v
+    #                     for k, v in incoming_page_data.items()
+    #                     if k not in forbidden
+    #                 }
+    #             # Determine target layout for this version after update: prefer incoming code_layout, else current
+    #             layout_name = request.data.get("code_layout") or version.code_layout
 
-        return Response(
-            {
-                "page_id": page.id,
-                "current_version": (
-                    page.get_current_published_version().id
-                    if page.get_current_published_version()
-                    else None
-                ),
-                "total_versions": len(version_data),
-                "versions": version_data,
-            }
-        )
+    #             effective_schema = PageDataSchema.get_effective_schema_for_layout(
+    #                 layout_name
+    #             )
+    #             if effective_schema:
+    #                 from jsonschema import Draft202012Validator, Draft7Validator
 
-    # DEPRECATED: Use PageVersionViewSet directly instead
-    @action(
-        detail=True,
-        methods=["get", "patch"],
-        url_path="versions/(?P<version_id>[^/.]+)",
-    )
-    def version_detail(self, request, pk=None, version_id=None):
-        """DEPRECATED: Get or update a specific version. Use /api/v1/webpages/versions/{version_id}/ instead"""
-        import warnings
+    #                 try:
+    #                     try:
+    #                         Draft202012Validator.check_schema(effective_schema)
+    #                         Draft202012Validator(effective_schema).validate(
+    #                             incoming_page_data
+    #                         )
+    #                     except Exception:
+    #                         Draft7Validator.check_schema(effective_schema)
+    #                         Draft7Validator(effective_schema).validate(
+    #                             incoming_page_data
+    #                         )
+    #                 except Exception as e:
+    #                     return Response(
+    #                         {"error": f"page_data validation failed: {str(e)}"},
+    #                         status=status.HTTP_400_BAD_REQUEST,
+    #                     )
 
-        warnings.warn(
-            "WebPageViewSet.version_detail is deprecated. Use PageVersionViewSet directly instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        page = self.get_object()
-        version = page.versions.filter(id=version_id).first()
-        if not version:
-            return Response(
-                {"error": f"Version {version_id} not found for page {page.id}"},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+    #         # Update version using serializer after validation
 
-        if request.method == "GET":
-            serializer = PageVersionSerializer(version)
-
-            return Response(serializer.data)
-        elif request.method == "PATCH":
-            # Validate page_data against effective schema when provided
-            incoming_page_data = request.data.get("page_data")
-            if incoming_page_data is not None:
-                if isinstance(incoming_page_data, dict):
-                    forbidden = {
-                        "title",
-                        "slug",
-                        "code_layout",
-                        "page_data",
-                        "widgets",
-                        "page_css_variables",
-                        "theme",
-                        "is_published",
-                        "version_title",
-                        "page_custom_css",
-                        "page_css_variables",
-                        "enable_css_injection",
-                    }
-                    incoming_page_data = {
-                        k: v
-                        for k, v in incoming_page_data.items()
-                        if k not in forbidden
-                    }
-                # Determine target layout for this version after update: prefer incoming code_layout, else current
-                layout_name = request.data.get("code_layout") or version.code_layout
-
-                effective_schema = PageDataSchema.get_effective_schema_for_layout(
-                    layout_name
-                )
-                if effective_schema:
-                    from jsonschema import Draft202012Validator, Draft7Validator
-
-                    try:
-                        try:
-                            Draft202012Validator.check_schema(effective_schema)
-                            Draft202012Validator(effective_schema).validate(
-                                incoming_page_data
-                            )
-                        except Exception:
-                            Draft7Validator.check_schema(effective_schema)
-                            Draft7Validator(effective_schema).validate(
-                                incoming_page_data
-                            )
-                    except Exception as e:
-                        return Response(
-                            {"error": f"page_data validation failed: {str(e)}"},
-                            status=status.HTTP_400_BAD_REQUEST,
-                        )
-
-            # Update version using serializer after validation
-
-            serializer = PageVersionSerializer(version, data=request.data, partial=True)
-            serializer.is_valid(raise_exception=True)
-            serializer.save()
-            return Response(serializer.data)
+    #         serializer = PageVersionSerializer(version, data=request.data, partial=True)
+    #         serializer.is_valid(raise_exception=True)
+    #         serializer.save()
+    #         return Response(serializer.data)
 
 
 class PageVersionViewSet(viewsets.ModelViewSet):
@@ -1009,6 +950,66 @@ class PageVersionViewSet(viewsets.ModelViewSet):
             )
 
         serializer = PageVersionSerializer(latest_version, context={"request": request})
+        return Response(serializer.data)
+
+    def partial_update(self, request, pk=None):
+        version = self.get_object()
+        if not version:
+            return Response(
+                {"error": f"Version {pk} not found for page {version.id}"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        print("version_detail::PATCH")
+        # Validate page_data against effective schema when provided
+        incoming_page_data = request.data.get("page_data")
+        if incoming_page_data is not None:
+            if isinstance(incoming_page_data, dict):
+                forbidden = {
+                    "title",
+                    "slug",
+                    "code_layout",
+                    "page_data",
+                    "widgets",
+                    "page_css_variables",
+                    "theme",
+                    "is_published",
+                    "version_title",
+                    "page_custom_css",
+                    "page_css_variables",
+                    "enable_css_injection",
+                }
+                incoming_page_data = {
+                    k: v for k, v in incoming_page_data.items() if k not in forbidden
+                }
+            # Determine target layout for this version after update: prefer incoming code_layout, else current
+            layout_name = request.data.get("code_layout") or version.code_layout
+
+            effective_schema = PageDataSchema.get_effective_schema_for_layout(
+                layout_name
+            )
+            if effective_schema:
+                from jsonschema import Draft202012Validator, Draft7Validator
+
+                try:
+                    try:
+                        Draft202012Validator.check_schema(effective_schema)
+                        Draft202012Validator(effective_schema).validate(
+                            incoming_page_data
+                        )
+                    except Exception:
+                        Draft7Validator.check_schema(effective_schema)
+                        Draft7Validator(effective_schema).validate(incoming_page_data)
+                except Exception as e:
+                    return Response(
+                        {"error": f"page_data validation failed: {str(e)}"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+        # Update version using serializer after validation
+
+        serializer = PageVersionSerializer(version, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
         return Response(serializer.data)
 
 

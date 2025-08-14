@@ -210,11 +210,9 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
     breadcrumbs = serializers.SerializerMethodField()
     effective_layout = serializers.SerializerMethodField()
     effective_theme = serializers.SerializerMethodField()
-    layout_type = serializers.SerializerMethodField()
     layout_inheritance_info = serializers.SerializerMethodField()
     available_code_layouts = serializers.SerializerMethodField()
     children_count = serializers.SerializerMethodField()
-    code_layout = serializers.SerializerMethodField()
 
     class Meta:
         model = WebPage
@@ -223,7 +221,6 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
             "slug",
             "title",
             "description",
-            "code_layout",
             "parent",
             "parent_id",
             "sort_order",
@@ -236,7 +233,6 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
             "breadcrumbs",
             "effective_layout",
             "effective_theme",
-            "layout_type",
             "layout_inheritance_info",
             "available_code_layouts",
             "children_count",
@@ -283,18 +279,6 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
             for page in breadcrumbs
         ]
 
-    def get_current_published_version(self, obj):
-        """DEPRECATED: Get version info via PageVersionViewSet instead"""
-        # For backward compatibility, return None
-        # To get actual version data, use the PageVersionViewSet API
-        return None
-
-    def get_code_layout(self, obj):
-        """Get code layout - NOTE: This field is deprecated, use PageVersionSerializer instead"""
-        # For backward compatibility, return empty string
-        # To get actual code_layout, query the PageVersion directly
-        return ""
-
     def get_effective_layout(self, obj):
         """Get the effective layout as a unified dictionary regardless of type"""
         return obj.get_effective_layout_dict()
@@ -331,7 +315,6 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
                 else None
             ),
             "effective_layout_dict": inheritance_info["effective_layout_dict"],
-            "layout_type": inheritance_info["layout_type"],
             "inherited_from": (
                 {
                     "id": inheritance_info["inherited_from"].id,
@@ -367,34 +350,17 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
 class PageVersionSerializer(serializers.ModelSerializer):
     """Serializer for page versions with enhanced workflow support"""
 
-    page = serializers.PrimaryKeyRelatedField(
-        queryset=WebPage.objects.all(), write_only=True
-    )
     created_by = UserSerializer(read_only=True)
-
-    # New date-based publishing fields (computed)
     is_published = serializers.SerializerMethodField()
     is_current_published = serializers.SerializerMethodField()
     publication_status = serializers.SerializerMethodField()
-    hostnames = serializers.SerializerMethodField()
-    slug = serializers.SerializerMethodField()
-    id = serializers.SerializerMethodField()
-    version_id = serializers.SerializerMethodField()
-    title = serializers.SerializerMethodField()
-    description = serializers.SerializerMethodField()
 
     class Meta:
         model = PageVersion
         fields = [
             "id",
-            "version_id",
-            "page",
             "version_number",
             "version_title",
-            "title",
-            "description",
-            "slug",
-            "hostnames",
             "code_layout",
             "page_data",
             "widgets",
@@ -425,14 +391,6 @@ class PageVersionSerializer(serializers.ModelSerializer):
             "created_by",
         ]
 
-    def get_id(self, obj):
-        """Page Id for this version"""
-        return obj.page.id
-
-    def get_version_id(self, obj):
-        """Version Id for this version"""
-        return obj.id
-
     def get_is_published(self, obj):
         """Check if this version is currently published based on dates"""
         return obj.is_published()
@@ -444,22 +402,6 @@ class PageVersionSerializer(serializers.ModelSerializer):
     def get_publication_status(self, obj):
         """Get human-readable publication status based on dates"""
         return obj.get_publication_status()
-
-    def get_title(self, obj):
-        """Get title from the page"""
-        return obj.page.title
-
-    def get_description(self, obj):
-        """Get description from the page"""
-        return obj.page.description
-
-    def get_hostnames(self, obj):
-        """Get hostnames from the page"""
-        return obj.page.hostnames
-
-    def get_slug(self, obj):
-        """Get slug from the page"""
-        return obj.page.slug
 
     def validate(self, attrs):
         # Strip forbidden keys from page_data on write
