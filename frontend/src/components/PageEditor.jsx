@@ -578,20 +578,20 @@ const PageEditor = () => {
 
             // Update UI based on what was saved
             let updatedPageData = currentData;
-            
+
             if (saveResult.pageResult) {
                 // Page was updated - use the response
                 updatedPageData = { ...updatedPageData, ...saveResult.pageResult };
             }
-            
+
             if (saveResult.versionResult) {
                 // New version was created - use the version data
-                updatedPageData = { 
-                    ...updatedPageData, 
+                updatedPageData = {
+                    ...updatedPageData,
                     ...saveResult.versionResult,
                     widgets: collectedData.widgets // Preserve collected widgets
                 };
-                
+
                 // Update current version
                 setCurrentVersion(saveResult.versionResult);
             }
@@ -611,10 +611,10 @@ const PageEditor = () => {
 
             // Show success notification with smart summary
             const actionDescription = saveResult.strategy === 'page-only' ? 'Page updated' :
-                                    saveResult.strategy === 'version-only' ? 'New version created' :
-                                    saveResult.strategy === 'both' ? 'Page and version updated' :
-                                    'No changes';
-                                    
+                saveResult.strategy === 'version-only' ? 'New version created' :
+                    saveResult.strategy === 'both' ? 'Page and version updated' :
+                        'No changes';
+
             addNotification({
                 type: 'success',
                 message: `${actionDescription}! ${saveResult.summary}${saveOptions.description ? ` - "${saveOptions.description}"` : ''}`
