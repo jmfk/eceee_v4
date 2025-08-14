@@ -344,12 +344,17 @@ class LayoutIntegrationTest(TestCase):
         page = WebPage.objects.create(
             title="Test Page",
             slug="test-page",
-            code_layout="single_column",
             created_by=self.user,
             last_modified_by=self.user,
         )
+        
+        # Create a version with code_layout since it's stored in PageVersion now
+        version = page.create_version(self.user, "Test version")
+        version.code_layout = "single_column"
+        version.save()
 
-        self.assertEqual(page.code_layout, "single_column")
+        # Code layout is now accessed via the version
+        self.assertEqual(version.code_layout, "single_column")
 
         # Should be able to get layout from registry
         from webpages.layout_registry import layout_registry
