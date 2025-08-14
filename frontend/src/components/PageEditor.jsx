@@ -19,6 +19,7 @@ import {
     Calendar
 } from 'lucide-react'
 import { pagesApi, layoutsApi, versionsApi } from '../api'
+import { smartSave, analyzeChanges, determineSaveStrategy, generateChangeSummary } from '../utils/smartSaveUtils'
 import { useNotificationContext } from './NotificationManager'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import ContentEditor from './ContentEditor'
@@ -167,6 +168,7 @@ const PageEditor = () => {
         }
     }, [tab, isNewPage, pageId, navigate, previousView, versionFromUrl])
     const [pageData, setPageData] = useState(null)
+    const [originalPageData, setOriginalPageData] = useState(null) // Track original for smart saving
     const [isDirty, setIsDirty] = useState(false)
     const [layoutData, setLayoutData] = useState(null)
     const [isLoadingLayout, setIsLoadingLayout] = useState(false)
@@ -265,6 +267,7 @@ const PageEditor = () => {
     useEffect(() => {
         if (page && !isNewPage) {
             setPageData(page)
+            setOriginalPageData(page) // Track original for smart saving
         }
     }, [page, isNewPage])
 
@@ -508,7 +511,7 @@ const PageEditor = () => {
         setShowSaveOptionsModal(true);
     }, [errorTodoItems, addNotification]);
 
-    // UNIFIED SAVE: Actual save logic with options
+    // SMART SAVE: Intelligent save logic that only saves what changed
     const handleActualSave = useCallback(async (saveOptions = {}) => {
         try {
             // Collect all data from editors (no saving yet)
@@ -519,14 +522,14 @@ const PageEditor = () => {
             if (contentEditorRef.current && contentEditorRef.current.saveWidgets) {
                 try {
                     const widgetResult = await contentEditorRef.current.saveWidgets({
-                        source: 'unified_save_from_statusbar',
-                        description: 'Unified save triggered from status bar',
+                        source: 'smart_save_from_statusbar',
+                        description: 'Smart save triggered from status bar',
                         collectOnly: true  // Tell ContentEditor to collect data, not save
                     });
                     // Merge any changes from ContentEditor with existing widgets
                     collectedData.widgets = widgetResult.data || widgetResult || collectedData.widgets;
                 } catch (error) {
-                    console.error('❌ UNIFIED SAVE: Widget data collection failed', error);
+                    console.error('❌ SMART SAVE: Widget data collection failed', error);
                 }
             }
 
@@ -536,7 +539,7 @@ const PageEditor = () => {
                     const settingsResult = await settingsEditorRef.current.saveSettings();
                     collectedData.settings = settingsResult.data || settingsResult;
                 } catch (error) {
-                    console.error('❌ UNIFIED SAVE: Settings data collection failed', error);
+                    console.error('❌ SMART SAVE: Settings data collection failed', error);
                     throw new Error(`Settings data collection failed: ${error.message}`);
                 }
             }
@@ -547,37 +550,55 @@ const PageEditor = () => {
                     const metadataResult = await metadataEditorRef.current.saveMetadata();
                     collectedData.metadata = metadataResult.data || metadataResult;
                 } catch (error) {
-                    console.error('❌ UNIFIED SAVE: Metadata collection failed', error);
+                    console.error('❌ SMART SAVE: Metadata collection failed', error);
                     throw new Error(`Metadata collection failed: ${error.message}`);
                 }
             }
 
-            // Combine all page data (settings + metadata)
-            const unifiedPageData = {
+            // Combine all current page data (settings + metadata)
+            const currentData = {
                 ...pageData,
                 ...collectedData.settings,
                 ...collectedData.metadata
             };
 
-            // Single API call for everything!
-            const response = await pagesApi.saveWithWidgets(
-                pageData.id || pageId || pageId,  // Fallback to pageId from URL if pageData.id || pageId is undefined
-                currentVersion?.id || pageData.version_id,  // Use current version ID
-                unifiedPageData,
-                collectedData.widgets,
+            // Use smart save to determine what to save
+            const saveResult = await smartSave(
+                originalPageData || {},  // Original data for comparison
+                currentData,             // Current data
+                collectedData.widgets,   // Current widgets
+                { pagesApi, versionsApi }, // API functions
                 {
-                    description: saveOptions.description || 'Unified save from page editor',
-                    autoPublish: false,
-                    createNewVersion: saveOptions.option === 'new',  // Only create new version if user chose 'new'
-                    currentVersionId: saveOptions.option === 'update' ? currentVersion?.id : null  // Pass current version ID for updates
+                    description: saveOptions.description || 'Auto-save',
+                    forceNewVersion: saveOptions.option === 'new'
                 }
             );
-            // Update UI state with response - preserve widgets and version data structure
-            setPageData(prev => ({
-                ...response,
-                widgets: response.widgets || prev.widgets || {},
-                version_data: response.version_data || prev.version_data
-            }));
+
+            console.log('💾 Smart Save Result:', saveResult);
+
+            // Update UI based on what was saved
+            let updatedPageData = currentData;
+            
+            if (saveResult.pageResult) {
+                // Page was updated - use the response
+                updatedPageData = { ...updatedPageData, ...saveResult.pageResult };
+            }
+            
+            if (saveResult.versionResult) {
+                // New version was created - use the version data
+                updatedPageData = { 
+                    ...updatedPageData, 
+                    ...saveResult.versionResult,
+                    widgets: collectedData.widgets // Preserve collected widgets
+                };
+                
+                // Update current version
+                setCurrentVersion(saveResult.versionResult);
+            }
+
+            // Update page data and mark as clean
+            setPageData(updatedPageData);
+            setOriginalPageData(updatedPageData); // Update original for next comparison
             setIsDirty(false);
 
             // Clear To-Do items on success
@@ -588,22 +609,28 @@ const PageEditor = () => {
                 contentEditorRef.current.layoutRenderer.markAsClean();
             }
 
-            // Show success notification
-            const versionAction = saveOptions.option === 'new' ? 'created' : 'updated';
+            // Show success notification with smart summary
+            const actionDescription = saveResult.strategy === 'page-only' ? 'Page updated' :
+                                    saveResult.strategy === 'version-only' ? 'New version created' :
+                                    saveResult.strategy === 'both' ? 'Page and version updated' :
+                                    'No changes';
+                                    
             addNotification({
                 type: 'success',
-                message: `Version ${versionAction} successfully! ${saveOptions.description ? `"${saveOptions.description}"` : ''}`
+                message: `${actionDescription}! ${saveResult.summary}${saveOptions.description ? ` - "${saveOptions.description}"` : ''}`
             });
 
-            // Reload versions to show the new/updated version, but preserve current version selection
-            await loadVersionsPreserveCurrent();
+            // Reload versions if a version was created/updated
+            if (saveResult.versionResult) {
+                await loadVersionsPreserveCurrent();
+            }
 
             // Invalidate queries to refresh data
             queryClient.invalidateQueries(['page', pageData.id || pageId]);
             queryClient.invalidateQueries(['pages', 'root']);
 
         } catch (error) {
-            console.error('❌ UNIFIED SAVE: Global save failed', error);
+            console.error('❌ SMART SAVE: Save failed', error);
             addNotification({
                 type: 'error',
                 message: `Save failed: ${error.message}`
@@ -619,7 +646,7 @@ const PageEditor = () => {
                 }
             }
         }
-    }, [addNotification, showError, pageData?.id, queryClient, loadVersionsPreserveCurrent]);
+    }, [addNotification, showError, pageData, originalPageData, queryClient, loadVersionsPreserveCurrent, currentVersion]);
 
     // Handle save options from modal
     const handleSaveOptions = useCallback(async (saveOptions) => {

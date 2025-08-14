@@ -386,7 +386,6 @@ class PageVersionSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "version_id",
-            # "page" removed - use computed fields (title, slug, etc.) instead
             "version_number",
             "version_title",
             "title",
