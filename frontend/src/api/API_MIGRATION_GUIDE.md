@@ -23,15 +23,15 @@ POST /api/v1/webpages/pages/{id}/publish/
 POST /api/v1/webpages/pages/{id}/unpublish/
 ```
 
-### New (Separated) Endpoints
+### New (Consistent Path-Based) Endpoints
 
 ```javascript
-// New direct version endpoints
-GET /api/v1/webpages/versions/?page={id}                   // List versions for page
-GET /api/v1/webpages/versions/?page={id}&current=true      // Current published version
-GET /api/v1/webpages/versions/?page={id}&latest=true       // Latest version
-GET /api/v1/webpages/versions/by-page/{id}/                // Detailed versions list
-GET /api/v1/webpages/versions/{version_id}/                // Get specific version
+// New consistent path-based endpoints (no query strings)
+GET /api/v1/webpages/pages/{id}/versions/                  // List versions for page
+GET /api/v1/webpages/pages/{id}/versions/current/          // Current published version
+GET /api/v1/webpages/pages/{id}/versions/latest/           // Latest version
+GET /api/v1/webpages/pages/{id}/versions/{version_id}/     // Get specific version
+GET /api/v1/webpages/versions/{version_id}/                // Direct version access
 POST /api/v1/webpages/versions/{version_id}/publish/       // Publish version
 POST /api/v1/webpages/versions/                            // Create new version
 ```
@@ -43,26 +43,26 @@ POST /api/v1/webpages/versions/                            // Create new version
 #### versions.js
 
 ```javascript
-// OLD: Used page-nested endpoints
-versionsApi.getPageVersionsList(pageId)  // Used /pages/{id}/versions/
+// OLD: Mixed query string approach
+versionsApi.getPageVersionsList(pageId)  // Used inconsistent endpoints
 
-// NEW: Uses separated endpoints
-versionsApi.getPageVersionsList(pageId)      // Uses /versions/by-page/{id}/
-versionsApi.getVersionsForPage(pageId)       // Uses /versions/?page={id}
-versionsApi.getCurrentVersionForPage(pageId) // Uses /versions/?page={id}&current=true
-versionsApi.getLatestVersionForPage(pageId)  // Uses /versions/?page={id}&latest=true
+// NEW: Consistent path-based endpoints
+versionsApi.getPageVersionsList(pageId)      // Uses /pages/{id}/versions/
+versionsApi.getVersionsForPage(pageId)       // Uses /pages/{id}/versions/
+versionsApi.getCurrentVersionForPage(pageId) // Uses /pages/{id}/versions/current/
+versionsApi.getLatestVersionForPage(pageId)  // Uses /pages/{id}/versions/latest/
 ```
 
 #### pages.js
 
 ```javascript
-// OLD: Used page-nested endpoints
-pagesApi.versionCurrent(pageId)              // Used /pages/{id}/versions/current/
-pagesApi.getVersion(pageId, versionId)       // Used /pages/{id}/versions/{versionId}/
+// OLD: Mixed approach with query strings
+pagesApi.versionCurrent(pageId)              // Used mixed query string approach
+pagesApi.getVersion(pageId, versionId)       // Used inconsistent routing
 
-// NEW: Uses separated endpoints
-pagesApi.versionCurrent(pageId)              // Uses /versions/?page={id}&current=true
-pagesApi.getVersion(pageId, versionId)       // Uses /versions/{versionId}/
+// NEW: Consistent path-based endpoints
+pagesApi.versionCurrent(pageId)              // Uses /pages/{id}/versions/current/
+pagesApi.getVersion(pageId, versionId)       // Uses /pages/{id}/versions/{versionId}/
 ```
 
 ## Migration Steps

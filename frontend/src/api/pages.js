@@ -95,17 +95,14 @@ export const pagesApi = {
         return api.get(endpoints.pages.detail(pageId))
     }, 'pages.getActiveVersion'),
 
-    // UPDATED: Use new separated version API
+    // UPDATED: Use consistent path-based version API
     versionCurrent: wrapApiCall(async (pageId) => {
-        const response = await api.get(endpoints.versions.currentForPage(pageId))
-        // The new API returns a list, get the first item
-        const data = response.data || response
-        return data.results ? data.results[0] : data[0] || null
+        return api.get(endpoints.versions.currentForPage(pageId))
     }, 'pages.versionCurrent'),
 
     /**
      * Get a page with a specific version
-     * @param {number} pageId - Page ID (kept for backward compatibility, not used in new API)
+     * @param {number} pageId - Page ID (used for consistent path-based routing)
      * @param {number} versionId - Version ID
      * @returns {Promise<WebPageDetailResponse>}
      */
@@ -113,8 +110,8 @@ export const pagesApi = {
         if (!versionId) {
             throw new Error('versionId is required for getVersion')
         }
-        // Use the new direct version endpoint instead of page-nested endpoint
-        return api.get(endpoints.versions.detail(versionId))
+        // Use consistent path-based endpoint that includes both page and version ID
+        return api.get(endpoints.versions.pageVersionDetail(pageId, versionId))
     }, 'pages.getVersion'),
 
     /**

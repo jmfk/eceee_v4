@@ -107,12 +107,12 @@ export const versionsApi = {
     }, 'versions.getPageVersionsList'),
 
     /**
-     * Get versions for a page using new separated API
+     * Get versions for a page using consistent path-based API  
      * @param {number} pageId - Page ID
      * @returns {Promise<Array>} Array of versions
      */
     getVersionsForPage: wrapApiCall(async (pageId) => {
-        return api.get(endpoints.versions.forPage(pageId))
+        return api.get(endpoints.versions.byPage(pageId))
     }, 'versions.getVersionsForPage'),
 
     /**
@@ -121,10 +121,7 @@ export const versionsApi = {
      * @returns {Promise<Object>} Current version or null
      */
     getCurrentVersionForPage: wrapApiCall(async (pageId) => {
-        const response = await api.get(endpoints.versions.currentForPage(pageId))
-        // The new API returns a list, get the first item
-        const data = response.data || response
-        return data.results ? data.results[0] : data[0] || null
+        return api.get(endpoints.versions.currentForPage(pageId))
     }, 'versions.getCurrentVersionForPage'),
 
     /**
@@ -133,10 +130,7 @@ export const versionsApi = {
      * @returns {Promise<Object>} Latest version or null
      */
     getLatestVersionForPage: wrapApiCall(async (pageId) => {
-        const response = await api.get(endpoints.versions.latestForPage(pageId))
-        // The new API returns a list, get the first item
-        const data = response.data || response
-        return data.results ? data.results[0] : data[0] || null
+        return api.get(endpoints.versions.latestForPage(pageId))
     }, 'versions.getLatestVersionForPage'),
 
     /**
