@@ -35,21 +35,34 @@ router.register(r"page-data-schemas", PageDataSchemaViewSet, basename="pagedatas
 urlpatterns = [
     path("", include(router.urls)),
     path("layouts/<str:layout_name>/json/", layout_json, name="layout-json"),
-    
     # Nested page-version endpoints (consistent path-based routing)
-    path("pages/<int:page_id>/versions/", 
-         PageVersionViewSet.as_view({'get': 'by_page'}), 
-         name="page-versions-list"),
-    path("pages/<int:page_id>/versions/current/", 
-         PageVersionViewSet.as_view({'get': 'current_for_page'}), 
-         name="page-current-version"),
-    path("pages/<int:page_id>/versions/latest/", 
-         PageVersionViewSet.as_view({'get': 'latest_for_page'}), 
-         name="page-latest-version"),
-    path("pages/<int:page_id>/versions/<int:version_id>/", 
-         PageVersionViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}), 
-         name="page-version-detail"),
-    
+    path(
+        "pages/<int:page_id>/versions/",
+        PageVersionViewSet.as_view({"get": "by_page"}),
+        name="page-versions-list",
+    ),
+    path(
+        "pages/<int:page_id>/versions/current/",
+        PageVersionViewSet.as_view({"get": "current_for_page"}),
+        name="page-current-version",
+    ),
+    path(
+        "pages/<int:page_id>/versions/latest/",
+        PageVersionViewSet.as_view({"get": "latest_for_page"}),
+        name="page-latest-version",
+    ),
+    path(
+        "pages/<int:page_id>/versions/<int:version_id>/",
+        PageVersionViewSet.as_view(
+            {
+                "get": "retrieve",
+                "put": "update",
+                "patch": "partial_update",
+                "delete": "destroy",
+            }
+        ),
+        name="page-version-detail",
+    ),
     # Backend rendering endpoints
     path("pages/<int:page_id>/render/", render_page_backend, name="page-render"),
     path(

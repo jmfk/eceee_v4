@@ -931,7 +931,7 @@ class PageVersionViewSet(viewsets.ModelViewSet):
     def current_for_page(self, request, page_id=None):
         """Get current published version for a specific page - path-based endpoint"""
         from django.shortcuts import get_object_or_404
-        
+
         try:
             page = get_object_or_404(WebPage, id=page_id)
         except ValueError:
@@ -939,25 +939,27 @@ class PageVersionViewSet(viewsets.ModelViewSet):
                 {"error": "Invalid page ID"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        
+
         current_version = page.get_current_published_version()
         if not current_version:
             # Fallback to latest version
             current_version = page.get_latest_version()
-        
+
         if not current_version:
             return Response(
                 {"detail": "No versions found for this page"},
                 status=status.HTTP_404_NOT_FOUND,
             )
-        
-        serializer = PageVersionSerializer(current_version, context={"request": request})
+
+        serializer = PageVersionSerializer(
+            current_version, context={"request": request}
+        )
         return Response(serializer.data)
 
     def latest_for_page(self, request, page_id=None):
         """Get latest version for a specific page - path-based endpoint"""
         from django.shortcuts import get_object_or_404
-        
+
         try:
             page = get_object_or_404(WebPage, id=page_id)
         except ValueError:
@@ -965,14 +967,14 @@ class PageVersionViewSet(viewsets.ModelViewSet):
                 {"error": "Invalid page ID"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        
+
         latest_version = page.get_latest_version()
         if not latest_version:
             return Response(
                 {"detail": "No versions found for this page"},
                 status=status.HTTP_404_NOT_FOUND,
             )
-        
+
         serializer = PageVersionSerializer(latest_version, context={"request": request})
         return Response(serializer.data)
 
