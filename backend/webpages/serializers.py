@@ -367,7 +367,7 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
 class PageVersionSerializer(serializers.ModelSerializer):
     """Serializer for page versions with enhanced workflow support"""
 
-    # page = WebPageTreeSerializer(read_only=True)
+    page = serializers.PrimaryKeyRelatedField(queryset=WebPage.objects.all(), write_only=True)
     created_by = UserSerializer(read_only=True)
 
     # New date-based publishing fields (computed)
@@ -386,6 +386,7 @@ class PageVersionSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "version_id",
+            "page",
             "version_number",
             "version_title",
             "title",
