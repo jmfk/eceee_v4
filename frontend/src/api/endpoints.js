@@ -35,13 +35,13 @@ export const endpoints = {
         unlinkObject: (id) => `${BASE_PATH}/webpages/pages/${id}/unlink-object/`,
         syncObject: (id) => `${BASE_PATH}/webpages/pages/${id}/sync-object/`,
         publicationStatus: `${BASE_PATH}/webpages/pages/publication_status/`,
-        // DEPRECATED: Version-related endpoints moved to versions API
-        versions: (id) => `${BASE_PATH}/webpages/pages/${id}/versions/`, // Use versions.byPage(id) instead
-        versionCurrent: (pageId) => `${BASE_PATH}/webpages/pages/${pageId}/versions/current/`, // Use versions.currentForPage(pageId) instead  
-        versionDetail: (pageId, versionId) => `${BASE_PATH}/webpages/pages/${pageId}/versions/${versionId}/` // Use versions.detail(versionId) instead
+        // DEPRECATED: Version-related endpoints moved to versions API (but URLs remain consistent)
+        versions: (id) => `${BASE_PATH}/webpages/pages/${id}/versions/`, // Still works, now consistent path-based
+        versionCurrent: (pageId) => `${BASE_PATH}/webpages/pages/${pageId}/versions/current/`, // Still works, now consistent path-based
+        versionDetail: (pageId, versionId) => `${BASE_PATH}/webpages/pages/${pageId}/versions/${versionId}/` // Still works, now consistent path-based
     },
 
-    // Versions endpoints (NEW SEPARATED API)
+    // Versions endpoints (CONSISTENT PATH-BASED API)
     versions: {
         base: `${BASE_PATH}/webpages/versions`,
         list: `${BASE_PATH}/webpages/versions/`,
@@ -51,17 +51,17 @@ export const endpoints = {
         restore: (id) => `${BASE_PATH}/webpages/versions/${id}/restore/`,
         compare: `${BASE_PATH}/webpages/versions/compare/`,
         search: `${BASE_PATH}/webpages/versions/search/`,
-        // NEW: Direct version endpoints (replaces page-nested endpoints)
-        byPage: (pageId) => `${BASE_PATH}/webpages/versions/by-page/${pageId}/`,
-        forPage: (pageId) => `${BASE_PATH}/webpages/versions/?page=${pageId}`,
-        currentForPage: (pageId) => `${BASE_PATH}/webpages/versions/?page=${pageId}&current=true`,
-        latestForPage: (pageId) => `${BASE_PATH}/webpages/versions/?page=${pageId}&latest=true`,
-        // DEPRECATED: Legacy page-nested endpoints (will be removed)
+        // NEW: Consistent path-based endpoints (no query strings)
+        byPage: (pageId) => `${BASE_PATH}/webpages/pages/${pageId}/versions/`,
+        currentForPage: (pageId) => `${BASE_PATH}/webpages/pages/${pageId}/versions/current/`,
+        latestForPage: (pageId) => `${BASE_PATH}/webpages/pages/${pageId}/versions/latest/`,
+        pageVersionDetail: (pageId, versionId) => `${BASE_PATH}/webpages/pages/${pageId}/versions/${versionId}/`,
+        // DEPRECATED: Query string endpoints (will be removed)
         legacy: {
-            byPage: (pageId) => `${BASE_PATH}/webpages/pages/${pageId}/versions/`,
-            current: (pageId) => `${BASE_PATH}/webpages/pages/${pageId}/versions/current/`,
-            latest: (pageId) => `${BASE_PATH}/webpages/pages/${pageId}/versions/latest/`,
-            detail: (pageId, versionId) => `${BASE_PATH}/webpages/pages/${pageId}/versions/${versionId}/`
+            forPage: (pageId) => `${BASE_PATH}/webpages/versions/?page=${pageId}`,
+            currentQuery: (pageId) => `${BASE_PATH}/webpages/versions/?page=${pageId}&current=true`,
+            latestQuery: (pageId) => `${BASE_PATH}/webpages/versions/?page=${pageId}&latest=true`,
+            byPageAction: (pageId) => `${BASE_PATH}/webpages/versions/by-page/${pageId}/`
         }
     },
 
