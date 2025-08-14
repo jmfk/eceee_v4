@@ -217,9 +217,16 @@ export async function smartSave(originalData, currentData, currentWidgets, apis,
     });
 
     // Force strategy override if user explicitly requests new version
-    if (options.forceNewVersion && strategy.needsVersionSave) {
-        strategy.needsVersionSave = true;
-        strategy.strategy = changes.hasPageChanges ? 'both' : 'version-only';
+    if (options.forceNewVersion) {
+        if (changes.hasPageChanges) {
+            strategy.strategy = 'both';
+            strategy.needsPageSave = true;
+            strategy.needsVersionSave = true;
+        } else {
+            strategy.strategy = 'version-only';
+            strategy.needsPageSave = false;
+            strategy.needsVersionSave = true;
+        }
     }
 
     const results = {
