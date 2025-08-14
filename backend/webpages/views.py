@@ -863,26 +863,37 @@ class PageVersionViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         # Auto-generate version number if not provided
-        if 'version_number' not in serializer.validated_data or serializer.validated_data['version_number'] is None:
-            page = serializer.validated_data['page']
+        if (
+            "version_number" not in serializer.validated_data
+            or serializer.validated_data["version_number"] is None
+        ):
+            page = serializer.validated_data["page"]
             with transaction.atomic():
                 # Get the latest version number with row-level locking to prevent race conditions
                 latest_version = (
-                    page.versions.select_for_update().order_by("-version_number").first()
+                    page.versions.select_for_update()
+                    .order_by("-version_number")
+                    .first()
                 )
                 version_number = (
                     (latest_version.version_number + 1) if latest_version else 1
                 )
-                serializer.validated_data['version_number'] = version_number
-        
+                serializer.validated_data["version_number"] = version_number
+
         # Ensure page_data has a default value if not provided
-        if 'page_data' not in serializer.validated_data or serializer.validated_data['page_data'] is None:
-            serializer.validated_data['page_data'] = {}
-            
-        # Ensure widgets has a default value if not provided  
-        if 'widgets' not in serializer.validated_data or serializer.validated_data['widgets'] is None:
-            serializer.validated_data['widgets'] = {}
-        
+        if (
+            "page_data" not in serializer.validated_data
+            or serializer.validated_data["page_data"] is None
+        ):
+            serializer.validated_data["page_data"] = {}
+
+        # Ensure widgets has a default value if not provided
+        if (
+            "widgets" not in serializer.validated_data
+            or serializer.validated_data["widgets"] is None
+        ):
+            serializer.validated_data["widgets"] = {}
+
         serializer.save(created_by=self.request.user)
 
     @action(detail=True, methods=["post"])
