@@ -103,8 +103,41 @@ export const versionsApi = {
      * @returns {Promise<Object>} Page versions list
      */
     getPageVersionsList: wrapApiCall(async (pageId) => {
-        return api.get(endpoints.pages.versions(pageId))
+        return api.get(endpoints.versions.byPage(pageId))
     }, 'versions.getPageVersionsList'),
+
+    /**
+     * Get versions for a page using new separated API
+     * @param {number} pageId - Page ID
+     * @returns {Promise<Array>} Array of versions
+     */
+    getVersionsForPage: wrapApiCall(async (pageId) => {
+        return api.get(endpoints.versions.forPage(pageId))
+    }, 'versions.getVersionsForPage'),
+
+    /**
+     * Get current published version for a page
+     * @param {number} pageId - Page ID
+     * @returns {Promise<Object>} Current version or null
+     */
+    getCurrentVersionForPage: wrapApiCall(async (pageId) => {
+        const response = await api.get(endpoints.versions.currentForPage(pageId))
+        // The new API returns a list, get the first item
+        const data = response.data || response
+        return data.results ? data.results[0] : data[0] || null
+    }, 'versions.getCurrentVersionForPage'),
+
+    /**
+     * Get latest version for a page
+     * @param {number} pageId - Page ID
+     * @returns {Promise<Object>} Latest version or null
+     */
+    getLatestVersionForPage: wrapApiCall(async (pageId) => {
+        const response = await api.get(endpoints.versions.latestForPage(pageId))
+        // The new API returns a list, get the first item
+        const data = response.data || response
+        return data.results ? data.results[0] : data[0] || null
+    }, 'versions.getLatestVersionForPage'),
 
     /**
      * Create a draft from a published version

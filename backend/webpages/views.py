@@ -459,14 +459,14 @@ class WebPageViewSet(viewsets.ModelViewSet):
                 # Use database-level filtering to avoid N+1 queries
                 # This uses the same logic as WebPageFilter.filter_is_published
                 from django.db.models import Exists, OuterRef
-                
+
                 now = timezone.now()
-                
+
                 # Subquery to check if page has published versions
                 published_version_exists = PageVersion.objects.filter(
                     page=OuterRef("pk"), effective_date__lte=now
                 ).filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
-                
+
                 queryset = queryset.filter(Exists(published_version_exists))
 
         return queryset
@@ -556,7 +556,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
         """Update WebPage fields only - no version creation"""
         # Save only WebPage fields, last_modified_by is updated automatically
         serializer.save(last_modified_by=self.request.user)
-        
+
         # Note: Version creation must now be handled explicitly via PageVersionViewSet
         # This separation ensures clean boundaries between page and version management
 
@@ -596,12 +596,13 @@ class WebPageViewSet(viewsets.ModelViewSet):
     def publish(self, request, pk=None):
         """DEPRECATED: Publish a page. Use PageVersionViewSet.publish() on a specific version instead"""
         import warnings
+
         warnings.warn(
             "WebPageViewSet.publish is deprecated. Create a version via PageVersionViewSet then publish it.",
             DeprecationWarning,
-            stacklevel=2
+            stacklevel=2,
         )
-        
+
         page = self.get_object()
         now = timezone.now()
 
@@ -632,12 +633,13 @@ class WebPageViewSet(viewsets.ModelViewSet):
     def unpublish(self, request, pk=None):
         """DEPRECATED: Unpublish a page. Use PageVersionViewSet to manage version publishing instead"""
         import warnings
+
         warnings.warn(
             "WebPageViewSet.unpublish is deprecated. Manage version publishing via PageVersionViewSet.",
             DeprecationWarning,
-            stacklevel=2
+            stacklevel=2,
         )
-        
+
         page = self.get_object()
         now = timezone.now()
 
