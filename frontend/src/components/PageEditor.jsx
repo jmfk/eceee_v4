@@ -498,8 +498,8 @@ const PageEditor = () => {
         }
     }, [autoSaveEnabled, layoutData]); // layoutData dependency ensures this runs after ContentEditor is mounted
 
-    // Show save options modal when save is triggered
-    const handleSaveFromStatusBar = useCallback(() => {
+    // Smart save - analyze changes first, then show modal only if needed
+    const handleSaveFromStatusBar = useCallback(async () => {
         const unresolved = errorTodoItems.filter(i => !i.checked).length
         if (unresolved > 0) {
             addNotification({
@@ -508,8 +508,92 @@ const PageEditor = () => {
             })
             return
         }
-        setShowSaveOptionsModal(true);
-    }, [errorTodoItems, addNotification]);
+
+        try {
+            // Collect all data from editors first (without saving)
+            const collectedData = {};
+
+            // Collect current widget data
+            collectedData.widgets = pageData.widgets || [];
+            if (contentEditorRef.current && contentEditorRef.current.saveWidgets) {
+                try {
+                    const widgetResult = await contentEditorRef.current.saveWidgets({
+                        source: 'smart_save_analysis',
+                        description: 'Analyzing changes for save decision',
+                        collectOnly: true
+                    });
+                    collectedData.widgets = widgetResult.data || widgetResult || collectedData.widgets;
+                } catch (error) {
+                    console.error('❌ Widget data collection failed during analysis', error);
+                }
+            }
+
+            // Collect settings data
+            if (settingsEditorRef.current && settingsEditorRef.current.saveSettings) {
+                try {
+                    const settingsResult = await settingsEditorRef.current.saveSettings();
+                    collectedData.settings = settingsResult.data || settingsResult;
+                } catch (error) {
+                    console.error('❌ Settings data collection failed during analysis', error);
+                    throw new Error(`Settings collection failed: ${error.message}`);
+                }
+            }
+
+            // Collect metadata
+            if (metadataEditorRef.current && metadataEditorRef.current.saveMetadata) {
+                try {
+                    const metadataResult = await metadataEditorRef.current.saveMetadata();
+                    collectedData.metadata = metadataResult.data || metadataResult;
+                } catch (error) {
+                    console.error('❌ Metadata collection failed during analysis', error);
+                    throw new Error(`Metadata collection failed: ${error.message}`);
+                }
+            }
+
+            // Combine current data
+            const currentData = {
+                ...pageData,
+                ...collectedData.settings,
+                ...collectedData.metadata
+            };
+
+            // Analyze what changed
+            const changes = analyzeChanges(originalPageData || {}, currentData, collectedData.widgets);
+            const strategy = determineSaveStrategy(changes);
+
+            console.log('🔍 Save Analysis:', {
+                strategy: strategy.strategy,
+                hasPageChanges: changes.hasPageChanges,
+                hasVersionChanges: changes.hasVersionChanges,
+                pageFields: Object.keys(changes.pageFields),
+                versionFields: Object.keys(changes.versionFields)
+            });
+
+            // Decision logic: Show modal only if version changes detected
+            if (strategy.strategy === 'page-only') {
+                // Only page changes - save directly without modal
+                console.log('🚀 Page-only changes detected - saving directly');
+                await handleActualSave({ description: 'Page attributes updated' });
+            } else if (strategy.strategy === 'none') {
+                // No changes - just show notification
+                addNotification({
+                    type: 'info',
+                    message: 'No changes detected'
+                });
+            } else {
+                // Version changes detected - show modal for user to choose options
+                console.log('📝 Version changes detected - showing save options modal');
+                setShowSaveOptionsModal(true);
+            }
+
+        } catch (error) {
+            console.error('❌ Save analysis failed:', error);
+            addNotification({
+                type: 'error',
+                message: `Save analysis failed: ${error.message}`
+            });
+        }
+    }, [errorTodoItems, addNotification, pageData, originalPageData, contentEditorRef, settingsEditorRef, metadataEditorRef, handleActualSave]);
 
     // SMART SAVE: Intelligent save logic that only saves what changed
     const handleActualSave = useCallback(async (saveOptions = {}) => {
