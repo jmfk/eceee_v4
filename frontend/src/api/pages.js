@@ -95,13 +95,17 @@ export const pagesApi = {
         return api.get(endpoints.pages.detail(pageId))
     }, 'pages.getActiveVersion'),
 
+    // UPDATED: Use new separated version API
     versionCurrent: wrapApiCall(async (pageId) => {
-        return api.get(endpoints.pages.versionCurrent(pageId))
+        const response = await api.get(endpoints.versions.currentForPage(pageId))
+        // The new API returns a list, get the first item
+        const data = response.data || response
+        return data.results ? data.results[0] : data[0] || null
     }, 'pages.versionCurrent'),
 
     /**
      * Get a page with a specific version
-     * @param {number} pageId - Page ID
+     * @param {number} pageId - Page ID (kept for backward compatibility, not used in new API)
      * @param {number} versionId - Version ID
      * @returns {Promise<WebPageDetailResponse>}
      */
@@ -109,7 +113,8 @@ export const pagesApi = {
         if (!versionId) {
             throw new Error('versionId is required for getVersion')
         }
-        return api.get(endpoints.pages.versionDetail(pageId, versionId))
+        // Use the new direct version endpoint instead of page-nested endpoint
+        return api.get(endpoints.versions.detail(versionId))
     }, 'pages.getVersion'),
 
     /**
