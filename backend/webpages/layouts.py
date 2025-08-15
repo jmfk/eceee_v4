@@ -13,7 +13,7 @@ class SingleColumnLayout(BaseLayout):
     """Simple single-column layout suitable for most content pages"""
 
     name = "single_column"
-    description = "Single column layout with header, main content, and footer areas"
+    description = "Single column layout with header, main content, sidebar, and footer areas"
     template_name = "webpages/layouts/single_column.html"
     css_classes = "layout-single-column"
 
@@ -34,6 +34,13 @@ class SingleColumnLayout(BaseLayout):
                     "description": "Primary page content area",
                     "max_widgets": None,  # Unlimited widgets
                     "css_classes": "slot-main",
+                },
+                {
+                    "name": "sidebar",
+                    "title": "Sidebar",
+                    "description": "Complementary content and widgets",
+                    "max_widgets": 4,
+                    "css_classes": "slot-sidebar",
                 },
                 {
                     "name": "footer",

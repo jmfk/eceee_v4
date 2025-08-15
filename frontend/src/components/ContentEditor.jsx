@@ -255,6 +255,14 @@ const ContentEditor = forwardRef(({
     // NEW: Set up widget data change callbacks for single source of truth
     layoutRenderer.setWidgetDataCallbacks({
       widgetDataChanged: (action, slotName, widgetData) => {
+        console.log('ContentEditor: widgetDataChanged callback received:', {
+          action,
+          slotName,
+          widgetData,
+          hasOnUpdate: Boolean(onUpdate),
+          currentWidgetsKeys: Object.keys(currentWidgets)
+        });
+        
         if (!onUpdate) {
           console.warn('ContentEditor: Cannot update widget data - missing onUpdate callback');
           return;

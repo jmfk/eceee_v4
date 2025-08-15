@@ -2694,8 +2694,15 @@ class LayoutRenderer {
       const widgetType = widgetElement.getAttribute('data-widget-type');
       const widgetName = widgetElement.querySelector('.widget-header span')?.textContent || 'Unknown Widget';
 
+      console.log('LayoutRenderer: Widget removal details:', {
+        slotName,
+        widgetType,
+        widgetName,
+        hasSlotElement: Boolean(slotElement)
+      });
 
       // NEW: Notify parent component to update pageData.widgets instead of directly removing from DOM
+      console.log('LayoutRenderer: Calling executeWidgetDataCallback for removal');
       this.executeWidgetDataCallback(WIDGET_ACTIONS.REMOVE, slotName, widgetId);
 
     } else {
@@ -5250,11 +5257,21 @@ class LayoutRenderer {
    * @param {...any} args - Additional arguments
    */
   executeWidgetDataCallback(action, slotName, widgetData, ...args) {
+    console.log('LayoutRenderer: executeWidgetDataCallback called with:', {
+      action,
+      slotName,
+      widgetData,
+      hasCallback: this.widgetDataCallbacks.has('widgetDataChanged')
+    });
+    
     const callback = this.widgetDataCallbacks.get('widgetDataChanged');
     if (typeof callback === 'function') {
       try {
+        console.log('LayoutRenderer: Executing widget data callback');
         callback(action, slotName, widgetData, ...args);
+        console.log('LayoutRenderer: Widget data callback completed successfully');
       } catch (error) {
+        console.error('LayoutRenderer: Widget data callback error:', error);
         this.handleError(ERROR_TYPES.CALLBACK_EXECUTION_ERROR,
           `widget data callback for action=${action}, slot=${slotName}`,
           error,
