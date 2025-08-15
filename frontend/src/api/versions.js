@@ -69,7 +69,7 @@ export const versionsApi = {
      * @returns {Promise<Object>} Page version data in flat structure
      */
     getPageVersion: wrapApiCall(async (pageId, versionId) => {
-        const response = await api.get(endpoints.pages.versionDetail(pageId, versionId))
+        const response = await api.get(endpoints.versions.pageVersionDetail(pageId, versionId))
         const versionData = response.data || response
 
         // Transform nested API response to flat pageData structure
@@ -234,7 +234,7 @@ export const canDeleteVersion = (version) => {
  * @returns {Promise<Object>} Version statistics
  */
 export const getVersionStats = wrapApiCall(async (pageId) => {
-    const response = await api.get(endpoints.pages.versions(pageId))
+    const response = await api.get(endpoints.versions.byPage(pageId))
     const versions = response.data || response.results || []
 
     return {
