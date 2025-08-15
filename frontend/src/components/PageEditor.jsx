@@ -308,15 +308,6 @@ const PageEditor = () => {
     useEffect(() => {
         if (!pageVersionData) return;
         if (!isVersionReady) return;
-        
-        // Debug: Log the actual structure to understand the issue
-        console.log('PageEditor: pageVersionData structure:', {
-            hasCodeLayout: Boolean(pageVersionData?.codeLayout),
-            hasCode_layout: Boolean(pageVersionData?.code_layout),
-            codeLayoutValue: pageVersionData?.codeLayout,
-            code_layoutValue: pageVersionData?.code_layout,
-            allKeys: Object.keys(pageVersionData || {})
-        });
         const fetchLayoutData = async () => {
             setIsLoadingLayout(true)
 

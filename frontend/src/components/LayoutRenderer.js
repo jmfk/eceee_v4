@@ -2683,7 +2683,9 @@ class LayoutRenderer {
  * @param {string} widgetId - ID of the widget to remove
  */
   removeWidgetFromSlot(widgetId) {
+    console.log('LayoutRenderer: Attempting to remove widget with ID:', widgetId);
     const widgetElement = document.querySelector(`.rendered-widget[data-widget-id="${widgetId}"]`);
+    console.log('LayoutRenderer: Found widget element:', widgetElement);
 
     if (widgetElement) {
       const slotElement = widgetElement.closest('[data-slot-name]');
