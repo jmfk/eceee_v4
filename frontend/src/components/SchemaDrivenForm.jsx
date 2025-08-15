@@ -2,15 +2,17 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { pageDataSchemasApi } from '../api'
 
 // Minimal JSON Schema -> form renderer (text/number/boolean/select) for top-level properties
-export default function SchemaDrivenForm({ pageData, codeLayout, onChange }) {
+export default function SchemaDrivenForm({ pageVersionData, onChange }) {
     const [schema, setSchema] = useState(null)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
 
+
+
     useEffect(() => {
         let mounted = true
         setLoading(true)
-        pageDataSchemasApi.getEffective(codeLayout)
+        pageDataSchemasApi.getEffective(pageVersionData?.codeLayout)
             .then((res) => {
                 const s = res?.data?.schema || res?.schema || null
                 if (mounted) setSchema(s)
@@ -18,7 +20,7 @@ export default function SchemaDrivenForm({ pageData, codeLayout, onChange }) {
             .catch((e) => setError(typeof e?.message === 'string' ? e.message : 'Failed to load schema'))
             .finally(() => setLoading(false))
         return () => { mounted = false }
-    }, [codeLayout])
+    }, [pageVersionData?.codeLayout])
 
     const properties = useMemo(() => {
         if (!schema) return {}
@@ -46,7 +48,7 @@ export default function SchemaDrivenForm({ pageData, codeLayout, onChange }) {
     }
 
     const renderField = (key, def) => {
-        const value = pageData?.[key] ?? ''
+        const value = pageVersionData?.pageData?.[key] ?? ''
         const type = Array.isArray(def.type) ? def.type[0] : def.type
         const title = def.title || key
         const description = def.description || ''

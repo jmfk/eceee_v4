@@ -243,6 +243,7 @@ export async function smartSave(originalWebpageData, currentWebpageData, origina
                 ...changes.versionFields,
                 version_title: options.description || 'Content updated'
             };
+
             results.versionResult = await versionsApi.create(pageId, versionData);
 
         } else if (strategy.strategy === 'both') {
@@ -256,6 +257,7 @@ export async function smartSave(originalWebpageData, currentWebpageData, origina
                 ...changes.versionFields,
                 version_title: options.description || 'Page and content updated'
             };
+
             results.versionResult = await versionsApi.create(pageId, versionData);
 
         } else {

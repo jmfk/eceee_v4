@@ -12,6 +12,7 @@ django-migration-linter>=4.1.0
 # API and serialization
 djangorestframework>=3.14.0
 djangorestframework-simplejwt>=5.3.0
+djangorestframework-camel-case>=1.4.2
 django-filter>=23.2
 drf-spectacular>=0.26.0
 PyYAML>=6.0.0

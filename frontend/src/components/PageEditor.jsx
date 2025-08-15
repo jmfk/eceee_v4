@@ -249,7 +249,8 @@ const PageEditor = () => {
     const { data: pageVersion, isLoading: isLoadingPageVersion } = useQuery({
         queryKey: ['pageVersion', pageId],
         queryFn: async () => {
-            return await pagesApi.versionCurrent(pageId)
+            const result = await pagesApi.versionCurrent(pageId)
+            return result
         },
         enabled: !isNewPage
     })
@@ -298,8 +299,8 @@ const PageEditor = () => {
     // Process page version data (PageVersion model fields)
     useEffect(() => {
         if (pageVersion && !isNewPage) {
-            setPageVersionData(pageVersion)
-            setOriginalPageVersionData(pageVersion) // Track original for smart saving
+            setPageVersionData({ ...pageVersion })
+            setOriginalPageVersionData({ ...pageVersion }) // Track original for smart saving
         }
     }, [pageVersion, isNewPage])
 
@@ -525,6 +526,7 @@ const PageEditor = () => {
 
             // Set pageVersionData with the raw API response structure
             setPageVersionData(versionPageData);
+            setOriginalPageVersionData(versionPageData);
 
             // Update URL to include version parameter
             const currentPath = location.pathname;
@@ -1070,10 +1072,11 @@ const PageEditor = () => {
                         )}
                         {activeTab === 'data' && (
                             <SchemaDrivenForm
-                                key={`data-${pageVersionData?.version_id || 'new'}`}
-                                pageData={pageVersionData?.pageData}
-                                codeLayout={pageVersionData?.code_layout}
-                                onChange={(data) => updatePageData({ pageData: data })}
+                                key={`data-${pageVersionData?.id || 'new'}`}
+                                pageVersionData={pageVersionData}
+                                onChange={(data) => updatePageData({
+                                    pageData: { ...pageVersionData?.pageData, ...data }
+                                })}
                             />
                         )}
                         {activeTab === 'preview' && (
