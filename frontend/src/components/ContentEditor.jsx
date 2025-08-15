@@ -283,10 +283,25 @@ const ContentEditor = forwardRef(({
           case WIDGET_ACTIONS.REMOVE:
             // Remove widget by ID from slot array
             // Note: widgetData is just the widgetId string for REMOVE action
+            console.log('ContentEditor: REMOVE action details:', {
+              slotName,
+              widgetIdToRemove: widgetData,
+              slotExists: Boolean(updatedWidgets[slotName]),
+              slotWidgets: updatedWidgets[slotName],
+              widgetIds: updatedWidgets[slotName]?.map(w => w.id)
+            });
+            
             if (updatedWidgets[slotName]) {
+              const beforeCount = updatedWidgets[slotName].length;
               updatedWidgets[slotName] = updatedWidgets[slotName].filter(
                 widget => widget.id !== widgetData
               );
+              const afterCount = updatedWidgets[slotName].length;
+              console.log('ContentEditor: Widget removal result:', {
+                beforeCount,
+                afterCount,
+                removed: beforeCount !== afterCount
+              });
             }
             break;
 
@@ -319,6 +334,13 @@ const ContentEditor = forwardRef(({
         }
 
         // Update pageVersionData with new widgets through parent component
+        console.log('ContentEditor: Calling onUpdate with updated widgets:', {
+          action,
+          slotName,
+          updatedWidgets,
+          totalWidgets: Object.keys(updatedWidgets).reduce((sum, slot) => sum + updatedWidgets[slot].length, 0)
+        });
+        
         onUpdate({
           webpageData,
           pageVersionData: {
@@ -331,6 +353,8 @@ const ContentEditor = forwardRef(({
         if (onDirtyChange) {
           onDirtyChange(true, `widget ${action} in slot ${slotName}`);
         }
+        
+        console.log('ContentEditor: onUpdate and onDirtyChange completed');
       }
     });
 
