@@ -203,7 +203,7 @@ export function generateChangeSummary(changes) {
 export async function smartSave(originalWebpageData, currentWebpageData, originalPageVersionData, currentPageVersionData, apis, options = {}) {
     const { pagesApi, versionsApi } = apis;
     const pageId = currentWebpageData.id || originalWebpageData.id;
-    const versionId = currentPageVersionData.versionId || originalPageVersionData.versionId;
+    const versionId = currentPageVersionData.id || originalPageVersionData.id;
 
     // Analyze what changed
     const changes = analyzeChanges(originalWebpageData, currentWebpageData, originalPageVersionData, currentPageVersionData);
@@ -235,36 +235,25 @@ export async function smartSave(originalWebpageData, currentWebpageData, origina
         // Execute saves based on strategy
         if (strategy.strategy === 'page-only') {
 
-            results.pageResult = await pagesApi.update(pageId, changes.pageFields);
+            results.pageResult = await pagesApi.update(pageId, currentWebpageData);
 
         } else if (strategy.strategy === 'version-only') {
 
-            const versionData = {
-                ...changes.versionFields,
-                version_title: options.description || 'Content updated'
-            };
-            console.log('versionData', versionData);
             if (options.forceNewVersion) {
-                results.versionResult = await versionsApi.create(pageId, versionData);
+                results.versionResult = await versionsApi.create(versionId, currentPageVersionData);
             } else {
-                results.versionResult = await versionsApi.update(versionId, versionData);
+                results.versionResult = await versionsApi.update(versionId, currentPageVersionData);
             }
 
         } else if (strategy.strategy === 'both') {
 
             // Save page first
-            results.pageResult = await pagesApi.update(pageId, changes.pageFields);
-
-            // Then create new version  
-            const versionData = {
-                ...changes.versionFields,
-                version_title: options.description || 'Page and content updated'
-            };
+            results.pageResult = await pagesApi.update(pageId, currentWebpageData);
 
             if (options.forceNewVersion) {
-                results.versionResult = await versionsApi.create(pageId, versionData);
+                results.versionResult = await versionsApi.create(versionId, currentPageVersionData);
             } else {
-                results.versionResult = await versionsApi.update(versionId, versionData);
+                results.versionResult = await versionsApi.update(versionId, currentPageVersionData);
             }
 
         } else {
