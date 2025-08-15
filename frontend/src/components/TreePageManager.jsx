@@ -198,7 +198,7 @@ const TreePageManager = () => {
     // Move page mutation
     const movePageMutation = useMutation({
         mutationFn: ({ pageId, parentId, sortOrder }) =>
-            movePage(pageId, parentId, sortOrder),
+            pagesApi.update(pageId, { parent_id: parentId, sort_order: sortOrder }),
         onMutate: () => {
             addNotification('Moving page...', 'info', 'page-move')
         },
