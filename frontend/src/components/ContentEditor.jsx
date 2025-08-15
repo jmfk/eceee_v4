@@ -341,12 +341,9 @@ const ContentEditor = forwardRef(({
           totalWidgets: Object.keys(updatedWidgets).reduce((sum, slot) => sum + updatedWidgets[slot].length, 0)
         });
         
+        // Pass only the widgets field update, not the entire objects
         onUpdate({
-          webpageData,
-          pageVersionData: {
-            ...pageVersionData,
-            widgets: updatedWidgets
-          }
+          widgets: updatedWidgets
         });
 
         // Mark as dirty since widgets changed
