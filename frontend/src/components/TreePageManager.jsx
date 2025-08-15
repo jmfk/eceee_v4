@@ -234,6 +234,25 @@ const TreePageManager = () => {
         }
     })
 
+    // Helper function to optimistically update tree structure
+    const updatePageInTree = useCallback((pages, pageId, updater) => {
+        const updateRecursive = (pageList) => {
+            return pageList.map(page => {
+                if (page.id === pageId) {
+                    return updater(page)
+                }
+                if (page.children && page.children.length > 0) {
+                    return {
+                        ...page,
+                        children: updateRecursive(page.children)
+                    }
+                }
+                return page
+            }).filter(Boolean) // Remove null/undefined pages
+        }
+        return updateRecursive(pages)
+    }, [])
+
     // Update pages when data changes
     useEffect(() => {
         if (rootPagesData?.results) {
@@ -249,38 +268,68 @@ const TreePageManager = () => {
             setExpandedPages(new Set(firstLevelPageIds))
 
             // Auto-load children for first-level pages that have children
-            const pagesWithChildren = rootPagesData.results.filter(page => page.children_count > 0)
-            pagesWithChildren.forEach(async (page) => {
+            const pagesWithChildren = rootPagesData.results.filter(page => (page.childrenCount || page.children_count) > 0)
+
+            // Load all children in parallel and update state once
+            const loadAllChildren = async () => {
                 try {
-                    const childrenData = await pagesApi.getPageChildren(page.id)
+                    const childrenPromises = pagesWithChildren.map(async (page) => {
+                        try {
+                            const childrenData = await pagesApi.getPageChildren(page.id)
 
-                    // Check if childrenData has the expected structure
-                    if (!childrenData || !childrenData.results) {
-                        console.warn(`Invalid children data structure for page ${page.id}:`, childrenData)
-                        return
-                    }
+                            // Check if childrenData has the expected structure
+                            if (!childrenData || !childrenData.results) {
+                                console.warn(`Invalid children data structure for page ${page.id}:`, childrenData)
+                                return null
+                            }
 
-                    const children = childrenData.results.map(child => pageTreeUtils.formatPageForTree(child))
+                            const children = childrenData.results.map(child => pageTreeUtils.formatPageForTree(child))
 
-                    // Update the specific page node with its children
-                    setPages(prevPages => {
-                        return updatePageInTree(prevPages, page.id, (p) => ({
-                            ...p,
-                            children: children,
-                            childrenLoaded: true,
-                            isExpanded: true
-                        }))
+                            // Cache the children data in React Query for invalidation
+                            queryClient.setQueryData(['page-children', page.id], childrenData)
+
+                            return {
+                                pageId: page.id,
+                                children: children
+                            }
+                        } catch (error) {
+                            console.error(`Failed to load children for page ${page.id}:`, error)
+                            showError(error, 'error')
+                            return null
+                        }
                     })
 
-                    // Cache the children data in React Query for invalidation
-                    queryClient.setQueryData(['page-children', page.id], childrenData)
+                    const childrenResults = await Promise.all(childrenPromises)
+
+                    // Update all pages with their children in a single state update
+                    setPages(prevPages => {
+                        let updatedPages = [...prevPages]
+
+                        childrenResults.forEach(result => {
+                            if (result) {
+                                updatedPages = updatePageInTree(updatedPages, result.pageId, (p) => ({
+                                    ...p,
+                                    children: result.children,
+                                    childrenLoaded: true,
+                                    isExpanded: true
+                                }))
+                            }
+                        })
+
+                        return updatedPages
+                    })
                 } catch (error) {
-                    console.error(`Failed to load children for page ${page.id}:`, error)
+                    console.error('Failed to load children for first-level pages:', error)
                     showError(error, 'error')
                 }
-            })
+            }
+
+            // Only load children if there are pages with children
+            if (pagesWithChildren.length > 0) {
+                loadAllChildren()
+            }
         }
-    }, [rootPagesData, queryClient])
+    }, [rootPagesData, queryClient, updatePageInTree, showError])
 
     // Process search results
     useEffect(() => {
@@ -318,25 +367,6 @@ const TreePageManager = () => {
             showError(error, 'error')
         }
     }, [queryClient])
-
-    // Helper function to optimistically update tree structure
-    const updatePageInTree = useCallback((pages, pageId, updater) => {
-        const updateRecursive = (pageList) => {
-            return pageList.map(page => {
-                if (page.id === pageId) {
-                    return updater(page)
-                }
-                if (page.children && page.children.length > 0) {
-                    return {
-                        ...page,
-                        children: updateRecursive(page.children)
-                    }
-                }
-                return page
-            }).filter(Boolean) // Remove null/undefined pages
-        }
-        return updateRecursive(pages)
-    }, [])
 
     // Callback function for PageTreeNode to update page data
     const updatePageData = useCallback((pageId, updates) => {
