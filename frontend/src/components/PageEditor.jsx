@@ -308,11 +308,20 @@ const PageEditor = () => {
     useEffect(() => {
         if (!pageVersionData) return;
         if (!isVersionReady) return;
+        
+        // Debug: Log the actual structure to understand the issue
+        console.log('PageEditor: pageVersionData structure:', {
+            hasCodeLayout: Boolean(pageVersionData?.codeLayout),
+            hasCode_layout: Boolean(pageVersionData?.code_layout),
+            codeLayoutValue: pageVersionData?.codeLayout,
+            code_layoutValue: pageVersionData?.code_layout,
+            allKeys: Object.keys(pageVersionData || {})
+        });
         const fetchLayoutData = async () => {
             setIsLoadingLayout(true)
 
-            // Determine which layout to load
-            let layoutToLoad = pageVersionData?.codeLayout;
+            // Determine which layout to load (support both camelCase and snake_case)
+            let layoutToLoad = pageVersionData?.codeLayout || pageVersionData?.code_layout;
             let isUsingFallback = false;
 
             if (!layoutToLoad) {
@@ -1017,7 +1026,7 @@ const PageEditor = () => {
                                 ) : (
                                     <>
                                         {/* Layout fallback warning */}
-                                        {!pageVersionData?.code_layout && (
+                                        {!(pageVersionData?.codeLayout || pageVersionData?.code_layout) && (
                                             <div className="bg-amber-50 border-l-4 border-amber-400 p-4 mb-4">
                                                 <div className="flex">
                                                     <div className="flex-shrink-0">
