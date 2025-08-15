@@ -81,8 +81,6 @@ if settings.DEBUG:
     urlpatterns += [
         # Debug toolbar
         path("__debug__/", include(debug_toolbar.urls)),
-        # Silk profiling
-        path("silk/", include("silk.urls", namespace="silk")),
     ]
 
     # Static and media files in development

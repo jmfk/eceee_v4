@@ -119,7 +119,6 @@ THIRD_PARTY_APPS = [
     # Development tools
     "django_extensions",
     "debug_toolbar",
-    "silk",
     # Monitoring
     "django_prometheus",
 ]
@@ -152,7 +151,6 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "debug_toolbar.middleware.DebugToolbarMiddleware",
-    "silk.middleware.SilkyMiddleware",
     "django_prometheus.middleware.PrometheusAfterMiddleware",
 ]
 
@@ -332,9 +330,6 @@ if DEBUG:
     SHELL_PLUS_PRINT_SQL = True
     SHELL_PLUS = "ipython"
 
-    # Silk profiling
-    SILKY_PYTHON_PROFILER = True
-    SILKY_PYTHON_PROFILER_BINARY = True
 
 # Logging Configuration
 LOGGING = {
