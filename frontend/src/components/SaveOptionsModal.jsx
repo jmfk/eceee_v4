@@ -67,7 +67,7 @@ const SaveOptionsModal = ({
                     {currentVersion && !isNewPage && (
                         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
                             <div className="text-sm text-blue-800">
-                                <strong>Current Version:</strong> v{currentVersion.version_number}
+                                <strong>Current Version:</strong> v{currentVersion.versionNumber}
                                 {currentVersion.description && (
                                     <div className="text-blue-600 mt-1">
                                         "{currentVersion.description}"
@@ -98,7 +98,7 @@ const SaveOptionsModal = ({
                                         </span>
                                     </div>
                                     <p className="text-sm text-gray-600 mt-1">
-                                        Modify the existing version v{currentVersion?.version_number || '?'}.
+                                        Modify the existing version v{currentVersion?.versionNumber || '?'}.
                                         Changes will overwrite current content.
                                     </p>
                                 </div>

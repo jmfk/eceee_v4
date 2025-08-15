@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { convertKeysToCamel, convertKeysToSnake } from '../utils/caseConversion.js'
 
 // API client configuration for Django backend with CSRF token handling
 const API_BASE_URL = ''
@@ -44,7 +45,7 @@ export const getCsrfToken = async () => {
     return null
 }
 
-// Request interceptor to add CSRF token
+// Request interceptor to add CSRF token and convert camelCase to snake_case
 apiClient.interceptors.request.use(
     async (config) => {
         // Get CSRF token if we don't have one
@@ -59,6 +60,16 @@ apiClient.interceptors.request.use(
             }
         }
 
+        // Convert request data from camelCase to snake_case for backend
+        if (config.data && typeof config.data === 'object') {
+            config.data = convertKeysToSnake(config.data)
+        }
+
+        // Convert query parameters from camelCase to snake_case
+        if (config.params && typeof config.params === 'object') {
+            config.params = convertKeysToSnake(config.params)
+        }
+
         return config
     },
     (error) => {
@@ -66,9 +77,15 @@ apiClient.interceptors.request.use(
     }
 )
 
-// Response interceptor for error handling
+// Response interceptor for error handling and snake_case to camelCase conversion
 apiClient.interceptors.response.use(
-    (response) => response,
+    (response) => {
+        // Convert response data from snake_case to camelCase for frontend
+        if (response.data && typeof response.data === 'object') {
+            response.data = convertKeysToCamel(response.data)
+        }
+        return response
+    },
     async (error) => {
         // If we get a 403 Forbidden (CSRF failure), try to refresh the token
         if (error.response?.status === 403 && error.response?.data?.detail?.includes('CSRF')) {
@@ -81,6 +98,11 @@ apiClient.interceptors.response.use(
                 error.config.headers['X-CSRFToken'] = csrfToken
                 return apiClient.request(error.config)
             }
+        }
+
+        // Convert error response data as well
+        if (error.response?.data && typeof error.response.data === 'object') {
+            error.response.data = convertKeysToCamel(error.response.data)
         }
 
         return Promise.reject(error)

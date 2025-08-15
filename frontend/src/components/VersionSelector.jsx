@@ -26,11 +26,11 @@ const VersionSelector = ({
     const getCurrentlyPublishedVersion = () => {
         const now = new Date();
 
-        // Find the latest version (by version_number) that is currently published
+        // Find the latest version (by versionNumber) that is currently published
         const publishedVersions = availableVersions
             .filter(version => {
-                const effectiveDate = version.effective_date ? new Date(version.effective_date) : null;
-                const expiryDate = version.expiry_date ? new Date(version.expiry_date) : null;
+                const effectiveDate = version.effectiveDate ? new Date(version.effectiveDate) : null;
+                const expiryDate = version.expiryDate ? new Date(version.expiryDate) : null;
 
                 // Must have effective date and be active
                 if (!effectiveDate || effectiveDate > now) return false;
@@ -40,17 +40,17 @@ const VersionSelector = ({
 
                 return true;
             })
-            .sort((a, b) => b.version_number - a.version_number); // Sort by version number descending
+            .sort((a, b) => b.versionNumber - a.versionNumber); // Sort by version number descending
 
-        // Return the latest version (highest version_number) that's currently published
+        // Return the latest version (highest versionNumber) that's currently published
         return publishedVersions.length > 0 ? publishedVersions[0] : null;
     }
 
     // Determine version status with proper icons and colors
     const getVersionStatus = (version) => {
         const now = new Date();
-        const effectiveDate = version.effective_date ? new Date(version.effective_date) : null;
-        const expiryDate = version.expiry_date ? new Date(version.expiry_date) : null;
+        const effectiveDate = version.effectiveDate ? new Date(version.effectiveDate) : null;
+        const expiryDate = version.expiryDate ? new Date(version.expiryDate) : null;
 
         // Check if this is the currently published version
         const currentlyPublished = getCurrentlyPublishedVersion();
@@ -83,7 +83,7 @@ const VersionSelector = ({
             }
         }
 
-        // Check for superseded versions (has effective_date but another version is currently published)
+        // Check for superseded versions (has effectiveDate but another version is currently published)
         if (effectiveDate && effectiveDate <= now && currentlyPublished && currentlyPublished.id !== version.id) {
             return {
                 icon: AlertCircle,
@@ -135,7 +135,7 @@ const VersionSelector = ({
                             <CurrentIcon className={`w-3.5 h-3.5 flex-shrink-0 ${currentStatus.color}`} />
                             <div className="min-w-0 flex-1 text-left">
                                 <div className="text-xs text-gray-900 truncate">
-                                    v{currentVersion.version_number} • {currentStatus.label}
+                                    v{currentVersion.versionNumber} • {currentStatus.label}
                                 </div>
                             </div>
                         </>
@@ -149,7 +149,7 @@ const VersionSelector = ({
 
             {/* Dropdown menu */}
             {isOpen && (
-                <div className="absolute bottom-full left-0 right-0 mb-1 bg-white border border-gray-200 rounded-md shadow-lg z-50 max-h-64 overflow-y-auto">
+                <div className="absolute bottom-full right-0 mb-1 bg-white border border-gray-200 rounded-md shadow-lg z-50 max-h-64 overflow-y-auto w-max max-w-64">
                     {availableVersions.map((version) => {
                         const status = getVersionStatus(version)
                         const StatusIcon = status.icon
@@ -166,10 +166,10 @@ const VersionSelector = ({
                                     <StatusIcon className={`w-4 h-4 flex-shrink-0 ${status.color}`} />
                                     <div className="min-w-0 flex-1">
                                         <div className="text-sm font-medium text-gray-900 truncate">
-                                            {version.description || `Version ${version.version_number}`}
+                                            {version.description || `Version ${version.versionNumber}`}
                                         </div>
                                         <div className="text-xs text-gray-500 flex items-center space-x-1">
-                                            <span>v{version.version_number}</span>
+                                            <span>v{version.versionNumber}</span>
                                             <span>•</span>
                                             <span className={status.color}>{status.label}</span>
                                         </div>

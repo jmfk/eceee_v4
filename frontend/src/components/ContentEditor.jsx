@@ -192,19 +192,24 @@ const ContentEditor = forwardRef(({
       return;
     }
 
-    // Initialize version management using webpage ID
-    layoutRenderer.initializeVersionManagement(pageId, null);
+    // Initialize version management using webpage ID and current version
+    const currentVersion = pageVersionData?.versionId ? {
+      id: pageVersionData.versionId,
+      versionNumber: pageVersionData.versionNumber,
+      versionTitle: pageVersionData.versionTitle || pageVersionData.description || 'No description',
+      publicationStatus: pageVersionData.publicationStatus || 'draft'
+    } : null;
+
+    layoutRenderer.initializeVersionManagement(pageId, currentVersion);
 
     // Set up version callbacks
     layoutRenderer.setVersionCallback('version-changed', (versionData) => {
-      // Optionally notify parent component about version change
+      // Notify parent component about version change via onUpdate
       if (onUpdate) {
         onUpdate({
           webpageData,
-          pageVersionData: {
-            ...pageVersionData,
-            currentVersion: versionData
-          }
+          pageVersionData: versionData,
+          versionChanged: true // Signal that this is a version change
         });
       }
     });
@@ -214,8 +219,25 @@ const ContentEditor = forwardRef(({
       setError(errorMessage);
     });
 
-  }, [layoutRenderer, pageId, isNewPage, onUpdate, webpageData, pageVersionData]);
+  }, [layoutRenderer, pageId, isNewPage, onUpdate, webpageData, pageVersionData?.versionId, pageVersionData?.versionNumber, pageVersionData?.versionTitle, pageVersionData?.publicationStatus]);
 
+  // Sync current version with LayoutRenderer when pageVersionData changes
+  useEffect(() => {
+    if (!layoutRenderer || !pageVersionData?.versionId) {
+      return;
+    }
+
+    // Update LayoutRenderer's current version when PageEditor switches versions
+    const currentVersion = {
+      id: pageVersionData.versionId,
+      versionNumber: pageVersionData.versionNumber,
+      versionTitle: pageVersionData.versionTitle || pageVersionData.description || 'No description',
+      publicationStatus: pageVersionData.publicationStatus || 'draft'
+    };
+
+    layoutRenderer.currentVersion = currentVersion;
+    layoutRenderer.updateVersionSelector();
+  }, [layoutRenderer, pageVersionData?.versionId, pageVersionData?.versionNumber, pageVersionData?.versionTitle, pageVersionData?.publicationStatus]);
 
   // Set up dirty state communication with LayoutRenderer
   useEffect(() => {

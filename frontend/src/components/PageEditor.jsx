@@ -57,8 +57,8 @@ function hashString(str) {
 
 function mapFieldToTarget(field) {
     if (!field) return { type: 'data' }
-    const settingsFields = new Set(['title', 'slug', 'code_layout'])
-    const metadataFields = new Set(['meta_title', 'meta_description', 'hostnames'])
+    const settingsFields = new Set(['title', 'slug', 'codeLayout'])
+    const metadataFields = new Set(['metaTitle', 'metaDescription', 'hostnames'])
     if (settingsFields.has(field)) return { type: 'settings' }
     if (metadataFields.has(field)) return { type: 'metadata' }
     return { type: 'data' }
@@ -219,9 +219,9 @@ const PageEditor = () => {
                 slug: '',
                 description: '',
                 hostnames: [],
-                enable_css_injection: false,
-                page_css_variables: {},
-                page_custom_css: ''
+                enableCssInjection: false,
+                pageCssVariables: {},
+                pageCustomCss: ''
             })
 
             // Initialize PageVersion data
@@ -312,7 +312,7 @@ const PageEditor = () => {
             setIsLoadingLayout(true)
 
             // Determine which layout to load
-            let layoutToLoad = pageVersionData?.code_layout;
+            let layoutToLoad = pageVersionData?.codeLayout;
             let isUsingFallback = false;
 
             if (!layoutToLoad) {
@@ -426,7 +426,7 @@ const PageEditor = () => {
             // Second priority: Use highest version number (last saved) if no URL version or URL version is invalid
             if (!targetVersion && versionsData.versions && versionsData.versions.length > 0) {
                 targetVersion = versionsData.versions.reduce((latest, current) => {
-                    return (current.version_number > latest.version_number) ? current : latest;
+                    return (current.versionNumber > latest.versionNumber) ? current : latest;
                 });
             }
 
@@ -484,11 +484,19 @@ const PageEditor = () => {
 
     // Handle page data updates - route to appropriate data structure
     const updatePageData = (updates) => {
+        // Handle version changes from LayoutRenderer
+        if (updates.versionChanged && updates.pageVersionData) {
+            // This is a version switch from LayoutRenderer, use switchToVersion
+            const versionId = updates.pageVersionData.id || updates.pageVersionData.versionId;
+            switchToVersion(versionId);
+            return; // Don't set dirty for version switches
+        }
+
         // Define fields that belong to WebPage model (sync with PAGE_FIELDS in smartSaveUtils.js)
         const webpageFields = [
-            'title', 'slug', 'description', 'parent', 'parent_id', 'sort_order',
-            'hostnames', 'enable_css_injection', 'page_css_variables', 'page_custom_css',
-            'meta_title', 'meta_description'
+            'title', 'slug', 'description', 'parent', 'parentId', 'sortOrder',
+            'hostnames', 'enableCssInjection', 'pageCssVariables', 'pageCustomCss',
+            'metaTitle', 'metaDescription'
         ]
 
         // Separate updates into webpage and version updates
@@ -499,7 +507,7 @@ const PageEditor = () => {
             if (webpageFields.includes(key)) {
                 webpageUpdates[key] = value
             } else {
-                // Everything else goes to version data (widgets, code_layout, pageData, etc.)
+                // Everything else goes to version data (widgets, codeLayout, pageData, etc.)
                 versionUpdates[key] = value
             }
         })
@@ -534,16 +542,16 @@ const PageEditor = () => {
             navigate(newUrl, { replace: true, state: { previousView } });
 
             // Handle layout fallback for versions without valid layouts
-            if (!versionPageData.code_layout) {
+            if (!versionPageData.codeLayout) {
                 addNotification({
                     type: 'warning',
-                    message: `Version ${versionData.version_number} has no layout. Using fallback layout for preview.`
+                    message: `Version ${versionData.versionNumber} has no layout. Using fallback layout for preview.`
                 });
             }
 
             addNotification({
                 type: 'info',
-                message: `Switched to version ${versionData.version_number}`
+                message: `Switched to version ${versionData.versionNumber}`
             });
         } catch (error) {
             console.error('PageEditor: Error switching to version', error);
@@ -1179,14 +1187,14 @@ const SettingsEditor = forwardRef(({ webpageData, pageVersionData, onUpdate, isN
                 slug: webpageData?.slug || '',
                 description: webpageData?.description || '',
                 parent: webpageData?.parent,
-                parent_id: webpageData?.parent_id,
-                sort_order: webpageData?.sort_order,
+                parentId: webpageData?.parentId,
+                sortOrder: webpageData?.sortOrder,
                 hostnames: webpageData?.hostnames || [],
-                enable_css_injection: webpageData?.enable_css_injection || false,
-                page_css_variables: webpageData?.page_css_variables || {},
-                page_custom_css: webpageData?.page_custom_css || '',
-                // PageVersion field (code_layout affects version content)
-                code_layout: pageVersionData?.code_layout || ''
+                enableCssInjection: webpageData?.enableCssInjection || false,
+                pageCssVariables: webpageData?.pageCssVariables || {},
+                pageCustomCss: webpageData?.pageCustomCss || '',
+                // PageVersion field (codeLayout affects version content)
+                codeLayout: pageVersionData?.codeLayout || ''
             };
 
             return {
@@ -1259,11 +1267,11 @@ const MetadataEditor = forwardRef(({ webpageData, onUpdate, isNewPage }, ref) =>
         saveMetadata: async () => {
             // Metadata is already saved in real-time via onUpdate
             // This method confirms the current state is saved
-            // Note: meta_title and meta_description are WebPage fields, 
+            // Note: metaTitle and metaDescription are WebPage fields, 
             // but hostnames is already handled in settings
             const currentMetadata = {
-                meta_title: webpageData?.meta_title || webpageData?.title || '',
-                meta_description: webpageData?.meta_description || ''
+                metaTitle: webpageData?.metaTitle || webpageData?.title || '',
+                metaDescription: webpageData?.metaDescription || ''
                 // hostnames are handled in settings, not duplicated here
             };
 
@@ -1289,8 +1297,8 @@ const MetadataEditor = forwardRef(({ webpageData, onUpdate, isNewPage }, ref) =>
                             </label>
                             <input
                                 type="text"
-                                value={webpageData?.meta_title || webpageData?.title || ''}
-                                onChange={(e) => onUpdate({ meta_title: e.target.value })}
+                                value={webpageData?.metaTitle || webpageData?.title || ''}
+                                onChange={(e) => onUpdate({ metaTitle: e.target.value })}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 placeholder="SEO title for search engines"
                             />
@@ -1301,8 +1309,8 @@ const MetadataEditor = forwardRef(({ webpageData, onUpdate, isNewPage }, ref) =>
                                 Meta Description
                             </label>
                             <textarea
-                                value={webpageData?.meta_description || ''}
-                                onChange={(e) => onUpdate({ meta_description: e.target.value })}
+                                value={webpageData?.metaDescription || ''}
+                                onChange={(e) => onUpdate({ metaDescription: e.target.value })}
                                 rows={3}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 placeholder="SEO description for search engines"

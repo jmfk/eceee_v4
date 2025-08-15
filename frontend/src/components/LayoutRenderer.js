@@ -149,11 +149,11 @@ class LayoutRenderer {
     }
 
     return apiWidgets
-      .filter(apiWidget => apiWidget.is_active !== false) // Only include active widgets
+      .filter(apiWidget => apiWidget.isActive !== false) // Only include active widgets
       .map(apiWidget => {
         try {
           // Extract default config from configuration schema
-          const defaultConfig = this.extractDefaultConfigFromSchema(apiWidget.configuration_schema);
+          const defaultConfig = this.extractDefaultConfigFromSchema(apiWidget.configurationSchema);
 
           // Generate appropriate icon and category based on widget class and name
           const iconAndCategory = this.generateIconAndCategory(apiWidget);
@@ -167,9 +167,9 @@ class LayoutRenderer {
             config: defaultConfig,
             // Store original API data for potential use in widget creation
             _apiData: {
-              widget_class: apiWidget.widget_class,
-              configuration_schema: apiWidget.configuration_schema,
-              template_json: apiWidget.template_json
+              widgetClass: apiWidget.widgetClass,
+              configurationSchema: apiWidget.configurationSchema,
+              templateJson: apiWidget.templateJson
             }
           };
         } catch (error) {
@@ -226,7 +226,7 @@ class LayoutRenderer {
    */
   generateIconAndCategory(apiWidget) {
     const name = (apiWidget.name || '').toLowerCase();
-    const className = (apiWidget.widget_class || '').toLowerCase();
+    const className = (apiWidget.widgetClass || '').toLowerCase();
 
     // Define icon and category mappings
     const mappings = [
@@ -1039,7 +1039,7 @@ class LayoutRenderer {
   }
 
   /**
-   * Edit widget instance using configuration_schema
+   * Edit widget instance using configurationSchema
    * @param {string} widgetId - ID of the widget to edit
    * @param {Object} widgetInstance - Widget instance to edit
    */
@@ -1053,7 +1053,7 @@ class LayoutRenderer {
     const widgetDef = availableWidgets.find(w => w.type === widgetInstance.type);
 
     // Prefer schema from widgetDef, fallback to instance _apiData
-    const schema = widgetDef?._apiData?.configuration_schema || widgetInstance._apiData?.configuration_schema || {};
+    const schema = widgetDef?._apiData?.configurationSchema || widgetInstance._apiData?.configurationSchema || {};
     const config = widgetInstance.config || {};
 
     // Create modal overlay
@@ -2253,7 +2253,7 @@ class LayoutRenderer {
       widget.appendChild(header);
     }
 
-    // Add widget content - pass full widgetInstance for template_json access
+    // Add widget content - pass full widgetInstance for templateJson access
     const content = await this.renderWidgetContent(type, config, widgetInstance);
     widget.appendChild(content);
 
@@ -2369,35 +2369,35 @@ class LayoutRenderer {
    * Render widget content based on type and configuration
    * @param {string} type - Widget type
    * @param {Object} config - Widget configuration
-   * @param {Object} widgetInstance - Full widget instance (optional, for template_json access)
+   * @param {Object} widgetInstance - Full widget instance (optional, for templateJson access)
    * @returns {HTMLElement} Widget content element
    */
   async renderWidgetContent(type, config, widgetInstance = null) {
     try {
-      // Check if widget has template_json available for rendering
+      // Check if widget has templateJson available for rendering
       // Look up widget definition by type
       const availableWidgets = await this.getAvailableWidgets();
       const widgetDef = availableWidgets.find(w => w.type === widgetInstance.type);
 
       if (widgetInstance &&
         widgetDef?._apiData &&
-        widgetDef?._apiData?.template_json) {
+        widgetDef?._apiData?.templateJson) {
 
         try {
-          // Use template_json rendering with caching
+          // Use templateJson rendering with caching
           return this.renderFromTemplateJsonCached(
-            widgetDef._apiData.template_json,
+            widgetDef._apiData.templateJson,
             config,
             type,
             widgetInstance.id // Pass widget ID for CSS scoping
           );
         } catch (templateError) {
-          console.error(`LayoutRenderer: template_json rendering failed for "${type}", falling back to legacy`, templateError);
+          console.error(`LayoutRenderer: templateJson rendering failed for "${type}", falling back to legacy`, templateError);
           // Fall through to legacy rendering
         }
       }
 
-      // Legacy rendering fallback or for widgets without template_json
+      // Legacy rendering fallback or for widgets without templateJson
       return this.renderWidgetContentLegacy(type, config);
 
     } catch (error) {
@@ -3021,7 +3021,7 @@ class LayoutRenderer {
   // ======================================================================
 
   /**
-   * Render widget content from template_json structure
+   * Render widget content from templateJson structure
    * @param {Object} templateJson - Parsed template JSON from backend
    * @param {Object} config - Widget configuration object
    * @param {string} widgetType - Widget type identifier
@@ -3030,13 +3030,13 @@ class LayoutRenderer {
    */
   renderFromTemplateJson(templateJson, config, widgetType, widgetId = null) {
     try {
-      // Validate template_json structure
+      // Validate templateJson structure
       if (!templateJson || typeof templateJson !== 'object') {
-        throw new Error('Invalid template_json object');
+        throw new Error('Invalid templateJson object');
       }
 
       if (!templateJson.structure) {
-        throw new Error('template_json missing structure property');
+        throw new Error('templateJson missing structure property');
       }
 
 
@@ -3060,7 +3060,7 @@ class LayoutRenderer {
       return element;
 
     } catch (error) {
-      console.error(`LayoutRenderer: Error rendering template_json for widget "${widgetType}"`, error);
+      console.error(`LayoutRenderer: Error rendering templateJson for widget "${widgetType}"`, error);
 
       // Enhanced error handling with detailed fallback
       return this.createTemplateErrorElement(error, widgetType, {
@@ -4142,7 +4142,7 @@ class LayoutRenderer {
   }
 
   /**
-   * Validate template_json structure before processing
+   * Validate templateJson structure before processing
    * @param {Object} templateJson - Template JSON to validate
    * @returns {Object} Validation result with errors
    */
@@ -4153,7 +4153,7 @@ class LayoutRenderer {
     try {
       // Check basic structure
       if (!templateJson || typeof templateJson !== 'object') {
-        errors.push('Invalid template_json: not an object');
+        errors.push('Invalid templateJson: not an object');
         return { isValid: false, errors, warnings };
       }
 
@@ -4354,10 +4354,10 @@ class LayoutRenderer {
 
       this.cacheMetrics.misses++;
 
-      // Validate template_json structure before processing
+      // Validate templateJson structure before processing
       const validation = this.validateTemplateJson(templateJson);
       if (!validation.isValid) {
-        throw new Error(`Invalid template_json: ${validation.errors.join(', ')}`);
+        throw new Error(`Invalid templateJson: ${validation.errors.join(', ')}`);
       }
 
       if (validation.warnings.length > 0) {
@@ -4638,7 +4638,7 @@ class LayoutRenderer {
 
   /**
    * Preload and cache widget templates for faster rendering
-   * @param {Array} widgets - Array of widget definitions with template_json
+   * @param {Array} widgets - Array of widget definitions with templateJson
    */
   async preloadWidgetTemplates(widgets) {
     try {
@@ -4648,20 +4648,20 @@ class LayoutRenderer {
 
       const preloadPromises = widgets.map(async (widget) => {
         try {
-          if (widget._apiData?.template_json) {
+          if (widget._apiData?.templateJson) {
             // Create a sample config for preprocessing
-            const sampleConfig = this.createSampleConfig(widget._apiData.configuration_schema);
+            const sampleConfig = this.createSampleConfig(widget._apiData.configurationSchema);
 
             // Preprocess and cache the template
             const cacheKey = this.generateTemplateCacheKey(
-              widget._apiData.template_json,
+              widget._apiData.templateJson,
               sampleConfig,
               widget.type
             );
 
             if (!this.getFromTemplateCache(cacheKey)) {
-              const preprocessed = this.preprocessTemplateStructure(widget._apiData.template_json);
-              this.setTemplateCache(cacheKey, preprocessed, widget._apiData.template_json);
+              const preprocessed = this.preprocessTemplateStructure(widget._apiData.templateJson);
+              this.setTemplateCache(cacheKey, preprocessed, widget._apiData.templateJson);
             }
           }
         } catch (error) {
@@ -5058,15 +5058,15 @@ class LayoutRenderer {
 
     // Update indicator
     if (this.currentVersion) {
-      const statusClass = this.currentVersion.status === 'published' ? 'text-green-600' : 'text-orange-600';
-      const statusIcon = this.currentVersion.status === 'published' ? '✓' : '⚠';
+      const statusClass = this.currentVersion.publicationStatus === 'published' ? 'text-green-600' : 'text-orange-600';
+      const statusIcon = this.currentVersion.publicationStatus === 'published' ? '✓' : '⚠';
       indicator.innerHTML = `
         <div class="text-sm font-medium text-gray-700">
           <span class="${statusClass}">${statusIcon}</span>
-          Version ${this.currentVersion.version_number}
-          <span class="text-xs text-gray-500">(${this.currentVersion.status})</span>
+          Version ${this.currentVersion.versionNumber}
+          <span class="text-xs text-gray-500">(${this.currentVersion.publicationStatus || 'draft'})</span>
         </div>
-        <div class="text-xs text-gray-600">${this.templateRenderer.escapeHtml(this.currentVersion.description || 'No description')}</div>
+        <div class="text-xs text-gray-600">${this.templateRenderer.escapeHtml(this.currentVersion.versionTitle || this.currentVersion.description || 'No description')}</div>
       `;
     } else {
       indicator.innerHTML = '<div class="text-sm text-gray-500">No version selected</div>';
@@ -5094,7 +5094,7 @@ class LayoutRenderer {
     select.appendChild(latestOption);
 
     // Add published version option
-    const publishedVersion = this.pageVersions.find(v => v.is_current_published);
+    const publishedVersion = this.pageVersions.find(v => v.isPublished || v.publicationStatus === 'published');
     if (publishedVersion) {
       const publishedOption = document.createElement('option');
       publishedOption.value = publishedVersion.id;
@@ -5121,8 +5121,8 @@ class LayoutRenderer {
 
         const option = document.createElement('option');
         option.value = version.id;
-        const statusIcon = version.status === 'published' ? '✓' : version.status === 'draft' ? '📝' : '📋';
-        option.textContent = `${statusIcon} v${version.version_number} - ${version.description || 'No description'}`;
+        const statusIcon = version.publicationStatus === 'published' ? '✓' : version.publicationStatus === 'draft' ? '📝' : '📋';
+        option.textContent = `${statusIcon} v${version.versionNumber} - ${version.versionTitle || 'No description'}`;
 
         if (this.currentVersion && this.currentVersion.id === version.id) {
           option.selected = true;
@@ -5143,12 +5143,15 @@ class LayoutRenderer {
     }
 
     try {
-      // Import the versions API client
-      const { getVersionWidgets } = await import('../api/versions.js');
-      const versionData = await getVersionWidgets(versionId);
+      // Import the versions API client for complete version data
+      const { getPageVersion } = await import('../api/versions.js');
+      const versionData = await getPageVersion(this.pageId, versionId);
 
-      // Update current version
-      this.currentVersion = versionData;
+      // Update current version metadata
+      const versionMetadata = this.pageVersions.find(v => v.id === versionId);
+      if (versionMetadata) {
+        this.currentVersion = versionMetadata;
+      }
 
       // Load the widget data for this version
       this.loadWidgetData(versionData.widgets || {});
@@ -5156,7 +5159,7 @@ class LayoutRenderer {
       // Update the version selector
       this.updateVersionSelector();
 
-      // Trigger version change callback if set
+      // Trigger version change callback if set - pass complete version data
       const callback = this.versionCallbacks.get('version-changed');
       if (callback && typeof callback === 'function') {
         callback(versionData);

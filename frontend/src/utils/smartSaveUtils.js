@@ -37,18 +37,18 @@ const VERSION_FIELDS = new Set([
 // Fields that are metadata/computed (don't save)
 const METADATA_FIELDS = new Set([
     'id',
-    'version_id',
-    'version_number',
-    'created_at',
-    'updated_at',
-    'created_by',
-    'last_modified_by',
-    'publication_status',
-    'is_published',
-    'is_current_published',
-    'absolute_url',
+    'versionId',
+    'versionNumber',
+    'createdAt',
+    'updatedAt',
+    'createdBy',
+    'lastModifiedBy',
+    'publicationStatus',
+    'isPublished',
+    'isCurrentPublished',
+    'absoluteUrl',
     'breadcrumbs',
-    'children_count'
+    'childrenCount'
 ]);
 
 /**
@@ -203,7 +203,7 @@ export function generateChangeSummary(changes) {
 export async function smartSave(originalWebpageData, currentWebpageData, originalPageVersionData, currentPageVersionData, apis, options = {}) {
     const { pagesApi, versionsApi } = apis;
     const pageId = currentWebpageData.id || originalWebpageData.id;
-    const versionId = currentPageVersionData.version_id || originalPageVersionData.version_id;
+    const versionId = currentPageVersionData.versionId || originalPageVersionData.versionId;
 
     // Analyze what changed
     const changes = analyzeChanges(originalWebpageData, currentWebpageData, originalPageVersionData, currentPageVersionData);
@@ -243,11 +243,14 @@ export async function smartSave(originalWebpageData, currentWebpageData, origina
                 ...changes.versionFields,
                 version_title: options.description || 'Content updated'
             };
-
-            results.versionResult = await versionsApi.create(pageId, versionData);
+            console.log('versionData', versionData);
+            if (options.forceNewVersion) {
+                results.versionResult = await versionsApi.create(pageId, versionData);
+            } else {
+                results.versionResult = await versionsApi.update(versionId, versionData);
+            }
 
         } else if (strategy.strategy === 'both') {
-
 
             // Save page first
             results.pageResult = await pagesApi.update(pageId, changes.pageFields);
@@ -258,7 +261,11 @@ export async function smartSave(originalWebpageData, currentWebpageData, origina
                 version_title: options.description || 'Page and content updated'
             };
 
-            results.versionResult = await versionsApi.create(pageId, versionData);
+            if (options.forceNewVersion) {
+                results.versionResult = await versionsApi.create(pageId, versionData);
+            } else {
+                results.versionResult = await versionsApi.update(versionId, versionData);
+            }
 
         } else {
 
