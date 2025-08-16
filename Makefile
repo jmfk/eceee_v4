@@ -1,6 +1,6 @@
 # Makefile for eceee_v4_test_1
 
-.PHONY: install backend frontend migrate createsuperuser test lint docker-up docker-down clean
+.PHONY: install backend frontend migrate createsuperuser sample-content sample-pages sample-data sample-clean test lint docker-up docker-down clean
 
 # Install backend and frontend dependencies
 install:
@@ -31,6 +31,19 @@ createsuperuser:
 
 changepassword:
 	docker-compose exec backend python manage.py changepassword -u admin -p admin
+
+# Create sample data
+sample-content:
+	docker-compose exec backend python manage.py create_sample_content --count 10 --verbose
+
+sample-pages:
+	docker-compose exec backend python manage.py create_sample_pages --verbose
+
+sample-data: sample-content sample-pages
+
+sample-clean:
+	docker-compose exec backend python manage.py create_sample_content --clean --count 10 --verbose
+	docker-compose exec backend python manage.py create_sample_pages --clear --verbose
 
 shell:
 	docker-compose exec backend bash
