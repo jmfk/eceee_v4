@@ -166,9 +166,6 @@ export default function SystemSchemaManager() {
                             <div>
                                 <h3 className="text-md font-medium mb-4">Schema Editor Preview</h3>
                                 <div className="bg-white border rounded-lg p-4">
-                                    <div className="mb-3 p-2 bg-gray-50 rounded text-sm text-gray-600">
-                                        <strong>Currently editing:</strong> Fields in the schema editor (default fields are added automatically when used)
-                                    </div>
                                     <SchemaFormPreview schema={systemForm.schema} title="Current Schema Fields" />
                                 </div>
                             </div>

@@ -153,7 +153,7 @@ const SaveOptionsModal = ({
                 </div>
 
                 {/* Footer */}
-                <div className="flex items-center justify-end space-x-3 p-6 border-t bg-gray-50">
+                <div className="flex items-center justify-center space-x-3 p-6 border-t bg-gray-50">
                     <button
                         onClick={handleClose}
                         disabled={isLoading}

@@ -6,7 +6,13 @@ export default function SchemaFormPreview({ schema }) {
   const [formData, setFormData] = useState({})
 
   if (!schema?.properties || Object.keys(schema.properties).length === 0) {
-    return null
+    return (
+      <div className="rounded-lg bg-gray-50 p-6 text-center">
+        <div className="text-gray-500 text-sm">
+          No schema properties defined yet. Add properties to see a form preview.
+        </div>
+      </div>
+    )
   }
 
   const handleInputChange = (key, value) => {

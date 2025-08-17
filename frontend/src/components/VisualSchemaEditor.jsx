@@ -395,7 +395,7 @@ function PropertyTypeSelector({ onAddProperty }) {
       </button>
 
       {isOpen && (
-        <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-3 w-80 bg-white border border-gray-200 rounded-xl shadow-xl z-20">
+        <div className="absolute top-full left-0 right-0 mx-auto mt-3 w-80 bg-white border border-gray-200 rounded-xl shadow-xl z-20">
           <div className="p-4">
             <div className="text-sm font-semibold text-gray-900 mb-3 text-center">Select Property Type</div>
             <div className="grid grid-cols-1 gap-2">
@@ -562,7 +562,9 @@ export default function VisualSchemaEditor({ schema, onChange }) {
                 <div className="text-gray-600 text-lg mb-2">No properties defined yet</div>
                 <div className="text-gray-500 text-sm">Add your first property to start building your schema</div>
               </div>
-              <PropertyTypeSelector onAddProperty={handleAddProperty} />
+              <div className="flex justify-center pt-4 border-t border-gray-100">
+                <PropertyTypeSelector onAddProperty={handleAddProperty} />
+              </div>
             </div>
           ) : (
             <>
