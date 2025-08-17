@@ -16,9 +16,7 @@ const PAGE_FIELDS = new Set([
     'hostnames',
     'enableCssInjection',
     'pageCssVariables',
-    'pageCustomCss',
-    'metaTitle',
-    'metaDescription'
+    'pageCustomCss'
 ]);
 
 // Fields that belong to the PageVersion model (save via versions API)
@@ -31,7 +29,9 @@ const VERSION_FIELDS = new Set([
     'versionTitle',
     'changeSummary',
     'effectiveDate',
-    'expiryDate'
+    'expiryDate',
+    'metaTitle',
+    'metaDescription'
 ]);
 
 // Fields that are metadata/computed (don't save)
@@ -50,6 +50,57 @@ const METADATA_FIELDS = new Set([
     'breadcrumbs',
     'childrenCount'
 ]);
+
+/**
+ * Prepare version data for saving by properly nesting meta fields in pageData
+ * @param {Object} versionData - Version data to prepare
+ * @returns {Object} Prepared version data with meta fields in pageData
+ */
+function prepareVersionDataForSave(versionData) {
+    const prepared = { ...versionData };
+
+    // Extract meta fields and existing pageData
+    const { metaTitle, metaDescription, pageData = {}, ...otherFields } = prepared;
+
+    // Create new pageData with meta fields
+    const newPageData = { ...pageData };
+
+    // Add meta fields to pageData if they exist
+    if (metaTitle !== undefined) {
+        newPageData.metaTitle = metaTitle;
+    }
+    if (metaDescription !== undefined) {
+        newPageData.metaDescription = metaDescription;
+    }
+
+    // Return version data with meta fields nested in pageData
+    return {
+        ...otherFields,
+        pageData: newPageData
+    };
+}
+
+/**
+ * Process loaded version data by flattening meta fields from pageData for UI
+ * @param {Object} versionData - Raw version data from API
+ * @returns {Object} Processed version data with meta fields at top level
+ */
+export function processLoadedVersionData(versionData) {
+    if (!versionData) return versionData;
+
+    const processed = { ...versionData };
+    const pageData = processed.pageData || {};
+
+    // Extract meta fields from pageData and add to top level for UI
+    if (pageData.metaTitle !== undefined) {
+        processed.metaTitle = pageData.metaTitle;
+    }
+    if (pageData.metaDescription !== undefined) {
+        processed.metaDescription = pageData.metaDescription;
+    }
+
+    return processed;
+}
 
 /**
  * Analyze what has changed between original and current data
@@ -238,11 +289,13 @@ export async function smartSave(originalWebpageData, currentWebpageData, origina
             results.pageResult = await pagesApi.update(pageId, currentWebpageData);
 
         } else if (strategy.strategy === 'version-only') {
+            // Prepare version data with meta fields properly nested in pageData
+            const versionDataForSave = prepareVersionDataForSave(currentPageVersionData);
 
             if (options.forceNewVersion) {
-                results.versionResult = await versionsApi.create(versionId, currentPageVersionData);
+                results.versionResult = await versionsApi.create(versionId, versionDataForSave);
             } else {
-                results.versionResult = await versionsApi.update(versionId, currentPageVersionData);
+                results.versionResult = await versionsApi.update(versionId, versionDataForSave);
             }
 
         } else if (strategy.strategy === 'both') {
@@ -250,10 +303,13 @@ export async function smartSave(originalWebpageData, currentWebpageData, origina
             // Save page first
             results.pageResult = await pagesApi.update(pageId, currentWebpageData);
 
+            // Prepare version data with meta fields properly nested in pageData
+            const versionDataForSave = prepareVersionDataForSave(currentPageVersionData);
+
             if (options.forceNewVersion) {
-                results.versionResult = await versionsApi.create(versionId, currentPageVersionData);
+                results.versionResult = await versionsApi.create(versionId, versionDataForSave);
             } else {
-                results.versionResult = await versionsApi.update(versionId, currentPageVersionData);
+                results.versionResult = await versionsApi.update(versionId, versionDataForSave);
             }
 
         } else {

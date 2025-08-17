@@ -54,7 +54,7 @@ const mockThemes = [
             background: '#ffffff',
             text: '#1f2937'
         },
-        custom_css: '.blue-theme { background: var(--background); }',
+        customCss: '.blue-theme { background: var(--background); }',
         isActive: true,
         createdAt: '2024-01-01T00:00:00Z',
         createdBy: { username: 'testuser' }
@@ -68,7 +68,7 @@ const mockThemes = [
             background: '#111827',
             text: '#f9fafb'
         },
-        custom_css: '.dark-theme { color: var(--text); }',
+        customCss: '.dark-theme { color: var(--text); }',
         isActive: true,
         createdAt: '2024-01-01T00:00:00Z',
         createdBy: { username: 'testuser' }

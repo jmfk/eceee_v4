@@ -208,7 +208,7 @@ const ThemeForm = ({ theme = null, onSave, onCancel }) => {
         name: theme?.name || '',
         description: theme?.description || '',
         cssVariables: theme?.cssVariables || {},
-        custom_css: theme?.custom_css || '',
+        customCss: theme?.customCss || '',
         isActive: theme?.isActive ?? true
     })
 
@@ -498,8 +498,8 @@ const ThemeForm = ({ theme = null, onSave, onCancel }) => {
                     {showCssEditor && (
                         <textarea
                             id="theme-custom-css"
-                            value={formData.custom_css}
-                            onChange={(e) => setFormData({ ...formData, custom_css: e.target.value })}
+                            value={formData.customCss}
+                            onChange={(e) => setFormData({ ...formData, customCss: e.target.value })}
                             rows={8}
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono text-sm"
                             placeholder={`/* Additional custom CSS for this theme */\n.theme-custom {\n  /* Your styles here */\n}\n\nbody {\n  background: var(--background);\n  color: var(--text);\n}`}

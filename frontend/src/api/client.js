@@ -1,5 +1,4 @@
 import axios from 'axios'
-import { convertKeysToCamel, convertKeysToSnake } from '../utils/caseConversion.js'
 
 // API client configuration for Django backend with CSRF token handling
 const API_BASE_URL = ''
@@ -45,7 +44,7 @@ export const getCsrfToken = async () => {
     return null
 }
 
-// Request interceptor to add CSRF token and convert camelCase to snake_case
+// Request interceptor to add CSRF token
 apiClient.interceptors.request.use(
     async (config) => {
         // Get CSRF token if we don't have one
@@ -60,15 +59,8 @@ apiClient.interceptors.request.use(
             }
         }
 
-        // Convert request data from camelCase to snake_case for backend
-        if (config.data && typeof config.data === 'object') {
-            config.data = convertKeysToSnake(config.data)
-        }
-
-        // Convert query parameters from camelCase to snake_case
-        if (config.params && typeof config.params === 'object') {
-            config.params = convertKeysToSnake(config.params)
-        }
+        // Note: Case conversion is handled by djangorestframework-camel-case on the backend
+        // Frontend should send camelCase data and receive camelCase responses
 
         return config
     },
@@ -77,13 +69,11 @@ apiClient.interceptors.request.use(
     }
 )
 
-// Response interceptor for error handling and snake_case to camelCase conversion
+// Response interceptor for error handling
 apiClient.interceptors.response.use(
     (response) => {
-        // Convert response data from snake_case to camelCase for frontend
-        if (response.data && typeof response.data === 'object') {
-            response.data = convertKeysToCamel(response.data)
-        }
+        // Note: Case conversion is handled by djangorestframework-camel-case on the backend
+        // Backend should send camelCase data directly
         return response
     },
     async (error) => {

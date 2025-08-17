@@ -165,7 +165,7 @@ export const pagesApi = {
     saveWithWidgets: wrapApiCall(async (pageId, versionId, pageData = {}, widgets = null, options = {}) => {
         const payload = { ...pageData }
 
-        // Build page_data JSON from provided pageData by excluding reserved transport keys
+        // Build pageData JSON from provided pageData by excluding reserved transport keys
         const reservedKeys = new Set([
             'id', 'versionId', 'versionNumber', 'widgets', 'versionOptions', 'publicationStatus',
             'isCurrentPublished', 'effectiveDate', 'expiryDate', 'createdAt', 'createdBy', 'changeSummary',
