@@ -303,6 +303,7 @@ class DjangoTemplateRenderer {
                     return this.createElementFromTemplate(structure, config);
 
                 case 'templateText':
+                case 'template_text':
                     return this.processTemplateText(structure, config);
 
                 case 'text':
@@ -315,10 +316,11 @@ class DjangoTemplateRenderer {
                     return this.processFragment(structure, config);
 
                 case 'conditionalBlock':
-                    // Handle conditional blocks with proper error handling
+                case 'conditional_block':
+                    // Handle conditional blocks with proper error handling (support both camelCase and snake_case)
                     try {
                         if (!structure.condition || typeof structure.condition !== 'string') {
-                            console.warn('DjangoTemplateRenderer: Invalid condition in conditionalBlock');
+                            console.warn('DjangoTemplateRenderer: Invalid condition in conditional block');
                             return document.createTextNode('<!-- Invalid condition -->');
                         }
 
@@ -326,33 +328,34 @@ class DjangoTemplateRenderer {
                         if (shouldRender && structure.content) {
                             // Validate content structure before processing
                             if (typeof structure.content !== 'object' || !structure.content.type) {
-                                console.warn('DjangoTemplateRenderer: Invalid content in conditionalBlock');
+                                console.warn('DjangoTemplateRenderer: Invalid content in conditional block');
                                 return document.createTextNode('<!-- Invalid content structure -->');
                             }
                             return this.processTemplateStructure(structure.content, config);
                         }
                         return document.createTextNode('');
                     } catch (error) {
-                        console.error('DjangoTemplateRenderer: Error processing conditionalBlock', error);
+                        console.error('DjangoTemplateRenderer: Error processing conditional block', error);
                         return document.createTextNode('<!-- Conditional block error -->');
                     }
 
                 case 'loop_block':
-                    // Handle loop blocks with proper error handling
+                case 'loopBlock':
+                    // Handle loop blocks with proper error handling (support both camelCase and snake_case)
                     try {
                         if (!structure.loop || typeof structure.loop !== 'string') {
-                            console.warn('DjangoTemplateRenderer: Invalid loop expression in loop_block');
+                            console.warn('DjangoTemplateRenderer: Invalid loop expression in loop block');
                             return document.createTextNode('<!-- Invalid loop expression -->');
                         }
 
                         if (!structure.content || typeof structure.content !== 'object') {
-                            console.warn('DjangoTemplateRenderer: Invalid content in loop_block');
+                            console.warn('DjangoTemplateRenderer: Invalid content in loop block');
                             return document.createTextNode('<!-- Invalid loop content -->');
                         }
 
                         return this.processLoopLogic(structure, config, []);
                     } catch (error) {
-                        console.error('DjangoTemplateRenderer: Error processing loop_block', error);
+                        console.error('DjangoTemplateRenderer: Error processing loop block', error);
                         return document.createTextNode('<!-- Loop block error -->');
                     }
 
@@ -842,6 +845,7 @@ class DjangoTemplateRenderer {
                     return this.createSafeElementFallback(structure, config, error);
 
                 case 'templateText':
+                case 'template_text':
                     return this.createSafeTextFallback(structure, config, error);
 
                 case 'text':
@@ -1274,7 +1278,8 @@ class DjangoTemplateRenderer {
                     return this.createElementFromTemplateWithLogic(structure, config, templateTags);
 
                 case 'templateText':
-                    // Check for conditional text rendering
+                case 'template_text':
+                    // Check for conditional text rendering (support both camelCase and snake_case)
                     if (structure.showIf) {
                         const shouldShow = this.evaluateCondition(structure.showIf, config);
                         if (!shouldShow) {
@@ -1284,7 +1289,8 @@ class DjangoTemplateRenderer {
                     return this.processTemplateText(structure, config);
 
                 case 'conditionalBlock':
-                    // Special type for conditional blocks
+                case 'conditional_block':
+                    // Special type for conditional blocks (support both camelCase and snake_case)
                     const shouldRender = this.evaluateCondition(structure.condition, config);
                     if (shouldRender && structure.content) {
                         return this.processTemplateStructureWithLogic(structure.content, config, templateTags);

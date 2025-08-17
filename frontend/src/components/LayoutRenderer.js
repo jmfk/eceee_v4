@@ -3097,6 +3097,7 @@ class LayoutRenderer {
           return this.templateRenderer.createElementFromTemplate(structure, config);
 
         case 'templateText':
+        case 'template_text':
           return this.templateRenderer.processTemplateText(structure, config);
 
         case 'text':
@@ -3571,7 +3572,8 @@ class LayoutRenderer {
           return this.templateRenderer.createElementFromTemplateWithLogic(structure, config, templateTags);
 
         case 'templateText':
-          // Check for conditional text rendering
+        case 'template_text':
+          // Check for conditional text rendering (support both camelCase and snake_case)
           if (structure.showIf) {
             const shouldShow = this.templateRenderer.evaluateCondition(structure.showIf, config);
             if (!shouldShow) {
@@ -3581,7 +3583,8 @@ class LayoutRenderer {
           return this.templateRenderer.processTemplateText(structure, config);
 
         case 'conditionalBlock':
-          // Special type for conditional blocks
+        case 'conditional_block':
+          // Special type for conditional blocks (support both camelCase and snake_case)
           const shouldRender = this.templateRenderer.evaluateCondition(structure.condition, config);
           if (shouldRender && structure.content) {
             return this.templateRenderer.processTemplateStructureWithLogic(structure.content, config, templateTags);
@@ -4056,6 +4059,7 @@ class LayoutRenderer {
           return this.createSafeElementFallback(structure, config, error);
 
         case 'templateText':
+        case 'template_text':
           return this.templateRenderer.createSafeTextFallback(structure, config, error);
 
         case 'text':
@@ -4215,7 +4219,7 @@ class LayoutRenderer {
         return;
       }
 
-      const validTypes = ['element', 'templateText', 'text', 'style', 'fragment', 'conditionalBlock', 'loop_block'];
+      const validTypes = ['element', 'templateText', 'template_text', 'text', 'style', 'fragment', 'conditionalBlock', 'conditional_block', 'loop_block', 'loopBlock'];
       if (!validTypes.includes(structure.type)) {
         warnings.push(`Unknown structure type: ${structure.type}`);
       }
@@ -4223,22 +4227,24 @@ class LayoutRenderer {
       // Validate type-specific properties
       switch (structure.type) {
         case 'conditionalBlock':
+        case 'conditional_block':
           if (!structure.condition || typeof structure.condition !== 'string') {
-            errors.push('conditionalBlock missing valid condition property');
+            errors.push('conditional block missing valid condition property');
           }
           if (!structure.content) {
-            errors.push('conditionalBlock missing content property');
+            errors.push('conditional block missing content property');
           } else {
             this.validateTemplateStructure(structure.content, errors, warnings);
           }
           break;
 
         case 'loop_block':
+        case 'loopBlock':
           if (!structure.loop || typeof structure.loop !== 'string') {
-            errors.push('loop_block missing valid loop property');
+            errors.push('loop block missing valid loop property');
           }
           if (!structure.content) {
-            errors.push('loop_block missing content property');
+            errors.push('loop block missing content property');
           } else {
             this.validateTemplateStructure(structure.content, errors, warnings);
           }
@@ -5263,7 +5269,7 @@ class LayoutRenderer {
       widgetData,
       hasCallback: this.widgetDataCallbacks.has('widgetDataChanged')
     });
-    
+
     const callback = this.widgetDataCallbacks.get('widgetDataChanged');
     if (typeof callback === 'function') {
       try {
