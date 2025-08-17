@@ -33,7 +33,7 @@ export const pagesApi = {
     getRootPages: wrapApiCall(async (filters = {}) => {
         const params = {
             parent_isnull: 'true',
-            ordering: 'sort_order,title',
+            ordering: 'sortOrder,title',
             ...filters
         }
         const queryString = buildQueryParams(params)
@@ -49,7 +49,7 @@ export const pagesApi = {
     getPageChildren: wrapApiCall(async (pageId, filters = {}) => {
         const params = {
             parent: pageId,
-            ordering: 'sort_order,title',
+            ordering: 'sortOrder,title',
             ...filters
         }
         const queryString = buildQueryParams(params)
@@ -167,11 +167,10 @@ export const pagesApi = {
 
         // Build page_data JSON from provided pageData by excluding reserved transport keys
         const reservedKeys = new Set([
-            'id', 'version_id', 'version_number', 'widgets', 'version_options', 'publication_status',
-            'is_current_published', 'effective_date', 'expiry_date', 'created_at', 'created_by', 'change_summary',
-            'last_modified', 'active_version', 'last_saved_version',
-            // Explicitly exclude core metadata fields from page_data
-            'title', 'slug', 'code_layout'
+            'id', 'versionId', 'versionNumber', 'widgets', 'versionOptions', 'publicationStatus',
+            'isCurrentPublished', 'effectiveDate', 'expiryDate', 'createdAt', 'createdBy', 'changeSummary',
+            'lastModified', 'activeVersion', 'lastSavedVersion',
+            'title', 'slug', 'codeLayout'
         ])
         const pageDataJson = {}
         Object.entries(pageData || {}).forEach(([key, value]) => {

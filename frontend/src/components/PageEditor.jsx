@@ -123,11 +123,11 @@ function deriveTodoItemsFromError(errorString) {
  *     title: string,
  *     slug: string,
  *     description: string,
- *     code_layout: string,
+ *     codeLayout: string,
  *     widgets: { slot_name: [widget_objects] },
  *     version_id: number,        // Current version being viewed
  *     version_number: number,    // Version number for display
- *     publication_status: string, // draft/published/scheduled/expired
+ *     publicationStatus: string, // draft/published/scheduled/expired
  *     // ... other page metadata
  *   }
  * - availableVersions: List of version metadata for dropdown
@@ -228,10 +228,10 @@ const PageEditor = () => {
             setPageVersionData({
                 pageData: {},
                 widgets: {},
-                code_layout: '',
+                codeLayout: '',
                 theme: null,
-                version_title: 'Initial version',
-                publication_status: 'unpublished'
+                versionTitle: 'Initial version',
+                publicationStatus: 'unpublished'
             })
         }
     }, [isNewPage, webpageData, pageVersionData])
@@ -304,7 +304,7 @@ const PageEditor = () => {
         }
     }, [pageVersion, isNewPage])
 
-    // Fetch layout data when page has a code_layout, with fallback support
+    // Fetch layout data when page has a codeLayout, with fallback support
     useEffect(() => {
         if (!pageVersionData) return;
         if (!isVersionReady) return;
@@ -312,7 +312,7 @@ const PageEditor = () => {
             setIsLoadingLayout(true)
 
             // Determine which layout to load (support both camelCase and snake_case)
-            let layoutToLoad = pageVersionData?.codeLayout || pageVersionData?.code_layout;
+            let layoutToLoad = pageVersionData?.codeLayout;
             let isUsingFallback = false;
 
             if (!layoutToLoad) {
@@ -356,14 +356,14 @@ const PageEditor = () => {
         if (pageVersionData) {
             fetchLayoutData()
         }
-    }, [pageVersionData?.code_layout, webpageData?.id, isVersionReady, addNotification, showError])
+    }, [pageVersionData?.codeLayout, webpageData?.id, isVersionReady, addNotification, showError])
 
 
     // Publish page mutation
     const publishPageMutation = useMutation({
         mutationFn: async () => {
             return await pagesApi.update(pageId, {
-                publication_status: 'published'
+                publicationStatus: 'published'
             })
         },
         onSuccess: (updatedPage) => {
@@ -1017,7 +1017,7 @@ const PageEditor = () => {
                                 ) : (
                                     <>
                                         {/* Layout fallback warning */}
-                                        {!(pageVersionData?.codeLayout || pageVersionData?.code_layout) && (
+                                        {!(pageVersionData?.codeLayout) && (
                                             <div className="bg-amber-50 border-l-4 border-amber-400 p-4 mb-4">
                                                 <div className="flex">
                                                     <div className="flex-shrink-0">
@@ -1134,11 +1134,11 @@ const PageEditor = () => {
                 customStatusContent={
                     <div className="flex items-center space-x-4">
                         <span>
-                            Status: <span className={`font-medium ${pageVersionData?.publication_status === 'published' ? 'text-green-600' :
-                                pageVersionData?.publication_status === 'scheduled' ? 'text-blue-600' :
+                            Status: <span className={`font-medium ${pageVersionData?.publicationStatus === 'published' ? 'text-green-600' :
+                                pageVersionData?.publicationStatus === 'scheduled' ? 'text-blue-600' :
                                     'text-gray-600'
                                 }`}>
-                                {pageVersionData?.publication_status || 'unpublished'}
+                                {pageVersionData?.publicationStatus || 'unpublished'}
                             </span>
                         </span>
 
@@ -1180,7 +1180,7 @@ const SettingsEditor = forwardRef(({ webpageData, pageVersionData, onUpdate, isN
         saveSettings: async () => {
             // Settings are already saved in real-time via onUpdate
             // This method confirms the current state is saved
-            // Settings are primarily WebPage fields, but code_layout is a PageVersion field
+            // Settings are primarily WebPage fields, but codeLayout is a PageVersion field
             const currentSettings = {
                 // WebPage fields
                 title: webpageData?.title || '',
@@ -1242,8 +1242,8 @@ const SettingsEditor = forwardRef(({ webpageData, pageVersionData, onUpdate, isN
                         {/* Page Layout Selection */}
                         <div>
                             <LayoutSelector
-                                value={pageVersionData?.code_layout || ''}
-                                onChange={(layout) => onUpdate({ code_layout: layout })}
+                                value={pageVersionData?.codeLayout || ''}
+                                onChange={(layout) => onUpdate({ codeLayout: layout })}
                                 label="Page Layout"
                                 description="Choose the layout template for this page"
                             />
@@ -1366,7 +1366,7 @@ const PagePreview = ({ webpageData, pageVersionData, isLoadingLayout, layoutData
         );
     }
 
-    if (!pageVersionData.code_layout) {
+    if (!pageVersionData.codeLayout) {
         return (
             <div className="h-full flex items-center justify-center bg-gray-50">
                 <div className="text-center text-gray-500">
@@ -1392,13 +1392,13 @@ const PagePreview = ({ webpageData, pageVersionData, isLoadingLayout, layoutData
     }
 
     // Show error state if layout data failed to load
-    if (!layoutData && pageVersionData.code_layout) {
+    if (!layoutData && pageVersionData.codeLayout) {
         return (
             <div className="h-full bg-gray-50 overflow-auto">
                 <div className="h-full p-4 flex items-center justify-center">
                     <div className="text-center text-red-500">
                         <p className="text-lg">Preview unavailable</p>
-                        <p className="text-sm">Failed to load layout: {pageVersionData.code_layout}</p>
+                        <p className="text-sm">Failed to load layout: {pageVersionData.codeLayout}</p>
                     </div>
                 </div>
             </div>
