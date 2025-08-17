@@ -255,7 +255,8 @@ class PageVersionViewSet(viewsets.ModelViewSet):
         if incoming_page_data is not None:
             if isinstance(incoming_page_data, dict):
                 forbidden = {
-                    "title",
+                    "meta_title",
+                    "meta_description",
                     "slug",
                     "code_layout",
                     "page_data",

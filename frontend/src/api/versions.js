@@ -90,7 +90,7 @@ export const versionsApi = {
             expiryDate: versionData.expiryDate,
 
             // Add version-specific fields
-            description: versionData.description,
+            metaDescription: versionData.metaDescription,
             createdAt: versionData.createdAt,
             createdBy: versionData.createdBy,
             changeSummary: versionData.changeSummary
@@ -103,7 +103,19 @@ export const versionsApi = {
      * @returns {Promise<Object>} Page versions list
      */
     getPageVersionsList: wrapApiCall(async (pageId) => {
-        return api.get(endpoints.versions.byPage(pageId))
+        const response = await api.get(endpoints.versions.byPage(pageId))
+
+        // Process versions to convert backend field names to frontend field names
+        if (response.versions && Array.isArray(response.versions)) {
+            response.versions = response.versions.map(version => ({
+                ...version,
+                // Convert backend field names to frontend field names for consistency
+                metaDescription: version.metaDescription,
+                metaTitle: version.metaTitle
+            }))
+        }
+
+        return response
     }, 'versions.getPageVersionsList'),
 
     /**
@@ -112,7 +124,19 @@ export const versionsApi = {
      * @returns {Promise<Array>} Array of versions
      */
     getVersionsForPage: wrapApiCall(async (pageId) => {
-        return api.get(endpoints.versions.byPage(pageId))
+        const response = await api.get(endpoints.versions.byPage(pageId))
+
+        // Process versions to convert backend field names to frontend field names
+        if (response.versions && Array.isArray(response.versions)) {
+            response.versions = response.versions.map(version => ({
+                ...version,
+                // Convert backend field names to frontend field names for consistency
+                metaDescription: version.metaDescription,
+                metaTitle: version.metaTitle
+            }))
+        }
+
+        return response
     }, 'versions.getVersionsForPage'),
 
     /**
@@ -121,7 +145,18 @@ export const versionsApi = {
      * @returns {Promise<Object>} Current version or null
      */
     getCurrentVersionForPage: wrapApiCall(async (pageId) => {
-        return api.get(endpoints.versions.currentForPage(pageId))
+        const response = await api.get(endpoints.versions.currentForPage(pageId))
+
+        // Convert backend field names to frontend field names for consistency
+        if (response && typeof response === 'object') {
+            return {
+                ...response,
+                metaDescription: response.metaDescription,
+                metaTitle: response.metaTitle
+            }
+        }
+
+        return response
     }, 'versions.getCurrentVersionForPage'),
 
     /**
@@ -130,7 +165,18 @@ export const versionsApi = {
      * @returns {Promise<Object>} Latest version or null
      */
     getLatestVersionForPage: wrapApiCall(async (pageId) => {
-        return api.get(endpoints.versions.latestForPage(pageId))
+        const response = await api.get(endpoints.versions.latestForPage(pageId))
+
+        // Convert backend field names to frontend field names for consistency
+        if (response && typeof response === 'object') {
+            return {
+                ...response,
+                metaDescription: response.metaDescription,
+                metaTitle: response.metaTitle
+            }
+        }
+
+        return response
     }, 'versions.getLatestVersionForPage'),
 
     /**

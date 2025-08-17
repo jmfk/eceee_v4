@@ -458,8 +458,8 @@ class WebPage(models.Model):
                 and current_version.page_data.get("title")
             ):
                 title = current_version.page_data["title"]
-            elif hasattr(current_version, "title") and current_version.title:
-                title = current_version.title
+            elif hasattr(current_version, "meta_title") and current_version.meta_title:
+                title = current_version.meta_title
             elif self.slug:
                 title = self.slug
 
@@ -1316,8 +1316,10 @@ class PageVersion(models.Model):
         help_text="Summary of specific changes made in this version",
     )
 
-    title = models.TextField(blank=True, help_text="Page Title")
-    description = models.TextField(blank=True, default="")
+    meta_title = models.TextField(blank=True, help_text="Meta Title")
+    meta_description = models.TextField(
+        blank=True, default="", help_text="Meta Description"
+    )
     code_layout = models.CharField(
         max_length=255,
         blank=True,
@@ -1575,8 +1577,8 @@ class PageVersion(models.Model):
     #         "version_number": self.version_number,
     #         "version_title": self.version_title,
     #         "change_summary": self.change_summary,
-    #         "title": self.title,
-    #         "description": self.description,
+    #         "meta_title": self.meta_title,
+    #         "meta_description": self.meta_description,
     #         "slug": self.page.slug,
     #         "hostnames": self.page.hostnames,
     #         "code_layout": self.code_layout,

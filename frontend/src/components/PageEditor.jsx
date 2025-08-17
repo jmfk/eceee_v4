@@ -20,7 +20,7 @@ import {
 import { pagesApi, layoutsApi, versionsApi } from '../api'
 import { api } from '../api/client'
 import { endpoints } from '../api/endpoints'
-import { smartSave, analyzeChanges, determineSaveStrategy, generateChangeSummary } from '../utils/smartSaveUtils'
+import { smartSave, analyzeChanges, determineSaveStrategy, generateChangeSummary, processLoadedVersionData } from '../utils/smartSaveUtils'
 import { useNotificationContext } from './NotificationManager'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import ContentEditor from './ContentEditor'
@@ -297,8 +297,9 @@ const PageEditor = () => {
     // Process page version data (PageVersion model fields)
     useEffect(() => {
         if (pageVersion && !isNewPage) {
-            setPageVersionData({ ...pageVersion })
-            setOriginalPageVersionData({ ...pageVersion }) // Track original for smart saving
+            const processedVersionData = processLoadedVersionData({ ...pageVersion });
+            setPageVersionData(processedVersionData)
+            setOriginalPageVersionData(processedVersionData) // Track original for smart saving
         }
     }, [pageVersion, isNewPage])
 
@@ -433,7 +434,7 @@ const PageEditor = () => {
                 // Load the complete version data including widgets using raw API
                 const response = await api.get(endpoints.versions.pageVersionDetail(webpageData.id || pageId, targetVersion.id));
                 const newPage = response.data || response;
-                setPageVersionData(newPage);
+                setPageVersionData(processLoadedVersionData(newPage));
             }
         } catch (error) {
             console.error('PageEditor: Error loading versions', error);
@@ -460,12 +461,12 @@ const PageEditor = () => {
                 // Load the complete version data including widgets using raw API
                 const response = await api.get(endpoints.versions.pageVersionDetail(webpageData.id || pageId, lastSavedVersion.id));
                 const newPage = response.data || response;
-                setPageVersionData(newPage);
+                setPageVersionData(processLoadedVersionData(newPage));
             } else if (currentVersion) {
                 // If we have a current version, reload the page data with that version using raw API
                 const response = await api.get(endpoints.versions.pageVersionDetail(webpageData.id || pageId, currentVersion.id));
                 const newPage = response.data || response;
-                setPageVersionData(newPage);
+                setPageVersionData(processLoadedVersionData(newPage));
             }
         } catch (error) {
             console.error('PageEditor: Error loading versions', error);
@@ -488,8 +489,7 @@ const PageEditor = () => {
         // Define fields that belong to WebPage model (sync with PAGE_FIELDS in smartSaveUtils.js)
         const webpageFields = [
             'title', 'slug', 'description', 'parent', 'parentId', 'sortOrder',
-            'hostnames', 'enableCssInjection', 'pageCssVariables', 'pageCustomCss',
-            'metaTitle', 'metaDescription'
+            'hostnames', 'enableCssInjection', 'pageCssVariables', 'pageCustomCss'
         ]
 
         // Separate updates into webpage and version updates
@@ -525,9 +525,10 @@ const PageEditor = () => {
             const versionData = availableVersions.find(version => version.id === versionId);
             setCurrentVersion(versionData);
 
-            // Set pageVersionData with the raw API response structure
-            setPageVersionData(versionPageData);
-            setOriginalPageVersionData(versionPageData);
+            // Set pageVersionData with processed data (meta fields flattened)
+            const processedVersionData = processLoadedVersionData(versionPageData);
+            setPageVersionData(processedVersionData);
+            setOriginalPageVersionData(processedVersionData);
 
             // Update URL to include version parameter
             const currentPath = location.pathname;
@@ -1168,9 +1169,9 @@ const SettingsEditor = forwardRef(({ webpageData, pageVersionData, onUpdate, isN
                 enableCssInjection: webpageData?.enableCssInjection || false,
                 pageCssVariables: webpageData?.pageCssVariables || {},
                 pageCustomCss: webpageData?.pageCustomCss || '',
-                // SEO & Metadata fields
-                metaTitle: webpageData?.metaTitle || webpageData?.title || '',
-                metaDescription: webpageData?.metaDescription || '',
+                // SEO & Metadata fields (now stored in pageVersionData)
+                metaTitle: pageVersionData?.metaTitle || webpageData?.title || '',
+                metaDescription: pageVersionData?.metaDescription || '',
                 // PageVersion field (codeLayout affects version content)
                 codeLayout: pageVersionData?.codeLayout || ''
             };
@@ -1192,19 +1193,6 @@ const SettingsEditor = forwardRef(({ webpageData, pageVersionData, onUpdate, isN
                     <h2 className="text-lg font-semibold text-gray-900 mb-6">Page Settings</h2>
 
                     <div className="space-y-6">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Page Title
-                            </label>
-                            <input
-                                type="text"
-                                value={webpageData?.title || ''}
-                                onChange={(e) => onUpdate({ title: e.target.value })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                placeholder="Enter page title"
-                            />
-                        </div>
-
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
                                 URL Slug
@@ -1241,7 +1229,7 @@ const SettingsEditor = forwardRef(({ webpageData, pageVersionData, onUpdate, isN
                             </label>
                             <input
                                 type="text"
-                                value={webpageData?.metaTitle || webpageData?.title || ''}
+                                value={pageVersionData?.metaTitle || webpageData?.title || ''}
                                 onChange={(e) => onUpdate({ metaTitle: e.target.value })}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 placeholder="SEO title for search engines"
@@ -1256,7 +1244,7 @@ const SettingsEditor = forwardRef(({ webpageData, pageVersionData, onUpdate, isN
                                 Meta Description
                             </label>
                             <textarea
-                                value={webpageData?.metaDescription || ''}
+                                value={pageVersionData?.metaDescription || ''}
                                 onChange={(e) => onUpdate({ metaDescription: e.target.value })}
                                 rows={3}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"

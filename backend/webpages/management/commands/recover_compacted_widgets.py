@@ -59,7 +59,7 @@ class Command(BaseCommand):
 
             # Check if this page might have been affected by compaction
             has_compaction_description = (
-                "Admin compaction" in current_version.description
+                "Admin compaction" in current_version.meta_description
             )
             has_empty_widgets = (
                 not current_version.widgets
@@ -80,7 +80,7 @@ class Command(BaseCommand):
             if has_compaction_description:
                 self.stdout.write(
                     self.style.WARNING(
-                        f"  - Found compaction description: {current_version.description}"
+                        f"  - Found compaction description: {current_version.meta_description}"
                     )
                 )
 
@@ -112,7 +112,7 @@ class Command(BaseCommand):
                         with transaction.atomic():
                             # Update current version with recovered widgets
                             current_version.widgets = widgets_found
-                            current_version.description += f" [Widgets recovered from v{source_version.version_number}]"
+                            current_version.meta_description += f" [Widgets recovered from v{source_version.version_number}]"
                             current_version.save()
 
                             recovered_count += 1
@@ -134,7 +134,9 @@ class Command(BaseCommand):
                     )
             else:
                 self.stdout.write(
-                    self.style.ERROR(f"  - ❌ No widgets found in any previous versions")
+                    self.style.ERROR(
+                        f"  - ❌ No widgets found in any previous versions"
+                    )
                 )
 
         # Summary

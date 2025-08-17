@@ -241,7 +241,7 @@ class WebPageAdmin(HostnameUpdateMixin, admin.ModelAdmin):
     def get_title(self, obj):
         """Display page title"""
         version = obj.get_current_published_version() or obj.get_latest_version()
-        return version.title if version and version.title else "No version"
+        return version.meta_title if version and version.meta_title else "No version"
 
     def is_published_display(self, obj):
         """Display publication status with color coding using date-based logic"""
@@ -509,7 +509,7 @@ class WebPageAdmin(HostnameUpdateMixin, admin.ModelAdmin):
 @admin.register(PageVersion)
 class PageVersionAdmin(admin.ModelAdmin):
     list_display = [
-        "title",
+        "meta_title",
         "version_number",
         "version_title",
         "publication_status_display",
@@ -550,8 +550,8 @@ class PageVersionAdmin(admin.ModelAdmin):
             {
                 "fields": (
                     "page",
-                    "title",
-                    "description",
+                    "meta_title",
+                    "meta_description",
                     "code_layout",
                     "version_number",
                     "page_admin_link",
@@ -625,9 +625,9 @@ class PageVersionAdmin(admin.ModelAdmin):
 
     restore_version.short_description = "Restore selected versions"
 
-    def get_title(self, obj):
-        """Display page title"""
-        return obj.title or obj.page.slug or "No title"
+    def get_meta_title(self, obj):
+        """Display page meta title"""
+        return obj.meta_title or obj.page.slug or "No title"
 
 
 # PageDataSchema Admin

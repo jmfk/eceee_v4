@@ -361,6 +361,8 @@ class PageVersionSerializer(serializers.ModelSerializer):
             "id",
             "version_number",
             "version_title",
+            "meta_title",
+            "meta_description",
             "code_layout",
             "page_data",
             "widgets",
@@ -407,7 +409,13 @@ class PageVersionSerializer(serializers.ModelSerializer):
         # Strip forbidden keys from page_data on write
         page_data = attrs.get("page_data")
         if isinstance(page_data, dict):
-            excluded_keys = {"title", "slug", "code_layout", "description", "hostnames"}
+            excluded_keys = {
+                "meta_title",
+                "meta_description",
+                "slug",
+                "code_layout",
+                "hostnames",
+            }
             attrs["page_data"] = {
                 k: v for k, v in page_data.items() if k not in excluded_keys
             }
@@ -500,6 +508,8 @@ class PageVersionListSerializer(serializers.ModelSerializer):
             "id",
             "version_number",
             "version_title",
+            "meta_title",
+            "meta_description",
             # New date-based publishing fields
             "effective_date",
             "expiry_date",
