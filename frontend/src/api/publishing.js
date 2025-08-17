@@ -23,7 +23,7 @@ export const publishingApi = {
 
     /**
      * Bulk schedule pages for publication
-     * @param {Object} scheduleData - Bulk schedule data with page_ids, effective_date, etc.
+     * @param {Object} scheduleData - Bulk schedule data with page_ids, effectiveDate, etc.
      * @returns {Promise<Object>} Bulk schedule result
      */
     bulkSchedule: wrapApiCall(async (scheduleData) => {

@@ -133,7 +133,7 @@ const TreePageManager = () => {
         queryFn: () => {
             const filters = {}
             if (debouncedSearchTerm) filters.search = debouncedSearchTerm
-            if (statusFilter !== 'all') filters.publication_status = statusFilter
+            if (statusFilter !== 'all') filters.publicationStatus = statusFilter
             return pagesApi.getRootPages(filters)
         },
         enabled: !debouncedSearchTerm, // Only fetch root pages when not searching
@@ -150,7 +150,7 @@ const TreePageManager = () => {
         queryKey: ['pages', 'search', { search: debouncedSearchTerm, status: statusFilter }],
         queryFn: () => {
             const filters = {}
-            if (statusFilter !== 'all') filters.publication_status = statusFilter
+            if (statusFilter !== 'all') filters.publicationStatus = statusFilter
             return searchAllPages(debouncedSearchTerm, filters)
         },
         enabled: !!debouncedSearchTerm && debouncedSearchTerm.length >= 2, // Only search when term is 2+ characters
@@ -198,7 +198,7 @@ const TreePageManager = () => {
     // Move page mutation
     const movePageMutation = useMutation({
         mutationFn: ({ pageId, parentId, sortOrder }) =>
-            pagesApi.update(pageId, { parent_id: parentId, sort_order: sortOrder }),
+            pagesApi.update(pageId, { parentId: parentId, sortOrder: sortOrder }),
         onMutate: () => {
             addNotification('Moving page...', 'info', 'page-move')
         },
@@ -733,8 +733,8 @@ const TreePageManager = () => {
                         // Add positioning params to page data if available
                         const finalPageData = { ...pageData }
                         if (positioningParams) {
-                            finalPageData.parent_id = positioningParams.parentId
-                            finalPageData.sort_order = positioningParams.suggestedSortOrder
+                            finalPageData.parentId = positioningParams.parentId
+                            finalPageData.sortOrder = positioningParams.suggestedSortOrder
                         }
                         createPageMutation.mutate(finalPageData)
                     }}
@@ -767,7 +767,7 @@ const PageCreationModal = ({ positioningParams, onSave, onCancel, isLoading }) =
     const [formData, setFormData] = useState({
         title: '',
         slug: '',
-        publication_status: 'unpublished'
+        publicationStatus: 'unpublished'
     })
 
     const generateSlug = (title) => {
@@ -859,8 +859,8 @@ const PageCreationModal = ({ positioningParams, onSave, onCancel, isLoading }) =
                         </label>
                         <select
                             id="publication-status"
-                            value={formData.publication_status}
-                            onChange={(e) => setFormData(prev => ({ ...prev, publication_status: e.target.value }))}
+                            value={formData.publicationStatus}
+                            onChange={(e) => setFormData(prev => ({ ...prev, publicationStatus: e.target.value }))}
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                         >
                             <option value="unpublished">Unpublished</option>
@@ -906,7 +906,7 @@ const RootPageCreationModal = ({ onSave, onCancel, isLoading }) => {
     const [formData, setFormData] = useState({
         title: '',
         hostnames: '',
-        publication_status: 'unpublished'
+        publicationStatus: 'unpublished'
     })
 
     const generateSlug = (title) => {
@@ -941,9 +941,9 @@ const RootPageCreationModal = ({ onSave, onCancel, isLoading }) => {
         const pageData = {
             title: formData.title,
             slug: slug,
-            publication_status: formData.publication_status,
+            publicationStatus: formData.publicationStatus,
             hostnames: hostnamesArray,
-            parent_id: null // Root pages have no parent
+            parentId: null // Root pages have no parent
         }
 
         onSave(pageData)
@@ -1007,8 +1007,8 @@ const RootPageCreationModal = ({ onSave, onCancel, isLoading }) => {
                         </label>
                         <select
                             id="root-publication-status"
-                            value={formData.publication_status}
-                            onChange={(e) => setFormData(prev => ({ ...prev, publication_status: e.target.value }))}
+                            value={formData.publicationStatus}
+                            onChange={(e) => setFormData(prev => ({ ...prev, publicationStatus: e.target.value }))}
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                         >
                             <option value="unpublished">Unpublished</option>

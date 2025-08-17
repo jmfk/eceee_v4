@@ -13,7 +13,7 @@ export function isValidPageResponse(page) {
         return false;
     }
 
-    const requiredFields = ['id', 'title', 'slug', 'sort_order', 'publication_status'];
+    const requiredFields = ['id', 'title', 'slug', 'sortOrder', 'publicationStatus'];
 
     for (const field of requiredFields) {
         if (!(field in page)) {
@@ -84,11 +84,11 @@ export function sanitizePageData(page) {
         hostnames: Array.isArray(page.hostnames) ? page.hostnames : [],
         // Ensure children_count is a number
         children_count: typeof page.children_count === 'number' ? page.children_count : 0,
-        // Ensure sort_order is a number
-        sort_order: typeof page.sort_order === 'number' ? page.sort_order : 0,
+        // Ensure sortOrder is a number
+        sortOrder: typeof page.sortOrder === 'number' ? page.sortOrder : 0,
         // Ensure parent is properly handled
         parent: page.parent || null,
-        parent_id: page.parent_id || null,
+        parentId: page.parentId || null,
     };
 }
 
@@ -141,7 +141,7 @@ export function getFirstHostname(page) {
  * @returns {boolean} True if root page
  */
 export function isRootPage(page) {
-    return !page.parent && !page.parent_id;
+    return !page.parent && !page.parentId;
 }
 
 /**

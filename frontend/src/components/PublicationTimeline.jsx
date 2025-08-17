@@ -38,7 +38,7 @@ const PublicationTimeline = () => {
             const startDate = getViewStartDate();
             const endDate = getViewEndDate();
 
-            const response = await api.get(`/api/v1/webpages/pages/?effective_date__gte=${startDate.toISOString()}&effective_date__lte=${endDate.toISOString()}`);
+            const response = await api.get(`/api/v1/webpages/pages/?effectiveDate__gte=${startDate.toISOString()}&effectiveDate__lte=${endDate.toISOString()}`);
             const data = response.data;
             setTimelineData(data.results || data);
         } catch (err) {
@@ -147,11 +147,11 @@ const PublicationTimeline = () => {
     const getPagesByDate = (date) => {
         const dateStr = date.toISOString().split('T')[0];
         return timelineData.filter(page => {
-            const effectiveDate = page.effective_date ? page.effective_date.split('T')[0] : null;
-            const expiryDate = page.expiry_date ? page.expiry_date.split('T')[0] : null;
+            const effectiveDate = page.effectiveDate ? page.effectiveDate.split('T')[0] : null;
+            const expiryDate = page.expiryDate ? page.expiryDate.split('T')[0] : null;
 
             return (effectiveDate === dateStr || expiryDate === dateStr) &&
-                selectedStatuses.includes(page.publication_status);
+                selectedStatuses.includes(page.publicationStatus);
         });
     };
 
@@ -300,12 +300,12 @@ const PublicationTimeline = () => {
 
                                 <div className="space-y-1">
                                     {pagesOnDate.map((page) => {
-                                        const Icon = getStatusIcon(page.publication_status);
+                                        const Icon = getStatusIcon(page.publicationStatus);
                                         return (
                                             <div
                                                 key={page.id}
-                                                className={`p-1 rounded text-xs text-white ${getStatusColor(page.publication_status)} flex items-center`}
-                                                title={`${page.title} - ${page.publication_status}`}
+                                                className={`p-1 rounded text-xs text-white ${getStatusColor(page.publicationStatus)} flex items-center`}
+                                                title={`${page.title} - ${page.publicationStatus}`}
                                             >
                                                 <Icon className="w-3 h-3 mr-1 flex-shrink-0" />
                                                 <span className="truncate">{page.title}</span>

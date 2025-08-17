@@ -28,9 +28,9 @@ export class SlotState {
             })
         })
 
-        // Sort widgets by sort_order within each slot
+        // Sort widgets by sortOrder within each slot
         Object.keys(widgetsBySlot).forEach(slot => {
-            widgetsBySlot[slot].sort((a, b) => a.sort_order - b.sort_order)
+            widgetsBySlot[slot].sort((a, b) => a.sortOrder - b.sortOrder)
         })
 
         return widgetsBySlot
@@ -49,7 +49,7 @@ export class SlotState {
      */
     getNextSortOrder(slotName) {
         const slotWidgets = this.getSlotWidgets(slotName)
-        const maxOrder = Math.max(...slotWidgets.map(w => w.sort_order), -1)
+        const maxOrder = Math.max(...slotWidgets.map(w => w.sortOrder), -1)
         return maxOrder + 1
     }
 
@@ -94,9 +94,9 @@ export class SlotState {
         }
 
         if (direction === 'up') {
-            return slotWidgets[currentIndex - 1].sort_order
+            return slotWidgets[currentIndex - 1].sortOrder
         } else {
-            return slotWidgets[currentIndex + 1].sort_order
+            return slotWidgets[currentIndex + 1].sortOrder
         }
     }
 

@@ -91,12 +91,12 @@ const SettingsManager = () => {
             normalizedTitle.includes(normalizedSearchTerm) ||
             normalizedSlug.includes(normalizedSearchTerm)
 
-        const matchesStatus = statusFilter === 'all' || page.publication_status === statusFilter
+        const matchesStatus = statusFilter === 'all' || page.publicationStatus === statusFilter
 
         const matchesLayout =
             layoutFilter === 'all' ||
-            (layoutFilter === 'none' && !page.code_layout) ||
-            (layoutFilter.startsWith('code:') && page.code_layout === layoutFilter.split(':')[1])
+            (layoutFilter === 'none' && !page.codeLayout) ||
+            (layoutFilter.startsWith('code:') && page.codeLayout === layoutFilter.split(':')[1])
 
         return matchesSearch && matchesStatus && matchesLayout
     })
@@ -110,8 +110,8 @@ const SettingsManager = () => {
 
         if (allLayouts) {
             // Add code layouts
-            if (allLayouts.code_layouts) {
-                allLayouts.code_layouts.forEach(layout => {
+            if (allLayouts.codeLayouts) {
+                allLayouts.codeLayouts.forEach(layout => {
                     options.push({
                         value: `code:${layout.name}`,
                         label: `📝 ${layout.name}`,
@@ -193,7 +193,7 @@ const SettingsManager = () => {
             const duplicateData = {
                 title: `${page.title} (Copy)`,
                 slug: `${page.slug}-copy-${Date.now()}`,
-                publication_status: 'unpublished', // Always create duplicates as unpublished
+                publicationStatus: 'unpublished', // Always create duplicates as unpublished
                 layout: page.layout?.id || null,
                 theme: page.theme?.id || null,
                 parent: page.parent?.id || null
@@ -395,7 +395,7 @@ const PageForm = ({ page = null, onSave, onCancel, isLoading = false }) => {
     const [formData, setFormData] = useState({
         title: page?.title || '',
         slug: page?.slug || '',
-        publication_status: page?.publication_status || 'unpublished'
+        publicationStatus: page?.publicationStatus || 'unpublished'
     })
 
     const handleSubmit = (e) => {
@@ -485,8 +485,8 @@ const PageForm = ({ page = null, onSave, onCancel, isLoading = false }) => {
                     </label>
                     <select
                         id="publication-status"
-                        value={formData.publication_status}
-                        onChange={(e) => setFormData(prev => ({ ...prev, publication_status: e.target.value }))}
+                        value={formData.publicationStatus}
+                        onChange={(e) => setFormData(prev => ({ ...prev, publicationStatus: e.target.value }))}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                         <option value="unpublished">Unpublished</option>

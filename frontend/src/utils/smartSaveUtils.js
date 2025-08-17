@@ -11,27 +11,27 @@ const PAGE_FIELDS = new Set([
     'description',
     'slug',
     'parent',
-    'parent_id',
-    'sort_order',
+    'parentId',
+    'sortOrder',
     'hostnames',
-    'enable_css_injection',
-    'page_css_variables',
-    'page_custom_css',
-    'meta_title',
-    'meta_description'
+    'enableCssInjection',
+    'pageCssVariables',
+    'pageCustomCss',
+    'metaTitle',
+    'metaDescription'
 ]);
 
 // Fields that belong to the PageVersion model (save via versions API)
 const VERSION_FIELDS = new Set([
     'pageData',
     'widgets',
-    'code_layout',
+    'codeLayout',
     'theme',
-    'theme_id',
-    'version_title',
-    'change_summary',
-    'effective_date',
-    'expiry_date'
+    'themeId',
+    'versionTitle',
+    'changeSummary',
+    'effectiveDate',
+    'expiryDate'
 ]);
 
 // Fields that are metadata/computed (don't save)
@@ -74,7 +74,7 @@ export function analyzeChanges(originalWebpageData = {}, currentWebpageData = {}
     for (const field of PAGE_FIELDS) {
         if (originalWebpageData[field] !== currentWebpageData[field]) {
             // Handle special cases for deep comparison
-            if (field === 'hostnames' || field === 'page_css_variables') {
+            if (field === 'hostnames' || field === 'pageCssVariables') {
                 if (JSON.stringify(originalWebpageData[field]) !== JSON.stringify(currentWebpageData[field])) {
                     changes.pageFields[field] = currentWebpageData[field];
                     changes.hasPageChanges = true;

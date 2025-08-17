@@ -47,7 +47,7 @@ const BulkPublishingOperations = () => {
     const filteredPages = pages.filter(page => {
         const matchesSearch = page.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
             page.slug.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesStatus = statusFilter === 'all' || page.publication_status === statusFilter;
+        const matchesStatus = statusFilter === 'all' || page.publicationStatus === statusFilter;
         return matchesSearch && matchesStatus;
     });
 
@@ -89,8 +89,8 @@ const BulkPublishingOperations = () => {
             const requestData = {
                 page_ids: pageIds,
                 ...(operation === 'schedule' && {
-                    effective_date: scheduledDate,
-                    ...(expiryDate && { expiry_date: expiryDate })
+                    effectiveDate: scheduledDate,
+                    ...(expiryDate && { expiryDate: expiryDate })
                 })
             };
 

@@ -297,7 +297,7 @@ const PageTreeNode = memo(({
 
         setIsTogglingPublication(true)
 
-        if (page.publication_status === 'published') {
+        if (page.publicationStatus === 'published') {
             unpublishPageMutation.mutate()
         } else {
             publishPageMutation.mutate()
@@ -306,7 +306,7 @@ const PageTreeNode = memo(({
 
     const canTogglePublication = () => {
         // Only allow toggling between published and unpublished for simplicity
-        return page.publication_status === 'published' || page.publication_status === 'unpublished'
+        return page.publicationStatus === 'published' || page.publicationStatus === 'unpublished'
     }
 
     // Update page hostnames mutation
@@ -371,7 +371,7 @@ const PageTreeNode = memo(({
             setIsTogglingPublication(false)
 
             // Update the specific page in the tree with optimistic update
-            onUpdatePageData(page.id, { publication_status: updatedPage.publication_status || 'published' })
+            onUpdatePageData(page.id, { publicationStatus: updatedPage.publicationStatus || 'published' })
         },
         onError: (error) => {
             console.error('Failed to publish page:', error.response?.data?.detail || error.message)
@@ -389,7 +389,7 @@ const PageTreeNode = memo(({
             setIsTogglingPublication(false)
 
             // Update the specific page in the tree with optimistic update
-            onUpdatePageData(page.id, { publication_status: updatedPage.publication_status || 'unpublished' })
+            onUpdatePageData(page.id, { publicationStatus: updatedPage.publicationStatus || 'unpublished' })
         },
         onError: (error) => {
             console.error('Failed to unpublish page:', error.response?.data?.detail || error.message)
@@ -548,7 +548,7 @@ const PageTreeNode = memo(({
                         )}
                         <PublicationStatusIcon
                             pageId={page.id}
-                            publicationStatus={page.publication_status}
+                            publicationStatus={page.publicationStatus}
                             canToggle={canTogglePublication()}
                             isToggling={isTogglingPublication}
                             onToggle={handlePublicationToggle}

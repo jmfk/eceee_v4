@@ -38,8 +38,8 @@ const VersionTimelinePage = () => {
     const [selectedVersion, setSelectedVersion] = useState(null);
     const [showScheduleDialog, setShowScheduleDialog] = useState(false);
     const [scheduleData, setScheduleData] = useState({
-        effective_date: '',
-        expiry_date: ''
+        effectiveDate: '',
+        expiryDate: ''
     });
     const [pageTitle, setPageTitle] = useState('');
     const [pageData, setPageData] = useState(null);
@@ -103,8 +103,8 @@ const VersionTimelinePage = () => {
     const handleScheduleVersion = (version) => {
         setSelectedVersion(version);
         setScheduleData({
-            effective_date: formatForDatetimeLocal(version.effective_date),
-            expiry_date: formatForDatetimeLocal(version.expiry_date)
+            effectiveDate: formatForDatetimeLocal(version.effectiveDate),
+            expiryDate: formatForDatetimeLocal(version.expiryDate)
         });
         setShowScheduleDialog(true);
     };
@@ -115,8 +115,8 @@ const VersionTimelinePage = () => {
         try {
             // Convert datetime-local values to ISO format for API
             const apiData = {
-                effective_date: scheduleData.effective_date ? new Date(scheduleData.effective_date).toISOString() : null,
-                expiry_date: scheduleData.expiry_date ? new Date(scheduleData.expiry_date).toISOString() : null
+                effectiveDate: scheduleData.effectiveDate ? new Date(scheduleData.effectiveDate).toISOString() : null,
+                expiryDate: scheduleData.expiryDate ? new Date(scheduleData.expiryDate).toISOString() : null
             };
 
             await scheduleVersion(selectedVersion.id, apiData);
@@ -193,7 +193,7 @@ const VersionTimelinePage = () => {
             versionsToDelete = sortedVersions.filter(v =>
                 v.version_number < currentPublished.version_number &&
                 v.id !== currentPublished.id &&
-                !v.effective_date  // Draft versions have no effective_date
+                !v.effectiveDate  // Draft versions have no effectiveDate
             );
         }
 
@@ -228,8 +228,8 @@ const VersionTimelinePage = () => {
 
     const getVersionStatusInfo = (version) => {
         const now = new Date();
-        const effectiveDate = version.effective_date ? new Date(version.effective_date) : null;
-        const expiryDate = version.expiry_date ? new Date(version.expiry_date) : null;
+        const effectiveDate = version.effectiveDate ? new Date(version.effectiveDate) : null;
+        const expiryDate = version.expiryDate ? new Date(version.expiryDate) : null;
 
         if (!effectiveDate) {
             return {
@@ -258,7 +258,7 @@ const VersionTimelinePage = () => {
             };
         }
 
-        // At this point, the version has effective_date <= now and is not expired
+        // At this point, the version has effectiveDate <= now and is not expired
         // Check if this version is the currently active published version
         const currentlyPublishedVersion = getCurrentlyPublishedVersion();
 
@@ -281,7 +281,7 @@ const VersionTimelinePage = () => {
             };
         }
 
-        // If there's no current published version but this has effective_date <= now,
+        // If there's no current published version but this has effectiveDate <= now,
         // it should be published (shouldn't happen, but fallback)
         return {
             status: 'published',
@@ -298,8 +298,8 @@ const VersionTimelinePage = () => {
         // Find the latest version (by version_number) that is currently published
         const publishedVersions = versions
             .filter(version => {
-                const effectiveDate = version.effective_date ? new Date(version.effective_date) : null;
-                const expiryDate = version.expiry_date ? new Date(version.expiry_date) : null;
+                const effectiveDate = version.effectiveDate ? new Date(version.effectiveDate) : null;
+                const expiryDate = version.expiryDate ? new Date(version.expiryDate) : null;
 
                 // Must have effective date and be active
                 if (!effectiveDate || effectiveDate > now) return false;
@@ -478,8 +478,8 @@ const VersionTimelinePage = () => {
                                 <div
                                     key={version.id}
                                     className={`bg-white border rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow ${isCurrentVersionFromEditor
-                                            ? 'border-blue-300 ring-2 ring-blue-100'
-                                            : 'border-gray-200'
+                                        ? 'border-blue-300 ring-2 ring-blue-100'
+                                        : 'border-gray-200'
                                         }`}
                                 >
                                     <div className="flex items-start justify-between">
@@ -566,14 +566,14 @@ const VersionTimelinePage = () => {
                                                 <div>
                                                     <span className="text-sm font-semibold text-gray-700 block mb-1">Effective Date:</span>
                                                     <div className="text-gray-900">
-                                                        {formatDate(version.effective_date)}
+                                                        {formatDate(version.effectiveDate)}
                                                     </div>
                                                 </div>
 
                                                 <div>
                                                     <span className="text-sm font-semibold text-gray-700 block mb-1">Expiry Date:</span>
                                                     <div className="text-gray-900">
-                                                        {formatDate(version.expiry_date)}
+                                                        {formatDate(version.expiryDate)}
                                                     </div>
                                                 </div>
                                             </div>
@@ -722,10 +722,10 @@ const VersionTimelinePage = () => {
                                     </label>
                                     <input
                                         type="datetime-local"
-                                        value={scheduleData.effective_date}
+                                        value={scheduleData.effectiveDate}
                                         onChange={(e) => setScheduleData(prev => ({
                                             ...prev,
-                                            effective_date: e.target.value
+                                            effectiveDate: e.target.value
                                         }))}
                                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     />
@@ -737,10 +737,10 @@ const VersionTimelinePage = () => {
                                     </label>
                                     <input
                                         type="datetime-local"
-                                        value={scheduleData.expiry_date}
+                                        value={scheduleData.expiryDate}
                                         onChange={(e) => setScheduleData(prev => ({
                                             ...prev,
-                                            expiry_date: e.target.value
+                                            expiryDate: e.target.value
                                         }))}
                                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     />

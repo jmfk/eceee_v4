@@ -34,7 +34,7 @@ export const endpoints = {
         linkObject: (id) => `${BASE_PATH}/webpages/pages/${id}/link-object/`,
         unlinkObject: (id) => `${BASE_PATH}/webpages/pages/${id}/unlink-object/`,
         syncObject: (id) => `${BASE_PATH}/webpages/pages/${id}/sync-object/`,
-        publicationStatus: `${BASE_PATH}/webpages/pages/publication_status/`,
+        publicationStatus: `${BASE_PATH}/webpages/pages/publicationStatus/`,
         // DEPRECATED: Version-related endpoints moved to versions API (but URLs remain consistent)
         versions: (id) => `${BASE_PATH}/webpages/pages/${id}/versions/`, // Still works, now consistent path-based
         versionCurrent: (pageId) => `${BASE_PATH}/webpages/pages/${pageId}/versions/current/`, // Still works, now consistent path-based
@@ -125,7 +125,7 @@ export const endpoints = {
         bulkPublish: '/api/webpages/bulk_publish/',
         bulkSchedule: '/api/webpages/bulk_schedule/',
         schedule: '/api/webpages/schedule/',
-        publicationStatus: '/api/webpages/publication_status/'
+        publicationStatus: '/api/webpages/publicationStatus/'
     }
 }
 

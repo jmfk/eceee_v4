@@ -30,7 +30,7 @@ const PublicationStatusDashboard = () => {
     const fetchPublicationStatus = async () => {
         try {
             setLoading(true);
-            const response = await api.get('/api/v1/webpages/pages/publication_status/');
+            const response = await api.get('/api/v1/webpages/pages/publicationStatus/');
             const data = response.data;
             setStatusData(data);
         } catch (err) {
@@ -182,10 +182,10 @@ const PublicationStatusDashboard = () => {
                                 </div>
                                 <div className="text-right">
                                     <p className="text-sm font-medium text-blue-900">
-                                        {formatDate(page.effective_date)}
+                                        {formatDate(page.effectiveDate)}
                                     </p>
                                     <p className="text-xs text-blue-600">
-                                        {formatRelativeDate(page.effective_date)}
+                                        {formatRelativeDate(page.effectiveDate)}
                                     </p>
                                 </div>
                             </div>
@@ -210,7 +210,7 @@ const PublicationStatusDashboard = () => {
                                 </div>
                                 <div className="text-right">
                                     <p className="text-sm font-medium text-red-900">
-                                        Expired: {formatDate(page.expiry_date)}
+                                        Expired: {formatDate(page.expiryDate)}
                                     </p>
                                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
                                         Needs Review

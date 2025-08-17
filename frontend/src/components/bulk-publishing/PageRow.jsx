@@ -37,15 +37,15 @@ const PageRow = ({
                 </div>
             </td>
             <td className="px-6 py-4">
-                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(page.publication_status)}`}>
-                    {page.publication_status}
+                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(page.publicationStatus)}`}>
+                    {page.publicationStatus}
                 </span>
             </td>
             <td className="px-6 py-4 text-sm text-gray-900">
-                {formatDate(page.effective_date)}
+                {formatDate(page.effectiveDate)}
             </td>
             <td className="px-6 py-4 text-sm text-gray-900">
-                {formatDate(page.expiry_date)}
+                {formatDate(page.expiryDate)}
             </td>
         </tr>
     );

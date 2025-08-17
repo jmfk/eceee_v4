@@ -84,16 +84,16 @@ export const versionsApi = {
             // Add version metadata
             version_id: versionData.version_id,
             version_number: versionData.version_number,
-            publication_status: versionData.publication_status,
+            publicationStatus: versionData.publicationStatus,
             is_current_published: versionData.is_current_published,
-            effective_date: versionData.effective_date,
-            expiry_date: versionData.expiry_date,
+            effectiveDate: versionData.effectiveDate,
+            expiryDate: versionData.expiryDate,
 
             // Add version-specific fields
             description: versionData.description,
             created_at: versionData.created_at,
             created_by: versionData.created_by,
-            change_summary: versionData.change_summary
+            changeSummary: versionData.changeSummary
         }
     }, 'versions.getPageVersion'),
 
@@ -198,7 +198,7 @@ export const getVersionsFiltered = versionsApi.getFiltered
  * @returns {boolean} Whether a draft can be created
  */
 export const canCreateDraft = (version) => {
-    return version && version.publication_status === 'published'
+    return version && version.publicationStatus === 'published'
 }
 
 /**
@@ -207,7 +207,7 @@ export const canCreateDraft = (version) => {
  * @returns {boolean} Whether the version can be edited
  */
 export const canEditVersion = (version) => {
-    return version && version.publication_status === 'draft'
+    return version && version.publicationStatus === 'draft'
 }
 
 /**
@@ -216,7 +216,7 @@ export const canEditVersion = (version) => {
  * @returns {boolean} Whether the version can be published
  */
 export const canPublishVersion = (version) => {
-    return version && version.publication_status === 'draft'
+    return version && version.publicationStatus === 'draft'
 }
 
 /**
@@ -225,7 +225,7 @@ export const canPublishVersion = (version) => {
  * @returns {boolean} Whether the version can be deleted
  */
 export const canDeleteVersion = (version) => {
-    return version && version.publication_status === 'draft'
+    return version && version.publicationStatus === 'draft'
 }
 
 /**
@@ -239,8 +239,8 @@ export const getVersionStats = wrapApiCall(async (pageId) => {
 
     return {
         total: versions.length,
-        drafts: versions.filter(v => v.publication_status === 'draft').length,
-        published: versions.filter(v => v.publication_status === 'published').length,
+        drafts: versions.filter(v => v.publicationStatus === 'draft').length,
+        published: versions.filter(v => v.publicationStatus === 'published').length,
         current: versions.filter(v => v.is_current_published).length
     }
 }, 'versions.getVersionStats')
@@ -256,8 +256,8 @@ export const formatVersionForDisplay = (version) => {
     return {
         ...version,
         displayName: `v${version.version_number}${version.is_current_published ? ' (Current)' : ''}`,
-        statusDisplay: version.publication_status === 'published' ? 'Published' : 'Draft',
-        dateDisplay: version.effective_date ? new Date(version.effective_date).toLocaleDateString() : 'Not published',
+        statusDisplay: version.publicationStatus === 'published' ? 'Published' : 'Draft',
+        dateDisplay: version.effectiveDate ? new Date(version.effectiveDate).toLocaleDateString() : 'Not published',
         createdDisplay: new Date(version.created_at).toLocaleDateString()
     }
 }
@@ -265,7 +265,7 @@ export const formatVersionForDisplay = (version) => {
 /**
  * Schedule a version for publishing
  * @param {number} versionId - Version ID  
- * @param {Object} scheduleData - Schedule data with effective_date and expiry_date
+ * @param {Object} scheduleData - Schedule data with effectiveDate and expiryDate
  * @returns {Promise<Object>} Schedule result
  */
 export const scheduleVersion = wrapApiCall(async (versionId, scheduleData) => {
@@ -279,8 +279,8 @@ export const scheduleVersion = wrapApiCall(async (versionId, scheduleData) => {
  */
 export const publishVersionNow = wrapApiCall(async (versionId) => {
     const scheduleData = {
-        effective_date: new Date().toISOString(),
-        expiry_date: null
+        effectiveDate: new Date().toISOString(),
+        expiryDate: null
     }
     return api.patch(endpoints.versions.detail(versionId), scheduleData)
 }, 'versions.publishVersionNow')

@@ -22,7 +22,7 @@ export const formatPageForTree = (page) => {
         title: page.title,
         slug: page.slug,
         parent: page.parent,
-        sort_order: page.sort_order,
+        sortOrder: page.sortOrder,
         children: page.children || [],
         hasChildren: hasChildrenFromCount || hasChildrenFromArray,
         childrenCount: childrenCount,
@@ -45,7 +45,7 @@ export const hasChildren = (page) => {
     if (childrenCount > 0) {
         return true
     }
-    
+
     // Fallback to checking loaded children array
     return Boolean(page?.children && page.children.length > 0)
 }
@@ -61,14 +61,14 @@ export const calculateSortOrderAbove = (siblings = [], targetPage) => {
         return 0
     }
 
-    const targetSortOrder = targetPage.sort_order || 0
+    const targetSortOrder = targetPage.sortOrder || 0
     const abovePage = siblings.find(sibling =>
-        (sibling.sort_order || 0) < targetSortOrder
+        (sibling.sortOrder || 0) < targetSortOrder
     )
 
     if (abovePage) {
         // Place between the above page and target page
-        return Math.floor(((abovePage.sort_order || 0) + targetSortOrder) / 2)
+        return Math.floor(((abovePage.sortOrder || 0) + targetSortOrder) / 2)
     } else {
         // Place before the target page
         return Math.max(0, targetSortOrder - 10)
@@ -83,17 +83,17 @@ export const calculateSortOrderAbove = (siblings = [], targetPage) => {
  */
 export const calculateSortOrderBelow = (siblings = [], targetPage) => {
     if (!targetPage) {
-        return siblings.length > 0 ? Math.max(...siblings.map(s => s.sort_order || 0)) + 10 : 10
+        return siblings.length > 0 ? Math.max(...siblings.map(s => s.sortOrder || 0)) + 10 : 10
     }
 
-    const targetSortOrder = targetPage.sort_order || 0
+    const targetSortOrder = targetPage.sortOrder || 0
     const belowPage = siblings.find(sibling =>
-        (sibling.sort_order || 0) > targetSortOrder
+        (sibling.sortOrder || 0) > targetSortOrder
     )
 
     if (belowPage) {
         // Place between target page and below page
-        return Math.floor((targetSortOrder + (belowPage.sort_order || 0)) / 2)
+        return Math.floor((targetSortOrder + (belowPage.sortOrder || 0)) / 2)
     } else {
         // Place after the target page
         return targetSortOrder + 10

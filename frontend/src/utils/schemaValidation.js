@@ -2,14 +2,14 @@
 
 // Default fields that are always present in all schemas
 export const DEFAULT_SCHEMA_FIELDS = {
-    meta_title: {
+    metaTitle: {
         type: 'string',
         title: 'Meta Title',
         description: 'The main title of this page',
         default: '',
         maxLength: 200,
     },
-    meta_description: {
+    metaDescription: {
         type: 'string',
         title: 'Page Description',
         description: 'A brief description of this page for SEO and previews',
