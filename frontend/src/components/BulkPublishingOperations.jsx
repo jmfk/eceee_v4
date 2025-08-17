@@ -87,7 +87,7 @@ const BulkPublishingOperations = () => {
 
             const pageIds = Array.from(selectedPages);
             const requestData = {
-                page_ids: pageIds,
+                pageIds: pageIds,
                 ...(operation === 'schedule' && {
                     effectiveDate: scheduledDate,
                     ...(expiryDate && { expiryDate: expiryDate })

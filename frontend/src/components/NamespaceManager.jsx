@@ -44,9 +44,9 @@ const NamespaceManager = () => {
             const params = {}
             if (searchTerm) params.search = searchTerm
             if (statusFilter !== 'all') {
-                if (statusFilter === 'active') params.is_active = true
-                if (statusFilter === 'inactive') params.is_active = false
-                if (statusFilter === 'default') params.is_default = true
+                if (statusFilter === 'active') params.isActive = true
+                if (statusFilter === 'inactive') params.isActive = false
+                if (statusFilter === 'default') params.isDefault = true
             }
             return namespacesApi.list(params)
         }
@@ -162,12 +162,12 @@ const NamespaceManager = () => {
     }, [addNotification])
 
     const handleDelete = async (namespace) => {
-        if (namespace.is_default) {
+        if (namespace.isDefault) {
             addNotification('Cannot delete the default namespace', 'error', 'namespace-validation')
             return
         }
 
-        if (namespace.content_count > 0) {
+        if (namespace.contentCount > 0) {
             addNotification('Cannot delete namespace with existing content', 'error', 'namespace-validation')
             return
         }
@@ -185,7 +185,7 @@ const NamespaceManager = () => {
     }
 
     const handleSetDefault = (namespace) => {
-        if (namespace.is_default) {
+        if (namespace.isDefault) {
             addNotification('This namespace is already the default', 'info', 'namespace-info')
             return
         }
@@ -198,7 +198,7 @@ const NamespaceManager = () => {
     }
 
     const getStatusBadge = (namespace) => {
-        if (namespace.is_default) {
+        if (namespace.isDefault) {
             return (
                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
                     <Star className="w-3 h-3 mr-1" />
@@ -206,7 +206,7 @@ const NamespaceManager = () => {
                 </span>
             )
         }
-        if (namespace.is_active) {
+        if (namespace.isActive) {
             return (
                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                     <Eye className="w-3 h-3 mr-1" />
@@ -360,9 +360,9 @@ const NamespaceManager = () => {
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <div className="flex items-center space-x-2">
                                                 <span className="text-sm text-gray-900">
-                                                    {namespace.content_count} items
+                                                    {namespace.contentCount} items
                                                 </span>
-                                                {namespace.content_count > 0 && (
+                                                {namespace.contentCount > 0 && (
                                                     <button
                                                         onClick={() => handleViewContent(namespace)}
                                                         className="text-blue-600 hover:text-blue-800 text-xs"
@@ -373,11 +373,11 @@ const NamespaceManager = () => {
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            {new Date(namespace.created_at).toLocaleDateString()}
+                                            {new Date(namespace.createdAt).toLocaleDateString()}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                             <div className="flex items-center justify-end space-x-2">
-                                                {!namespace.is_default && (
+                                                {!namespace.isDefault && (
                                                     <button
                                                         onClick={() => handleSetDefault(namespace)}
                                                         className="text-yellow-600 hover:text-yellow-800"
@@ -393,7 +393,7 @@ const NamespaceManager = () => {
                                                 >
                                                     <Edit3 className="w-4 h-4" />
                                                 </button>
-                                                {!namespace.is_default && namespace.content_count === 0 && (
+                                                {!namespace.isDefault && namespace.contentCount === 0 && (
                                                     <button
                                                         onClick={() => handleDelete(namespace)}
                                                         className="text-red-600 hover:text-red-800"
@@ -447,8 +447,8 @@ const NamespaceForm = ({ namespace = null, onSave, onCancel, isLoading = false }
         name: namespace?.name || '',
         slug: namespace?.slug || '',
         description: namespace?.description || '',
-        is_active: namespace?.is_active ?? true,
-        is_default: namespace?.is_default ?? false
+        isActive: namespace?.isActive ?? true,
+        isDefault: namespace?.isDefault ?? false
     })
 
     const handleSubmit = (e) => {
@@ -546,8 +546,8 @@ const NamespaceForm = ({ namespace = null, onSave, onCancel, isLoading = false }
                         <label className="flex items-center">
                             <input
                                 type="checkbox"
-                                checked={formData.is_active}
-                                onChange={(e) => setFormData(prev => ({ ...prev, is_active: e.target.checked }))}
+                                checked={formData.isActive}
+                                onChange={(e) => setFormData(prev => ({ ...prev, isActive: e.target.checked }))}
                                 className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                             />
                             <span className="ml-2 text-sm text-gray-700">Active</span>
@@ -556,8 +556,8 @@ const NamespaceForm = ({ namespace = null, onSave, onCancel, isLoading = false }
                         <label className="flex items-center">
                             <input
                                 type="checkbox"
-                                checked={formData.is_default}
-                                onChange={(e) => setFormData(prev => ({ ...prev, is_default: e.target.checked }))}
+                                checked={formData.isDefault}
+                                onChange={(e) => setFormData(prev => ({ ...prev, isDefault: e.target.checked }))}
                                 className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                             />
                             <span className="ml-2 text-sm text-gray-700">Default</span>
@@ -588,7 +588,7 @@ const NamespaceForm = ({ namespace = null, onSave, onCancel, isLoading = false }
 }
 
 const ContentSummaryModal = ({ data, onClose }) => {
-    const { namespace, content_summary } = data
+    const { namespace, contentSummary } = data
 
     return (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-10 overflow-y-auto h-full w-full z-50">
@@ -607,7 +607,7 @@ const ContentSummaryModal = ({ data, onClose }) => {
 
                 <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
-                        {Object.entries(content_summary).map(([type, count]) => {
+                        {Object.entries(contentSummary).map(([type, count]) => {
                             if (type === 'total') return null
                             return (
                                 <div key={type} className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
@@ -627,7 +627,7 @@ const ContentSummaryModal = ({ data, onClose }) => {
                         <div className="flex items-center justify-between">
                             <span className="text-sm font-medium text-gray-900">Total Content</span>
                             <span className="text-lg font-bold text-blue-600">
-                                {content_summary.total} items
+                                {contentSummary.total} items
                             </span>
                         </div>
                     </div>

@@ -17,45 +17,45 @@ describe('Inline Conditional Attributes', () => {
     describe('Backend Template Preprocessing', () => {
         it('should convert inline conditionals to data-conditional-attrs format', () => {
             // This simulates what the backend preprocessing does
-            const templateSource = `<a href="{{ config.url }}" {% if config.open_in_new_tab %}target="_blank" rel="noopener noreferrer"{% endif %}>Click me</a>`;
+            const templateSource = `<a href="{{ config.url }}" {% if config.openInNewTab %}target="_blank" rel="noopener noreferrer"{% endif %}>Click me</a>`;
 
             // The backend would convert this to:
-            const expectedProcessed = `<a href="{{ config.url }}" data-conditional-attrs="config.open_in_new_tab|target=&quot;_blank&quot; rel=&quot;noopener noreferrer&quot;">Click me</a>`;
+            const expectedProcessed = `<a href="{{ config.url }}" data-conditional-attrs="config.openInNewTab|target=&quot;_blank&quot; rel=&quot;noopener noreferrer&quot;">Click me</a>`;
 
             // We can test this transformation pattern
             const inlineConditionalPattern = /\{\%\s*if\s+([^%]+?)\s*\%\}([^{]*?)\{\%\s*endif\s*\%\}/;
             const match = inlineConditionalPattern.exec(templateSource);
 
             expect(match).toBeTruthy();
-            expect(match[1].trim()).toBe('config.open_in_new_tab');
+            expect(match[1].trim()).toBe('config.openInNewTab');
             expect(match[2].trim()).toBe('target="_blank" rel="noopener noreferrer"');
         });
     });
 
     describe('Frontend Condition Evaluation', () => {
-        it('should evaluate config.open_in_new_tab correctly for true value', () => {
-            const config = { open_in_new_tab: true };
-            const result = renderer.evaluateCondition('config.open_in_new_tab', config);
+        it('should evaluate config.openInNewTab correctly for true value', () => {
+            const config = { openInNewTab: true };
+            const result = renderer.evaluateCondition('config.openInNewTab', config);
             expect(result).toBe(true);
         });
 
-        it('should evaluate config.open_in_new_tab correctly for false value', () => {
-            const config = { open_in_new_tab: false };
-            const result = renderer.evaluateCondition('config.open_in_new_tab', config);
+        it('should evaluate config.openInNewTab correctly for false value', () => {
+            const config = { openInNewTab: false };
+            const result = renderer.evaluateCondition('config.openInNewTab', config);
             expect(result).toBe(false);
         });
 
-        it('should evaluate config.open_in_new_tab correctly for undefined value', () => {
+        it('should evaluate config.openInNewTab correctly for undefined value', () => {
             const config = {};
-            const result = renderer.evaluateCondition('config.open_in_new_tab', config);
+            const result = renderer.evaluateCondition('config.openInNewTab', config);
             // evaluateCondition should return undefined when the property doesn't exist
             // but our current implementation returns false for safety in conditional logic
             expect(result).toBeFalsy(); // Accept either undefined or false as both are falsy
         });
 
         it('should handle nested config properties', () => {
-            const config = { settings: { open_in_new_tab: true } };
-            const result = renderer.evaluateCondition('config.settings.open_in_new_tab', config);
+            const config = { settings: { openInNewTab: true } };
+            const result = renderer.evaluateCondition('config.settings.openInNewTab', config);
             expect(result).toBe(true);
         });
     });
@@ -96,8 +96,8 @@ describe('Inline Conditional Attributes', () => {
     describe('Frontend Conditional Attribute Processing', () => {
                 it('should apply attributes when condition is true', () => {
             const element = document.createElement('a');
-            const conditionalData = 'config.open_in_new_tab|target=&quot;_blank&quot; rel=&quot;noopener noreferrer&quot;';
-            const config = { open_in_new_tab: true };
+            const conditionalData = 'config.openInNewTab|target=&quot;_blank&quot; rel=&quot;noopener noreferrer&quot;';
+            const config = { openInNewTab: true };
             
             // Skip hash validation for testing
             renderer.processConditionalAttributes(element, conditionalData, config, 'test-skip-hash');
@@ -108,8 +108,8 @@ describe('Inline Conditional Attributes', () => {
 
                 it('should not apply attributes when condition is false', () => {
             const element = document.createElement('a');
-            const conditionalData = 'config.open_in_new_tab|target=&quot;_blank&quot; rel=&quot;noopener noreferrer&quot;';
-            const config = { open_in_new_tab: false };
+            const conditionalData = 'config.openInNewTab|target=&quot;_blank&quot; rel=&quot;noopener noreferrer&quot;';
+            const config = { openInNewTab: false };
             
             // Skip hash validation for testing
             renderer.processConditionalAttributes(element, conditionalData, config, 'test-skip-hash');
@@ -120,7 +120,7 @@ describe('Inline Conditional Attributes', () => {
 
         it('should not apply attributes when condition is undefined', () => {
             const element = document.createElement('a');
-            const conditionalData = 'config.open_in_new_tab|target=&quot;_blank&quot; rel=&quot;noopener noreferrer&quot;';
+            const conditionalData = 'config.openInNewTab|target=&quot;_blank&quot; rel=&quot;noopener noreferrer&quot;';
             const config = {};
             
             // Skip hash validation for testing
@@ -132,11 +132,11 @@ describe('Inline Conditional Attributes', () => {
 
         it('should handle invalid conditional data gracefully', () => {
             const element = document.createElement('a');
-            const config = { open_in_new_tab: true };
+            const config = { openInNewTab: true };
 
             // Test with invalid format (no separator)
             expect(() => {
-                renderer.processConditionalAttributes(element, 'config.open_in_new_tab', config);
+                renderer.processConditionalAttributes(element, 'config.openInNewTab', config);
             }).not.toThrow();
 
             // Test with null/undefined data
@@ -157,13 +157,13 @@ describe('Inline Conditional Attributes', () => {
                 tag: 'a',
                 attributes: {
                     href: 'https://example.com',
-                    'data-conditional-attrs': 'config.open_in_new_tab|target=&quot;_blank&quot; rel=&quot;noopener noreferrer&quot;',
+                    'data-conditional-attrs': 'config.openInNewTab|target=&quot;_blank&quot; rel=&quot;noopener noreferrer&quot;',
                     'data-conditional-hash': 'test-skip-hash'
                 },
                 children: []
             };
             
-            const config = { open_in_new_tab: true };
+            const config = { openInNewTab: true };
             
             const element = renderer.createElementFromTemplate(elementData, config);
             
@@ -183,13 +183,13 @@ describe('Inline Conditional Attributes', () => {
                 tag: 'a',
                 attributes: {
                     href: 'https://example.com',
-                    'data-conditional-attrs': 'config.open_in_new_tab|target=&quot;_blank&quot; rel=&quot;noopener noreferrer&quot;',
+                    'data-conditional-attrs': 'config.openInNewTab|target=&quot;_blank&quot; rel=&quot;noopener noreferrer&quot;',
                     'data-conditional-hash': 'test-skip-hash'
                 },
                 children: []
             };
             
-            const config = { open_in_new_tab: false };
+            const config = { openInNewTab: false };
             
             const element = renderer.createElementFromTemplate(elementData, config);
             
@@ -212,7 +212,7 @@ describe('Inline Conditional Attributes', () => {
                 tag: 'a',
                 attributes: {
                     href: 'https://example.com',
-                    'data-conditional-attrs': 'config.open_in_new_tab|target=&quot;_blank&quot; rel=&quot;noopener noreferrer&quot;',
+                    'data-conditional-attrs': 'config.openInNewTab|target=&quot;_blank&quot; rel=&quot;noopener noreferrer&quot;',
                     'data-conditional-hash': 'test-skip-hash'
                 }
             };
@@ -220,7 +220,7 @@ describe('Inline Conditional Attributes', () => {
             const config = {
                 url: 'https://example.com',
                 text: 'Click me', 
-                open_in_new_tab: true
+                openInNewTab: true
             };
             
             const element = renderer.createElementFromTemplate(linkStructure, config);
@@ -239,7 +239,7 @@ describe('Inline Conditional Attributes', () => {
                 tag: 'a',
                 attributes: {
                     href: 'https://example.com',
-                    'data-conditional-attrs': 'config.open_in_new_tab|target=&quot;_blank&quot; rel=&quot;noopener noreferrer&quot;',
+                    'data-conditional-attrs': 'config.openInNewTab|target=&quot;_blank&quot; rel=&quot;noopener noreferrer&quot;',
                     'data-conditional-hash': 'test-skip-hash'
                 }
             };
@@ -247,7 +247,7 @@ describe('Inline Conditional Attributes', () => {
             const config = {
                 url: 'https://example.com',
                 text: 'Click me',
-                open_in_new_tab: false
+                openInNewTab: false
             };
             
             const element = renderer.createElementFromTemplate(linkStructure, config);

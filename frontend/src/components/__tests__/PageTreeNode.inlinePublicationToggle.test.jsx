@@ -33,8 +33,8 @@ const mockUnpublishedPage = {
     id: 1,
     title: 'Test Page',
     slug: 'test-page',
-    publication_status: 'unpublished',
-    children_count: 0,
+    publicationStatus: 'unpublished',
+    childrenCount: 0,
     children: [],
     isExpanded: false,
     childrenLoaded: true
@@ -44,8 +44,8 @@ const mockPublishedPage = {
     id: 2,
     title: 'Published Page',
     slug: 'published-page',
-    publication_status: 'published',
-    children_count: 0,
+    publicationStatus: 'published',
+    childrenCount: 0,
     children: [],
     isExpanded: false,
     childrenLoaded: true
@@ -55,8 +55,8 @@ const mockScheduledPage = {
     id: 3,
     title: 'Scheduled Page',
     slug: 'scheduled-page',
-    publication_status: 'scheduled',
-    children_count: 0,
+    publicationStatus: 'scheduled',
+    childrenCount: 0,
     children: [],
     isExpanded: false,
     childrenLoaded: true
@@ -66,8 +66,8 @@ const mockExpiredPage = {
     id: 4,
     title: 'Expired Page',
     slug: 'expired-page',
-    publication_status: 'expired',
-    children_count: 0,
+    publicationStatus: 'expired',
+    childrenCount: 0,
     children: [],
     isExpanded: false,
     childrenLoaded: true
@@ -152,7 +152,7 @@ describe('PageTreeNode - Inline Publication Toggle', () => {
     })
 
     it('should publish an unpublished page when clicked', async () => {
-        const mockResponse = { data: { ...mockUnpublishedPage, publication_status: 'published' } }
+        const mockResponse = { data: { ...mockUnpublishedPage, publicationStatus: 'published' } }
         api.post.mockResolvedValue(mockResponse)
 
         renderWithProviders(
@@ -171,7 +171,7 @@ describe('PageTreeNode - Inline Publication Toggle', () => {
     })
 
     it('should unpublish a published page when clicked', async () => {
-        const mockResponse = { data: { ...mockPublishedPage, publication_status: 'unpublished' } }
+        const mockResponse = { data: { ...mockPublishedPage, publicationStatus: 'unpublished' } }
         api.post.mockResolvedValue(mockResponse)
 
         renderWithProviders(
@@ -297,7 +297,7 @@ describe('PageTreeNode - Inline Publication Toggle', () => {
         expect(api.post).toHaveBeenCalledTimes(1)
 
         // Resolve the promise
-        resolvePromise({ data: { ...mockUnpublishedPage, publication_status: 'published' } })
+        resolvePromise({ data: { ...mockUnpublishedPage, publicationStatus: 'published' } })
     })
 
     it('should not be clickable for scheduled pages', async () => {

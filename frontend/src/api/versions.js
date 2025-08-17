@@ -74,25 +74,25 @@ export const versionsApi = {
 
         // Transform nested API response to flat pageData structure
         return {
-            // Page metadata from nested page_data
-            ...versionData.page_data,
+            // Page metadata from nested pageData
+            ...versionData.pageData,
 
             // Add page ID and widgets at root level
-            id: versionData.page_id,
+            id: versionData.pageId,
             widgets: versionData.widgets,
 
             // Add version metadata
-            version_id: versionData.version_id,
-            version_number: versionData.version_number,
+            versionId: versionData.versionId,
+            versionNumber: versionData.versionNumber,
             publicationStatus: versionData.publicationStatus,
-            is_current_published: versionData.is_current_published,
+            isCurrentPublished: versionData.isCurrentPublished,
             effectiveDate: versionData.effectiveDate,
             expiryDate: versionData.expiryDate,
 
             // Add version-specific fields
             description: versionData.description,
-            created_at: versionData.created_at,
-            created_by: versionData.created_by,
+            createdAt: versionData.createdAt,
+            createdBy: versionData.createdBy,
             changeSummary: versionData.changeSummary
         }
     }, 'versions.getPageVersion'),
@@ -241,7 +241,7 @@ export const getVersionStats = wrapApiCall(async (pageId) => {
         total: versions.length,
         drafts: versions.filter(v => v.publicationStatus === 'draft').length,
         published: versions.filter(v => v.publicationStatus === 'published').length,
-        current: versions.filter(v => v.is_current_published).length
+        current: versions.filter(v => v.isCurrentPublished).length
     }
 }, 'versions.getVersionStats')
 
@@ -255,10 +255,10 @@ export const formatVersionForDisplay = (version) => {
 
     return {
         ...version,
-        displayName: `v${version.version_number}${version.is_current_published ? ' (Current)' : ''}`,
+        displayName: `v${version.versionNumber}${version.isCurrentPublished ? ' (Current)' : ''}`,
         statusDisplay: version.publicationStatus === 'published' ? 'Published' : 'Draft',
         dateDisplay: version.effectiveDate ? new Date(version.effectiveDate).toLocaleDateString() : 'Not published',
-        createdDisplay: new Date(version.created_at).toLocaleDateString()
+        createdDisplay: new Date(version.createdAt).toLocaleDateString()
     }
 }
 

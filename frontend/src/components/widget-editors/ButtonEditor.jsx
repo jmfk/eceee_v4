@@ -52,14 +52,14 @@ const ButtonEditor = ({ config, onChange, errors, widgetType }) => {
                         if (previewConfig.url) {
                             window.open(
                                 previewConfig.url,
-                                previewConfig.open_in_new_tab ? '_blank' : '_self'
+                                previewConfig.openInNewTab ? '_blank' : '_self'
                             )
                         }
                     }}
                 >
                     <div className="flex items-center space-x-2">
                         <span>{previewConfig.text || 'Button Text'}</span>
-                        {previewConfig.open_in_new_tab && (
+                        {previewConfig.openInNewTab && (
                             <ExternalLink className="w-4 h-4" />
                         )}
                     </div>
@@ -204,7 +204,7 @@ const ButtonEditor = ({ config, onChange, errors, widgetType }) => {
 
                     {/* Open in New Tab */}
                     {renderCheckboxField(
-                        'open_in_new_tab',
+                        'openInNewTab',
                         'Open in new tab',
                         'Check this to open the link in a new browser tab'
                     )}

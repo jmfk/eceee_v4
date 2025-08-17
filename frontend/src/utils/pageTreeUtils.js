@@ -12,8 +12,8 @@
 export const formatPageForTree = (page) => {
     if (!page) return null
 
-    // Check children count from API (supports both camelCase and snake_case)
-    const childrenCount = page.childrenCount || page.children_count || 0
+    // Check children count from API
+    const childrenCount = page.childrenCount || 0
     const hasChildrenFromCount = childrenCount > 0
     const hasChildrenFromArray = Boolean(page.children && page.children.length > 0)
 
@@ -40,8 +40,8 @@ export const formatPageForTree = (page) => {
  * @returns {boolean} Whether the page has children
  */
 export const hasChildren = (page) => {
-    // Check children_count from API first (before children are loaded)
-    const childrenCount = page?.childrenCount || page?.children_count || 0
+    // Check childrenCount from API first (before children are loaded)
+    const childrenCount = page?.childrenCount || 0
     if (childrenCount > 0) {
         return true
     }

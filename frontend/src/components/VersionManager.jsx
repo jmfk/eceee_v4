@@ -125,7 +125,7 @@ const VersionManager = ({ pageId, onClose }) => {
     const handlePublish = async (version) => {
         const confirmed = await showConfirm({
             title: 'Publish Version',
-            message: `Are you sure you want to publish version ${version.version_number}?`,
+            message: `Are you sure you want to publish version ${version.versionNumber}?`,
             confirmText: 'Publish',
             confirmButtonStyle: 'primary'
         })
@@ -138,7 +138,7 @@ const VersionManager = ({ pageId, onClose }) => {
     const handleDelete = async (version) => {
         const confirmed = await showConfirm({
             title: 'Delete Version',
-            message: `Are you sure you want to delete version ${version.version_number}?`,
+            message: `Are you sure you want to delete version ${version.versionNumber}?`,
             confirmText: 'Delete',
             confirmButtonStyle: 'danger'
         })
@@ -164,7 +164,7 @@ const VersionManager = ({ pageId, onClose }) => {
     const handleRestore = async (version) => {
         const confirmed = await showConfirm({
             title: 'Restore Version',
-            message: `Are you sure you want to restore to version ${version.version_number}?`,
+            message: `Are you sure you want to restore to version ${version.versionNumber}?`,
             confirmText: 'Restore',
             confirmButtonStyle: 'warning'
         })
@@ -180,17 +180,17 @@ const VersionManager = ({ pageId, onClose }) => {
     }
 
     const VersionCard = ({ version }) => (
-        <div className={`border rounded-lg p-4 ${version.is_current_published ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}>
+        <div className={`border rounded-lg p-4 ${version.isCurrentPublished ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}>
             <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center space-x-3">
-                    <span className="text-lg font-semibold">v{version.version_number}</span>
+                    <span className="text-lg font-semibold">v{version.versionNumber}</span>
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${version.statusBadge.color === 'green' ? 'bg-green-100 text-green-800' :
                         version.statusBadge.color === 'yellow' ? 'bg-yellow-100 text-yellow-800' :
                             'bg-gray-100 text-gray-800'
                         }`}>
                         {version.statusBadge.text}
                     </span>
-                    {version.is_current_published && (
+                    {version.isCurrentPublished && (
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                             Current
                         </span>
@@ -241,13 +241,13 @@ const VersionManager = ({ pageId, onClose }) => {
                 <div className="flex items-center space-x-4">
                     <span className="flex items-center">
                         <Users className="h-4 w-4 mr-1" />
-                        {version.created_by?.username || 'Unknown'}
+                        {version.createdBy?.username || 'Unknown'}
                     </span>
                     <span className="flex items-center">
                         <Calendar className="h-4 w-4 mr-1" />
                         {version.formattedDate}
                     </span>
-                    {version.published_at && (
+                    {version.publishedAt && (
                         <span className="flex items-center">
                             <CheckCircle className="h-4 w-4 mr-1" />
                             Published {version.formattedPublishDate}
@@ -286,11 +286,11 @@ const VersionManager = ({ pageId, onClose }) => {
     const VersionStats = () => (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <div className="bg-blue-50 p-4 rounded-lg">
-                <div className="text-2xl font-bold text-blue-600">{versionStats?.total_drafts || 0}</div>
+                <div className="text-2xl font-bold text-blue-600">{versionStats?.totalDrafts || 0}</div>
                 <div className="text-sm text-blue-600">Drafts</div>
             </div>
             <div className="bg-green-50 p-4 rounded-lg">
-                <div className="text-2xl font-bold text-green-600">{versionStats?.total_published || 0}</div>
+                <div className="text-2xl font-bold text-green-600">{versionStats?.totalPublished || 0}</div>
                 <div className="text-sm text-green-600">Published</div>
             </div>
             <div className="bg-purple-50 p-4 rounded-lg">
@@ -299,7 +299,7 @@ const VersionManager = ({ pageId, onClose }) => {
             </div>
             <div className="bg-gray-50 p-4 rounded-lg">
                 <div className="text-2xl font-bold text-gray-600">
-                    {versionStats?.current_version?.version_number || 'N/A'}
+                    {versionStats?.currentVersion?.versionNumber || 'N/A'}
                 </div>
                 <div className="text-sm text-gray-600">Current Version</div>
             </div>
@@ -329,12 +329,12 @@ const VersionManager = ({ pageId, onClose }) => {
                 <div className="space-y-6">
                     <div className="grid grid-cols-2 gap-6">
                         <div className="border rounded-lg p-4">
-                            <h4 className="font-semibold mb-2">Version {compareVersions.version1.version_number}</h4>
+                            <h4 className="font-semibold mb-2">Version {compareVersions.version1.versionNumber}</h4>
                             <p className="text-sm text-gray-600">{compareVersions.version1.description}</p>
                             <p className="text-xs text-gray-500 mt-2">{compareVersions.version1.formattedDate}</p>
                         </div>
                         <div className="border rounded-lg p-4">
-                            <h4 className="font-semibold mb-2">Version {compareVersions.version2.version_number}</h4>
+                            <h4 className="font-semibold mb-2">Version {compareVersions.version2.versionNumber}</h4>
                             <p className="text-sm text-gray-600">{compareVersions.version2.description}</p>
                             <p className="text-xs text-gray-500 mt-2">{compareVersions.version2.formattedDate}</p>
                         </div>
@@ -342,37 +342,37 @@ const VersionManager = ({ pageId, onClose }) => {
 
                     <div className="border rounded-lg p-4">
                         <h4 className="font-semibold mb-4">Changes</h4>
-                        {comparisonData.changes.fields_changed.length > 0 && (
+                        {comparisonData.changes.fieldsChanged.length > 0 && (
                             <div className="mb-4">
                                 <h5 className="font-medium text-sm mb-2">Field Changes:</h5>
                                 <div className="space-y-2">
-                                    {comparisonData.changes.fields_changed.map((change, index) => (
+                                    {comparisonData.changes.fieldsChanged.map((change, index) => (
                                         <div key={index} className="text-sm bg-yellow-50 p-2 rounded">
-                                            <strong>{change.field}:</strong> {String(change.old_value)} → {String(change.new_value)}
+                                            <strong>{change.field}:</strong> {String(change.oldValue)} → {String(change.newValue)}
                                         </div>
                                     ))}
                                 </div>
                             </div>
                         )}
 
-                        {comparisonData.changes.widgets_added.length > 0 && (
+                        {comparisonData.changes.widgetsAdded.length > 0 && (
                             <div className="mb-4">
                                 <h5 className="font-medium text-sm mb-2">Widgets Added:</h5>
-                                <div className="text-sm text-green-600">{comparisonData.changes.widgets_added.length} widgets added</div>
+                                <div className="text-sm text-green-600">{comparisonData.changes.widgetsAdded.length} widgets added</div>
                             </div>
                         )}
 
-                        {comparisonData.changes.widgets_removed.length > 0 && (
+                        {comparisonData.changes.widgetsRemoved.length > 0 && (
                             <div className="mb-4">
                                 <h5 className="font-medium text-sm mb-2">Widgets Removed:</h5>
-                                <div className="text-sm text-red-600">{comparisonData.changes.widgets_removed.length} widgets removed</div>
+                                <div className="text-sm text-red-600">{comparisonData.changes.widgetsRemoved.length} widgets removed</div>
                             </div>
                         )}
 
-                        {comparisonData.changes.widgets_modified.length > 0 && (
+                        {comparisonData.changes.widgetsModified.length > 0 && (
                             <div className="mb-4">
                                 <h5 className="font-medium text-sm mb-2">Widgets Modified:</h5>
-                                <div className="text-sm text-blue-600">{comparisonData.changes.widgets_modified.length} widgets modified</div>
+                                <div className="text-sm text-blue-600">{comparisonData.changes.widgetsModified.length} widgets modified</div>
                             </div>
                         )}
 

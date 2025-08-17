@@ -159,7 +159,7 @@ const LayoutSelector = ({
                     </p>
                 )}
                 <p className="text-xs text-gray-400 mt-1">
-                    {option.layout.slot_configuration?.slots?.length || 0} slots
+                    {option.layout.slotConfiguration?.slots?.length || 0} slots
                 </p>
             </div>
         </div>

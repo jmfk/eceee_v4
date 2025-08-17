@@ -32,8 +32,8 @@ const mockPage = {
     id: 1,
     title: 'Test Page',
     slug: 'test-page',
-    publication_status: 'published',
-    children_count: 0,
+    publicationStatus: 'published',
+    childrenCount: 0,
     children: [],
     isExpanded: false,
     childrenLoaded: true

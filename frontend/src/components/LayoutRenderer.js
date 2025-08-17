@@ -3050,7 +3050,7 @@ class LayoutRenderer {
 
 
       // Process the template structure with config and template logic support
-      const templateTags = templateJson.template_tags || [];
+      const templateTags = templateJson.templateTags || [];
       let element;
 
       if (templateTags.length > 0 && (templateTags.includes('if') || templateTags.includes('for'))) {
@@ -3062,7 +3062,7 @@ class LayoutRenderer {
       }
 
       // Handle inline CSS if present
-      if (templateJson.has_inline_css) {
+      if (templateJson.hasInlineCss) {
         this.processInlineStyles(templateJson, config, widgetId);
       }
 
@@ -3096,7 +3096,7 @@ class LayoutRenderer {
         case 'element':
           return this.templateRenderer.createElementFromTemplate(structure, config);
 
-        case 'template_text':
+        case 'templateText':
           return this.templateRenderer.processTemplateText(structure, config);
 
         case 'text':
@@ -3143,8 +3143,8 @@ class LayoutRenderer {
       }
 
       // Process template attributes (attributes with variables)
-      if (elementData.template_attributes) {
-        this.templateRenderer.processTemplateAttributes(element, elementData.template_attributes, config);
+      if (elementData.templateAttributes) {
+        this.templateRenderer.processTemplateAttributes(element, elementData.templateAttributes, config);
       }
 
       // Process children recursively
@@ -3417,14 +3417,14 @@ class LayoutRenderer {
   evaluateCondition(condition, config) {
     try {
       if (typeof condition === 'string') {
-        // Handle string conditions like "config.show_title"
+        // Handle string conditions like "config.showTitle"
         if (condition.startsWith('config.')) {
           const fieldPath = condition.substring(7); // Remove 'config.'
           const value = this.templateRenderer.getNestedValue(config, fieldPath);
           return Boolean(value);
         }
 
-        // Handle negation like "not config.hide_element"
+        // Handle negation like "not config.hideElement"
         if (condition.startsWith('not ')) {
           const innerCondition = condition.substring(4).trim();
           return !this.templateRenderer.evaluateCondition(innerCondition, config);
@@ -3452,7 +3452,7 @@ class LayoutRenderer {
 
       if (typeof condition === 'object' && condition !== null) {
         // Handle object-based conditions
-        if (condition.type === 'field_check') {
+        if (condition.type === 'fieldCheck') {
           const value = this.templateRenderer.getNestedValue(config, condition.field);
           return Boolean(value);
         }
@@ -3570,7 +3570,7 @@ class LayoutRenderer {
         case 'element':
           return this.templateRenderer.createElementFromTemplateWithLogic(structure, config, templateTags);
 
-        case 'template_text':
+        case 'templateText':
           // Check for conditional text rendering
           if (structure.showIf) {
             const shouldShow = this.templateRenderer.evaluateCondition(structure.showIf, config);
@@ -3580,7 +3580,7 @@ class LayoutRenderer {
           }
           return this.templateRenderer.processTemplateText(structure, config);
 
-        case 'conditional_block':
+        case 'conditionalBlock':
           // Special type for conditional blocks
           const shouldRender = this.templateRenderer.evaluateCondition(structure.condition, config);
           if (shouldRender && structure.content) {
@@ -3651,7 +3651,7 @@ class LayoutRenderer {
    */
   processInlineStyles(templateJson, config, widgetId = null) {
     try {
-      if (!templateJson.has_inline_css) {
+      if (!templateJson.hasInlineCss) {
         return;
       }
 
@@ -3699,7 +3699,7 @@ class LayoutRenderer {
       // Check if this is an element with inline styles
       if (node.type === 'element' && node.attributes && node.attributes.style) {
         styleElements.push({
-          type: 'inline_style',
+          type: 'inlineStyle',
           css: node.attributes.style,
           selector: node.tag
         });
@@ -3982,7 +3982,7 @@ class LayoutRenderer {
         hasConfig: !!context.config,
         widgetId: context.widgetId,
         templateStructureType: context.templateJson?.structure?.type,
-        templateTags: context.templateJson?.template_tags,
+        templateTags: context.templateJson?.templateTags,
         configKeys: context.config ? Object.keys(context.config) : []
       },
       timestamp: new Date().toISOString()
@@ -4055,7 +4055,7 @@ class LayoutRenderer {
         case 'element':
           return this.createSafeElementFallback(structure, config, error);
 
-        case 'template_text':
+        case 'templateText':
           return this.templateRenderer.createSafeTextFallback(structure, config, error);
 
         case 'text':
@@ -4181,8 +4181,8 @@ class LayoutRenderer {
       }
 
       // Check template tags
-      if (templateJson.template_tags && !Array.isArray(templateJson.template_tags)) {
-        warnings.push('template_tags should be an array');
+      if (templateJson.templateTags && !Array.isArray(templateJson.templateTags)) {
+        warnings.push('templateTags should be an array');
       }
 
       return {
@@ -4215,19 +4215,19 @@ class LayoutRenderer {
         return;
       }
 
-      const validTypes = ['element', 'template_text', 'text', 'style', 'fragment', 'conditional_block', 'loop_block'];
+      const validTypes = ['element', 'templateText', 'text', 'style', 'fragment', 'conditionalBlock', 'loop_block'];
       if (!validTypes.includes(structure.type)) {
         warnings.push(`Unknown structure type: ${structure.type}`);
       }
 
       // Validate type-specific properties
       switch (structure.type) {
-        case 'conditional_block':
+        case 'conditionalBlock':
           if (!structure.condition || typeof structure.condition !== 'string') {
-            errors.push('conditional_block missing valid condition property');
+            errors.push('conditionalBlock missing valid condition property');
           }
           if (!structure.content) {
-            errors.push('conditional_block missing content property');
+            errors.push('conditionalBlock missing content property');
           } else {
             this.validateTemplateStructure(structure.content, errors, warnings);
           }
@@ -4476,9 +4476,9 @@ class LayoutRenderer {
     try {
       return {
         structure: this.preprocessNode(templateJson.structure),
-        templateTags: templateJson.template_tags || [],
+        templateTags: templateJson.templateTags || [],
         templateVariables: templateJson.template_variables || [],
-        hasInlineCSS: templateJson.has_inline_css || false,
+        hasInlineCSS: templateJson.hasInlineCss || false,
         metadata: {
           preprocessedAt: Date.now(),
           structureType: templateJson.structure?.type
@@ -4549,7 +4549,7 @@ class LayoutRenderer {
         // Reconstruct templateJson for CSS processing
         const templateJson = {
           structure: cachedTemplate.structure,
-          has_inline_css: cachedTemplate.hasInlineCSS
+          hasInlineCss: cachedTemplate.hasInlineCSS
         };
         this.processInlineStyles(templateJson, config, widgetId);
       }

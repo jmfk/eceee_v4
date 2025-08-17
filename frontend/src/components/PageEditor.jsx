@@ -125,8 +125,8 @@ function deriveTodoItemsFromError(errorString) {
  *     description: string,
  *     codeLayout: string,
  *     widgets: { slot_name: [widget_objects] },
- *     version_id: number,        // Current version being viewed
- *     version_number: number,    // Version number for display
+ *     versionId: number,        // Current version being viewed
+ *     versionNumber: number,    // Version number for display
  *     publicationStatus: string, // draft/published/scheduled/expired
  *     // ... other page metadata
  *   }
@@ -179,7 +179,6 @@ const PageEditor = () => {
     const [isLoadingLayout, setIsLoadingLayout] = useState(false)
     const contentEditorRef = useRef(null)
     const settingsEditorRef = useRef(null)
-    const metadataEditorRef = useRef(null)
 
     // Note: pageData has been completely removed - use webpageData and pageVersionData directly
 
@@ -456,7 +455,7 @@ const PageEditor = () => {
             if (!currentVersion && versionsData.versions && versionsData.versions.length > 0) {
                 // Find the version with the highest version number (last saved)
                 const lastSavedVersion = versionsData.versions.reduce((latest, current) => {
-                    return (current.version_number > latest.version_number) ? current : latest;
+                    return (current.versionNumber > latest.versionNumber) ? current : latest;
                 });
                 setCurrentVersion(lastSavedVersion);
                 // Load the complete version data including widgets using raw API
@@ -475,12 +474,7 @@ const PageEditor = () => {
         }
     }, [webpageData?.id, isNewPage, currentVersion, showError]);
 
-    // Navigate to version timeline page
-    const handleShowVersionTimeline = () => {
-        const timelineUrl = `/pages/${webpageData?.id}/versions`;
-        const versionParam = currentVersion ? `?currentVersion=${currentVersion.id}` : '';
-        navigate(`${timelineUrl}${versionParam}`);
-    }
+
 
     // Handle page data updates - route to appropriate data structure
     const updatePageData = (updates) => {
@@ -605,16 +599,7 @@ const PageEditor = () => {
                 }
             }
 
-            // Collect metadata from MetadataEditor
-            if (metadataEditorRef.current && metadataEditorRef.current.saveMetadata) {
-                try {
-                    const metadataResult = await metadataEditorRef.current.saveMetadata();
-                    collectedData.metadata = metadataResult.data || metadataResult;
-                } catch (error) {
-                    console.error('❌ SMART SAVE: Metadata collection failed', error);
-                    throw new Error(`Metadata collection failed: ${error.message}`);
-                }
-            }
+
 
             // Prepare data for smart save
             const currentWebpageDataForSave = {
@@ -761,22 +746,12 @@ const PageEditor = () => {
                 }
             }
 
-            // Collect metadata
-            if (metadataEditorRef.current && metadataEditorRef.current.saveMetadata) {
-                try {
-                    const metadataResult = await metadataEditorRef.current.saveMetadata();
-                    collectedData.metadata = metadataResult.data || metadataResult;
-                } catch (error) {
-                    console.error('❌ Metadata collection failed during analysis', error);
-                    throw new Error(`Metadata collection failed: ${error.message}`);
-                }
-            }
+
 
             // Prepare data for save analysis
             const currentWebpageDataForSave = {
                 ...webpageData,
-                ...collectedData.settings,
-                ...collectedData.metadata
+                ...collectedData.settings
             };
 
             const currentVersionDataForSave = {
@@ -819,7 +794,7 @@ const PageEditor = () => {
                 message: `Save analysis failed: ${error.message}`
             });
         }
-    }, [errorTodoItems, addNotification, webpageData, pageVersionData, originalWebpageData, originalPageVersionData, contentEditorRef, settingsEditorRef, metadataEditorRef, handleActualSave]);
+    }, [errorTodoItems, addNotification, webpageData, pageVersionData, originalWebpageData, originalPageVersionData, contentEditorRef, settingsEditorRef, handleActualSave]);
 
     // Handle save options from modal
     const handleSaveOptions = useCallback(async (saveOptions) => {
@@ -846,18 +821,17 @@ const PageEditor = () => {
         });
     }, [addNotification]);
 
-    // Tab navigation (main tabs only - Settings and Metadata moved to more menu)
+    // Tab navigation (main tabs)
     const tabs = [
         { id: 'content', label: 'Content', icon: Layout },
         { id: 'data', label: 'Data', icon: FileText },
+        { id: 'settings', label: 'Settings & SEO', icon: Settings },
+        { id: 'publishing', label: 'Publishing', icon: Calendar },
         { id: 'preview', label: 'Preview', icon: Eye },
     ]
 
-    // More menu items (includes Settings and Metadata)
-    const moreMenuItems = [
-        { id: 'settings', label: 'Settings', icon: Settings },
-        { id: 'metadata', label: 'Metadata', icon: FileText },
-    ]
+    // More menu items (empty for now)
+    const moreMenuItems = []
 
     // State for more menu dropdown
     const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false)
@@ -924,8 +898,9 @@ const PageEditor = () => {
                         </div>
 
                         {/* Center section - Tab navigation */}
-                        <div className="flex items-center space-x-1">
-                            {tabs.map((tabItem) => {
+                        {/* Desktop tabs - hidden on mobile */}
+                        <div className="hidden lg:flex items-center space-x-1">
+                            {tabs.map((tabItem, index) => {
                                 const Icon = tabItem.icon
                                 const tabPath = isNewPage ? `/pages/new/${tabItem.id}` : `/pages/${pageId}/edit/${tabItem.id}`
                                 const isActive = activeTab === tabItem.id
@@ -946,17 +921,61 @@ const PageEditor = () => {
                             })}
                         </div>
 
+                        {/* Mobile tab dropdown - visible on mobile */}
+                        <div className="lg:hidden relative">
+                            <button
+                                onClick={() => setIsMoreMenuOpen(!isMoreMenuOpen)}
+                                className="flex items-center px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                            >
+                                {(() => {
+                                    const currentTab = tabs.find(tab => tab.id === activeTab)
+                                    if (currentTab) {
+                                        const Icon = currentTab.icon
+                                        return (
+                                            <>
+                                                <Icon className="w-4 h-4 mr-2" />
+                                                <span className="text-sm font-medium">{currentTab.label}</span>
+                                            </>
+                                        )
+                                    }
+                                    return <span className="text-sm">Select Tab</span>
+                                })()}
+                                <ChevronDown className="w-4 h-4 ml-2" />
+                            </button>
+
+                            {/* Mobile dropdown menu */}
+                            {isMoreMenuOpen && (
+                                <div className="absolute left-0 top-full mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+                                    <div className="py-1">
+                                        {tabs.map((tabItem) => {
+                                            const Icon = tabItem.icon
+                                            const tabPath = isNewPage ? `/pages/new/${tabItem.id}` : `/pages/${pageId}/edit/${tabItem.id}`
+                                            const isActive = activeTab === tabItem.id
+
+                                            return (
+                                                <button
+                                                    key={tabItem.id}
+                                                    onClick={() => {
+                                                        navigate(tabPath, { state: { previousView } })
+                                                        setIsMoreMenuOpen(false)
+                                                    }}
+                                                    className={`w-full flex items-center px-4 py-2 text-sm transition-colors ${isActive
+                                                        ? 'bg-blue-50 text-blue-700'
+                                                        : 'text-gray-700 hover:bg-gray-50'
+                                                        }`}
+                                                >
+                                                    <Icon className="w-4 h-4 mr-3" />
+                                                    {tabItem.label}
+                                                </button>
+                                            )
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
                         {/* Right section - Actions */}
                         <div className="flex items-center space-x-3">
-
-
-                            <button
-                                onClick={handleShowVersionTimeline}
-                                className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                            >
-                                <Calendar className="w-4 h-4 mr-2" />
-                                Manage Publishing
-                            </button>
 
                             <div className="relative">
                                 <button
@@ -1042,7 +1061,7 @@ const PageEditor = () => {
                                             </div>
                                         ) : (
                                             <ContentEditor
-                                                key={`${webpageData?.id}-${pageVersionData?.version_id || 'current'}`}
+                                                key={`${webpageData?.id}-${pageVersionData?.versionId || 'current'}`}
                                                 ref={contentEditorRef}
                                                 webpageData={webpageData}
                                                 pageVersionData={pageVersionData}
@@ -1061,7 +1080,7 @@ const PageEditor = () => {
                         )}
                         {activeTab === 'settings' && (
                             <SettingsEditor
-                                key={`settings-${pageVersionData?.version_id || 'new'}`}
+                                key={`settings-${pageVersionData?.versionId || 'new'}`}
                                 ref={settingsEditorRef}
                                 webpageData={webpageData}
                                 pageVersionData={pageVersionData}
@@ -1069,13 +1088,14 @@ const PageEditor = () => {
                                 isNewPage={isNewPage}
                             />
                         )}
-                        {activeTab === 'metadata' && (
-                            <MetadataEditor
-                                key={`metadata-${pageVersionData?.version_id || 'new'}`}
-                                ref={metadataEditorRef}
+                        {activeTab === 'publishing' && !isNewPage && (
+                            <PublishingEditor
+                                key={`publishing-${pageVersionData?.versionId || 'current'}`}
                                 webpageData={webpageData}
-                                onUpdate={updatePageData}
-                                isNewPage={isNewPage}
+                                pageVersionData={pageVersionData}
+                                pageId={pageId}
+                                currentVersion={currentVersion}
+                                onVersionChange={switchToVersion}
                             />
                         )}
                         {activeTab === 'data' && (
@@ -1144,11 +1164,11 @@ const PageEditor = () => {
 
                         {!isNewPage && (
                             <button
-                                onClick={handleShowVersionTimeline}
+                                onClick={() => navigate(`/pages/${pageId}/edit/publishing`, { state: { previousView } })}
                                 className="text-xs px-3 py-1 rounded-md font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors flex items-center space-x-1"
                             >
                                 <Calendar className="w-3 h-3" />
-                                <span>Manage Publishing</span>
+                                <span>Publishing</span>
                             </button>
                         )}
 
@@ -1173,14 +1193,13 @@ const PageEditor = () => {
     )
 }
 
-// Settings Editor Tab
+// Settings & SEO Editor Tab (merged from SettingsEditor and MetadataEditor)
 const SettingsEditor = forwardRef(({ webpageData, pageVersionData, onUpdate, isNewPage }, ref) => {
     // Expose save method to parent
     useImperativeHandle(ref, () => ({
         saveSettings: async () => {
             // Settings are already saved in real-time via onUpdate
             // This method confirms the current state is saved
-            // Settings are primarily WebPage fields, but codeLayout is a PageVersion field
             const currentSettings = {
                 // WebPage fields
                 title: webpageData?.title || '',
@@ -1193,6 +1212,9 @@ const SettingsEditor = forwardRef(({ webpageData, pageVersionData, onUpdate, isN
                 enableCssInjection: webpageData?.enableCssInjection || false,
                 pageCssVariables: webpageData?.pageCssVariables || {},
                 pageCustomCss: webpageData?.pageCustomCss || '',
+                // SEO & Metadata fields
+                metaTitle: webpageData?.metaTitle || webpageData?.title || '',
+                metaDescription: webpageData?.metaDescription || '',
                 // PageVersion field (codeLayout affects version content)
                 codeLayout: pageVersionData?.codeLayout || ''
             };
@@ -1209,6 +1231,7 @@ const SettingsEditor = forwardRef(({ webpageData, pageVersionData, onUpdate, isN
     return (
         <div className="h-full p-6 overflow-y-auto">
             <div className="max-w-2xl mx-auto space-y-6">
+                {/* Page Settings Section */}
                 <div className="bg-white rounded-lg shadow p-6">
                     <h2 className="text-lg font-semibold text-gray-900 mb-6">Page Settings</h2>
 
@@ -1248,45 +1271,10 @@ const SettingsEditor = forwardRef(({ webpageData, pageVersionData, onUpdate, isN
                                 description="Choose the layout template for this page"
                             />
                         </div>
-
-
                     </div>
                 </div>
-            </div>
-        </div>
-    )
-});
 
-// Add display name for debugging
-SettingsEditor.displayName = 'SettingsEditor';
-
-// Metadata Editor Tab
-const MetadataEditor = forwardRef(({ webpageData, onUpdate, isNewPage }, ref) => {
-    // Expose save method to parent
-    useImperativeHandle(ref, () => ({
-        saveMetadata: async () => {
-            // Metadata is already saved in real-time via onUpdate
-            // This method confirms the current state is saved
-            // Note: metaTitle and metaDescription are WebPage fields, 
-            // but hostnames is already handled in settings
-            const currentMetadata = {
-                metaTitle: webpageData?.metaTitle || webpageData?.title || '',
-                metaDescription: webpageData?.metaDescription || ''
-                // hostnames are handled in settings, not duplicated here
-            };
-
-            return {
-                module: 'metadata',
-                status: 'success',
-                data: currentMetadata,
-                timestamp: new Date().toISOString()
-            };
-        }
-    }), [webpageData]);
-
-    return (
-        <div className="h-full p-6 overflow-y-auto">
-            <div className="max-w-2xl mx-auto space-y-6">
+                {/* SEO & Metadata Section */}
                 <div className="bg-white rounded-lg shadow p-6">
                     <h2 className="text-lg font-semibold text-gray-900 mb-6">SEO & Metadata</h2>
 
@@ -1302,6 +1290,9 @@ const MetadataEditor = forwardRef(({ webpageData, onUpdate, isNewPage }, ref) =>
                                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 placeholder="SEO title for search engines"
                             />
+                            <p className="text-sm text-gray-500 mt-1">
+                                If empty, will use the page title
+                            </p>
                         </div>
 
                         <div>
@@ -1342,7 +1333,122 @@ const MetadataEditor = forwardRef(({ webpageData, onUpdate, isNewPage }, ref) =>
 });
 
 // Add display name for debugging
-MetadataEditor.displayName = 'MetadataEditor';
+SettingsEditor.displayName = 'SettingsEditor';
+
+// Publishing Editor Tab - Version Timeline & Publishing Management
+const PublishingEditor = ({ webpageData, pageVersionData, pageId, currentVersion, onVersionChange }) => {
+    const [versions, setVersions] = useState([])
+    const [isLoading, setIsLoading] = useState(true)
+    const { addNotification } = useGlobalNotifications()
+
+    // Load versions when component mounts
+    useEffect(() => {
+        loadVersions()
+    }, [pageId])
+
+    const loadVersions = async () => {
+        if (!pageId) return
+        setIsLoading(true)
+        try {
+            const response = await versionsApi.getPageVersionsList(pageId)
+            setVersions(response.versions || [])
+        } catch (error) {
+            console.error('Failed to load versions:', error)
+            addNotification('Failed to load versions', 'error')
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
+    if (isLoading) {
+        return (
+            <div className="h-full flex items-center justify-center bg-gray-50">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                    <p className="text-gray-600">Loading versions...</p>
+                </div>
+            </div>
+        )
+    }
+
+    return (
+        <div className="h-full p-6 overflow-y-auto">
+            <div className="max-w-4xl mx-auto space-y-6">
+                {/* Header */}
+                <div className="bg-white rounded-lg shadow p-6">
+                    <h2 className="text-lg font-semibold text-gray-900 mb-2">Version Timeline & Publishing</h2>
+                    <p className="text-gray-600">
+                        Manage page versions, scheduling, and publishing workflow
+                    </p>
+                </div>
+
+                {/* Version List */}
+                <div className="bg-white rounded-lg shadow">
+                    <div className="p-6">
+                        <h3 className="text-md font-semibold text-gray-900 mb-4">Page Versions</h3>
+
+                        {versions.length === 0 ? (
+                            <div className="text-center py-8 text-gray-500">
+                                <Calendar className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+                                <p>No versions found for this page</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                {versions.map((version) => {
+                                    const isCurrentVersion = currentVersion?.id === version.id
+
+                                    return (
+                                        <div
+                                            key={version.id}
+                                            className={`border rounded-lg p-4 ${isCurrentVersion ? 'border-blue-300 bg-blue-50' : 'border-gray-200'}`}
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center space-x-4">
+                                                    <div>
+                                                        <div className="flex items-center space-x-2">
+                                                            <span className="font-medium text-gray-900">
+                                                                Version {version.versionNumber}
+                                                            </span>
+                                                            {isCurrentVersion && (
+                                                                <span className="px-2 py-1 text-xs rounded-full bg-indigo-100 text-indigo-800">
+                                                                    Current
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <p className="text-sm text-gray-600 mt-1">
+                                                            {version.changeSummary || 'No description'}
+                                                        </p>
+                                                        <p className="text-xs text-gray-500 mt-1">
+                                                            Created {new Date(version.createdAt).toLocaleDateString()}
+                                                        </p>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex items-center space-x-2">
+                                                    {!isCurrentVersion && (
+                                                        <button
+                                                            onClick={() => onVersionChange(version)}
+                                                            className="px-3 py-1 text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
+                                                        >
+                                                            Switch to
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+// Add display name for debugging
+PublishingEditor.displayName = 'PublishingEditor';
 
 // Preview component that renders actual page content without editing controls
 const PagePreview = ({ webpageData, pageVersionData, isLoadingLayout, layoutData }) => {
@@ -1445,7 +1551,7 @@ const PagePreview = ({ webpageData, pageVersionData, isLoadingLayout, layoutData
                     <div className="h-full p-4">
                         <div className="bg-white shadow-lg rounded-lg w-full h-full overflow-auto">
                             <ContentEditor
-                                key={`preview-${webpageData?.id}-${pageVersionData?.version_id || 'current'}`}
+                                key={`preview-${webpageData?.id}-${pageVersionData?.versionId || 'current'}`}
                                 layoutJson={layoutData}
                                 webpageData={webpageData}
                                 pageVersionData={pageVersionData}
@@ -1489,7 +1595,7 @@ const PagePreview = ({ webpageData, pageVersionData, isLoadingLayout, layoutData
                                     {/* Device content area with natural scrolling */}
                                     <div className="w-full">
                                         <ContentEditor
-                                            key={`mobile-preview-${webpageData?.id}-${pageVersionData?.version_id || 'current'}`}
+                                            key={`mobile-preview-${webpageData?.id}-${pageVersionData?.versionId || 'current'}`}
                                             layoutJson={layoutData}
                                             webpageData={webpageData}
                                             pageVersionData={pageVersionData}

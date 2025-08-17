@@ -72,7 +72,7 @@ export const namespacesApi = {
      * Get active namespaces only
      */
     getActive: wrapApiCall(async () => {
-        const params = { is_active: true }
+        const params = { isActive: true }
         const queryString = buildQueryParams(params)
         return api.get(`/api/v1/namespaces/${queryString}`)
     }, 'namespaces.getActive')

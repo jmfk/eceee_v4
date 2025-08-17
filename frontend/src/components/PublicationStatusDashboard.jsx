@@ -137,7 +137,7 @@ const PublicationStatusDashboard = () => {
 
                 {/* Status Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {Object.entries(statusData.status_counts).map(([status, count]) => {
+                    {Object.entries(statusData.statusCounts).map(([status, count]) => {
                         const Icon = getStatusIcon(status);
                         return (
                             <div key={status} className="bg-gray-50 rounded-lg p-4">
@@ -161,20 +161,20 @@ const PublicationStatusDashboard = () => {
                 <div className="mt-4 p-4 bg-blue-50 rounded-lg">
                     <div className="flex items-center justify-between">
                         <span className="text-sm font-medium text-blue-900">Total Pages</span>
-                        <span className="text-lg font-bold text-blue-900">{statusData.total_pages}</span>
+                        <span className="text-lg font-bold text-blue-900">{statusData.totalPages}</span>
                     </div>
                 </div>
             </div>
 
             {/* Upcoming Scheduled Pages */}
-            {statusData.upcoming_scheduled.length > 0 && (
+            {statusData.upcomingScheduled.length > 0 && (
                 <div className="bg-white rounded-lg shadow p-6">
                     <div className="flex items-center mb-4">
                         <Clock className="w-5 h-5 text-blue-600 mr-2" />
                         <h3 className="text-lg font-semibold text-gray-900">Upcoming Scheduled Publications</h3>
                     </div>
                     <div className="space-y-3">
-                        {statusData.upcoming_scheduled.map((page) => (
+                        {statusData.upcomingScheduled.map((page) => (
                             <div key={page.id} className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
                                 <div>
                                     <h4 className="font-medium text-gray-900">{page.title}</h4>
@@ -195,14 +195,14 @@ const PublicationStatusDashboard = () => {
             )}
 
             {/* Recently Expired Pages */}
-            {statusData.recently_expired.length > 0 && (
+            {statusData.recentlyExpired.length > 0 && (
                 <div className="bg-white rounded-lg shadow p-6">
                     <div className="flex items-center mb-4">
                         <Archive className="w-5 h-5 text-red-600 mr-2" />
                         <h3 className="text-lg font-semibold text-gray-900">Recently Expired Pages</h3>
                     </div>
                     <div className="space-y-3">
-                        {statusData.recently_expired.map((page) => (
+                        {statusData.recentlyExpired.map((page) => (
                             <div key={page.id} className="flex items-center justify-between p-3 bg-red-50 rounded-lg">
                                 <div>
                                     <h4 className="font-medium text-gray-900">{page.title}</h4>

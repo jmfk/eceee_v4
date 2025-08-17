@@ -48,8 +48,8 @@ describe('WidgetLibrary', () => {
                     name: "Text Block",
                     description: "A simple text content widget",
                     template_name: "webpages/widgets/text_block.html",
-                    is_active: true,
-                    configuration_schema: {
+                    isActive: true,
+                    configurationSchema: {
                         type: "object",
                         properties: {
                             content: { type: "string", description: "Text content" },
@@ -66,8 +66,8 @@ describe('WidgetLibrary', () => {
                     name: "Image",
                     description: "Display an image with optional caption",
                     template_name: "webpages/widgets/image.html",
-                    is_active: true,
-                    configuration_schema: {
+                    isActive: true,
+                    configurationSchema: {
                         type: "object",
                         properties: {
                             image_url: { type: "string", description: "Image URL" },
@@ -80,8 +80,8 @@ describe('WidgetLibrary', () => {
                     name: "Button",
                     description: "Interactive button widget",
                     template_name: "webpages/widgets/button.html",
-                    is_active: false, // This should be filtered out
-                    configuration_schema: {
+                    isActive: false, // This should be filtered out
+                    configurationSchema: {
                         type: "object",
                         properties: {
                             text: { type: "string", description: "Button text" },

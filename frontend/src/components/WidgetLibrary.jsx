@@ -28,7 +28,7 @@ const WidgetLibrary = ({ onSelectWidget, selectedWidgetTypes = [] }) => {
         queryFn: async () => {
             const response = await widgetsApi.getTypes()
             // New API returns direct array, filter active ones
-            return response?.filter(widget => widget.is_active) || []
+            return response?.filter(widget => widget.isActive) || []
         }
     })
 

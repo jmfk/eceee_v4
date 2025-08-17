@@ -14,7 +14,7 @@ import { handleApiError, wrapApiCall, buildQueryParams } from './utils.js'
 export const publishingApi = {
     /**
      * Bulk publish pages
-     * @param {Object} publishData - Bulk publish data with page_ids array
+     * @param {Object} publishData - Bulk publish data with pageIds array
      * @returns {Promise<Object>} Bulk publish result
      */
     bulkPublish: wrapApiCall(async (publishData) => {
@@ -23,7 +23,7 @@ export const publishingApi = {
 
     /**
      * Bulk schedule pages for publication
-     * @param {Object} scheduleData - Bulk schedule data with page_ids, effectiveDate, etc.
+     * @param {Object} scheduleData - Bulk schedule data with pageIds, effectiveDate, etc.
      * @returns {Promise<Object>} Bulk schedule result
      */
     bulkSchedule: wrapApiCall(async (scheduleData) => {

@@ -418,6 +418,16 @@ class PageDataSchemaSerializer(serializers.ModelSerializer):
     """Serializer for page data JSON Schemas (system and layout scopes)."""
 
     created_by = UserSerializer(read_only=True)
+    layout_name = serializers.CharField(
+        max_length=255, required=False, allow_blank=True, allow_null=True
+    )
+
+    def to_internal_value(self, data):
+        # Ensure layout_name is present for field validation
+        if "layout_name" not in data:
+            data = data.copy() if hasattr(data, "copy") else dict(data)
+            data["layout_name"] = ""
+        return super().to_internal_value(data)
 
     class Meta:
         model = PageDataSchema
@@ -436,13 +446,26 @@ class PageDataSchemaSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at", "updated_at", "created_by"]
 
     def validate(self, data):
-        # Validate basic constraints: layout_name must be present for layout scope
+        # Handle system vs layout scope constraints
         scope = data.get("scope", getattr(self.instance, "scope", None))
-        layout_name = data.get("layout_name", getattr(self.instance, "layout_name", ""))
-        if scope == PageDataSchema.SCOPE_LAYOUT and not layout_name:
-            raise serializers.ValidationError(
-                "layout_name is required for layout scope"
+
+        if scope == PageDataSchema.SCOPE_SYSTEM:
+            # For system schemas, clear layout_name and name fields (like model.clean())
+            data["layout_name"] = ""
+            data["name"] = ""
+        elif scope == PageDataSchema.SCOPE_LAYOUT:
+            # For layout schemas, layout_name is required
+            layout_name = data.get(
+                "layout_name", getattr(self.instance, "layout_name", "")
             )
+            if not layout_name:
+                raise serializers.ValidationError(
+                    {"layout_name": "Layout name is required for layout scope"}
+                )
+        else:
+            # Default layout_name to empty string if not provided
+            if "layout_name" not in data:
+                data["layout_name"] = ""
 
         # Validate JSON Schema correctness using jsonschema library
         try:

@@ -302,7 +302,7 @@ class DjangoTemplateRenderer {
                 case 'element':
                     return this.createElementFromTemplate(structure, config);
 
-                case 'template_text':
+                case 'templateText':
                     return this.processTemplateText(structure, config);
 
                 case 'text':
@@ -314,11 +314,11 @@ class DjangoTemplateRenderer {
                 case 'fragment':
                     return this.processFragment(structure, config);
 
-                case 'conditional_block':
+                case 'conditionalBlock':
                     // Handle conditional blocks with proper error handling
                     try {
                         if (!structure.condition || typeof structure.condition !== 'string') {
-                            console.warn('DjangoTemplateRenderer: Invalid condition in conditional_block');
+                            console.warn('DjangoTemplateRenderer: Invalid condition in conditionalBlock');
                             return document.createTextNode('<!-- Invalid condition -->');
                         }
 
@@ -326,14 +326,14 @@ class DjangoTemplateRenderer {
                         if (shouldRender && structure.content) {
                             // Validate content structure before processing
                             if (typeof structure.content !== 'object' || !structure.content.type) {
-                                console.warn('DjangoTemplateRenderer: Invalid content in conditional_block');
+                                console.warn('DjangoTemplateRenderer: Invalid content in conditionalBlock');
                                 return document.createTextNode('<!-- Invalid content structure -->');
                             }
                             return this.processTemplateStructure(structure.content, config);
                         }
                         return document.createTextNode('');
                     } catch (error) {
-                        console.error('DjangoTemplateRenderer: Error processing conditional_block', error);
+                        console.error('DjangoTemplateRenderer: Error processing conditionalBlock', error);
                         return document.createTextNode('<!-- Conditional block error -->');
                     }
 
@@ -403,8 +403,8 @@ class DjangoTemplateRenderer {
             }
 
             // Process template attributes (attributes with variables)
-            if (elementData.template_attributes) {
-                this.processTemplateAttributes(element, elementData.template_attributes, config);
+            if (elementData.templateAttributes) {
+                this.processTemplateAttributes(element, elementData.templateAttributes, config);
             }
 
             // Process conditional attributes (inline conditionals from Django templates)
@@ -841,7 +841,7 @@ class DjangoTemplateRenderer {
                 case 'element':
                     return this.createSafeElementFallback(structure, config, error);
 
-                case 'template_text':
+                case 'templateText':
                     return this.createSafeTextFallback(structure, config, error);
 
                 case 'text':
@@ -1273,7 +1273,7 @@ class DjangoTemplateRenderer {
                 case 'element':
                     return this.createElementFromTemplateWithLogic(structure, config, templateTags);
 
-                case 'template_text':
+                case 'templateText':
                     // Check for conditional text rendering
                     if (structure.showIf) {
                         const shouldShow = this.evaluateCondition(structure.showIf, config);
@@ -1283,7 +1283,7 @@ class DjangoTemplateRenderer {
                     }
                     return this.processTemplateText(structure, config);
 
-                case 'conditional_block':
+                case 'conditionalBlock':
                     // Special type for conditional blocks
                     const shouldRender = this.evaluateCondition(structure.condition, config);
                     if (shouldRender && structure.content) {
@@ -1424,14 +1424,14 @@ class DjangoTemplateRenderer {
     evaluateCondition(condition, config) {
         try {
             if (typeof condition === 'string') {
-                // Handle string conditions like "config.show_title" (but not comparisons)
+                // Handle string conditions like "config.showTitle" (but not comparisons)
                 if (condition.startsWith('config.') && !condition.includes('==') && !condition.includes('!=')) {
                     const fieldPath = condition.substring(7); // Remove 'config.'
                     const value = this.getNestedValue(config, fieldPath);
                     return Boolean(value);
                 }
 
-                // Handle negation like "not config.hide_element"
+                // Handle negation like "not config.hideElement"
                 if (condition.startsWith('not ')) {
                     const innerCondition = condition.substring(4).trim();
                     return !this.evaluateCondition(innerCondition, config);
@@ -1459,7 +1459,7 @@ class DjangoTemplateRenderer {
 
             if (typeof condition === 'object' && condition !== null) {
                 // Handle object-based conditions
-                if (condition.type === 'field_check') {
+                if (condition.type === 'fieldCheck') {
                     const value = this.getNestedValue(config, condition.field);
                     return Boolean(value);
                 }

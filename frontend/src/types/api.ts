@@ -6,8 +6,8 @@ export type PublicationStatus = 'unpublished' | 'scheduled' | 'published' | 'exp
 export interface UserResponse {
   id: number;
   username: string;
-  first_name?: string;
-  last_name?: string;
+  firstName?: string;
+  lastName?: string;
   email?: string;
 }
 
@@ -16,12 +16,12 @@ export interface WebPageTreeResponse {
   title: string;
   slug: string;
   parent?: number | null;
-  sort_order: number;
+  sortOrder: number;
   hostnames: string[];
-  publication_status: PublicationStatus;
-  effective_date?: string | null;
-  expiry_date?: string | null;
-  children_count: number;
+  publicationStatus: PublicationStatus;
+  effectiveDate?: string | null;
+  expiryDate?: string | null;
+  childrenCount: number;
   
   // Tree-specific fields (added by frontend logic)
   isExpanded?: boolean;
@@ -34,15 +34,15 @@ export interface ThemeResponse {
   id: number;
   name: string;
   description?: string;
-  css_variables: Record<string, string>;
-  is_active: boolean;
+  cssVariables: Record<string, string>;
+  isActive: boolean;
 }
 
 export interface LayoutResponse {
   name: string;
   description?: string;
   slots: Record<string, any>[];
-  template_path?: string;
+  templatePath?: string;
 }
 
 export interface WebPageDetailResponse {
@@ -51,32 +51,32 @@ export interface WebPageDetailResponse {
   slug: string;
   description?: string;
   parent?: WebPageTreeResponse | null;
-  parent_id?: number | null;
-  sort_order: number;
+  parentId?: number | null;
+  sortOrder: number;
   hostnames: string[];
-  code_layout?: string;
+  codeLayout?: string;
   theme?: ThemeResponse | null;
-  theme_id?: number | null;
-  publication_status: PublicationStatus;
-  effective_date?: string | null;
-  expiry_date?: string | null;
-  meta_title?: string;
-  meta_description?: string;
-  meta_keywords?: string;
+  themeId?: number | null;
+  publicationStatus: PublicationStatus;
+  effectiveDate?: string | null;
+  expiryDate?: string | null;
+  metaTitle?: string;
+  metaDescription?: string;
+  metaKeywords?: string;
 
-  created_at: string;
-  updated_at: string;
-  created_by: UserResponse;
-  last_modified_by: UserResponse;
-  absolute_url: string;
-  is_published: boolean;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: UserResponse;
+  lastModifiedBy: UserResponse;
+  absoluteUrl: string;
+  isPublished: boolean;
   breadcrumbs: Record<string, any>[];
-  effective_layout?: LayoutResponse | null;
-  effective_theme?: ThemeResponse | null;
-  layout_type?: string;
-  layout_inheritance_info: Record<string, any>;
-  available_code_layouts: LayoutResponse[];
-  children_count: number;
+  effectiveLayout?: LayoutResponse | null;
+  effectiveTheme?: ThemeResponse | null;
+  layoutType?: string;
+  layoutInheritanceInfo: Record<string, any>;
+  availableCodeLayouts: LayoutResponse[];
+  childrenCount: number;
 }
 
 export interface WebPageListResponse {
@@ -85,17 +85,17 @@ export interface WebPageListResponse {
   slug: string;
   description?: string;
   parent?: WebPageTreeResponse | null;
-  sort_order: number;
+  sortOrder: number;
   hostnames: string[];
-  publication_status: PublicationStatus;
-  effective_date?: string | null;
-  expiry_date?: string | null;
-  created_at: string;
-  updated_at: string;
-  created_by: UserResponse;
-  last_modified_by: UserResponse;
-  is_published: boolean;
-  children_count: number;
+  publicationStatus: PublicationStatus;
+  effectiveDate?: string | null;
+  expiryDate?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: UserResponse;
+  lastModifiedBy: UserResponse;
+  isPublished: boolean;
+  childrenCount: number;
   layout?: LayoutResponse | null;
   theme?: ThemeResponse | null;
 }
@@ -113,17 +113,17 @@ export interface CreatePageRequest {
   title: string;
   slug: string;
   description?: string;
-  parent_id?: number | null;
-  sort_order?: number;
+  parentId?: number | null;
+  sortOrder?: number;
   hostnames?: string[];
-  code_layout?: string;
-  theme_id?: number | null;
-  publication_status?: PublicationStatus;
-  effective_date?: string | null;
-  expiry_date?: string | null;
-  meta_title?: string;
-  meta_description?: string;
-  meta_keywords?: string;
+  codeLayout?: string;
+  themeId?: number | null;
+  publicationStatus?: PublicationStatus;
+  effectiveDate?: string | null;
+  expiryDate?: string | null;
+  metaTitle?: string;
+  metaDescription?: string;
+  metaKeywords?: string;
 }
 
 export interface UpdatePageRequest extends Partial<CreatePageRequest> {
@@ -145,7 +145,7 @@ export interface ApiError {
 export interface PageFilters {
   search?: string;
   parent?: number;
-  parent_isnull?: boolean;
-  publication_status?: PublicationStatus;
+  parentIsnull?: boolean;
+  publicationStatus?: PublicationStatus;
   ordering?: string;
 } 

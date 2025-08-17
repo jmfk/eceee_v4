@@ -32,7 +32,7 @@ export const pagesApi = {
      */
     getRootPages: wrapApiCall(async (filters = {}) => {
         const params = {
-            parent_isnull: 'true',
+            parentIsnull: 'true',
             ordering: 'sortOrder,title',
             ...filters
         }
@@ -81,7 +81,7 @@ export const pagesApi = {
      * @returns {Promise<WebPageDetailResponse>}
      */
     get: wrapApiCall(async (pageId, versionId = null) => {
-        const params = versionId ? { version_id: versionId } : {}
+        const params = versionId ? { versionId: versionId } : {}
         const queryString = buildQueryParams(params)
         return api.get(`${endpoints.pages.detail(pageId)}${queryString}`)
     }, 'pages.get'),
@@ -179,7 +179,7 @@ export const pagesApi = {
             }
         })
         if (Object.keys(pageDataJson).length > 0) {
-            payload.page_data = pageDataJson
+            payload.pageData = pageDataJson
         }
 
         // Add widgets if provided
@@ -189,10 +189,10 @@ export const pagesApi = {
 
         // Add version options if widgets are being saved
         if (widgets !== null || options.description || options.autoPublish !== undefined || options.createNewVersion !== undefined) {
-            payload.version_options = {
+            payload.versionOptions = {
                 description: options.description || 'Auto-save',
-                auto_publish: options.autoPublish || false,
-                create_new_version: options.createNewVersion || false
+                autoPublish: options.autoPublish || false,
+                createNewVersion: options.createNewVersion || false
             }
         }
 

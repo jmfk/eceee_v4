@@ -39,7 +39,7 @@ const WidgetIconMenu = ({
         queryKey: ['widget-types'],
         queryFn: async () => {
             const response = await api.get('/api/v1/webpages/widget-types/')
-            return response.data?.filter(widget => widget.is_active) || []
+            return response.data?.filter(widget => widget.isActive) || []
         }
     })
 
@@ -107,9 +107,9 @@ const WidgetIconMenu = ({
         let available = [...widgetTypes]
 
         // Filter by allowed widget types if slot specifies them
-        if (slot?.allowed_widget_types && slot.allowed_widget_types.length > 0) {
+        if (slot?.allowedWidgetTypes && slot.allowedWidgetTypes.length > 0) {
             available = available.filter(widget =>
-                slot.allowed_widget_types.includes(widget.name)
+                slot.allowedWidgetTypes.includes(widget.name)
             )
         }
 
@@ -206,9 +206,9 @@ const WidgetIconMenu = ({
                             <div className="px-3 py-4 text-center">
                                 <Grid3X3 className="w-6 h-6 text-gray-300 mx-auto mb-2" />
                                 <div className="text-sm text-gray-500">No widgets available</div>
-                                {slot?.allowed_widget_types && (
+                                {slot?.allowedWidgetTypes && (
                                     <div className="text-xs text-gray-400 mt-1">
-                                        This slot only accepts: {slot.allowed_widget_types.join(', ')}
+                                        This slot only accepts: {slot.allowedWidgetTypes.join(', ')}
                                     </div>
                                 )}
                             </div>

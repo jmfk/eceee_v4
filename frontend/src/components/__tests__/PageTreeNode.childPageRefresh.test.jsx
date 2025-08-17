@@ -33,15 +33,15 @@ const mockParentPage = {
     id: 1,
     title: 'Parent Page',
     slug: 'parent-page',
-    publication_status: 'published',
-    children_count: 2,
+    publicationStatus: 'published',
+    childrenCount: 2,
     children: [
         {
             id: 2,
             title: 'Child Page 1',
             slug: 'child-page-1',
-            publication_status: 'unpublished',
-            children_count: 0,
+            publicationStatus: 'unpublished',
+            childrenCount: 0,
             children: [],
             isExpanded: false,
             childrenLoaded: true
@@ -50,8 +50,8 @@ const mockParentPage = {
             id: 3,
             title: 'Child Page 2',
             slug: 'child-page-2',
-            publication_status: 'published',
-            children_count: 0,
+            publicationStatus: 'published',
+            childrenCount: 0,
             children: [],
             isExpanded: false,
             childrenLoaded: true
@@ -158,7 +158,7 @@ describe('PageTreeNode - Child Page Refresh', () => {
     })
 
     it('should NOT call onRefreshChildren when parent page publication status is toggled (using targeted updates)', async () => {
-        const mockResponse = { data: { ...mockParentPage, publication_status: 'unpublished' } }
+        const mockResponse = { data: { ...mockParentPage, publicationStatus: 'unpublished' } }
         api.post.mockResolvedValue(mockResponse)
 
         renderWithProviders(
@@ -188,8 +188,8 @@ describe('PageTreeNode - Child Page Refresh', () => {
             id: 2,
             title: 'Child Page 1',
             slug: 'child-page-1',
-            publication_status: 'unpublished',
-            children_count: 0,
+            publicationStatus: 'unpublished',
+            childrenCount: 0,
             children: [],
             isExpanded: false,
             childrenLoaded: true

@@ -94,10 +94,10 @@ const FormsEditor = ({ config, onChange, errors, widgetType }) => {
                 {/* Form Header */}
                 <div className="mb-6">
                     <h3 className="text-xl font-bold text-gray-900 mb-2">
-                        {previewConfig.form_title || 'Contact Form'}
+                        {previewConfig.formTitle || 'Contact Form'}
                     </h3>
-                    {previewConfig.form_description && (
-                        <p className="text-gray-600">{previewConfig.form_description}</p>
+                    {previewConfig.formDescription && (
+                        <p className="text-gray-600">{previewConfig.formDescription}</p>
                     )}
                 </div>
 
@@ -157,12 +157,12 @@ const FormsEditor = ({ config, onChange, errors, widgetType }) => {
                         disabled
                     >
                         <Send className="w-4 h-4" />
-                        <span>{previewConfig.submit_button_text || 'Submit'}</span>
+                        <span>{previewConfig.submitButtonText || 'Submit'}</span>
                     </button>
 
-                    {previewConfig.submit_url && (
+                    {previewConfig.submitUrl && (
                         <div className="mt-2 text-xs text-gray-500 text-center">
-                            Form will submit to: {previewConfig.submit_url}
+                            Form will submit to: {previewConfig.submitUrl}
                         </div>
                     )}
                 </div>
@@ -327,12 +327,12 @@ const FormsEditor = ({ config, onChange, errors, widgetType }) => {
             }) => (
                 <>
                     {/* Form Title */}
-                    {renderTextField('form_title', 'Form Title', {
+                    {renderTextField('formTitle', 'Form Title', {
                         placeholder: 'Enter a title for your form'
                     })}
 
                     {/* Form Description */}
-                    {renderTextArea('form_description', 'Form Description (Optional)', {
+                    {renderTextArea('formDescription', 'Form Description (Optional)', {
                         placeholder: 'Optional description or instructions for form users',
                         rows: 3
                     })}
@@ -438,15 +438,15 @@ const FormsEditor = ({ config, onChange, errors, widgetType }) => {
                             <span>Form Settings</span>
                         </h4>
 
-                        {renderUrlField('submit_url', 'Submit URL (Optional)', {
+                        {renderUrlField('submitUrl', 'Submit URL (Optional)', {
                             placeholder: 'https://example.com/submit'
                         })}
 
-                        {renderTextField('submit_button_text', 'Submit Button Text', {
+                        {renderTextField('submitButtonText', 'Submit Button Text', {
                             placeholder: 'Submit'
                         })}
 
-                        {renderTextField('success_message', 'Success Message', {
+                        {renderTextField('successMessage', 'Success Message', {
                             placeholder: 'Thank you for your submission!'
                         })}
                     </div>

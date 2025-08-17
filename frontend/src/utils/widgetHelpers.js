@@ -10,13 +10,13 @@ export class WidgetModel {
     // Get inheritance settings from widget
     getInheritanceSettings() {
         return {
-            inherit_from_parent: this.widget.inherit_from_parent,
+            inheritFromParent: this.widget.inheritFromParent,
             override_parent: this.widget.override_parent,
             inheritance_behavior: this.widget.inheritance_behavior || 'inherit',
             inheritance_conditions: this.widget.inheritance_conditions || {},
             priority: this.widget.priority || 0,
-            is_visible: this.widget.is_visible !== false,
-            max_inheritance_depth: this.widget.max_inheritance_depth
+            isVisible: this.widget.isVisible !== false,
+            maxInheritanceDepth: this.widget.maxInheritanceDepth
         }
     }
 
@@ -32,12 +32,12 @@ export class WidgetModel {
 
     // Check if widget is visible
     isVisible() {
-        return this.widget.is_visible !== false
+        return this.widget.isVisible !== false
     }
 
     // Check if widget is inherited
     isInherited() {
-        return this.widget.is_inherited
+        return this.widget.isInherited
     }
 
     // Get inheritance behavior
@@ -58,11 +58,11 @@ export class WidgetModel {
 
     // Get widget type information
     getTypeName() {
-        return this.widgetType?.name || this.widget.widget_type?.name || 'Unknown'
+        return this.widgetType?.name || this.widget.widgetType?.name || 'Unknown'
     }
 
     getTypeDescription() {
-        return this.widgetType?.description || this.widget.widget_type?.description || ''
+        return this.widgetType?.description || this.widget.widgetType?.description || ''
     }
 }
 
@@ -76,24 +76,24 @@ export const widgetHelpers = {
     // Extract inheritance settings from a widget
     extractInheritanceSettings: (widget) => {
         return {
-            inherit_from_parent: widget.inherit_from_parent,
+            inheritFromParent: widget.inheritFromParent,
             override_parent: widget.override_parent,
             inheritance_behavior: widget.inheritance_behavior || 'inherit',
             inheritance_conditions: widget.inheritance_conditions || {},
             priority: widget.priority || 0,
-            is_visible: widget.is_visible !== false,
-            max_inheritance_depth: widget.max_inheritance_depth
+            isVisible: widget.isVisible !== false,
+            maxInheritanceDepth: widget.maxInheritanceDepth
         }
     },
 
     // Get widget display information
     getWidgetDisplayInfo: (widget) => {
         return {
-            name: widget.widget_type?.name || 'Unknown',
-            description: widget.widget_type?.description || '',
+            name: widget.widgetType?.name || 'Unknown',
+            description: widget.widgetType?.description || '',
             priority: widget.priority || 0,
-            isInherited: widget.is_inherited,
-            isVisible: widget.is_visible !== false,
+            isInherited: widget.isInherited,
+            isVisible: widget.isVisible !== false,
             inheritanceBehavior: widget.inheritance_behavior || 'inherit'
         }
     }

@@ -82,8 +82,8 @@ export function sanitizePageData(page) {
         ...page,
         // Ensure hostnames is always an array
         hostnames: Array.isArray(page.hostnames) ? page.hostnames : [],
-        // Ensure children_count is a number
-        children_count: typeof page.children_count === 'number' ? page.children_count : 0,
+        // Ensure childrenCount is a number
+        childrenCount: typeof page.childrenCount === 'number' ? page.childrenCount : 0,
         // Ensure sortOrder is a number
         sortOrder: typeof page.sortOrder === 'number' ? page.sortOrder : 0,
         // Ensure parent is properly handled

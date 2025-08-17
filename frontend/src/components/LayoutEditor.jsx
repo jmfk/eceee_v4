@@ -159,7 +159,7 @@ const LayoutEditor = ({
 
 // Layout Card Component
 const LayoutCard = ({ layout, isSelected, onSelect, onPreview, mode }) => {
-    const slotCount = layout.slot_configuration?.slots?.length || 0
+    const slotCount = layout.slotConfiguration?.slots?.length || 0
 
     return (
         <div
@@ -218,11 +218,11 @@ const LayoutCard = ({ layout, isSelected, onSelect, onPreview, mode }) => {
 
                 <div className="flex items-center justify-between text-xs text-gray-500">
                     <span>Status</span>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${layout.is_active
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${layout.isActive
                         ? 'bg-green-100 text-green-800'
                         : 'bg-gray-100 text-gray-800'
                         }`}>
-                        {layout.is_active ? 'Active' : 'Inactive'}
+                        {layout.isActive ? 'Active' : 'Inactive'}
                     </span>
                 </div>
             </div>
@@ -283,24 +283,24 @@ const LayoutPreviewModal = ({ layout, onClose }) => {
                             </div>
                             <div className="flex justify-between text-sm">
                                 <span className="text-gray-600">Status:</span>
-                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${layout.is_active
+                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${layout.isActive
                                     ? 'bg-green-100 text-green-800'
                                     : 'bg-gray-100 text-gray-800'
                                     }`}>
-                                    {layout.is_active ? 'Active' : 'Inactive'}
+                                    {layout.isActive ? 'Active' : 'Inactive'}
                                 </span>
                             </div>
                         </div>
                     </div>
 
                     {/* Slots Configuration */}
-                    {layout.slot_configuration?.slots && layout.slot_configuration.slots.length > 0 && (
+                    {layout.slotConfiguration?.slots && layout.slotConfiguration.slots.length > 0 && (
                         <div>
                             <h4 className="text-sm font-medium text-gray-900 mb-2">
-                                Widget Slots ({layout.slot_configuration.slots.length})
+                                Widget Slots ({layout.slotConfiguration.slots.length})
                             </h4>
                             <div className="space-y-3">
-                                {layout.slot_configuration.slots.map((slot, index) => (
+                                {layout.slotConfiguration.slots.map((slot, index) => (
                                     <div key={index} className="bg-gray-50 rounded-lg p-3">
                                         <div className="flex items-center justify-between mb-2">
                                             <span className="font-medium text-sm text-gray-900">

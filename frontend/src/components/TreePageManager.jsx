@@ -68,8 +68,8 @@ const TreePageManager = () => {
         // Extract all parent page IDs from hierarchy paths
         const parentIds = new Set()
         results.forEach(result => {
-            if (result.hierarchy_path && Array.isArray(result.hierarchy_path)) {
-                result.hierarchy_path.forEach(parent => {
+            if (result.hierarchyPath && Array.isArray(result.hierarchyPath)) {
+                result.hierarchyPath.forEach(parent => {
                     parentIds.add(parent.id)
                 })
             }
@@ -268,7 +268,7 @@ const TreePageManager = () => {
             setExpandedPages(new Set(firstLevelPageIds))
 
             // Auto-load children for first-level pages that have children
-            const pagesWithChildren = rootPagesData.results.filter(page => (page.childrenCount || page.children_count) > 0)
+            const pagesWithChildren = rootPagesData.results.filter(page => (page.childrenCount || page.childrenCount) > 0)
 
             // Load all children in parallel and update state once
             const loadAllChildren = async () => {

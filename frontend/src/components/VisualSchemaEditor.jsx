@@ -388,10 +388,10 @@ function PropertyTypeSelector({ onAddProperty }) {
     <div className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-3 rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-md hover:shadow-lg"
+        className="flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-2.5 rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-sm hover:shadow-md font-medium text-sm"
       >
-        <Plus className="w-5 h-5" />
-        <span className="font-medium">Add Property</span>
+        <Plus className="w-4 h-4" />
+        <span>Add Property</span>
       </button>
 
       {isOpen && (
@@ -558,9 +558,9 @@ export default function VisualSchemaEditor({ schema, onChange }) {
         <div className="space-y-6">
           {properties.length === 0 ? (
             <div className="text-center py-12 bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-dashed border-blue-200 rounded-xl">
-              <div className="mb-4">
+              <div className="mb-6">
                 <div className="text-gray-600 text-lg mb-2">No properties defined yet</div>
-                <div className="text-gray-500 text-sm mb-6">Add your first property to start building your schema</div>
+                <div className="text-gray-500 text-sm">Add your first property to start building your schema</div>
               </div>
               <PropertyTypeSelector onAddProperty={handleAddProperty} />
             </div>
@@ -579,7 +579,7 @@ export default function VisualSchemaEditor({ schema, onChange }) {
               </div>
 
               {/* Add property button */}
-              <div className="flex justify-center">
+              <div className="flex justify-center pt-4 border-t border-gray-100">
                 <PropertyTypeSelector onAddProperty={handleAddProperty} />
               </div>
             </>

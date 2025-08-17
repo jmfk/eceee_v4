@@ -25,7 +25,7 @@ vi.mock('../../api/pages', () => ({
     deletePage: vi.fn(),
     searchAllPages: vi.fn(() => Promise.resolve({ results: [] })),
     pageTreeUtils: {
-        hasChildren: vi.fn((page) => page.children_count > 0),
+        hasChildren: vi.fn((page) => page.childrenCount > 0),
         formatPageForTree: vi.fn((page) => ({
             ...page,
             isExpanded: false,
@@ -90,17 +90,17 @@ const mockPages = {
             id: 1,
             title: 'Home Page',
             slug: 'home',
-            publication_status: 'published',
-            children_count: 2,
-            sort_order: 0
+            publicationStatus: 'published',
+            childrenCount: 2,
+            sortOrder: 0
         },
         {
             id: 2,
             title: 'About Page',
             slug: 'about',
-            publication_status: 'published',
-            children_count: 0,
-            sort_order: 1
+            publicationStatus: 'published',
+            childrenCount: 0,
+            sortOrder: 1
         }
     ],
     count: 2
@@ -259,17 +259,17 @@ describe('TreePageManager', () => {
                     id: 1,
                     title: 'Home Page',
                     slug: 'home',
-                    publication_status: 'published',
-                    children_count: 2,
-                    sort_order: 0
+                    publicationStatus: 'published',
+                    childrenCount: 2,
+                    sortOrder: 0
                 },
                 {
                     id: 2,
                     title: 'About Page',
                     slug: 'about',
-                    publication_status: 'published',
-                    children_count: 0,
-                    sort_order: 1
+                    publicationStatus: 'published',
+                    childrenCount: 0,
+                    sortOrder: 1
                 }
             ],
             count: 2
@@ -282,17 +282,17 @@ describe('TreePageManager', () => {
                     id: 3,
                     title: 'Child Page 1',
                     slug: 'child-1',
-                    publication_status: 'published',
-                    children_count: 0,
-                    sort_order: 0
+                    publicationStatus: 'published',
+                    childrenCount: 0,
+                    sortOrder: 0
                 },
                 {
                     id: 4,
                     title: 'Child Page 2',
                     slug: 'child-2',
-                    publication_status: 'published',
-                    children_count: 0,
-                    sort_order: 1
+                    publicationStatus: 'published',
+                    childrenCount: 0,
+                    sortOrder: 1
                 }
             ],
             count: 2

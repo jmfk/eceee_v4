@@ -17,7 +17,7 @@ export const DEFAULT_SCHEMA_FIELDS = {
         default: '',
         maxLength: 500,
     },
-    featured_image: {
+    featuredImage: {
         type: 'string',
         title: 'Featured Image URL',
         description: 'URL of the main image for this page',

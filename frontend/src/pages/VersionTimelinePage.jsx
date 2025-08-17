@@ -70,7 +70,7 @@ const VersionTimelinePage = () => {
             ]);
 
             setVersions(versionsData.versions || []);
-            setPageTitle(versionsData.page_title || pageResponse.title || 'Page');
+            setPageTitle(versionsData.pageTitle || pageResponse.title || 'Page');
             setPageData(pageResponse);
         } catch (error) {
             console.error('Failed to load versions:', error);

@@ -47,7 +47,7 @@ const mockThemes = [
         id: 1,
         name: 'Blue Theme',
         description: 'A professional blue color scheme',
-        css_variables: {
+        cssVariables: {
             primary: '#3b82f6',
             'primary-dark': '#1d4ed8',
             secondary: '#64748b',
@@ -55,23 +55,23 @@ const mockThemes = [
             text: '#1f2937'
         },
         custom_css: '.blue-theme { background: var(--background); }',
-        is_active: true,
-        created_at: '2024-01-01T00:00:00Z',
-        created_by: { username: 'testuser' }
+        isActive: true,
+        createdAt: '2024-01-01T00:00:00Z',
+        createdBy: { username: 'testuser' }
     },
     {
         id: 2,
         name: 'Dark Theme',
         description: 'A modern dark color scheme',
-        css_variables: {
+        cssVariables: {
             primary: '#8b5cf6',
             background: '#111827',
             text: '#f9fafb'
         },
         custom_css: '.dark-theme { color: var(--text); }',
-        is_active: true,
-        created_at: '2024-01-01T00:00:00Z',
-        created_by: { username: 'testuser' }
+        isActive: true,
+        createdAt: '2024-01-01T00:00:00Z',
+        createdBy: { username: 'testuser' }
     }
 ]
 
@@ -297,7 +297,7 @@ describe('ThemeEditor', () => {
                 expect.objectContaining({
                     name: 'Test Theme',
                     description: 'A test theme',
-                    css_variables: expect.objectContaining({
+                    cssVariables: expect.objectContaining({
                         primary: '#3b82f6'
                     })
                 })

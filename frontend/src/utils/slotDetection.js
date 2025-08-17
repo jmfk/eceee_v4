@@ -101,11 +101,11 @@ export class HtmlSlot {
     getSlotConfiguration() {
         return {
             name: this.name,
-            display_name: this.metadata.title || this.name,
+            displayName: this.metadata.title || this.name,
             description: this.metadata.description || '',
-            max_widgets: this.metadata.maxWidgets || null,
-            allowed_widget_types: this.metadata.allowedTypes || [],
-            css_classes: this.metadata.cssClasses || '',
+            maxWidgets: this.metadata.maxWidgets || null,
+            allowedWidgetTypes: this.metadata.allowedTypes || [],
+            cssClasses: this.metadata.cssClasses || '',
             responsive: this.metadata.responsive || false,
             selector: `[${SLOT_DETECTION_CONFIG.slotAttribute}="${this.name}"]`,
             element: this.element,

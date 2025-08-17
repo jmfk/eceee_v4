@@ -568,7 +568,7 @@ const PageTreeNode = memo(({
                 {/* Children count */}
                 {hasChildren && (
                     <span className="text-xs text-gray-400 mr-2 cursor-help">
-                        ({page.children_count})
+                        ({page.childrenCount})
                     </span>
                 )}
 

@@ -40,7 +40,7 @@ const BaseWidgetEditor = ({
     const renderTextField = (fieldName, label, props = {}) => {
         const value = localConfig[fieldName] || ''
         const error = errors[fieldName]
-        const isRequired = widgetType?.configuration_schema?.required?.includes(fieldName)
+        const isRequired = widgetType?.configurationSchema?.required?.includes(fieldName)
 
         return (
             <div className="space-y-2">
@@ -69,7 +69,7 @@ const BaseWidgetEditor = ({
     const renderTextArea = (fieldName, label, props = {}) => {
         const value = localConfig[fieldName] || ''
         const error = errors[fieldName]
-        const isRequired = widgetType?.configuration_schema?.required?.includes(fieldName)
+        const isRequired = widgetType?.configurationSchema?.required?.includes(fieldName)
 
         return (
             <div className="space-y-2">
@@ -98,7 +98,7 @@ const BaseWidgetEditor = ({
     const renderSelectField = (fieldName, label, options = [], props = {}) => {
         const value = localConfig[fieldName] || ''
         const error = errors[fieldName]
-        const isRequired = widgetType?.configuration_schema?.required?.includes(fieldName)
+        const isRequired = widgetType?.configurationSchema?.required?.includes(fieldName)
 
         return (
             <div className="space-y-2">
@@ -159,7 +159,7 @@ const BaseWidgetEditor = ({
     const renderDateField = (fieldName, label, props = {}) => {
         const value = localConfig[fieldName] || ''
         const error = errors[fieldName]
-        const isRequired = widgetType?.configuration_schema?.required?.includes(fieldName)
+        const isRequired = widgetType?.configurationSchema?.required?.includes(fieldName)
 
         return (
             <div className="space-y-2">
@@ -188,7 +188,7 @@ const BaseWidgetEditor = ({
     const renderDateTimeField = (fieldName, label, props = {}) => {
         const value = localConfig[fieldName] || ''
         const error = errors[fieldName]
-        const isRequired = widgetType?.configuration_schema?.required?.includes(fieldName)
+        const isRequired = widgetType?.configurationSchema?.required?.includes(fieldName)
 
         return (
             <div className="space-y-2">
@@ -217,7 +217,7 @@ const BaseWidgetEditor = ({
     const renderUrlField = (fieldName, label, props = {}) => {
         const value = localConfig[fieldName] || ''
         const error = errors[fieldName]
-        const isRequired = widgetType?.configuration_schema?.required?.includes(fieldName)
+        const isRequired = widgetType?.configurationSchema?.required?.includes(fieldName)
 
         return (
             <div className="space-y-2">

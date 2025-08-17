@@ -16,7 +16,7 @@ export class SlotState {
         const widgetsBySlot = {}
 
         this.pageWidgetsData.forEach(widget => {
-            const slotName = widget.slot_name
+            const slotName = widget.slotName
 
             if (!widgetsBySlot[slotName]) {
                 widgetsBySlot[slotName] = []
@@ -24,7 +24,7 @@ export class SlotState {
 
             widgetsBySlot[slotName].push({
                 ...widget,
-                is_inherited: !!widget.inherited_from
+                isInherited: !!widget.inheritedFrom
             })
         })
 
@@ -73,7 +73,7 @@ export class SlotState {
      * Check if a widget can be moved in a direction
      */
     canMoveWidget(widget, direction) {
-        const slotWidgets = this.getSlotWidgets(widget.slot_name)
+        const slotWidgets = this.getSlotWidgets(widget.slotName)
         const currentIndex = slotWidgets.findIndex(w => w.id === widget.id)
 
         if (currentIndex === -1) return false
@@ -86,7 +86,7 @@ export class SlotState {
      * Get the target sort order for moving a widget
      */
     getMoveSortOrder(widget, direction) {
-        const slotWidgets = this.getSlotWidgets(widget.slot_name)
+        const slotWidgets = this.getSlotWidgets(widget.slotName)
         const currentIndex = slotWidgets.findIndex(w => w.id === widget.id)
 
         if (!this.canMoveWidget(widget, direction)) {
@@ -105,7 +105,7 @@ export class SlotState {
      */
     hasInheritedWidgets(slotName) {
         const slotWidgets = this.getSlotWidgets(slotName)
-        return slotWidgets.some(w => w.is_inherited)
+        return slotWidgets.some(w => w.isInherited)
     }
 
     /**
@@ -113,14 +113,14 @@ export class SlotState {
      */
     getSlotInheritanceInfo(slotName) {
         const slotWidgets = this.getSlotWidgets(slotName)
-        const inherited = slotWidgets.filter(w => w.is_inherited)
-        const local = slotWidgets.filter(w => !w.is_inherited)
+        const inherited = slotWidgets.filter(w => w.isInherited)
+        const local = slotWidgets.filter(w => !w.isInherited)
 
         return {
             total: slotWidgets.length,
             inherited: inherited.length,
             local: local.length,
-            inheritanceSources: [...new Set(inherited.map(w => w.inherited_from).filter(Boolean))]
+            inheritanceSources: [...new Set(inherited.map(w => w.inheritedFrom).filter(Boolean))]
         }
     }
 
@@ -130,11 +130,11 @@ export class SlotState {
     validateWidgetAction(widget, action) {
         const errors = []
 
-        if (widget.is_inherited && action === 'delete') {
+        if (widget.isInherited && action === 'delete') {
             errors.push('Cannot delete inherited widgets. Override them instead.')
         }
 
-        if (widget.is_inherited && action === 'move') {
+        if (widget.isInherited && action === 'move') {
             errors.push('Cannot reorder inherited widgets. Override them first.')
         }
 

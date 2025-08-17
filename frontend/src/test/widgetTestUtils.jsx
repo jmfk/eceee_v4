@@ -152,7 +152,7 @@ export const MockDataFactory = {
         id: 1,
         name: 'Text Block',
         description: 'Rich text content block',
-        is_active: true,
+        isActive: true,
         json_schema: {
             type: 'object',
             properties: {
@@ -331,7 +331,7 @@ export const mockWidgetTypes = [
         name: "Text Block",
         description: "A simple text content widget",
         template_name: "webpages/widgets/text_block.html",
-        is_active: true,
+        isActive: true,
         configuration_schema: {
             type: "object",
             properties: {
@@ -350,7 +350,7 @@ export const mockWidgetTypes = [
         name: "Image",
         description: "Display an image with optional caption",
         template_name: "webpages/widgets/image.html",
-        is_active: true,
+        isActive: true,
         configuration_schema: {
             type: "object",
             properties: {
@@ -365,7 +365,7 @@ export const mockWidgetTypes = [
         name: "Button",
         description: "Interactive button widget",
         template_name: "webpages/widgets/button.html",
-        is_active: true,
+        isActive: true,
         configuration_schema: {
             type: "object",
             properties: {

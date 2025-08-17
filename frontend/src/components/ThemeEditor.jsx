@@ -139,7 +139,7 @@ const ThemesList = ({ themes, selectedTheme, onSelectTheme, isLoading }) => {
                             <div className="flex-1">
                                 <h4 className="font-medium text-gray-900">{theme.name}</h4>
                                 <p className="text-sm text-gray-500 mt-1">
-                                    {Object.keys(theme.css_variables || {}).length} variables
+                                    {Object.keys(theme.cssVariables || {}).length} variables
                                 </p>
                                 {theme.description && (
                                     <p className="text-sm text-gray-600 mt-1">{theme.description}</p>
@@ -147,7 +147,7 @@ const ThemesList = ({ themes, selectedTheme, onSelectTheme, isLoading }) => {
 
                                 {/* Color Preview */}
                                 <div className="flex items-center space-x-1 mt-2">
-                                    {getColorVariables(theme.css_variables).slice(0, 5).map((color, i) => (
+                                    {getColorVariables(theme.cssVariables).slice(0, 5).map((color, i) => (
                                         <div
                                             key={i}
                                             className="w-4 h-4 rounded-full border border-gray-300"
@@ -155,16 +155,16 @@ const ThemesList = ({ themes, selectedTheme, onSelectTheme, isLoading }) => {
                                             title={color}
                                         />
                                     ))}
-                                    {getColorVariables(theme.css_variables).length > 5 && (
+                                    {getColorVariables(theme.cssVariables).length > 5 && (
                                         <span className="text-xs text-gray-400">
-                                            +{getColorVariables(theme.css_variables).length - 5}
+                                            +{getColorVariables(theme.cssVariables).length - 5}
                                         </span>
                                     )}
                                 </div>
                             </div>
 
                             <div className="flex items-center space-x-2">
-                                {theme.is_active ? (
+                                {theme.isActive ? (
                                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                                         Active
                                     </span>
@@ -207,9 +207,9 @@ const ThemeForm = ({ theme = null, onSave, onCancel }) => {
     const [formData, setFormData] = useState({
         name: theme?.name || '',
         description: theme?.description || '',
-        css_variables: theme?.css_variables || {},
+        cssVariables: theme?.cssVariables || {},
         custom_css: theme?.custom_css || '',
-        is_active: theme?.is_active ?? true
+        isActive: theme?.isActive ?? true
     })
 
     const [newVariable, setNewVariable] = useState({ key: '', value: '' })
@@ -243,8 +243,8 @@ const ThemeForm = ({ theme = null, onSave, onCancel }) => {
         if (newVariable.key && newVariable.value) {
             setFormData({
                 ...formData,
-                css_variables: {
-                    ...formData.css_variables,
+                cssVariables: {
+                    ...formData.cssVariables,
                     [newVariable.key]: newVariable.value
                 }
             })
@@ -253,23 +253,23 @@ const ThemeForm = ({ theme = null, onSave, onCancel }) => {
     }
 
     const removeVariable = (key) => {
-        const updatedVariables = { ...formData.css_variables }
+        const updatedVariables = { ...formData.cssVariables }
         delete updatedVariables[key]
         setFormData({
             ...formData,
-            css_variables: updatedVariables
+            cssVariables: updatedVariables
         })
     }
 
     const updateVariable = (oldKey, newKey, value) => {
-        const updatedVariables = { ...formData.css_variables }
+        const updatedVariables = { ...formData.cssVariables }
         if (oldKey !== newKey) {
             delete updatedVariables[oldKey]
         }
         updatedVariables[newKey] = value
         setFormData({
             ...formData,
-            css_variables: updatedVariables
+            cssVariables: updatedVariables
         })
     }
 
@@ -313,8 +313,8 @@ const ThemeForm = ({ theme = null, onSave, onCancel }) => {
     const applyTemplate = (template) => {
         setFormData({
             ...formData,
-            css_variables: {
-                ...formData.css_variables,
+            cssVariables: {
+                ...formData.cssVariables,
                 ...colorSchemeTemplates[template]
             }
         })
@@ -357,8 +357,8 @@ const ThemeForm = ({ theme = null, onSave, onCancel }) => {
                             <input
                                 id="theme-active"
                                 type="checkbox"
-                                checked={formData.is_active}
-                                onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+                                checked={formData.isActive}
+                                onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
                                 className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
                             />
                             <span className="ml-2 text-sm text-gray-700">Active</span>
@@ -447,7 +447,7 @@ const ThemeForm = ({ theme = null, onSave, onCancel }) => {
 
                     {/* Variables List */}
                     <div className="space-y-2 max-h-60 overflow-y-auto">
-                        {Object.entries(formData.css_variables).map(([key, value]) => (
+                        {Object.entries(formData.cssVariables).map(([key, value]) => (
                             <VariableEditor
                                 key={key}
                                 originalKey={key}
@@ -457,7 +457,7 @@ const ThemeForm = ({ theme = null, onSave, onCancel }) => {
                             />
                         ))}
 
-                        {Object.keys(formData.css_variables).length === 0 && (
+                        {Object.keys(formData.cssVariables).length === 0 && (
                             <div className="text-center py-4 text-gray-500">
                                 <Hash className="w-6 h-6 mx-auto mb-2" />
                                 <p className="text-sm">No CSS variables defined. Add variables to customize your theme.</p>
@@ -471,7 +471,7 @@ const ThemeForm = ({ theme = null, onSave, onCancel }) => {
                             <div className="text-xs text-gray-300 mb-2">Generated CSS Variables</div>
                             <pre className="text-xs text-green-300 overflow-x-auto">
                                 <code>
-                                    {`:root {\n${Object.entries(formData.css_variables)
+                                    {`:root {\n${Object.entries(formData.cssVariables)
                                         .map(([key, value]) => `  --${key}: ${value};`)
                                         .join('\n')}\n}`}
                                 </code>
@@ -634,7 +634,7 @@ const ThemeEditPanel = ({ theme, onUpdate, onCancel, showPreview, onTogglePrevie
         const themeData = {
             name: theme.name,
             description: theme.description,
-            css_variables: theme.css_variables,
+            cssVariables: theme.cssVariables,
             custom_css: theme.custom_css
         }
 
@@ -668,7 +668,7 @@ const ThemeEditPanel = ({ theme, onUpdate, onCancel, showPreview, onTogglePrevie
                 <div>
                     <h3 className="text-lg font-medium text-gray-900">{theme.name}</h3>
                     <p className="text-sm text-gray-500 mt-1">
-                        {Object.keys(theme.css_variables || {}).length} CSS variables defined
+                        {Object.keys(theme.cssVariables || {}).length} CSS variables defined
                     </p>
                 </div>
                 <div className="flex items-center space-x-2">
@@ -732,16 +732,16 @@ const ThemeEditPanel = ({ theme, onUpdate, onCancel, showPreview, onTogglePrevie
                             <div>
                                 <dt className="text-sm font-medium text-gray-500">Status</dt>
                                 <dd className="text-sm">
-                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${theme.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${theme.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                                         }`}>
-                                        {theme.is_active ? 'Active' : 'Inactive'}
+                                        {theme.isActive ? 'Active' : 'Inactive'}
                                     </span>
                                 </dd>
                             </div>
                             <div>
                                 <dt className="text-sm font-medium text-gray-500">Created</dt>
                                 <dd className="text-sm text-gray-900">
-                                    {new Date(theme.created_at).toLocaleDateString()} by {theme.created_by?.username}
+                                    {new Date(theme.createdAt).toLocaleDateString()} by {theme.createdBy?.username}
                                 </dd>
                             </div>
                         </dl>
@@ -750,9 +750,9 @@ const ThemeEditPanel = ({ theme, onUpdate, onCancel, showPreview, onTogglePrevie
                     {/* CSS Variables */}
                     <div>
                         <h4 className="font-medium text-gray-900 mb-3">CSS Variables</h4>
-                        {Object.keys(theme.css_variables || {}).length > 0 ? (
+                        {Object.keys(theme.cssVariables || {}).length > 0 ? (
                             <div className="space-y-2">
-                                {Object.entries(theme.css_variables).map(([key, value]) => (
+                                {Object.entries(theme.cssVariables).map(([key, value]) => (
                                     <div key={key} className="flex items-center justify-between p-2 bg-gray-50 rounded">
                                         <div className="flex items-center space-x-3">
                                             <code className="text-sm font-mono text-gray-700">--{key}</code>
@@ -789,7 +789,7 @@ const ThemeEditPanel = ({ theme, onUpdate, onCancel, showPreview, onTogglePrevie
 
 // Theme Preview Component
 const ThemePreview = ({ theme }) => {
-    const variables = theme.css_variables || {}
+    const variables = theme.cssVariables || {}
 
     // Create style object from CSS variables
     const previewStyle = Object.entries(variables).reduce((acc, [key, value]) => {

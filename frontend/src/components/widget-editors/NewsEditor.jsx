@@ -38,10 +38,10 @@ const NewsEditor = ({ config, onChange, errors, widgetType }) => {
         return (
             <article className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
                 {/* Featured Image */}
-                {previewConfig.featured_image && (
+                {previewConfig.featuredImage && (
                     <div className="aspect-w-16 aspect-h-9">
                         <img
-                            src={previewConfig.featured_image}
+                            src={previewConfig.featuredImage}
                             alt={previewConfig.title || 'Featured image'}
                             className="w-full h-48 object-cover"
                             onError={(e) => {
@@ -59,7 +59,7 @@ const NewsEditor = ({ config, onChange, errors, widgetType }) => {
                         </h2>
 
                         {/* Meta Information */}
-                        {previewConfig.show_meta !== false && (
+                        {previewConfig.showMeta !== false && (
                             <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
                                 {previewConfig.author && (
                                     <div className="flex items-center space-x-1">
@@ -67,10 +67,10 @@ const NewsEditor = ({ config, onChange, errors, widgetType }) => {
                                         <span>By {previewConfig.author}</span>
                                     </div>
                                 )}
-                                {previewConfig.publication_date && (
+                                {previewConfig.publicationDate && (
                                     <div className="flex items-center space-x-1">
                                         <Calendar className="w-4 h-4" />
-                                        <span>{new Date(previewConfig.publication_date).toLocaleDateString()}</span>
+                                        <span>{new Date(previewConfig.publicationDate).toLocaleDateString()}</span>
                                     </div>
                                 )}
                                 {previewConfig.category && (
@@ -172,19 +172,19 @@ const NewsEditor = ({ config, onChange, errors, widgetType }) => {
                         </label>
                         <input
                             type="date"
-                            value={formatDateForInput(localConfig.publication_date)}
-                            onChange={(e) => handleFieldChange('publication_date', e.target.value)}
-                            className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.publication_date ? 'border-red-300 focus:border-red-500' : 'border-gray-300 focus:border-transparent'
+                            value={formatDateForInput(localConfig.publicationDate)}
+                            onChange={(e) => handleFieldChange('publicationDate', e.target.value)}
+                            className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.publicationDate ? 'border-red-300 focus:border-red-500' : 'border-gray-300 focus:border-transparent'
                                 }`}
                         />
-                        {!localConfig.publication_date && (
+                        {!localConfig.publicationDate && (
                             <div className="text-xs text-gray-500">
                                 Leave empty to use current date
                             </div>
                         )}
-                        {errors.publication_date && (
+                        {errors.publicationDate && (
                             <div className="flex items-center space-x-1 text-red-600">
-                                <span className="text-xs">{errors.publication_date}</span>
+                                <span className="text-xs">{errors.publicationDate}</span>
                             </div>
                         )}
                     </div>
@@ -194,16 +194,16 @@ const NewsEditor = ({ config, onChange, errors, widgetType }) => {
                         <label className="block text-sm font-medium text-gray-700">
                             Featured Image (Optional)
                         </label>
-                        {renderUrlField('featured_image', 'Image URL', {
+                        {renderUrlField('featuredImage', 'Image URL', {
                             placeholder: 'https://example.com/image.jpg'
                         })}
 
                         {/* Image Preview */}
-                        {localConfig.featured_image && (
+                        {localConfig.featuredImage && (
                             <div className="mt-2">
                                 <div className="text-xs text-gray-600 mb-1">Image Preview:</div>
                                 <img
-                                    src={localConfig.featured_image}
+                                    src={localConfig.featuredImage}
                                     alt="Featured image preview"
                                     className="w-full max-w-md h-32 object-cover rounded border"
                                     onError={(e) => {
@@ -219,7 +219,7 @@ const NewsEditor = ({ config, onChange, errors, widgetType }) => {
 
                     {/* Meta Display Settings */}
                     {renderCheckboxField(
-                        'show_meta',
+                        'showMeta',
                         'Show meta information',
                         'Display author, publication date, and category information'
                     )}

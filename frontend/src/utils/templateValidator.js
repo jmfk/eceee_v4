@@ -41,12 +41,12 @@ export const validateTemplate = async ({
 }) => {
     // Default validation options
     const defaultOptions = {
-        html_validation: true,
-        css_validation: true,
-        security_scan: true,
-        performance_analysis: true,
-        accessibility_check: true,
-        slot_validation: true
+        htmlValidation: true,
+        cssValidation: true,
+        securityScan: true,
+        performanceAnalysis: true,
+        accessibilityCheck: true,
+        slotValidation: true
     };
 
     const options = { ...defaultOptions, ...validationOptions };
@@ -63,10 +63,10 @@ export const validateTemplate = async ({
 
     try {
         const response = await apiClient.post('/webpages/layouts/validate-template/', {
-            html_content: htmlContent,
-            css_content: cssContent,
-            template_name: templateName,
-            validation_options: options
+            htmlContent: htmlContent,
+            cssContent: cssContent,
+            templateName: templateName,
+            validationOptions: options
         });
 
         const result = response.data;
@@ -87,7 +87,7 @@ export const validateTemplate = async ({
 
         // Return error result in consistent format
         return {
-            is_valid: false,
+            isValid: false,
             issues: [{
                 type: 'system_error',
                 severity: 'critical',
@@ -95,11 +95,11 @@ export const validateTemplate = async ({
                 suggestion: 'Please check your connection and try again',
                 context: error.message
             }],
-            error_count: 1,
-            warning_count: 0,
-            critical_count: 1,
-            validation_time_ms: 0,
-            validated_at: new Date().toISOString(),
+            errorCount: 1,
+            warningCount: 0,
+            criticalCount: 1,
+            validationTimeMs: 0,
+            validatedAt: new Date().toISOString(),
             error: true
         };
     }
@@ -120,9 +120,9 @@ export const quickValidateTemplate = async ({
 }) => {
     try {
         const response = await apiClient.post('/webpages/layouts/quick-validate/', {
-            html_content: htmlContent,
-            css_content: cssContent,
-            validation_types: validationTypes
+            htmlContent: htmlContent,
+            cssContent: cssContent,
+            validationTypes: validationTypes
         });
 
         return response.data;
@@ -131,16 +131,16 @@ export const quickValidateTemplate = async ({
         console.error('Quick validation failed:', error);
 
         return {
-            is_valid: false,
-            error_count: 1,
-            warning_count: 0,
-            critical_count: 1,
+            isValid: false,
+            errorCount: 1,
+            warningCount: 0,
+            criticalCount: 1,
             issues: [{
                 type: 'system_error',
                 severity: 'critical',
                 message: 'Quick validation unavailable'
             }],
-            validation_time_ms: 0,
+            validationTimeMs: 0,
             timestamp: new Date().toISOString(),
             error: true
         };
@@ -161,18 +161,18 @@ export const securityScanTemplate = async ({
     scanOptions = {}
 }) => {
     const defaultScanOptions = {
-        xss_scan: true,
-        sql_injection_scan: true,
-        csp_validation: true
+        xssScan: true,
+        sqlInjectionScan: true,
+        cspValidation: true
     };
 
     const options = { ...defaultScanOptions, ...scanOptions };
 
     try {
         const response = await apiClient.post('/webpages/layouts/security-scan/', {
-            html_content: htmlContent,
-            css_content: cssContent,
-            scan_options: options
+            htmlContent: htmlContent,
+            cssContent: cssContent,
+            scanOptions: options
         });
 
         return response.data;
@@ -181,16 +181,16 @@ export const securityScanTemplate = async ({
         console.error('Security scan failed:', error);
 
         return {
-            security_findings: [],
-            security_metrics: {
-                total_findings: 0,
-                severity_counts: { critical: 0, high: 0, medium: 0, low: 0 },
-                category_counts: {},
-                security_score: 0,
-                risk_level: 'UNKNOWN'
+            securityFindings: [],
+            securityMetrics: {
+                totalFindings: 0,
+                severityCounts: { critical: 0, high: 0, medium: 0, low: 0 },
+                categoryCounts: {},
+                securityScore: 0,
+                riskLevel: 'UNKNOWN'
             },
-            is_secure: false,
-            scan_timestamp: new Date().toISOString(),
+            isSecure: false,
+            scanTimestamp: new Date().toISOString(),
             error: true
         };
     }
@@ -211,9 +211,9 @@ export const analyzeTemplatePerformance = async ({
 }) => {
     try {
         const response = await apiClient.post('/webpages/layouts/performance-analysis/', {
-            html_content: htmlContent,
-            css_content: cssContent,
-            template_name: templateName
+            htmlContent: htmlContent,
+            cssContent: cssContent,
+            templateName: templateName
         });
 
         return response.data;
@@ -222,18 +222,18 @@ export const analyzeTemplatePerformance = async ({
         console.error('Performance analysis failed:', error);
 
         return {
-            performance_metrics: {
-                parse_time_ms: 0,
-                dom_nodes: 0,
-                css_rules: 0,
-                slot_count: 0,
-                template_size_bytes: 0,
-                complexity_score: 0,
-                estimated_render_time_ms: 0
+            performanceMetrics: {
+                parseTimeMs: 0,
+                domNodes: 0,
+                cssRules: 0,
+                slotCount: 0,
+                templateSizeBytes: 0,
+                complexityScore: 0,
+                estimatedRenderTimeMs: 0
             },
             recommendations: [],
-            performance_grade: 'F',
-            analysis_timestamp: new Date().toISOString(),
+            performanceGrade: 'F',
+            analysisTimestamp: new Date().toISOString(),
             error: true
         };
     }
@@ -252,8 +252,8 @@ export const checkTemplateAccessibility = async ({
 }) => {
     try {
         const response = await apiClient.post('/webpages/layouts/accessibility-check/', {
-            html_content: htmlContent,
-            template_name: templateName
+            htmlContent: htmlContent,
+            templateName: templateName
         });
 
         return response.data;
@@ -262,12 +262,12 @@ export const checkTemplateAccessibility = async ({
         console.error('Accessibility check failed:', error);
 
         return {
-            accessibility_score: 0,
-            accessibility_grade: 'F',
+            accessibilityScore: 0,
+            accessibilityGrade: 'F',
             issues: [],
             recommendations: [],
-            compliance_level: 'Non-compliant',
-            check_timestamp: new Date().toISOString(),
+            complianceLevel: 'Non-compliant',
+            checkTimestamp: new Date().toISOString(),
             error: true
         };
     }
@@ -295,12 +295,12 @@ export const analyzeTemplate = async (params) => {
             cssContent,
             templateName,
             validationOptions: {
-                html_validation: true,
-                css_validation: true,
-                security_scan: includeSecurity,
-                performance_analysis: includePerformance,
-                accessibility_check: includeAccessibility,
-                slot_validation: true
+                htmlValidation: true,
+                cssValidation: true,
+                securityScan: includeSecurity,
+                performanceAnalysis: includePerformance,
+                accessibilityCheck: includeAccessibility,
+                slotValidation: true
             }
         });
 
@@ -333,7 +333,7 @@ export const analyzeTemplate = async (params) => {
             performance,
             accessibility,
             timestamp: new Date().toISOString(),
-            template_name: templateName
+            templateName: templateName
         };
 
     } catch (error) {
@@ -388,12 +388,12 @@ export const VALIDATION_SEVERITY = {
  * Validation types
  */
 export const VALIDATION_TYPES = {
-    HTML_SYNTAX: 'html_syntax',
-    HTML_STRUCTURE: 'html_structure',
-    CSS_SYNTAX: 'css_syntax',
-    CSS_SECURITY: 'css_security',
-    SLOT_CONFIGURATION: 'slot_configuration',
-    SECURITY_SCAN: 'security_scan',
+    HTML_SYNTAX: 'htmlSyntax',
+    HTML_STRUCTURE: 'htmlStructure',
+    CSS_SYNTAX: 'cssSyntax',
+    CSS_SECURITY: 'cssSecurity',
+    SLOT_CONFIGURATION: 'slotConfiguration',
+    SECURITY_SCAN: 'securityScan',
     PERFORMANCE: 'performance',
     ACCESSIBILITY: 'accessibility'
 };

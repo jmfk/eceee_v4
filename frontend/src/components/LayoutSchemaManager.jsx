@@ -13,17 +13,17 @@ export default function LayoutSchemaManager({ fixedLayoutName = null }) {
     const [validationErrors, setValidationErrors] = useState({})
     const [layoutForm, setLayoutForm] = useState({
         scope: 'layout',
-        layout_name: '',
+        layoutName: '',
         schema: { type: 'object', properties: {} },
-        is_active: true,
+        isActive: true,
     })
 
     const fetchData = async () => {
         setLoading(true)
         try {
             const [schemasRes, layoutsRes] = await Promise.all([
-                pageDataSchemasApi.list({ ordering: '-updated_at' }),
-                layoutsApi.list({ active_only: true }),
+                pageDataSchemasApi.list({ ordering: '-updatedAt' }),
+                layoutsApi.list({ activeOnly: true }),
             ])
             const allSchemas = Array.isArray(schemasRes) ? schemasRes : (schemasRes?.results || [])
             const allLayouts = Array.isArray(layoutsRes) ? layoutsRes : (layoutsRes?.results || [])
@@ -32,13 +32,13 @@ export default function LayoutSchemaManager({ fixedLayoutName = null }) {
 
             if (fixedLayoutName) {
                 const existingLayoutSchema = allSchemas.find(
-                    (s) => s.scope === 'layout' && s.layout_name === fixedLayoutName
+                    (s) => s.scope === 'layout' && s.layoutName === fixedLayoutName
                 )
                 setLayoutForm((f) => ({
                     ...f,
-                    layout_name: fixedLayoutName,
+                    layoutName: fixedLayoutName,
                     schema: existingLayoutSchema ? getSchemaWithoutDefaults(existingLayoutSchema.schema) : { type: 'object', properties: {} },
-                    is_active: existingLayoutSchema ? existingLayoutSchema.is_active : true,
+                    isActive: existingLayoutSchema ? existingLayoutSchema.isActive : true,
                 }))
             }
         } catch (e) {
@@ -58,8 +58,8 @@ export default function LayoutSchemaManager({ fixedLayoutName = null }) {
 
     const validateForm = (formData) => {
         const errors = {}
-        if (!formData.layout_name?.trim()) {
-            errors.layout_name = 'Layout selection is required'
+        if (!formData.layoutName?.trim()) {
+            errors.layoutName = 'Layout selection is required'
         }
         if (formData.schema?.properties) {
             const invalidKeys = Object.keys(formData.schema.properties).filter(
@@ -83,7 +83,7 @@ export default function LayoutSchemaManager({ fixedLayoutName = null }) {
             const cleanFormData = { ...formData }
             cleanFormData.schema = mergeWithDefaults(formData.schema)
 
-            const existingSchema = layoutSchemas.find((s) => s.layout_name === formData.layout_name)
+            const existingSchema = layoutSchemas.find((s) => s.layoutName === formData.layoutName)
             if (existingSchema) {
                 await pageDataSchemasApi.update(existingSchema.id, cleanFormData)
             } else {
@@ -94,10 +94,10 @@ export default function LayoutSchemaManager({ fixedLayoutName = null }) {
         } catch (e) {
             const errorData = e?.response?.data
             if (typeof errorData === 'object' && errorData) {
-                if (errorData.layout_name)
-                    setValidationErrors((prev) => ({ ...prev, layout_name: errorData.layout_name[0] }))
+                if (errorData.layoutName)
+                    setValidationErrors((prev) => ({ ...prev, layoutName: errorData.layoutName[0] }))
                 if (errorData.schema) setValidationErrors((prev) => ({ ...prev, schema: errorData.schema[0] }))
-                if (!errorData.layout_name && !errorData.schema) setError(JSON.stringify(errorData))
+                if (!errorData.layoutName && !errorData.schema) setError(JSON.stringify(errorData))
             } else {
                 setError(e?.message || 'Save failed')
             }
@@ -133,21 +133,21 @@ export default function LayoutSchemaManager({ fixedLayoutName = null }) {
                                         </div>
                                     ) : (
                                         <select
-                                            className={`w-full max-w-md border rounded-lg px-3 py-2 ${validationErrors.layout_name ? 'border-red-500' : ''}`}
-                                            value={layoutForm.layout_name}
+                                            className={`w-full max-w-md border rounded-lg px-3 py-2 ${validationErrors.layoutName ? 'border-red-500' : ''}`}
+                                            value={layoutForm.layoutName}
                                             onChange={(e) => {
                                                 const newLayoutName = e.target.value
-                                                const existingLayoutSchema = layoutSchemas.find((s) => s.layout_name === newLayoutName)
+                                                const existingLayoutSchema = layoutSchemas.find((s) => s.layoutName === newLayoutName)
                                                 setLayoutForm((prev) => ({
                                                     ...prev,
-                                                    layout_name: newLayoutName,
+                                                    layoutName: newLayoutName,
                                                     schema: existingLayoutSchema
                                                         ? getSchemaWithoutDefaults(existingLayoutSchema.schema)
                                                         : { type: 'object', properties: {} },
-                                                    is_active: existingLayoutSchema ? existingLayoutSchema.is_active : true,
+                                                    isActive: existingLayoutSchema ? existingLayoutSchema.isActive : true,
                                                 }))
-                                                if (validationErrors.layout_name) {
-                                                    setValidationErrors((prev) => ({ ...prev, layout_name: '' }))
+                                                if (validationErrors.layoutName) {
+                                                    setValidationErrors((prev) => ({ ...prev, layoutName: '' }))
                                                 }
                                             }}
                                         >
@@ -159,26 +159,26 @@ export default function LayoutSchemaManager({ fixedLayoutName = null }) {
                                             ))}
                                         </select>
                                     )}
-                                    {validationErrors.layout_name && (
-                                        <div className="text-red-500 text-sm mt-1">{validationErrors.layout_name}</div>
+                                    {validationErrors.layoutName && (
+                                        <div className="text-red-500 text-sm mt-1">{validationErrors.layoutName}</div>
                                     )}
                                 </div>
 
-                                {layoutForm.layout_name && (
+                                {layoutForm.layoutName && (
                                     <>
                                         <div className="flex items-center justify-between mb-4">
-                                            <h3 className="text-md font-medium">Additional Fields for {layoutForm.layout_name}</h3>
-                                            {layoutSchemas.find((s) => s.layout_name === layoutForm.layout_name) && (
+                                            <h3 className="text-md font-medium">Additional Fields for {layoutForm.layoutName}</h3>
+                                            {layoutSchemas.find((s) => s.layoutName === layoutForm.layoutName) && (
                                                 <span className="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded-full">Existing Schema</span>
                                             )}
                                         </div>
 
-                                        <VisualSchemaEditor key={`layout-${layoutForm.layout_name}`} schema={layoutForm.schema} onChange={handleLayoutSchemaChange} />
+                                        <VisualSchemaEditor key={`layout-${layoutForm.layoutName}`} schema={layoutForm.schema} onChange={handleLayoutSchemaChange} />
                                         {validationErrors.schema && <div className="text-red-500 text-sm mt-2">{validationErrors.schema}</div>}
 
                                         <div className="flex space-x-3 mt-6">
                                             <button onClick={handleSubmit} className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors" disabled={loading}>
-                                                {layoutSchemas.find((s) => s.layout_name === layoutForm.layout_name) ? 'Update Layout Schema' : 'Create Layout Schema'}
+                                                {layoutSchemas.find((s) => s.layoutName === layoutForm.layoutName) ? 'Update Layout Schema' : 'Create Layout Schema'}
                                             </button>
                                         </div>
                                     </>
@@ -188,13 +188,13 @@ export default function LayoutSchemaManager({ fixedLayoutName = null }) {
                             <div>
                                 <h3 className="text-md font-medium mb-4">Complete Form Preview</h3>
                                 <div className="bg-white border rounded-lg p-4">
-                                    {layoutForm.layout_name ? (
+                                    {layoutForm.layoutName ? (
                                         <>
                                             <div className="mb-3 p-2 bg-green-50 rounded text-sm text-green-700">
                                                 <strong>Includes:</strong> Default fields + System schema + Layout fields
                                             </div>
                                             <SchemaFormPreview
-                                                key={`preview-${layoutForm.layout_name}-${Object.keys(layoutForm.schema?.properties || {}).length}`}
+                                                key={`preview-${layoutForm.layoutName}-${Object.keys(layoutForm.schema?.properties || {}).length}`}
                                                 schema={mergeWithDefaults({
                                                     type: 'object',
                                                     properties: {

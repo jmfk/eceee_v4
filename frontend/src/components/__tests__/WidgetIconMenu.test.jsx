@@ -46,10 +46,10 @@ const renderWithQueryClient = (component) => {
 }
 
 const mockWidgetTypes = [
-    { name: 'Text Block', description: 'Add formatted text content', is_active: true },
-    { name: 'Image', description: 'Display images with captions', is_active: true },
-    { name: 'Button', description: 'Interactive clickable buttons', is_active: true },
-    { name: 'HTML Block', description: 'Custom HTML content', is_active: true }
+    { name: 'Text Block', description: 'Add formatted text content', isActive: true },
+    { name: 'Image', description: 'Display images with captions', isActive: true },
+    { name: 'Button', description: 'Interactive clickable buttons', isActive: true },
+    { name: 'HTML Block', description: 'Custom HTML content', isActive: true }
 ]
 
 describe('WidgetIconMenu', () => {
@@ -152,7 +152,7 @@ describe('WidgetIconMenu', () => {
         const mockOnSelectWidget = vi.fn()
         const restrictedSlot = {
             name: 'restricted_slot',
-            allowed_widget_types: ['Text Block', 'Image']
+            allowedWidgetTypes: ['Text Block', 'Image']
         }
 
         renderWithQueryClient(
@@ -227,7 +227,7 @@ describe('WidgetIconMenu', () => {
         const mockOnSelectWidget = vi.fn()
         const restrictedSlot = {
             name: 'very_restricted_slot',
-            allowed_widget_types: ['NonExistentWidget']
+            allowedWidgetTypes: ['NonExistentWidget']
         }
 
         renderWithQueryClient(
