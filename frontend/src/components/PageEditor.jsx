@@ -9,7 +9,6 @@ import {
     FileText,
     Clock,
     Share2,
-    MoreHorizontal,
     ChevronDown,
     ArrowLeft,
     Palette,
@@ -830,13 +829,10 @@ const PageEditor = () => {
         { id: 'preview', label: 'Preview', icon: Eye },
     ]
 
-    // More menu items (empty for now)
-    const moreMenuItems = []
-
-    // State for more menu dropdown
+    // State for mobile dropdown menu
     const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false)
 
-    // Close more menu when clicking outside
+    // Close dropdown when clicking outside
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (isMoreMenuOpen && !event.target.closest('.relative')) {
@@ -850,7 +846,7 @@ const PageEditor = () => {
         }
     }, [isMoreMenuOpen])
 
-    // Close more menu when activeTab changes
+    // Close dropdown when activeTab changes
     useEffect(() => {
         setIsMoreMenuOpen(false)
     }, [activeTab])
@@ -899,106 +895,66 @@ const PageEditor = () => {
 
                         {/* Center section - Tab navigation */}
                         {/* Desktop tabs - hidden on mobile */}
-                        <div className="hidden lg:flex items-center space-x-1">
-                            {tabs.map((tabItem, index) => {
-                                const Icon = tabItem.icon
-                                const tabPath = isNewPage ? `/pages/new/${tabItem.id}` : `/pages/${pageId}/edit/${tabItem.id}`
-                                const isActive = activeTab === tabItem.id
-
-                                return (
-                                    <button
-                                        key={tabItem.id}
-                                        onClick={() => navigate(tabPath, { state: { previousView } })}
-                                        className={`flex items-center px-4 py-2 rounded-lg transition-colors ${isActive
-                                            ? 'bg-blue-100 text-blue-700'
-                                            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                                            }`}
-                                    >
-                                        <Icon className="w-4 h-4 mr-2" />
-                                        {tabItem.label}
-                                    </button>
-                                )
-                            })}
-                        </div>
-
-                        {/* Mobile tab dropdown - visible on mobile */}
-                        <div className="lg:hidden relative">
-                            <button
-                                onClick={() => setIsMoreMenuOpen(!isMoreMenuOpen)}
-                                className="flex items-center px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-                            >
-                                {(() => {
-                                    const currentTab = tabs.find(tab => tab.id === activeTab)
-                                    if (currentTab) {
-                                        const Icon = currentTab.icon
-                                        return (
-                                            <>
-                                                <Icon className="w-4 h-4 mr-2" />
-                                                <span className="text-sm font-medium">{currentTab.label}</span>
-                                            </>
-                                        )
-                                    }
-                                    return <span className="text-sm">Select Tab</span>
-                                })()}
-                                <ChevronDown className="w-4 h-4 ml-2" />
-                            </button>
-
-                            {/* Mobile dropdown menu */}
-                            {isMoreMenuOpen && (
-                                <div className="absolute left-0 top-full mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
-                                    <div className="py-1">
-                                        {tabs.map((tabItem) => {
-                                            const Icon = tabItem.icon
-                                            const tabPath = isNewPage ? `/pages/new/${tabItem.id}` : `/pages/${pageId}/edit/${tabItem.id}`
-                                            const isActive = activeTab === tabItem.id
-
-                                            return (
-                                                <button
-                                                    key={tabItem.id}
-                                                    onClick={() => {
-                                                        navigate(tabPath, { state: { previousView } })
-                                                        setIsMoreMenuOpen(false)
-                                                    }}
-                                                    className={`w-full flex items-center px-4 py-2 text-sm transition-colors ${isActive
-                                                        ? 'bg-blue-50 text-blue-700'
-                                                        : 'text-gray-700 hover:bg-gray-50'
-                                                        }`}
-                                                >
-                                                    <Icon className="w-4 h-4 mr-3" />
-                                                    {tabItem.label}
-                                                </button>
-                                            )
-                                        })}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Right section - Actions */}
                         <div className="flex items-center space-x-3">
+                            <div className="hidden lg:flex items-center space-x-1">
+                                {tabs.map((tabItem, index) => {
+                                    const Icon = tabItem.icon
+                                    const tabPath = isNewPage ? `/pages/new/${tabItem.id}` : `/pages/${pageId}/edit/${tabItem.id}`
+                                    const isActive = activeTab === tabItem.id
 
-                            <div className="relative">
+                                    return (
+                                        <button
+                                            key={tabItem.id}
+                                            onClick={() => navigate(tabPath, { state: { previousView } })}
+                                            className={`flex items-center px-4 py-2 rounded-lg transition-colors ${isActive
+                                                ? 'bg-blue-100 text-blue-700'
+                                                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                                                }`}
+                                        >
+                                            <Icon className="w-4 h-4 mr-2" />
+                                            {tabItem.label}
+                                        </button>
+                                    )
+                                })}
+                            </div>
+
+
+
+                            <div className="lg:hidden relative">
                                 <button
                                     onClick={() => setIsMoreMenuOpen(!isMoreMenuOpen)}
                                     className="flex items-center px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
                                 >
-                                    <MoreHorizontal className="w-4 h-4" />
+                                    {(() => {
+                                        const currentTab = tabs.find(tab => tab.id === activeTab)
+                                        if (currentTab) {
+                                            const Icon = currentTab.icon
+                                            return (
+                                                <>
+                                                    <Icon className="w-4 h-4 mr-2" />
+                                                    <span className="text-sm font-medium">{currentTab.label}</span>
+                                                </>
+                                            )
+                                        }
+                                        return <span className="text-sm">Select Tab</span>
+                                    })()}
+                                    <ChevronDown className="w-4 h-4 ml-2" />
                                 </button>
 
-                                {/* More menu dropdown */}
+                                {/* Mobile dropdown menu */}
                                 {isMoreMenuOpen && (
-                                    <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+                                    <div className="absolute right-0 top-full mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
                                         <div className="py-1">
-                                            {moreMenuItems.map((menuItem) => {
-                                                const Icon = menuItem.icon
-                                                const itemPath = isNewPage ? `/pages/new/${menuItem.id}` : `/pages/${pageId}/edit/${menuItem.id}`
-                                                const isActive = activeTab === menuItem.id
+                                            {tabs.map((tabItem) => {
+                                                const Icon = tabItem.icon
+                                                const tabPath = isNewPage ? `/pages/new/${tabItem.id}` : `/pages/${pageId}/edit/${tabItem.id}`
+                                                const isActive = activeTab === tabItem.id
 
                                                 return (
                                                     <button
-                                                        key={menuItem.id}
+                                                        key={tabItem.id}
                                                         onClick={() => {
-                                                            navigate(itemPath, { state: { previousView } })
+                                                            navigate(tabPath, { state: { previousView } })
                                                             setIsMoreMenuOpen(false)
                                                         }}
                                                         className={`w-full flex items-center px-4 py-2 text-sm transition-colors ${isActive
@@ -1007,7 +963,7 @@ const PageEditor = () => {
                                                             }`}
                                                     >
                                                         <Icon className="w-4 h-4 mr-3" />
-                                                        {menuItem.label}
+                                                        {tabItem.label}
                                                     </button>
                                                 )
                                             })}
