@@ -499,6 +499,10 @@ const PageEditor = () => {
         Object.entries(updates).forEach(([key, value]) => {
             if (webpageFields.includes(key)) {
                 webpageUpdates[key] = value
+            } else if (key === 'metaTitle') {
+                // Special case: metaTitle should update both webpage title and version metaTitle
+                webpageUpdates.title = value
+                versionUpdates.metaTitle = value
             } else {
                 // Everything else goes to version data (widgets, codeLayout, pageData, etc.)
                 versionUpdates[key] = value

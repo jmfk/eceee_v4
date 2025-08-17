@@ -52,51 +52,44 @@ const METADATA_FIELDS = new Set([
 ]);
 
 /**
- * Prepare version data for saving by properly nesting meta fields in pageData
+ * Prepare version data for saving by converting frontend camelCase to backend snake_case
  * @param {Object} versionData - Version data to prepare
- * @returns {Object} Prepared version data with meta fields in pageData
+ * @returns {Object} Prepared version data with proper field names for backend
  */
 function prepareVersionDataForSave(versionData) {
     const prepared = { ...versionData };
 
-    // Extract meta fields and existing pageData
-    const { metaTitle, metaDescription, pageData = {}, ...otherFields } = prepared;
-
-    // Create new pageData with meta fields
-    const newPageData = { ...pageData };
-
-    // Add meta fields to pageData if they exist
-    if (metaTitle !== undefined) {
-        newPageData.metaTitle = metaTitle;
+    // Convert camelCase meta fields to snake_case for backend
+    if (prepared.metaTitle !== undefined) {
+        prepared.meta_title = prepared.metaTitle;
+        delete prepared.metaTitle;
     }
-    if (metaDescription !== undefined) {
-        newPageData.metaDescription = metaDescription;
+    if (prepared.metaDescription !== undefined) {
+        prepared.meta_description = prepared.metaDescription;
+        delete prepared.metaDescription;
     }
 
-    // Return version data with meta fields nested in pageData
-    return {
-        ...otherFields,
-        pageData: newPageData
-    };
+    return prepared;
 }
 
 /**
- * Process loaded version data by flattening meta fields from pageData for UI
+ * Process loaded version data by converting backend snake_case to frontend camelCase
  * @param {Object} versionData - Raw version data from API
- * @returns {Object} Processed version data with meta fields at top level
+ * @returns {Object} Processed version data with camelCase field names for frontend
  */
 export function processLoadedVersionData(versionData) {
     if (!versionData) return versionData;
 
     const processed = { ...versionData };
-    const pageData = processed.pageData || {};
 
-    // Extract meta fields from pageData and add to top level for UI
-    if (pageData.metaTitle !== undefined) {
-        processed.metaTitle = pageData.metaTitle;
+    // Convert snake_case meta fields from backend to camelCase for frontend
+    if (processed.meta_title !== undefined) {
+        processed.metaTitle = processed.meta_title;
+        delete processed.meta_title;
     }
-    if (pageData.metaDescription !== undefined) {
-        processed.metaDescription = pageData.metaDescription;
+    if (processed.meta_description !== undefined) {
+        processed.metaDescription = processed.meta_description;
+        delete processed.meta_description;
     }
 
     return processed;
@@ -158,6 +151,20 @@ export function analyzeChanges(originalWebpageData = {}, currentWebpageData = {}
                 changes.versionFields.pageData = currentFormData;
                 changes.hasVersionChanges = true;
                 changes.changedFieldNames.push('pageData');
+            }
+        } else if (field === 'metaTitle') {
+            // Special handling for metaTitle - it affects both page title and version meta_title
+            if (originalPageVersionData[field] !== currentPageVersionData[field]) {
+                changes.versionFields[field] = currentPageVersionData[field];
+                changes.hasVersionChanges = true;
+                changes.changedFieldNames.push(field);
+
+                // Also mark as page change since it updates webpage.title
+                changes.pageFields.title = currentPageVersionData[field];
+                changes.hasPageChanges = true;
+                if (!changes.changedFieldNames.includes('title')) {
+                    changes.changedFieldNames.push('title');
+                }
             }
         } else {
             // Compare other version fields directly
