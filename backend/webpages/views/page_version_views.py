@@ -281,6 +281,19 @@ class PageVersionViewSet(viewsets.ModelViewSet):
                 {"error": "Invalid page ID"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        
+        # Get all versions for this page
+        versions = page.versions.select_related("created_by").order_by("-version_number")
+        
+        # Apply pagination
+        page_obj = self.paginate_queryset(versions)
+        if page_obj is not None:
+            serializer = PageVersionListSerializer(page_obj, many=True, context={"request": request})
+            return self.get_paginated_response(serializer.data)
+        
+        # If no pagination, return all versions
+        serializer = PageVersionListSerializer(versions, many=True, context={"request": request})
+        return Response(serializer.data)
 
     # Granular Update Endpoints
 
@@ -369,7 +382,11 @@ class PageVersionViewSet(viewsets.ModelViewSet):
             }
         )
 
-    @action(detail=False, methods=["get"], url_path="pages/(?P<page_id>[^/.]+)/versions/current")
+    @action(
+        detail=False,
+        methods=["get"],
+        url_path="pages/(?P<page_id>[^/.]+)/versions/current",
+    )
     def current_for_page(self, request, page_id=None):
         """Get current published version for a specific page - path-based endpoint"""
         try:
@@ -379,7 +396,7 @@ class PageVersionViewSet(viewsets.ModelViewSet):
                 {"error": "Invalid page ID"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        
+
         # Get current published version
         current_version = page.get_current_published_version()
         if not current_version:
@@ -387,8 +404,10 @@ class PageVersionViewSet(viewsets.ModelViewSet):
                 {"error": "No published version found for this page"},
                 status=status.HTTP_404_NOT_FOUND,
             )
-        
-        serializer = PageVersionSerializer(current_version, context={"request": request})
+
+        serializer = PageVersionSerializer(
+            current_version, context={"request": request}
+        )
         return Response(serializer.data)
 
     # Granular Update Endpoints
@@ -463,6 +482,11 @@ class PageVersionViewSet(viewsets.ModelViewSet):
         )
         return Response(serializer.data)
 
+    @action(
+        detail=False,
+        methods=["get"],
+        url_path="pages/(?P<page_id>[^/.]+)/versions/latest",
+    )
     def latest_for_page(self, request, page_id=None):
         """Get latest version for a specific page - path-based endpoint"""
         try:
@@ -472,6 +496,17 @@ class PageVersionViewSet(viewsets.ModelViewSet):
                 {"error": "Invalid page ID"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        
+        # Get latest version
+        latest_version = page.get_latest_version()
+        if not latest_version:
+            return Response(
+                {"error": "No versions found for this page"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        
+        serializer = PageVersionSerializer(latest_version, context={"request": request})
+        return Response(serializer.data)
 
     # Granular Update Endpoints
 
