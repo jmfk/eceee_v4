@@ -1,6 +1,6 @@
-// Shared schema validation and defaults utilities for schema management UIs
+// Shared schema validation utilities for schema management UIs
 
-// Default fields that are always present in all schemas
+// Default fields template for empty system schemas only
 export const DEFAULT_SCHEMA_FIELDS = {
     metaTitle: {
         type: 'string',
@@ -26,13 +26,24 @@ export const DEFAULT_SCHEMA_FIELDS = {
     },
 }
 
-export function isDefaultField(fieldName) {
-    return Object.prototype.hasOwnProperty.call(DEFAULT_SCHEMA_FIELDS, fieldName)
-}
-
 export function validateFieldName(name) {
     if (typeof name !== 'string') return false
-    return /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)
+
+    // Check if it's a valid camelCase identifier
+    // - Starts with lowercase letter
+    // - Followed by letters and numbers only (no underscores or hyphens)
+    // - No consecutive uppercase letters (to avoid PascalCase)
+    const camelCasePattern = /^[a-z][a-zA-Z0-9]*$/
+
+    if (!camelCasePattern.test(name)) {
+        return false
+    }
+
+    // Additional check: ensure it's not PascalCase (no consecutive uppercase)
+    // and follows proper camelCase conventions
+    const hasConsecutiveUppercase = /[A-Z]{2,}/.test(name)
+
+    return !hasConsecutiveUppercase
 }
 
 // Basic structural validation for schemas edited in the UI
@@ -65,47 +76,6 @@ export function validateSchemaShape(schema) {
     }
 
     return { valid: true }
-}
-
-export function mergeWithDefaults(schema) {
-    const mergedProperties = { ...DEFAULT_SCHEMA_FIELDS }
-    const inputProps = schema?.properties || {}
-    Object.entries(inputProps).forEach(([key, value]) => {
-        if (!isDefaultField(key)) {
-            mergedProperties[key] = value
-        }
-    })
-    const inputRequired = Array.isArray(schema?.required) ? schema.required : []
-    // Remove default fields from required and avoid duplicating 'title'
-    const filteredRequired = inputRequired.filter(
-        (field) => !isDefaultField(field) && field !== 'title'
-    )
-    // Ensure 'required' contains unique values with 'title' enforced exactly once
-    const uniqueRequired = Array.from(new Set(['title', ...filteredRequired]))
-    return {
-        type: 'object',
-        properties: mergedProperties,
-        required: uniqueRequired,
-    }
-}
-
-export function getSchemaWithoutDefaults(schema) {
-    if (!schema?.properties) return { type: 'object', properties: {} }
-    const userProperties = {}
-    Object.entries(schema.properties).forEach(([key, value]) => {
-        if (!isDefaultField(key)) {
-            userProperties[key] = value
-        }
-    })
-    const rawRequired = Array.isArray(schema.required) ? schema.required : []
-    const cleanedRequired = rawRequired.filter((field) => !isDefaultField(field))
-    // Deduplicate any existing duplicates to keep schema valid if it already had them
-    const uniqueCleanedRequired = Array.from(new Set(cleanedRequired))
-    return {
-        type: 'object',
-        properties: userProperties,
-        required: uniqueCleanedRequired,
-    }
 }
 
 

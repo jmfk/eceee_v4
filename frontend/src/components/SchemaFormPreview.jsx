@@ -115,10 +115,26 @@ export default function SchemaFormPreview({ schema }) {
     }
   }
 
+  // Get ordered property keys
+  const getOrderedPropertyKeys = () => {
+    const propertyOrder = schema.propertyOrder || []
+    const allKeys = Object.keys(schema.properties)
+
+    if (propertyOrder.length > 0) {
+      // Use propertyOrder, then add any missing keys
+      const orderedKeys = [...propertyOrder.filter(key => schema.properties[key])]
+      const remainingKeys = allKeys.filter(key => !propertyOrder.includes(key))
+      return [...orderedKeys, ...remainingKeys]
+    }
+
+    return allKeys
+  }
+
   return (
     <div className="rounded-lg bg-gray-50">
       <div className="space-y-4">
-        {Object.entries(schema.properties).map(([key, property]) => {
+        {getOrderedPropertyKeys().map((key) => {
+          const property = schema.properties[key]
           const isRequired = schema.required?.includes(key)
 
           return (

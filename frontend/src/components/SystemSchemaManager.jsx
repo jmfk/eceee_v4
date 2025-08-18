@@ -3,7 +3,7 @@ import { pageDataSchemasApi } from '../api'
 import VisualSchemaEditor from './VisualSchemaEditor'
 import SchemaFormPreview from './SchemaFormPreview'
 import ConfirmDialog from './ConfirmDialog'
-import { mergeWithDefaults, getSchemaWithoutDefaults, validateFieldName, DEFAULT_SCHEMA_FIELDS } from '../utils/schemaValidation'
+import { validateFieldName, DEFAULT_SCHEMA_FIELDS } from '../utils/schemaValidation'
 
 export default function SystemSchemaManager() {
     const [loading, setLoading] = useState(false)
@@ -28,11 +28,11 @@ export default function SystemSchemaManager() {
                 const sys = allSchemas.find((s) => s.scope === 'system') || null
                 setSystemSchema(sys)
                 if (sys) {
-                    // For existing schemas, show only user-defined fields (defaults are merged automatically)
+                    // For existing schemas, use the schema as-is
                     setSystemForm({
                         id: sys.id,
                         scope: 'system',
-                        schema: getSchemaWithoutDefaults(sys.schema),
+                        schema: sys.schema,
                         isActive: sys.isActive,
                     })
                 }
@@ -67,16 +67,24 @@ export default function SystemSchemaManager() {
         if (Object.keys(errors).length > 0) return
 
         try {
-            const cleanFormData = { ...formData }
-            cleanFormData.schema = mergeWithDefaults(formData.schema)
-
+            // Save the schema exactly as edited
+            let updatedSchema
             if (formData.id) {
-                await pageDataSchemasApi.update(formData.id, cleanFormData)
+                updatedSchema = await pageDataSchemasApi.update(formData.id, formData)
             } else if (systemSchema) {
-                await pageDataSchemasApi.update(systemSchema.id, cleanFormData)
+                updatedSchema = await pageDataSchemasApi.update(systemSchema.id, formData)
             } else {
-                await pageDataSchemasApi.create(cleanFormData)
+                updatedSchema = await pageDataSchemasApi.create(formData)
             }
+
+            // Update local state with the response from the API
+            setSystemSchema(updatedSchema)
+            setSystemForm({
+                id: updatedSchema.id,
+                scope: 'system',
+                schema: updatedSchema.schema,
+                isActive: updatedSchema.isActive,
+            })
             setValidationErrors({})
         } catch (e) {
             const errorData = e?.response?.data

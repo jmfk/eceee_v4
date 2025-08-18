@@ -1738,4 +1738,53 @@ class PageDataSchema(models.Model):
         if merged_required:
             merged_schema["required"] = merged_required
 
-        return merged_schema
+        # Normalize the merged schema to ensure consistent case
+        return cls._normalize_schema_case(merged_schema)
+
+    @classmethod
+    def _normalize_schema_case(cls, schema):
+        """
+        Normalize schema to use consistent snake_case for properties and required fields.
+        This handles both camelCase and snake_case schemas for backwards compatibility.
+        """
+        if not isinstance(schema, dict):
+            return schema
+
+        normalized_schema = {}
+
+        for key, value in schema.items():
+            if key == "properties" and isinstance(value, dict):
+                # Normalize property names to snake_case
+                normalized_properties = {}
+                for prop_key, prop_value in value.items():
+                    snake_key = cls._camel_to_snake(prop_key)
+                    normalized_properties[snake_key] = prop_value
+                normalized_schema["properties"] = normalized_properties
+
+            elif key == "required" and isinstance(value, list):
+                # Normalize required field names to snake_case
+                normalized_schema["required"] = [
+                    cls._camel_to_snake(field) for field in value
+                ]
+
+            elif key in ["property_order", "propertyOrder"] and isinstance(value, list):
+                # Normalize property order field names to snake_case and use snake_case key
+                normalized_schema["property_order"] = [
+                    cls._camel_to_snake(field) for field in value
+                ]
+
+            else:
+                normalized_schema[key] = value
+
+        return normalized_schema
+
+    @classmethod
+    def _camel_to_snake(cls, name):
+        """Convert camelCase to snake_case"""
+        import re
+
+        # Handle the case where name is already snake_case
+        if "_" in name and name.islower():
+            return name
+        s1 = re.sub("(.)([A-Z][a-z]+)", r"\1_\2", name)
+        return re.sub("([a-z0-9])([A-Z])", r"\1_\2", s1).lower()

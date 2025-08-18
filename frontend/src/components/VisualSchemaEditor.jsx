@@ -14,6 +14,7 @@ import {
   FileText,
   ChevronDown,
   ChevronRight,
+  ChevronUp,
   Eye,
   Code
 } from 'lucide-react'
@@ -105,7 +106,7 @@ const PROPERTY_TYPES = {
 }
 
 // Property configuration component
-function PropertyConfig({ property, onUpdate, onDelete }) {
+function PropertyConfig({ property, index, totalCount, onUpdate, onDelete, onMoveUp, onMoveDown }) {
   const [isExpanded, setIsExpanded] = useState(false)
   const [localProperty, setLocalProperty] = useState(property)
 
@@ -129,7 +130,12 @@ function PropertyConfig({ property, onUpdate, onDelete }) {
             <Icon className="w-5 h-5 text-blue-600" />
           </div>
           <div>
-            <div className="font-semibold text-gray-900">{property.key || 'Unnamed Property'}</div>
+            <div className="font-semibold text-gray-900">
+              {property.title && property.key
+                ? `${property.title} (${property.key})`
+                : property.title || property.key || 'Unnamed Property'
+              }
+            </div>
             <div className="text-sm text-gray-500">{typeInfo?.label}</div>
             {property.required && (
               <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 mt-1">
@@ -139,6 +145,23 @@ function PropertyConfig({ property, onUpdate, onDelete }) {
           </div>
         </div>
         <div className="flex items-center space-x-2">
+          {/* Sort buttons */}
+          <button
+            onClick={(e) => { e.stopPropagation(); onMoveUp() }}
+            className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Move up"
+            disabled={index === 0}
+          >
+            <ChevronUp className="w-4 h-4" />
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); onMoveDown() }}
+            className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Move down"
+            disabled={index === totalCount - 1}
+          >
+            <ChevronDown className="w-4 h-4" />
+          </button>
           <button
             onClick={(e) => { e.stopPropagation(); onDelete() }}
             className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
@@ -153,22 +176,22 @@ function PropertyConfig({ property, onUpdate, onDelete }) {
       </div>
 
       {isExpanded && (
-        <div className="px-4 pb-4 border-t bg-gray-50 space-y-4">
+        <div className="px-4 py-4 border-t bg-gray-50 space-y-4">
           {/* Basic Properties */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">Property Key</label>
               <input
                 type="text"
-                className={`w-full border rounded px-3 py-2 text-sm ${property.key && !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(property.key) ? 'border-red-500' : ''
+                className={`w-full border rounded px-3 py-2 text-sm ${property.key && !validateFieldName(property.key) ? 'border-red-500' : ''
                   }`}
                 value={property.key || ''}
                 onChange={(e) => handleChange('key', e.target.value)}
-                placeholder="property_name"
+                placeholder="propertyName"
               />
-              {property.key && !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(property.key) && (
+              {property.key && !validateFieldName(property.key) && (
                 <div className="text-red-500 text-xs mt-1">
-                  Key must start with a letter or underscore, followed by letters, numbers, or underscores
+                  Key must be in camelCase (start with lowercase letter, followed by letters and numbers only)
                 </div>
               )}
             </div>
@@ -372,7 +395,14 @@ function PropertyTypeSelector({ onAddProperty }) {
 
   const handleAddProperty = (typeKey) => {
     const typeInfo = PROPERTY_TYPES[typeKey]
-    const baseKey = typeInfo.label.toLowerCase().replace(/[^a-z0-9]/g, '_')
+    // Convert to camelCase: "Text Field" -> "textField"
+    const baseKey = typeInfo.label
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, '') // Remove special characters
+      .split(/\s+/) // Split by spaces
+      .map((word, index) => index === 0 ? word : word.charAt(0).toUpperCase() + word.slice(1))
+      .join('')
+
     const newProperty = {
       ...typeInfo.defaultConfig,
       uiType: typeKey,
@@ -438,12 +468,50 @@ export default function VisualSchemaEditor({ schema, onChange }) {
     // Convert schema properties to internal format
     const schemaProps = schema?.properties || {}
     const required = schema?.required || []
+    const propertyOrder = schema?.propertyOrder || []
 
-    return Object.entries(schemaProps).map(([key, prop]) => ({
+    // If propertyOrder exists, use it to maintain order
+    if (propertyOrder.length > 0) {
+      const orderedProps = []
+
+      // Add properties in the specified order
+      propertyOrder.forEach((key, index) => {
+        if (schemaProps[key]) {
+          orderedProps.push({
+            ...schemaProps[key],
+            key,
+            required: required.includes(key),
+            uiType: schemaProps[key].enum ? 'enum' : (schemaProps[key].format === 'textarea' ? 'textarea' : schemaProps[key].type),
+            _id: `prop-${index}-${key}` // Stable ID for React key
+          })
+        }
+      })
+
+      // Add any properties not in the order list (for backward compatibility)
+      let extraIndex = propertyOrder.length
+      Object.entries(schemaProps).forEach(([key, prop]) => {
+        if (!propertyOrder.includes(key)) {
+          orderedProps.push({
+            ...prop,
+            key,
+            required: required.includes(key),
+            uiType: prop.enum ? 'enum' : (prop.format === 'textarea' ? 'textarea' : prop.type),
+            _id: `prop-${extraIndex}-${key}` // Stable ID for React key
+          })
+          extraIndex++
+        }
+      })
+
+      return orderedProps
+    }
+
+    // Fallback to object key order if no propertyOrder
+    return Object.entries(schemaProps).map(([key, prop], index) => ({
       ...prop,
       key,
       required: required.includes(key),
-      uiType: prop.enum ? 'enum' : (prop.format === 'textarea' ? 'textarea' : prop.type)
+      uiType: prop.enum ? 'enum' : (prop.format === 'textarea' ? 'textarea' : prop.type),
+      _id: `prop-${index}-${key}` // Stable ID for React key
     }))
   })
 
@@ -487,13 +555,15 @@ export default function VisualSchemaEditor({ schema, onChange }) {
     const newSchema = {
       type: 'object',
       properties: {},
-      required: []
+      required: [],
+      propertyOrder: []
     }
 
     newProperties.forEach(prop => {
-      const { key, required, uiType, ...schemaProp } = prop
+      const { key, required, uiType, _id, ...schemaProp } = prop
       if (key && validateFieldName(key)) {
         newSchema.properties[key] = cleanProperty(schemaProp)
+        newSchema.propertyOrder.push(key)
         if (required) {
           newSchema.required.push(key)
         }
@@ -504,25 +574,48 @@ export default function VisualSchemaEditor({ schema, onChange }) {
     if (newSchema.required.length === 0) {
       delete newSchema.required
     }
+    if (newSchema.propertyOrder.length === 0) {
+      delete newSchema.propertyOrder
+    }
 
     onChange(newSchema)
   }, [onChange])
 
   const handleAddProperty = useCallback((newProperty) => {
-    const updatedProperties = [...properties, newProperty]
+    // Add a stable ID to the new property
+    const propertyWithId = {
+      ...newProperty,
+      _id: `prop-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    }
+    const updatedProperties = [...properties, propertyWithId]
     setProperties(updatedProperties)
     updateSchema(updatedProperties)
   }, [properties, updateSchema])
 
   const handleUpdateProperty = useCallback((index, updatedProperty) => {
     const updatedProperties = [...properties]
-    updatedProperties[index] = updatedProperty
+    // Preserve the _id when updating
+    updatedProperties[index] = {
+      ...updatedProperty,
+      _id: properties[index]._id
+    }
     setProperties(updatedProperties)
     updateSchema(updatedProperties)
   }, [properties, updateSchema])
 
   const handleDeleteProperty = useCallback((index) => {
     const updatedProperties = properties.filter((_, i) => i !== index)
+    setProperties(updatedProperties)
+    updateSchema(updatedProperties)
+  }, [properties, updateSchema])
+
+  const handleMoveProperty = useCallback((index, direction) => {
+    const newIndex = direction === 'up' ? index - 1 : index + 1
+    if (newIndex < 0 || newIndex >= properties.length) return
+
+    const updatedProperties = [...properties]
+    const [movedProperty] = updatedProperties.splice(index, 1)
+    updatedProperties.splice(newIndex, 0, movedProperty)
     setProperties(updatedProperties)
     updateSchema(updatedProperties)
   }, [properties, updateSchema])
@@ -572,10 +665,14 @@ export default function VisualSchemaEditor({ schema, onChange }) {
               <div className="space-y-4">
                 {properties.map((property, index) => (
                   <PropertyConfig
-                    key={`${property.key}-${index}`}
+                    key={property._id || `prop-${index}-${property.key}`}
                     property={property}
+                    index={index}
+                    totalCount={properties.length}
                     onUpdate={(updated) => handleUpdateProperty(index, updated)}
                     onDelete={() => handleDeleteProperty(index)}
+                    onMoveUp={() => handleMoveProperty(index, 'up')}
+                    onMoveDown={() => handleMoveProperty(index, 'down')}
                   />
                 ))}
               </div>
