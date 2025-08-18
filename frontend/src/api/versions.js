@@ -44,6 +44,153 @@ export const versionsApi = {
         return api.patch(endpoints.versions.detail(versionId), versionData)
     }, 'versions.update'),
 
+    // Granular Update Methods
+
+    /**
+     * Update only widget data - no page_data validation
+     * @param {number} versionId - Version ID
+     * @param {Object} widgetData - Widget data only
+     * @returns {Promise<Object>} Updated version
+     */
+    updateWidgets: wrapApiCall(async (versionId, widgetData) => {
+        return api.patch(`${endpoints.versions.detail(versionId)}/widgets/`, widgetData)
+    }, 'versions.updateWidgets'),
+
+    /**
+     * Update only page_data with schema validation
+     * @param {number} versionId - Version ID  
+     * @param {Object} pageData - Page data only
+     * @returns {Promise<Object>} Updated version
+     */
+    updatePageData: wrapApiCall(async (versionId, pageData) => {
+        return api.patch(`${endpoints.versions.detail(versionId)}/page-data/`, pageData)
+    }, 'versions.updatePageData'),
+
+    /**
+     * Update version metadata (title, layout, theme, etc.)
+     * @param {number} versionId - Version ID
+     * @param {Object} metadata - Metadata only
+     * @returns {Promise<Object>} Updated version
+     */
+    updateMetadata: wrapApiCall(async (versionId, metadata) => {
+        return api.patch(`${endpoints.versions.detail(versionId)}/metadata/`, metadata)
+    }, 'versions.updateMetadata'),
+
+    /**
+     * Update publishing dates and settings
+     * @param {number} versionId - Version ID
+     * @param {Object} publishingData - Publishing data only
+     * @returns {Promise<Object>} Updated version
+     */
+    updatePublishing: wrapApiCall(async (versionId, publishingData) => {
+        return api.patch(`${endpoints.versions.detail(versionId)}/publishing/`, publishingData)
+    }, 'versions.updatePublishing'),
+
+    /**
+     * Smart save - automatically detects what changed and uses appropriate endpoints
+     * @param {number} versionId - Version ID
+     * @param {Object} changes - Object containing the changes to save
+     * @param {Object} originalVersion - Original version data for comparison
+     * @returns {Promise<Object>} Updated version (from the last successful update)
+     */
+    smartSave: wrapApiCall(async (versionId, changes, originalVersion = null) => {
+        const updatePromises = []
+        let lastResult = null
+
+        // Detect what components are being updated
+        const hasWidgetChanges = 'widgets' in changes
+        const hasPageDataChanges = 'page_data' in changes
+        const hasMetadataChanges = ['version_title', 'code_layout', 'theme', 'meta_title', 'meta_description', 'page_css_variables', 'page_custom_css', 'enable_css_injection'].some(field => field in changes)
+        const hasPublishingChanges = ['effective_date', 'expiry_date'].some(field => field in changes)
+
+        // Use granular endpoints for single-component updates
+        if (hasWidgetChanges && !hasPageDataChanges && !hasMetadataChanges && !hasPublishingChanges) {
+            // Widget-only update
+            return versionsApi.updateWidgets(versionId, { widgets: changes.widgets })
+        }
+
+        if (hasPageDataChanges && !hasWidgetChanges && !hasMetadataChanges && !hasPublishingChanges) {
+            // Page data-only update
+            return versionsApi.updatePageData(versionId, { page_data: changes.page_data })
+        }
+
+        if (hasMetadataChanges && !hasWidgetChanges && !hasPageDataChanges && !hasPublishingChanges) {
+            // Metadata-only update
+            const metadataFields = ['version_title', 'code_layout', 'theme', 'meta_title', 'meta_description', 'page_css_variables', 'page_custom_css', 'enable_css_injection']
+            const metadata = {}
+            metadataFields.forEach(field => {
+                if (field in changes) {
+                    metadata[field] = changes[field]
+                }
+            })
+            return versionsApi.updateMetadata(versionId, metadata)
+        }
+
+        if (hasPublishingChanges && !hasWidgetChanges && !hasPageDataChanges && !hasMetadataChanges) {
+            // Publishing-only update
+            const publishingFields = ['effective_date', 'expiry_date']
+            const publishing = {}
+            publishingFields.forEach(field => {
+                if (field in changes) {
+                    publishing[field] = changes[field]
+                }
+            })
+            return versionsApi.updatePublishing(versionId, publishing)
+        }
+
+        // Multi-component updates - execute in parallel for better performance
+        if (hasWidgetChanges) {
+            updatePromises.push(
+                versionsApi.updateWidgets(versionId, { widgets: changes.widgets })
+                    .then(result => { lastResult = result; return result })
+            )
+        }
+
+        if (hasPageDataChanges) {
+            updatePromises.push(
+                versionsApi.updatePageData(versionId, { page_data: changes.page_data })
+                    .then(result => { lastResult = result; return result })
+            )
+        }
+
+        if (hasMetadataChanges) {
+            const metadataFields = ['version_title', 'code_layout', 'theme', 'meta_title', 'meta_description', 'page_css_variables', 'page_custom_css', 'enable_css_injection']
+            const metadata = {}
+            metadataFields.forEach(field => {
+                if (field in changes) {
+                    metadata[field] = changes[field]
+                }
+            })
+            updatePromises.push(
+                versionsApi.updateMetadata(versionId, metadata)
+                    .then(result => { lastResult = result; return result })
+            )
+        }
+
+        if (hasPublishingChanges) {
+            const publishingFields = ['effective_date', 'expiry_date']
+            const publishing = {}
+            publishingFields.forEach(field => {
+                if (field in changes) {
+                    publishing[field] = changes[field]
+                }
+            })
+            updatePromises.push(
+                versionsApi.updatePublishing(versionId, publishing)
+                    .then(result => { lastResult = result; return result })
+            )
+        }
+
+        // Execute all updates in parallel
+        if (updatePromises.length > 0) {
+            await Promise.all(updatePromises)
+            return lastResult
+        }
+
+        // Fallback to full update if no specific changes detected
+        return versionsApi.update(versionId, changes)
+    }, 'versions.smartSave'),
+
     /**
      * Delete a version (only drafts can be deleted)
      * @param {number} versionId - Version ID

@@ -17,6 +17,10 @@ from ..serializers import (
     PageVersionSerializer,
     PageVersionListSerializer,
     PageVersionComparisonSerializer,
+    WidgetUpdateSerializer,
+    PageDataUpdateSerializer,
+    MetadataUpdateSerializer,
+    PublishingUpdateSerializer,
 )
 from ..filters import PageVersionFilter
 
@@ -138,6 +142,62 @@ class PageVersionViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+    # Granular Update Endpoints
+
+    @action(detail=True, methods=["patch"], url_path="widgets")
+    def update_widgets(self, request, pk=None):
+        """Update only widget data - no page_data validation"""
+        version = self.get_object()
+
+        serializer = WidgetUpdateSerializer(version, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        # Return full version data for consistency
+        full_serializer = PageVersionSerializer(version)
+        return Response(full_serializer.data)
+
+    @action(detail=True, methods=["patch"], url_path="page-data")
+    def update_page_data(self, request, pk=None):
+        """Update only page_data with schema validation"""
+        version = self.get_object()
+
+        serializer = PageDataUpdateSerializer(version, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        # Return full version data for consistency
+        full_serializer = PageVersionSerializer(version)
+        return Response(full_serializer.data)
+
+    @action(detail=True, methods=["patch"], url_path="metadata")
+    def update_metadata(self, request, pk=None):
+        """Update version metadata (title, layout, theme, etc.)"""
+        version = self.get_object()
+
+        serializer = MetadataUpdateSerializer(version, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        # Return full version data for consistency
+        full_serializer = PageVersionSerializer(version)
+        return Response(full_serializer.data)
+
+    @action(detail=True, methods=["patch"], url_path="publishing")
+    def update_publishing(self, request, pk=None):
+        """Update publishing dates and settings"""
+        version = self.get_object()
+
+        serializer = PublishingUpdateSerializer(
+            version, data=request.data, partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        # Return full version data for consistency
+        full_serializer = PageVersionSerializer(version)
+        return Response(full_serializer.data)
+
         try:
             # Handle anonymous user for development
             user = request.user if request.user.is_authenticated else None
@@ -155,6 +215,62 @@ class PageVersionViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+    # Granular Update Endpoints
+
+    @action(detail=True, methods=["patch"], url_path="widgets")
+    def update_widgets(self, request, pk=None):
+        """Update only widget data - no page_data validation"""
+        version = self.get_object()
+
+        serializer = WidgetUpdateSerializer(version, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        # Return full version data for consistency
+        full_serializer = PageVersionSerializer(version)
+        return Response(full_serializer.data)
+
+    @action(detail=True, methods=["patch"], url_path="page-data")
+    def update_page_data(self, request, pk=None):
+        """Update only page_data with schema validation"""
+        version = self.get_object()
+
+        serializer = PageDataUpdateSerializer(version, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        # Return full version data for consistency
+        full_serializer = PageVersionSerializer(version)
+        return Response(full_serializer.data)
+
+    @action(detail=True, methods=["patch"], url_path="metadata")
+    def update_metadata(self, request, pk=None):
+        """Update version metadata (title, layout, theme, etc.)"""
+        version = self.get_object()
+
+        serializer = MetadataUpdateSerializer(version, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        # Return full version data for consistency
+        full_serializer = PageVersionSerializer(version)
+        return Response(full_serializer.data)
+
+    @action(detail=True, methods=["patch"], url_path="publishing")
+    def update_publishing(self, request, pk=None):
+        """Update publishing dates and settings"""
+        version = self.get_object()
+
+        serializer = PublishingUpdateSerializer(
+            version, data=request.data, partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        # Return full version data for consistency
+        full_serializer = PageVersionSerializer(version)
+        return Response(full_serializer.data)
+
     @action(detail=False, methods=["get"], url_path="by-page/(?P<page_id>[^/.]+)")
     def by_page(self, request, page_id=None):
         """Get all versions for a specific page - replaces WebPageViewSet.versions"""
@@ -165,6 +281,62 @@ class PageVersionViewSet(viewsets.ModelViewSet):
                 {"error": "Invalid page ID"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+    # Granular Update Endpoints
+
+    @action(detail=True, methods=["patch"], url_path="widgets")
+    def update_widgets(self, request, pk=None):
+        """Update only widget data - no page_data validation"""
+        version = self.get_object()
+
+        serializer = WidgetUpdateSerializer(version, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        # Return full version data for consistency
+        full_serializer = PageVersionSerializer(version)
+        return Response(full_serializer.data)
+
+    @action(detail=True, methods=["patch"], url_path="page-data")
+    def update_page_data(self, request, pk=None):
+        """Update only page_data with schema validation"""
+        version = self.get_object()
+
+        serializer = PageDataUpdateSerializer(version, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        # Return full version data for consistency
+        full_serializer = PageVersionSerializer(version)
+        return Response(full_serializer.data)
+
+    @action(detail=True, methods=["patch"], url_path="metadata")
+    def update_metadata(self, request, pk=None):
+        """Update version metadata (title, layout, theme, etc.)"""
+        version = self.get_object()
+
+        serializer = MetadataUpdateSerializer(version, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        # Return full version data for consistency
+        full_serializer = PageVersionSerializer(version)
+        return Response(full_serializer.data)
+
+    @action(detail=True, methods=["patch"], url_path="publishing")
+    def update_publishing(self, request, pk=None):
+        """Update publishing dates and settings"""
+        version = self.get_object()
+
+        serializer = PublishingUpdateSerializer(
+            version, data=request.data, partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        # Return full version data for consistency
+        full_serializer = PageVersionSerializer(version)
+        return Response(full_serializer.data)
 
         versions = page.versions.select_related("created_by").order_by(
             "-version_number"
@@ -197,6 +369,7 @@ class PageVersionViewSet(viewsets.ModelViewSet):
             }
         )
 
+    @action(detail=False, methods=["get"], url_path="pages/(?P<page_id>[^/.]+)/versions/current")
     def current_for_page(self, request, page_id=None):
         """Get current published version for a specific page - path-based endpoint"""
         try:
@@ -206,6 +379,73 @@ class PageVersionViewSet(viewsets.ModelViewSet):
                 {"error": "Invalid page ID"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        
+        # Get current published version
+        current_version = page.get_current_published_version()
+        if not current_version:
+            return Response(
+                {"error": "No published version found for this page"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        
+        serializer = PageVersionSerializer(current_version, context={"request": request})
+        return Response(serializer.data)
+
+    # Granular Update Endpoints
+
+    @action(detail=True, methods=["patch"], url_path="widgets")
+    def update_widgets(self, request, pk=None):
+        """Update only widget data - no page_data validation"""
+        version = self.get_object()
+
+        serializer = WidgetUpdateSerializer(version, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        # Return full version data for consistency
+        full_serializer = PageVersionSerializer(version)
+        return Response(full_serializer.data)
+
+    @action(detail=True, methods=["patch"], url_path="page-data")
+    def update_page_data(self, request, pk=None):
+        """Update only page_data with schema validation"""
+        version = self.get_object()
+
+        serializer = PageDataUpdateSerializer(version, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        # Return full version data for consistency
+        full_serializer = PageVersionSerializer(version)
+        return Response(full_serializer.data)
+
+    @action(detail=True, methods=["patch"], url_path="metadata")
+    def update_metadata(self, request, pk=None):
+        """Update version metadata (title, layout, theme, etc.)"""
+        version = self.get_object()
+
+        serializer = MetadataUpdateSerializer(version, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        # Return full version data for consistency
+        full_serializer = PageVersionSerializer(version)
+        return Response(full_serializer.data)
+
+    @action(detail=True, methods=["patch"], url_path="publishing")
+    def update_publishing(self, request, pk=None):
+        """Update publishing dates and settings"""
+        version = self.get_object()
+
+        serializer = PublishingUpdateSerializer(
+            version, data=request.data, partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        # Return full version data for consistency
+        full_serializer = PageVersionSerializer(version)
+        return Response(full_serializer.data)
 
         current_version = page.get_current_published_version()
         if not current_version:
@@ -233,6 +473,62 @@ class PageVersionViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+    # Granular Update Endpoints
+
+    @action(detail=True, methods=["patch"], url_path="widgets")
+    def update_widgets(self, request, pk=None):
+        """Update only widget data - no page_data validation"""
+        version = self.get_object()
+
+        serializer = WidgetUpdateSerializer(version, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        # Return full version data for consistency
+        full_serializer = PageVersionSerializer(version)
+        return Response(full_serializer.data)
+
+    @action(detail=True, methods=["patch"], url_path="page-data")
+    def update_page_data(self, request, pk=None):
+        """Update only page_data with schema validation"""
+        version = self.get_object()
+
+        serializer = PageDataUpdateSerializer(version, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        # Return full version data for consistency
+        full_serializer = PageVersionSerializer(version)
+        return Response(full_serializer.data)
+
+    @action(detail=True, methods=["patch"], url_path="metadata")
+    def update_metadata(self, request, pk=None):
+        """Update version metadata (title, layout, theme, etc.)"""
+        version = self.get_object()
+
+        serializer = MetadataUpdateSerializer(version, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        # Return full version data for consistency
+        full_serializer = PageVersionSerializer(version)
+        return Response(full_serializer.data)
+
+    @action(detail=True, methods=["patch"], url_path="publishing")
+    def update_publishing(self, request, pk=None):
+        """Update publishing dates and settings"""
+        version = self.get_object()
+
+        serializer = PublishingUpdateSerializer(
+            version, data=request.data, partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        # Return full version data for consistency
+        full_serializer = PageVersionSerializer(version)
+        return Response(full_serializer.data)
+
         latest_version = page.get_latest_version()
         if not latest_version:
             return Response(
@@ -250,7 +546,8 @@ class PageVersionViewSet(viewsets.ModelViewSet):
                 {"error": f"Version {pk} not found for page {version.id}"},
                 status=status.HTTP_404_NOT_FOUND,
             )
-        # Validate page_data against effective schema when provided
+
+        # Only validate page_data against schema if it's actually being updated
         incoming_page_data = request.data.get("page_data")
         if incoming_page_data is not None:
             if isinstance(incoming_page_data, dict):
@@ -323,6 +620,62 @@ class PageVersionViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+    # Granular Update Endpoints
+
+    @action(detail=True, methods=["patch"], url_path="widgets")
+    def update_widgets(self, request, pk=None):
+        """Update only widget data - no page_data validation"""
+        version = self.get_object()
+
+        serializer = WidgetUpdateSerializer(version, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        # Return full version data for consistency
+        full_serializer = PageVersionSerializer(version)
+        return Response(full_serializer.data)
+
+    @action(detail=True, methods=["patch"], url_path="page-data")
+    def update_page_data(self, request, pk=None):
+        """Update only page_data with schema validation"""
+        version = self.get_object()
+
+        serializer = PageDataUpdateSerializer(version, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        # Return full version data for consistency
+        full_serializer = PageVersionSerializer(version)
+        return Response(full_serializer.data)
+
+    @action(detail=True, methods=["patch"], url_path="metadata")
+    def update_metadata(self, request, pk=None):
+        """Update version metadata (title, layout, theme, etc.)"""
+        version = self.get_object()
+
+        serializer = MetadataUpdateSerializer(version, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        # Return full version data for consistency
+        full_serializer = PageVersionSerializer(version)
+        return Response(full_serializer.data)
+
+    @action(detail=True, methods=["patch"], url_path="publishing")
+    def update_publishing(self, request, pk=None):
+        """Update publishing dates and settings"""
+        version = self.get_object()
+
+        serializer = PublishingUpdateSerializer(
+            version, data=request.data, partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        # Return full version data for consistency
+        full_serializer = PageVersionSerializer(version)
+        return Response(full_serializer.data)
+
     @action(detail=True, methods=["get"])
     def widgets(self, request, pk=None):
         """Get widget data for this specific version"""
@@ -339,6 +692,62 @@ class PageVersionViewSet(viewsets.ModelViewSet):
                 {"error": "page_id is required"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+    # Granular Update Endpoints
+
+    @action(detail=True, methods=["patch"], url_path="widgets")
+    def update_widgets(self, request, pk=None):
+        """Update only widget data - no page_data validation"""
+        version = self.get_object()
+
+        serializer = WidgetUpdateSerializer(version, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        # Return full version data for consistency
+        full_serializer = PageVersionSerializer(version)
+        return Response(full_serializer.data)
+
+    @action(detail=True, methods=["patch"], url_path="page-data")
+    def update_page_data(self, request, pk=None):
+        """Update only page_data with schema validation"""
+        version = self.get_object()
+
+        serializer = PageDataUpdateSerializer(version, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        # Return full version data for consistency
+        full_serializer = PageVersionSerializer(version)
+        return Response(full_serializer.data)
+
+    @action(detail=True, methods=["patch"], url_path="metadata")
+    def update_metadata(self, request, pk=None):
+        """Update version metadata (title, layout, theme, etc.)"""
+        version = self.get_object()
+
+        serializer = MetadataUpdateSerializer(version, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        # Return full version data for consistency
+        full_serializer = PageVersionSerializer(version)
+        return Response(full_serializer.data)
+
+    @action(detail=True, methods=["patch"], url_path="publishing")
+    def update_publishing(self, request, pk=None):
+        """Update publishing dates and settings"""
+        version = self.get_object()
+
+        serializer = PublishingUpdateSerializer(
+            version, data=request.data, partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        # Return full version data for consistency
+        full_serializer = PageVersionSerializer(version)
+        return Response(full_serializer.data)
 
         try:
             page = WebPage.objects.get(id=page_id)
@@ -400,6 +809,62 @@ class PageVersionViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+    # Granular Update Endpoints
+
+    @action(detail=True, methods=["patch"], url_path="widgets")
+    def update_widgets(self, request, pk=None):
+        """Update only widget data - no page_data validation"""
+        version = self.get_object()
+
+        serializer = WidgetUpdateSerializer(version, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        # Return full version data for consistency
+        full_serializer = PageVersionSerializer(version)
+        return Response(full_serializer.data)
+
+    @action(detail=True, methods=["patch"], url_path="page-data")
+    def update_page_data(self, request, pk=None):
+        """Update only page_data with schema validation"""
+        version = self.get_object()
+
+        serializer = PageDataUpdateSerializer(version, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        # Return full version data for consistency
+        full_serializer = PageVersionSerializer(version)
+        return Response(full_serializer.data)
+
+    @action(detail=True, methods=["patch"], url_path="metadata")
+    def update_metadata(self, request, pk=None):
+        """Update version metadata (title, layout, theme, etc.)"""
+        version = self.get_object()
+
+        serializer = MetadataUpdateSerializer(version, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        # Return full version data for consistency
+        full_serializer = PageVersionSerializer(version)
+        return Response(full_serializer.data)
+
+    @action(detail=True, methods=["patch"], url_path="publishing")
+    def update_publishing(self, request, pk=None):
+        """Update publishing dates and settings"""
+        version = self.get_object()
+
+        serializer = PublishingUpdateSerializer(
+            version, data=request.data, partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        # Return full version data for consistency
+        full_serializer = PageVersionSerializer(version)
+        return Response(full_serializer.data)
+
     @action(detail=False, methods=["post"], url_path="pack-drafts")
     def pack_drafts(self, request):
         """Remove only draft versions older than current published"""
@@ -409,6 +874,62 @@ class PageVersionViewSet(viewsets.ModelViewSet):
                 {"error": "page_id is required"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+    # Granular Update Endpoints
+
+    @action(detail=True, methods=["patch"], url_path="widgets")
+    def update_widgets(self, request, pk=None):
+        """Update only widget data - no page_data validation"""
+        version = self.get_object()
+
+        serializer = WidgetUpdateSerializer(version, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        # Return full version data for consistency
+        full_serializer = PageVersionSerializer(version)
+        return Response(full_serializer.data)
+
+    @action(detail=True, methods=["patch"], url_path="page-data")
+    def update_page_data(self, request, pk=None):
+        """Update only page_data with schema validation"""
+        version = self.get_object()
+
+        serializer = PageDataUpdateSerializer(version, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        # Return full version data for consistency
+        full_serializer = PageVersionSerializer(version)
+        return Response(full_serializer.data)
+
+    @action(detail=True, methods=["patch"], url_path="metadata")
+    def update_metadata(self, request, pk=None):
+        """Update version metadata (title, layout, theme, etc.)"""
+        version = self.get_object()
+
+        serializer = MetadataUpdateSerializer(version, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        # Return full version data for consistency
+        full_serializer = PageVersionSerializer(version)
+        return Response(full_serializer.data)
+
+    @action(detail=True, methods=["patch"], url_path="publishing")
+    def update_publishing(self, request, pk=None):
+        """Update publishing dates and settings"""
+        version = self.get_object()
+
+        serializer = PublishingUpdateSerializer(
+            version, data=request.data, partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        # Return full version data for consistency
+        full_serializer = PageVersionSerializer(version)
+        return Response(full_serializer.data)
 
         try:
             page = WebPage.objects.get(id=page_id)
@@ -470,3 +991,59 @@ class PageVersionViewSet(viewsets.ModelViewSet):
                 {"error": f"Pack operation failed: {str(e)}"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+    # Granular Update Endpoints
+
+    @action(detail=True, methods=["patch"], url_path="widgets")
+    def update_widgets(self, request, pk=None):
+        """Update only widget data - no page_data validation"""
+        version = self.get_object()
+
+        serializer = WidgetUpdateSerializer(version, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        # Return full version data for consistency
+        full_serializer = PageVersionSerializer(version)
+        return Response(full_serializer.data)
+
+    @action(detail=True, methods=["patch"], url_path="page-data")
+    def update_page_data(self, request, pk=None):
+        """Update only page_data with schema validation"""
+        version = self.get_object()
+
+        serializer = PageDataUpdateSerializer(version, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        # Return full version data for consistency
+        full_serializer = PageVersionSerializer(version)
+        return Response(full_serializer.data)
+
+    @action(detail=True, methods=["patch"], url_path="metadata")
+    def update_metadata(self, request, pk=None):
+        """Update version metadata (title, layout, theme, etc.)"""
+        version = self.get_object()
+
+        serializer = MetadataUpdateSerializer(version, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        # Return full version data for consistency
+        full_serializer = PageVersionSerializer(version)
+        return Response(full_serializer.data)
+
+    @action(detail=True, methods=["patch"], url_path="publishing")
+    def update_publishing(self, request, pk=None):
+        """Update publishing dates and settings"""
+        version = self.get_object()
+
+        serializer = PublishingUpdateSerializer(
+            version, data=request.data, partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        # Return full version data for consistency
+        full_serializer = PageVersionSerializer(version)
+        return Response(full_serializer.data)

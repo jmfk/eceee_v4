@@ -585,6 +585,125 @@ class PageDataSchemaSerializer(serializers.ModelSerializer):
         return data
 
 
+class WidgetUpdateSerializer(serializers.ModelSerializer):
+    """Specialized serializer for widget-only updates"""
+
+    class Meta:
+        model = PageVersion
+        fields = ["widgets"]
+
+    def validate_widgets(self, value):
+        """Basic widget data validation without page_data schema validation"""
+        if not isinstance(value, dict):
+            raise serializers.ValidationError("Widgets must be a dictionary")
+
+        # Validate widget structure but don't enforce page_data schema
+        for slot_name, widgets in value.items():
+            if not isinstance(widgets, list):
+                raise serializers.ValidationError(
+                    f"Widgets in slot '{slot_name}' must be a list"
+                )
+
+            for i, widget in enumerate(widgets):
+                if not isinstance(widget, dict):
+                    raise serializers.ValidationError(
+                        f"Widget {i} in slot '{slot_name}' must be a dictionary"
+                    )
+
+                # Basic required fields check
+                if "type" not in widget:
+                    raise serializers.ValidationError(
+                        f"Widget {i} in slot '{slot_name}' missing 'type' field"
+                    )
+
+        return value
+
+
+class PageDataUpdateSerializer(serializers.ModelSerializer):
+    """Specialized serializer for page_data-only updates with schema validation"""
+
+    class Meta:
+        model = PageVersion
+        fields = ["page_data"]
+
+    def validate_page_data(self, value):
+        """Validate page_data against effective schema"""
+        if not isinstance(value, dict):
+            raise serializers.ValidationError("Page data must be a dictionary")
+
+        # Get the version instance to determine layout
+        version = self.instance
+        if not version:
+            # For creation, we can't validate schema yet
+            return value
+
+        # Filter out forbidden keys
+        forbidden = {
+            "meta_title",
+            "meta_description",
+            "slug",
+            "code_layout",
+            "page_data",
+            "widgets",
+            "page_css_variables",
+            "theme",
+            "is_published",
+            "version_title",
+            "page_custom_css",
+            "page_css_variables",
+            "enable_css_injection",
+        }
+
+        filtered_data = {k: v for k, v in value.items() if k not in forbidden}
+
+        # Validate against schema
+        from ..models import PageDataSchema
+
+        effective_schema = PageDataSchema.get_effective_schema_for_layout(
+            version.code_layout
+        )
+
+        if effective_schema:
+            from jsonschema import Draft202012Validator, Draft7Validator
+
+            try:
+                try:
+                    Draft202012Validator.check_schema(effective_schema)
+                    Draft202012Validator(effective_schema).validate(filtered_data)
+                except Exception:
+                    Draft7Validator.check_schema(effective_schema)
+                    Draft7Validator(effective_schema).validate(filtered_data)
+            except Exception as e:
+                raise serializers.ValidationError(f"Schema validation failed: {str(e)}")
+
+        return filtered_data
+
+
+class MetadataUpdateSerializer(serializers.ModelSerializer):
+    """Specialized serializer for version metadata updates"""
+
+    class Meta:
+        model = PageVersion
+        fields = [
+            "version_title",
+            "code_layout",
+            "theme",
+            "meta_title",
+            "meta_description",
+            "page_css_variables",
+            "page_custom_css",
+            "enable_css_injection",
+        ]
+
+
+class PublishingUpdateSerializer(serializers.ModelSerializer):
+    """Specialized serializer for publishing-related updates"""
+
+    class Meta:
+        model = PageVersion
+        fields = ["effective_date", "expiry_date"]
+
+
 class PageVersionListSerializer(serializers.ModelSerializer):
     """Lightweight serializer for version lists (without page_data)"""
 
