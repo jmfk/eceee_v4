@@ -281,18 +281,24 @@ class PageVersionViewSet(viewsets.ModelViewSet):
                 {"error": "Invalid page ID"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        
+
         # Get all versions for this page
-        versions = page.versions.select_related("created_by").order_by("-version_number")
-        
+        versions = page.versions.select_related("created_by").order_by(
+            "-version_number"
+        )
+
         # Apply pagination
         page_obj = self.paginate_queryset(versions)
         if page_obj is not None:
-            serializer = PageVersionListSerializer(page_obj, many=True, context={"request": request})
+            serializer = PageVersionListSerializer(
+                page_obj, many=True, context={"request": request}
+            )
             return self.get_paginated_response(serializer.data)
-        
+
         # If no pagination, return all versions
-        serializer = PageVersionListSerializer(versions, many=True, context={"request": request})
+        serializer = PageVersionListSerializer(
+            versions, many=True, context={"request": request}
+        )
         return Response(serializer.data)
 
     # Granular Update Endpoints
@@ -496,7 +502,7 @@ class PageVersionViewSet(viewsets.ModelViewSet):
                 {"error": "Invalid page ID"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        
+
         # Get latest version
         latest_version = page.get_latest_version()
         if not latest_version:
@@ -504,7 +510,7 @@ class PageVersionViewSet(viewsets.ModelViewSet):
                 {"error": "No versions found for this page"},
                 status=status.HTTP_404_NOT_FOUND,
             )
-        
+
         serializer = PageVersionSerializer(latest_version, context={"request": request})
         return Response(serializer.data)
 
@@ -585,31 +591,13 @@ class PageVersionViewSet(viewsets.ModelViewSet):
         # Only validate page_data against schema if it's actually being updated
         incoming_page_data = request.data.get("page_data")
         if incoming_page_data is not None:
-            if isinstance(incoming_page_data, dict):
-                forbidden = {
-                    "meta_title",
-                    "meta_description",
-                    "slug",
-                    "code_layout",
-                    "page_data",
-                    "widgets",
-                    "page_css_variables",
-                    "theme",
-                    "is_published",
-                    "version_title",
-                    "page_custom_css",
-                    "page_css_variables",
-                    "enable_css_injection",
-                }
-                incoming_page_data = {
-                    k: v for k, v in incoming_page_data.items() if k not in forbidden
-                }
-            # Determine target layout for this version after update: prefer incoming code_layout, else current
             layout_name = request.data.get("code_layout") or version.code_layout
 
             effective_schema = PageDataSchema.get_effective_schema_for_layout(
                 layout_name
             )
+            import json
+
             if effective_schema:
                 from jsonschema import Draft202012Validator, Draft7Validator
 
@@ -629,7 +617,6 @@ class PageVersionViewSet(viewsets.ModelViewSet):
                     )
 
         # Update version using serializer after validation
-
         serializer = PageVersionSerializer(version, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
