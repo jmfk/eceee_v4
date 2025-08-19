@@ -191,8 +191,6 @@ const PageEditor = () => {
         Boolean(currentVersion?.id) && Boolean(pageVersionData?.id) && currentVersion.id === pageVersionData.id
     )
 
-
-
     // Auto-save management state
     const [autoSaveEnabled, setAutoSaveEnabled] = useState(true)
 
@@ -408,27 +406,25 @@ const PageEditor = () => {
         }
         try {
             const versionsData = await versionsApi.getPageVersionsList(webpageData.id || pageId);
-            setAvailableVersions(versionsData.versions || []);
+            setAvailableVersions(versionsData.results || []);
 
             let targetVersion = null;
 
             // First priority: Use version from URL if specified and valid
-            if (versionFromUrl && versionsData.versions) {
-                targetVersion = versionsData.versions.find(v => v.id.toString() === versionFromUrl);
+            if (versionFromUrl && versionsData.results) {
+                targetVersion = versionsData.results.find(v => v.id.toString() === versionFromUrl);
                 if (!targetVersion) {
                     // Version ID from URL is invalid, remove it from URL
                     const currentPath = location.pathname;
                     navigate(currentPath, { replace: true, state: { previousView } });
                 }
             }
-
             // Second priority: Use highest version number (last saved) if no URL version or URL version is invalid
-            if (!targetVersion && versionsData.versions && versionsData.versions.length > 0) {
-                targetVersion = versionsData.versions.reduce((latest, current) => {
+            if (!targetVersion && versionsData.results && versionsData.results.length > 0) {
+                targetVersion = versionsData.results.reduce((latest, current) => {
                     return (current.versionNumber > latest.versionNumber) ? current : latest;
                 });
             }
-
             if (targetVersion) {
                 setCurrentVersion(targetVersion);
                 // Load the complete version data including widgets using raw API
@@ -449,12 +445,12 @@ const PageEditor = () => {
         }
         try {
             const versionsData = await versionsApi.getPageVersionsList(webpageData.id || pageId);
-            setAvailableVersions(versionsData.versions || []);
+            setAvailableVersions(versionsData.results || []);
 
             // Only set current version if not already set
-            if (!currentVersion && versionsData.versions && versionsData.versions.length > 0) {
+            if (!currentVersion && versionsData.results && versionsData.results.length > 0) {
                 // Find the version with the highest version number (last saved)
-                const lastSavedVersion = versionsData.versions.reduce((latest, current) => {
+                const lastSavedVersion = versionsData.results.reduce((latest, current) => {
                     return (current.versionNumber > latest.versionNumber) ? current : latest;
                 });
                 setCurrentVersion(lastSavedVersion);
@@ -1238,9 +1234,6 @@ const SettingsEditor = forwardRef(({ webpageData, pageVersionData, onUpdate, isN
                                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 placeholder="SEO title for search engines"
                             />
-                            <p className="text-sm text-gray-500 mt-1">
-                                If empty, will use the page title
-                            </p>
                         </div>
 
                         <div>

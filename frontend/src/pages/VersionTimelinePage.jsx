@@ -64,12 +64,13 @@ const VersionTimelinePage = () => {
         try {
             setIsLoading(true);
             // Load both versions and page data
+
             const [versionsData, pageResponse] = await Promise.all([
                 getPageVersionsList(pageId),
                 getPageActiveVersion(pageId)
             ]);
 
-            setVersions(versionsData.versions || []);
+            setVersions(versionsData.results || []); // this was versions but I think that is wrong
             setPageTitle(versionsData.pageTitle || pageResponse.title || 'Page');
             setPageData(pageResponse);
         } catch (error) {

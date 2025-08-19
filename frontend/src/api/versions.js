@@ -251,17 +251,6 @@ export const versionsApi = {
      */
     getPageVersionsList: wrapApiCall(async (pageId) => {
         const response = await api.get(endpoints.versions.byPage(pageId))
-
-        // Process versions to convert backend field names to frontend field names
-        if (response.versions && Array.isArray(response.versions)) {
-            response.versions = response.versions.map(version => ({
-                ...version,
-                // Convert backend field names to frontend field names for consistency
-                metaDescription: version.metaDescription,
-                metaTitle: version.metaTitle
-            }))
-        }
-
         return response
     }, 'versions.getPageVersionsList'),
 
@@ -272,17 +261,6 @@ export const versionsApi = {
      */
     getVersionsForPage: wrapApiCall(async (pageId) => {
         const response = await api.get(endpoints.versions.byPage(pageId))
-
-        // Process versions to convert backend field names to frontend field names
-        if (response.versions && Array.isArray(response.versions)) {
-            response.versions = response.versions.map(version => ({
-                ...version,
-                // Convert backend field names to frontend field names for consistency
-                metaDescription: version.metaDescription,
-                metaTitle: version.metaTitle
-            }))
-        }
-
         return response
     }, 'versions.getVersionsForPage'),
 
@@ -293,16 +271,6 @@ export const versionsApi = {
      */
     getCurrentVersionForPage: wrapApiCall(async (pageId) => {
         const response = await api.get(endpoints.versions.currentForPage(pageId))
-
-        // Convert backend field names to frontend field names for consistency
-        if (response && typeof response === 'object') {
-            return {
-                ...response,
-                metaDescription: response.metaDescription,
-                metaTitle: response.metaTitle
-            }
-        }
-
         return response
     }, 'versions.getCurrentVersionForPage'),
 
@@ -313,16 +281,6 @@ export const versionsApi = {
      */
     getLatestVersionForPage: wrapApiCall(async (pageId) => {
         const response = await api.get(endpoints.versions.latestForPage(pageId))
-
-        // Convert backend field names to frontend field names for consistency
-        if (response && typeof response === 'object') {
-            return {
-                ...response,
-                metaDescription: response.metaDescription,
-                metaTitle: response.metaTitle
-            }
-        }
-
         return response
     }, 'versions.getLatestVersionForPage'),
 

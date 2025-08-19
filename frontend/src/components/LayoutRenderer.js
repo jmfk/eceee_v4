@@ -1035,7 +1035,7 @@ class LayoutRenderer {
     // 1. Open a modal with widget-specific edit form
     // 2. Switch to inline editing mode
     // 3. Use the widget data callback system to update pageData.widgets
-    alert(`Edit functionality for ${widgetInstance.name} widget is coming soon!`);
+    // TODO: Implement edit functionality for widgets
   }
 
   /**
@@ -2201,7 +2201,7 @@ class LayoutRenderer {
         `handling widget selection for type=${widgetType}, slot=${slotName}`,
         error,
         { widgetType, slotName });
-      alert(`Error adding widget: ${error.message}`);
+      console.error('Error adding widget:', error.message);
     }
   }
 
@@ -2683,9 +2683,9 @@ class LayoutRenderer {
  * @param {string} widgetId - ID of the widget to remove
  */
   removeWidgetFromSlot(widgetId) {
-    console.log('LayoutRenderer: Attempting to remove widget with ID:', widgetId);
+
     const widgetElement = document.querySelector(`.rendered-widget[data-widget-id="${widgetId}"]`);
-    console.log('LayoutRenderer: Found widget element:', widgetElement);
+
 
     if (widgetElement) {
       const slotElement = widgetElement.closest('[data-slot-name]');
@@ -2694,15 +2694,10 @@ class LayoutRenderer {
       const widgetType = widgetElement.getAttribute('data-widget-type');
       const widgetName = widgetElement.querySelector('.widget-header span')?.textContent || 'Unknown Widget';
 
-      console.log('LayoutRenderer: Widget removal details:', {
-        slotName,
-        widgetType,
-        widgetName,
-        hasSlotElement: Boolean(slotElement)
-      });
+
 
       // NEW: Notify parent component to update pageData.widgets instead of directly removing from DOM
-      console.log('LayoutRenderer: Calling executeWidgetDataCallback for removal');
+
       this.executeWidgetDataCallback(WIDGET_ACTIONS.REMOVE, slotName, widgetId);
 
     } else {
@@ -4986,7 +4981,7 @@ class LayoutRenderer {
       const { getPageVersionsList } = await import('../api/versions.js');
       const versionsData = await getPageVersionsList(this.pageId);
 
-      this.pageVersions = versionsData.versions || [];
+      this.pageVersions = versionsData.results || [];
 
       // If no current version is set, use the current published version
       if (!this.currentVersion && versionsData.current_version) {
@@ -5263,19 +5258,12 @@ class LayoutRenderer {
    * @param {...any} args - Additional arguments
    */
   executeWidgetDataCallback(action, slotName, widgetData, ...args) {
-    console.log('LayoutRenderer: executeWidgetDataCallback called with:', {
-      action,
-      slotName,
-      widgetData,
-      hasCallback: this.widgetDataCallbacks.has('widgetDataChanged')
-    });
+
 
     const callback = this.widgetDataCallbacks.get('widgetDataChanged');
     if (typeof callback === 'function') {
       try {
-        console.log('LayoutRenderer: Executing widget data callback');
         callback(action, slotName, widgetData, ...args);
-        console.log('LayoutRenderer: Widget data callback completed successfully');
       } catch (error) {
         console.error('LayoutRenderer: Widget data callback error:', error);
         this.handleError(ERROR_TYPES.CALLBACK_EXECUTION_ERROR,
