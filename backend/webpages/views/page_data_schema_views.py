@@ -32,4 +32,10 @@ class PageDataSchemaViewSet(viewsets.ModelViewSet):
         """Return the effective schema for a given layout name (query param: layout_name)."""
         layout_name = request.query_params.get("layout_name")
         schema = PageDataSchema.get_effective_schema_for_layout(layout_name)
+        
+        # Convert schema to camelCase for frontend consistency
+        if schema:
+            serializer = PageDataSchemaSerializer()
+            schema = serializer._convert_schema_keys_to_camel_case(schema)
+        
         return Response({"layout_name": layout_name, "schema": schema})
