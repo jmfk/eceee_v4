@@ -407,18 +407,6 @@ class PageVersionSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         # Strip forbidden keys from page_data on write
-        page_data = attrs.get("page_data")
-        if isinstance(page_data, dict):
-            excluded_keys = {
-                "meta_title",
-                "meta_description",
-                "slug",
-                "code_layout",
-                "hostnames",
-            }
-            attrs["page_data"] = {
-                k: v for k, v in page_data.items() if k not in excluded_keys
-            }
         return super().validate(attrs)
 
 
