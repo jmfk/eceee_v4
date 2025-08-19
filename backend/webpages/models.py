@@ -1788,3 +1788,35 @@ class PageDataSchema(models.Model):
             return name
         s1 = re.sub("(.)([A-Z][a-z]+)", r"\1_\2", name)
         return re.sub("([a-z0-9])([A-Z])", r"\1_\2", s1).lower()
+
+    @classmethod
+    def _snake_to_camel(cls, name):
+        """Convert snake_case to camelCase"""
+        if "_" not in name:
+            return name
+        components = name.split("_")
+        return components[0] + "".join(word.capitalize() for word in components[1:])
+
+    @classmethod
+    def _convert_camel_to_snake_keys(cls, obj):
+        """Convert object keys from camelCase to snake_case recursively"""
+        if obj is None or not isinstance(obj, dict):
+            return obj
+
+        converted = {}
+        for key, value in obj.items():
+            snake_key = cls._camel_to_snake(key)
+            if isinstance(value, dict):
+                converted[snake_key] = cls._convert_camel_to_snake_keys(value)
+            elif isinstance(value, list):
+                converted[snake_key] = [
+                    (
+                        cls._convert_camel_to_snake_keys(item)
+                        if isinstance(item, dict)
+                        else item
+                    )
+                    for item in value
+                ]
+            else:
+                converted[snake_key] = value
+        return converted

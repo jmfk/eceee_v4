@@ -82,7 +82,8 @@ export const endpoints = {
         base: `${BASE_PATH}/webpages/page-data-schemas`,
         list: `${BASE_PATH}/webpages/page-data-schemas/`,
         detail: (id) => `${BASE_PATH}/webpages/page-data-schemas/${id}/`,
-        effective: (layoutName) => `${BASE_PATH}/webpages/page-data-schemas/effective/${layoutName ? `?layout_name=${encodeURIComponent(layoutName)}` : ''}`
+        effective: (layoutName) => `${BASE_PATH}/webpages/page-data-schemas/effective/${layoutName ? `?layout_name=${encodeURIComponent(layoutName)}` : ''}`,
+        validate: `${BASE_PATH}/webpages/page-data-schemas/validate/`
     },
 
     // Widgets endpoints

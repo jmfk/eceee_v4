@@ -31,6 +31,12 @@ export const pageDataSchemasApi = {
     getEffective: wrapApiCall(async (layoutName = '') => {
         return api.get(endpoints.pageDataSchemas.effective(layoutName))
     }, 'schemas.effective'),
+
+    validate: wrapApiCall(async (data) => {
+        // Validate page data against schema
+        // Expected data: { page_data: {}, layout_name?: string, schema?: object }
+        return api.post(endpoints.pageDataSchemas.validate, data)
+    }, 'schemas.validate'),
 }
 
 export default pageDataSchemasApi
