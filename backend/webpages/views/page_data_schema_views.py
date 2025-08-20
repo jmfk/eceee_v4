@@ -32,6 +32,40 @@ class PageDataSchemaViewSet(viewsets.ModelViewSet):
         """Return the effective schema for a given layout name (query param: layout_name)."""
         layout_name = request.query_params.get("layout_name")
         schema = PageDataSchema.get_effective_schema_for_layout(layout_name)
+
+        # Convert field names in required and propertyOrder to camelCase
+        if schema and schema.get("groups"):
+            clean_schema = schema.copy()
+
+            # Convert field names in required, propertyOrder, and property keys to camelCase
+            if "groups" in clean_schema:
+                for group_key, group_data in clean_schema["groups"].items():
+                    # Convert property keys to camelCase
+                    if "properties" in group_data:
+                        camel_properties = {}
+                        for prop_key, prop_def in group_data["properties"].items():
+                            camel_key = PageDataSchema._snake_to_camel(prop_key)
+                            camel_properties[camel_key] = prop_def
+                        clean_schema["groups"][group_key][
+                            "properties"
+                        ] = camel_properties
+
+                    # Convert required field names to camelCase
+                    if "required" in group_data:
+                        clean_schema["groups"][group_key]["required"] = [
+                            PageDataSchema._snake_to_camel(field)
+                            for field in group_data["required"]
+                        ]
+
+                    # Convert propertyOrder field names to camelCase
+                    if "propertyOrder" in group_data:
+                        clean_schema["groups"][group_key]["propertyOrder"] = [
+                            PageDataSchema._snake_to_camel(field)
+                            for field in group_data["propertyOrder"]
+                        ]
+
+            return Response({"layout_name": layout_name, "schema": clean_schema})
+
         return Response({"layout_name": layout_name, "schema": schema})
 
     @action(detail=False, methods=["post"], url_path="validate")
@@ -76,26 +110,116 @@ class PageDataSchemaViewSet(viewsets.ModelViewSet):
                 }
             )
 
-        # Perform validation
+        # Perform group-by-group validation
         validation_result = {
             "is_valid": True,
             "errors": {},
             "warnings": {},
-            "schema_used": schema,
+            "schema_used": schema,  # Return the original grouped schema to the frontend
+            "group_validation": {},  # Track validation results per group
+        }
+
+        all_properties = set()  # Track all valid properties across groups
+
+        if schema.get("groups"):
+            for group_key, group_data in schema["groups"].items():
+                group_result = self._validate_group(
+                    group_key, group_data, converted_page_data
+                )
+                validation_result["group_validation"][group_key] = group_result
+
+                # Collect properties from this group
+                if group_data.get("properties"):
+                    all_properties.update(group_data["properties"].keys())
+
+                # If any group is invalid, overall validation is invalid
+                if not group_result["is_valid"]:
+                    validation_result["is_valid"] = False
+
+                # Merge group errors into overall errors
+                for prop, prop_errors in group_result["errors"].items():
+                    if prop not in validation_result["errors"]:
+                        validation_result["errors"][prop] = []
+                    validation_result["errors"][prop].extend(prop_errors)
+
+        # Check for additional properties not in any group
+        if all_properties:
+            data_properties = (
+                set(converted_page_data.keys())
+                if isinstance(converted_page_data, dict)
+                else set()
+            )
+            extra_properties = data_properties - all_properties
+
+            if extra_properties and schema.get("additionalProperties") is False:
+                # Convert property names back to camelCase for frontend
+                camel_extra = [
+                    PageDataSchema._snake_to_camel(prop) for prop in extra_properties
+                ]
+                validation_result["warnings"]["_additional"] = [
+                    f"Additional properties not allowed: {', '.join(camel_extra)}"
+                ]
+            elif extra_properties:
+                # Convert property names back to camelCase for frontend
+                camel_extra = [
+                    PageDataSchema._snake_to_camel(prop) for prop in extra_properties
+                ]
+                validation_result["warnings"]["_additional"] = [
+                    f"Properties not defined in schema: {', '.join(camel_extra)}"
+                ]
+
+        # Convert error property names back to camelCase for frontend
+        if validation_result["errors"]:
+            camel_errors = {}
+            for prop, errors in validation_result["errors"].items():
+                if prop == "_root":
+                    camel_errors[prop] = errors
+                else:
+                    # Convert snake_case property name back to camelCase
+                    camel_prop = PageDataSchema._snake_to_camel(prop)
+                    camel_errors[camel_prop] = errors
+            validation_result["errors"] = camel_errors
+
+        return Response(validation_result)
+
+    def _validate_group(self, group_key, group_data, converted_page_data):
+        """Validate data against a specific group's schema."""
+        from jsonschema import Draft202012Validator, Draft7Validator
+
+        # Create a schema for just this group
+        group_schema = {"type": "object"}
+
+        if group_data.get("properties"):
+            group_schema["properties"] = group_data["properties"]
+        if group_data.get("required"):
+            group_schema["required"] = group_data["required"]
+
+        group_result = {
+            "is_valid": True,
+            "errors": {},
+            "group_name": group_data.get("title", group_key.title()),
         }
 
         try:
-            # Validate schema structure first
+            # Validate group schema structure
             try:
-                Draft202012Validator.check_schema(schema)
-                validator = Draft202012Validator(schema)
+                Draft202012Validator.check_schema(group_schema)
+                validator = Draft202012Validator(group_schema)
             except Exception:
-                Draft7Validator.check_schema(schema)
-                validator = Draft7Validator(schema)
+                Draft7Validator.check_schema(group_schema)
+                validator = Draft7Validator(group_schema)
 
-            # Validate the data (use converted snake_case data for validation)
+            # Extract only the properties that belong to this group from the data
+            group_properties = group_data.get("properties", {}).keys()
+            group_data_subset = {
+                key: value
+                for key, value in converted_page_data.items()
+                if key in group_properties
+            }
+
+            # Validate the group's data subset
             errors = []
-            for error in validator.iter_errors(converted_page_data):
+            for error in validator.iter_errors(group_data_subset):
                 errors.append(
                     {
                         "property": (
@@ -104,25 +228,19 @@ class PageDataSchemaViewSet(viewsets.ModelViewSet):
                             else "_root"
                         ),
                         "message": error.message,
-                        "invalid_value": error.instance,
-                        "schema_path": (
-                            ".".join(str(p) for p in error.schema_path)
-                            if error.schema_path
-                            else ""
-                        ),
                         "constraint": error.validator,
-                        "constraint_value": error.validator_value,
+                        "invalid_value": error.instance,
                     }
                 )
 
             if errors:
-                validation_result["is_valid"] = False
+                group_result["is_valid"] = False
                 # Group errors by property
                 for error in errors:
                     prop = error["property"]
-                    if prop not in validation_result["errors"]:
-                        validation_result["errors"][prop] = []
-                    validation_result["errors"][prop].append(
+                    if prop not in group_result["errors"]:
+                        group_result["errors"][prop] = []
+                    group_result["errors"][prop].append(
                         {
                             "message": error["message"],
                             "constraint": error["constraint"],
@@ -130,51 +248,14 @@ class PageDataSchemaViewSet(viewsets.ModelViewSet):
                         }
                     )
 
-            # Check for additional properties not in schema
-            if schema.get("properties"):
-                schema_properties = set(schema["properties"].keys())
-                data_properties = (
-                    set(converted_page_data.keys())
-                    if isinstance(converted_page_data, dict)
-                    else set()
-                )
-                extra_properties = data_properties - schema_properties
-
-                if extra_properties and schema.get("additionalProperties") is False:
-                    # Convert property names back to camelCase for frontend
-                    camel_extra = [
-                        PageDataSchema._snake_to_camel(prop)
-                        for prop in extra_properties
-                    ]
-                    validation_result["warnings"]["_additional"] = [
-                        f"Additional properties not allowed: {', '.join(camel_extra)}"
-                    ]
-                elif extra_properties:
-                    # Convert property names back to camelCase for frontend
-                    camel_extra = [
-                        PageDataSchema._snake_to_camel(prop)
-                        for prop in extra_properties
-                    ]
-                    validation_result["warnings"]["_additional"] = [
-                        f"Properties not defined in schema: {', '.join(camel_extra)}"
-                    ]
-
-            # Convert error property names back to camelCase for frontend
-            if validation_result["errors"]:
-                camel_errors = {}
-                for prop, errors in validation_result["errors"].items():
-                    if prop == "_root":
-                        camel_errors[prop] = errors
-                    else:
-                        # Convert snake_case property name back to camelCase
-                        camel_prop = PageDataSchema._snake_to_camel(prop)
-                        camel_errors[camel_prop] = errors
-                validation_result["errors"] = camel_errors
-
         except Exception as e:
-            return Response(
-                {"error": f"Validation failed: {str(e)}", "is_valid": False},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+            group_result["is_valid"] = False
+            group_result["errors"]["_group"] = [
+                {
+                    "message": f"Group validation failed: {str(e)}",
+                    "constraint": "validation_error",
+                    "invalid_value": None,
+                }
+            ]
 
-        return Response(validation_result)
+        return group_result
