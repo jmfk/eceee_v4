@@ -98,7 +98,7 @@ export default function SchemaDrivenForm({ pageVersionData, onChange, onValidati
 
                         // Clear any existing cache when schema changes
                         validatorRef.current.clearCache()
-                        
+
                         // Validate initial data (even if empty to catch required field errors)
                         const initialData = pageVersionData?.pageData || {}
                         validatorRef.current.validateAll(initialData)
@@ -107,7 +107,7 @@ export default function SchemaDrivenForm({ pageVersionData, onChange, onValidati
             })
             .catch((e) => setError(typeof e?.message === 'string' ? e.message : 'Failed to load schema'))
             .finally(() => setLoading(false))
-        return () => { 
+        return () => {
             mounted = false
             // Clean up validator timers when component unmounts
             if (validatorRef.current) {
@@ -285,11 +285,18 @@ export default function SchemaDrivenForm({ pageVersionData, onChange, onValidati
             handlePropertyChange(key, v)
         }
 
-        const handleBlur = () => {
+        const handleBlur = (e) => {
             // Trigger validation on blur to ensure validation runs even when user stops typing
+            // Use the current input value to avoid stale data issues
+            const currentValue = type === 'number' || type === 'integer' ?
+                Number(e.target.value) :
+                type === 'boolean' ?
+                    e.target.checked :
+                    e.target.value
+                    
             if (validatorRef.current) {
-                validatorRef.current.validateProperty(key, value ?? '', {
-                    pageData: { ...pageVersionData?.pageData, [key]: value ?? '' },
+                validatorRef.current.validateProperty(key, currentValue, {
+                    pageData: { ...pageVersionData?.pageData, [key]: currentValue },
                     debounce: false, // Skip debouncing on blur for immediate validation
                     cacheMs: 1000   // Shorter cache timeout for blur validation
                 })

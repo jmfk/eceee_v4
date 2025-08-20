@@ -536,18 +536,48 @@ export class HybridValidator {
     }
 
     _combineValidationResults(clientResult, serverResult) {
-        // Server validation takes precedence for errors
-        // Client validation can add additional warnings
+        // Prefer client-side error messages for better user experience
+        // Server validation provides authoritative validation but client messages are more user-friendly
+        const combinedErrors = []
+        const combinedWarnings = []
+
+        // For common validation errors, prefer client-side messages
+        if (clientResult.errors.length > 0) {
+            // Check if client has user-friendly messages for common cases
+            const hasUserFriendlyClientErrors = clientResult.errors.some(error =>
+                error.includes('is required') ||
+                error.includes('Maximum length') ||
+                error.includes('Minimum length') ||
+                error.includes('Invalid') ||
+                error.includes('must be')
+            )
+
+            if (hasUserFriendlyClientErrors) {
+                // Use client errors as primary, add unique server errors
+                combinedErrors.push(...clientResult.errors)
+                combinedErrors.push(...serverResult.errors.filter(e =>
+                    !clientResult.errors.some(ce =>
+                        ce.toLowerCase().includes('required') && e.includes('should be non-empty')
+                    )
+                ))
+            } else {
+                // Fallback to server-first if client errors aren't user-friendly
+                combinedErrors.push(...serverResult.errors)
+                combinedErrors.push(...clientResult.errors.filter(e => !serverResult.errors.includes(e)))
+            }
+        } else {
+            // No client errors, use server errors
+            combinedErrors.push(...serverResult.errors)
+        }
+
+        // Combine warnings (client first for consistency)
+        combinedWarnings.push(...clientResult.warnings)
+        combinedWarnings.push(...serverResult.warnings.filter(w => !clientResult.warnings.includes(w)))
+
         return {
             isValid: serverResult.isValid && clientResult.isValid,
-            errors: [
-                ...serverResult.errors,
-                ...clientResult.errors.filter(e => !serverResult.errors.includes(e))
-            ],
-            warnings: [
-                ...serverResult.warnings,
-                ...clientResult.warnings.filter(w => !serverResult.warnings.includes(w))
-            ],
+            errors: combinedErrors,
+            warnings: combinedWarnings,
             severity: serverResult.isValid ? clientResult.severity : 'error',
             clientDetails: clientResult,
             serverDetails: serverResult
