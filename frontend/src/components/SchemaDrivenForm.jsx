@@ -192,7 +192,17 @@ export default function SchemaDrivenForm({ pageVersionData, onChange, onValidati
                             prop,
                             {
                                 isValid: false,
-                                errors: errors.map(e => e.message),
+                                errors: errors.map(e => {
+                                    const message = e.message || e
+                                    // Clean up ugly server error messages
+                                    if (message.includes('should be non-empty') || message.includes("'' should be")) {
+                                        return 'This field is required'
+                                    }
+                                    if (message.includes("'' is too short")) {
+                                        return 'This field is required'
+                                    }
+                                    return message
+                                }),
                                 warnings: [],
                                 severity: 'error'
                             }
@@ -293,7 +303,7 @@ export default function SchemaDrivenForm({ pageVersionData, onChange, onValidati
                 type === 'boolean' ?
                     e.target.checked :
                     e.target.value
-                    
+
             if (validatorRef.current) {
                 validatorRef.current.validateProperty(key, currentValue, {
                     pageData: { ...pageVersionData?.pageData, [key]: currentValue },
@@ -464,7 +474,7 @@ export default function SchemaDrivenForm({ pageVersionData, onChange, onValidati
                         </span>
                     </div>
                     {/* Group-level error summary */}
-                    {groupHasErrors !== 0 && groupHasErrors && (
+                    {false && groupHasErrors !== 0 && groupHasErrors && (
                         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
                             <h4 className="text-sm font-medium text-red-800 mb-1">Group Validation Errors:</h4>
                             <ul className="text-sm text-red-700 space-y-1">

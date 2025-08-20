@@ -554,7 +554,7 @@ export class HybridValidator {
 
             if (hasUserFriendlyClientErrors) {
                 // Use client errors as primary, add unique server errors
-                                combinedErrors.push(...clientResult.errors)
+                combinedErrors.push(...clientResult.errors)
                 combinedErrors.push(...serverResult.errors.filter(e => {
                     // Filter out ugly server messages that have better client equivalents
                     if (e.includes('should be non-empty') || e.includes("'' should be")) {
@@ -567,13 +567,31 @@ export class HybridValidator {
                     return true
                 }))
             } else {
-                // Fallback to server-first if client errors aren't user-friendly
-                combinedErrors.push(...serverResult.errors)
+                // Fallback to server-first if client errors aren't user-friendly, but clean them up
+                combinedErrors.push(...serverResult.errors.map(error => {
+                    // Clean up ugly server error messages
+                    if (error.includes('should be non-empty') || error.includes("'' should be")) {
+                        return 'This field is required'
+                    }
+                    if (error.includes("'' is too short")) {
+                        return 'This field is required'
+                    }
+                    return error
+                }))
                 combinedErrors.push(...clientResult.errors.filter(e => !serverResult.errors.includes(e)))
             }
         } else {
-            // No client errors, use server errors
-            combinedErrors.push(...serverResult.errors)
+            // No client errors, use server errors but clean them up
+            combinedErrors.push(...serverResult.errors.map(error => {
+                // Clean up ugly server error messages
+                if (error.includes('should be non-empty') || error.includes("'' should be")) {
+                    return 'This field is required'
+                }
+                if (error.includes("'' is too short")) {
+                    return 'This field is required'
+                }
+                return error
+            }))
         }
 
         // Combine warnings (client first for consistency)
