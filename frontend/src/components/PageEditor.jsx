@@ -199,6 +199,7 @@ const PageEditor = () => {
 
     // Validation To-Do sidebar state
     const [errorTodoItems, setErrorTodoItems] = useState([])
+    const [schemaValidationState, setSchemaValidationState] = useState({ isValid: true, hasErrors: false })
 
     const queryClient = useQueryClient()
     const { showError, showConfirm } = useNotificationContext()
@@ -716,6 +717,15 @@ const PageEditor = () => {
             return
         }
 
+        // Check for schema validation errors
+        if (schemaValidationState.hasErrors) {
+            addNotification({
+                type: 'error',
+                message: 'Cannot save: please fix validation errors in the page data'
+            })
+            return
+        }
+
         try {
             // Collect all data from editors first (without saving)
             const collectedData = {};
@@ -794,7 +804,7 @@ const PageEditor = () => {
                 message: `Save analysis failed: ${error.message}`
             });
         }
-    }, [errorTodoItems, addNotification, webpageData, pageVersionData, originalWebpageData, originalPageVersionData, contentEditorRef, settingsEditorRef, handleActualSave]);
+    }, [errorTodoItems, schemaValidationState, addNotification, webpageData, pageVersionData, originalWebpageData, originalPageVersionData, contentEditorRef, settingsEditorRef, handleActualSave]);
 
     // Handle save options from modal
     const handleSaveOptions = useCallback(async (saveOptions) => {
@@ -1062,6 +1072,7 @@ const PageEditor = () => {
                                 onChange={(data) => updatePageData({
                                     pageData: { ...pageVersionData?.pageData, ...data }
                                 })}
+                                onValidationChange={setSchemaValidationState}
                             />
                         )}
                         {activeTab === 'preview' && (
@@ -1108,6 +1119,7 @@ const PageEditor = () => {
                 autoSaveEnabled={autoSaveEnabled}
                 webpageData={webpageData}
                 pageVersionData={pageVersionData}
+                validationState={schemaValidationState}
                 customStatusContent={
                     <div className="flex items-center space-x-4">
                         <span>

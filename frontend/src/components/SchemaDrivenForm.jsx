@@ -5,7 +5,7 @@ import ValidatedInput from './validation/ValidatedInput.jsx'
 import ValidationSummary from './validation/ValidationSummary.jsx'
 
 // Minimal JSON Schema -> form renderer (text/number/boolean/select) for top-level properties
-export default function SchemaDrivenForm({ pageVersionData, onChange }) {
+export default function SchemaDrivenForm({ pageVersionData, onChange, onValidationChange }) {
     const [schema, setSchema] = useState(null)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
@@ -15,6 +15,7 @@ export default function SchemaDrivenForm({ pageVersionData, onChange }) {
     const [validationSummary, setValidationSummary] = useState(null)
     const [validatingProperties, setValidatingProperties] = useState(new Set())
     const [groupValidationResults, setGroupValidationResults] = useState({})
+    const [isValidationValid, setIsValidationValid] = useState(true)
     const validatorRef = useRef(null)
 
     useEffect(() => {
@@ -79,6 +80,12 @@ export default function SchemaDrivenForm({ pageVersionData, onChange }) {
                                     if (result.serverResult?.group_validation) {
                                         setGroupValidationResults(result.serverResult.group_validation)
                                     }
+
+                                    // Calculate overall validation state
+                                    const hasErrors = result.summary?.errorCount > 0 ||
+                                        (result.serverResult?.group_validation &&
+                                            Object.values(result.serverResult.group_validation).some(g => !g.is_valid))
+                                    setIsValidationValid(!hasErrors)
                                 }
                             },
                             onValidationError: ({ type, error, propertyName }) => {
@@ -168,6 +175,10 @@ export default function SchemaDrivenForm({ pageVersionData, onChange }) {
 
             if (response?.data?.group_validation) {
                 setGroupValidationResults(response.data.group_validation)
+
+                // Calculate overall validation state from groups
+                const hasGroupErrors = Object.values(response.data.group_validation).some(g => !g.is_valid)
+                setIsValidationValid(!hasGroupErrors)
             }
 
             // Also update overall validation results
@@ -191,6 +202,31 @@ export default function SchemaDrivenForm({ pageVersionData, onChange }) {
             console.error('Group validation failed:', error)
         }
     }, [pageVersionData?.pageData, pageVersionData?.codeLayout])
+
+    // Calculate overall validation state from individual field results
+    useEffect(() => {
+        const hasFieldErrors = Object.values(validationResults).some(result =>
+            result && (!result.isValid || (result.errors && result.errors.length > 0))
+        )
+        const hasGroupErrors = Object.values(groupValidationResults).some(group => !group.is_valid)
+        const overallHasErrors = hasFieldErrors || hasGroupErrors
+
+        if (isValidationValid !== !overallHasErrors) {
+            setIsValidationValid(!overallHasErrors)
+        }
+    }, [validationResults, groupValidationResults, isValidationValid])
+
+    // Report validation state changes to parent
+    useEffect(() => {
+        if (onValidationChange) {
+            onValidationChange({
+                isValid: isValidationValid,
+                hasErrors: !isValidationValid,
+                groupResults: groupValidationResults,
+                fieldResults: validationResults
+            })
+        }
+    }, [isValidationValid, groupValidationResults, validationResults, onValidationChange])
 
     // Handle property focus for validation summary navigation
     const handlePropertyFocus = useCallback((propertyName) => {

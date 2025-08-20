@@ -15,7 +15,9 @@ const StatusBar = ({
     // Save functionality props
     onSaveClick = null,
     onAutoSaveToggle = null,
-    autoSaveEnabled = true
+    autoSaveEnabled = true,
+    // Validation state props
+    validationState = { isValid: true, hasErrors: false }
 }) => {
     const {
         notifications,
@@ -98,10 +100,19 @@ const StatusBar = ({
                     {isDirty && (
                         <button
                             onClick={() => onSaveClick && onSaveClick()}
-                            className="text-orange-600 font-medium hover:text-orange-700 hover:bg-orange-50 px-2 py-1 rounded transition-colors cursor-pointer"
-                            title="Click to save changes"
+                            disabled={validationState.hasErrors}
+                            className={`font-medium px-2 py-1 rounded transition-colors ${validationState.hasErrors
+                                ? 'text-gray-400 cursor-not-allowed bg-gray-100'
+                                : 'text-orange-600 hover:text-orange-700 hover:bg-orange-50 cursor-pointer'
+                                }`}
+                            title={validationState.hasErrors
+                                ? "Cannot save: fix validation errors first"
+                                : "Click to save changes"}
                         >
-                            💾 Unsaved changes - Click to save
+                            {validationState.hasErrors ? '🚫' : '💾'}
+                            {validationState.hasErrors
+                                ? 'Validation errors - Cannot save'
+                                : 'Unsaved changes - Click to save'}
                         </button>
                     )}
                     {showAutoSave && (
