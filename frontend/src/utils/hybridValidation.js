@@ -554,12 +554,18 @@ export class HybridValidator {
 
             if (hasUserFriendlyClientErrors) {
                 // Use client errors as primary, add unique server errors
-                combinedErrors.push(...clientResult.errors)
-                combinedErrors.push(...serverResult.errors.filter(e =>
-                    !clientResult.errors.some(ce =>
-                        ce.toLowerCase().includes('required') && e.includes('should be non-empty')
-                    )
-                ))
+                                combinedErrors.push(...clientResult.errors)
+                combinedErrors.push(...serverResult.errors.filter(e => {
+                    // Filter out ugly server messages that have better client equivalents
+                    if (e.includes('should be non-empty') || e.includes("'' should be")) {
+                        return false // Skip these ugly server messages
+                    }
+                    // Skip if client already has a required field message
+                    if (clientResult.errors.some(ce => ce.toLowerCase().includes('required'))) {
+                        return false
+                    }
+                    return true
+                }))
             } else {
                 // Fallback to server-first if client errors aren't user-friendly
                 combinedErrors.push(...serverResult.errors)

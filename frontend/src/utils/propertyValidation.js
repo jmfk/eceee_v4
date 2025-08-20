@@ -31,7 +31,7 @@ export function validateProperty(value, propertySchema, propertyName) {
         if (propertySchema.required || (Array.isArray(propertySchema.type) ? propertySchema.type.includes('null') === false : propertySchema.type !== 'null')) {
             if (propertySchema.default === undefined) {
                 const fieldTitle = propertySchema.title || propertyName
-                result.errors.push(`${fieldTitle} is required`)
+                result.errors.push(`This field is required`)
                 result.isValid = false
                 result.severity = 'error'
             }
