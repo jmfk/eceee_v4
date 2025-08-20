@@ -1,6 +1,6 @@
 # Makefile for eceee_v4_test_1
 
-.PHONY: install backend frontend migrate createsuperuser sample-content sample-pages sample-data sample-clean test lint docker-up docker-down clean
+.PHONY: install backend frontend migrate createsuperuser sample-content sample-pages sample-data sample-clean migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only test lint docker-up docker-down clean
 
 # Install backend and frontend dependencies
 install:
@@ -44,6 +44,22 @@ sample-data: sample-content sample-pages
 sample-clean:
 	docker-compose exec backend python manage.py create_sample_content --clean --count 10 --verbose
 	docker-compose exec backend python manage.py create_sample_pages --clear --verbose
+
+# Migration commands for camelCase conversion
+migrate-to-camelcase-dry:
+	docker-compose exec backend python manage.py migrate_to_camelcase --dry-run --backup
+
+migrate-to-camelcase:
+	docker-compose exec backend python manage.py migrate_to_camelcase --backup
+
+migrate-schemas-only:
+	docker-compose exec backend python manage.py migrate_to_camelcase --schemas-only --backup
+
+migrate-pagedata-only:
+	docker-compose exec backend python manage.py migrate_to_camelcase --pagedata-only --backup
+
+migrate-widgets-only:
+	docker-compose exec backend python manage.py migrate_to_camelcase --widgets-only --backup
 
 shell:
 	docker-compose exec backend bash

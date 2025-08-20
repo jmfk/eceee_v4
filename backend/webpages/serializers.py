@@ -424,98 +424,13 @@ class PageDataSchemaSerializer(serializers.ModelSerializer):
             data = data.copy() if hasattr(data, "copy") else dict(data)
             data["layout_name"] = ""
 
-        # Handle schema field case conversion
-        if "schema" in data and isinstance(data["schema"], dict):
-            data = data.copy() if hasattr(data, "copy") else dict(data)
-            data["schema"] = self._convert_schema_keys_to_snake_case(data["schema"])
-
+        # Schema field is kept in camelCase - no conversion needed
         return super().to_internal_value(data)
 
-    def _convert_schema_keys_to_snake_case(self, schema):
-        """Convert schema property keys and references to snake_case"""
-        if not isinstance(schema, dict):
-            return schema
-
-        converted_schema = {}
-
-        # Convert top-level schema keys
-        for key, value in schema.items():
-            if key == "properties" and isinstance(value, dict):
-                # Convert property names to snake_case
-                converted_properties = {}
-                for prop_key, prop_value in value.items():
-                    snake_key = self._camel_to_snake(prop_key)
-                    converted_properties[snake_key] = prop_value
-                converted_schema["properties"] = converted_properties
-            elif key == "required" and isinstance(value, list):
-                # Convert required field names to snake_case
-                converted_schema["required"] = [
-                    self._camel_to_snake(field) for field in value
-                ]
-            elif key == "property_order" and isinstance(value, list):
-                # Convert property order field names to snake_case
-                converted_schema["property_order"] = [
-                    self._camel_to_snake(field) for field in value
-                ]
-            else:
-                converted_schema[key] = value
-
-        return converted_schema
-
-    def _camel_to_snake(self, name):
-        """Convert camelCase to snake_case"""
-        import re
-
-        s1 = re.sub("(.)([A-Z][a-z]+)", r"\1_\2", name)
-        return re.sub("([a-z0-9])([A-Z])", r"\1_\2", s1).lower()
-
-    def _snake_to_camel(self, name):
-        """Convert snake_case to camelCase"""
-        components = name.split("_")
-        return components[0] + "".join(word.capitalize() for word in components[1:])
-
     def to_representation(self, instance):
-        """Convert schema field back to camelCase for frontend"""
+        """Schema field is already in camelCase - no conversion needed"""
         data = super().to_representation(instance)
-
-        # Convert schema field back to camelCase
-        if "schema" in data and isinstance(data["schema"], dict):
-            data["schema"] = self._convert_schema_keys_to_camel_case(data["schema"])
-
         return data
-
-    def _convert_schema_keys_to_camel_case(self, schema):
-        """Convert schema property keys and references to camelCase"""
-        if not isinstance(schema, dict):
-            return schema
-
-        converted_schema = {}
-
-        # Convert top-level schema keys
-        for key, value in schema.items():
-            if key == "properties" and isinstance(value, dict):
-                # Convert property names to camelCase
-                converted_properties = {}
-                for prop_key, prop_value in value.items():
-                    camel_key = self._snake_to_camel(prop_key)
-                    converted_properties[camel_key] = prop_value
-                converted_schema["properties"] = converted_properties
-            elif key == "required" and isinstance(value, list):
-                # Convert required field names to camelCase
-                converted_schema["required"] = [
-                    self._snake_to_camel(field) for field in value
-                ]
-            elif key == "property_order" and isinstance(value, list):
-                # Convert property order field names to camelCase
-                converted_schema["propertyOrder"] = [
-                    self._snake_to_camel(field) for field in value
-                ]
-            else:
-                # Convert key itself if it's property_order -> propertyOrder
-                converted_key = "propertyOrder" if key == "property_order" else key
-                converted_schema[converted_key] = value
-
-        return converted_schema
 
     class Meta:
         model = PageDataSchema

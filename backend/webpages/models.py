@@ -1756,39 +1756,10 @@ class PageDataSchema(models.Model):
     @classmethod
     def _normalize_schema_case(cls, schema):
         """
-        Normalize schema to use consistent snake_case for properties and required fields.
-        This handles both camelCase and snake_case schemas for backwards compatibility.
+        Keep schema in camelCase format - no normalization needed.
+        Schemas and their properties remain in camelCase throughout the system.
         """
-        if not isinstance(schema, dict):
-            return schema
-
-        normalized_schema = {}
-
-        for key, value in schema.items():
-            if key == "properties" and isinstance(value, dict):
-                # Normalize property names to snake_case
-                normalized_properties = {}
-                for prop_key, prop_value in value.items():
-                    snake_key = cls._camel_to_snake(prop_key)
-                    normalized_properties[snake_key] = prop_value
-                normalized_schema["properties"] = normalized_properties
-
-            elif key == "required" and isinstance(value, list):
-                # Normalize required field names to snake_case
-                normalized_schema["required"] = [
-                    cls._camel_to_snake(field) for field in value
-                ]
-
-            elif key in ["property_order", "propertyOrder"] and isinstance(value, list):
-                # Normalize property order field names to snake_case and use snake_case key
-                normalized_schema["property_order"] = [
-                    cls._camel_to_snake(field) for field in value
-                ]
-
-            else:
-                normalized_schema[key] = value
-
-        return normalized_schema
+        return schema
 
     @classmethod
     def _camel_to_snake(cls, name):
@@ -1811,24 +1782,5 @@ class PageDataSchema(models.Model):
 
     @classmethod
     def _convert_camel_to_snake_keys(cls, obj):
-        """Convert object keys from camelCase to snake_case recursively"""
-        if obj is None or not isinstance(obj, dict):
-            return obj
-
-        converted = {}
-        for key, value in obj.items():
-            snake_key = cls._camel_to_snake(key)
-            if isinstance(value, dict):
-                converted[snake_key] = cls._convert_camel_to_snake_keys(value)
-            elif isinstance(value, list):
-                converted[snake_key] = [
-                    (
-                        cls._convert_camel_to_snake_keys(item)
-                        if isinstance(item, dict)
-                        else item
-                    )
-                    for item in value
-                ]
-            else:
-                converted[snake_key] = value
-        return converted
+        """Keep pageData in camelCase - no conversion needed"""
+        return obj

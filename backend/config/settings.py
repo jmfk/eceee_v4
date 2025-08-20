@@ -280,6 +280,8 @@ REST_FRAMEWORK = {
     # Configure camelCase conversion
     "JSON_UNDERSCOREIZE": {
         "no_underscore_before_number": True,
+        # Exclude schema and pageData fields from case conversion
+        "ignore_fields": ["schema", "page_data", "pageData"],
     },
 }
 
