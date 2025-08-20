@@ -29,28 +29,8 @@ export default function SchemaDrivenForm({ pageVersionData, onChange, onValidati
 
                     // Initialize validator
                     if (s) {
-                        // Create a compatibility schema for the existing validation system
-                        // by merging group properties back into root level
-                        const compatibilitySchema = s.groups ? {
-                            type: 'object',
-                            properties: {},
-                            required: []
-                        } : s
-
-                        if (s.groups) {
-                            // Merge all group properties into root level for validator compatibility
-                            Object.values(s.groups).forEach(group => {
-                                if (group.properties) {
-                                    Object.assign(compatibilitySchema.properties, group.properties)
-                                }
-                                if (group.required) {
-                                    compatibilitySchema.required.push(...group.required)
-                                }
-                            })
-                        }
-
                         validatorRef.current = createValidator({
-                            schema: compatibilitySchema,
+                            schema: s, // Pass the original schema with groups intact
                             layoutName: pageVersionData?.codeLayout,
                             mode: ValidationMode.HYBRID,
                             debounceMs: 300,
@@ -60,7 +40,6 @@ export default function SchemaDrivenForm({ pageVersionData, onChange, onValidati
                                 }
                             },
                             onValidationComplete: ({ type, result }) => {
-                                // Debug: console.log('Validation completed:', type, result)
                                 if (type === 'property' && result.property) {
                                     setValidatingProperties(prev => {
                                         const next = new Set(prev)
@@ -76,15 +55,23 @@ export default function SchemaDrivenForm({ pageVersionData, onChange, onValidati
                                     setValidationResults(result.combinedResults)
                                     setValidationSummary(result.summary)
 
-                                    // Handle group validation results if available
-                                    if (result.serverResult?.group_validation) {
-                                        setGroupValidationResults(result.serverResult.group_validation)
+                                    // Handle group validation results from client validation
+                                    if (result.combinedResults?._groupResults) {
+                                        setGroupValidationResults(result.combinedResults._groupResults)
+                                    }
+
+                                    // Handle group validation results from server validation if available
+                                    if (result.serverValidation?.group_validation) {
+                                        setGroupValidationResults(prev => ({
+                                            ...prev,
+                                            ...result.serverValidation.group_validation
+                                        }))
                                     }
 
                                     // Calculate overall validation state
                                     const hasErrors = result.summary?.errorCount > 0 ||
-                                        (result.serverResult?.group_validation &&
-                                            Object.values(result.serverResult.group_validation).some(g => !g.is_valid))
+                                        (result.combinedResults?._groupResults &&
+                                            Object.values(result.combinedResults._groupResults).some(g => !g.isValid))
                                     setIsValidationValid(!hasErrors)
                                 }
                             },
@@ -109,6 +96,9 @@ export default function SchemaDrivenForm({ pageVersionData, onChange, onValidati
                             }
                         })
 
+                        // Clear any existing cache when schema changes
+                        validatorRef.current.clearCache()
+                        
                         // Validate initial data (even if empty to catch required field errors)
                         const initialData = pageVersionData?.pageData || {}
                         validatorRef.current.validateAll(initialData)
@@ -117,13 +107,19 @@ export default function SchemaDrivenForm({ pageVersionData, onChange, onValidati
             })
             .catch((e) => setError(typeof e?.message === 'string' ? e.message : 'Failed to load schema'))
             .finally(() => setLoading(false))
-        return () => { mounted = false }
+        return () => { 
+            mounted = false
+            // Clean up validator timers when component unmounts
+            if (validatorRef.current) {
+                validatorRef.current.clearCache()
+            }
+        }
     }, [pageVersionData?.codeLayout])
 
     const properties = useMemo(() => {
         if (!schema) return {}
 
-        // If schema has groups, merge all group properties for legacy compatibility
+        // If schema has groups, merge all group properties for rendering compatibility
         if (schema.groups) {
             const merged = {}
             Object.values(schema.groups).forEach(group => {
@@ -141,6 +137,12 @@ export default function SchemaDrivenForm({ pageVersionData, onChange, onValidati
             return merged
         }
         return schema.properties || {}
+    }, [schema])
+
+    // Get groups structure for organized rendering
+    const groups = useMemo(() => {
+        if (!schema?.groups) return null
+        return schema.groups
     }, [schema])
 
     // Handle property value changes with validation
@@ -208,7 +210,9 @@ export default function SchemaDrivenForm({ pageVersionData, onChange, onValidati
         const hasFieldErrors = Object.values(validationResults).some(result =>
             result && (!result.isValid || (result.errors && result.errors.length > 0))
         )
-        const hasGroupErrors = Object.values(groupValidationResults).some(group => !group.is_valid)
+        const hasGroupErrors = Object.values(groupValidationResults).some(group =>
+            !(group.isValid ?? group.is_valid ?? true)
+        )
         const overallHasErrors = hasFieldErrors || hasGroupErrors
 
         if (isValidationValid !== !overallHasErrors) {
@@ -281,11 +285,23 @@ export default function SchemaDrivenForm({ pageVersionData, onChange, onValidati
             handlePropertyChange(key, v)
         }
 
+        const handleBlur = () => {
+            // Trigger validation on blur to ensure validation runs even when user stops typing
+            if (validatorRef.current) {
+                validatorRef.current.validateProperty(key, value ?? '', {
+                    pageData: { ...pageVersionData?.pageData, [key]: value ?? '' },
+                    debounce: false, // Skip debouncing on blur for immediate validation
+                    cacheMs: 1000   // Shorter cache timeout for blur validation
+                })
+            }
+        }
+
         const commonProps = {
             id: `field-${key}`,
             name: key,
             value: value ?? '',
             onChange: handleChange,
+            onBlur: handleBlur,
             validation,
             isValidating,
             label: title,
@@ -403,8 +419,12 @@ export default function SchemaDrivenForm({ pageVersionData, onChange, onValidati
 
             // Get group validation status
             const groupValidation = groupValidationResults[groupKey]
-            const groupIsValid = groupValidation ? groupValidation.is_valid : true
-            const groupHasErrors = groupValidation && groupValidation.errors && Object.keys(groupValidation.errors).length > 0
+            // Handle both client-side (isValid) and server-side (is_valid) formats
+            const groupIsValid = groupValidation ? (groupValidation.isValid ?? groupValidation.is_valid ?? true) : true
+            const groupHasErrors = groupValidation && (
+                (groupValidation.errors && Object.keys(groupValidation.errors).length > 0) ||
+                (groupValidation.errorCount && groupValidation.errorCount > 0)
+            )
 
             // Determine group status styling
             const getGroupStatusColor = () => {
@@ -436,17 +456,32 @@ export default function SchemaDrivenForm({ pageVersionData, onChange, onValidati
                             {Object.keys(groupProperties).length} field{Object.keys(groupProperties).length !== 1 ? 's' : ''}
                         </span>
                     </div>
-
                     {/* Group-level error summary */}
-                    {groupHasErrors && (
+                    {groupHasErrors !== 0 && groupHasErrors && (
                         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
                             <h4 className="text-sm font-medium text-red-800 mb-1">Group Validation Errors:</h4>
                             <ul className="text-sm text-red-700 space-y-1">
-                                {Object.entries(groupValidation.errors).map(([prop, errors]) => (
-                                    <li key={prop}>
-                                        <strong>{prop === '_root' ? 'General' : prop}:</strong> {errors.map(e => e.message).join(', ')}
-                                    </li>
-                                ))}
+                                {(() => {
+                                    // Handle client-side format (results object with individual property validations)
+                                    if (groupValidation.results) {
+                                        return Object.entries(groupValidation.results)
+                                            .filter(([prop, result]) => result.errors && result.errors.length > 0)
+                                            .map(([prop, result]) => (
+                                                <li key={prop}>
+                                                    <strong>{prop}:</strong> {result.errors.join(', ')}
+                                                </li>
+                                            ))
+                                    }
+                                    // Handle server-side format (direct errors object)
+                                    if (groupValidation.errors) {
+                                        return Object.entries(groupValidation.errors).map(([prop, errors]) => (
+                                            <li key={prop}>
+                                                <strong>{prop === '_root' ? 'General' : prop}:</strong> {errors.map(e => e.message || e).join(', ')}
+                                            </li>
+                                        ))
+                                    }
+                                    return []
+                                })()}
                             </ul>
                         </div>
                     )}

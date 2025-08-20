@@ -35,9 +35,7 @@ export const pageDataSchemasApi = {
     validate: wrapApiCall(async (data) => {
         // Validate page data against database schemas (system and layout)
         // Expected data: { page_data: {}, layout_name: string }
-        console.log("validate", data)
         const result = await api.post(endpoints.pageDataSchemas.validate, data)
-        console.log("result", result)
         return result;
     }, 'schemas.validate'),
 }

@@ -54,7 +54,7 @@ export class HybridValidator {
         // Check cache first
         if (this.enableCaching && this._cache.has(cacheKey)) {
             const cached = this._cache.get(cacheKey)
-            if (Date.now() - cached.timestamp < (options.cacheMs || 30000)) {
+            if (Date.now() - cached.timestamp < (options.cacheMs || 5000)) {
                 return { ...cached.result, cached: true }
             }
         }
@@ -80,7 +80,7 @@ export class HybridValidator {
         // Check cache first
         if (this.enableCaching && this._cache.has(cacheKey)) {
             const cached = this._cache.get(cacheKey)
-            if (Date.now() - cached.timestamp < (options.cacheMs || 30000)) {
+            if (Date.now() - cached.timestamp < (options.cacheMs || 5000)) {
                 return { ...cached.result, cached: true }
             }
         }
@@ -110,10 +110,37 @@ export class HybridValidator {
     }
 
     /**
-     * Clear validation cache
+     * Clear validation cache and pending timers
      */
     clearCache() {
         this._cache.clear()
+        // Clear any pending debounce timers
+        this._debounceTimers.forEach(timerId => clearTimeout(timerId))
+        this._debounceTimers.clear()
+    }
+
+    /**
+     * Get group information for the current schema
+     * @returns {object|null} Group information or null if no groups
+     */
+    getGroups() {
+        return this.schema?.groups || null
+    }
+
+    /**
+     * Get the group name for a specific property
+     * @param {string} propertyName - Name of the property
+     * @returns {string|null} Group name or null if not found
+     */
+    getPropertyGroup(propertyName) {
+        if (!this.schema?.groups) return null
+
+        for (const [groupName, group] of Object.entries(this.schema.groups)) {
+            if (group.properties?.[propertyName]) {
+                return groupName
+            }
+        }
+        return null
     }
 
     // Internal methods
@@ -188,7 +215,6 @@ export class HybridValidator {
 
     async _validateAllInternal(data, options) {
         this.onValidationStart({ type: 'all', data })
-
         let result = {
             data,
             clientValidation: null,
@@ -202,11 +228,10 @@ export class HybridValidator {
                 properties: { valid: [], errors: [], warnings: [] }
             }
         }
-
         try {
             if (this.mode === ValidationMode.CLIENT_ONLY || this.mode === ValidationMode.HYBRID || this.mode === ValidationMode.HYBRID_PARALLEL) {
                 result.clientValidation = await this._clientValidateAll(data)
-                result.combinedResults = { ...result.clientValidation }
+                result.combinedResults = result.clientValidation // Preserve all properties including _groupResults
             }
 
             if (this.mode === ValidationMode.SERVER_ONLY || this.mode === ValidationMode.HYBRID || this.mode === ValidationMode.HYBRID_PARALLEL) {
@@ -267,24 +292,107 @@ export class HybridValidator {
     }
 
     async _clientValidateProperty(propertyName, value) {
-        if (!this.schema?.properties?.[propertyName]) {
-            return {
-                isValid: true,
-                errors: [],
-                warnings: ['No schema definition found'],
-                severity: 'warning'
+        // Find property definition in schema groups or direct properties
+        let propertySchema = null
+        let groupName = null
+
+        if (this.schema?.groups) {
+            // Search through groups to find the property
+            for (const [gName, group] of Object.entries(this.schema.groups)) {
+                if (group.properties?.[propertyName]) {
+                    propertySchema = group.properties[propertyName]
+                    groupName = gName
+                    break
+                }
+            }
+        } else if (this.schema?.properties?.[propertyName]) {
+            propertySchema = this.schema.properties[propertyName]
+        } else if (this.schema?.allOf) {
+            // Search through allOf schemas
+            for (const subSchema of this.schema.allOf) {
+                if (subSchema.properties?.[propertyName]) {
+                    propertySchema = subSchema.properties[propertyName]
+                    break
+                }
             }
         }
 
-        return validateProperty(value, this.schema.properties[propertyName], propertyName)
+        if (!propertySchema) {
+            return {
+                isValid: false,
+                errors: [`Property '${propertyName}' is not defined in the schema`],
+                warnings: [],
+                severity: 'error'
+            }
+        }
+
+        const result = validateProperty(value, propertySchema, propertyName)
+
+        // Add group information if available
+        if (groupName) {
+            result.groupName = groupName
+        }
+
+        return result
     }
 
     async _clientValidateAll(data) {
         if (!this.schema) {
             return {}
         }
-
+        // Handle schema groups
+        if (this.schema.groups) {
+            return this._validateSchemaGroups(data, this.schema.groups)
+        }
         return validateProperties(data, this.schema)
+    }
+
+    /**
+     * Validate data against schema groups
+     * @param {object} data - Data to validate
+     * @param {object} groups - Schema groups
+     * @returns {object} Validation results grouped by property
+     */
+    _validateSchemaGroups(data, groups) {
+        const results = {}
+        const groupResults = {}
+        // Validate each group separately
+        Object.entries(groups).forEach(([groupName, group]) => {
+
+            if (!group.properties) return
+
+            // Create a schema for this group
+            const groupSchema = {
+                type: 'object',
+                ...group
+            }
+
+            // Validate data against this group's schema
+            const groupValidationResults = validateProperties(data, groupSchema)
+
+            // Store group-level results
+            groupResults[groupName] = {
+                isValid: Object.values(groupValidationResults).every(result => result.isValid),
+                results: groupValidationResults,
+                errorCount: Object.values(groupValidationResults).reduce((count, result) =>
+                    count + (result.errors?.length || 0), 0),
+                warningCount: Object.values(groupValidationResults).reduce((count, result) =>
+                    count + (result.warnings?.length || 0), 0)
+            }
+
+            // Merge property results into main results object
+            Object.entries(groupValidationResults).forEach(([propertyName, result]) => {
+                results[propertyName] = {
+                    ...result,
+                    groupName: groupName
+                }
+            })
+        })
+
+        // Store group results in the main results for access by components
+        results._groupResults = groupResults
+
+        return results
     }
 
     async _serverValidateProperty(propertyName, value, pageData = {}) {
@@ -375,8 +483,24 @@ export class HybridValidator {
                 })
             }
 
-            // Add valid properties from schema
-            if (this.schema?.properties) {
+            // Add valid properties from schema (handle groups and direct properties)
+            if (this.schema?.groups) {
+                Object.entries(this.schema.groups).forEach(([groupName, group]) => {
+                    if (group.properties) {
+                        Object.keys(group.properties).forEach(prop => {
+                            if (!results[prop]) {
+                                results[prop] = {
+                                    isValid: true,
+                                    errors: [],
+                                    warnings: [],
+                                    severity: 'none',
+                                    groupName: groupName
+                                }
+                            }
+                        })
+                    }
+                })
+            } else if (this.schema?.properties) {
                 Object.keys(this.schema.properties).forEach(prop => {
                     if (!results[prop]) {
                         results[prop] = {
@@ -385,6 +509,21 @@ export class HybridValidator {
                             warnings: [],
                             severity: 'none'
                         }
+                    }
+                })
+            } else if (this.schema?.allOf) {
+                this.schema.allOf.forEach(subSchema => {
+                    if (subSchema.properties) {
+                        Object.keys(subSchema.properties).forEach(prop => {
+                            if (!results[prop]) {
+                                results[prop] = {
+                                    isValid: true,
+                                    errors: [],
+                                    warnings: [],
+                                    severity: 'none'
+                                }
+                            }
+                        })
                     }
                 })
             }
@@ -420,6 +559,11 @@ export class HybridValidator {
         const allProps = new Set([...Object.keys(clientResults), ...Object.keys(serverResults)])
 
         allProps.forEach(prop => {
+            // Skip special properties like _groupResults
+            if (prop.startsWith('_')) {
+                return
+            }
+
             const client = clientResults[prop]
             const server = serverResults[prop]
 
@@ -429,6 +573,25 @@ export class HybridValidator {
                 combined[prop] = server
             } else if (client) {
                 combined[prop] = client
+            }
+        })
+
+        // Preserve special properties from client results (like _groupResults)
+        Object.keys(clientResults).forEach(key => {
+            if (key.startsWith('_')) {
+                combined[key] = clientResults[key]
+            }
+        })
+
+        // Preserve special properties from server results
+        Object.keys(serverResults).forEach(key => {
+            if (key.startsWith('_')) {
+                // Merge or override with server results if available
+                if (combined[key] && typeof combined[key] === 'object' && typeof serverResults[key] === 'object') {
+                    combined[key] = { ...combined[key], ...serverResults[key] }
+                } else {
+                    combined[key] = serverResults[key]
+                }
             }
         })
 

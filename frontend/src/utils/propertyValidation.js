@@ -108,9 +108,9 @@ export function validateProperties(data, schema) {
     const results = {}
     const properties = schema?.properties || {}
     const required = schema?.required || []
-
     // Validate each property in the schema
     Object.entries(properties).forEach(([propertyName, propertySchema]) => {
+
         const value = data?.[propertyName]
         const isRequired = required.includes(propertyName)
 
@@ -119,20 +119,6 @@ export function validateProperties(data, schema) {
 
         results[propertyName] = validateProperty(value, schemaWithRequired, propertyName)
     })
-
-    // Check for extra properties not in schema
-    if (data && typeof data === 'object') {
-        Object.keys(data).forEach(key => {
-            if (!properties[key]) {
-                results[key] = {
-                    isValid: true,
-                    errors: [],
-                    warnings: [`Property '${key}' is not defined in the schema`],
-                    severity: 'warning'
-                }
-            }
-        })
-    }
 
     return results
 }
@@ -156,11 +142,16 @@ export function getValidationSummary(validationResults) {
     }
 
     Object.entries(validationResults).forEach(([propertyName, result]) => {
-        if (result.errors.length > 0) {
+        // Skip special properties like _groupResults
+        if (propertyName.startsWith('_')) {
+            return
+        }
+
+        if (result.errors?.length > 0) {
             summary.isValid = false
             summary.errorCount += result.errors.length
             summary.properties.errors.push(propertyName)
-        } else if (result.warnings.length > 0) {
+        } else if (result.warnings?.length > 0) {
             summary.hasWarnings = true
             summary.warningCount += result.warnings.length
             summary.properties.warnings.push(propertyName)

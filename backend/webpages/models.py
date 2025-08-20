@@ -1756,10 +1756,46 @@ class PageDataSchema(models.Model):
     @classmethod
     def _normalize_schema_case(cls, schema):
         """
-        Keep schema in camelCase format - no normalization needed.
-        Schemas and their properties remain in camelCase throughout the system.
+        Convert schema properties from snake_case to camelCase for frontend compatibility.
+        This ensures all schema constraints use camelCase (maxLength, minLength, etc.)
         """
-        return schema
+        if not isinstance(schema, dict):
+            return schema
+
+        def snake_to_camel(snake_str):
+            """Convert snake_case to camelCase"""
+            components = snake_str.split("_")
+            return components[0] + "".join(word.capitalize() for word in components[1:])
+
+        def convert_schema_keys(obj):
+            """Recursively convert schema keys to camelCase"""
+            if isinstance(obj, dict):
+                converted = {}
+                for key, value in obj.items():
+                    # Convert constraint keys to camelCase
+                    if key in [
+                        "max_length",
+                        "min_length",
+                        "max_items",
+                        "min_items",
+                        "exclusive_minimum",
+                        "exclusive_maximum",
+                        "multiple_of",
+                        "unique_items",
+                        "additional_properties",
+                        "property_order",
+                    ]:
+                        new_key = snake_to_camel(key)
+                        converted[new_key] = convert_schema_keys(value)
+                    else:
+                        converted[key] = convert_schema_keys(value)
+                return converted
+            elif isinstance(obj, list):
+                return [convert_schema_keys(item) for item in obj]
+            else:
+                return obj
+
+        return convert_schema_keys(schema)
 
     @classmethod
     def _camel_to_snake(cls, name):
