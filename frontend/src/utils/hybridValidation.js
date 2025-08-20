@@ -293,7 +293,6 @@ export class HybridValidator {
         const validationData = {
             page_data: { ...pageData, [propertyName]: value },
             layout_name: this.layoutName,
-            schema: this.schema
         }
 
         // Debug: console.log('Validating property:', propertyName, 'with data:', validationData)
@@ -338,7 +337,6 @@ export class HybridValidator {
         const validationData = {
             page_data: data,
             layout_name: this.layoutName,
-            schema: this.schema
         }
 
         // Debug: console.log('Validating all properties with data:', validationData)

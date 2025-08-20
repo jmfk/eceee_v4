@@ -2,6 +2,7 @@
 PageDataSchema ViewSet for CRUD operations on page data JSON Schemas.
 """
 
+import json
 from rest_framework import viewsets, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -45,7 +46,12 @@ class PageDataSchemaViewSet(viewsets.ModelViewSet):
                         camel_properties = {}
                         for prop_key, prop_def in group_data["properties"].items():
                             camel_key = PageDataSchema._snake_to_camel(prop_key)
-                            camel_properties[camel_key] = prop_def
+                            # Also convert property definition field names to camelCase
+                            camel_prop_def = {}
+                            for def_key, def_value in prop_def.items():
+                                camel_def_key = PageDataSchema._snake_to_camel(def_key)
+                                camel_prop_def[camel_def_key] = def_value
+                            camel_properties[camel_key] = camel_prop_def
                         clean_schema["groups"][group_key][
                             "properties"
                         ] = camel_properties
@@ -70,14 +76,13 @@ class PageDataSchemaViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["post"], url_path="validate")
     def validate_data(self, request):
-        """Validate page data against a schema."""
+        """Validate page data against database schemas (system and layout)."""
         from rest_framework import status
         from jsonschema import Draft202012Validator, Draft7Validator, ValidationError
 
         data = request.data
         page_data = data.get("page_data", {})
         layout_name = data.get("layout_name")
-        schema = data.get("schema")  # Optional: provide schema directly
 
         # Convert camelCase page_data to snake_case for backend validation
         from ..models import PageDataSchema
@@ -85,20 +90,22 @@ class PageDataSchemaViewSet(viewsets.ModelViewSet):
         converted_page_data = (
             PageDataSchema._convert_camel_to_snake_keys(page_data) if page_data else {}
         )
+        import json
 
+        print("converted_page_data", json.dumps(converted_page_data, indent=2))
         if not page_data:
             return Response(
                 {"error": "page_data is required"}, status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Get effective schema if not provided
-        if not schema:
-            if not layout_name:
-                return Response(
-                    {"error": "Either schema or layout_name is required"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            schema = PageDataSchema.get_effective_schema_for_layout(layout_name)
+        if not layout_name:
+            return Response(
+                {"error": "layout_name is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Get effective schema from database (combines system and layout schemas)
+        schema = PageDataSchema.get_effective_schema_for_layout(layout_name)
 
         if not schema:
             return Response(
@@ -123,11 +130,12 @@ class PageDataSchemaViewSet(viewsets.ModelViewSet):
 
         if schema.get("groups"):
             for group_key, group_data in schema["groups"].items():
+                print("group_data", group_data)
                 group_result = self._validate_group(
                     group_key, group_data, converted_page_data
                 )
                 validation_result["group_validation"][group_key] = group_result
-
+                print(group_key, "group_result", group_result)
                 # Collect properties from this group
                 if group_data.get("properties"):
                     all_properties.update(group_data["properties"].keys())
@@ -186,13 +194,8 @@ class PageDataSchemaViewSet(viewsets.ModelViewSet):
         """Validate data against a specific group's schema."""
         from jsonschema import Draft202012Validator, Draft7Validator
 
-        # Create a schema for just this group
-        group_schema = {"type": "object"}
-
-        if group_data.get("properties"):
-            group_schema["properties"] = group_data["properties"]
-        if group_data.get("required"):
-            group_schema["required"] = group_data["required"]
+        # group_data already contains the complete schema for this group
+        group_schema = {"type": "object", **group_data}
 
         group_result = {
             "is_valid": True,
@@ -208,14 +211,16 @@ class PageDataSchemaViewSet(viewsets.ModelViewSet):
             except Exception:
                 Draft7Validator.check_schema(group_schema)
                 validator = Draft7Validator(group_schema)
-
+            print("group_schema", json.dumps(group_schema, indent=2))
             # Extract only the properties that belong to this group from the data
-            group_properties = group_data.get("properties", {}).keys()
+            group_properties = group_schema.get("properties", {}).keys()
             group_data_subset = {
                 key: value
                 for key, value in converted_page_data.items()
                 if key in group_properties
             }
+            print("group_properties", group_properties)
+            print("group_data_subset", group_data_subset)
 
             # Validate the group's data subset
             errors = []

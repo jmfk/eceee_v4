@@ -1676,26 +1676,23 @@ class PageDataSchema(models.Model):
     @classmethod
     def get_effective_schema_for_layout(cls, layout_name: str | None):
         """
-        Compute the effective JSON Schema for a given layout name with grouped fields.
-
-        The system schema is the base, and layout schemas extend it.
-        System schema fields are mandatory and cannot be removed.
+        Get schemas organized as groups without merging.
 
         Returns a grouped schema structure:
         {
             "type": "object",
-            "properties": {...},  # All properties merged for compatibility
-            "required": [...],    # All required fields merged for compatibility
             "groups": {
                 "system": {
                     "title": "System Fields",
                     "properties": {...},
-                    "required": [...]
+                    "required": [...],
+                    "property_order": [...]
                 },
-                "default": {
+                "layout": {
                     "title": "Layout Fields",
                     "properties": {...},
-                    "required": [...]
+                    "required": [...],
+                    "property_order": [...]
                 }
             }
         }
@@ -1713,169 +1710,46 @@ class PageDataSchema(models.Model):
                 scope=cls.SCOPE_LAYOUT, layout_name=layout_name, is_active=True
             ).first()
 
-        if not system_schema_obj:
-            # If no system schema, return layout schema if available with default group
-            if layout_schema_obj:
-                layout_schema = layout_schema_obj.schema
-                normalized_schema = cls._normalize_schema_case(layout_schema)
-                return cls._add_groups_to_schema(
-                    normalized_schema,
-                    {},
-                    normalized_schema.get("properties", {}),
-                    None,
-                    layout_schema,
-                )
+        # Build grouped schema without merging
+        grouped_schema = {"type": "object", "groups": {}}
+
+        # Add system schema as a group if it exists
+        if system_schema_obj:
+            system_schema = cls._normalize_schema_case(system_schema_obj.schema)
+            if system_schema.get("properties"):
+                grouped_schema["groups"]["system"] = {
+                    "title": "System Fields",
+                    "properties": system_schema["properties"],
+                }
+                if system_schema.get("required"):
+                    grouped_schema["groups"]["system"]["required"] = system_schema[
+                        "required"
+                    ]
+                if system_schema.get("property_order"):
+                    grouped_schema["groups"]["system"]["property_order"] = (
+                        system_schema["property_order"]
+                    )
+
+        # Add layout schema as a group if it exists
+        if layout_schema_obj:
+            layout_schema = cls._normalize_schema_case(layout_schema_obj.schema)
+            if layout_schema.get("properties"):
+                grouped_schema["groups"]["layout"] = {
+                    "title": "Layout Fields",
+                    "properties": layout_schema["properties"],
+                }
+                if layout_schema.get("required"):
+                    grouped_schema["groups"]["layout"]["required"] = layout_schema[
+                        "required"
+                    ]
+                if layout_schema.get("property_order"):
+                    grouped_schema["groups"]["layout"]["property_order"] = (
+                        layout_schema["property_order"]
+                    )
+
+        # Return None if no groups were added
+        if not grouped_schema["groups"]:
             return None
-
-        system_schema = system_schema_obj.schema
-
-        if not layout_schema_obj:
-            # Just return system schema with system group only
-            normalized_schema = cls._normalize_schema_case(system_schema)
-            return cls._add_groups_to_schema(
-                normalized_schema,
-                normalized_schema.get("properties", {}),
-                {},
-                system_schema,
-                None,
-            )
-
-        # Merge system schema (base) with layout schema (extensions)
-        layout_schema = layout_schema_obj.schema
-
-        # Create merged schema
-        merged_properties = {}
-        merged_required = []
-        system_properties = {}
-        layout_properties = {}
-
-        # Start with system schema properties (these are mandatory)
-        if system_schema.get("properties"):
-            system_properties.update(system_schema["properties"])
-            merged_properties.update(system_schema["properties"])
-        if system_schema.get("required"):
-            merged_required.extend(system_schema["required"])
-
-        # Add layout-specific properties (cannot override system properties)
-        if layout_schema.get("properties"):
-            for prop_name, prop_def in layout_schema["properties"].items():
-                if (
-                    prop_name not in merged_properties
-                ):  # Don't allow override of system fields
-                    layout_properties[prop_name] = prop_def
-                    merged_properties[prop_name] = prop_def
-
-        # Add layout-specific required fields
-        if layout_schema.get("required"):
-            for req_field in layout_schema["required"]:
-                if req_field not in merged_required:
-                    merged_required.append(req_field)
-
-        merged_schema = {"type": "object"}
-
-        # Don't add properties, required or propertyOrder to the root level - they'll be in groups
-
-        # Normalize the merged schema to ensure consistent case
-        normalized_schema = cls._normalize_schema_case(merged_schema)
-        normalized_system_properties = cls._normalize_schema_case(
-            {"properties": system_properties}
-        ).get("properties", {})
-        normalized_layout_properties = cls._normalize_schema_case(
-            {"properties": layout_properties}
-        ).get("properties", {})
-
-        return cls._add_groups_to_schema(
-            normalized_schema,
-            normalized_system_properties,
-            normalized_layout_properties,
-            system_schema,
-            layout_schema,
-        )
-
-    @classmethod
-    def _add_groups_to_schema(
-        cls,
-        merged_schema,
-        system_properties,
-        layout_properties,
-        system_schema=None,
-        layout_schema=None,
-    ):
-        """
-        Add groups to the schema structure for organizing fields by source.
-
-        Args:
-            merged_schema: The merged schema with all properties
-            system_properties: Properties from system schema
-            layout_properties: Properties from layout schema
-            system_schema: Original system schema (optional, for metadata)
-            layout_schema: Original layout schema (optional, for metadata)
-
-        Returns:
-            Schema with groups structure added
-        """
-        grouped_schema = merged_schema.copy()
-
-        # Create groups structure
-        groups = {}
-
-        # Add system group if there are system properties
-        if system_properties:
-            groups["system"] = {
-                "title": "System Fields",
-                "properties": system_properties,
-            }
-
-            # Add system-specific required fields
-            if system_schema and system_schema.get("required"):
-                system_required = [
-                    field
-                    for field in system_schema["required"]
-                    if field in system_properties
-                ]
-                if system_required:
-                    groups["system"]["required"] = system_required
-
-            # Add system-specific property order
-            if system_schema and system_schema.get("property_order"):
-                system_property_order = [
-                    field
-                    for field in system_schema["property_order"]
-                    if field in system_properties
-                ]
-                if system_property_order:
-                    groups["system"]["propertyOrder"] = system_property_order
-
-        # Add default group if there are layout properties
-        if layout_properties:
-            groups["default"] = {
-                "title": "Layout Fields",
-                "properties": layout_properties,
-            }
-
-            # Add layout-specific required fields
-            if layout_schema and layout_schema.get("required"):
-                layout_required = [
-                    field
-                    for field in layout_schema["required"]
-                    if field in layout_properties
-                ]
-                if layout_required:
-                    groups["default"]["required"] = layout_required
-
-            # Add layout-specific property order
-            if layout_schema and layout_schema.get("property_order"):
-                layout_property_order = [
-                    field
-                    for field in layout_schema["property_order"]
-                    if field in layout_properties
-                ]
-                if layout_property_order:
-                    groups["default"]["propertyOrder"] = layout_property_order
-
-        # Add groups to schema
-        if groups:
-            grouped_schema["groups"] = groups
 
         return grouped_schema
 

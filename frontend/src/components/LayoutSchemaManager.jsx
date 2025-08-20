@@ -9,8 +9,10 @@ export default function LayoutSchemaManager({ fixedLayoutName = null }) {
     const [schemas, setSchemas] = useState([])
     const [layouts, setLayouts] = useState([])
     const [loading, setLoading] = useState(false)
+    const [saving, setSaving] = useState(false)
     const [error, setError] = useState('')
     const [validationErrors, setValidationErrors] = useState({})
+    const [saveSuccess, setSaveSuccess] = useState(false)
     const [layoutForm, setLayoutForm] = useState({
         scope: 'layout',
         layoutName: '',
@@ -74,14 +76,15 @@ export default function LayoutSchemaManager({ fixedLayoutName = null }) {
 
     const handleSubmit = async () => {
         setError('')
+        setSaveSuccess(false)
         const formData = layoutForm
         const errors = validateForm(formData)
         setValidationErrors(errors)
         if (Object.keys(errors).length > 0) return
 
+        setSaving(true)
         try {
             // Save the schema exactly as edited
-
             const existingSchema = layoutSchemas.find((s) => s.layoutName === formData.layoutName)
             if (existingSchema) {
                 await pageDataSchemasApi.update(existingSchema.id, formData)
@@ -89,6 +92,10 @@ export default function LayoutSchemaManager({ fixedLayoutName = null }) {
                 await pageDataSchemasApi.create(formData)
             }
             setValidationErrors({})
+            setSaveSuccess(true)
+
+            // Clear success message after 3 seconds
+            setTimeout(() => setSaveSuccess(false), 3000)
             fetchData()
         } catch (e) {
             const errorData = e?.response?.data
@@ -100,6 +107,8 @@ export default function LayoutSchemaManager({ fixedLayoutName = null }) {
             } else {
                 setError(e?.message || 'Save failed')
             }
+        } finally {
+            setSaving(false)
         }
     }
 
@@ -177,8 +186,31 @@ export default function LayoutSchemaManager({ fixedLayoutName = null }) {
                                         {validationErrors.schema && <div className="text-red-500 text-sm mt-2">{validationErrors.schema}</div>}
 
                                         <div className="flex space-x-3 mt-6">
-                                            <button onClick={handleSubmit} className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors" disabled={loading}>
-                                                {layoutSchemas.find((s) => s.layoutName === layoutForm.layoutName) ? 'Update Layout Schema' : 'Create Layout Schema'}
+                                            <button
+                                                onClick={handleSubmit}
+                                                className={`px-6 py-2 rounded-lg transition-colors inline-flex items-center space-x-2 ${saving
+                                                        ? 'bg-green-400 cursor-not-allowed'
+                                                        : saveSuccess
+                                                            ? 'bg-green-600 hover:bg-green-700'
+                                                            : 'bg-green-600 hover:bg-green-700'
+                                                    } text-white`}
+                                                disabled={loading || saving}
+                                            >
+                                                {saving && (
+                                                    <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                                                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25"></circle>
+                                                        <path fill="currentColor" className="opacity-75" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                    </svg>
+                                                )}
+                                                {saveSuccess && <span>✓</span>}
+                                                <span>
+                                                    {saving
+                                                        ? 'Saving...'
+                                                        : saveSuccess
+                                                            ? 'Saved!'
+                                                            : (layoutSchemas.find((s) => s.layoutName === layoutForm.layoutName) ? 'Update Layout Schema' : 'Create Layout Schema')
+                                                    }
+                                                </span>
                                             </button>
                                         </div>
                                     </>
