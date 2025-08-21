@@ -19,6 +19,7 @@ const WidgetEditorPanel = ({
     onClose,
     onSave,
     onRealTimeUpdate,
+    onUnsavedChanges,
     widgetData,
     schema,
     title = "Edit Widget"
@@ -256,6 +257,11 @@ const WidgetEditorPanel = ({
         // Check if we have changes compared to original
         const hasActualChanges = JSON.stringify(newConfig) !== JSON.stringify(originalConfig)
         setHasChanges(hasActualChanges)
+        
+        // Notify parent about unsaved changes state
+        if (onUnsavedChanges) {
+            onUnsavedChanges(hasActualChanges)
+        }
 
         // Trigger widget validation using dedicated API
         validateWidget(newConfig)
@@ -274,6 +280,11 @@ const WidgetEditorPanel = ({
         // Save the current config as the new original
         setOriginalConfig({ ...config })
         setHasChanges(false)
+        
+        // Notify parent that changes are saved
+        if (onUnsavedChanges) {
+            onUnsavedChanges(false)
+        }
 
         // Commit changes to server
         onSave({
@@ -282,10 +293,15 @@ const WidgetEditorPanel = ({
         })
     }
 
-    // Handle reset - revert to original state
+            // Handle reset - revert to original state
     const handleReset = () => {
         setConfig({ ...originalConfig })
         setHasChanges(false)
+        
+        // Notify parent that changes are reset
+        if (onUnsavedChanges) {
+            onUnsavedChanges(false)
+        }
 
         // Apply reset immediately to the widget preview
         if (onRealTimeUpdate && widgetData) {

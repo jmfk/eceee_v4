@@ -202,6 +202,7 @@ const PageEditor = () => {
     // Widget editor panel state
     const [widgetEditorOpen, setWidgetEditorOpen] = useState(false)
     const [editingWidget, setEditingWidget] = useState(null)
+    const [widgetHasUnsavedChanges, setWidgetHasUnsavedChanges] = useState(false)
 
     // Validation To-Do sidebar state
     const [errorTodoItems, setErrorTodoItems] = useState([])
@@ -389,6 +390,29 @@ const PageEditor = () => {
 
     // Handle close with unsaved changes check
     const handleClose = async () => {
+        // Check for widget unsaved changes first
+        if (widgetHasUnsavedChanges) {
+            const confirmed = await showConfirm({
+                title: 'Unsaved Widget Changes',
+                message: 'You have unsaved widget changes. What would you like to do?',
+                confirmText: 'Save Changes',
+                cancelText: 'Discard Changes',
+                confirmButtonStyle: 'primary'
+            })
+            
+            if (confirmed) {
+                // Save widget changes first
+                if (editingWidget) {
+                    handleSaveWidget(editingWidget)
+                }
+            } else {
+                // Discard widget changes
+                handleCloseWidgetEditor()
+            }
+            return // Don't close the page editor yet
+        }
+        
+        // Check for page unsaved changes
         if (isDirty) {
             addNotification('Checking for unsaved changes...', 'info', 'editor-close')
             const confirmed = await showConfirm({
@@ -841,11 +865,13 @@ const PageEditor = () => {
     const handleOpenWidgetEditor = useCallback((widgetData) => {
         setEditingWidget(widgetData)
         setWidgetEditorOpen(true)
+        setWidgetHasUnsavedChanges(false) // Reset unsaved changes when opening new widget
     }, [])
 
     const handleCloseWidgetEditor = useCallback(() => {
         setWidgetEditorOpen(false)
         setEditingWidget(null)
+        setWidgetHasUnsavedChanges(false)
     }, [])
 
     const handleRealTimeWidgetUpdate = useCallback((updatedWidget) => {
@@ -909,12 +935,39 @@ const PageEditor = () => {
         setIsMoreMenuOpen(false)
     }, [activeTab])
 
-    // Close widget editor panel when leaving the Content tab
+    // Handle widget editor panel when navigating between tabs
     useEffect(() => {
         if (widgetEditorOpen && activeTab !== 'content') {
-            handleCloseWidgetEditor()
+            // Check for unsaved changes before closing
+            if (widgetHasUnsavedChanges) {
+                // Show confirmation modal for unsaved changes
+                const handleUnsavedChanges = async () => {
+                    const confirmed = await showConfirm({
+                        title: 'Unsaved Widget Changes',
+                        message: 'You have unsaved changes to the widget. What would you like to do?',
+                        confirmText: 'Save Changes',
+                        cancelText: 'Discard Changes',
+                        confirmButtonStyle: 'primary'
+                    })
+                    
+                    if (confirmed) {
+                        // Save the widget changes
+                        if (editingWidget) {
+                            handleSaveWidget(editingWidget)
+                        }
+                    } else {
+                        // Discard changes and close panel
+                        handleCloseWidgetEditor()
+                    }
+                }
+                
+                handleUnsavedChanges()
+            } else {
+                // No unsaved changes, just close the panel
+                handleCloseWidgetEditor()
+            }
         }
-    }, [activeTab, widgetEditorOpen, handleCloseWidgetEditor])
+    }, [activeTab, widgetEditorOpen, widgetHasUnsavedChanges, editingWidget, handleCloseWidgetEditor, handleSaveWidget, showConfirm])
 
     if (isLoading && !isNewPage) {
         return (
@@ -1165,6 +1218,7 @@ const PageEditor = () => {
                         onClose={handleCloseWidgetEditor}
                         onSave={handleSaveWidget}
                         onRealTimeUpdate={handleRealTimeWidgetUpdate}
+                        onUnsavedChanges={setWidgetHasUnsavedChanges}
                         widgetData={editingWidget}
                         title={editingWidget ? `Edit ${editingWidget.name}` : 'Edit Widget'}
                     />
