@@ -29,6 +29,8 @@ const WidgetEditorPanel = forwardRef(({
     const [hasChanges, setHasChanges] = useState(false)
     const [validationResults, setValidationResults] = useState({})
     const [isValidating, setIsValidating] = useState(false)
+    const [isWidgetValid, setIsWidgetValid] = useState(true)
+    const [showValidationWarning, setShowValidationWarning] = useState(false)
     const [widgetTypeName, setWidgetTypeName] = useState(null)
     const [widgetTypeSlug, setWidgetTypeSlug] = useState(null)
     const [fetchedSchema, setFetchedSchema] = useState(null)
@@ -44,19 +46,6 @@ const WidgetEditorPanel = forwardRef(({
     const rafRef = useRef(null)
     const updateTimeoutRef = useRef(null)
     const validationTimeoutRef = useRef(null)
-
-    // Expose save method to parent component
-    useImperativeHandle(ref, () => ({
-        saveCurrentWidget: () => {
-            const currentWidget = {
-                ...widgetData,
-                config
-            }
-            handleSave()
-            return currentWidget
-        },
-        hasUnsavedChanges: hasChanges
-    }), [widgetData, config, hasChanges, handleSave])
 
     // Initialize config when widget data changes
     useEffect(() => {
@@ -141,6 +130,8 @@ const WidgetEditorPanel = forwardRef(({
 
                 // Convert API response to format expected by ValidatedInput
                 const formattedResults = {}
+                let hasValidationErrors = false
+                
                 if (result.errors) {
                     Object.entries(result.errors).forEach(([field, messages]) => {
                         formattedResults[field] = {
@@ -148,10 +139,12 @@ const WidgetEditorPanel = forwardRef(({
                             errors: Array.isArray(messages) ? messages : [messages],
                             warnings: result.warnings?.[field] || []
                         }
+                        hasValidationErrors = true
                     })
                 }
 
                 setValidationResults(formattedResults)
+                setIsWidgetValid(result.is_valid && !hasValidationErrors)
                 setIsValidating(false)
             } catch (error) {
                 console.error('Widget validation failed:', error)
@@ -283,8 +276,18 @@ const WidgetEditorPanel = forwardRef(({
         triggerRealTimeUpdate(newConfig)
     }, [config, originalConfig, triggerRealTimeUpdate, validateWidget])
 
-    // Handle save - commit changes to server
+        // Handle save - commit changes to server
     const handleSave = () => {
+        // Check if widget is valid before saving
+        if (!isWidgetValid) {
+            // Show validation warning for 3 seconds
+            setShowValidationWarning(true)
+            setTimeout(() => {
+                setShowValidationWarning(false)
+            }, 3000)
+            return
+        }
+
         // Clear any pending real-time update
         if (updateTimeoutRef.current) {
             clearTimeout(updateTimeoutRef.current)
@@ -293,7 +296,7 @@ const WidgetEditorPanel = forwardRef(({
         // Save the current config as the new original
         setOriginalConfig({ ...config })
         setHasChanges(false)
-
+        
         // Notify parent that changes are saved
         if (onUnsavedChanges) {
             onUnsavedChanges(false)
@@ -305,6 +308,21 @@ const WidgetEditorPanel = forwardRef(({
             config
         })
     }
+
+    // Expose save method to parent component
+    useImperativeHandle(ref, () => ({
+        saveCurrentWidget: () => {
+            const currentWidget = {
+                ...widgetData,
+                config
+            }
+            handleSave()
+            return currentWidget
+        },
+        hasUnsavedChanges: hasChanges,
+        isValid: isWidgetValid,
+        isValidating: isValidating
+    }), [widgetData, config, hasChanges, handleSave, isWidgetValid, isValidating])
 
     // Handle reset - revert to original state
     const handleReset = () => {
@@ -589,35 +607,41 @@ const WidgetEditorPanel = forwardRef(({
                         )}
                     </div>
 
-                    {/* Footer with action buttons */}
+                                        {/* Footer with action buttons */}
                     <div className="border-t border-gray-200 p-4 bg-gray-50">
                         <div className="flex justify-between">
                             <button
-                                onClick={handleReset}
-                                disabled={!hasChanges}
-                                className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                onClick={() => {
+                                    handleReset()
+                                    handleClose()
+                                }}
+                                className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
                             >
                                 <RotateCcw className="w-4 h-4 mr-2" />
-                                Reset
+                                Reset & Close
                             </button>
-
-                            <div className="flex space-x-3">
-                                <button
-                                    onClick={handleClose}
-                                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={handleSave}
-                                    disabled={!hasChanges}
-                                    className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                >
-                                    <Save className="w-4 h-4 mr-2" />
-                                    Save Changes
-                                </button>
-                            </div>
+                            
+                            <button
+                                onClick={handleSave}
+                                disabled={!hasChanges || isValidating || !isWidgetValid}
+                                className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            >
+                                <Save className="w-4 h-4 mr-2" />
+                                Save Changes
+                            </button>
                         </div>
+
+                        {/* Validation warning snackbar */}
+                        {showValidationWarning && (
+                            <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
+                                <p className="text-sm text-red-800 font-medium">
+                                    Cannot save: Please fix validation errors first
+                                </p>
+                                <p className="text-xs text-red-600 mt-1">
+                                    Check the form fields above for errors and correct them before saving.
+                                </p>
+                            </div>
+                        )}
 
                         <div className="flex items-center justify-between mt-2">
                             <p className="text-xs text-gray-500">

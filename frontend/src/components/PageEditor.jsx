@@ -939,9 +939,23 @@ const PageEditor = () => {
         setIsMoreMenuOpen(false)
     }, [activeTab])
 
-    // Handle widget editor panel when navigating between tabs
+        // Handle widget editor panel when navigating between tabs
     useEffect(() => {
         if (widgetEditorOpen && activeTab !== 'content') {
+            // Check widget validation state
+            const widgetState = widgetEditorRef.current
+            const isValidating = widgetState?.isValidating || false
+            const isValid = widgetState?.isValid !== false
+            
+            // Block navigation if validating
+            if (isValidating) {
+                addNotification({
+                    type: 'warning',
+                    message: 'Please wait for validation to complete before navigating'
+                })
+                return
+            }
+            
             // Check for unsaved changes before closing
             if (widgetHasUnsavedChanges) {
                 // Show confirmation modal for unsaved changes
@@ -953,8 +967,17 @@ const PageEditor = () => {
                         cancelText: 'Discard Changes',
                         confirmButtonStyle: 'primary'
                     })
-
+                    
                     if (confirmed) {
+                        // Check if widget is valid before saving
+                        if (!isValid) {
+                            addNotification({
+                                type: 'error',
+                                message: 'Cannot save: Please fix validation errors first'
+                            })
+                            return
+                        }
+                        
                         // Save the widget changes using the panel's save method
                         if (widgetEditorRef.current) {
                             const savedWidget = widgetEditorRef.current.saveCurrentWidget()
@@ -967,14 +990,14 @@ const PageEditor = () => {
                         handleCloseWidgetEditor()
                     }
                 }
-
+                
                 handleUnsavedChanges()
             } else {
                 // No unsaved changes, just close the panel
                 handleCloseWidgetEditor()
             }
         }
-    }, [activeTab, widgetEditorOpen, widgetHasUnsavedChanges, editingWidget, handleCloseWidgetEditor, handleSaveWidget, showConfirm])
+    }, [activeTab, widgetEditorOpen, widgetHasUnsavedChanges, editingWidget, handleCloseWidgetEditor, handleSaveWidget, showConfirm, addNotification])
 
     if (isLoading && !isNewPage) {
         return (
