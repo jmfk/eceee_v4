@@ -31,6 +31,7 @@ import LayoutSelector from './LayoutSelector'
 import StatusBar from './StatusBar'
 import SaveOptionsModal from './SaveOptionsModal'
 import WidgetEditorPanel from './WidgetEditorPanel'
+import useNavigationGuard from '../hooks/useNavigationGuard'
 
 // Helpers: error parsing and merging for To-Do items
 function mergeTodoItems(existing, incoming) {
@@ -212,6 +213,35 @@ const PageEditor = () => {
     const queryClient = useQueryClient()
     const { showError, showConfirm } = useNotificationContext()
     const { addNotification } = useGlobalNotifications()
+
+    // Navigation guard to prevent losing unsaved changes
+    const hasAnyUnsavedChanges = isDirty || widgetHasUnsavedChanges
+    const { safeNavigate } = useNavigationGuard(
+        hasAnyUnsavedChanges,
+        async () => {
+            // Save function called when user chooses to save before navigation
+            if (widgetHasUnsavedChanges && widgetEditorRef.current) {
+                // Save widget changes first
+                const savedWidget = widgetEditorRef.current.saveCurrentWidget()
+                if (savedWidget) {
+                    await handleSaveWidget(savedWidget)
+                }
+            }
+
+            if (isDirty) {
+                // Save page changes
+                await handleSaveFromStatusBar()
+            }
+        },
+        {
+            savePromptTitle: 'Unsaved Changes Detected',
+            savePromptMessage: hasAnyUnsavedChanges
+                ? `You have unsaved ${widgetHasUnsavedChanges && isDirty ? 'widget and page' : widgetHasUnsavedChanges ? 'widget' : 'page'} changes. Would you like to save before continuing?`
+                : 'You have unsaved changes. Would you like to save before continuing?',
+            saveButtonText: 'Save & Continue',
+            enableBrowserBackGuard: true
+        }
+    )
 
 
 
@@ -431,7 +461,7 @@ const PageEditor = () => {
             }
         }
         addNotification('Closing page editor...', 'info', 'editor-close')
-        navigate(previousView)
+        safeNavigate(previousView)
     }
 
     // Version management functions
@@ -451,7 +481,7 @@ const PageEditor = () => {
                 if (!targetVersion) {
                     // Version ID from URL is invalid, remove it from URL
                     const currentPath = location.pathname;
-                    navigate(currentPath, { replace: true, state: { previousView } });
+                    safeNavigate(currentPath, { replace: true, state: { previousView } });
                 }
             }
             // Second priority: Use highest version number (last saved) if no URL version or URL version is invalid
@@ -471,7 +501,7 @@ const PageEditor = () => {
             console.error('PageEditor: Error loading versions', error);
             showError('Failed to load page versions');
         }
-    }, [webpageData?.id, isNewPage, versionFromUrl, location.pathname, navigate, previousView, showError]);
+    }, [webpageData?.id, isNewPage, versionFromUrl, location.pathname, previousView, showError]);
 
     // Load versions but preserve current version selection
     const loadVersionsPreserveCurrent = useCallback(async () => {
@@ -568,7 +598,7 @@ const PageEditor = () => {
             // Update URL to include version parameter
             const currentPath = location.pathname;
             const newUrl = buildUrlWithVersion(currentPath, versionId);
-            navigate(newUrl, { replace: true, state: { previousView } });
+            safeNavigate(newUrl, { replace: true, state: { previousView } });
 
             // Handle layout fallback for versions without valid layouts
             if (!versionPageData.codeLayout) {
@@ -586,7 +616,7 @@ const PageEditor = () => {
             console.error('PageEditor: Error switching to version', error);
             showError(`Failed to load version: ${error.message}`);
         }
-    }, [webpageData, availableVersions, showError, addNotification, location.pathname, navigate, buildUrlWithVersion, previousView]);
+    }, [webpageData, availableVersions, showError, addNotification, location.pathname, buildUrlWithVersion, previousView]);
 
     // Load versions when page data is available
     useEffect(() => {
@@ -899,11 +929,36 @@ const PageEditor = () => {
             renderer.executeWidgetDataCallback(WIDGET_ACTIONS.EDIT, widgetInstance.slotName, widgetInstance)
             renderer.updateSlot(widgetInstance.slotName, renderer.getSlotWidgetData(widgetInstance.slotName))
 
+            setPageVersionData(prev => {
+                const widgets = prev?.widgets || {}
+                const slot = widgets[updatedWidget.slotName] || []
+                const existingWidgetIndex = slot.findIndex(w => w.id === updatedWidget.id);
+                if (existingWidgetIndex >= 0) {
+                    slot[existingWidgetIndex] = updatedWidget;
+                } else {
+                    slot.push(updatedWidget);
+                }
+                return prev
+            })
+
             addNotification({
                 type: 'success',
                 message: `Widget "${widgetInstance.name}" saved successfully`
             })
+        } else {
+            setPageVersionData(prev => {
+                const widgets = prev?.widgets || {}
+                const slot = widgets[updatedWidget.slotName] || []
+                const existingWidgetIndex = slot.findIndex(w => w.id === updatedWidget.id);
+                if (existingWidgetIndex >= 0) {
+                    slot[existingWidgetIndex] = updatedWidget;
+                } else {
+                    slot.push(updatedWidget);
+                }
+                return prev
+            })
         }
+        setShowSaveOptionsModal(true);
 
         handleCloseWidgetEditor()
     }, [addNotification, handleCloseWidgetEditor])
@@ -939,14 +994,14 @@ const PageEditor = () => {
         setIsMoreMenuOpen(false)
     }, [activeTab])
 
-        // Handle widget editor panel when navigating between tabs
+    // Handle widget editor panel when navigating between tabs
     useEffect(() => {
         if (widgetEditorOpen && activeTab !== 'content') {
             // Check widget validation state
             const widgetState = widgetEditorRef.current
             const isValidating = widgetState?.isValidating || false
             const isValid = widgetState?.isValid !== false
-            
+
             // Block navigation if validating
             if (isValidating) {
                 addNotification({
@@ -955,7 +1010,7 @@ const PageEditor = () => {
                 })
                 return
             }
-            
+
             // Check for unsaved changes before closing
             if (widgetHasUnsavedChanges) {
                 // Show confirmation modal for unsaved changes
@@ -967,7 +1022,7 @@ const PageEditor = () => {
                         cancelText: 'Discard Changes',
                         confirmButtonStyle: 'primary'
                     })
-                    
+
                     if (confirmed) {
                         // Check if widget is valid before saving
                         if (!isValid) {
@@ -977,7 +1032,7 @@ const PageEditor = () => {
                             })
                             return
                         }
-                        
+
                         // Save the widget changes using the panel's save method
                         if (widgetEditorRef.current) {
                             const savedWidget = widgetEditorRef.current.saveCurrentWidget()
@@ -990,7 +1045,7 @@ const PageEditor = () => {
                         handleCloseWidgetEditor()
                     }
                 }
-                
+
                 handleUnsavedChanges()
             } else {
                 // No unsaved changes, just close the panel
@@ -1053,7 +1108,7 @@ const PageEditor = () => {
                                     return (
                                         <button
                                             key={tabItem.id}
-                                            onClick={() => navigate(tabPath, { state: { previousView } })}
+                                            onClick={() => safeNavigate(tabPath, { state: { previousView } })}
                                             className={`flex items-center px-4 py-2 rounded-lg transition-colors ${isActive
                                                 ? 'bg-blue-100 text-blue-700'
                                                 : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
@@ -1102,7 +1157,7 @@ const PageEditor = () => {
                                                     <button
                                                         key={tabItem.id}
                                                         onClick={() => {
-                                                            navigate(tabPath, { state: { previousView } })
+                                                            safeNavigate(tabPath, { state: { previousView } })
                                                             setIsMoreMenuOpen(false)
                                                         }}
                                                         className={`w-full flex items-center px-4 py-2 text-sm transition-colors ${isActive
@@ -1238,7 +1293,7 @@ const PageEditor = () => {
                         <ErrorTodoSidebar
                             items={errorTodoItems}
                             onToggle={(id, checked) => setErrorTodoItems(prev => prev.map(i => i.id === id ? { ...i, checked } : i))}
-                            onNavigate={(item) => navigateToFix({ item, navigate, pageId, isNewPage, currentVersion, previousView })}
+                            onNavigate={(item) => navigateToFix({ item, navigate: safeNavigate, pageId, isNewPage, currentVersion, previousView })}
                         />
                     )}
 
@@ -1283,7 +1338,7 @@ const PageEditor = () => {
 
                         {!isNewPage && (
                             <button
-                                onClick={() => navigate(`/pages/${pageId}/edit/publishing`, { state: { previousView } })}
+                                onClick={() => safeNavigate(`/pages/${pageId}/edit/publishing`, { state: { previousView } })}
                                 className="text-xs px-3 py-1 rounded-md font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors flex items-center space-x-1"
                             >
                                 <Calendar className="w-3 h-3" />
@@ -1737,5 +1792,5 @@ function navigateToFix({ item, navigate, pageId, isNewPage, currentVersion, prev
     if (targetType === 'settings') path = `${base}/settings`
     if (targetType === 'metadata') path = `${base}/metadata`
     if (targetType === 'content') path = `${base}/content`
-    navigate(path, { state: { previousView } })
+    safeNavigate(path, { state: { previousView } })
 }

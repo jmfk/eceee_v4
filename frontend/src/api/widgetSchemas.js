@@ -55,12 +55,12 @@ export const getWidgetConfigurationDefaults = async (widgetType) => {
  * Validate widget data using dedicated Pydantic validation API
  * @param {string} widgetType - The widget type name
  * @param {Object} widgetData - The widget data to validate
- * @returns {Promise<Object>} Validation result with is_valid, errors, and warnings properties
+ * @returns {Promise<Object>} Validation result with isValid, errors, and warnings properties
  */
 export const validateWidgetConfiguration = async (widgetType, widgetData) => {
     try {
         const response = await api.post(`/api/v1/webpages/widget-types/${encodeURIComponent(widgetType)}/validate/`, {
-            widget_data: widgetData
+            widgetData: widgetData
         })
         return response.data
     } catch (error) {
@@ -68,7 +68,7 @@ export const validateWidgetConfiguration = async (widgetType, widgetData) => {
 
         // Return error in consistent format
         return {
-            is_valid: false,
+            isValid: false,
             errors: {
                 _general: [error.response?.data?.error || error.message || 'Validation service unavailable']
             },

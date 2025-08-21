@@ -179,7 +179,7 @@ export default function SchemaDrivenForm({ pageVersionData, onChange, onValidati
                 setGroupValidationResults(response.data.group_validation)
 
                 // Calculate overall validation state from groups
-                const hasGroupErrors = Object.values(response.data.group_validation).some(g => !g.is_valid)
+                const hasGroupErrors = Object.values(response.data.group_validation).some(g => !g.isValid)
                 setIsValidationValid(!hasGroupErrors)
             }
 
@@ -221,7 +221,7 @@ export default function SchemaDrivenForm({ pageVersionData, onChange, onValidati
             result && (!result.isValid || (result.errors && result.errors.length > 0))
         )
         const hasGroupErrors = Object.values(groupValidationResults).some(group =>
-            !(group.isValid ?? group.is_valid ?? true)
+            !(group.isValid ?? group.isValid ?? true)
         )
         const overallHasErrors = hasFieldErrors || hasGroupErrors
 
@@ -436,8 +436,8 @@ export default function SchemaDrivenForm({ pageVersionData, onChange, onValidati
 
             // Get group validation status
             const groupValidation = groupValidationResults[groupKey]
-            // Handle both client-side (isValid) and server-side (is_valid) formats
-            const groupIsValid = groupValidation ? (groupValidation.isValid ?? groupValidation.is_valid ?? true) : true
+            // Handle both client-side (isValid) and server-side (isValid) formats
+            const groupIsValid = groupValidation ? (groupValidation.isValid ?? groupValidation.isValid ?? true) : true
             const groupHasErrors = groupValidation && (
                 (groupValidation.errors && Object.keys(groupValidation.errors).length > 0) ||
                 (groupValidation.errorCount && groupValidation.errorCount > 0)

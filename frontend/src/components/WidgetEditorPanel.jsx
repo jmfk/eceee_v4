@@ -125,13 +125,14 @@ const WidgetEditorPanel = forwardRef(({
         validationTimeoutRef.current = setTimeout(async () => {
             setIsValidating(true)
 
+
             try {
                 const result = await validateWidgetConfiguration(widgetTypeSlug, configToValidate)
 
                 // Convert API response to format expected by ValidatedInput
                 const formattedResults = {}
                 let hasValidationErrors = false
-                
+
                 if (result.errors) {
                     Object.entries(result.errors).forEach(([field, messages]) => {
                         formattedResults[field] = {
@@ -144,7 +145,7 @@ const WidgetEditorPanel = forwardRef(({
                 }
 
                 setValidationResults(formattedResults)
-                setIsWidgetValid(result.is_valid && !hasValidationErrors)
+                setIsWidgetValid((result.is_valid || result.isValid) && !hasValidationErrors)
                 setIsValidating(false)
             } catch (error) {
                 console.error('Widget validation failed:', error)
@@ -276,8 +277,9 @@ const WidgetEditorPanel = forwardRef(({
         triggerRealTimeUpdate(newConfig)
     }, [config, originalConfig, triggerRealTimeUpdate, validateWidget])
 
-        // Handle save - commit changes to server
+    // Handle save - commit changes to server
     const handleSave = () => {
+        console.log('handleSave', isWidgetValid)
         // Check if widget is valid before saving
         if (!isWidgetValid) {
             // Show validation warning for 3 seconds
@@ -296,13 +298,14 @@ const WidgetEditorPanel = forwardRef(({
         // Save the current config as the new original
         setOriginalConfig({ ...config })
         setHasChanges(false)
-        
+
         // Notify parent that changes are saved
         if (onUnsavedChanges) {
             onUnsavedChanges(false)
         }
 
         // Commit changes to server
+        console.log('onSave', widgetData, config)
         onSave({
             ...widgetData,
             config
@@ -607,7 +610,7 @@ const WidgetEditorPanel = forwardRef(({
                         )}
                     </div>
 
-                                        {/* Footer with action buttons */}
+                    {/* Footer with action buttons */}
                     <div className="border-t border-gray-200 p-4 bg-gray-50">
                         <div className="flex justify-between">
                             <button
@@ -620,7 +623,7 @@ const WidgetEditorPanel = forwardRef(({
                                 <RotateCcw className="w-4 h-4 mr-2" />
                                 Reset & Close
                             </button>
-                            
+
                             <button
                                 onClick={handleSave}
                                 disabled={!hasChanges || isValidating || !isWidgetValid}
@@ -642,17 +645,6 @@ const WidgetEditorPanel = forwardRef(({
                                 </p>
                             </div>
                         )}
-
-                        <div className="flex items-center justify-between mt-2">
-                            <p className="text-xs text-gray-500">
-                                Preview updates in real-time
-                            </p>
-                            {hasChanges && (
-                                <p className="text-xs text-amber-600">
-                                    Unsaved changes
-                                </p>
-                            )}
-                        </div>
                     </div>
                 </div>
             </div>

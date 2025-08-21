@@ -323,8 +323,8 @@ const ContentEditor = forwardRef(({
           widgets: updatedWidgets
         });
 
-        // Mark as dirty since widgets changed
-        if (onDirtyChange) {
+        // Only mark as dirty for persistent changes (not real-time preview updates)
+        if (onDirtyChange && action !== WIDGET_ACTIONS.UPDATE) {
           onDirtyChange(true, `widget ${action} in slot ${slotName}`);
         }
 
