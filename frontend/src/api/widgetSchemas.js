@@ -5,6 +5,7 @@
  */
 
 import { api } from './client.js'
+import { convertKeysToSnake } from '../utils/caseConversion.js'
 
 /**
  * Get JSON schema for a specific widget type
@@ -59,8 +60,11 @@ export const getWidgetConfigurationDefaults = async (widgetType) => {
  */
 export const validateWidgetConfiguration = async (widgetType, widgetData) => {
     try {
+        // Convert camelCase frontend data to snake_case for backend
+        const snakeCaseData = convertKeysToSnake(widgetData)
+        
         const response = await api.post(`/api/v1/webpages/widget-types/${encodeURIComponent(widgetType)}/validate/`, {
-            widget_data: widgetData
+            widget_data: snakeCaseData
         })
         return response.data
     } catch (error) {
