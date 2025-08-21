@@ -909,9 +909,9 @@ const PageEditor = () => {
         setIsMoreMenuOpen(false)
     }, [activeTab])
 
-    // Close widget editor panel when navigating between tabs
+    // Close widget editor panel when leaving the Content tab
     useEffect(() => {
-        if (widgetEditorOpen) {
+        if (widgetEditorOpen && activeTab !== 'content') {
             handleCloseWidgetEditor()
         }
     }, [activeTab, widgetEditorOpen, handleCloseWidgetEditor])
