@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react'
 import { X, Save, RotateCcw } from 'lucide-react'
 import ValidatedInput from './validation/ValidatedInput.jsx'
 import { getWidgetSchema, validateWidgetConfiguration } from '../api/widgetSchemas.js'
@@ -14,7 +14,7 @@ import { widgetsApi } from '../api'
  * - Resizable with drag handle
  * - Save/Cancel actions
  */
-const WidgetEditorPanel = ({
+const WidgetEditorPanel = forwardRef(({
     isOpen,
     onClose,
     onSave,
@@ -23,7 +23,7 @@ const WidgetEditorPanel = ({
     widgetData,
     schema,
     title = "Edit Widget"
-}) => {
+}, ref) => {
     const [config, setConfig] = useState({})
     const [originalConfig, setOriginalConfig] = useState({})
     const [hasChanges, setHasChanges] = useState(false)
@@ -44,6 +44,19 @@ const WidgetEditorPanel = ({
     const rafRef = useRef(null)
     const updateTimeoutRef = useRef(null)
     const validationTimeoutRef = useRef(null)
+
+    // Expose save method to parent component
+    useImperativeHandle(ref, () => ({
+        saveCurrentWidget: () => {
+            const currentWidget = {
+                ...widgetData,
+                config
+            }
+            handleSave()
+            return currentWidget
+        },
+        hasUnsavedChanges: hasChanges
+    }), [widgetData, config, hasChanges, handleSave])
 
     // Initialize config when widget data changes
     useEffect(() => {
@@ -621,6 +634,9 @@ const WidgetEditorPanel = ({
             </div>
         </>
     )
-}
+})
+
+// Add display name for debugging
+WidgetEditorPanel.displayName = 'WidgetEditorPanel'
 
 export default WidgetEditorPanel

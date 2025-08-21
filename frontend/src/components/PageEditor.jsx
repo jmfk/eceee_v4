@@ -203,6 +203,7 @@ const PageEditor = () => {
     const [widgetEditorOpen, setWidgetEditorOpen] = useState(false)
     const [editingWidget, setEditingWidget] = useState(null)
     const [widgetHasUnsavedChanges, setWidgetHasUnsavedChanges] = useState(false)
+    const widgetEditorRef = useRef(null)
 
     // Validation To-Do sidebar state
     const [errorTodoItems, setErrorTodoItems] = useState([])
@@ -401,10 +402,12 @@ const PageEditor = () => {
             })
 
             if (confirmed) {
-                // Save widget changes first, then continue with navigation
-                if (editingWidget) {
-                    await handleSaveWidget(editingWidget)
-                    // After saving, the panel will close and navigation can continue
+                // Save widget changes using the panel's save method
+                if (widgetEditorRef.current) {
+                    const savedWidget = widgetEditorRef.current.saveCurrentWidget()
+                    if (savedWidget) {
+                        await handleSaveWidget(savedWidget)
+                    }
                 }
             } else {
                 // Discard widget changes
@@ -952,10 +955,12 @@ const PageEditor = () => {
                     })
 
                     if (confirmed) {
-                        // Save the widget changes, then close panel
-                        if (editingWidget) {
-                            await handleSaveWidget(editingWidget)
-                            // handleSaveWidget will close the panel after saving
+                        // Save the widget changes using the panel's save method
+                        if (widgetEditorRef.current) {
+                            const savedWidget = widgetEditorRef.current.saveCurrentWidget()
+                            if (savedWidget) {
+                                await handleSaveWidget(savedWidget)
+                            }
                         }
                     } else {
                         // Discard changes and close panel
@@ -1216,6 +1221,7 @@ const PageEditor = () => {
 
                     {/* Widget Editor Panel - positioned within content area */}
                     <WidgetEditorPanel
+                        ref={widgetEditorRef}
                         isOpen={widgetEditorOpen}
                         onClose={handleCloseWidgetEditor}
                         onSave={handleSaveWidget}
