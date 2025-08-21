@@ -21,6 +21,7 @@ import { pagesApi, layoutsApi, versionsApi } from '../api'
 import { api } from '../api/client'
 import { endpoints } from '../api/endpoints'
 import { smartSave, analyzeChanges, determineSaveStrategy, generateChangeSummary, processLoadedVersionData } from '../utils/smartSaveUtils'
+import { WIDGET_ACTIONS } from '../utils/widgetConstants'
 import { useNotificationContext } from './NotificationManager'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import ContentEditor from './ContentEditor'
@@ -853,7 +854,7 @@ const PageEditor = () => {
             const renderer = contentEditorRef.current.layoutRenderer
 
             // Use UPDATE action for real-time preview updates
-            renderer.executeWidgetDataCallback('UPDATE', updatedWidget.slotName, updatedWidget)
+            renderer.executeWidgetDataCallback(WIDGET_ACTIONS.UPDATE, updatedWidget.slotName, updatedWidget)
             renderer.updateSlot(updatedWidget.slotName, renderer.getSlotWidgetData(updatedWidget.slotName))
         }
     }, [])
@@ -865,7 +866,7 @@ const PageEditor = () => {
 
             // Update widget config and trigger server save
             const widgetInstance = updatedWidget
-            renderer.executeWidgetDataCallback('EDIT', widgetInstance.slotName, widgetInstance)
+            renderer.executeWidgetDataCallback(WIDGET_ACTIONS.EDIT, widgetInstance.slotName, widgetInstance)
             renderer.updateSlot(widgetInstance.slotName, renderer.getSlotWidgetData(widgetInstance.slotName))
 
             addNotification({

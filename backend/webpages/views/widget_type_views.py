@@ -2,6 +2,7 @@
 WidgetType ViewSet for managing code-based widget types.
 """
 
+import json
 from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -129,6 +130,8 @@ class WidgetTypeViewSet(viewsets.ViewSet):
         """Validate widget configuration using Pydantic models"""
         from ..widget_registry import widget_type_registry
 
+        print("validate_widget_config", pk)
+
         # Try to find by slug first, then by name
         widget_type = widget_type_registry.get_widget_type_by_slug(
             pk
@@ -139,11 +142,11 @@ class WidgetTypeViewSet(viewsets.ViewSet):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        configuration = request.data.get("configuration", {})
+        widget_data = request.data.get("widget_data", {})
 
         try:
             # Use Pydantic model for validation
-            validated_config = widget_type.configuration_model(**configuration)
+            validated_config = widget_type.configuration_model(**widget_data)
             return Response(
                 {
                     "is_valid": True,
