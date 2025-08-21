@@ -33,6 +33,44 @@ export const useNavigationGuard = (
     const isNavigatingRef = useRef(false)
     const originalNavigateRef = useRef(navigate)
 
+    // Handle navigation attempt with save prompt
+    const handleNavigationAttempt = useCallback(async (proceedCallback, cancelCallback) => {
+        try {
+            // First ask if they want to save
+            const shouldSave = await showConfirm({
+                title: savePromptTitle,
+                message: savePromptMessage,
+                confirmText: saveButtonText,
+                cancelText: 'Continue without saving',
+                confirmButtonStyle: 'primary'
+            })
+
+            if (shouldSave) {
+                // User chose to save
+                if (onSave) {
+                    try {
+                        await onSave()
+                        isNavigatingRef.current = true
+                        proceedCallback()
+                    } catch (error) {
+                        console.error('Save failed during navigation:', error)
+                        cancelCallback()
+                    }
+                } else {
+                    isNavigatingRef.current = true
+                    proceedCallback()
+                }
+            } else {
+                // User chose to continue without saving
+                isNavigatingRef.current = true
+                proceedCallback()
+            }
+        } catch (error) {
+            console.error('Navigation guard error:', error)
+            cancelCallback()
+        }
+    }, [showConfirm, onSave, savePromptTitle, savePromptMessage, saveButtonText])
+
     // Handle browser back/forward navigation and page unload
     useEffect(() => {
         const handleBeforeUnload = (event) => {
@@ -81,44 +119,6 @@ export const useNavigationGuard = (
             }
         }
     }, [hasUnsavedChanges, enableBrowserBackGuard, handleNavigationAttempt])
-
-    // Handle navigation attempt with save prompt
-    const handleNavigationAttempt = useCallback(async (proceedCallback, cancelCallback) => {
-        try {
-            // First ask if they want to save
-            const shouldSave = await showConfirm({
-                title: savePromptTitle,
-                message: savePromptMessage,
-                confirmText: saveButtonText,
-                cancelText: 'Continue without saving',
-                confirmButtonStyle: 'primary'
-            })
-
-            if (shouldSave) {
-                // User chose to save
-                if (onSave) {
-                    try {
-                        await onSave()
-                        isNavigatingRef.current = true
-                        proceedCallback()
-                    } catch (error) {
-                        console.error('Save failed during navigation:', error)
-                        cancelCallback()
-                    }
-                } else {
-                    isNavigatingRef.current = true
-                    proceedCallback()
-                }
-            } else {
-                // User chose to continue without saving
-                isNavigatingRef.current = true
-                proceedCallback()
-            }
-        } catch (error) {
-            console.error('Navigation guard error:', error)
-            cancelCallback()
-        }
-    }, [showConfirm, onSave, savePromptTitle, savePromptMessage, saveButtonText])
 
     // Safe navigation function that respects the guard
     const safeNavigate = useCallback(async (to, options = {}) => {
