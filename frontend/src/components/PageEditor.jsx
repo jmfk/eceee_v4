@@ -399,11 +399,12 @@ const PageEditor = () => {
                 cancelText: 'Discard Changes',
                 confirmButtonStyle: 'primary'
             })
-            
+
             if (confirmed) {
-                // Save widget changes first
+                // Save widget changes first, then continue with navigation
                 if (editingWidget) {
-                    handleSaveWidget(editingWidget)
+                    await handleSaveWidget(editingWidget)
+                    // After saving, the panel will close and navigation can continue
                 }
             } else {
                 // Discard widget changes
@@ -411,7 +412,7 @@ const PageEditor = () => {
             }
             return // Don't close the page editor yet
         }
-        
+
         // Check for page unsaved changes
         if (isDirty) {
             addNotification('Checking for unsaved changes...', 'info', 'editor-close')
@@ -885,7 +886,7 @@ const PageEditor = () => {
         }
     }, [])
 
-    const handleSaveWidget = useCallback((updatedWidget) => {
+    const handleSaveWidget = useCallback(async (updatedWidget) => {
         if (contentEditorRef.current && contentEditorRef.current.layoutRenderer) {
             // Commit the widget changes to the server via LayoutRenderer
             const renderer = contentEditorRef.current.layoutRenderer
@@ -949,18 +950,19 @@ const PageEditor = () => {
                         cancelText: 'Discard Changes',
                         confirmButtonStyle: 'primary'
                     })
-                    
+
                     if (confirmed) {
-                        // Save the widget changes
+                        // Save the widget changes, then close panel
                         if (editingWidget) {
-                            handleSaveWidget(editingWidget)
+                            await handleSaveWidget(editingWidget)
+                            // handleSaveWidget will close the panel after saving
                         }
                     } else {
                         // Discard changes and close panel
                         handleCloseWidgetEditor()
                     }
                 }
-                
+
                 handleUnsavedChanges()
             } else {
                 // No unsaved changes, just close the panel

@@ -257,7 +257,7 @@ const WidgetEditorPanel = ({
         // Check if we have changes compared to original
         const hasActualChanges = JSON.stringify(newConfig) !== JSON.stringify(originalConfig)
         setHasChanges(hasActualChanges)
-        
+
         // Notify parent about unsaved changes state
         if (onUnsavedChanges) {
             onUnsavedChanges(hasActualChanges)
@@ -280,7 +280,7 @@ const WidgetEditorPanel = ({
         // Save the current config as the new original
         setOriginalConfig({ ...config })
         setHasChanges(false)
-        
+
         // Notify parent that changes are saved
         if (onUnsavedChanges) {
             onUnsavedChanges(false)
@@ -293,11 +293,11 @@ const WidgetEditorPanel = ({
         })
     }
 
-            // Handle reset - revert to original state
+    // Handle reset - revert to original state
     const handleReset = () => {
         setConfig({ ...originalConfig })
         setHasChanges(false)
-        
+
         // Notify parent that changes are reset
         if (onUnsavedChanges) {
             onUnsavedChanges(false)
