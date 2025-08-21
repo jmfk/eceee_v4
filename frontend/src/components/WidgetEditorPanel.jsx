@@ -321,7 +321,12 @@ const WidgetEditorPanel = ({
         const fieldType = fieldSchema.type || 'string'
         const fieldTitle = fieldSchema.title || fieldName
         const fieldDescription = fieldSchema.description
-        const isRequired = activeSchema?.required?.includes(fieldName) || false
+        // Determine if field should show as required in UI
+        // Don't show as required if it's a string field that allows empty values (no min_length constraint)
+        const isSchemaRequired = activeSchema?.required?.includes(fieldName) || false
+        const isStringField = fieldType === 'string'
+        const hasMinLength = fieldSchema.minLength > 0 || fieldSchema.min_length > 0
+        const isRequired = isSchemaRequired && (!isStringField || hasMinLength)
         const validation = validationResults[fieldName]
         const fieldIsValidating = isValidating // Use global validation state
 

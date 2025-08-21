@@ -130,8 +130,6 @@ class WidgetTypeViewSet(viewsets.ViewSet):
         """Validate widget configuration using Pydantic models"""
         from ..widget_registry import widget_type_registry
 
-        print("validate_widget_config", pk)
-
         # Try to find by slug first, then by name
         widget_type = widget_type_registry.get_widget_type_by_slug(
             pk

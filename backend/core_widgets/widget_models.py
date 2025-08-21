@@ -28,7 +28,9 @@ class ImageConfig(BaseModel):
     """Configuration for Image widget"""
 
     image_url: HttpUrl = Field(..., description="URL or path to the image")
-    alt_text: str = Field(..., description="Alternative text for accessibility")
+    alt_text: str = Field(
+        ..., min_length=1, description="Alternative text for accessibility"
+    )
     caption: Optional[str] = Field(None, description="Optional caption below the image")
     size: Literal["small", "medium", "large", "full"] = Field(
         "medium", description="Image size"
@@ -41,7 +43,7 @@ class ImageConfig(BaseModel):
 class ButtonConfig(BaseModel):
     """Configuration for Button widget"""
 
-    text: str = Field(..., description="Text displayed on the button")
+    text: str = Field(..., min_length=1, description="Text displayed on the button")
     url: HttpUrl = Field(..., description="Link destination")
     style: Literal["primary", "secondary", "outline"] = Field(
         "primary", description="Button style"
@@ -68,7 +70,7 @@ class SpacerConfig(BaseModel):
 class HTMLBlockConfig(BaseModel):
     """Configuration for HTML Block widget"""
 
-    html_content: str = Field(..., description="Raw HTML content")
+    html_content: str = Field(..., min_length=1, description="Raw HTML content")
     allow_scripts: bool = Field(
         False, description="WARNING: Only enable for trusted content"
     )
@@ -77,9 +79,11 @@ class HTMLBlockConfig(BaseModel):
 class NewsConfig(BaseModel):
     """Configuration for News widget"""
 
-    title: str = Field(..., description="Main headline for the news article")
+    title: str = Field(
+        ..., min_length=1, description="Main headline for the news article"
+    )
     summary: Optional[str] = Field(None, description="Brief summary or lead paragraph")
-    content: str = Field(..., description="Full article content")
+    content: str = Field(..., min_length=1, description="Full article content")
     author: Optional[str] = Field(None, description="Article author name")
     publication_date: Optional[dt.date] = Field(
         None, description="When the article was published"
@@ -94,7 +98,7 @@ class NewsConfig(BaseModel):
 class EventConfig(BaseModel):
     """Configuration for Events widget"""
 
-    event_title: str = Field(..., description="Name of the event")
+    event_title: str = Field(..., min_length=1, description="Name of the event")
     description: Optional[str] = Field(None, description="Event description")
     start_date: datetime = Field(..., description="Event start date and time")
     end_date: Optional[datetime] = Field(None, description="Event end date and time")
@@ -116,7 +120,7 @@ class EventConfig(BaseModel):
 class CalendarEventConfig(BaseModel):
     """Individual event configuration for calendar widget"""
 
-    title: str = Field(..., description="Event title")
+    title: str = Field(..., min_length=1, description="Event title")
     date: dt.date = Field(..., description="Event date")
     time: Optional[str] = Field(None, description="Event time")
     description: Optional[str] = Field(None, description="Event description")
@@ -145,8 +149,8 @@ class CalendarConfig(BaseModel):
 class FormFieldConfig(BaseModel):
     """Individual form field configuration"""
 
-    name: str = Field(..., description="Field name")
-    label: str = Field(..., description="Field label")
+    name: str = Field(..., min_length=1, description="Field name")
+    label: str = Field(..., min_length=1, description="Field label")
     type: Literal[
         "text", "email", "phone", "textarea", "select", "checkbox", "radio"
     ] = Field(..., description="Field type")
@@ -160,7 +164,9 @@ class FormFieldConfig(BaseModel):
 class FormsConfig(BaseModel):
     """Configuration for Forms widget"""
 
-    form_title: str = Field(..., description="Title displayed above the form")
+    form_title: str = Field(
+        ..., min_length=1, description="Title displayed above the form"
+    )
     form_description: Optional[str] = Field(
         None, description="Optional description text"
     )
@@ -182,7 +188,7 @@ class GalleryImageConfig(BaseModel):
 
     url: HttpUrl = Field(..., description="Image URL")
     thumbnail: Optional[HttpUrl] = Field(None, description="Thumbnail URL")
-    alt_text: str = Field(..., description="Alt text")
+    alt_text: str = Field(..., min_length=1, description="Alt text")
     caption: Optional[str] = Field(None, description="Caption")
     description: Optional[str] = Field(None, description="Description")
 
