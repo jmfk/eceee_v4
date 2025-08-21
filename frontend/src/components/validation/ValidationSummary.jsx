@@ -30,9 +30,9 @@ export default function ValidationSummary({
             case 'warning':
                 return <AlertTriangle className="w-5 h-5 text-yellow-500" />
             case 'valid':
-                return <CheckCircle className="w-5 h-5 text-green-500" />
+                return null // Don't show icon for valid status
             default:
-                return <Info className="w-5 h-5 text-gray-500" />
+                return null // Don't show icon for neutral status
         }
     }
 
@@ -53,7 +53,7 @@ export default function ValidationSummary({
             case 'warning':
                 return 'bg-yellow-50 border-yellow-200 text-yellow-800'
             case 'valid':
-                return 'bg-green-50 border-green-200 text-green-800'
+                return 'bg-gray-50 border-gray-200 text-gray-800' // Use neutral colors for valid
             default:
                 return 'bg-gray-50 border-gray-200 text-gray-800'
         }

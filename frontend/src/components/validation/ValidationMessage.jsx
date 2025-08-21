@@ -58,7 +58,7 @@ export default function ValidationMessage({
                 colorClasses = 'text-yellow-600'
                 break
             case 'valid':
-                colorClasses = 'text-green-600'
+                colorClasses = 'text-gray-500' // Use neutral color for valid, not green
                 break
             case 'info':
                 colorClasses = 'text-blue-600'

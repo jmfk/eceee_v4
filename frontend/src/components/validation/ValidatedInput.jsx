@@ -37,6 +37,7 @@ export default function ValidatedInput({
     const validationStatus = getValidationStatus()
 
     // Get input border classes based on validation
+    // Only show colors for problems (errors/warnings) or when validating
     const getBorderClasses = () => {
         if (disabled) return 'border-gray-300'
         if (focused) {
@@ -45,12 +46,12 @@ export default function ValidatedInput({
                     return 'border-red-500 ring-2 ring-red-200'
                 case 'warning':
                     return 'border-yellow-500 ring-2 ring-yellow-200'
-                case 'valid':
-                    return 'border-green-500 ring-2 ring-green-200'
                 case 'validating':
                     return 'border-blue-500 ring-2 ring-blue-200'
+                case 'valid':
+                case 'none':
                 default:
-                    return 'border-blue-500 ring-2 ring-blue-200'
+                    return 'border-blue-500 ring-2 ring-blue-200' // Normal focus state
             }
         } else {
             switch (validationStatus) {
@@ -58,12 +59,12 @@ export default function ValidatedInput({
                     return 'border-red-300'
                 case 'warning':
                     return 'border-yellow-300'
-                case 'valid':
-                    return 'border-green-300'
                 case 'validating':
                     return 'border-blue-300'
+                case 'valid':
+                case 'none':
                 default:
-                    return 'border-gray-300'
+                    return 'border-gray-300' // Normal unfocused state
             }
         }
     }

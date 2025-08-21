@@ -444,16 +444,19 @@ export default function SchemaDrivenForm({ pageVersionData, onChange, onValidati
             )
 
             // Determine group status styling
+            // Only show colors for problems (errors/warnings), not for valid groups
             const getGroupStatusColor = () => {
                 if (!groupValidation) return 'text-gray-500'
-                if (groupIsValid) return 'text-green-600'
-                return 'text-red-600'
+                if (groupHasErrors) return 'text-red-600'
+                // Don't show green for valid - use neutral gray
+                return 'text-gray-500'
             }
 
             const getGroupBorderColor = () => {
                 if (!groupValidation) return 'border-gray-200'
-                if (groupIsValid) return 'border-green-200'
-                return 'border-red-200'
+                if (groupHasErrors) return 'border-red-200'
+                // Don't show green for valid - use neutral gray
+                return 'border-gray-200'
             }
 
             return (

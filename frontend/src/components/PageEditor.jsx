@@ -909,6 +909,13 @@ const PageEditor = () => {
         setIsMoreMenuOpen(false)
     }, [activeTab])
 
+    // Close widget editor panel when navigating between tabs
+    useEffect(() => {
+        if (widgetEditorOpen) {
+            handleCloseWidgetEditor()
+        }
+    }, [activeTab, widgetEditorOpen, handleCloseWidgetEditor])
+
     if (isLoading && !isNewPage) {
         return (
             <div className="fixed inset-0 bg-gray-50 flex items-center justify-center z-50">
