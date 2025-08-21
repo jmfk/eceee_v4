@@ -29,6 +29,7 @@ import SchemaDrivenForm from './SchemaDrivenForm'
 import LayoutSelector from './LayoutSelector'
 import StatusBar from './StatusBar'
 import SaveOptionsModal from './SaveOptionsModal'
+import WidgetEditorPanel from './WidgetEditorPanel'
 
 // Helpers: error parsing and merging for To-Do items
 function mergeTodoItems(existing, incoming) {
@@ -196,6 +197,10 @@ const PageEditor = () => {
 
     // Save options modal state
     const [showSaveOptionsModal, setShowSaveOptionsModal] = useState(false)
+
+    // Widget editor panel state
+    const [widgetEditorOpen, setWidgetEditorOpen] = useState(false)
+    const [editingWidget, setEditingWidget] = useState(null)
 
     // Validation To-Do sidebar state
     const [errorTodoItems, setErrorTodoItems] = useState([])
@@ -831,6 +836,47 @@ const PageEditor = () => {
         });
     }, [addNotification]);
 
+    // Widget editor handlers
+    const handleOpenWidgetEditor = useCallback((widgetData) => {
+        setEditingWidget(widgetData)
+        setWidgetEditorOpen(true)
+    }, [])
+
+    const handleCloseWidgetEditor = useCallback(() => {
+        setWidgetEditorOpen(false)
+        setEditingWidget(null)
+    }, [])
+
+    const handleRealTimeWidgetUpdate = useCallback((updatedWidget) => {
+        if (contentEditorRef.current && contentEditorRef.current.layoutRenderer) {
+            // Update the widget through the LayoutRenderer using UPDATE action
+            const renderer = contentEditorRef.current.layoutRenderer
+
+            // Use UPDATE action for real-time preview updates
+            renderer.executeWidgetDataCallback('UPDATE', updatedWidget.slotName, updatedWidget)
+            renderer.updateSlot(updatedWidget.slotName, renderer.getSlotWidgetData(updatedWidget.slotName))
+        }
+    }, [])
+
+    const handleSaveWidget = useCallback((updatedWidget) => {
+        if (contentEditorRef.current && contentEditorRef.current.layoutRenderer) {
+            // Commit the widget changes to the server via LayoutRenderer
+            const renderer = contentEditorRef.current.layoutRenderer
+
+            // Update widget config and trigger server save
+            const widgetInstance = updatedWidget
+            renderer.executeWidgetDataCallback('EDIT', widgetInstance.slotName, widgetInstance)
+            renderer.updateSlot(widgetInstance.slotName, renderer.getSlotWidgetData(widgetInstance.slotName))
+
+            addNotification({
+                type: 'success',
+                message: `Widget "${widgetInstance.name}" saved successfully`
+            })
+        }
+
+        handleCloseWidgetEditor()
+    }, [addNotification, handleCloseWidgetEditor])
+
     // Tab navigation (main tabs)
     const tabs = [
         { id: 'content', label: 'Content', icon: Layout },
@@ -987,10 +1033,10 @@ const PageEditor = () => {
                 </div>
             </div>
 
-            {/* Main Content Area with right error To-Do sidebar */}
+            {/* Main Content Area with right error To-Do sidebar and widget editor panel */}
             <div className="flex-1 overflow-hidden">
-                <div className="h-full flex">
-                    <div className="flex-1 min-w-0">
+                <div className="h-full flex relative">
+                    <div className={`flex-1 min-w-0 transition-all duration-300 ${widgetEditorOpen ? 'mr-0' : ''}`}>
                         {activeTab === 'content' && (
                             <>
                                 {!isVersionReady ? (
@@ -1039,6 +1085,7 @@ const PageEditor = () => {
                                                 onDirtyChange={(isDirty, reason) => {
                                                     setIsDirty(isDirty);
                                                 }}
+                                                onOpenWidgetEditor={handleOpenWidgetEditor}
                                             />
                                         )}
                                     </>
@@ -1103,6 +1150,16 @@ const PageEditor = () => {
                             onNavigate={(item) => navigateToFix({ item, navigate, pageId, isNewPage, currentVersion, previousView })}
                         />
                     )}
+
+                    {/* Widget Editor Panel - positioned within content area */}
+                    <WidgetEditorPanel
+                        isOpen={widgetEditorOpen}
+                        onClose={handleCloseWidgetEditor}
+                        onSave={handleSaveWidget}
+                        onRealTimeUpdate={handleRealTimeWidgetUpdate}
+                        widgetData={editingWidget}
+                        title={editingWidget ? `Edit ${editingWidget.name}` : 'Edit Widget'}
+                    />
                 </div>
             </div>
 
@@ -1510,6 +1567,7 @@ const PagePreview = ({ webpageData, pageVersionData, isLoadingLayout, layoutData
                                 pageVersionData={pageVersionData}
                                 editable={false}
                                 className="h-full preview-mode"
+                                onOpenWidgetEditor={handleOpenWidgetEditor}
                             />
                         </div>
                     </div>
@@ -1554,6 +1612,7 @@ const PagePreview = ({ webpageData, pageVersionData, isLoadingLayout, layoutData
                                             pageVersionData={pageVersionData}
                                             editable={false}
                                             className="preview-mode device-content"
+                                            onOpenWidgetEditor={handleOpenWidgetEditor}
                                             style={{
                                                 minHeight: 'auto',
                                                 height: 'auto',

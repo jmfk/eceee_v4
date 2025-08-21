@@ -9,6 +9,7 @@ from abc import ABC, abstractmethod
 from typing import Dict, List, Any, Optional, Type, Tuple
 from django.template.loader import get_template
 from django.core.exceptions import ImproperlyConfigured
+from django.utils.text import slugify
 from pydantic import BaseModel, ValidationError
 from pydantic.fields import PydanticUndefined
 import logging
@@ -121,6 +122,11 @@ class BaseWidget(ABC):
         """
         return self.configuration_model(**configuration)
 
+    @property
+    def slug(self):
+        """Generate a URL-safe slug from the widget name"""
+        return slugify(self.name)
+
     def to_dict(self, include_template_json: bool = True) -> Dict[str, Any]:
         """Convert widget type to dictionary representation.
 
@@ -131,6 +137,7 @@ class BaseWidget(ABC):
         result = {
             "type": self.type,  # Unique type id
             "name": self.name,
+            "slug": self.slug,  # URL-safe slug for API endpoints
             "description": self.description,
             "widget_class": self.__class__.__name__,
             "is_active": self.is_active,
@@ -265,6 +272,13 @@ class WidgetTypeRegistry:
     def get_widget_type(self, name: str) -> Optional[BaseWidget]:
         """Get a widget type instance by name."""
         return self._instances.get(name)
+
+    def get_widget_type_by_slug(self, slug: str) -> Optional[BaseWidget]:
+        """Get a widget type instance by slug."""
+        for widget in self._instances.values():
+            if widget.slug == slug:
+                return widget
+        return None
 
     def get_widget_class(self, name: str) -> Optional[Type[BaseWidget]]:
         """Get a widget type class by name."""

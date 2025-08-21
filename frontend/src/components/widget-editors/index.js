@@ -2,18 +2,22 @@
 export { default as BaseWidgetEditor } from './BaseWidgetEditor'
 
 // Core widget editors
-export { default as TextBlockEditor } from './TextBlockEditor'
-export { default as ImageEditor } from './ImageEditor'
-export { default as ButtonEditor } from './ButtonEditor'
-export { default as SpacerEditor } from './SpacerEditor'
-export { default as HTMLBlockEditor } from './HTMLBlockEditor'
+import TextBlockEditor from './TextBlockEditor'
+import ImageEditor from './ImageEditor'
+import ButtonEditor from './ButtonEditor'
+import SpacerEditor from './SpacerEditor'
+import HTMLBlockEditor from './HTMLBlockEditor'
 
 // Content widget editors
-export { default as NewsEditor } from './NewsEditor'
-export { default as EventsEditor } from './EventsEditor'
-export { default as CalendarEditor } from './CalendarEditor'
-export { default as FormsEditor } from './FormsEditor'
-export { default as GalleryEditor } from './GalleryEditor'
+import NewsEditor from './NewsEditor'
+import EventsEditor from './EventsEditor'
+import CalendarEditor from './CalendarEditor'
+import FormsEditor from './FormsEditor'
+import GalleryEditor from './GalleryEditor'
+
+// Export individual editors
+export { TextBlockEditor, ImageEditor, ButtonEditor, SpacerEditor, HTMLBlockEditor }
+export { NewsEditor, EventsEditor, CalendarEditor, FormsEditor, GalleryEditor }
 
 /**
  * Widget Editor Registry

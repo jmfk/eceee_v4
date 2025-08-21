@@ -19,7 +19,8 @@ const ContentEditor = forwardRef(({
   webpageData,
   pageVersionData,
   onUpdate,
-  isNewPage
+  isNewPage,
+  onOpenWidgetEditor
 }, ref) => {
   const containerRef = useRef(null);
   const rendererRef = useRef(null);
@@ -180,9 +181,14 @@ const ContentEditor = forwardRef(({
           onConfirm();
         }
       };
+
+      // Set up widget editor callback for slide-out panel
+      if (onOpenWidgetEditor) {
+        rendererRef.current.openWidgetEditor = onOpenWidgetEditor;
+      }
     }
     return rendererRef.current;
-  }, [createWidgetElement, editable, showConfirm]);
+  }, [createWidgetElement, editable, showConfirm, onOpenWidgetEditor]);
 
 
 
@@ -295,14 +301,6 @@ const ContentEditor = forwardRef(({
             break;
 
           case WIDGET_ACTIONS.UPDATE:
-            // Update existing widget in slot
-            if (updatedWidgets[slotName]) {
-              updatedWidgets[slotName] = updatedWidgets[slotName].map(
-                widget => widget.id === widgetData.id ? widgetData : widget
-              );
-            }
-            break;
-
           case WIDGET_ACTIONS.EDIT:
             // Update existing widget in slot
             if (updatedWidgets[slotName]) {

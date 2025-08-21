@@ -1023,27 +1023,19 @@ class LayoutRenderer {
   }
 
   /**
-   * Edit widget functionality
-   * @param {string} widgetId - ID of the widget
-   * @param {Object} widgetInstance - Widget instance data
-   */
-  editWidget(widgetId, widgetInstance) {
-    // For now, just log the edit request
-    // In the future, this could open an edit modal or inline editor
-    // TODO: Implement widget editing functionality
-    // This could:
-    // 1. Open a modal with widget-specific edit form
-    // 2. Switch to inline editing mode
-    // 3. Use the widget data callback system to update pageData.widgets
-    // TODO: Implement edit functionality for widgets
-  }
-
-  /**
-   * Edit widget instance using configurationSchema
+   * Edit widget instance using slide-out panel
    * @param {string} widgetId - ID of the widget to edit
    * @param {Object} widgetInstance - Widget instance to edit
    */
   async editWidget(widgetId, widgetInstance) {
+    // Use the new slide-out panel if callback is available
+    if (this.openWidgetEditor) {
+      // Open the slide-out panel with widget data (schema will be fetched by the panel)
+      this.openWidgetEditor(widgetInstance);
+      return;
+    }
+
+    // Fallback to modal if slide-out panel is not available (backward compatibility)
     // Remove any existing edit modal
     const existingModal = document.querySelector('.widget-edit-modal');
     if (existingModal) existingModal.remove();
@@ -1101,7 +1093,7 @@ class LayoutRenderer {
       if (!widgetInstance.type && widgetDef?.type) {
         widgetInstance.type = widgetDef.type;
       }
-      this.executeWidgetDataCallback(WIDGET_ACTIONS.EDIT, widgetInstance.slotName, widgetInstance);
+      this.executeWidgetDataCallback(WIDGET_ACTIONS.UPDATE, widgetInstance.slotName, widgetInstance);
       //this.markWidgetAsEdited(widgetId, widgetInstance);
       this.updateSlot(widgetInstance.slotName, this.getSlotWidgetData(widgetInstance.slotName));
       closeModal();
