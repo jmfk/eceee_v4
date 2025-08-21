@@ -645,17 +645,6 @@ const WidgetEditorPanel = forwardRef(({
                                 </p>
                             </div>
                         )}
-
-                        <div className="flex items-center justify-between mt-2">
-                            <p className="text-xs text-gray-500">
-                                Preview updates in real-time
-                            </p>
-                            {hasChanges && (
-                                <p className="text-xs text-amber-600">
-                                    Unsaved changes
-                                </p>
-                            )}
-                        </div>
                     </div>
                 </div>
             </div>

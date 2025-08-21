@@ -899,11 +899,36 @@ const PageEditor = () => {
             renderer.executeWidgetDataCallback(WIDGET_ACTIONS.EDIT, widgetInstance.slotName, widgetInstance)
             renderer.updateSlot(widgetInstance.slotName, renderer.getSlotWidgetData(widgetInstance.slotName))
 
+            setPageVersionData(prev => {
+                const widgets = prev?.widgets || {}
+                const slot = widgets[updatedWidget.slotName] || []
+                const existingWidgetIndex = slot.findIndex(w => w.id === updatedWidget.id);
+                if (existingWidgetIndex >= 0) {
+                    slot[existingWidgetIndex] = updatedWidget;
+                } else {
+                    slot.push(updatedWidget);
+                }
+                return prev
+            })
+
             addNotification({
                 type: 'success',
                 message: `Widget "${widgetInstance.name}" saved successfully`
             })
+        } else {
+            setPageVersionData(prev => {
+                const widgets = prev?.widgets || {}
+                const slot = widgets[updatedWidget.slotName] || []
+                const existingWidgetIndex = slot.findIndex(w => w.id === updatedWidget.id);
+                if (existingWidgetIndex >= 0) {
+                    slot[existingWidgetIndex] = updatedWidget;
+                } else {
+                    slot.push(updatedWidget);
+                }
+                return prev
+            })
         }
+        setShowSaveOptionsModal(true);
 
         handleCloseWidgetEditor()
     }, [addNotification, handleCloseWidgetEditor])
