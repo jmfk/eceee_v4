@@ -5,7 +5,7 @@ import ValidatedInput from './validation/ValidatedInput.jsx'
 import ValidationSummary from './validation/ValidationSummary.jsx'
 
 // Minimal JSON Schema -> form renderer (text/number/boolean/select) for top-level properties
-export default function SchemaDrivenForm({ pageVersionData, onChange, onValidationChange }) {
+export default function SchemaDrivenForm({ pageVersionData, onChange, onValidationChange, onValidatedDataSync }) {
     const [schema, setSchema] = useState(null)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
@@ -15,7 +15,7 @@ export default function SchemaDrivenForm({ pageVersionData, onChange, onValidati
     const [validationSummary, setValidationSummary] = useState(null)
     const [validatingProperties, setValidatingProperties] = useState(new Set())
     const [groupValidationResults, setGroupValidationResults] = useState({})
-    const [isValidationValid, setIsValidationValid] = useState(true)
+    const [isValidationValid, setIsValidationValid] = useState(true) // Start optimistic for server-only validation
     const validatorRef = useRef(null)
 
     useEffect(() => {
@@ -32,7 +32,7 @@ export default function SchemaDrivenForm({ pageVersionData, onChange, onValidati
                         validatorRef.current = createValidator({
                             schema: s, // Pass the original schema with groups intact
                             layoutName: pageVersionData?.codeLayout,
-                            mode: ValidationMode.HYBRID,
+                            mode: ValidationMode.SERVER_ONLY,
                             debounceMs: 300,
                             onValidationStart: ({ type, propertyName }) => {
                                 if (type === 'property' && propertyName) {
@@ -50,6 +50,13 @@ export default function SchemaDrivenForm({ pageVersionData, onChange, onValidati
                                         ...prev,
                                         [result.property]: result.combinedResult
                                     }))
+
+                                    // NEW: Sync validated data to canonical state when validation passes
+                                    if (result.combinedResult?.isValid && onValidatedDataSync) {
+                                        onValidatedDataSync({
+                                            [result.property]: result.data?.[result.property] ?? result.value
+                                        })
+                                    }
                                 } else if (type === 'all') {
                                     setValidatingProperties(new Set())
                                     setValidationResults(result.combinedResults)
@@ -99,9 +106,7 @@ export default function SchemaDrivenForm({ pageVersionData, onChange, onValidati
                         // Clear any existing cache when schema changes
                         validatorRef.current.clearCache()
 
-                        // Validate initial data (even if empty to catch required field errors)
-                        const initialData = pageVersionData?.pageData || {}
-                        validatorRef.current.validateAll(initialData)
+                        // Skip initial validation for server-only mode - validation will happen on save
                     }
                 }
             })
@@ -147,10 +152,10 @@ export default function SchemaDrivenForm({ pageVersionData, onChange, onValidati
 
     // Handle property value changes with validation
     const handlePropertyChange = useCallback(async (propertyName, value) => {
-        // Update parent component
+        // Update parent component (for immediate UI feedback)
         onChange?.({ [propertyName]: value })
 
-        // Trigger validation
+        // Trigger validation which will sync to canonical state when successful
         if (validatorRef.current) {
             await validatorRef.current.validateProperty(propertyName, value, {
                 pageData: { ...pageVersionData?.pageData, [propertyName]: value }
@@ -225,6 +230,8 @@ export default function SchemaDrivenForm({ pageVersionData, onChange, onValidati
         )
         const overallHasErrors = hasFieldErrors || hasGroupErrors
 
+        // Server-only validation: only update state when server responds with errors
+
         if (isValidationValid !== !overallHasErrors) {
             setIsValidationValid(!overallHasErrors)
         }
@@ -233,12 +240,16 @@ export default function SchemaDrivenForm({ pageVersionData, onChange, onValidati
     // Report validation state changes to parent
     useEffect(() => {
         if (onValidationChange) {
-            onValidationChange({
+            const validationState = {
                 isValid: isValidationValid,
                 hasErrors: !isValidationValid,
                 groupResults: groupValidationResults,
                 fieldResults: validationResults
-            })
+            }
+
+            // Server-only validation state change
+
+            onValidationChange(validationState)
         }
     }, [isValidationValid, groupValidationResults, validationResults, onValidationChange])
 

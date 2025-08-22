@@ -97,11 +97,11 @@ const StatusBar = ({
 
                 {/* Right side - Auto-save status and other info */}
                 <div className="flex items-center space-x-2 text-gray-600 flex-shrink-0 ml-4">
-                    {isDirty && !validationState.hasErrors && (
+                    {isDirty && (
                         <button
                             onClick={() => onSaveClick && onSaveClick()}
                             className="font-medium px-2 py-1 text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded transition-colors flex items-center space-x-2"
-                            title="Click to save changes"
+                            title={validationState.hasErrors ? "Save changes (validation errors will be handled)" : "Click to save changes"}
                         ><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-save w-4 h-4" aria-hidden="true"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"></path><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"></path><path d="M7 3v4a1 1 0 0 0 1 1h7"></path></svg><span>Save</span>
 
                         </button>

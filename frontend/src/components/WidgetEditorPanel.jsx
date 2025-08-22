@@ -20,6 +20,7 @@ const WidgetEditorPanel = forwardRef(({
     onSave,
     onRealTimeUpdate,
     onUnsavedChanges,
+    onValidatedWidgetSync,
     widgetData,
     schema,
     title = "Edit Widget"
@@ -145,14 +146,23 @@ const WidgetEditorPanel = forwardRef(({
                 }
 
                 setValidationResults(formattedResults)
-                setIsWidgetValid((result.is_valid || result.isValid) && !hasValidationErrors)
+                const isValid = (result.is_valid || result.isValid) && !hasValidationErrors
+                setIsWidgetValid(isValid)
                 setIsValidating(false)
+
+                // NEW: Sync validated widget data to canonical state when validation passes
+                if (isValid && onValidatedWidgetSync && widgetData) {
+                    onValidatedWidgetSync({
+                        ...widgetData,
+                        config: configToValidate
+                    })
+                }
             } catch (error) {
                 console.error('Widget validation failed:', error)
                 setIsValidating(false)
             }
         }, 300) // 300ms debounce
-    }, [widgetTypeSlug])
+    }, [widgetTypeSlug, onValidatedWidgetSync, widgetData])
 
     // Handle resize drag with useCallback and RAF for smooth performance
     const handleResizeMove = useCallback((e) => {
@@ -277,90 +287,12 @@ const WidgetEditorPanel = forwardRef(({
         triggerRealTimeUpdate(newConfig)
     }, [config, originalConfig, triggerRealTimeUpdate, validateWidget])
 
-    // Handle save - commit changes to server
-    const handleSave = () => {
-        console.log('handleSave', isWidgetValid)
-        // Check if widget is valid before saving
-        if (!isWidgetValid) {
-            // Show validation warning for 3 seconds
-            setShowValidationWarning(true)
-            setTimeout(() => {
-                setShowValidationWarning(false)
-            }, 3000)
-            return
-        }
-
-        // Clear any pending real-time update
-        if (updateTimeoutRef.current) {
-            clearTimeout(updateTimeoutRef.current)
-        }
-
-        // Save the current config as the new original
-        setOriginalConfig({ ...config })
-        setHasChanges(false)
-
-        // Notify parent that changes are saved
-        if (onUnsavedChanges) {
-            onUnsavedChanges(false)
-        }
-
-        // Commit changes to server
-        console.log('onSave', widgetData, config)
-        onSave({
-            ...widgetData,
-            config
-        })
-    }
-
-    // Expose save method to parent component
-    useImperativeHandle(ref, () => ({
-        saveCurrentWidget: () => {
-            const currentWidget = {
-                ...widgetData,
-                config
-            }
-            handleSave()
-            return currentWidget
-        },
-        hasUnsavedChanges: hasChanges,
-        isValid: isWidgetValid,
-        isValidating: isValidating
-    }), [widgetData, config, hasChanges, handleSave, isWidgetValid, isValidating])
-
-    // Handle reset - revert to original state
-    const handleReset = () => {
-        setConfig({ ...originalConfig })
-        setHasChanges(false)
-
-        // Notify parent that changes are reset
-        if (onUnsavedChanges) {
-            onUnsavedChanges(false)
-        }
-
-        // Apply reset immediately to the widget preview
-        if (onRealTimeUpdate && widgetData) {
-            onRealTimeUpdate({
-                ...widgetData,
-                config: originalConfig
-            })
-        }
-    }
-
     // Handle close - revert changes if not saved
     const handleClose = () => {
         // Clear any pending real-time update
         if (updateTimeoutRef.current) {
             clearTimeout(updateTimeoutRef.current)
         }
-
-        // If there are unsaved changes, revert to original state
-        if (hasChanges && onRealTimeUpdate && widgetData) {
-            onRealTimeUpdate({
-                ...widgetData,
-                config: originalConfig
-            })
-        }
-
         onClose()
     }
 
@@ -611,31 +543,9 @@ const WidgetEditorPanel = forwardRef(({
                     </div>
 
                     {/* Footer with action buttons */}
-                    <div className="border-t border-gray-200 p-4 bg-gray-50">
-                        <div className="flex justify-between">
-                            <button
-                                onClick={() => {
-                                    handleReset()
-                                    handleClose()
-                                }}
-                                className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
-                            >
-                                <RotateCcw className="w-4 h-4 mr-2" />
-                                Reset & Close
-                            </button>
-
-                            <button
-                                onClick={handleSave}
-                                disabled={!hasChanges || isValidating || !isWidgetValid}
-                                className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                            >
-                                <Save className="w-4 h-4 mr-2" />
-                                Save Changes
-                            </button>
-                        </div>
-
-                        {/* Validation warning snackbar */}
-                        {showValidationWarning && (
+                    {showValidationWarning && (
+                        <div className="border-t border-gray-200 p-4 bg-gray-50">
+                            {/* Validation warning snackbar */}
                             <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
                                 <p className="text-sm text-red-800 font-medium">
                                     Cannot save: Please fix validation errors first
@@ -644,10 +554,10 @@ const WidgetEditorPanel = forwardRef(({
                                     Check the form fields above for errors and correct them before saving.
                                 </p>
                             </div>
-                        )}
-                    </div>
+                        </div>
+                    )}
                 </div>
-            </div>
+            </div >
         </>
     )
 })
