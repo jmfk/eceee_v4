@@ -1,10 +1,11 @@
 import React, { useState } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
-import { Grid3X3, Palette, Settings as Cog, Calendar, FolderOpen, Code, ChevronDown } from 'lucide-react'
+import { Grid3X3, Palette, Settings as Cog, Calendar, FolderOpen, Code, ChevronDown, Hash } from 'lucide-react'
 
 const tabs = [
     { id: 'layouts', label: 'Layouts', icon: Grid3X3, href: '/settings?tab=layouts' },
     { id: 'themes', label: 'Themes', icon: Palette, href: '/settings?tab=themes' },
+    { id: 'tags', label: 'Tags', icon: Hash, href: '/settings?tab=tags' },
     { id: 'versions', label: 'Versions', icon: Cog, href: '/settings?tab=versions' },
     { id: 'publishing', label: 'Publishing Workflow', icon: Calendar, href: '/settings?tab=publishing' },
     { id: 'namespaces', label: 'Namespaces', icon: FolderOpen, href: '/settings?tab=namespaces' },

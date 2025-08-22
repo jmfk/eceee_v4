@@ -9,6 +9,8 @@ from rest_framework import serializers
 from django.contrib.auth.models import User
 from .models import WebPage, PageVersion, PageTheme, PageDataSchema
 from django.utils import timezone
+from content.models import Tag
+from content.serializers import TagSerializer
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -355,6 +357,15 @@ class PageVersionSerializer(serializers.ModelSerializer):
     is_current_published = serializers.SerializerMethodField()
     publication_status = serializers.SerializerMethodField()
 
+    # Tags as array of strings
+    tags = serializers.ListField(
+        child=serializers.CharField(max_length=50),
+        required=False,
+        allow_empty=True,
+        default=list,
+        help_text="List of tag names for this page version",
+    )
+
     class Meta:
         model = PageVersion
         fields = [
@@ -366,6 +377,7 @@ class PageVersionSerializer(serializers.ModelSerializer):
             "code_layout",
             "page_data",
             "widgets",
+            "tags",
             # Styling/config fields previously only in detail serializer
             "theme",
             "page_css_variables",

@@ -31,6 +31,7 @@ import LayoutSelector from './LayoutSelector'
 import StatusBar from './StatusBar'
 import SaveOptionsModal from './SaveOptionsModal'
 import WidgetEditorPanel from './WidgetEditorPanel'
+import PageTagWidget from './PageTagWidget'
 
 import { logValidationSync } from '../utils/stateVerification'
 
@@ -1404,7 +1405,9 @@ const SettingsEditor = forwardRef(({ webpageData, pageVersionData, onUpdate, isN
                 metaTitle: pageVersionData?.metaTitle || webpageData?.title || '',
                 metaDescription: pageVersionData?.metaDescription || '',
                 // PageVersion field (codeLayout affects version content)
-                codeLayout: pageVersionData?.codeLayout || ''
+                codeLayout: pageVersionData?.codeLayout || '',
+                // Tags (stored in pageVersionData)
+                tags: pageVersionData?.tags || []
             };
 
             return {
@@ -1444,6 +1447,15 @@ const SettingsEditor = forwardRef(({ webpageData, pageVersionData, onUpdate, isN
                                 onChange={(layout) => onUpdate({ codeLayout: layout })}
                                 label="Page Layout"
                                 description="Choose the layout template for this page"
+                            />
+                        </div>
+
+                        {/* Page Tags */}
+                        <div>
+                            <PageTagWidget
+                                tags={pageVersionData?.tags || []}
+                                onChange={(tags) => onUpdate({ tags })}
+                                disabled={false}
                             />
                         </div>
                     </div>

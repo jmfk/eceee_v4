@@ -236,21 +236,47 @@ docker-compose exec backend flake8
 
 ### Widget Management
 When working with widgets:
-1. Widget types define JSON schemas for configuration
-2. PageWidget instances store configuration data
-3. Widgets can be inherited from parent pages
-4. Use SlotManager component for widget placement
+1. Widgets are defined in the widget registry with JSON schemas
+2. Widget configuration stored in PageVersion.widgets field
+3. Custom widget editors in `frontend/src/widget-editors/`
+4. Real-time validation against JSON schemas
+5. Widget preview updates automatically on configuration change
 
 ### Page Operations
 Common page management tasks:
-1. Creating versions on every update
-2. Validating parent-child relationships
-3. Handling layout/theme inheritance
-4. Managing publication status and dates
+1. Version created automatically on every save
+2. Parent-child slug uniqueness validation
+3. Publishing/unpublishing with date-based scheduling
+4. Bulk operations for multiple pages
+5. Schema-driven page data fields (metaTitle, metaDescription, etc.)
+
+### State Management
+- Zustand stores for global state (auth, notifications)
+- React Query for server state with optimistic updates
+- Form state with React Hook Form + Zod validation
+- Unsaved changes detection and navigation guards
 
 ### API Integration
 Frontend-backend communication:
-- React Query for data fetching and caching
-- Axios for HTTP requests with proxy to backend
-- JWT tokens for authentication
-- Real-time updates via cache invalidation
+- Centralized API client in `frontend/src/api/`
+- Automatic camelCase/snake_case conversion
+- Consistent error handling with toast notifications
+- JWT authentication with token refresh
+- Request/response interceptors for common logic
+
+## Current Issues and TODOs
+
+Based on open GitHub issues:
+- Issue #81: Fix Django settings CSRF_TRUSTED_ORIGINS configuration
+- Issue #82: Refactor oversized WebPage model (1495 lines)
+- Issue #85: Simplify complex conditional logic in models and filters
+- Issue #89: Simplify template validation system
+- Multiple frontend issues around error handling and validation
+
+## Important Notes
+
+- Always run linting and type checking before committing code
+- Use the Makefile commands for common tasks
+- Docker Compose is the preferred development environment
+- Test coverage should be maintained above 80%
+- Follow existing code patterns and conventions

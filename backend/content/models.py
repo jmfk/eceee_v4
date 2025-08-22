@@ -237,6 +237,7 @@ class Tag(models.Model):
     )
 
     name = models.CharField(max_length=50)
+    slug = models.SlugField(max_length=50)
 
     # Usage tracking
     usage_count = models.PositiveIntegerField(
@@ -259,13 +260,14 @@ class Tag(models.Model):
         return self.name
 
     def save(self, *args, **kwargs):
-        """Override save to ensure default namespace and auto-generate slug"""
+        """Override save to ensure default namespace and generate slug"""
         # Ensure default namespace exists and assign it if none provided
         if not self.namespace:
             self.namespace = Namespace.get_default()
 
-        normalized_name = self.name.strip().lower()
-        self.name = slugify(normalized_name)
+        # Normalize the name and generate slug
+        self.name = self.name.strip().lower()
+        self.slug = slugify(self.name)
 
         super().save(*args, **kwargs)
 

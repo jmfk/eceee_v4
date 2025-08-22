@@ -1370,6 +1370,14 @@ class PageVersion(models.Model):
         db_index=True,
     )
 
+    # Tags for content organization
+    tags = ArrayField(
+        models.CharField(max_length=50),
+        default=list,
+        blank=True,
+        help_text="List of tag names for organizing and categorizing page versions",
+    )
+
     # Timestamps and ownership
     created_at = models.DateTimeField(auto_now_add=True)
     created_by = models.ForeignKey(User, on_delete=models.PROTECT)
