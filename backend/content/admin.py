@@ -75,22 +75,54 @@ class CategoryAdmin(admin.ModelAdmin):
 class TagAdmin(admin.ModelAdmin):
     """Admin configuration for Tag model"""
 
-    list_display = ["name", "slug", "namespace", "usage_count", "created_at"]
+    list_display = ["name", "namespace", "usage_count", "content_usage", "created_at"]
     list_filter = ["namespace", "created_at"]
     search_fields = ["name"]
-    prepopulated_fields = {"slug": ("name",)}
-    ordering = ["namespace", "name"]
+    ordering = ["namespace", "-usage_count", "name"]
 
-    def usage_count(self, obj):
-        """Show how many objects use this tag"""
+    fieldsets = (
+        ("Basic Information", {"fields": ("name", "namespace")}),
+        ("Usage Statistics", {"fields": ("usage_count",), "classes": ("collapse",)}),
+        ("Timestamps", {"fields": ("created_at",), "classes": ("collapse",)}),
+    )
+
+    readonly_fields = ["usage_count", "created_at"]
+
+    actions = ["reset_usage_count"]
+
+    def content_usage(self, obj):
+        """Show how many content objects use this tag"""
         news_count = obj.news_articles.count()
         events_count = obj.events.count()
         library_count = obj.library_items.count()
         members_count = obj.members.count()
         total = news_count + events_count + library_count + members_count
-        return f"{total} objects"
 
-    usage_count.short_description = "Usage"
+        if total > 0:
+            details = []
+            if news_count > 0:
+                details.append(f"{news_count} news")
+            if events_count > 0:
+                details.append(f"{events_count} events")
+            if library_count > 0:
+                details.append(f"{library_count} library")
+            if members_count > 0:
+                details.append(f"{members_count} members")
+
+            return format_html(
+                '<span title="{}">{} objects</span>', ", ".join(details), total
+            )
+        return "0 objects"
+
+    content_usage.short_description = "Content Usage"
+
+    # Admin actions
+    def reset_usage_count(self, request, queryset):
+        """Reset usage count for selected tags"""
+        updated = queryset.update(usage_count=0)
+        self.message_user(request, f"Usage count reset for {updated} tag(s).")
+
+    reset_usage_count.short_description = "Reset usage count"
 
 
 @admin.register(News)

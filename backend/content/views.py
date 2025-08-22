@@ -4,7 +4,7 @@ Content Object Views for Object Publishing System
 Provides REST API views for content objects that can be published as pages.
 """
 
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -149,15 +149,110 @@ class CategoryViewSet(viewsets.ModelViewSet):
 
 
 class TagViewSet(viewsets.ModelViewSet):
-    """ViewSet for Tag model"""
+    """Enhanced ViewSet for Tag model with namespace and usage features"""
 
-    queryset = Tag.objects.all()
+    queryset = Tag.objects.select_related("namespace")
     serializer_class = TagSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
-    filter_backends = [SearchFilter, OrderingFilter]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ["namespace"]
     search_fields = ["name"]
-    ordering_fields = ["name", "created_at"]
-    ordering = ["name"]
+    ordering_fields = ["name", "created_at", "usage_count"]
+    ordering = ["-usage_count", "name"]
+
+    def get_queryset(self):
+        """Filter tags with enhanced options"""
+        queryset = Tag.objects.select_related("namespace")
+
+        # Filter by namespace (use default if not specified)
+        namespace_id = self.request.query_params.get("namespace")
+        if namespace_id:
+            queryset = queryset.filter(namespace_id=namespace_id)
+        else:
+            # Use default namespace if none specified
+            default_namespace = Namespace.get_default()
+            queryset = queryset.filter(namespace=default_namespace)
+
+        return queryset
+
+    @action(detail=False, methods=["get"])
+    def popular(self, request):
+        """Get most popular tags"""
+        namespace_id = request.query_params.get("namespace")
+        limit = int(request.query_params.get("limit", 20))
+
+        namespace = None
+        if namespace_id:
+            namespace = get_object_or_404(Namespace, id=namespace_id)
+
+        tags = Tag.get_popular_tags(namespace=namespace, limit=limit)
+        serializer = self.get_serializer(tags, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=["get"])
+    def search_tags(self, request):
+        """Search tags with query"""
+        query = request.query_params.get("q", "")
+        namespace_id = request.query_params.get("namespace")
+        limit = int(request.query_params.get("limit", 10))
+
+        if not query:
+            return Response(
+                {"error": "Query parameter q is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        namespace = None
+        if namespace_id:
+            namespace = get_object_or_404(Namespace, id=namespace_id)
+
+        tags = Tag.search_tags(query=query, namespace=namespace, limit=limit)
+        serializer = self.get_serializer(tags, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=["post"])
+    def increment_usage(self, request, pk=None):
+        """Increment usage count for a tag"""
+        tag = self.get_object()
+        tag.increment_usage()
+
+        return Response(
+            {
+                "id": tag.id,
+                "usage_count": tag.usage_count,
+            }
+        )
+
+    @action(detail=False, methods=["post"])
+    def get_or_create(self, request):
+        """Get existing tag or create new one"""
+        name = request.data.get("name")
+        if not name:
+            return Response(
+                {"error": "Name is required"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        namespace_id = request.data.get("namespace")
+        namespace = None
+        if namespace_id:
+            namespace = get_object_or_404(Namespace, id=namespace_id)
+
+        # Extract additional fields
+        extra_fields = {
+            key: value
+            for key, value in request.data.items()
+            if key not in ["name", "namespace"]
+        }
+
+        tag, created = Tag.get_or_create_tag(
+            name=name, namespace=namespace, **extra_fields
+        )
+
+        serializer = self.get_serializer(tag)
+        return Response(
+            {**serializer.data, "created": created},
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
 
 
 class NewsViewSet(viewsets.ModelViewSet):

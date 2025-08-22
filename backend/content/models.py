@@ -13,7 +13,7 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 from django.urls import reverse
 from django.core.validators import URLValidator
-import uuid
+from django.utils.text import slugify
 
 
 class Namespace(models.Model):
@@ -224,7 +224,7 @@ class Category(models.Model):
 
 
 class Tag(models.Model):
-    """Tags for content objects"""
+    """Tags for content objects with enhanced features"""
 
     # Namespace for slug organization
     namespace = models.ForeignKey(
@@ -236,16 +236,105 @@ class Tag(models.Model):
         blank=True,
     )
 
-    name = models.CharField(max_length=50, unique=True)
-    slug = models.SlugField(max_length=50)
+    name = models.CharField(max_length=50)
+
+    # Usage tracking
+    usage_count = models.PositiveIntegerField(
+        default=0, help_text="Number of times this tag has been used"
+    )
+
+    # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ["name"]
-        unique_together = ["namespace", "slug"]
+        unique_together = ["namespace", "name"]
+        indexes = [
+            models.Index(fields=["namespace", "name"], name="content_tag_ns_name_idx"),
+            models.Index(fields=["usage_count"], name="content_tag_usage_idx"),
+            models.Index(fields=["created_at"], name="content_tag_created_idx"),
+        ]
 
     def __str__(self):
         return self.name
+
+    def save(self, *args, **kwargs):
+        """Override save to ensure default namespace and auto-generate slug"""
+        # Ensure default namespace exists and assign it if none provided
+        if not self.namespace:
+            self.namespace = Namespace.get_default()
+
+        normalized_name = self.name.strip().lower()
+        self.name = slugify(normalized_name)
+
+        super().save(*args, **kwargs)
+
+    def increment_usage(self):
+        """Increment usage count"""
+        self.usage_count += 1
+        self.save(update_fields=["usage_count"])
+
+    @classmethod
+    def get_or_create_tag(cls, name, namespace=None, **kwargs):
+        """
+        Get existing tag or create a new one with proper defaults
+
+        Args:
+            name: Tag name
+            namespace: Namespace object (uses default if None)
+            **kwargs: Additional fields for tag creation
+
+        Returns:
+            tuple: (tag, created) where created is True if tag was created
+        """
+        # Use default namespace if none provided
+        if not namespace:
+            namespace = Namespace.get_default()
+
+        # Normalize name
+        normalized_name = name.strip().lower()
+
+        # Try to get existing tag
+        try:
+            tag = cls.objects.get(namespace=namespace, name=normalized_name)
+            return tag, False
+        except cls.DoesNotExist:
+            # Create new tag
+            tag_data = {"name": normalized_name, "namespace": namespace, **kwargs}
+            tag = cls(**tag_data)
+            tag.save()
+            return tag, True
+
+    @classmethod
+    def get_popular_tags(cls, namespace=None, limit=20):
+        """Get most popular tags in a namespace"""
+        queryset = cls.objects.filter(usage_count__gt=0)
+        if namespace:
+            queryset = queryset.filter(namespace=namespace)
+        else:
+            # Use default namespace if none specified
+            queryset = queryset.filter(namespace=Namespace.get_default())
+
+        return queryset.order_by("-usage_count", "name")[:limit]
+
+    @classmethod
+    def search_tags(cls, query, namespace=None, limit=10):
+        """Search tags by name"""
+        from django.db.models import Q
+
+        queryset = cls.objects.all()
+        if namespace:
+            queryset = queryset.filter(namespace=namespace)
+        else:
+            # Use default namespace if none specified
+            queryset = queryset.filter(namespace=Namespace.get_default())
+
+        # Search by name
+        queryset = queryset.filter(Q(name__icontains=query)).order_by(
+            "-usage_count", "name"
+        )[:limit]
+
+        return queryset
 
 
 class News(BaseContentModel):

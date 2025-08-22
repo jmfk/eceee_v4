@@ -111,10 +111,29 @@ class CategorySerializer(serializers.ModelSerializer):
 class TagSerializer(serializers.ModelSerializer):
     """Serializer for Tag model"""
 
+    namespace_name = serializers.CharField(source="namespace.name", read_only=True)
+
     class Meta:
         model = Tag
-        fields = ["id", "name", "slug", "created_at"]
-        read_only_fields = ["id", "created_at"]
+        fields = [
+            "id",
+            "name",
+            "namespace",
+            "namespace_name",
+            "usage_count",
+            "created_at",
+        ]
+        read_only_fields = [
+            "id",
+            "usage_count",
+            "created_at",
+        ]
+
+    def create(self, validated_data):
+        """Create tag with default namespace if none provided"""
+        if "namespace" not in validated_data or validated_data["namespace"] is None:
+            validated_data["namespace"] = Namespace.get_default()
+        return super().create(validated_data)
 
 
 class NewsSerializer(serializers.ModelSerializer):
