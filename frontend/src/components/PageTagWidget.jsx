@@ -78,30 +78,32 @@ const PageTagWidget = ({ tags = [], onChange, disabled = false }) => {
         }
     }
 
-    const addTag = async (tagName) => {
+        const addTag = async (tagName) => {
         if (!tagName) return
         
-        // Check for case-insensitive duplicates in current page tags
+        // Normalize tag name for comparison
+        const normalizedTagName = tagName.trim()
+        
+        // Check for duplicates (case-insensitive) in current page tags
         const isDuplicate = tags.some(existingTag => 
-            existingTag.toLowerCase() === tagName.toLowerCase()
+            existingTag.toLowerCase() === normalizedTagName.toLowerCase()
         )
         if (isDuplicate) return
 
         // Check if this tag already exists in our available tags
-        const existingTag = availableTags.find(tag =>
-            tag.name.toLowerCase() === tagName.toLowerCase()
+        const existingTag = availableTags.find(tag => 
+            tag.name.toLowerCase() === normalizedTagName.toLowerCase()
         )
 
         if (existingTag) {
-            // Tag exists, check if it's not already in the current page's tags (case-insensitive)
-            const isAlreadyAdded = tags.some(tag => 
+            // Tag exists, add it directly (but check for duplicates again)
+            const isAlreadyInPage = tags.some(tag => 
                 tag.toLowerCase() === existingTag.name.toLowerCase()
             )
-            if (!isAlreadyAdded) {
+            if (!isAlreadyInPage) {
                 const newTags = [...tags, existingTag.name]
                 onChange(newTags)
             }
-            // Always clear the input regardless
             setInputValue('')
             setShowSuggestions(false)
             setSelectedIndex(-1)
@@ -111,44 +113,39 @@ const PageTagWidget = ({ tags = [], onChange, disabled = false }) => {
         // Tag doesn't exist, validate and potentially create it
         setIsValidating(true)
         try {
-            const result = await tagsApi.validateAndCreate(tagName)
-
+            const result = await tagsApi.validateAndCreate(normalizedTagName)
+            
             if (result.conflict) {
                 // Show conflict modal
                 setConflictModal({
                     isOpen: true,
-                    conflictedTag: tagName,
+                    conflictedTag: normalizedTagName,
                     existingTag: result.tag,
                     conflictType: result.conflictType
                 })
-                        } else if (result.tag) {
+            } else if (result.tag) {
                 // Tag was created successfully or already exists
-                // Double-check that this tag isn't already in the current page's tags (case-insensitive)
-                const isAlreadyAdded = tags.some(tag => 
+                // Final check for duplicates before adding (case-insensitive)
+                const isAlreadyInPage = tags.some(tag => 
                     tag.toLowerCase() === result.tag.name.toLowerCase()
                 )
-                if (!isAlreadyAdded) {
+                if (!isAlreadyInPage) {
                     const newTags = [...tags, result.tag.name]
                     onChange(newTags)
-                    setInputValue('')
-                    setShowSuggestions(false)
-                    setSelectedIndex(-1)
                     
                     // Refresh the tags list to include the new tag
                     queryClient.invalidateQueries(['tags'])
-                } else {
-                    // Tag is already in the list, just clear the input
-                    setInputValue('')
-                    setShowSuggestions(false)
-                    setSelectedIndex(-1)
                 }
+                setInputValue('')
+                setShowSuggestions(false)
+                setSelectedIndex(-1)
             }
         } catch (error) {
             console.error('Error validating/creating tag:', error)
             // Show error in conflict modal
             setConflictModal({
                 isOpen: true,
-                conflictedTag: tagName,
+                conflictedTag: normalizedTagName,
                 existingTag: null,
                 conflictType: 'invalid'
             })
