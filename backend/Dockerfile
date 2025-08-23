@@ -18,6 +18,10 @@ RUN apt-get update \
         libpq-dev \
         curl \
         git \
+        tesseract-ocr \
+        tesseract-ocr-eng \
+        libmagic1 \
+        libmagic-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
