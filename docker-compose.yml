@@ -113,7 +113,7 @@ services:
       - "9000:9000"    # API
       - "9001:9001"    # Console
     volumes:
-      - minio_data:/data
+      - ./storage/minio:/data
     command: server /data --console-address ":9001"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
@@ -121,80 +121,12 @@ services:
       timeout: 20s
       retries: 3
 
-  # MCP Server for PostgreSQL operations
-  # mcp-postgres:
-  #   image: mcp/postgres
-  #   container_name: eceee_v4_mcp_postgres
-  #   restart: unless-stopped
-  #   depends_on:
-  #     db:
-  #       condition: service_healthy
-  #   volumes:
-  #     - mcp_logs:/var/log/mcp
-  #   environment:
-  #     - MCP_SERVER_NAME=postgres
-  #     - DATABASE_URL=postgresql://postgres:postgres@db:5432/eceee_v4
-  #   networks:
-  #     - mcp_network
-
-  # MCP Server for Puppeteer operations
-  # mcp-puppeteer:
-  #   build:
-  #     context: ./docker/mcp-servers
-  #     dockerfile: Dockerfile.puppeteer
-  #   container_name: eceee_v4_mcp_puppeteer
-  #   restart: unless-stopped
-  #   volumes:
-  #     - mcp_logs:/var/log/mcp
-  #   environment:
-  #     - MCP_SERVER_NAME=puppeteer
-  #   networks:
-  #     - mcp_network
-
-  # MCP Server for Django operations
-  # mcp-django:
-  #   build:
-  #     context: ./docker/mcp-servers
-  #     dockerfile: Dockerfile.django
-  #   container_name: eceee_v4_mcp_django
-  #   restart: unless-stopped
-  #   depends_on:
-  #     - backend
-  #   volumes:
-  #     - ./:/workspace:ro
-  #     - mcp_logs:/var/log/mcp
-  #   environment:
-  #     - MCP_SERVER_NAME=django
-  #     - DJANGO_PROJECT_PATH=/workspace/backend
-  #   networks:
-  #     - mcp_network
-
-
-  # MCP Server for Logs operations
-  # mcp-logs:
-  #   build:
-  #     context: ./docker/mcp-servers
-  #     dockerfile: Dockerfile.logs
-  #   container_name: eceee_v4_mcp_logs
-  #   restart: unless-stopped
-  #   volumes:
-  #     - ./:/workspace:ro
-  #     - mcp_logs:/var/log/mcp
-  #     - /var/log:/host/var/log:ro
-  #     - /var/run/docker.sock:/var/run/docker.sock:ro
-  #   environment:
-  #     - MCP_SERVER_NAME=logs
-  #   networks:
-  #     - mcp_network
-
-
 volumes:
   postgres_data:
   backend_static:
   backend_media:
   frontend_node_modules:
   redis_data:
-  minio_data:
   mcp_logs:
 
 networks:

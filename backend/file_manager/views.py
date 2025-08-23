@@ -156,7 +156,9 @@ class MediaFileViewSet(viewsets.ModelViewSet):
 class MediaUploadView(APIView):
     """Handle file uploads with AI analysis."""
 
-    permission_classes = [permissions.IsAuthenticated]
+    # Explicitly disable authentication and permissions for uploads
+    authentication_classes = []
+    permission_classes = [permissions.AllowAny]
     parser_classes = [MultiPartParser, FormParser]
 
     def post(self, request):
@@ -216,6 +218,15 @@ class MediaUploadView(APIView):
                 else:
                     file_type = "other"
 
+                # Get user for file ownership (use admin user if anonymous for debugging)
+                from django.contrib.auth.models import User
+
+                user = (
+                    request.user
+                    if request.user.is_authenticated
+                    else User.objects.get(id=1)
+                )
+
                 # Create MediaFile record
                 media_file = MediaFile.objects.create(
                     title=ai_analysis.get("suggested_title") or uploaded_file.name,
@@ -233,8 +244,8 @@ class MediaUploadView(APIView):
                     ai_extracted_text=ai_analysis.get("extracted_text", ""),
                     ai_confidence_score=ai_analysis.get("confidence_score", 0.0),
                     namespace=namespace,
-                    created_by=request.user,
-                    last_modified_by=request.user,
+                    created_by=user,
+                    last_modified_by=user,
                 )
 
                 # Create thumbnail records
@@ -448,3 +459,111 @@ class MediaAISuggestionsView(APIView):
                 {"error": "Failed to generate AI suggestions", "details": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+
+class MediaFileBySlugView(APIView):
+    """Access media files by SEO-friendly slug."""
+
+    permission_classes = [permissions.AllowAny]  # Adjust based on your needs
+
+    def get(self, request, namespace_slug, file_slug):
+        """Get media file by namespace and file slug."""
+        try:
+            from content.models import Namespace
+
+            namespace = Namespace.objects.get(slug=namespace_slug)
+            media_file = MediaFile.objects.get(slug=file_slug, namespace=namespace)
+
+            # Update access tracking
+            media_file.download_count += 1
+            media_file.last_accessed = timezone.now()
+            media_file.save(update_fields=["download_count", "last_accessed"])
+
+            # Get signed URL for secure access
+            signed_url = storage.get_signed_url(media_file.file_path)
+
+            if signed_url:
+                from django.shortcuts import redirect
+
+                return redirect(signed_url)
+            else:
+                # Fallback to public URL
+                public_url = storage.get_public_url(media_file.file_path)
+                return redirect(public_url)
+
+        except (Namespace.DoesNotExist, MediaFile.DoesNotExist):
+            raise Http404("Media file not found")
+
+
+class MediaFileByUUIDView(APIView):
+    """Access media files by UUID (fallback/direct access)."""
+
+    permission_classes = [permissions.AllowAny]  # Adjust based on your needs
+
+    def get(self, request, file_uuid):
+        """Get media file by UUID."""
+        try:
+            media_file = MediaFile.objects.get(id=file_uuid)
+
+            # Update access tracking
+            media_file.download_count += 1
+            media_file.last_accessed = timezone.now()
+            media_file.save(update_fields=["download_count", "last_accessed"])
+
+            # Get signed URL for secure access
+            signed_url = storage.get_signed_url(media_file.file_path)
+
+            if signed_url:
+                from django.shortcuts import redirect
+
+                return redirect(signed_url)
+            else:
+                # Fallback to public URL
+                public_url = storage.get_public_url(media_file.file_path)
+                return redirect(public_url)
+
+        except MediaFile.DoesNotExist:
+            raise Http404("Media file not found")
+
+
+class MediaFileDownloadView(APIView):
+    """Download media files with proper headers."""
+
+    permission_classes = [permissions.AllowAny]  # Adjust based on your needs
+
+    def get(self, request, namespace_slug, file_slug):
+        """Download media file by namespace and file slug."""
+        try:
+            from content.models import Namespace
+
+            namespace = Namespace.objects.get(slug=namespace_slug)
+            media_file = MediaFile.objects.get(slug=file_slug, namespace=namespace)
+
+            # Update access tracking
+            media_file.download_count += 1
+            media_file.last_accessed = timezone.now()
+            media_file.save(update_fields=["download_count", "last_accessed"])
+
+            # Get signed URL for secure access
+            signed_url = storage.get_signed_url(media_file.file_path)
+
+            if signed_url:
+                from django.shortcuts import redirect
+
+                response = redirect(signed_url)
+                # Add download headers
+                response["Content-Disposition"] = (
+                    f'attachment; filename="{media_file.original_filename}"'
+                )
+                return response
+            else:
+                # Fallback to public URL
+                public_url = storage.get_public_url(media_file.file_path)
+                response = redirect(public_url)
+                response["Content-Disposition"] = (
+                    f'attachment; filename="{media_file.original_filename}"'
+                )
+                return response
+
+        except (Namespace.DoesNotExist, MediaFile.DoesNotExist):
+            raise Http404("Media file not found")

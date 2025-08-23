@@ -109,7 +109,7 @@ const MediaManagerPage = () => {
           <MediaBrowser
             namespace={selectedNamespace}
             onFileSelect={handleFileSelect}
-            selectionMode="single"
+            selectionMode="multiple"
           />
         </div>
       )}

@@ -11,6 +11,9 @@ from .views import (
     MediaUploadView,
     MediaSearchView,
     MediaAISuggestionsView,
+    MediaFileBySlugView,
+    MediaFileByUUIDView,
+    MediaFileDownloadView,
 )
 
 app_name = "file_manager"
@@ -30,4 +33,20 @@ urlpatterns = [
     # AI and bulk operation endpoints
     path("ai-suggestions/", MediaAISuggestionsView.as_view(), name="ai-suggestions"),
     # path('bulk-operations/', BulkMediaOperationsView.as_view(), name='bulk-operations'),
+    # SEO-friendly file access URLs
+    path(
+        "file/<slug:namespace_slug>/<slug:file_slug>/",
+        MediaFileBySlugView.as_view(),
+        name="media-file-by-slug",
+    ),
+    path(
+        "file/<uuid:file_uuid>/",
+        MediaFileByUUIDView.as_view(),
+        name="media-file-by-uuid",
+    ),
+    path(
+        "download/<slug:namespace_slug>/<slug:file_slug>/",
+        MediaFileDownloadView.as_view(),
+        name="media-file-download",
+    ),
 ]

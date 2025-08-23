@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
-import { Upload, Image as ImageIcon, X, ExternalLink } from 'lucide-react'
+import { Upload, Image as ImageIcon, X, ExternalLink, FolderOpen } from 'lucide-react'
 import BaseWidgetEditor from './BaseWidgetEditor'
+import MediaPicker from '../media/MediaPicker'
 
 /**
  * ImageEditor - Specialized editor for Image widgets
@@ -12,9 +13,10 @@ import BaseWidgetEditor from './BaseWidgetEditor'
  * - Alt text and caption editing
  * - Alignment controls
  */
-const ImageEditor = ({ config, onChange, errors, widgetType }) => {
+const ImageEditor = ({ config, onChange, errors, widgetType, namespace }) => {
     const [dragOver, setDragOver] = useState(false)
-    const [uploadMethod, setUploadMethod] = useState('url') // 'url' or 'upload'
+    const [uploadMethod, setUploadMethod] = useState('url') // 'url', 'upload', or 'library'
+    const [showMediaPicker, setShowMediaPicker] = useState(false)
     const fileInputRef = useRef(null)
 
     const sizeOptions = [
@@ -45,6 +47,19 @@ const ImageEditor = ({ config, onChange, errors, widgetType }) => {
             image_url: previewUrl,
             alt_text: config.alt_text || file.name.replace(/\.[^/.]+$/, '')
         })
+    }
+
+    const handleMediaSelect = (selectedFiles) => {
+        if (selectedFiles && selectedFiles.length > 0) {
+            const selectedFile = selectedFiles[0]
+            onChange({
+                ...config,
+                image_url: selectedFile.file_url,
+                alt_text: config.alt_text || selectedFile.title,
+                media_file_id: selectedFile.id // Store reference to media file
+            })
+        }
+        setShowMediaPicker(false)
     }
 
     const handleDrop = (e) => {
@@ -141,6 +156,17 @@ const ImageEditor = ({ config, onChange, errors, widgetType }) => {
                                 <input
                                     type="radio"
                                     name="upload-method"
+                                    value="library"
+                                    checked={uploadMethod === 'library'}
+                                    onChange={(e) => setUploadMethod(e.target.value)}
+                                    className="mr-2"
+                                />
+                                Media Library
+                            </label>
+                            <label className="flex items-center">
+                                <input
+                                    type="radio"
+                                    name="upload-method"
                                     value="upload"
                                     checked={uploadMethod === 'upload'}
                                     onChange={(e) => setUploadMethod(e.target.value)}
@@ -173,13 +199,36 @@ const ImageEditor = ({ config, onChange, errors, widgetType }) => {
                         </div>
                     )}
 
+                    {/* Media Library Selection */}
+                    {uploadMethod === 'library' && (
+                        <div className="space-y-4">
+                            <button
+                                type="button"
+                                onClick={() => setShowMediaPicker(true)}
+                                className="w-full flex items-center justify-center gap-2 p-6 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-colors"
+                            >
+                                <FolderOpen className="w-6 h-6 text-gray-400" />
+                                <span className="text-gray-600">
+                                    {localConfig.image_url ? 'Change Image from Library' : 'Select Image from Library'}
+                                </span>
+                            </button>
+
+                            {localConfig.media_file_id && (
+                                <div className="text-sm text-gray-600 bg-green-50 p-3 rounded-lg">
+                                    <p className="font-medium text-green-800">Selected from Media Library</p>
+                                    <p>This image is managed in your media library and will stay up-to-date automatically.</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                     {/* File Upload */}
                     {uploadMethod === 'upload' && (
                         <div className="space-y-2">
                             <div
                                 className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${dragOver
-                                        ? 'border-blue-400 bg-blue-50'
-                                        : 'border-gray-300 hover:border-gray-400'
+                                    ? 'border-blue-400 bg-blue-50'
+                                    : 'border-gray-300 hover:border-gray-400'
                                     }`}
                                 onDrop={handleDrop}
                                 onDragOver={(e) => {
@@ -250,6 +299,18 @@ const ImageEditor = ({ config, onChange, errors, widgetType }) => {
                             {renderImagePreview()}
                         </div>
                     </div>
+
+                    {/* Media Picker Modal */}
+                    {showMediaPicker && (
+                        <MediaPicker
+                            mode="modal"
+                            multiple={false}
+                            fileTypes={['image']}
+                            namespace={namespace}
+                            onSelect={handleMediaSelect}
+                            onClose={() => setShowMediaPicker(false)}
+                        />
+                    )}
                 </>
             )}
         </BaseWidgetEditor>

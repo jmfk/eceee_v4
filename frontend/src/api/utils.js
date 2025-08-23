@@ -116,13 +116,15 @@ export const validateRequiredParams = (params, requiredFields) => {
 export const wrapApiCall = (apiCall, operationName) => {
     return async (...args) => {
         try {
-            const response = await apiCall(...args)
-            return processResponse(response)
+            const response = await apiCall(...args);
+            const processedResponse = processResponse(response);
+            return processedResponse;
         } catch (error) {
+
             throw handleApiError(error, `${operationName} failed`, {
                 operation: operationName,
                 arguments: args
-            })
+            });
         }
     }
 }

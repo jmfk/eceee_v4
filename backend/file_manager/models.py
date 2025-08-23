@@ -215,8 +215,78 @@ class MediaFile(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.slug:
-            self.slug = slugify(self.title)
+            self.slug = self._generate_unique_slug()
         super().save(*args, **kwargs)
+
+    def _generate_unique_slug(self):
+        """Generate a unique, SEO-friendly slug for the media file."""
+        import re
+        import os
+        from django.utils.text import slugify
+
+        # Start with the title, fallback to filename without extension
+        base_text = self.title or os.path.splitext(self.original_filename)[0]
+
+        # Clean and optimize for SEO
+        base_text = self._clean_text_for_seo(base_text)
+
+        # Generate base slug
+        base_slug = slugify(base_text)
+
+        # Ensure minimum length and meaningful content
+        if len(base_slug) < 3:
+            base_slug = f"file-{base_slug}" if base_slug else "media-file"
+
+        # Ensure uniqueness within namespace
+        return self._ensure_unique_slug(base_slug)
+
+    def _clean_text_for_seo(self, text):
+        """Clean text for SEO-friendly slug generation."""
+        import re
+
+        # Remove file extensions if present
+        text = re.sub(
+            r"\.(pdf|jpg|jpeg|png|gif|svg|mp4|mp3|doc|docx|txt)$",
+            "",
+            text,
+            flags=re.IGNORECASE,
+        )
+
+        # Replace common separators with spaces
+        text = re.sub(r"[_\-\.]", " ", text)
+
+        # Remove special characters but keep alphanumeric and spaces
+        text = re.sub(r"[^\w\s\-]", "", text)
+
+        # Normalize whitespace
+        text = re.sub(r"\s+", " ", text).strip()
+
+        # Convert to title case for better readability
+        text = text.title()
+
+        return text
+
+    def _ensure_unique_slug(self, base_slug):
+        """Ensure slug is unique within the namespace."""
+        slug = base_slug
+        counter = 1
+
+        # Check if slug exists in the same namespace
+        while (
+            MediaFile.objects.filter(namespace=self.namespace, slug=slug)
+            .exclude(pk=self.pk)
+            .exists()
+        ):
+            slug = f"{base_slug}-{counter}"
+            counter += 1
+
+            # Prevent infinite loops
+            if counter > 1000:
+                # Fallback to UUID-based slug
+                slug = f"{base_slug}-{str(uuid.uuid4())[:8]}"
+                break
+
+        return slug
 
     @property
     def file_size_human(self) -> str:
@@ -249,6 +319,76 @@ class MediaFile(models.Model):
             return None
         # This will be implemented in the storage service
         return f"/media/thumbnails/{self.id}/{size}.webp"
+
+    def get_absolute_url(self):
+        """Get the canonical URL for this media file using slug."""
+        from django.urls import reverse
+
+        return reverse(
+            "file_manager:media-file-by-slug",
+            kwargs={"namespace_slug": self.namespace.slug, "file_slug": self.slug},
+        )
+
+    def get_uuid_url(self):
+        """Get the UUID-based URL for this media file."""
+        from django.urls import reverse
+
+        return reverse(
+            "file_manager:media-file-by-uuid", kwargs={"file_uuid": str(self.id)}
+        )
+
+    def get_download_url(self):
+        """Get the download URL (SEO-friendly slug version)."""
+        from django.urls import reverse
+
+        return reverse(
+            "file_manager:media-file-download",
+            kwargs={"namespace_slug": self.namespace.slug, "file_slug": self.slug},
+        )
+
+    def get_api_url(self):
+        """Get the API URL for this media file."""
+        from django.urls import reverse
+
+        return reverse("file_manager:mediafile-detail", kwargs={"pk": str(self.id)})
+
+    @classmethod
+    def get_by_slug_or_uuid(cls, identifier, namespace=None):
+        """
+        Get media file by slug or UUID.
+
+        Args:
+            identifier: Either a slug or UUID string
+            namespace: Namespace object or slug (required for slug lookup)
+
+        Returns:
+            MediaFile instance or None
+        """
+        import uuid as uuid_module
+
+        # Try to parse as UUID first
+        try:
+            uuid_obj = uuid_module.UUID(identifier)
+            return cls.objects.get(id=uuid_obj)
+        except (ValueError, cls.DoesNotExist):
+            pass
+
+        # Try as slug (requires namespace)
+        if namespace:
+            try:
+                if hasattr(namespace, "slug"):
+                    namespace_slug = namespace.slug
+                else:
+                    namespace_slug = str(namespace)
+
+                from content.models import Namespace
+
+                namespace_obj = Namespace.objects.get(slug=namespace_slug)
+                return cls.objects.get(slug=identifier, namespace=namespace_obj)
+            except (cls.DoesNotExist, Namespace.DoesNotExist):
+                pass
+
+        return None
 
 
 class MediaThumbnail(models.Model):

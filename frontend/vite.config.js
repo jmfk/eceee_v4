@@ -29,6 +29,8 @@ export default defineConfig({
         target: 'http://backend:8000',
         changeOrigin: true,
         secure: false,
+        timeout: 300000, // 5 minutes for large uploads
+        proxyTimeout: 300000,
       },
       '/admin': {
         target: 'http://backend:8000',

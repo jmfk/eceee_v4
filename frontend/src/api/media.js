@@ -95,7 +95,7 @@ export const mediaUploadApi = {
         const formData = new FormData();
 
         // Add files to form data
-        Array.from(uploadData.files).forEach((file, index) => {
+        Array.from(uploadData.files).forEach((file) => {
             formData.append('files', file);
         });
 
@@ -105,7 +105,7 @@ export const mediaUploadApi = {
             formData.append('folder_path', uploadData.folderPath);
         }
 
-        return wrapApiCall(() =>
+        const wrappedCall = wrapApiCall(() =>
             apiClient.post(endpoints.media.upload, formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data',
@@ -118,8 +118,11 @@ export const mediaUploadApi = {
                         onProgress(percentCompleted, progressEvent);
                     }
                 },
-            })
+            }),
+            'media-upload'
         );
+
+        return wrappedCall();
     },
 
     /**
@@ -191,9 +194,11 @@ export const mediaSearchApi = {
      * @param {number} searchParams.pageSize - Items per page
      * @returns {Promise} API response with search results
      */
-    search: (searchParams = {}) => wrapApiCall(() =>
-        apiClient.get(endpoints.media.search, { params: searchParams })
-    ),
+    search: (searchParams = {}) => {
+        return wrapApiCall(() =>
+            apiClient.get(endpoints.media.search, { params: searchParams })
+        )();
+    },
 
     /**
      * Get search suggestions based on query
@@ -378,6 +383,43 @@ export const mediaAIApi = {
 };
 
 /**
+ * Media Bulk Operations API
+ */
+export const mediaBulkOperationsApi = {
+    /**
+     * Execute bulk operation on multiple files
+     * @param {Object} operationData - Bulk operation data
+     * @param {string[]} operationData.file_ids - Array of file IDs
+     * @param {string} operationData.operation - Operation type
+     * @param {string[]} operationData.tag_ids - Tag IDs (for tag operations)
+     * @param {string} operationData.collection_id - Collection ID (for collection operations)
+     * @param {string} operationData.access_level - Access level (for access level operations)
+     * @returns {Promise} API response with operation results
+     */
+    execute: (operationData) => wrapApiCall(() =>
+        apiClient.post(endpoints.media.bulkOperations, operationData)
+    ),
+
+    /**
+     * Get bulk operation status
+     * @param {string} operationId - Operation ID
+     * @returns {Promise} API response with operation status
+     */
+    getStatus: (operationId) => wrapApiCall(() =>
+        apiClient.get(`${endpoints.media.bulkOperations}${operationId}/status/`)
+    ),
+
+    /**
+     * Cancel bulk operation
+     * @param {string} operationId - Operation ID
+     * @returns {Promise} API response
+     */
+    cancel: (operationId) => wrapApiCall(() =>
+        apiClient.post(`${endpoints.media.bulkOperations}${operationId}/cancel/`)
+    ),
+};
+
+/**
  * Unified Media API
  * Combines all media-related API functions
  */
@@ -388,6 +430,7 @@ export const mediaApi = {
     tags: mediaTagsApi,
     collections: mediaCollectionsApi,
     ai: mediaAIApi,
+    bulkOperations: mediaBulkOperationsApi,
 };
 
 export default mediaApi;
