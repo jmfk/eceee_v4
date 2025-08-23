@@ -153,7 +153,7 @@ class S3MediaStorage:
             extra_args = {
                 "ContentType": metadata["content_type"],
                 "Metadata": {
-                    "original-filename": file.name,
+                    "original-filename": self._encode_filename_for_s3(file.name),
                     "file-hash": file_hash,
                     "upload-timestamp": timezone.now().isoformat(),
                 },
@@ -206,6 +206,59 @@ class S3MediaStorage:
             return True
         except ClientError:
             return False
+
+    def _encode_filename_for_s3(self, filename: str) -> str:
+        """
+        Encode filename for S3 metadata (ASCII only).
+
+        S3 metadata only supports ASCII characters, so we need to encode
+        non-ASCII characters properly.
+        """
+        import urllib.parse
+
+        try:
+            # First try to encode as ASCII
+            filename.encode("ascii")
+            return filename
+        except UnicodeEncodeError:
+            # If it contains non-ASCII characters, URL encode it
+            encoded = urllib.parse.quote(filename, safe="")
+
+            # If the encoded version is too long, truncate and add hash
+            if (
+                len(encoded) > 200
+            ):  # S3 metadata value limit is ~2KB, but keep it reasonable
+                import hashlib
+
+                name_hash = hashlib.md5(filename.encode("utf-8")).hexdigest()[:8]
+                # Take first part of encoded name and add hash
+                truncated = encoded[:180]
+                encoded = f"{truncated}...{name_hash}"
+
+            return encoded
+
+    def _decode_filename_from_s3(self, encoded_filename: str) -> str:
+        """
+        Decode filename from S3 metadata back to original form.
+
+        Args:
+            encoded_filename: URL-encoded filename from S3 metadata
+
+        Returns:
+            Original filename with proper Unicode characters
+        """
+        import urllib.parse
+
+        try:
+            # Check if it looks like a URL-encoded string
+            if "%" in encoded_filename:
+                return urllib.parse.unquote(encoded_filename)
+            else:
+                # Already ASCII, return as-is
+                return encoded_filename
+        except Exception:
+            # If decoding fails, return the encoded version
+            return encoded_filename
 
     def extract_metadata(
         self, file: UploadedFile, file_content: bytes
@@ -393,11 +446,19 @@ class S3MediaStorage:
         try:
             client = self._get_s3_client()
             response = client.head_object(Bucket=self.bucket_name, Key=file_path)
+
+            # Decode metadata filenames
+            metadata = response.get("Metadata", {})
+            if "original-filename" in metadata:
+                metadata["original-filename"] = self._decode_filename_from_s3(
+                    metadata["original-filename"]
+                )
+
             return {
                 "size": response["ContentLength"],
                 "last_modified": response["LastModified"],
                 "content_type": response["ContentType"],
-                "metadata": response.get("Metadata", {}),
+                "metadata": metadata,
                 "etag": response["ETag"].strip('"'),
             }
         except Exception as e:

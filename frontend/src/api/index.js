@@ -28,7 +28,7 @@ export { themesApi } from './themes.js'
 export { contentApi } from './content.js'
 export { publishingApi } from './publishing.js'
 export { pageDataSchemasApi } from './pageDataSchemas.js'
-export { mediaApi } from './media.js'
+export { mediaApi, mediaTagsApi, mediaCollectionsApi } from './media.js'
 
 // Utility functions
 export { buildEndpoint, handleApiError } from './utils.js'
@@ -43,7 +43,7 @@ import { themesApi } from './themes.js'
 import { contentApi } from './content.js'
 import { publishingApi } from './publishing.js'
 import { pageDataSchemasApi } from './pageDataSchemas.js'
-import { mediaApi } from './media.js'
+import { mediaApi, mediaTagsApi, mediaCollectionsApi } from './media.js'
 
 export default {
     pages: pagesApi,
@@ -55,5 +55,7 @@ export default {
     content: contentApi,
     publishing: publishingApi,
     pageDataSchemas: pageDataSchemasApi,
-    media: mediaApi
+    media: mediaApi,
+    mediaTags: mediaTagsApi,
+    mediaCollections: mediaCollectionsApi
 }

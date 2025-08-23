@@ -286,6 +286,29 @@ REST_FRAMEWORK = {
     },
 }
 
+# File Upload Settings
+# Increase upload limits for media files
+FILE_UPLOAD_MAX_MEMORY_SIZE = 100 * 1024 * 1024  # 100MB
+DATA_UPLOAD_MAX_MEMORY_SIZE = 100 * 1024 * 1024  # 100MB
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 1000  # Allow more form fields
+
+# Media file settings
+MEDIA_FILE_MAX_SIZE = 100 * 1024 * 1024  # 100MB per file
+MEDIA_ALLOWED_TYPES = [
+    "image/jpeg",
+    "image/png",
+    "image/gif",
+    "image/webp",
+    "image/svg+xml",
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "video/mp4",
+    "video/webm",
+    "audio/mpeg",
+    "audio/wav",
+]
+
 # API Documentation with drf-spectacular
 SPECTACULAR_SETTINGS = {
     "TITLE": "ECEEE v4 API",
@@ -428,6 +451,7 @@ MEDIA_ALLOWED_TYPES = [
     "image/png",
     "image/gif",
     "image/webp",
+    "image/svg+xml",  # Added for testing
     "application/pdf",
     "application/msword",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",

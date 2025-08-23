@@ -192,6 +192,10 @@ class MediaFileListSerializer(serializers.ModelSerializer):
     file_size_human = serializers.CharField(read_only=True)
     dimensions = serializers.CharField(read_only=True)
     thumbnail_url = serializers.SerializerMethodField()
+    # SEO-friendly URLs
+    absolute_url = serializers.SerializerMethodField()
+    uuid_url = serializers.SerializerMethodField()
+    download_url = serializers.SerializerMethodField()
 
     class Meta:
         model = MediaFile
@@ -211,6 +215,9 @@ class MediaFileListSerializer(serializers.ModelSerializer):
             "namespace_name",
             "tags",
             "thumbnail_url",
+            "absolute_url",
+            "uuid_url",
+            "download_url",
             "created_at",
             "created_by",
             "created_by_name",
@@ -221,6 +228,27 @@ class MediaFileListSerializer(serializers.ModelSerializer):
         if obj.is_image:
             return obj.get_thumbnail_url("medium")
         return None
+
+    def get_absolute_url(self, obj):
+        """Get SEO-friendly slug-based URL."""
+        try:
+            return obj.get_absolute_url()
+        except:
+            return None
+
+    def get_uuid_url(self, obj):
+        """Get UUID-based URL."""
+        try:
+            return obj.get_uuid_url()
+        except:
+            return None
+
+    def get_download_url(self, obj):
+        """Get download URL."""
+        try:
+            return obj.get_download_url()
+        except:
+            return None
 
 
 class MediaFileDetailSerializer(serializers.ModelSerializer):
@@ -354,7 +382,7 @@ class MediaUploadSerializer(serializers.Serializer):
     folder_path = serializers.CharField(
         max_length=200, required=False, allow_blank=True
     )
-    namespace = serializers.UUIDField(required=True)
+    namespace = serializers.IntegerField(required=True)
 
     def validate_namespace(self, value):
         """Validate namespace exists and user has access."""
@@ -378,6 +406,7 @@ class MediaUploadSerializer(serializers.Serializer):
                 "image/png",
                 "image/gif",
                 "image/webp",
+                "image/svg+xml",  # Added for testing
                 "application/pdf",
                 "application/msword",
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -424,7 +453,7 @@ class MediaSearchSerializer(serializers.Serializer):
     created_before = serializers.DateTimeField(required=False)
     min_size = serializers.IntegerField(required=False, min_value=0)
     max_size = serializers.IntegerField(required=False, min_value=0)
-    namespace = serializers.UUIDField(required=False)
+    namespace = serializers.IntegerField(required=False)
 
     def validate(self, data):
         """Cross-field validation."""

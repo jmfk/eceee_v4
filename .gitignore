@@ -66,3 +66,6 @@ docker-compose.override.yml
 
 # MCP
 mcp-server-logs/
+
+# Local storage for development
+storage/
