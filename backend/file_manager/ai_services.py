@@ -14,7 +14,7 @@ from django.utils.text import slugify
 import openai
 from PIL import Image
 
-# import pytesseract  # Temporarily commented out - needs tesseract system package
+import pytesseract
 
 logger = logging.getLogger(__name__)
 
@@ -134,10 +134,8 @@ class MediaAIService:
                     img = img.convert("RGB")
 
                 # Extract text using pytesseract
-                # TODO: Install tesseract system package
-                # extracted_text = pytesseract.image_to_string(img, lang='eng')
-                # return extracted_text.strip()
-                return ""  # Temporary fallback
+                extracted_text = pytesseract.image_to_string(img, lang="eng")
+                return extracted_text.strip()
 
         except Exception as e:
             logger.error(f"OCR extraction failed: {e}")

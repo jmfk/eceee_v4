@@ -121,6 +121,7 @@ class MediaFileViewSet(viewsets.ModelViewSet):
         if signed_url:
             # Redirect to signed URL
             from django.shortcuts import redirect
+
             return redirect(signed_url)
         else:
             # Fallback to public URL
@@ -143,6 +144,7 @@ class MediaFileViewSet(viewsets.ModelViewSet):
 
             if signed_url:
                 from django.shortcuts import redirect
+
                 return redirect(signed_url)
             else:
                 raise Http404("Thumbnail not accessible")
@@ -183,19 +185,21 @@ class MediaUploadView(APIView):
                     ).first()
 
                     if existing_file:
-                        uploaded_files.append({
-                            "id": existing_file.id,
-                            "title": existing_file.title,
-                            "status": "exists",
-                            "message": "File already exists"
-                        })
+                        uploaded_files.append(
+                            {
+                                "id": existing_file.id,
+                                "title": existing_file.title,
+                                "status": "exists",
+                                "message": "File already exists",
+                            }
+                        )
                         continue
 
                 # AI analysis
                 ai_analysis = ai_service.analyze_media_file(
                     uploaded_file.read(),
                     uploaded_file.name,
-                    upload_result["content_type"]
+                    upload_result["content_type"],
                 )
                 uploaded_file.seek(0)  # Reset file pointer
 
@@ -230,7 +234,7 @@ class MediaUploadView(APIView):
                     ai_confidence_score=ai_analysis.get("confidence_score", 0.0),
                     namespace=namespace,
                     created_by=request.user,
-                    last_modified_by=request.user
+                    last_modified_by=request.user,
                 )
 
                 # Create thumbnail records
@@ -241,33 +245,32 @@ class MediaUploadView(APIView):
                         file_path=thumbnail_data["path"],
                         width=thumbnail_data["width"],
                         height=thumbnail_data["height"],
-                        file_size=thumbnail_data["file_size"]
+                        file_size=thumbnail_data["file_size"],
                     )
 
-                uploaded_files.append({
-                    "id": media_file.id,
-                    "title": media_file.title,
-                    "file_type": media_file.file_type,
-                    "file_size": media_file.file_size,
-                    "ai_suggestions": {
-                        "tags": ai_analysis.get("suggested_tags", []),
-                        "title": ai_analysis.get("suggested_title", ""),
-                        "confidence": ai_analysis.get("confidence_score", 0.0)
-                    },
-                    "status": "uploaded"
-                })
+                uploaded_files.append(
+                    {
+                        "id": media_file.id,
+                        "title": media_file.title,
+                        "file_type": media_file.file_type,
+                        "file_size": media_file.file_size,
+                        "ai_suggestions": {
+                            "tags": ai_analysis.get("suggested_tags", []),
+                            "title": ai_analysis.get("suggested_title", ""),
+                            "confidence": ai_analysis.get("confidence_score", 0.0),
+                        },
+                        "status": "uploaded",
+                    }
+                )
 
             except Exception as e:
                 logger.error(f"Upload failed for {uploaded_file.name}: {e}")
-                errors.append({
-                    "filename": uploaded_file.name,
-                    "error": str(e)
-                })
+                errors.append({"filename": uploaded_file.name, "error": str(e)})
 
         response_data = {
             "uploaded_files": uploaded_files,
             "success_count": len(uploaded_files),
-            "error_count": len(errors)
+            "error_count": len(errors),
         }
 
         if errors:
@@ -300,11 +303,11 @@ class MediaSearchView(APIView):
             # Full-text search
             query = filters["q"]
             queryset = queryset.filter(
-                Q(title__icontains=query) |
-                Q(description__icontains=query) |
-                Q(original_filename__icontains=query) |
-                Q(ai_extracted_text__icontains=query) |
-                Q(tags__name__icontains=query)
+                Q(title__icontains=query)
+                | Q(description__icontains=query)
+                | Q(original_filename__icontains=query)
+                | Q(ai_extracted_text__icontains=query)
+                | Q(tags__name__icontains=query)
             ).distinct()
 
         if filters.get("file_type"):
@@ -336,6 +339,7 @@ class MediaSearchView(APIView):
 
         # Pagination
         from django.core.paginator import Paginator
+
         page_size = min(int(request.query_params.get("page_size", 20)), 100)
         page_number = int(request.query_params.get("page", 1))
 
@@ -345,12 +349,102 @@ class MediaSearchView(APIView):
         # Serialize results
         serializer = MediaFileListSerializer(page.object_list, many=True)
 
-        return Response({
-            "results": serializer.data,
-            "count": paginator.count,
-            "page": page_number,
-            "page_size": page_size,
-            "total_pages": paginator.num_pages,
-            "has_next": page.has_next(),
-            "has_previous": page.has_previous()
-        })
+        return Response(
+            {
+                "results": serializer.data,
+                "count": paginator.count,
+                "page": page_number,
+                "page_size": page_size,
+                "total_pages": paginator.num_pages,
+                "has_next": page.has_next(),
+                "has_previous": page.has_previous(),
+            }
+        )
+
+
+class MediaAISuggestionsView(APIView):
+    """API view for generating AI suggestions for media files."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        """Generate AI suggestions for a media file."""
+        serializer = AIMediaSuggestionsSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(
+                {"error": "Invalid request data", "details": serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        media_file = serializer.validated_data["file_id"]
+
+        try:
+            # Check if user has access to this file
+            if media_file.namespace and not request.user.has_perm(
+                "content.view_namespace", media_file.namespace
+            ):
+                return Response(
+                    {"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN
+                )
+
+            # Get file content from storage
+            file_content = storage.get_file_content(media_file.file_path)
+            if not file_content:
+                return Response(
+                    {"error": "Could not retrieve file content"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+            # Generate AI analysis
+            ai_analysis = ai_service.analyze_media_file(
+                file_content=file_content,
+                filename=media_file.original_filename,
+                content_type=media_file.content_type,
+            )
+
+            # Generate slug suggestions
+            existing_slugs = list(
+                MediaFile.objects.filter(namespace=media_file.namespace).values_list(
+                    "slug", flat=True
+                )
+            )
+
+            slug_suggestions = ai_service.generate_slug_suggestions(
+                title=ai_analysis.get("suggested_title", media_file.title),
+                existing_slugs=existing_slugs,
+            )
+
+            # Generate collection suggestions
+            existing_collections = list(
+                MediaCollection.objects.filter(
+                    namespace=media_file.namespace
+                ).values_list("name", flat=True)
+            )
+
+            collection_suggestions = ai_service.suggest_collections(
+                tags=ai_analysis.get("suggested_tags", []),
+                existing_collections=existing_collections,
+            )
+
+            return Response(
+                {
+                    "file_id": str(media_file.id),
+                    "suggestions": {
+                        "tags": ai_analysis.get("suggested_tags", []),
+                        "title": ai_analysis.get("suggested_title", ""),
+                        "slugs": slug_suggestions,
+                        "collections": collection_suggestions,
+                        "extracted_text": ai_analysis.get("extracted_text", ""),
+                        "confidence_score": ai_analysis.get("confidence_score", 0.0),
+                        "metadata": ai_analysis.get("analysis_metadata", {}),
+                    },
+                    "generated_at": timezone.now().isoformat(),
+                }
+            )
+
+        except Exception as e:
+            logger.error(f"AI suggestions failed for file {media_file.id}: {e}")
+            return Response(
+                {"error": "Failed to generate AI suggestions", "details": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )

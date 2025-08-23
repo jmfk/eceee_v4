@@ -18,7 +18,7 @@ from PIL import Image, ImageOps
 import boto3
 from botocore.exceptions import ClientError, NoCredentialsError
 
-# import magic  # Temporarily commented out - needs system libmagic
+import magic
 
 logger = logging.getLogger(__name__)
 
@@ -220,13 +220,12 @@ class S3MediaStorage:
         }
 
         # Use python-magic for more accurate MIME type detection
-        # TODO: Install system libmagic library
-        # try:
-        #     detected_mime = magic.from_buffer(file_content, mime=True)
-        #     if detected_mime:
-        #         metadata['content_type'] = detected_mime
-        # except Exception as e:
-        #     logger.warning(f"Failed to detect MIME type: {e}")
+        try:
+            detected_mime = magic.from_buffer(file_content, mime=True)
+            if detected_mime:
+                metadata["content_type"] = detected_mime
+        except Exception as e:
+            logger.warning(f"Failed to detect MIME type: {e}")
 
         # Determine file type
         content_type = metadata["content_type"].lower()
@@ -339,9 +338,7 @@ class S3MediaStorage:
 
             if "Contents" in response:
                 for obj in response["Contents"]:
-                    client.delete_object(
-                        Bucket=self.bucket_name, Key=obj["Key"]
-                    )
+                    client.delete_object(Bucket=self.bucket_name, Key=obj["Key"])
                     logger.info(f"Deleted thumbnail: {obj['Key']}")
 
             logger.info(f"Deleted file and thumbnails: {file_path}")
@@ -395,9 +392,7 @@ class S3MediaStorage:
         """Get file information from S3."""
         try:
             client = self._get_s3_client()
-            response = client.head_object(
-                Bucket=self.bucket_name, Key=file_path
-            )
+            response = client.head_object(Bucket=self.bucket_name, Key=file_path)
             return {
                 "size": response["ContentLength"],
                 "last_modified": response["LastModified"],
@@ -407,6 +402,16 @@ class S3MediaStorage:
             }
         except Exception as e:
             logger.error(f"Failed to get file info for {file_path}: {e}")
+            return None
+
+    def get_file_content(self, file_path: str) -> Optional[bytes]:
+        """Get file content from S3."""
+        try:
+            client = self._get_s3_client()
+            response = client.get_object(Bucket=self.bucket_name, Key=file_path)
+            return response["Body"].read()
+        except Exception as e:
+            logger.error(f"Failed to get file content for {file_path}: {e}")
             return None
 
 

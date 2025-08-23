@@ -333,6 +333,51 @@ export const mediaCollectionsApi = {
 };
 
 /**
+ * Media AI Suggestions API
+ */
+export const mediaAIApi = {
+    /**
+     * Generate AI suggestions for a media file
+     * @param {string} fileId - Media file ID
+     * @returns {Promise} API response with AI suggestions
+     */
+    getSuggestions: (fileId) => wrapApiCall(() =>
+        apiClient.post(endpoints.media.aiSuggestions, { file_id: fileId })
+    ),
+
+    /**
+     * Generate slug suggestions from title
+     * @param {string} title - Title to generate slugs from
+     * @param {string[]} existingSlugs - Existing slugs to avoid conflicts
+     * @returns {Promise} API response with slug suggestions
+     */
+    generateSlugs: (title, existingSlugs = []) => wrapApiCall(() =>
+        apiClient.post(`${endpoints.media.aiSuggestions}slugs/`, {
+            title,
+            existing_slugs: existingSlugs
+        })
+    ),
+
+    /**
+     * Extract text from uploaded file using OCR
+     * @param {File} file - File to extract text from
+     * @returns {Promise} API response with extracted text
+     */
+    extractText: (file) => {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        return wrapApiCall(() =>
+            apiClient.post(`${endpoints.media.aiSuggestions}extract-text/`, formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                }
+            })
+        );
+    },
+};
+
+/**
  * Unified Media API
  * Combines all media-related API functions
  */
@@ -342,6 +387,7 @@ export const mediaApi = {
     search: mediaSearchApi,
     tags: mediaTagsApi,
     collections: mediaCollectionsApi,
+    ai: mediaAIApi,
 };
 
 export default mediaApi;
