@@ -28,11 +28,11 @@ const PageTagWidget = ({ tags = [], onChange, disabled = false }) => {
 
     const availableTags = availableTagsResponse?.data?.results || availableTagsResponse?.results || []
 
-    // Filter suggestions based on input and exclude already selected tags
+    // Filter suggestions based on input and exclude already selected tags (case-insensitive)
     const suggestions = availableTags
         .filter(tag =>
             tag.name.toLowerCase().includes(inputValue.toLowerCase()) &&
-            !tags.includes(tag.name)
+            !tags.some(existingTag => existingTag.toLowerCase() === tag.name.toLowerCase())
         )
         .slice(0, 10)
 
@@ -79,17 +79,29 @@ const PageTagWidget = ({ tags = [], onChange, disabled = false }) => {
     }
 
     const addTag = async (tagName) => {
-        if (!tagName || tags.includes(tagName)) return
+        if (!tagName) return
+        
+        // Check for case-insensitive duplicates in current page tags
+        const isDuplicate = tags.some(existingTag => 
+            existingTag.toLowerCase() === tagName.toLowerCase()
+        )
+        if (isDuplicate) return
 
         // Check if this tag already exists in our available tags
-        const existingTag = availableTags.find(tag => 
+        const existingTag = availableTags.find(tag =>
             tag.name.toLowerCase() === tagName.toLowerCase()
         )
 
         if (existingTag) {
-            // Tag exists, add it directly
-            const newTags = [...tags, existingTag.name]
-            onChange(newTags)
+            // Tag exists, check if it's not already in the current page's tags (case-insensitive)
+            const isAlreadyAdded = tags.some(tag => 
+                tag.toLowerCase() === existingTag.name.toLowerCase()
+            )
+            if (!isAlreadyAdded) {
+                const newTags = [...tags, existingTag.name]
+                onChange(newTags)
+            }
+            // Always clear the input regardless
             setInputValue('')
             setShowSuggestions(false)
             setSelectedIndex(-1)
@@ -100,7 +112,7 @@ const PageTagWidget = ({ tags = [], onChange, disabled = false }) => {
         setIsValidating(true)
         try {
             const result = await tagsApi.validateAndCreate(tagName)
-            
+
             if (result.conflict) {
                 // Show conflict modal
                 setConflictModal({
@@ -109,16 +121,27 @@ const PageTagWidget = ({ tags = [], onChange, disabled = false }) => {
                     existingTag: result.tag,
                     conflictType: result.conflictType
                 })
-            } else if (result.tag) {
+                        } else if (result.tag) {
                 // Tag was created successfully or already exists
-                const newTags = [...tags, result.tag.name]
-                onChange(newTags)
-                setInputValue('')
-                setShowSuggestions(false)
-                setSelectedIndex(-1)
-                
-                // Refresh the tags list to include the new tag
-                queryClient.invalidateQueries(['tags'])
+                // Double-check that this tag isn't already in the current page's tags (case-insensitive)
+                const isAlreadyAdded = tags.some(tag => 
+                    tag.toLowerCase() === result.tag.name.toLowerCase()
+                )
+                if (!isAlreadyAdded) {
+                    const newTags = [...tags, result.tag.name]
+                    onChange(newTags)
+                    setInputValue('')
+                    setShowSuggestions(false)
+                    setSelectedIndex(-1)
+                    
+                    // Refresh the tags list to include the new tag
+                    queryClient.invalidateQueries(['tags'])
+                } else {
+                    // Tag is already in the list, just clear the input
+                    setInputValue('')
+                    setShowSuggestions(false)
+                    setSelectedIndex(-1)
+                }
             }
         } catch (error) {
             console.error('Error validating/creating tag:', error)
@@ -279,8 +302,8 @@ const PageTagWidget = ({ tags = [], onChange, disabled = false }) => {
                 {disabled
                     ? "Tags help organize and categorize your page content"
                     : isValidating
-                    ? "Validating tag..."
-                    : "Type to search existing tags or create new ones. Press Enter or click + to add."
+                        ? "Validating tag..."
+                        : "Type to search existing tags or create new ones. Press Enter or click + to add."
                 }
             </p>
 
