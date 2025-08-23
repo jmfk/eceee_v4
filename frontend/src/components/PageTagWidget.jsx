@@ -78,26 +78,26 @@ const PageTagWidget = ({ tags = [], onChange, disabled = false }) => {
         }
     }
 
-        const addTag = async (tagName) => {
+    const addTag = async (tagName) => {
         if (!tagName) return
-        
+
         // Normalize tag name for comparison
         const normalizedTagName = tagName.trim()
-        
+
         // Check for duplicates (case-insensitive) in current page tags
-        const isDuplicate = tags.some(existingTag => 
+        const isDuplicate = tags.some(existingTag =>
             existingTag.toLowerCase() === normalizedTagName.toLowerCase()
         )
         if (isDuplicate) return
 
         // Check if this tag already exists in our available tags
-        const existingTag = availableTags.find(tag => 
+        const existingTag = availableTags.find(tag =>
             tag.name.toLowerCase() === normalizedTagName.toLowerCase()
         )
 
         if (existingTag) {
             // Tag exists, add it directly (but check for duplicates again)
-            const isAlreadyInPage = tags.some(tag => 
+            const isAlreadyInPage = tags.some(tag =>
                 tag.toLowerCase() === existingTag.name.toLowerCase()
             )
             if (!isAlreadyInPage) {
@@ -114,7 +114,7 @@ const PageTagWidget = ({ tags = [], onChange, disabled = false }) => {
         setIsValidating(true)
         try {
             const result = await tagsApi.validateAndCreate(normalizedTagName)
-            
+
             if (result.conflict) {
                 // Show conflict modal
                 setConflictModal({
@@ -126,13 +126,13 @@ const PageTagWidget = ({ tags = [], onChange, disabled = false }) => {
             } else if (result.tag) {
                 // Tag was created successfully or already exists
                 // Final check for duplicates before adding (case-insensitive)
-                const isAlreadyInPage = tags.some(tag => 
+                const isAlreadyInPage = tags.some(tag =>
                     tag.toLowerCase() === result.tag.name.toLowerCase()
                 )
                 if (!isAlreadyInPage) {
                     const newTags = [...tags, result.tag.name]
                     onChange(newTags)
-                    
+
                     // Refresh the tags list to include the new tag
                     queryClient.invalidateQueries(['tags'])
                 }
