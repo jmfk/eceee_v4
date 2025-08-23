@@ -1,14 +1,23 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { X, Plus, Hash, Search } from 'lucide-react'
 import { tagsApi } from '../api/tags'
+import TagConflictModal from './TagConflictModal'
 
 const PageTagWidget = ({ tags = [], onChange, disabled = false }) => {
     const [inputValue, setInputValue] = useState('')
     const [showSuggestions, setShowSuggestions] = useState(false)
     const [selectedIndex, setSelectedIndex] = useState(-1)
+    const [isValidating, setIsValidating] = useState(false)
+    const [conflictModal, setConflictModal] = useState({
+        isOpen: false,
+        conflictedTag: '',
+        existingTag: null,
+        conflictType: 'duplicate'
+    })
     const inputRef = useRef(null)
     const suggestionsRef = useRef(null)
+    const queryClient = useQueryClient()
 
     // Fetch available tags for suggestions
     const { data: availableTagsResponse } = useQuery({
@@ -69,19 +78,59 @@ const PageTagWidget = ({ tags = [], onChange, disabled = false }) => {
         }
     }
 
-    const addTag = (tagName) => {
+    const addTag = async (tagName) => {
         if (!tagName || tags.includes(tagName)) return
 
-        const newTags = [...tags, tagName]
-        onChange(newTags)
-        setInputValue('')
-        setShowSuggestions(false)
-        setSelectedIndex(-1)
+        // Check if this tag already exists in our available tags
+        const existingTag = availableTags.find(tag => 
+            tag.name.toLowerCase() === tagName.toLowerCase()
+        )
 
-        // Increment usage count for existing tags
-        const existingTag = availableTags.find(tag => tag.name === tagName)
         if (existingTag) {
-            // Note: We could call tagsApi.incrementUsage here if needed
+            // Tag exists, add it directly
+            const newTags = [...tags, existingTag.name]
+            onChange(newTags)
+            setInputValue('')
+            setShowSuggestions(false)
+            setSelectedIndex(-1)
+            return
+        }
+
+        // Tag doesn't exist, validate and potentially create it
+        setIsValidating(true)
+        try {
+            const result = await tagsApi.validateAndCreate(tagName)
+            
+            if (result.conflict) {
+                // Show conflict modal
+                setConflictModal({
+                    isOpen: true,
+                    conflictedTag: tagName,
+                    existingTag: result.tag,
+                    conflictType: result.conflictType
+                })
+            } else if (result.tag) {
+                // Tag was created successfully or already exists
+                const newTags = [...tags, result.tag.name]
+                onChange(newTags)
+                setInputValue('')
+                setShowSuggestions(false)
+                setSelectedIndex(-1)
+                
+                // Refresh the tags list to include the new tag
+                queryClient.invalidateQueries(['tags'])
+            }
+        } catch (error) {
+            console.error('Error validating/creating tag:', error)
+            // Show error in conflict modal
+            setConflictModal({
+                isOpen: true,
+                conflictedTag: tagName,
+                existingTag: null,
+                conflictType: 'invalid'
+            })
+        } finally {
+            setIsValidating(false)
         }
     }
 
@@ -92,6 +141,20 @@ const PageTagWidget = ({ tags = [], onChange, disabled = false }) => {
 
     const handleSuggestionClick = (tag) => {
         addTag(tag.name)
+    }
+
+    const handleConflictResolve = async (newTagName) => {
+        // Try to add the new tag name
+        await addTag(newTagName)
+    }
+
+    const handleConflictClose = () => {
+        setConflictModal({
+            isOpen: false,
+            conflictedTag: '',
+            existingTag: null,
+            conflictType: 'duplicate'
+        })
     }
 
     // Close suggestions when clicking outside
@@ -153,16 +216,17 @@ const PageTagWidget = ({ tags = [], onChange, disabled = false }) => {
                                 value={inputValue}
                                 onChange={handleInputChange}
                                 onKeyDown={handleKeyDown}
-                                className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                placeholder="Add a tag..."
-                                disabled={disabled}
+                                className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
+                                placeholder={isValidating ? "Validating..." : "Add a tag..."}
+                                disabled={disabled || isValidating}
                             />
                         </div>
                         {inputValue.trim() && (
                             <button
                                 type="button"
                                 onClick={() => addTag(inputValue.trim())}
-                                className="ml-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center"
+                                className="ml-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
+                                disabled={isValidating}
                             >
                                 <Plus className="w-4 h-4" />
                             </button>
@@ -214,9 +278,21 @@ const PageTagWidget = ({ tags = [], onChange, disabled = false }) => {
             <p className="text-sm text-gray-500">
                 {disabled
                     ? "Tags help organize and categorize your page content"
+                    : isValidating
+                    ? "Validating tag..."
                     : "Type to search existing tags or create new ones. Press Enter or click + to add."
                 }
             </p>
+
+            {/* Tag Conflict Modal */}
+            <TagConflictModal
+                isOpen={conflictModal.isOpen}
+                onClose={handleConflictClose}
+                conflictedTag={conflictModal.conflictedTag}
+                existingTag={conflictModal.existingTag}
+                conflictType={conflictModal.conflictType}
+                onResolve={handleConflictResolve}
+            />
         </div>
     )
 }

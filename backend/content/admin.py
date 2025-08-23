@@ -75,13 +75,20 @@ class CategoryAdmin(admin.ModelAdmin):
 class TagAdmin(admin.ModelAdmin):
     """Admin configuration for Tag model"""
 
-    list_display = ["name", "namespace", "usage_count", "content_usage", "created_at"]
+    list_display = [
+        "name",
+        "slug",
+        "namespace",
+        "usage_count",
+        "content_usage",
+        "created_at",
+    ]
     list_filter = ["namespace", "created_at"]
-    search_fields = ["name"]
+    search_fields = ["name", "slug"]
     ordering = ["namespace", "-usage_count", "name"]
 
     fieldsets = (
-        ("Basic Information", {"fields": ("name", "namespace")}),
+        ("Basic Information", {"fields": ("name", "slug", "namespace")}),
         ("Usage Statistics", {"fields": ("usage_count",), "classes": ("collapse",)}),
         ("Timestamps", {"fields": ("created_at",), "classes": ("collapse",)}),
     )

@@ -236,8 +236,8 @@ class Tag(models.Model):
         blank=True,
     )
 
-    name = models.CharField(max_length=50)
-    slug = models.SlugField(max_length=50)
+    name = models.CharField(max_length=50, unique=True)
+    slug = models.SlugField(max_length=50, unique=True)
 
     # Usage tracking
     usage_count = models.PositiveIntegerField(
@@ -266,8 +266,14 @@ class Tag(models.Model):
             self.namespace = Namespace.get_default()
 
         # Normalize the name and generate slug
-        self.name = self.name.strip().lower()
+        self.name = self.name.strip()
         self.slug = slugify(self.name)
+
+        # Check for uniqueness of both name and slug
+        if Tag.objects.exclude(pk=self.pk).filter(name=self.name).exists():
+            raise ValidationError("A tag with this name already exists")
+        if Tag.objects.exclude(pk=self.pk).filter(slug=self.slug).exists():
+            raise ValidationError("A tag with this slug already exists")
 
         super().save(*args, **kwargs)
 
@@ -294,11 +300,14 @@ class Tag(models.Model):
             namespace = Namespace.get_default()
 
         # Normalize name
-        normalized_name = name.strip().lower()
+        normalized_name = name.strip()
+        normalized_slug = slugify(normalized_name)
 
         # Try to get existing tag
         try:
-            tag = cls.objects.get(namespace=namespace, name=normalized_name)
+            tag = cls.objects.get(namespace=namespace, slug=normalized_slug)
+            if tag is None:
+                tag = cls.objects.get(namespace=namespace, name=normalized_name)
             return tag, False
         except cls.DoesNotExist:
             # Create new tag

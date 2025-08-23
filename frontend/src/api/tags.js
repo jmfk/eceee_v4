@@ -79,6 +79,57 @@ export const tagsApi = {
     }, 'tags.getUsage'),
 
     /**
+     * Validate and potentially create a tag
+     * @param {string} tagName - Tag name to validate
+     * @param {number} namespaceId - Namespace ID (optional)
+     * @returns {Promise<Object>} Validation result with tag data or conflict info
+     */
+    validateAndCreate: wrapApiCall(async (tagName, namespaceId = null) => {
+        // First, check if tag already exists
+        const searchResult = await api.get(`/api/v1/tags/?search=${encodeURIComponent(tagName)}`)
+        const existingTags = searchResult.data?.results || searchResult.results || []
+        
+        // Check for exact match (case-insensitive)
+        const exactMatch = existingTags.find(tag => 
+            tag.name.toLowerCase() === tagName.toLowerCase()
+        )
+        
+        if (exactMatch) {
+            return {
+                exists: true,
+                tag: exactMatch,
+                conflict: true,
+                conflictType: 'duplicate'
+            }
+        }
+
+        // Try to create the tag
+        try {
+            const createData = { name: tagName }
+            if (namespaceId) {
+                createData.namespace = namespaceId
+            }
+            
+            const result = await api.post('/api/v1/tags/', createData)
+            return {
+                exists: false,
+                tag: result.data || result,
+                conflict: false,
+                created: true
+            }
+        } catch (error) {
+            // Handle creation errors (validation, uniqueness, etc.)
+            return {
+                exists: false,
+                tag: null,
+                conflict: true,
+                conflictType: 'invalid',
+                error: error.response?.data || error.message
+            }
+        }
+    }, 'tags.validateAndCreate'),
+
+    /**
      * Bulk delete tags (not implemented in backend yet)
      * @param {number[]} ids - Array of tag IDs
      * @returns {Promise<Object>} Bulk delete response
