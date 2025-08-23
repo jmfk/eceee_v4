@@ -133,6 +133,7 @@ LOCAL_APPS = [
     "content",
     "core_widgets",  # Core widget types - can be disabled to use only custom widgets
     "example_custom_widgets",  # Example of custom site-specific widgets
+    "file_manager",  # Comprehensive media file management system
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -411,3 +412,31 @@ HEALTH_CHECK = {
     "DISK_USAGE_MAX": 90,  # percent
     "MEMORY_MIN": 100,  # in MB
 }
+
+# S3 Storage Configuration for Media Files
+AWS_ACCESS_KEY_ID = config("AWS_ACCESS_KEY_ID", default="minioadmin")
+AWS_SECRET_ACCESS_KEY = config("AWS_SECRET_ACCESS_KEY", default="minioadmin")
+AWS_STORAGE_BUCKET_NAME = config("AWS_STORAGE_BUCKET_NAME", default="eceee-media")
+AWS_S3_ENDPOINT_URL = config("AWS_S3_ENDPOINT_URL", default="http://minio:9000")
+AWS_S3_REGION_NAME = config("AWS_S3_REGION_NAME", default="us-east-1")
+AWS_S3_USE_SSL = config("AWS_S3_USE_SSL", default=False, cast=bool)
+
+# Media File Handling Configuration
+MEDIA_FILE_MAX_SIZE = 100 * 1024 * 1024  # 100MB
+MEDIA_ALLOWED_TYPES = [
+    "image/jpeg",
+    "image/png",
+    "image/gif",
+    "image/webp",
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "video/mp4",
+    "video/webm",
+    "audio/mpeg",
+    "audio/wav",
+]
+
+# AI Integration Configuration
+OPENAI_API_KEY = config("OPENAI_API_KEY", default="")
+AI_TAGGING_ENABLED = config("AI_TAGGING_ENABLED", default=True, cast=bool)
