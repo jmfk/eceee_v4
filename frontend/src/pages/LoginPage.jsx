@@ -51,45 +51,38 @@ const LoginPage = () => {
         setError('');
 
         try {
-            // First get CSRF token
-            const csrfResponse = await fetch('/csrf-token/', {
-                credentials: 'include'
-            });
-            const csrfData = await csrfResponse.json();
-
-            // Login request to Django admin
-            const response = await fetch('/admin/login/', {
+            // Use JWT authentication endpoint
+            const response = await fetch('/api/v1/auth/token/', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                    'X-CSRFToken': csrfData.csrfToken,
+                    'Content-Type': 'application/json',
                 },
                 credentials: 'include',
-                body: new URLSearchParams({
+                body: JSON.stringify({
                     username: credentials.username,
                     password: credentials.password,
-                    csrfmiddlewaretoken: csrfData.csrfToken,
-                    next: '/admin/'
                 })
             });
 
             if (response.ok) {
-                // Check if login was successful by testing API access
-                const apiTest = await fetch('/api/v1/webpages/pages/', {
-                    credentials: 'include'
-                });
+                const data = await response.json();
 
-                if (apiTest.ok) {
-                    // Login successful - update auth context
-                    await login(credentials);
-                    addNotification('Login successful!', 'success');
-                    navigate(from, { replace: true });
-                } else {
-                    // Login failed
-                    setError('Invalid username or password');
-                }
+                // Store JWT tokens
+                localStorage.setItem('access_token', data.access);
+                localStorage.setItem('refresh_token', data.refresh);
+
+                // Update authentication state
+                await login(credentials);
+
+                addNotification('Login successful!', 'success');
+                navigate(from, { replace: true });
             } else {
-                setError('Login failed. Please try again.');
+                const errorData = await response.json().catch(() => ({}));
+                if (response.status === 401) {
+                    setError('Invalid username or password');
+                } else {
+                    setError(errorData.detail || 'Login failed. Please try again.');
+                }
             }
         } catch (err) {
             console.error('Login error:', err);

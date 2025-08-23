@@ -127,6 +127,22 @@ export const endpoints = {
         bulkSchedule: '/api/webpages/bulk_schedule/',
         schedule: '/api/webpages/schedule/',
         publicationStatus: '/api/webpages/publicationStatus/'
+    },
+
+    // Media endpoints
+    media: {
+        base: `${BASE_PATH}/media`,
+        files: `${BASE_PATH}/media/files/`,
+        file: (id) => `${BASE_PATH}/media/files/${id}/`,
+        upload: `${BASE_PATH}/media/upload/`,
+        search: `${BASE_PATH}/media/search/`,
+        tags: `${BASE_PATH}/media/tags/`,
+        tag: (id) => `${BASE_PATH}/media/tags/${id}/`,
+        collections: `${BASE_PATH}/media/collections/`,
+        collection: (id) => `${BASE_PATH}/media/collections/${id}/`,
+        // Future endpoints for AI and bulk operations
+        aiSuggestions: `${BASE_PATH}/media/ai-suggestions/`,
+        bulkOperations: `${BASE_PATH}/media/bulk-operations/`
     }
 }
 

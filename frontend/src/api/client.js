@@ -45,19 +45,13 @@ export const getCsrfToken = async () => {
     return null
 }
 
-// Request interceptor to add CSRF token
+// Request interceptor to add JWT token
 apiClient.interceptors.request.use(
     async (config) => {
-        // Get CSRF token if we don't have one
-        if (!csrfToken) {
-            await getCsrfToken()
-        }
-
-        // Add CSRF token to headers for unsafe methods
-        if (config.method && !['get', 'head', 'options', 'trace'].includes(config.method.toLowerCase())) {
-            if (csrfToken) {
-                config.headers['X-CSRFToken'] = csrfToken
-            }
+        // Add JWT token to requests
+        const accessToken = localStorage.getItem('access_token');
+        if (accessToken) {
+            config.headers['Authorization'] = `Bearer ${accessToken}`;
         }
 
         // Note: Case conversion is handled by djangorestframework-camel-case on the backend
@@ -70,7 +64,7 @@ apiClient.interceptors.request.use(
     }
 )
 
-// Response interceptor for error handling
+// Response interceptor for error handling and token refresh
 apiClient.interceptors.response.use(
     (response) => {
         // Note: Case conversion is handled by djangorestframework-camel-case on the backend
@@ -78,16 +72,47 @@ apiClient.interceptors.response.use(
         return response
     },
     async (error) => {
-        // If we get a 403 Forbidden (CSRF failure), try to refresh the token
-        if (error.response?.status === 403 && error.response?.data?.detail?.includes('CSRF')) {
-            // console.log('CSRF token expired, refreshing...')
-            csrfToken = null
-            await getCsrfToken()
+        const originalRequest = error.config;
 
-            // Retry the original request with new token
-            if (csrfToken && error.config) {
-                error.config.headers['X-CSRFToken'] = csrfToken
-                return apiClient.request(error.config)
+        // If we get a 401 Unauthorized, try to refresh the token
+        if (error.response?.status === 401 && !originalRequest._retry) {
+            originalRequest._retry = true;
+
+            const refreshToken = localStorage.getItem('refresh_token');
+            if (refreshToken) {
+                try {
+                    const response = await fetch('/api/v1/auth/token/refresh/', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            refresh: refreshToken
+                        })
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        localStorage.setItem('access_token', data.access);
+
+                        // Retry the original request with new token
+                        originalRequest.headers['Authorization'] = `Bearer ${data.access}`;
+                        return apiClient.request(originalRequest);
+                    } else {
+                        // Refresh failed, clear tokens and redirect to login
+                        localStorage.removeItem('access_token');
+                        localStorage.removeItem('refresh_token');
+                        window.location.href = '/login';
+                    }
+                } catch (refreshError) {
+                    console.error('Token refresh failed:', refreshError);
+                    localStorage.removeItem('access_token');
+                    localStorage.removeItem('refresh_token');
+                    window.location.href = '/login';
+                }
+            } else {
+                // No refresh token, redirect to login
+                window.location.href = '/login';
             }
         }
 
@@ -100,8 +125,7 @@ apiClient.interceptors.response.use(
     }
 )
 
-// Initialize CSRF token when module loads
-getCsrfToken()
+// JWT authentication is handled via interceptors
 
 export default apiClient
 

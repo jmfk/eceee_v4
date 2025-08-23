@@ -22,9 +22,22 @@ export const AuthProvider = ({ children }) => {
 
     const checkAuthStatus = async () => {
         try {
+            // Check if we have tokens
+            const accessToken = localStorage.getItem('access_token');
+            const refreshToken = localStorage.getItem('refresh_token');
+
+            if (!accessToken || !refreshToken) {
+                setIsAuthenticated(false);
+                setUser(null);
+                setIsLoading(false);
+                return;
+            }
+
             // Try to make an authenticated request to check status
             const response = await fetch('/api/v1/webpages/pages/', {
-                credentials: 'include'
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`
+                }
             });
 
             if (response.ok) {
@@ -33,8 +46,36 @@ export const AuthProvider = ({ children }) => {
                 // const userData = await fetchUserDetails();
                 // setUser(userData);
             } else if (response.status === 401) {
-                setIsAuthenticated(false);
-                setUser(null);
+                // Token might be expired, try to refresh
+                try {
+                    const refreshResponse = await fetch('/api/v1/auth/token/refresh/', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            refresh: refreshToken
+                        })
+                    });
+
+                    if (refreshResponse.ok) {
+                        const data = await refreshResponse.json();
+                        localStorage.setItem('access_token', data.access);
+                        setIsAuthenticated(true);
+                    } else {
+                        // Refresh failed, clear tokens
+                        localStorage.removeItem('access_token');
+                        localStorage.removeItem('refresh_token');
+                        setIsAuthenticated(false);
+                        setUser(null);
+                    }
+                } catch (refreshError) {
+                    console.error('Token refresh failed:', refreshError);
+                    localStorage.removeItem('access_token');
+                    localStorage.removeItem('refresh_token');
+                    setIsAuthenticated(false);
+                    setUser(null);
+                }
             }
         } catch (error) {
             console.error('Auth check failed:', error);
@@ -54,20 +95,9 @@ export const AuthProvider = ({ children }) => {
 
     const logout = async () => {
         try {
-            // Get CSRF token first
-            const csrfResponse = await fetch('/csrf-token/', {
-                credentials: 'include'
-            });
-            const csrfData = await csrfResponse.json();
-
-            // Logout request
-            await fetch('/admin/logout/', {
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': csrfData.csrfToken,
-                },
-                credentials: 'include'
-            });
+            // Clear JWT tokens from localStorage
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('refresh_token');
         } catch (error) {
             console.error('Logout error:', error);
         } finally {

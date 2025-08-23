@@ -42,6 +42,13 @@ services:
       - ALLOWED_HOSTS=localhost,127.0.0.1,backend,frontend
       - CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
       - SECRET_KEY=dev-secret-key-change-in-production
+      - AWS_ACCESS_KEY_ID=minioadmin
+      - AWS_SECRET_ACCESS_KEY=minioadmin
+      - AWS_STORAGE_BUCKET_NAME=eceee-media
+      - AWS_S3_ENDPOINT_URL=http://minio:9000
+      - AWS_S3_REGION_NAME=us-east-1
+      - AWS_S3_USE_SSL=False
+      - REDIS_URL=redis://redis:6379/0
     volumes:
       - ./backend:/app
       - backend_static:/app/staticfiles
@@ -92,6 +99,27 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+
+  # MinIO for S3-compatible object storage
+  minio:
+    image: minio/minio:latest
+    platform: linux/arm64
+    container_name: eceee_v4_minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"    # API
+      - "9001:9001"    # Console
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
 
   # MCP Server for PostgreSQL operations
   # mcp-postgres:
@@ -166,6 +194,7 @@ volumes:
   backend_media:
   frontend_node_modules:
   redis_data:
+  minio_data:
   mcp_logs:
 
 networks:

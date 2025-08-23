@@ -49,4 +49,5 @@ urlpatterns = [
     # path('core/', include('apps.core.urls')),
     path("webpages/", include("webpages.api_urls")),
     path("content/", include("content.urls")),
+    path("media/", include("file_manager.urls")),
 ]

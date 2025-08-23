@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { Menu, X, Code, Cpu, Settings, Grid3X3, ChevronDown } from 'lucide-react'
+import { Menu, X, Code, Cpu, Settings, Grid3X3, ChevronDown, FolderOpen } from 'lucide-react'
 import { useState } from 'react'
 
 const Navbar = () => {
@@ -11,7 +11,8 @@ const Navbar = () => {
   const navigation = [
     { name: 'Home', href: '/', icon: Code },
     { name: 'About', href: '/about', icon: Cpu },
-    { name: 'Pages', href: '/pages', icon: Settings },
+    { name: 'Pages', href: '/pages', icon: Grid3X3 },
+    { name: 'Media', href: '/media', icon: FolderOpen },
     { name: 'Settings', href: '/settings', icon: Settings },
   ]
 

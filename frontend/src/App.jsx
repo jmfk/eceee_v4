@@ -9,6 +9,7 @@ import SettingsManager from '@pages/SettingsManager'
 import SystemSchemaPage from '@pages/SystemSchemaPage'
 import LayoutSchemaPage from '@pages/LayoutSchemaPage'
 import LayoutSchemaEditorPage from '@pages/LayoutSchemaEditorPage'
+import MediaManagerPage from '@pages/MediaManagerPage'
 import TreePageManager from '@components/TreePageManager'
 import PageEditor from '@components/PageEditor'
 import VersionTimelinePage from '@pages/VersionTimelinePage'
@@ -85,6 +86,19 @@ function App() {
                         </div>
                       </main>
                       <StatusBar customStatusContent={<span>Pages Management - Ready</span>} />
+                    </div>
+                  </PrivateRoute>
+                } />
+                <Route path="/media" element={
+                  <PrivateRoute>
+                    <div className="fixed inset-0 bg-gray-50 flex flex-col">
+                      <Navbar />
+                      <main className="flex-1 overflow-hidden">
+                        <div className="h-full overflow-y-auto">
+                          <MediaManagerPage />
+                        </div>
+                      </main>
+                      <StatusBar customStatusContent={<span>Media Manager - Ready</span>} />
                     </div>
                   </PrivateRoute>
                 } />

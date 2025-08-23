@@ -1,0 +1,414 @@
+"""
+S3-compatible storage service for media file management.
+
+This module provides a unified interface for S3-compatible storage backends
+including AWS S3, Linode Object Storage, and local MinIO development.
+"""
+
+import os
+import io
+import hashlib
+import logging
+from typing import Optional, Dict, Any, Tuple, List
+from urllib.parse import urljoin
+from django.conf import settings
+from django.core.files.uploadedfile import UploadedFile
+from django.utils import timezone
+from PIL import Image, ImageOps
+import boto3
+from botocore.exceptions import ClientError, NoCredentialsError
+
+# import magic  # Temporarily commented out - needs system libmagic
+
+logger = logging.getLogger(__name__)
+
+
+class S3MediaStorage:
+    """S3-compatible storage handler with multiple backend support."""
+
+    def __init__(self):
+        """Initialize S3 client with configuration from settings."""
+        self.bucket_name = getattr(settings, "AWS_STORAGE_BUCKET_NAME", "eceee-media")
+        self.region = getattr(settings, "AWS_S3_REGION_NAME", "us-east-1")
+        self.endpoint_url = getattr(settings, "AWS_S3_ENDPOINT_URL", None)
+        self.use_ssl = getattr(settings, "AWS_S3_USE_SSL", True)
+
+        # Lazy initialization - client will be created when first needed
+        self.s3_client = None
+        self._bucket_checked = False
+
+    def _create_s3_client(self):
+        """Create S3 client with proper configuration."""
+        try:
+            session = boto3.Session(
+                aws_access_key_id=getattr(settings, "AWS_ACCESS_KEY_ID"),
+                aws_secret_access_key=getattr(settings, "AWS_SECRET_ACCESS_KEY"),
+                region_name=self.region,
+            )
+
+            client_config = {
+                "region_name": self.region,
+            }
+
+            if self.endpoint_url:
+                client_config["endpoint_url"] = self.endpoint_url
+                client_config["use_ssl"] = self.use_ssl
+
+            return session.client("s3", **client_config)
+
+        except NoCredentialsError:
+            logger.error("AWS credentials not found")
+            raise
+        except Exception as e:
+            logger.error(f"Failed to create S3 client: {e}")
+            raise
+
+    def _get_s3_client(self):
+        """Get or create S3 client with lazy initialization."""
+        if self.s3_client is None:
+            self.s3_client = self._create_s3_client()
+        return self.s3_client
+
+    def _ensure_bucket_exists(self):
+        """Ensure the S3 bucket exists, create if it doesn't."""
+        if self._bucket_checked:
+            return
+
+        try:
+            client = self._get_s3_client()
+            client.head_bucket(Bucket=self.bucket_name)
+            logger.info(f"Bucket {self.bucket_name} exists")
+            self._bucket_checked = True
+        except ClientError as e:
+            error_code = e.response["Error"]["Code"]
+            if error_code == "404":
+                try:
+                    client = self._get_s3_client()
+                    if self.region == "us-east-1":
+                        client.create_bucket(Bucket=self.bucket_name)
+                    else:
+                        client.create_bucket(
+                            Bucket=self.bucket_name,
+                            CreateBucketConfiguration={
+                                "LocationConstraint": self.region
+                            },
+                        )
+                    logger.info(f"Created bucket {self.bucket_name}")
+                    self._bucket_checked = True
+                except ClientError as create_error:
+                    logger.error(f"Failed to create bucket: {create_error}")
+                    raise
+            else:
+                logger.error(f"Error checking bucket: {e}")
+                raise
+        except Exception as e:
+            logger.warning(f"Could not connect to S3 storage: {e}")
+            # Don't raise exception during initialization - let it fail later when actually used
+
+    def upload_file(self, file: UploadedFile, folder_path: str = "") -> Dict[str, Any]:
+        """
+        Upload file with automatic path generation and metadata extraction.
+
+        Args:
+            file: Django UploadedFile instance
+            folder_path: Optional folder path prefix
+
+        Returns:
+            Dict containing file metadata and S3 information
+        """
+        try:
+            # Read file content
+            file.seek(0)
+            file_content = file.read()
+            file.seek(0)
+
+            # Generate file hash for deduplication
+            file_hash = hashlib.sha256(file_content).hexdigest()
+
+            # Extract metadata
+            metadata = self.extract_metadata(file, file_content)
+
+            # Generate S3 key/path
+            file_extension = os.path.splitext(file.name)[1].lower()
+            s3_key = self._generate_s3_key(file_hash, file_extension, folder_path)
+
+            # Check if file already exists
+            if self._file_exists(s3_key):
+                logger.info(f"File already exists: {s3_key}")
+                return {
+                    "file_path": s3_key,
+                    "file_hash": file_hash,
+                    "file_size": len(file_content),
+                    "content_type": metadata["content_type"],
+                    "width": metadata.get("width"),
+                    "height": metadata.get("height"),
+                    "existing_file": True,
+                }
+
+            # Ensure bucket exists and get client
+            self._ensure_bucket_exists()
+            client = self._get_s3_client()
+
+            # Upload to S3
+            extra_args = {
+                "ContentType": metadata["content_type"],
+                "Metadata": {
+                    "original-filename": file.name,
+                    "file-hash": file_hash,
+                    "upload-timestamp": timezone.now().isoformat(),
+                },
+            }
+
+            client.put_object(
+                Bucket=self.bucket_name, Key=s3_key, Body=file_content, **extra_args
+            )
+
+            logger.info(f"Uploaded file to S3: {s3_key}")
+
+            # Generate thumbnails for images
+            thumbnail_paths = []
+            if metadata.get("is_image"):
+                thumbnail_paths = self.generate_thumbnails(file_content, file_hash)
+
+            return {
+                "file_path": s3_key,
+                "file_hash": file_hash,
+                "file_size": len(file_content),
+                "content_type": metadata["content_type"],
+                "width": metadata.get("width"),
+                "height": metadata.get("height"),
+                "thumbnail_paths": thumbnail_paths,
+                "existing_file": False,
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to upload file {file.name}: {e}")
+            raise
+
+    def _generate_s3_key(
+        self, file_hash: str, extension: str, folder_path: str = ""
+    ) -> str:
+        """Generate S3 key/path for file storage."""
+        # Use first 2 characters of hash for directory structure
+        prefix = file_hash[:2]
+        middle = file_hash[2:4]
+
+        if folder_path:
+            return f"{folder_path}/{prefix}/{middle}/{file_hash}{extension}"
+        else:
+            return f"media/{prefix}/{middle}/{file_hash}{extension}"
+
+    def _file_exists(self, s3_key: str) -> bool:
+        """Check if file exists in S3."""
+        try:
+            client = self._get_s3_client()
+            client.head_object(Bucket=self.bucket_name, Key=s3_key)
+            return True
+        except ClientError:
+            return False
+
+    def extract_metadata(
+        self, file: UploadedFile, file_content: bytes
+    ) -> Dict[str, Any]:
+        """Extract metadata from uploaded file."""
+        metadata = {
+            "content_type": file.content_type,
+            "is_image": False,
+            "is_document": False,
+            "is_video": False,
+            "is_audio": False,
+        }
+
+        # Use python-magic for more accurate MIME type detection
+        # TODO: Install system libmagic library
+        # try:
+        #     detected_mime = magic.from_buffer(file_content, mime=True)
+        #     if detected_mime:
+        #         metadata['content_type'] = detected_mime
+        # except Exception as e:
+        #     logger.warning(f"Failed to detect MIME type: {e}")
+
+        # Determine file type
+        content_type = metadata["content_type"].lower()
+        if content_type.startswith("image/"):
+            metadata["is_image"] = True
+            # Extract image dimensions
+            try:
+                with Image.open(io.BytesIO(file_content)) as img:
+                    metadata["width"] = img.width
+                    metadata["height"] = img.height
+                    metadata["format"] = img.format
+            except Exception as e:
+                logger.warning(f"Failed to extract image metadata: {e}")
+
+        elif content_type.startswith("video/"):
+            metadata["is_video"] = True
+        elif content_type.startswith("audio/"):
+            metadata["is_audio"] = True
+        elif content_type in [
+            "application/pdf",
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ]:
+            metadata["is_document"] = True
+
+        return metadata
+
+    def generate_thumbnails(
+        self, image_content: bytes, file_hash: str
+    ) -> List[Dict[str, Any]]:
+        """Generate multiple thumbnail sizes for images."""
+        thumbnail_sizes = {
+            "small": (150, 150),
+            "medium": (300, 300),
+            "large": (600, 600),
+            "xlarge": (1200, 1200),
+        }
+
+        thumbnail_paths = []
+
+        try:
+            with Image.open(io.BytesIO(image_content)) as img:
+                # Convert to RGB if necessary
+                if img.mode in ("RGBA", "LA", "P"):
+                    img = img.convert("RGB")
+
+                for size_name, (width, height) in thumbnail_sizes.items():
+                    # Create thumbnail
+                    thumbnail = img.copy()
+                    thumbnail.thumbnail((width, height), Image.Resampling.LANCZOS)
+
+                    # Save as WebP for better compression
+                    thumbnail_buffer = io.BytesIO()
+                    thumbnail.save(
+                        thumbnail_buffer, format="WEBP", quality=85, optimize=True
+                    )
+                    thumbnail_content = thumbnail_buffer.getvalue()
+
+                    # Generate S3 key for thumbnail
+                    thumbnail_key = f"thumbnails/{file_hash[:2]}/{file_hash[2:4]}/{file_hash}_{size_name}.webp"
+
+                    # Upload thumbnail
+                    client = self._get_s3_client()
+                    client.put_object(
+                        Bucket=self.bucket_name,
+                        Key=thumbnail_key,
+                        Body=thumbnail_content,
+                        ContentType="image/webp",
+                        Metadata={
+                            "original-hash": file_hash,
+                            "thumbnail-size": size_name,
+                            "dimensions": f"{thumbnail.width}x{thumbnail.height}",
+                        },
+                    )
+
+                    thumbnail_paths.append(
+                        {
+                            "size": size_name,
+                            "path": thumbnail_key,
+                            "width": thumbnail.width,
+                            "height": thumbnail.height,
+                            "file_size": len(thumbnail_content),
+                        }
+                    )
+
+                    logger.info(f"Generated {size_name} thumbnail: {thumbnail_key}")
+
+        except Exception as e:
+            logger.error(f"Failed to generate thumbnails: {e}")
+
+        return thumbnail_paths
+
+    def delete_file(self, file_path: str) -> bool:
+        """Delete file and all associated thumbnails."""
+        try:
+            # Delete main file
+            client = self._get_s3_client()
+            client.delete_object(Bucket=self.bucket_name, Key=file_path)
+
+            # Delete thumbnails if it's an image
+            file_hash = os.path.splitext(os.path.basename(file_path))[0]
+            thumbnail_prefix = (
+                f"thumbnails/{file_hash[:2]}/{file_hash[2:4]}/{file_hash}_"
+            )
+
+            # List and delete thumbnails
+            response = client.list_objects_v2(
+                Bucket=self.bucket_name, Prefix=thumbnail_prefix
+            )
+
+            if "Contents" in response:
+                for obj in response["Contents"]:
+                    client.delete_object(
+                        Bucket=self.bucket_name, Key=obj["Key"]
+                    )
+                    logger.info(f"Deleted thumbnail: {obj['Key']}")
+
+            logger.info(f"Deleted file and thumbnails: {file_path}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to delete file {file_path}: {e}")
+            return False
+
+    def get_signed_url(self, file_path: str, expires_in: int = 3600) -> Optional[str]:
+        """Generate signed URL for secure access."""
+        try:
+            client = self._get_s3_client()
+            url = client.generate_presigned_url(
+                "get_object",
+                Params={"Bucket": self.bucket_name, "Key": file_path},
+                ExpiresIn=expires_in,
+            )
+            return url
+        except Exception as e:
+            logger.error(f"Failed to generate signed URL for {file_path}: {e}")
+            return None
+
+    def get_public_url(self, file_path: str) -> str:
+        """Get public URL for file (if bucket is public)."""
+        if self.endpoint_url:
+            # For MinIO or custom S3 endpoints
+            base_url = self.endpoint_url.rstrip("/")
+            return f"{base_url}/{self.bucket_name}/{file_path}"
+        else:
+            # For AWS S3
+            return (
+                f"https://{self.bucket_name}.s3.{self.region}.amazonaws.com/{file_path}"
+            )
+
+    def copy_file(self, source_path: str, destination_path: str) -> bool:
+        """Copy file within the same bucket."""
+        try:
+            client = self._get_s3_client()
+            copy_source = {"Bucket": self.bucket_name, "Key": source_path}
+            client.copy_object(
+                CopySource=copy_source, Bucket=self.bucket_name, Key=destination_path
+            )
+            logger.info(f"Copied file from {source_path} to {destination_path}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to copy file: {e}")
+            return False
+
+    def get_file_info(self, file_path: str) -> Optional[Dict[str, Any]]:
+        """Get file information from S3."""
+        try:
+            client = self._get_s3_client()
+            response = client.head_object(
+                Bucket=self.bucket_name, Key=file_path
+            )
+            return {
+                "size": response["ContentLength"],
+                "last_modified": response["LastModified"],
+                "content_type": response["ContentType"],
+                "metadata": response.get("Metadata", {}),
+                "etag": response["ETag"].strip('"'),
+            }
+        except Exception as e:
+            logger.error(f"Failed to get file info for {file_path}: {e}")
+            return None
+
+
+# Global storage instance
+storage = S3MediaStorage()

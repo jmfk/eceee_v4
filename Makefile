@@ -25,12 +25,16 @@ migrations:
 migrate:
 	docker-compose exec backend python manage.py migrate
 
+requirements:
+	docker-compose exec backend pip install -r requirements.txt
+
+
 # Create Django superuser
 createsuperuser:
 	docker-compose exec backend python manage.py createsuperuser
 
 changepassword:
-	docker-compose exec backend python manage.py changepassword -u admin -p admin
+	docker-compose exec backend python manage.py changepassword admin
 
 # Create sample data
 sample-content:
@@ -63,7 +67,6 @@ migrate-widgets-only:
 
 shell:
 	docker-compose exec backend bash
-
 
 # Run backend tests
 backend-test:
