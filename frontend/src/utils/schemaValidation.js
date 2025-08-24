@@ -18,11 +18,13 @@ export const DEFAULT_SCHEMA_FIELDS = {
         maxLength: 500,
     },
     featuredImage: {
-        type: 'string',
-        title: 'Featured Image URL',
-        description: 'URL of the main image for this page',
-        format: 'url',
-        default: '',
+        type: 'object',
+        title: 'Featured Image',
+        description: 'Main image for this page from media library',
+        format: 'media',
+        mediaTypes: ['image'],
+        multiple: false,
+        default: null,
     },
 }
 

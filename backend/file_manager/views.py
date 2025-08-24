@@ -77,14 +77,85 @@ class MediaCollectionViewSet(viewsets.ModelViewSet):
 
 
 class MediaFileViewSet(viewsets.ModelViewSet):
-    """ViewSet for managing media files."""
+    """ViewSet for managing media files with security controls."""
 
-    permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ["file_type", "access_level", "namespace", "created_by"]
     search_fields = ["title", "description", "original_filename", "ai_extracted_text"]
     ordering_fields = ["title", "created_at", "updated_at", "file_size"]
     ordering = ["-created_at"]
+
+    def get_permissions(self):
+        """Get permissions based on action."""
+        from .security import MediaFilePermission
+
+        return [MediaFilePermission()]
+
+    def get_queryset(self):
+        """Filter queryset based on user permissions and namespace access."""
+        from .security import SecurityAuditLogger
+
+        user = self.request.user
+
+        # Staff users see all files
+        if user.is_staff:
+            return MediaFile.objects.select_related(
+                "namespace", "created_by", "last_modified_by"
+            ).prefetch_related("tags", "collections")
+
+        # Regular users only see files from accessible namespaces
+        accessible_namespaces = user.accessible_namespaces.all()
+        queryset = (
+            MediaFile.objects.filter(namespace__in=accessible_namespaces)
+            .select_related("namespace", "created_by", "last_modified_by")
+            .prefetch_related("tags", "collections")
+        )
+
+        # Further filter by access level
+        from django.db.models import Q
+
+        queryset = queryset.filter(
+            Q(access_level="public")
+            | Q(access_level="members")
+            | Q(access_level="private", created_by=user)
+        )
+
+        return queryset
+
+    def perform_create(self, serializer):
+        """Set user and perform security logging on create."""
+        from .security import SecurityAuditLogger
+
+        media_file = serializer.save(
+            created_by=self.request.user, last_modified_by=self.request.user
+        )
+
+        SecurityAuditLogger.log_file_upload(
+            self.request.user,
+            {
+                "filename": media_file.original_filename,
+                "size": media_file.file_size,
+                "id": str(media_file.id),
+            },
+            success=True,
+        )
+
+    def perform_update(self, serializer):
+        """Update last_modified_by on update."""
+        serializer.save(last_modified_by=self.request.user)
+
+    def retrieve(self, request, *args, **kwargs):
+        """Log file access on retrieve."""
+        from .security import SecurityAuditLogger
+
+        instance = self.get_object()
+        SecurityAuditLogger.log_file_access(request.user, instance, "view")
+
+        # Update last accessed timestamp
+        instance.last_accessed = timezone.now()
+        instance.save(update_fields=["last_accessed"])
+
+        return super().retrieve(request, *args, **kwargs)
 
     def get_serializer_class(self):
         """Use different serializers for list vs detail views."""
@@ -154,15 +225,16 @@ class MediaFileViewSet(viewsets.ModelViewSet):
 
 
 class MediaUploadView(APIView):
-    """Handle file uploads with AI analysis."""
+    """Handle file uploads with AI analysis and security validation."""
 
-    # Explicitly disable authentication and permissions for uploads
-    authentication_classes = []
-    permission_classes = [permissions.AllowAny]
+    # Require authentication for uploads
+    permission_classes = [permissions.IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser]
 
     def post(self, request):
-        """Upload multiple files with metadata extraction."""
+        """Upload multiple files with comprehensive security validation."""
+        from .security import FileUploadValidator, SecurityAuditLogger
+
         serializer = MediaUploadSerializer(data=request.data)
 
         if not serializer.is_valid():
@@ -172,10 +244,43 @@ class MediaUploadView(APIView):
         folder_path = serializer.validated_data.get("folder_path", "")
         namespace = serializer.validated_data["namespace"]
 
+        # Check namespace access
+        if not request.user.accessible_namespaces.filter(id=namespace.id).exists():
+            SecurityAuditLogger.log_security_violation(
+                request.user,
+                "unauthorized_namespace_access",
+                f"Attempted access to namespace: {namespace.id}",
+            )
+            return Response(
+                {"error": "Access denied to specified namespace"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         uploaded_files = []
         errors = []
 
         for uploaded_file in files:
+            # Comprehensive security validation
+            validation_result = FileUploadValidator.validate_file(uploaded_file)
+
+            if not validation_result["is_valid"]:
+                error_msg = f"File '{uploaded_file.name}' failed validation: {'; '.join(validation_result['errors'])}"
+                errors.append(error_msg)
+                SecurityAuditLogger.log_file_upload(
+                    request.user,
+                    {"filename": uploaded_file.name, "size": uploaded_file.size},
+                    success=False,
+                )
+                continue
+
+            # Log warnings if any
+            if validation_result["warnings"]:
+                logger.warning(
+                    f"File upload warnings for '{uploaded_file.name}': {validation_result['warnings']}"
+                )
+
+            # Use validated metadata
+            validated_metadata = validation_result["metadata"]
             try:
                 # Upload to S3
                 upload_result = storage.upload_file(uploaded_file, folder_path)
