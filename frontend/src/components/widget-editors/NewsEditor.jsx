@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { Calendar, User, Tag, Image as ImageIcon, Eye } from 'lucide-react'
+import { Calendar, User, Tag, Image as ImageIcon, Eye, FolderOpen, ExternalLink } from 'lucide-react'
 import BaseWidgetEditor from './BaseWidgetEditor'
+import MediaPicker from '../media/MediaPicker'
 
 /**
  * NewsEditor - Specialized editor for News widgets
@@ -9,12 +10,15 @@ import BaseWidgetEditor from './BaseWidgetEditor'
  * - Article title and content editing
  * - Author and publication date fields
  * - Category selection
- * - Featured image management
+ * - Featured image management with MediaPicker integration and URL support
  * - Meta information controls
  * - Live article preview
+ * - Media library integration with automatic metadata
  */
-const NewsEditor = ({ config, onChange, errors, widgetType }) => {
+const NewsEditor = ({ config, onChange, errors, widgetType, namespace }) => {
     const [showPreview, setShowPreview] = useState(false)
+    const [imageSource, setImageSource] = useState(config?.media_file_id ? 'library' : 'url')
+    const [showMediaPicker, setShowMediaPicker] = useState(false)
 
     const categoryOptions = [
         { value: 'general', label: 'General' },
@@ -24,6 +28,19 @@ const NewsEditor = ({ config, onChange, errors, widgetType }) => {
         { value: 'health', label: 'Health' },
         { value: 'politics', label: 'Politics' }
     ]
+
+    // Handle media selection from MediaPicker
+    const handleMediaSelect = (selectedFiles) => {
+        if (selectedFiles && selectedFiles.length > 0) {
+            const selectedFile = selectedFiles[0]
+            onChange({
+                ...config,
+                featuredImage: selectedFile.file_url,
+                media_file_id: selectedFile.id // Store reference to media file
+            })
+        }
+        setShowMediaPicker(false)
+    }
 
     // Format date for input field
     const formatDateForInput = (dateString) => {
@@ -194,9 +211,77 @@ const NewsEditor = ({ config, onChange, errors, widgetType }) => {
                         <label className="block text-sm font-medium text-gray-700">
                             Featured Image (Optional)
                         </label>
-                        {renderUrlField('featuredImage', 'Image URL', {
-                            placeholder: 'https://example.com/image.jpg'
-                        })}
+
+                        {/* Image Source Selection */}
+                        <div className="flex space-x-4">
+                            <label className="flex items-center">
+                                <input
+                                    type="radio"
+                                    name="image-source"
+                                    value="url"
+                                    checked={imageSource === 'url'}
+                                    onChange={(e) => setImageSource(e.target.value)}
+                                    className="mr-2"
+                                />
+                                URL
+                            </label>
+                            <label className="flex items-center">
+                                <input
+                                    type="radio"
+                                    name="image-source"
+                                    value="library"
+                                    checked={imageSource === 'library'}
+                                    onChange={(e) => setImageSource(e.target.value)}
+                                    className="mr-2"
+                                />
+                                Media Library
+                            </label>
+                        </div>
+
+                        {/* URL Input */}
+                        {imageSource === 'url' && (
+                            <div className="space-y-2">
+                                {renderUrlField('featuredImage', 'Image URL', {
+                                    placeholder: 'https://example.com/image.jpg'
+                                })}
+                                {localConfig.featuredImage && (
+                                    <div className="flex items-center space-x-2 text-xs text-gray-600">
+                                        <ExternalLink className="w-3 h-3" />
+                                        <a
+                                            href={localConfig.featuredImage}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="hover:text-blue-600"
+                                        >
+                                            View original image
+                                        </a>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Media Library Selection */}
+                        {imageSource === 'library' && (
+                            <div className="space-y-4">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowMediaPicker(true)}
+                                    className="w-full flex items-center justify-center gap-2 p-6 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-colors"
+                                >
+                                    <FolderOpen className="w-6 h-6 text-gray-400" />
+                                    <span className="text-gray-600">
+                                        {localConfig.media_file_id ? 'Change Featured Image from Library' : 'Select Featured Image from Library'}
+                                    </span>
+                                </button>
+
+                                {localConfig.media_file_id && (
+                                    <div className="text-sm text-gray-600 bg-green-50 p-3 rounded-lg">
+                                        <p className="font-medium text-green-800">Selected from Media Library</p>
+                                        <p>This image is managed in your media library and will stay up-to-date automatically.</p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
                         {/* Image Preview */}
                         {localConfig.featuredImage && (
@@ -270,6 +355,18 @@ const NewsEditor = ({ config, onChange, errors, widgetType }) => {
                             </div>
                         </div>
                     </div>
+
+                    {/* Media Picker Modal */}
+                    {showMediaPicker && (
+                        <MediaPicker
+                            mode="modal"
+                            multiple={false}
+                            fileTypes={['image']}
+                            namespace={namespace}
+                            onSelect={handleMediaSelect}
+                            onClose={() => setShowMediaPicker(false)}
+                        />
+                    )}
                 </>
             )}
         </BaseWidgetEditor>

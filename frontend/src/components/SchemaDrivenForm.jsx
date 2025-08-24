@@ -3,9 +3,10 @@ import { pageDataSchemasApi } from '../api'
 import { createValidator, ValidationMode } from '../utils/hybridValidation.js'
 import ValidatedInput from './validation/ValidatedInput.jsx'
 import ValidationSummary from './validation/ValidationSummary.jsx'
+import MediaField from './form-fields/MediaField.jsx'
 
 // Minimal JSON Schema -> form renderer (text/number/boolean/select) for top-level properties
-export default function SchemaDrivenForm({ pageVersionData, onChange, onValidationChange, onValidatedDataSync }) {
+export default function SchemaDrivenForm({ pageVersionData, onChange, onValidationChange, onValidatedDataSync, namespace }) {
     const [schema, setSchema] = useState(null)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
@@ -371,6 +372,28 @@ export default function SchemaDrivenForm({ pageVersionData, onChange, onValidati
                     key={key}
                     type="number"
                     {...commonProps}
+                />
+            )
+        }
+
+        // Handle media fields
+        if (def.format === 'media') {
+            return (
+                <MediaField
+                    key={key}
+                    value={value}
+                    onChange={(mediaValue) => handlePropertyChange(key, mediaValue)}
+                    label={title}
+                    description={description}
+                    required={required}
+                    multiple={def.multiple || type === 'array'}
+                    mediaTypes={def.mediaTypes || ['image', 'video', 'audio', 'document']}
+                    maxItems={def.maxItems}
+                    minItems={def.minItems}
+                    validation={validation}
+                    isValidating={isValidating}
+                    showValidation={true}
+                    namespace={namespace}
                 />
             )
         }

@@ -1,22 +1,26 @@
 import { useState } from 'react'
-import { Plus, Trash2, Image as ImageIcon, Edit3, Eye, Grid, Layout } from 'lucide-react'
+import { Plus, Trash2, Image as ImageIcon, Edit3, Eye, Grid, Layout, FolderOpen, ExternalLink } from 'lucide-react'
 import BaseWidgetEditor from './BaseWidgetEditor'
+import MediaPicker from '../media/MediaPicker'
 
 /**
  * GalleryEditor - Specialized editor for Gallery widgets
  * 
  * Features:
  * - Gallery title and layout configuration
- * - Multi-image management with URLs
+ * - Multi-image management with MediaPicker integration and URL support
+ * - Bulk image selection from media library
  * - Image captions and descriptions
  * - Layout options (grid, masonry, carousel, lightbox)
  * - Column settings and display options
  * - Live gallery preview
+ * - Media library integration with automatic metadata
  */
-const GalleryEditor = ({ config, onChange, errors, widgetType }) => {
+const GalleryEditor = ({ config, onChange, errors, widgetType, namespace }) => {
     const [showPreview, setShowPreview] = useState(false)
     const [editingImage, setEditingImage] = useState(null)
     const [showImageForm, setShowImageForm] = useState(false)
+    const [showMediaPicker, setShowMediaPicker] = useState(false)
 
     const layoutOptions = [
         { value: 'grid', label: 'Grid Layout', icon: '⚏', description: 'Evenly spaced image grid' },
@@ -33,6 +37,29 @@ const GalleryEditor = ({ config, onChange, errors, widgetType }) => {
         { value: 5, label: '5 Columns' },
         { value: 6, label: '6 Columns' }
     ]
+
+    // Handle media selection from MediaPicker
+    const handleMediaSelect = (selectedFiles) => {
+        if (selectedFiles && selectedFiles.length > 0) {
+            // Add multiple images from media library
+            const images = config?.images || []
+            const newImages = selectedFiles.map(file => ({
+                id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+                url: file.file_url,
+                thumbnail: file.thumbnail_url || file.file_url,
+                alt_text: file.title,
+                caption: file.title,
+                description: file.description || '',
+                media_file_id: file.id // Store reference to media file
+            }))
+
+            onChange({
+                ...config,
+                images: [...images, ...newImages]
+            })
+        }
+        setShowMediaPicker(false)
+    }
 
     // Add or update image
     const handleImageSave = (imageData) => {
@@ -243,8 +270,27 @@ const GalleryEditor = ({ config, onChange, errors, widgetType }) => {
             thumbnail: image?.thumbnail || '',
             alt_text: image?.alt_text || '',
             caption: image?.caption || '',
-            description: image?.description || ''
+            description: image?.description || '',
+            media_file_id: image?.media_file_id || null
         })
+        const [imageSource, setImageSource] = useState(image?.media_file_id ? 'library' : 'url')
+        const [showImagePicker, setShowImagePicker] = useState(false)
+
+        const handleMediaSelectForForm = (selectedFiles) => {
+            if (selectedFiles && selectedFiles.length > 0) {
+                const selectedFile = selectedFiles[0]
+                setFormData({
+                    ...formData,
+                    url: selectedFile.file_url,
+                    thumbnail: selectedFile.thumbnail_url || selectedFile.file_url,
+                    alt_text: formData.alt_text || selectedFile.title,
+                    caption: formData.caption || selectedFile.title,
+                    description: formData.description || selectedFile.description || '',
+                    media_file_id: selectedFile.id
+                })
+            }
+            setShowImagePicker(false)
+        }
 
         const handleSubmit = (e) => {
             e.preventDefault()
@@ -272,35 +318,124 @@ const GalleryEditor = ({ config, onChange, errors, widgetType }) => {
                 </div>
 
                 <div className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Image URL *
+                    {/* Image Source Selection */}
+                    <div className="space-y-3">
+                        <label className="block text-sm font-medium text-gray-700">
+                            Image Source *
                         </label>
-                        <input
-                            type="url"
-                            value={formData.url}
-                            onChange={(e) => setFormData({ ...formData, url: e.target.value })}
-                            placeholder="https://example.com/image.jpg"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            required
-                        />
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Thumbnail URL (Optional)
-                        </label>
-                        <input
-                            type="url"
-                            value={formData.thumbnail}
-                            onChange={(e) => setFormData({ ...formData, thumbnail: e.target.value })}
-                            placeholder="https://example.com/thumbnail.jpg"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                        <div className="text-xs text-gray-500 mt-1">
-                            Used for lightbox layout. Falls back to main image if not provided.
+                        <div className="flex space-x-4">
+                            <label className="flex items-center">
+                                <input
+                                    type="radio"
+                                    name="image-source"
+                                    value="url"
+                                    checked={imageSource === 'url'}
+                                    onChange={(e) => setImageSource(e.target.value)}
+                                    className="mr-2"
+                                />
+                                URL
+                            </label>
+                            <label className="flex items-center">
+                                <input
+                                    type="radio"
+                                    name="image-source"
+                                    value="library"
+                                    checked={imageSource === 'library'}
+                                    onChange={(e) => setImageSource(e.target.value)}
+                                    className="mr-2"
+                                />
+                                Media Library
+                            </label>
                         </div>
                     </div>
+
+                    {/* URL Input */}
+                    {imageSource === 'url' && (
+                        <>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Image URL *
+                                </label>
+                                <input
+                                    type="url"
+                                    value={formData.url}
+                                    onChange={(e) => setFormData({ ...formData, url: e.target.value, media_file_id: null })}
+                                    placeholder="https://example.com/image.jpg"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    required
+                                />
+                                {formData.url && (
+                                    <div className="flex items-center space-x-2 text-xs text-gray-600 mt-1">
+                                        <ExternalLink className="w-3 h-3" />
+                                        <a
+                                            href={formData.url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="hover:text-blue-600"
+                                        >
+                                            View original image
+                                        </a>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Thumbnail URL (Optional)
+                                </label>
+                                <input
+                                    type="url"
+                                    value={formData.thumbnail}
+                                    onChange={(e) => setFormData({ ...formData, thumbnail: e.target.value })}
+                                    placeholder="https://example.com/thumbnail.jpg"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                                <div className="text-xs text-gray-500 mt-1">
+                                    Used for lightbox layout. Falls back to main image if not provided.
+                                </div>
+                            </div>
+                        </>
+                    )}
+
+                    {/* Media Library Selection */}
+                    {imageSource === 'library' && (
+                        <div className="space-y-4">
+                            <button
+                                type="button"
+                                onClick={() => setShowImagePicker(true)}
+                                className="w-full flex items-center justify-center gap-2 p-6 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-colors"
+                            >
+                                <FolderOpen className="w-6 h-6 text-gray-400" />
+                                <span className="text-gray-600">
+                                    {formData.media_file_id ? 'Change Image from Library' : 'Select Image from Library'}
+                                </span>
+                            </button>
+
+                            {formData.media_file_id && (
+                                <div className="text-sm text-gray-600 bg-green-50 p-3 rounded-lg">
+                                    <p className="font-medium text-green-800">Selected from Media Library</p>
+                                    <p>This image is managed in your media library and will stay up-to-date automatically.</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Image Preview */}
+                    {formData.url && (
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Preview
+                            </label>
+                            <img
+                                src={formData.url}
+                                alt={formData.alt_text || 'Preview'}
+                                className="w-32 h-32 object-cover rounded-lg border border-gray-200"
+                                onError={(e) => {
+                                    e.target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128"><rect width="100%" height="100%" fill="%23f3f4f6"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="%236b7280">Image not found</text></svg>'
+                                }}
+                            />
+                        </div>
+                    )}
 
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -358,6 +493,18 @@ const GalleryEditor = ({ config, onChange, errors, widgetType }) => {
                         Cancel
                     </button>
                 </div>
+
+                {/* Media Picker Modal for Individual Image */}
+                {showImagePicker && (
+                    <MediaPicker
+                        mode="modal"
+                        multiple={false}
+                        fileTypes={['image']}
+                        namespace={namespace}
+                        onSelect={handleMediaSelectForForm}
+                        onClose={() => setShowImagePicker(false)}
+                    />
+                )}
             </form>
         )
     }
@@ -399,8 +546,8 @@ const GalleryEditor = ({ config, onChange, errors, widgetType }) => {
                                     <label
                                         key={option.value}
                                         className={`cursor-pointer border-2 rounded-lg p-3 transition-all ${localConfig.layout === option.value
-                                                ? 'border-blue-500 bg-blue-50'
-                                                : 'border-gray-200 hover:border-gray-300'
+                                            ? 'border-blue-500 bg-blue-50'
+                                            : 'border-gray-200 hover:border-gray-300'
                                             }`}
                                     >
                                         <input
@@ -435,14 +582,24 @@ const GalleryEditor = ({ config, onChange, errors, widgetType }) => {
                             <label className="block text-sm font-medium text-gray-700">
                                 Gallery Images
                             </label>
-                            <button
-                                type="button"
-                                onClick={() => setShowImageForm(true)}
-                                className="flex items-center space-x-1 px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
-                            >
-                                <Plus className="w-3 h-3" />
-                                <span>Add Image</span>
-                            </button>
+                            <div className="flex items-center space-x-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowMediaPicker(true)}
+                                    className="flex items-center space-x-1 px-3 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700"
+                                >
+                                    <FolderOpen className="w-3 h-3" />
+                                    <span>Add from Library</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowImageForm(true)}
+                                    className="flex items-center space-x-1 px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
+                                >
+                                    <Plus className="w-3 h-3" />
+                                    <span>Add by URL</span>
+                                </button>
+                            </div>
                         </div>
 
                         {/* Image Form */}
@@ -603,6 +760,18 @@ const GalleryEditor = ({ config, onChange, errors, widgetType }) => {
                             </div>
                         </div>
                     </div>
+
+                    {/* Main Media Picker Modal for Bulk Selection */}
+                    {showMediaPicker && (
+                        <MediaPicker
+                            mode="modal"
+                            multiple={true}
+                            fileTypes={['image']}
+                            namespace={namespace}
+                            onSelect={handleMediaSelect}
+                            onClose={() => setShowMediaPicker(false)}
+                        />
+                    )}
                 </>
             )}
         </BaseWidgetEditor>

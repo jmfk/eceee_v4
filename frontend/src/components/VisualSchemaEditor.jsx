@@ -16,7 +16,10 @@ import {
   ChevronRight,
   ChevronUp,
   Eye,
-  Code
+  Code,
+  Image,
+  FolderOpen,
+  Files
 } from 'lucide-react'
 import SchemaFormPreview from './SchemaFormPreview'
 
@@ -101,6 +104,66 @@ const PROPERTY_TYPES = {
       minLength: null,
       maxLength: null,
       format: 'textarea'
+    }
+  },
+  media: {
+    icon: Image,
+    label: 'Media File',
+    description: 'Single media file from library',
+    defaultConfig: {
+      type: 'object',
+      title: '',
+      description: '',
+      format: 'media',
+      default: null,
+      mediaTypes: ['image', 'video', 'audio', 'document'],
+      multiple: false
+    }
+  },
+  media_multiple: {
+    icon: Files,
+    label: 'Multiple Media',
+    description: 'Multiple media files from library',
+    defaultConfig: {
+      type: 'array',
+      title: '',
+      description: '',
+      format: 'media',
+      default: [],
+      mediaTypes: ['image', 'video', 'audio', 'document'],
+      multiple: true,
+      maxItems: null,
+      minItems: null
+    }
+  },
+  image: {
+    icon: Image,
+    label: 'Image',
+    description: 'Single image from library',
+    defaultConfig: {
+      type: 'object',
+      title: '',
+      description: '',
+      format: 'media',
+      default: null,
+      mediaTypes: ['image'],
+      multiple: false
+    }
+  },
+  gallery: {
+    icon: FolderOpen,
+    label: 'Image Gallery',
+    description: 'Multiple images from library',
+    defaultConfig: {
+      type: 'array',
+      title: '',
+      description: '',
+      format: 'media',
+      default: [],
+      mediaTypes: ['image'],
+      multiple: true,
+      maxItems: null,
+      minItems: null
     }
   }
 }

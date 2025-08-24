@@ -1280,6 +1280,7 @@ const PageEditor = () => {
                                 })}
                                 onValidationChange={setSchemaValidationState}
                                 onValidatedDataSync={handleValidatedPageDataSync}
+                                namespace={null} // TODO: Add proper namespace integration
                             />
                         )}
                         {activeTab === 'preview' && (
