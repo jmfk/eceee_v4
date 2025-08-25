@@ -464,3 +464,9 @@ MEDIA_ALLOWED_TYPES = [
 # AI Integration Configuration
 OPENAI_API_KEY = config("OPENAI_API_KEY", default="")
 AI_TAGGING_ENABLED = config("AI_TAGGING_ENABLED", default=True, cast=bool)
+
+# imgproxy Configuration
+IMGPROXY_URL = config("IMGPROXY_URL", default="http://imgproxy:8080")
+IMGPROXY_KEY = config("IMGPROXY_KEY", default="")
+IMGPROXY_SALT = config("IMGPROXY_SALT", default="")
+IMGPROXY_SIGNATURE_SIZE = config("IMGPROXY_SIGNATURE_SIZE", default=32, cast=int)

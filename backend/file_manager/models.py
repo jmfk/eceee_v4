@@ -313,13 +313,6 @@ class MediaFile(models.Model):
         """Calculate SHA-256 hash of file content."""
         return hashlib.sha256(file_content).hexdigest()
 
-    def get_thumbnail_url(self, size: str = "medium") -> Optional[str]:
-        """Get thumbnail URL for images."""
-        if not self.is_image:
-            return None
-        # This will be implemented in the storage service
-        return f"/media/thumbnails/{self.id}/{size}.webp"
-
     def get_absolute_url(self):
         """Get the canonical URL for this media file using slug."""
         from django.urls import reverse
@@ -390,39 +383,130 @@ class MediaFile(models.Model):
 
         return None
 
+    def get_imgproxy_url(self, width=None, height=None, **kwargs):
+        """
+        Get imgproxy URL for on-the-fly image processing.
 
-class MediaThumbnail(models.Model):
-    """Thumbnail variants for media files."""
+        Args:
+            width: Target width in pixels
+            height: Target height in pixels
+            **kwargs: Additional imgproxy options (resize_type, quality, format, etc.)
 
-    SIZE_CHOICES = [
-        ("small", "Small (150x150)"),
-        ("medium", "Medium (300x300)"),
-        ("large", "Large (600x600)"),
-        ("xlarge", "Extra Large (1200x1200)"),
-    ]
+        Returns:
+            imgproxy URL for processed image, or original URL if not an image
+        """
+        if self.file_type != "image":
+            return self.get_file_url()
 
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    media_file = models.ForeignKey(
-        MediaFile, on_delete=models.CASCADE, related_name="thumbnails"
-    )
-    size = models.CharField(max_length=10, choices=SIZE_CHOICES)
-    file_path = models.CharField(max_length=500, help_text="S3 path to thumbnail")
-    width = models.PositiveIntegerField()
-    height = models.PositiveIntegerField()
-    file_size = models.BigIntegerField(help_text="Thumbnail file size in bytes")
+        from .imgproxy import get_image_url
+        from .storage import S3MediaStorage
 
-    # Metadata
-    created_at = models.DateTimeField(auto_now_add=True)
+        storage = S3MediaStorage()
+        source_url = storage.get_public_url(self.file_path)
 
-    class Meta:
-        unique_together = [["media_file", "size"]]
-        ordering = ["size"]
-        indexes = [
-            models.Index(fields=["media_file", "size"]),
-        ]
+        return get_image_url(
+            source_url=source_url, width=width, height=height, **kwargs
+        )
 
-    def __str__(self):
-        return f"{self.media_file.title} - {self.get_size_display()}"
+    def get_responsive_urls(self, **kwargs):
+        """
+        Get responsive image URLs for different screen sizes.
+
+        Args:
+            **kwargs: Additional imgproxy options
+
+        Returns:
+            Dictionary mapping size names to imgproxy URLs
+        """
+        if self.file_type != "image":
+            return {"original": self.get_file_url()}
+
+        from .imgproxy import get_responsive_images
+        from .storage import S3MediaStorage
+
+        storage = S3MediaStorage()
+        source_url = storage.get_public_url(self.file_path)
+
+        return get_responsive_images(source_url=source_url, **kwargs)
+
+    def get_imgproxy_thumbnail_url(self, size=150):
+        """
+        Get thumbnail URL using imgproxy.
+
+        Args:
+            size: Thumbnail size (square)
+
+        Returns:
+            Thumbnail imgproxy URL
+        """
+        if self.file_type != "image":
+            return self.get_file_url()
+
+        from .imgproxy import get_thumbnail_url
+        from .storage import S3MediaStorage
+
+        storage = S3MediaStorage()
+        source_url = storage.get_public_url(self.file_path)
+
+        return get_thumbnail_url(source_url=source_url, size=size)
+
+    def get_preset_url(self, preset):
+        """
+        Get imgproxy URL using a predefined preset.
+
+        Args:
+            preset: Preset name (thumbnail, small, medium, large, hero, avatar)
+
+        Returns:
+            imgproxy URL with preset
+        """
+        if self.file_type != "image":
+            return self.get_file_url()
+
+        from .imgproxy import imgproxy_service
+        from .storage import S3MediaStorage
+
+        storage = S3MediaStorage()
+        source_url = storage.get_public_url(self.file_path)
+
+        return imgproxy_service.get_preset_url(source_url=source_url, preset=preset)
+
+    def get_optimized_url(self, width=None, height=None, webp=True, quality=85):
+        """
+        Get optimized image URL with modern format support.
+
+        Args:
+            width: Target width
+            height: Target height
+            webp: Enable WebP format detection
+            quality: Image quality (1-100)
+
+        Returns:
+            Optimized imgproxy URL
+        """
+        if self.file_type != "image":
+            return self.get_file_url()
+
+        from .imgproxy import imgproxy_service
+        from .storage import S3MediaStorage
+
+        storage = S3MediaStorage()
+        source_url = storage.get_public_url(self.file_path)
+
+        return imgproxy_service.get_optimized_url(
+            source_url=source_url,
+            width=width,
+            height=height,
+            webp=webp,
+            quality=quality,
+        )
+
+    def get_file_url(self):
+        """Get the direct file URL (S3 or local)."""
+        from .storage import S3MediaStorage
+
+        storage = S3MediaStorage()
+        return storage.get_public_url(self.file_path)
 
 
 class MediaUsage(models.Model):

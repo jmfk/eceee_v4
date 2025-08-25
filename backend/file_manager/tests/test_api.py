@@ -24,7 +24,7 @@ import json
 import uuid
 from unittest.mock import patch, MagicMock
 
-from file_manager.models import MediaFile, MediaTag, MediaCollection, MediaThumbnail
+from file_manager.models import MediaFile, MediaTag, MediaCollection
 from content.models import Namespace
 
 

@@ -1,6 +1,6 @@
 # Makefile for eceee_v4_test_1
 
-.PHONY: install backend frontend migrate createsuperuser sample-content sample-pages sample-data sample-clean migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only test lint docker-up docker-down clean
+.PHONY: install backend frontend migrate createsuperuser sample-content sample-pages sample-data sample-clean migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only test lint docker-up docker-down restart clean
 
 # Install backend and frontend dependencies
 install:
@@ -9,7 +9,7 @@ install:
 
 # Run Django backend server
 servers:
-	docker-compose up db redis -d
+	docker-compose up db redis minio imgproxy -d
 
 backend:
 	docker-compose up backend
@@ -83,6 +83,10 @@ docker-up:
 # Stop all Docker Compose services
 docker-down:
 	docker-compose down
+
+# Restart all Docker Compose services
+restart:
+	docker-compose restart
 
 # Clean Python, Node, and Docker artifacts
 clean:

@@ -9,7 +9,7 @@ from django.contrib import admin
 from django.utils.html import format_html
 from django.urls import reverse
 from django.utils.safestring import mark_safe
-from .models import MediaFile, MediaTag, MediaCollection, MediaThumbnail, MediaUsage
+from .models import MediaFile, MediaTag, MediaCollection, MediaUsage
 
 
 @admin.register(MediaTag)
@@ -51,25 +51,6 @@ class MediaTagAdmin(admin.ModelAdmin):
         if not change:
             obj.created_by = request.user
         super().save_model(request, obj, form, change)
-
-
-class MediaThumbnailInline(admin.TabularInline):
-    """Inline admin for media thumbnails."""
-
-    model = MediaThumbnail
-    extra = 0
-    readonly_fields = [
-        "size",
-        "file_path",
-        "width",
-        "height",
-        "file_size",
-        "created_at",
-    ]
-    can_delete = False
-
-    def has_add_permission(self, request, obj=None):
-        return False
 
 
 class MediaUsageInline(admin.TabularInline):
@@ -140,7 +121,7 @@ class MediaFileAdmin(admin.ModelAdmin):
         "created_by",
     ]
     filter_horizontal = ["tags", "collections"]
-    inlines = [MediaThumbnailInline, MediaUsageInline]
+    inlines = [MediaUsageInline]
 
     fieldsets = (
         (
@@ -291,54 +272,6 @@ class MediaCollectionAdmin(admin.ModelAdmin):
             obj.created_by = request.user
         obj.last_modified_by = request.user
         super().save_model(request, obj, form, change)
-
-
-@admin.register(MediaThumbnail)
-class MediaThumbnailAdmin(admin.ModelAdmin):
-    """Admin interface for media thumbnails."""
-
-    list_display = [
-        "media_file",
-        "size",
-        "dimensions_display",
-        "file_size_display",
-        "created_at",
-    ]
-    list_filter = ["size", "created_at"]
-    search_fields = ["media_file__title", "media_file__slug"]
-    readonly_fields = [
-        "media_file",
-        "size",
-        "file_path",
-        "width",
-        "height",
-        "file_size",
-        "created_at",
-    ]
-
-    def dimensions_display(self, obj):
-        """Display thumbnail dimensions."""
-        return f"{obj.width}x{obj.height}"
-
-    dimensions_display.short_description = "Dimensions"
-
-    def file_size_display(self, obj):
-        """Display human-readable file size."""
-        for unit in ["B", "KB", "MB", "GB"]:
-            if obj.file_size < 1024.0:
-                return f"{obj.file_size:.1f} {unit}"
-            obj.file_size /= 1024.0
-        return f"{obj.file_size:.1f} TB"
-
-    file_size_display.short_description = "Size"
-
-    def has_add_permission(self, request):
-        """Thumbnails are auto-generated, no manual adding."""
-        return False
-
-    def has_change_permission(self, request, obj=None):
-        """Thumbnails are read-only."""
-        return False
 
 
 @admin.register(MediaUsage)

@@ -20,7 +20,7 @@ import io
 from PIL import Image
 
 from file_manager.storage import S3MediaStorage
-from file_manager.models import MediaFile, MediaThumbnail
+from file_manager.models import MediaFile
 from content.models import Namespace
 
 
@@ -139,99 +139,6 @@ class ThumbnailGenerationTest(TestCase):
             image_io.getvalue(),
             content_type=f"image/{format.lower()}",
         )
-
-    @patch("file_manager.storage.S3MediaStorage.save")
-    @patch("file_manager.storage.S3MediaStorage.url")
-    def test_generate_thumbnails(self, mock_url, mock_save):
-        """Test thumbnail generation for images"""
-        # Mock storage methods
-        mock_save.side_effect = [
-            "uploads/original.jpg",
-            "uploads/thumbnails/small.jpg",
-            "uploads/thumbnails/medium.jpg",
-            "uploads/thumbnails/large.jpg",
-        ]
-        mock_url.return_value = "https://example.com/test.jpg"
-
-        # Create test image
-        test_image = self.create_test_image()
-
-        # Create media file
-        media_file = MediaFile.objects.create(
-            title="Test Image",
-            slug="test-image",
-            file_type="image/jpeg",
-            file_size=len(test_image.read()),
-            file_url="https://example.com/original.jpg",
-            uploaded_by=self.user,
-            namespace=self.namespace,
-        )
-
-        # Test thumbnail generation
-        thumbnails = self.storage.generate_thumbnails(media_file, test_image)
-
-        self.assertEqual(len(thumbnails), 3)  # small, medium, large
-
-        # Verify thumbnails were created in database
-        db_thumbnails = MediaThumbnail.objects.filter(media_file=media_file)
-        self.assertEqual(db_thumbnails.count(), 3)
-
-        # Check thumbnail sizes
-        sizes = [thumb.size for thumb in db_thumbnails]
-        self.assertIn("small", sizes)
-        self.assertIn("medium", sizes)
-        self.assertIn("large", sizes)
-
-    @patch("file_manager.storage.S3MediaStorage.save")
-    def test_thumbnail_size_constraints(self, mock_save):
-        """Test thumbnail size constraints"""
-        mock_save.return_value = "uploads/thumbnail.jpg"
-
-        # Create small test image (smaller than thumbnail sizes)
-        small_image = self.create_test_image(width=100, height=75)
-
-        media_file = MediaFile.objects.create(
-            title="Small Image",
-            slug="small-image",
-            file_type="image/jpeg",
-            file_size=len(small_image.read()),
-            file_url="https://example.com/small.jpg",
-            uploaded_by=self.user,
-            namespace=self.namespace,
-        )
-
-        # Test thumbnail generation for small image
-        thumbnails = self.storage.generate_thumbnails(media_file, small_image)
-
-        # Should only generate thumbnails smaller than original
-        self.assertLessEqual(len(thumbnails), 3)
-
-        for thumbnail in thumbnails:
-            self.assertLessEqual(thumbnail["width"], 100)
-            self.assertLessEqual(thumbnail["height"], 75)
-
-    def test_non_image_file_thumbnails(self):
-        """Test thumbnail generation for non-image files"""
-        # Create non-image file
-        pdf_file = SimpleUploadedFile(
-            "test.pdf", b"fake pdf content", content_type="application/pdf"
-        )
-
-        media_file = MediaFile.objects.create(
-            title="Test PDF",
-            slug="test-pdf",
-            file_type="application/pdf",
-            file_size=len(pdf_file.read()),
-            file_url="https://example.com/test.pdf",
-            uploaded_by=self.user,
-            namespace=self.namespace,
-        )
-
-        # Test thumbnail generation for non-image
-        thumbnails = self.storage.generate_thumbnails(media_file, pdf_file)
-
-        # Should return empty list for non-images
-        self.assertEqual(len(thumbnails), 0)
 
 
 class MetadataExtractionTest(TestCase):

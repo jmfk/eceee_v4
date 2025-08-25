@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Plus, Trash2, Image as ImageIcon, Edit3, Eye, Grid, Layout, FolderOpen, ExternalLink } from 'lucide-react'
 import BaseWidgetEditor from './BaseWidgetEditor'
 import MediaPicker from '../media/MediaPicker'
+import { generateThumbnailUrl } from '../../utils/imgproxy'
 
 /**
  * GalleryEditor - Specialized editor for Gallery widgets
@@ -46,7 +47,7 @@ const GalleryEditor = ({ config, onChange, errors, widgetType, namespace }) => {
             const newImages = selectedFiles.map(file => ({
                 id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
                 url: file.file_url,
-                thumbnail: file.thumbnail_url || file.file_url,
+                thumbnail: generateThumbnailUrl(file.imgproxy_base_url || file.file_url, 300, 300) || file.file_url,
                 alt_text: file.title,
                 caption: file.title,
                 description: file.description || '',
@@ -234,7 +235,7 @@ const GalleryEditor = ({ config, onChange, errors, widgetType, namespace }) => {
                             {images.map(image => (
                                 <div key={image.id} className="group relative cursor-pointer">
                                     <img
-                                        src={image.thumbnail || image.url}
+                                        src={image.thumbnail || generateThumbnailUrl(image.url, 200, 200) || image.url}
                                         alt={image.alt_text}
                                         className="w-full h-24 object-cover rounded-lg group-hover:opacity-80 transition-opacity"
                                         onError={(e) => {
@@ -282,7 +283,7 @@ const GalleryEditor = ({ config, onChange, errors, widgetType, namespace }) => {
                 setFormData({
                     ...formData,
                     url: selectedFile.file_url,
-                    thumbnail: selectedFile.thumbnail_url || selectedFile.file_url,
+                    thumbnail: generateThumbnailUrl(selectedFile.imgproxy_base_url || selectedFile.file_url, 300, 300) || selectedFile.file_url,
                     alt_text: formData.alt_text || selectedFile.title,
                     caption: formData.caption || selectedFile.title,
                     description: formData.description || selectedFile.description || '',
