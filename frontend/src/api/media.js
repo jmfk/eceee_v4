@@ -68,14 +68,7 @@ export const mediaFilesApi = {
      */
     getDownloadUrl: (id) => `${endpoints.media.file(id)}download/`,
 
-    /**
-     * Get thumbnail URL for an image file
-     * @param {string} id - Media file ID
-     * @param {string} size - Thumbnail size (small, medium, large, xlarge)
-     * @returns {string} Thumbnail URL
-     */
-    getThumbnailUrl: (id, size = 'medium') =>
-        `${endpoints.media.file(id)}thumbnail/?size=${size}`,
+
 };
 
 /**

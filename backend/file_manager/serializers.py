@@ -9,7 +9,7 @@ from rest_framework import serializers
 from django.contrib.auth.models import User
 from django.conf import settings
 from content.models import Namespace
-from .models import MediaFile, MediaTag, MediaCollection, MediaThumbnail, MediaUsage
+from .models import MediaFile, MediaTag, MediaCollection, MediaUsage
 
 
 class MediaTagSerializer(serializers.ModelSerializer):
@@ -46,31 +46,6 @@ class MediaTagSerializer(serializers.ModelSerializer):
         """Set created_by from request user."""
         validated_data["created_by"] = self.context["request"].user
         return super().create(validated_data)
-
-
-class MediaThumbnailSerializer(serializers.ModelSerializer):
-    """Serializer for media thumbnails."""
-
-    url = serializers.SerializerMethodField()
-
-    class Meta:
-        model = MediaThumbnail
-        fields = [
-            "id",
-            "size",
-            "file_path",
-            "width",
-            "height",
-            "file_size",
-            "url",
-            "created_at",
-        ]
-        read_only_fields = ["id", "created_at"]
-
-    def get_url(self, obj):
-        """Get thumbnail URL."""
-        # This will be implemented with the storage service
-        return f"/api/media/thumbnails/{obj.id}/"
 
 
 class MediaUsageSerializer(serializers.ModelSerializer):
@@ -191,7 +166,7 @@ class MediaFileListSerializer(serializers.ModelSerializer):
     namespace_name = serializers.CharField(source="namespace.name", read_only=True)
     file_size_human = serializers.CharField(read_only=True)
     dimensions = serializers.CharField(read_only=True)
-    thumbnail_url = serializers.SerializerMethodField()
+    imgproxy_base_url = serializers.SerializerMethodField()
     # SEO-friendly URLs
     absolute_url = serializers.SerializerMethodField()
     uuid_url = serializers.SerializerMethodField()
@@ -214,7 +189,7 @@ class MediaFileListSerializer(serializers.ModelSerializer):
             "namespace",
             "namespace_name",
             "tags",
-            "thumbnail_url",
+            "imgproxy_base_url",
             "absolute_url",
             "uuid_url",
             "download_url",
@@ -223,10 +198,10 @@ class MediaFileListSerializer(serializers.ModelSerializer):
             "created_by_name",
         ]
 
-    def get_thumbnail_url(self, obj):
-        """Get thumbnail URL for images."""
+    def get_imgproxy_base_url(self, obj):
+        """Get imgproxy base URL for dynamic resizing."""
         if obj.is_image:
-            return obj.get_thumbnail_url("medium")
+            return obj.get_file_url()
         return None
 
     def get_absolute_url(self, obj):
@@ -256,7 +231,6 @@ class MediaFileDetailSerializer(serializers.ModelSerializer):
 
     tags = MediaTagSerializer(many=True, read_only=True)
     collections = MediaCollectionSerializer(many=True, read_only=True)
-    thumbnails = MediaThumbnailSerializer(many=True, read_only=True)
     usage_records = MediaUsageSerializer(many=True, read_only=True)
 
     tag_ids = serializers.ListField(
@@ -276,6 +250,9 @@ class MediaFileDetailSerializer(serializers.ModelSerializer):
     file_size_human = serializers.CharField(read_only=True)
     dimensions = serializers.CharField(read_only=True)
     file_url = serializers.SerializerMethodField()
+
+    # imgproxy base URL for dynamic resizing
+    imgproxy_base_url = serializers.SerializerMethodField()
 
     class Meta:
         model = MediaFile
@@ -305,11 +282,11 @@ class MediaFileDetailSerializer(serializers.ModelSerializer):
             "last_accessed",
             "tags",
             "collections",
-            "thumbnails",
             "usage_records",
             "tag_ids",
             "collection_ids",
             "file_url",
+            "imgproxy_base_url",
             "created_at",
             "updated_at",
             "created_by",
@@ -369,6 +346,12 @@ class MediaFileDetailSerializer(serializers.ModelSerializer):
             media_file.collections.set(collections)
 
         return media_file
+
+    def get_imgproxy_base_url(self, obj):
+        """Get imgproxy base URL for dynamic resizing."""
+        if obj.is_image:
+            return obj.get_file_url()
+        return None
 
 
 class MediaUploadSerializer(serializers.Serializer):

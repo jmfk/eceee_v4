@@ -8,6 +8,7 @@ AI suggestions, and bulk operations.
 import logging
 from typing import Dict, Any
 from django.conf import settings
+from django.db import models
 from django.db.models import Q
 from django.http import HttpResponse, Http404
 from django.utils import timezone
@@ -19,7 +20,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 
-from .models import MediaFile, MediaTag, MediaCollection, MediaThumbnail, MediaUsage
+from .models import MediaFile, MediaTag, MediaCollection, MediaUsage
 from .serializers import (
     MediaFileListSerializer,
     MediaFileDetailSerializer,
@@ -104,7 +105,13 @@ class MediaFileViewSet(viewsets.ModelViewSet):
             ).prefetch_related("tags", "collections")
 
         # Regular users only see files from accessible namespaces
-        accessible_namespaces = user.accessible_namespaces.all()
+        from content.models import Namespace
+
+        # Get namespaces the user can access
+        accessible_namespaces = Namespace.objects.filter(
+            models.Q(created_by=user) | models.Q(is_active=True)
+        )
+
         queryset = (
             MediaFile.objects.filter(namespace__in=accessible_namespaces)
             .select_related("namespace", "created_by", "last_modified_by")
@@ -199,30 +206,6 @@ class MediaFileViewSet(viewsets.ModelViewSet):
             public_url = storage.get_public_url(media_file.file_path)
             return redirect(public_url)
 
-    @action(detail=True, methods=["get"])
-    def thumbnail(self, request, pk=None):
-        """Get thumbnail for image files."""
-        media_file = self.get_object()
-
-        if not media_file.is_image:
-            raise Http404("Thumbnails only available for images")
-
-        size = request.query_params.get("size", "medium")
-
-        try:
-            thumbnail = media_file.thumbnails.get(size=size)
-            signed_url = storage.get_signed_url(thumbnail.file_path)
-
-            if signed_url:
-                from django.shortcuts import redirect
-
-                return redirect(signed_url)
-            else:
-                raise Http404("Thumbnail not accessible")
-
-        except MediaThumbnail.DoesNotExist:
-            raise Http404("Thumbnail not found")
-
 
 class MediaUploadView(APIView):
     """Handle file uploads with AI analysis and security validation."""
@@ -245,7 +228,7 @@ class MediaUploadView(APIView):
         namespace = serializer.validated_data["namespace"]
 
         # Check namespace access
-        if not request.user.accessible_namespaces.filter(id=namespace.id).exists():
+        if not self._has_namespace_access(request.user, namespace):
             SecurityAuditLogger.log_security_violation(
                 request.user,
                 "unauthorized_namespace_access",
@@ -353,17 +336,6 @@ class MediaUploadView(APIView):
                     last_modified_by=user,
                 )
 
-                # Create thumbnail records
-                for thumbnail_data in upload_result.get("thumbnail_paths", []):
-                    MediaThumbnail.objects.create(
-                        media_file=media_file,
-                        size=thumbnail_data["size"],
-                        file_path=thumbnail_data["path"],
-                        width=thumbnail_data["width"],
-                        height=thumbnail_data["height"],
-                        file_size=thumbnail_data["file_size"],
-                    )
-
                 uploaded_files.append(
                     {
                         "id": media_file.id,
@@ -393,6 +365,29 @@ class MediaUploadView(APIView):
             response_data["errors"] = errors
 
         return Response(response_data, status=status.HTTP_201_CREATED)
+
+    def _has_namespace_access(self, user, namespace):
+        """
+        Check if user has access to the specified namespace.
+
+        Args:
+            user: User instance
+            namespace: Namespace instance
+
+        Returns:
+            bool: True if user has access, False otherwise
+        """
+        # Staff users have access to all namespaces
+        if user.is_staff:
+            return True
+
+        # Users have access to namespaces they created
+        if namespace.created_by == user:
+            return True
+
+        # For now, allow access to active namespaces for authenticated users
+        # This can be extended with more granular permissions later
+        return namespace.is_active
 
 
 class MediaSearchView(APIView):

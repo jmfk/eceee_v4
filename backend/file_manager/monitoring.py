@@ -35,6 +35,7 @@ class HealthChecker:
             "cache": self._check_cache,
             "storage": self._check_storage,
             "ai_services": self._check_ai_services,
+            "imgproxy": self._check_imgproxy,
             "disk_space": self._check_disk_space,
             "memory": self._check_memory,
             "celery": self._check_celery,
@@ -248,6 +249,48 @@ class HealthChecker:
             return {
                 "status": "warning",
                 "message": f"AI services unavailable: {e}",
+                "timestamp": timezone.now().isoformat(),
+            }
+
+    def _check_imgproxy(self) -> Dict[str, Any]:
+        """Check imgproxy service availability."""
+        try:
+            from .imgproxy import validate_imgproxy_config
+
+            config_result = validate_imgproxy_config()
+
+            if not config_result["configured"]:
+                return {
+                    "status": "warning",
+                    "message": "imgproxy not configured",
+                    "timestamp": timezone.now().isoformat(),
+                }
+
+            if not config_result["healthy"]:
+                return {
+                    "status": "warning",
+                    "message": f"imgproxy service unavailable: {'; '.join(config_result['errors'])}",
+                    "metrics": {
+                        "url": config_result["url"],
+                        "signed": config_result["signed"],
+                    },
+                    "timestamp": timezone.now().isoformat(),
+                }
+
+            return {
+                "status": "healthy",
+                "message": f"imgproxy service operational at {config_result['url']}",
+                "metrics": {
+                    "url": config_result["url"],
+                    "signed": config_result["signed"],
+                },
+                "timestamp": timezone.now().isoformat(),
+            }
+
+        except Exception as e:
+            return {
+                "status": "warning",
+                "message": f"imgproxy check failed: {e}",
                 "timestamp": timezone.now().isoformat(),
             }
 

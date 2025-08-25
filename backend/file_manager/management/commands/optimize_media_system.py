@@ -12,7 +12,7 @@ from file_manager.performance import (
     warm_cache,
     cleanup_expired_cache,
 )
-from file_manager.models import MediaFile, MediaThumbnail
+from file_manager.models import MediaFile
 import logging
 
 logger = logging.getLogger(__name__)
@@ -87,7 +87,11 @@ class Command(BaseCommand):
             self._optimize_cache(dry_run)
 
         if run_thumbnails:
-            self._optimize_thumbnails(dry_run)
+            self.stdout.write(
+                self.style.WARNING(
+                    "Thumbnail optimization is no longer needed - using imgproxy for on-the-fly resizing"
+                )
+            )
 
         if run_cleanup:
             self._cleanup_system(dry_run)
@@ -180,50 +184,6 @@ class Command(BaseCommand):
             self.stdout.write(self.style.ERROR(f"✗ Cache optimization failed: {e}"))
             logger.error(f"Cache optimization failed: {e}")
 
-    def _optimize_thumbnails(self, dry_run=False):
-        """Optimize thumbnail generation and processing."""
-        self.stdout.write("\n" + "=" * 50)
-        self.stdout.write(self.style.HTTP_INFO("THUMBNAIL OPTIMIZATION"))
-        self.stdout.write("=" * 50)
-
-        try:
-            # Find images without thumbnails
-            images_without_thumbnails = MediaFile.objects.filter(
-                file_type="image"
-            ).exclude(
-                id__in=MediaThumbnail.objects.values_list("media_file_id", flat=True)
-            )
-
-            missing_count = images_without_thumbnails.count()
-            self.stdout.write(f"Found {missing_count} images without thumbnails")
-
-            if dry_run:
-                self.stdout.write(
-                    f"Would generate thumbnails for {missing_count} images"
-                )
-                return
-
-            if missing_count == 0:
-                self.stdout.write("All images have thumbnails")
-                return
-
-            # Optimize image processing settings
-            FileProcessingOptimizer.optimize_image_processing()
-
-            # Generate missing thumbnails in batches
-            self.stdout.write("Generating missing thumbnails...")
-            FileProcessingOptimizer.batch_thumbnail_generation(
-                list(images_without_thumbnails), batch_size=10
-            )
-
-            self.stdout.write(
-                self.style.SUCCESS(f"✓ Generated thumbnails for {missing_count} images")
-            )
-
-        except Exception as e:
-            self.stdout.write(self.style.ERROR(f"✗ Thumbnail optimization failed: {e}"))
-            logger.error(f"Thumbnail optimization failed: {e}")
-
     def _cleanup_system(self, dry_run=False):
         """Clean up orphaned files and expired data."""
         self.stdout.write("\n" + "=" * 50)
@@ -231,19 +191,6 @@ class Command(BaseCommand):
         self.stdout.write("=" * 50)
 
         try:
-            # Find orphaned thumbnails
-            orphaned_thumbnails = MediaThumbnail.objects.filter(media_file__isnull=True)
-            orphaned_count = orphaned_thumbnails.count()
-
-            if orphaned_count > 0:
-                self.stdout.write(f"Found {orphaned_count} orphaned thumbnails")
-                if not dry_run:
-                    orphaned_thumbnails.delete()
-                    self.stdout.write(f"✓ Deleted {orphaned_count} orphaned thumbnails")
-                else:
-                    self.stdout.write(
-                        f"Would delete {orphaned_count} orphaned thumbnails"
-                    )
 
             # Find files with missing S3 objects
             self.stdout.write("Checking for files with missing S3 objects...")

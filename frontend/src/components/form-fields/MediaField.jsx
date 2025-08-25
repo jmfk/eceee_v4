@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { Image, FolderOpen, X, Eye } from 'lucide-react'
 import MediaPicker from '../media/MediaPicker'
+import { generateThumbnailUrl } from '../../utils/imgproxy'
 
 /**
  * MediaField - Form field component for media selection
@@ -94,8 +95,8 @@ const MediaField = ({
                     type="button"
                     onClick={() => setShowMediaPicker(true)}
                     className={`w-full flex items-center justify-center gap-2 p-6 border-2 border-dashed rounded-lg transition-colors ${hasError
-                            ? 'border-red-300 hover:border-red-400 hover:bg-red-50'
-                            : 'border-gray-300 hover:border-blue-400 hover:bg-blue-50'
+                        ? 'border-red-300 hover:border-red-400 hover:bg-red-50'
+                        : 'border-gray-300 hover:border-blue-400 hover:bg-blue-50'
                         }`}
                 >
                     <FolderOpen className="w-6 h-6 text-gray-400" />
@@ -124,7 +125,7 @@ const MediaField = ({
                                 <div className="flex-shrink-0">
                                     {file.file_type?.startsWith('image/') ? (
                                         <img
-                                            src={file.thumbnail_url || file.file_url}
+                                            src={generateThumbnailUrl(file.imgproxy_base_url || file.file_url, 48, 48) || file.file_url}
                                             alt={file.title}
                                             className="w-12 h-12 object-cover rounded"
                                             onError={(e) => {

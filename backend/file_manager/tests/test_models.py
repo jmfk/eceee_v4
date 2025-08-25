@@ -5,7 +5,7 @@ Tests cover:
 - MediaFile model validation and methods
 - MediaTag model functionality
 - MediaCollection model operations
-- MediaThumbnail generation and management
+
 - MediaUsage tracking
 - Model relationships and constraints
 - Namespace integration
@@ -23,7 +23,6 @@ from file_manager.models import (
     MediaFile,
     MediaTag,
     MediaCollection,
-    MediaThumbnail,
     MediaUsage,
 )
 from content.models import Namespace
@@ -368,83 +367,6 @@ class MediaCollectionModelTest(TestCase):
         self.assertEqual(collection.file_count, 2)
 
 
-class MediaThumbnailModelTest(TestCase):
-    """Test MediaThumbnail model functionality"""
-
-    def setUp(self):
-        self.user = User.objects.create_user(
-            username="testuser", email="test@example.com", password="testpass123"
-        )
-        self.namespace, _ = Namespace.objects.get_or_create(
-            slug="test-namespace",
-            defaults={
-                "name": "Test Namespace",
-                "is_active": True,
-                "created_by": self.user,
-            },
-        )
-        self.media_file = MediaFile.objects.create(
-            title="Test Image",
-            slug="test-image",
-            file_type="image/jpeg",
-            file_size=1024000,
-            file_url="https://example.com/test.jpg",
-            uploaded_by=self.user,
-            namespace=self.namespace,
-        )
-
-    def test_media_thumbnail_creation(self):
-        """Test basic MediaThumbnail creation"""
-        thumbnail = MediaThumbnail.objects.create(
-            media_file=self.media_file,
-            size="medium",
-            width=300,
-            height=200,
-            file_url="https://example.com/test_medium.jpg",
-        )
-
-        self.assertEqual(thumbnail.media_file, self.media_file)
-        self.assertEqual(thumbnail.size, "medium")
-        self.assertEqual(thumbnail.width, 300)
-        self.assertEqual(thumbnail.height, 200)
-        self.assertEqual(thumbnail.file_url, "https://example.com/test_medium.jpg")
-        self.assertIsInstance(thumbnail.id, uuid.UUID)
-
-    def test_media_thumbnail_str_representation(self):
-        """Test MediaThumbnail string representation"""
-        thumbnail = MediaThumbnail.objects.create(
-            media_file=self.media_file,
-            size="large",
-            width=800,
-            height=600,
-            file_url="https://example.com/test_large.jpg",
-        )
-
-        expected_str = f"Test Image - large (800x600)"
-        self.assertEqual(str(thumbnail), expected_str)
-
-    def test_media_thumbnail_unique_constraint(self):
-        """Test unique constraint on MediaThumbnail"""
-        # Create first thumbnail
-        MediaThumbnail.objects.create(
-            media_file=self.media_file,
-            size="small",
-            width=150,
-            height=100,
-            file_url="https://example.com/test_small.jpg",
-        )
-
-        # Try to create another thumbnail with same media_file and size
-        with self.assertRaises(Exception):  # Should raise IntegrityError
-            MediaThumbnail.objects.create(
-                media_file=self.media_file,
-                size="small",  # Same size for same file
-                width=200,
-                height=150,
-                file_url="https://example.com/test_small2.jpg",
-            )
-
-
 class MediaUsageModelTest(TestCase):
     """Test MediaUsage model functionality"""
 
@@ -593,42 +515,3 @@ class MediaModelRelationshipsTest(TestCase):
         # Test reverse relationship
         self.assertEqual(file1.collections.count(), 1)
         self.assertIn(collection, file1.collections.all())
-
-    def test_media_file_thumbnails_relationship(self):
-        """Test one-to-many relationship between MediaFile and MediaThumbnail"""
-        # Create media file
-        media_file = MediaFile.objects.create(
-            title="Test Image",
-            slug="test-image",
-            file_type="image/jpeg",
-            file_size=1024000,
-            file_url="https://example.com/test.jpg",
-            uploaded_by=self.user,
-            namespace=self.namespace,
-        )
-
-        # Create thumbnails
-        thumb_small = MediaThumbnail.objects.create(
-            media_file=media_file,
-            size="small",
-            width=150,
-            height=100,
-            file_url="https://example.com/test_small.jpg",
-        )
-
-        thumb_medium = MediaThumbnail.objects.create(
-            media_file=media_file,
-            size="medium",
-            width=300,
-            height=200,
-            file_url="https://example.com/test_medium.jpg",
-        )
-
-        # Test relationships
-        self.assertEqual(media_file.thumbnails.count(), 2)
-        self.assertIn(thumb_small, media_file.thumbnails.all())
-        self.assertIn(thumb_medium, media_file.thumbnails.all())
-
-        # Test reverse relationship
-        self.assertEqual(thumb_small.media_file, media_file)
-        self.assertEqual(thumb_medium.media_file, media_file)

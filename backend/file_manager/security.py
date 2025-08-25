@@ -35,10 +35,7 @@ class MediaFilePermission(permissions.BasePermission):
         if not request.user.is_authenticated:
             return False
 
-        # Check if user has access to any namespaces
-        if not hasattr(request.user, "accessible_namespaces"):
-            return request.user.is_staff
-
+        # All authenticated users have basic access
         return True
 
     def has_object_permission(self, request, view, obj):
@@ -48,7 +45,7 @@ class MediaFilePermission(permissions.BasePermission):
             return True
 
         # Check namespace access
-        if not request.user.accessible_namespaces.filter(id=obj.namespace_id).exists():
+        if not self._has_namespace_access(request.user, obj.namespace):
             return False
 
         # Check access level
@@ -65,6 +62,29 @@ class MediaFilePermission(permissions.BasePermission):
             return obj.created_by == request.user or request.user.is_staff
 
         return True
+
+    def _has_namespace_access(self, user, namespace):
+        """
+        Check if user has access to the specified namespace.
+
+        Args:
+            user: User instance
+            namespace: Namespace instance
+
+        Returns:
+            bool: True if user has access, False otherwise
+        """
+        # Staff users have access to all namespaces
+        if user.is_staff:
+            return True
+
+        # Users have access to namespaces they created
+        if namespace.created_by == user:
+            return True
+
+        # For now, allow access to active namespaces for authenticated users
+        # This can be extended with more granular permissions later
+        return namespace.is_active
 
 
 class FileUploadValidator:
@@ -257,9 +277,9 @@ class FileUploadValidator:
         # Check for embedded scripts in images
         if results["metadata"].get("file_type") == "image":
             cls._check_image_security(file_content, results)
-
-        # Check for malicious content patterns
-        cls._check_malicious_patterns(file_content, results)
+        else:
+            # Check for malicious content patterns
+            cls._check_malicious_patterns(file_content, results)
 
         # Generate file hash for deduplication
         file_hash = hashlib.sha256(file_content).hexdigest()
@@ -287,6 +307,28 @@ class FileUploadValidator:
     @classmethod
     def _check_malicious_patterns(cls, file_content: bytes, results: Dict):
         """Check for common malicious patterns."""
+        # Get the detected MIME type from results
+        content_type = results.get("content_type", "")
+
+        # Skip pattern detection for binary files (images, videos, audio)
+        if content_type.startswith(("image/", "video/", "audio/")):
+            # For binary files, only check for very specific executable patterns
+            executable_patterns = [
+                b"#!/bin/",  # Shell scripts
+                b"#!/usr/bin/",  # Shell scripts
+                b"MZ",  # Windows executable header
+                b"\x7fELF",  # Linux executable header
+            ]
+
+            for pattern in executable_patterns:
+                if file_content.startswith(pattern):
+                    results["errors"].append(
+                        f"Executable content detected in media file"
+                    )
+                    results["is_valid"] = False
+            return
+
+        # For text-based files, check for script injection patterns
         malicious_patterns = [
             b"<?php",
             b"<%",
@@ -410,7 +452,7 @@ class SecureFileAccess:
             return True
 
         # Check namespace access
-        if not user.accessible_namespaces.filter(id=media_file.namespace_id).exists():
+        if not SecurityAuditLogger._has_namespace_access(user, media_file.namespace):
             return False
 
         # Check access level
@@ -457,6 +499,30 @@ class SecurityAuditLogger:
             f"Type: {violation_type}, "
             f"Details: {details}"
         )
+
+    @staticmethod
+    def _has_namespace_access(user, namespace):
+        """
+        Check if user has access to the specified namespace.
+
+        Args:
+            user: User instance
+            namespace: Namespace instance
+
+        Returns:
+            bool: True if user has access, False otherwise
+        """
+        # Staff users have access to all namespaces
+        if user.is_staff:
+            return True
+
+        # Users have access to namespaces they created
+        if namespace.created_by == user:
+            return True
+
+        # For now, allow access to active namespaces for authenticated users
+        # This can be extended with more granular permissions later
+        return namespace.is_active
 
 
 # Security middleware for additional protection
