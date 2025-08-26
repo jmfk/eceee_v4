@@ -24,13 +24,16 @@ import {
     CheckCircle,
     X,
     ChevronLeft,
-    ChevronRight
+    ChevronRight,
+    Edit3
 } from 'lucide-react';
 import { mediaApi } from '../../api';
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext';
 import BulkOperations from './BulkOperations';
 import OptimizedImage from './OptimizedImage';
+import MediaEditForm from './MediaEditForm';
 import { generateThumbnailUrl, generateImgproxyUrl } from '../../utils/imgproxy';
+import { extractErrorMessage } from '../../utils/errorHandling';
 
 const MediaBrowser = ({
     onFileSelect,
@@ -59,6 +62,7 @@ const MediaBrowser = ({
     const [isDragOver, setIsDragOver] = useState(false);
     const [uploadState, setUploadState] = useState('idle'); // idle, uploading, complete
     const [showBulkOperations, setShowBulkOperations] = useState(false);
+    const [editingFile, setEditingFile] = useState(null);
 
     const { addNotification } = useGlobalNotifications();
 
@@ -142,6 +146,24 @@ const MediaBrowser = ({
                 return newSelection;
             });
         }
+    };
+
+    // Handle edit button click
+    const handleEditClick = (file, event) => {
+        event.stopPropagation(); // Prevent file selection
+        setEditingFile(file);
+    };
+
+    // Handle edit form save
+    const handleEditSave = (updatedFile) => {
+        setEditingFile(null);
+        // Refresh the file list to show updated data
+        loadFiles(true);
+    };
+
+    // Handle edit form cancel
+    const handleEditCancel = () => {
+        setEditingFile(null);
     };
 
     const isFileSelected = (file) => {
@@ -240,7 +262,10 @@ const MediaBrowser = ({
             }, 2000);
 
         } catch (error) {
-            addNotification('Upload failed', 'error');
+            console.error('Upload error:', error);
+
+            const errorMessage = extractErrorMessage(error, 'Upload failed');
+            addNotification(errorMessage, 'error');
             setUploadState('idle');
         }
     };
@@ -316,7 +341,7 @@ const MediaBrowser = ({
                 <div
                     key={file.id}
                     className={`
-                        group cursor-pointer rounded-lg border-2 transition-all duration-200 hover:shadow-md
+                        group cursor-pointer rounded-lg border-2 transition-all duration-200 hover:shadow-md relative
                         ${isFileSelected(file)
                             ? 'border-blue-500 bg-blue-50 shadow-md'
                             : 'border-gray-200 hover:border-gray-300'
@@ -324,6 +349,15 @@ const MediaBrowser = ({
                     `}
                     onClick={() => handleFileClick(file)}
                 >
+                    {/* Edit Button */}
+                    <button
+                        onClick={(e) => handleEditClick(file, e)}
+                        className="absolute top-2 right-2 z-10 p-1.5 bg-white rounded-full shadow-md transition-opacity duration-200 hover:bg-gray-50"
+                        title="Edit file"
+                    >
+                        <Edit3 className="w-3.5 h-3.5 text-gray-600" />
+                    </button>
+
                     <div className="aspect-square p-2">
                         {renderThumbnail(file, 200)}
                     </div>
@@ -351,16 +385,17 @@ const MediaBrowser = ({
         <div className="overflow-hidden">
             <div className="grid grid-cols-12 gap-4 p-4 bg-gray-50 border-b border-gray-200 text-sm font-medium text-gray-700">
                 <div className="col-span-1">Preview</div>
-                <div className="col-span-4">Title</div>
+                <div className="col-span-3">Title</div>
                 <div className="col-span-2">Type</div>
                 <div className="col-span-2">Size</div>
                 <div className="col-span-3">Created</div>
+                <div className="col-span-1">Actions</div>
             </div>
             {files.map((file) => (
                 <div
                     key={file.id}
                     className={`
-                        grid grid-cols-12 gap-4 p-4 border-b border-gray-100 cursor-pointer transition-colors hover:bg-gray-50
+                        group grid grid-cols-12 gap-4 p-4 border-b border-gray-100 cursor-pointer transition-colors hover:bg-gray-50 items-center
                         ${isFileSelected(file) ? 'bg-blue-50 border-blue-200' : ''}
                     `}
                     onClick={() => handleFileClick(file)}
@@ -370,207 +405,236 @@ const MediaBrowser = ({
                             {renderThumbnail(file, 48)}
                         </div>
                     </div>
-                    <div className="col-span-4">
-                        <div className="flex flex-col">
+                    <div className="col-span-3">
+                        <div className="flex flex-col justify-center">
                             <span className="font-medium text-gray-900 truncate">{file.title}</span>
                             <span className="text-sm text-gray-500 truncate">{file.originalFilename || file.original_filename}</span>
                         </div>
                     </div>
-                    <div className="col-span-2 text-sm text-gray-600 capitalize">{file.fileType || file.file_type}</div>
-                    <div className="col-span-2 text-sm text-gray-600">{formatFileSize(file.fileSize || file.file_size)}</div>
-                    <div className="col-span-3 text-sm text-gray-600">{formatDate(file.createdAt || file.created_at)}</div>
+                    <div className="col-span-2 text-sm text-gray-600 capitalize flex items-center">{file.fileType || file.file_type}</div>
+                    <div className="col-span-2 text-sm text-gray-600 flex items-center">{formatFileSize(file.fileSize || file.file_size)}</div>
+                    <div className="col-span-3 text-sm text-gray-600 flex items-center">{formatDate(file.createdAt || file.created_at)}</div>
+                    <div className="col-span-1 flex justify-center items-center">
+                        <button
+                            onClick={(e) => handleEditClick(file, e)}
+                            className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                            title="Edit file"
+                        >
+                            <Edit3 className="w-4 h-4" />
+                        </button>
+                    </div>
                 </div>
             ))}
         </div>
     );
 
     return (
-        <div className="h-full flex flex-col">
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row gap-4 p-4 bg-white border-b border-gray-200">
-                <div className="flex-1">
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                        <input
-                            type="text"
-                            placeholder="Search media files..."
-                            value={searchQuery}
-                            onChange={handleSearch}
-                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        />
-                    </div>
-                </div>
-
-                <div className="flex gap-2">
-                    <select
-                        value={filters.fileType}
-                        onChange={(e) => handleFilterChange('fileType', e.target.value)}
-                        className="px-3 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                        <option value="">All Types</option>
-                        <option value="image">Images</option>
-                        <option value="video">Videos</option>
-                        <option value="audio">Audio</option>
-                        <option value="document">Documents</option>
-                        <option value="other">Other</option>
-                    </select>
-
-
-                </div>
-
-                <div className="flex rounded-md border border-gray-300 overflow-hidden">
-                    <button
-                        onClick={() => setViewMode('grid')}
-                        className={`
-                            flex items-center gap-2 px-3 py-2 text-sm font-medium transition-colors
-                            ${viewMode === 'grid'
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-white text-gray-700 hover:bg-gray-50'
-                            }
-                        `}
-                    >
-                        <Grid3X3 className="w-4 h-4" />
-                        Grid
-                    </button>
-                    <button
-                        onClick={() => setViewMode('list')}
-                        className={`
-                            flex items-center gap-2 px-3 py-2 text-sm font-medium transition-colors border-l border-gray-300
-                            ${viewMode === 'list'
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-white text-gray-700 hover:bg-gray-50'
-                            }
-                        `}
-                    >
-                        <List className="w-4 h-4" />
-                        List
-                    </button>
-                </div>
-            </div>
-
-            {/* Upload Area */}
-            {showUploader && (
-                <div
-                    className={`
-                        m-4 border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-all duration-200
-                        ${isDragOver
-                            ? 'border-blue-500 bg-blue-50 scale-105'
-                            : 'border-gray-300 bg-gray-50 hover:border-blue-400 hover:bg-blue-50'
-                        }
-                        ${uploadState === 'uploading'
-                            ? 'border-green-500 bg-green-50 pointer-events-none opacity-70'
-                            : ''
-                        }
-                    `}
-                    onDragOver={handleDragOver}
-                    onDragLeave={handleDragLeave}
-                    onDrop={handleDrop}
-                    onClick={() => document.getElementById('file-input').click()}
-                >
-                    <div className="pointer-events-none">
-                        {uploadState === 'uploading' ? (
-                            <div className="flex flex-col items-center gap-3">
-                                <Loader2 className="w-8 h-8 animate-spin text-green-600" />
-                                <p className="text-gray-700">Uploading files...</p>
-                            </div>
-                        ) : uploadState === 'complete' ? (
-                            <div className="flex flex-col items-center gap-3">
-                                <CheckCircle className="w-8 h-8 text-green-600" />
-                                <p className="text-green-700 font-medium">Upload complete!</p>
-                            </div>
-                        ) : (
-                            <div className="flex flex-col items-center gap-3">
-                                <FolderOpen className="w-12 h-12 text-gray-400" />
-                                <div>
-                                    <p className="text-gray-700 mb-1">
-                                        <span className="font-semibold">Drag files here</span> or <span className="text-blue-600 underline">click to browse</span>
-                                    </p>
-                                    <p className="text-sm text-gray-500">
-                                        Supports images, documents, videos, and audio files
-                                    </p>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                    <input
-                        id="file-input"
-                        type="file"
-                        multiple
-                        accept="image/*,application/pdf,.doc,.docx,video/*,audio/*"
-                        onChange={handleFileInputChange}
-                        className="hidden"
-                    />
-                </div>
-            )}
-
-            {/* Selection info */}
-            {selectedFiles.length > 0 && (
-                <div className="flex justify-between items-center px-4 py-3 bg-blue-50 border-b border-blue-200">
-                    <p className="text-sm text-blue-700 font-medium">
-                        {selectedFiles.length} file(s) selected
-                    </p>
-                    <div className="flex items-center gap-2">
-                        <button
-                            onClick={() => setShowBulkOperations(true)}
-                            className="flex items-center gap-2 px-3 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                        >
-                            Bulk Actions
-                        </button>
-                        <button
-                            onClick={() => setSelectedFiles([])}
-                            className="flex items-center gap-1 px-3 py-1 text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded transition-colors"
-                        >
-                            <X className="w-3 h-3" />
-                            Clear Selection
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            {/* Content */}
-            <div className="flex-1 overflow-auto">
-                {loading ? (
-                    <div className="flex items-center justify-center h-64">
-                        <div className="text-center">
-                            <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-600" />
-                            <p className="text-gray-600">Loading media files...</p>
+        <div className="h-full flex flex-col overflow-hidden">
+            {/* Fixed Top Section - Header, Upload Area, Selection Info */}
+            <div className="flex-shrink-0">
+                {/* Header */}
+                <div className="flex flex-col sm:flex-row gap-4 p-4 bg-white border-b border-gray-200">
+                    <div className="flex-1">
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                            <input
+                                type="text"
+                                placeholder="Search media files..."
+                                value={searchQuery}
+                                onChange={handleSearch}
+                                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            />
                         </div>
                     </div>
-                ) : files.length === 0 ? (
-                    <div></div>
-                ) : (
-                    <>
-                        {viewMode === 'grid' ? renderGridView() : renderListView()}
-                    </>
+
+                    <div className="flex gap-2">
+                        <select
+                            value={filters.fileType}
+                            onChange={(e) => handleFilterChange('fileType', e.target.value)}
+                            className="px-3 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                            <option value="">All Types</option>
+                            <option value="image">Images</option>
+                            <option value="video">Videos</option>
+                            <option value="audio">Audio</option>
+                            <option value="document">Documents</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+
+                    <div className="flex rounded-md border border-gray-300 overflow-hidden">
+                        <button
+                            onClick={() => setViewMode('grid')}
+                            className={`
+                                flex items-center gap-2 px-3 py-2 text-sm font-medium transition-colors
+                                ${viewMode === 'grid'
+                                    ? 'bg-blue-600 text-white'
+                                    : 'bg-white text-gray-700 hover:bg-gray-50'
+                                }
+                            `}
+                        >
+                            <Grid3X3 className="w-4 h-4" />
+                            Grid
+                        </button>
+                        <button
+                            onClick={() => setViewMode('list')}
+                            className={`
+                                flex items-center gap-2 px-3 py-2 text-sm font-medium transition-colors border-l border-gray-300
+                                ${viewMode === 'list'
+                                    ? 'bg-blue-600 text-white'
+                                    : 'bg-white text-gray-700 hover:bg-gray-50'
+                                }
+                            `}
+                        >
+                            <List className="w-4 h-4" />
+                            List
+                        </button>
+                    </div>
+                </div>
+
+                {/* Upload Area or Edit Form */}
+                {showUploader && (
+                    editingFile ? (
+                        <div className="m-4">
+                            <MediaEditForm
+                                file={editingFile}
+                                namespace={namespace}
+                                onSave={handleEditSave}
+                                onCancel={handleEditCancel}
+                                mode="edit"
+                            />
+                        </div>
+                    ) : (
+                        <div
+                            className={`
+                                m-4 border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-all duration-200
+                                ${isDragOver
+                                    ? 'border-blue-500 bg-blue-50 scale-105'
+                                    : 'border-gray-300 bg-gray-50 hover:border-blue-400 hover:bg-blue-50'
+                                }
+                                ${uploadState === 'uploading'
+                                    ? 'border-green-500 bg-green-50 pointer-events-none opacity-70'
+                                    : ''
+                                }
+                            `}
+                            onDragOver={handleDragOver}
+                            onDragLeave={handleDragLeave}
+                            onDrop={handleDrop}
+                            onClick={() => document.getElementById('file-input').click()}
+                        >
+                            <div className="pointer-events-none">
+                                {uploadState === 'uploading' ? (
+                                    <div className="flex flex-col items-center gap-2">
+                                        <Loader2 className="w-6 h-6 animate-spin text-green-600" />
+                                        <p className="text-sm text-gray-700">Uploading files...</p>
+                                    </div>
+                                ) : uploadState === 'complete' ? (
+                                    <div className="flex flex-col items-center gap-2">
+                                        <CheckCircle className="w-6 h-6 text-green-600" />
+                                        <p className="text-sm text-green-700 font-medium">Upload complete!</p>
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col items-center gap-2">
+                                        <FolderOpen className="w-8 h-8 text-gray-400" />
+                                        <div>
+                                            <p className="text-sm text-gray-700 mb-1">
+                                                <span className="font-semibold">Drag files here</span> or <span className="text-blue-600 underline">click to browse</span>
+                                            </p>
+                                            <p className="text-xs text-gray-500">
+                                                Supports images, documents, videos, and audio files
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                            <input
+                                id="file-input"
+                                type="file"
+                                multiple
+                                accept="image/*,application/pdf,.doc,.docx,video/*,audio/*"
+                                onChange={handleFileInputChange}
+                                className="hidden"
+                            />
+                        </div>
+                    )
+                )}
+
+                {/* Selection info */}
+                {selectedFiles.length > 0 && (
+                    <div className="flex justify-between items-center px-4 py-3 bg-blue-50 border-b border-blue-200">
+                        <p className="text-sm text-blue-700 font-medium">
+                            {selectedFiles.length} file(s) selected
+                        </p>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setShowBulkOperations(true)}
+                                className="flex items-center gap-2 px-3 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                            >
+                                Bulk Actions
+                            </button>
+                            <button
+                                onClick={() => setSelectedFiles([])}
+                                className="flex items-center gap-1 px-3 py-1 text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded transition-colors"
+                            >
+                                <X className="w-3 h-3" />
+                                Clear Selection
+                            </button>
+                        </div>
+                    </div>
                 )}
             </div>
 
-            {/* Pagination */}
-            {pagination.totalPages > 1 && (
-                <div className="flex justify-between items-center px-4 py-3 bg-gray-50 border-t border-gray-200">
-                    <button
-                        onClick={() => handlePageChange(pagination.page - 1)}
-                        disabled={pagination.page <= 1}
-                        className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                        <ChevronLeft className="w-4 h-4" />
-                        Previous
-                    </button>
-
-                    <span className="text-sm text-gray-600">
-                        Page {pagination.page} of {pagination.totalPages} • {pagination.count} total files
-                    </span>
-
-                    <button
-                        onClick={() => handlePageChange(pagination.page + 1)}
-                        disabled={pagination.page >= pagination.totalPages}
-                        className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                        Next
-                        <ChevronRight className="w-4 h-4" />
-                    </button>
+            {/* Scrollable Content Section */}
+            <div className="flex-1 flex flex-col min-h-0 h-0">
+                <div className="flex-1 overflow-y-auto h-full">
+                    {loading ? (
+                        <div className="flex items-center justify-center h-64">
+                            <div className="text-center">
+                                <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-600" />
+                                <p className="text-gray-600">Loading media files...</p>
+                            </div>
+                        </div>
+                    ) : files.length === 0 ? (
+                        <div className="flex items-center justify-center h-64">
+                            <div className="text-center">
+                                <FolderOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                                <p className="text-gray-600">No files found</p>
+                            </div>
+                        </div>
+                    ) : (
+                        <>
+                            {viewMode === 'grid' ? renderGridView() : renderListView()}
+                        </>
+                    )}
                 </div>
-            )}
+
+                {/* Fixed Pagination at bottom of scrollable area */}
+                {pagination.totalPages > 1 && (
+                    <div className="flex-shrink-0 flex justify-between items-center px-4 py-3 bg-gray-50 border-t border-gray-200">
+                        <button
+                            onClick={() => handlePageChange(pagination.page - 1)}
+                            disabled={pagination.page <= 1}
+                            className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                            <ChevronLeft className="w-4 h-4" />
+                            Previous
+                        </button>
+
+                        <span className="text-sm text-gray-600">
+                            Page {pagination.page} of {pagination.totalPages} • {pagination.count} total files
+                        </span>
+
+                        <button
+                            onClick={() => handlePageChange(pagination.page + 1)}
+                            disabled={pagination.page >= pagination.totalPages}
+                            className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                            Next
+                            <ChevronRight className="w-4 h-4" />
+                        </button>
+                    </div>
+                )}
+            </div>
 
             {/* Bulk Operations Modal */}
             {showBulkOperations && selectedFiles.length > 0 && (
