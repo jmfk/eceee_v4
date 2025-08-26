@@ -132,7 +132,6 @@ const TagManager = () => {
         reader.onload = (e) => {
             try {
                 const importedTags = JSON.parse(e.target.result)
-                console.log('Imported tags:', importedTags)
                 addNotification('Tag import functionality coming soon', 'info')
             } catch (error) {
                 addNotification('Invalid JSON file', 'error')

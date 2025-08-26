@@ -140,9 +140,18 @@ export const endpoints = {
         tag: (id) => `${BASE_PATH}/media/tags/${id}/`,
         collections: `${BASE_PATH}/media/collections/`,
         collection: (id) => `${BASE_PATH}/media/collections/${id}/`,
-        // Future endpoints for AI and bulk operations
+        // Pending files endpoints
+        pendingFiles: `${BASE_PATH}/media/pending-files/`,
+        pendingFile: (id) => `${BASE_PATH}/media/pending-files/${id}/`,
+        approvePendingFile: (id) => `${BASE_PATH}/media/pending-files/${id}/approve/`,
+        rejectPendingFile: (id) => `${BASE_PATH}/media/pending-files/${id}/reject/`,
+        bulkApprovePendingFiles: `${BASE_PATH}/media/pending-files/bulk_approve/`,
+        bulkRejectPendingFiles: `${BASE_PATH}/media/pending-files/bulk_reject/`,
+        // AI and bulk operations
         aiSuggestions: `${BASE_PATH}/media/ai-suggestions/`,
-        bulkOperations: `${BASE_PATH}/media/bulk-operations/`
+        bulkOperations: `${BASE_PATH}/media/bulk-operations/`,
+        // Slug validation
+        validateSlug: `${BASE_PATH}/media/validate-slug/`
     }
 }
 

@@ -9,7 +9,7 @@ from django.contrib import admin
 from django.utils.html import format_html
 from django.urls import reverse
 from django.utils.safestring import mark_safe
-from .models import MediaFile, MediaTag, MediaCollection, MediaUsage
+from .models import MediaFile, MediaTag, MediaCollection, MediaUsage, PendingMediaFile
 
 
 @admin.register(MediaTag)
@@ -78,6 +78,7 @@ class MediaFileAdmin(admin.ModelAdmin):
 
     list_display = [
         "title",
+        "slug",
         "file_type",
         "file_size_display",
         "dimensions_display",
@@ -307,3 +308,156 @@ class MediaUsageAdmin(admin.ModelAdmin):
     def has_change_permission(self, request, obj=None):
         """Usage records are read-only."""
         return False
+
+
+@admin.register(PendingMediaFile)
+class PendingMediaFileAdmin(admin.ModelAdmin):
+    """Admin interface for pending media files."""
+
+    list_display = [
+        "original_filename",
+        "file_type",
+        "file_size_display",
+        "status",
+        "namespace",
+        "uploaded_by",
+        "created_at",
+        "expires_at",
+    ]
+    list_filter = [
+        "status",
+        "file_type",
+        "namespace",
+        "uploaded_by",
+        "created_at",
+        "expires_at",
+    ]
+    search_fields = [
+        "original_filename",
+        "ai_suggested_title",
+        "ai_extracted_text",
+    ]
+    readonly_fields = [
+        "id",
+        "file_hash",
+        "file_size",
+        "content_type",
+        "width",
+        "height",
+        "ai_generated_tags",
+        "ai_suggested_title",
+        "ai_extracted_text",
+        "ai_confidence_score",
+        "created_at",
+        "uploaded_by",
+    ]
+
+    fieldsets = (
+        (
+            None,
+            {"fields": ("original_filename", "status", "namespace", "folder_path")},
+        ),
+        (
+            "File Information",
+            {
+                "fields": (
+                    "file_path",
+                    "file_hash",
+                    "file_size",
+                    "content_type",
+                    "file_type",
+                ),
+                "classes": ("collapse",),
+            },
+        ),
+        ("Media Properties", {"fields": ("width", "height"), "classes": ("collapse",)}),
+        (
+            "AI Analysis",
+            {
+                "fields": (
+                    "ai_generated_tags",
+                    "ai_suggested_title",
+                    "ai_extracted_text",
+                    "ai_confidence_score",
+                ),
+                "classes": ("collapse",),
+            },
+        ),
+        (
+            "Metadata",
+            {
+                "fields": (
+                    "created_at",
+                    "expires_at",
+                    "uploaded_by",
+                ),
+                "classes": ("collapse",),
+            },
+        ),
+    )
+
+    actions = ["approve_files", "reject_files"]
+
+    def file_size_display(self, obj):
+        """Display human-readable file size."""
+        for unit in ["B", "KB", "MB", "GB", "TB"]:
+            if obj.file_size < 1024.0:
+                return f"{obj.file_size:.1f} {unit}"
+            obj.file_size /= 1024.0
+        return f"{obj.file_size:.1f} PB"
+
+    file_size_display.short_description = "Size"
+
+    def approve_files(self, request, queryset):
+        """Approve selected pending files."""
+        approved_count = 0
+        for pending_file in queryset.filter(status="pending"):
+            try:
+                # Use AI suggested title or filename as fallback
+                title = (
+                    pending_file.ai_suggested_title or pending_file.original_filename
+                )
+                pending_file.approve_and_create_media_file(title=title)
+                approved_count += 1
+            except Exception as e:
+                self.message_user(
+                    request,
+                    f"Failed to approve {pending_file.original_filename}: {e}",
+                    level="ERROR",
+                )
+
+        if approved_count > 0:
+            self.message_user(
+                request,
+                f"Successfully approved {approved_count} files.",
+                level="SUCCESS",
+            )
+
+    approve_files.short_description = "Approve selected pending files"
+
+    def reject_files(self, request, queryset):
+        """Reject selected pending files."""
+        rejected_count = 0
+        for pending_file in queryset.filter(status="pending"):
+            try:
+                pending_file.reject()
+                rejected_count += 1
+            except Exception as e:
+                self.message_user(
+                    request,
+                    f"Failed to reject {pending_file.original_filename}: {e}",
+                    level="ERROR",
+                )
+
+        if rejected_count > 0:
+            self.message_user(
+                request,
+                f"Successfully rejected {rejected_count} files.",
+                level="SUCCESS",
+            )
+
+    reject_files.short_description = "Reject selected pending files"
+
+    def get_queryset(self, request):
+        """Optimize queryset with select_related."""
+        return super().get_queryset(request).select_related("namespace", "uploaded_by")

@@ -29,7 +29,7 @@ import {
 } from 'lucide-react';
 import { mediaApi } from '../../api';
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext';
-import MediaMetadataForm from './MediaMetadataForm';
+import MediaApprovalForm from './MediaApprovalForm';
 
 const MediaUploader = ({
     namespace,
@@ -38,7 +38,7 @@ const MediaUploader = ({
     folderPath = '',
     maxFiles = 10
 }) => {
-    const [uploadState, setUploadState] = useState('idle'); // idle, uploading, metadata, complete
+    const [uploadState, setUploadState] = useState('idle'); // idle, uploading, approval, complete
     const [selectedFiles, setSelectedFiles] = useState([]);
     const [uploadProgress, setUploadProgress] = useState({});
     const [uploadResults, setUploadResults] = useState([]);
@@ -119,9 +119,9 @@ const MediaUploader = ({
 
             const result = await mediaApi.upload.upload(uploadData, onProgress);
 
-            // Handle direct API response
+            // Handle direct API response - now these are pending files
             setUploadResults(result.uploadedFiles || result.uploaded_files || []);
-            setUploadState('metadata');
+            setUploadState('approval');
 
             if (result.errors && result.errors.length > 0) {
                 setErrors(result.errors);
@@ -140,11 +140,22 @@ const MediaUploader = ({
         }
     };
 
-    // Metadata editing
-    const handleMetadataComplete = () => {
+    // Approval handling
+    const handleApprovalComplete = (results) => {
         setUploadState('complete');
         if (onUploadComplete) {
-            onUploadComplete(uploadResults);
+            // Extract approved media files from results
+            const approvedFiles = [];
+            results.forEach(result => {
+                if (result.type === 'approvals' && result.result.results) {
+                    result.result.results.forEach(item => {
+                        if (item.status === 'approved') {
+                            approvedFiles.push({ id: item.media_file_id });
+                        }
+                    });
+                }
+            });
+            onUploadComplete(approvedFiles);
         }
     };
 
@@ -198,13 +209,13 @@ const MediaUploader = ({
         );
     }
 
-    // Render metadata editing state
-    if (uploadState === 'metadata') {
+    // Render approval state
+    if (uploadState === 'approval') {
         return (
-            <MediaMetadataForm
-                uploadResults={uploadResults}
+            <MediaApprovalForm
+                pendingFiles={uploadResults}
                 namespace={namespace}
-                onComplete={handleMetadataComplete}
+                onComplete={handleApprovalComplete}
                 onCancel={resetUploader}
             />
         );
