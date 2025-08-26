@@ -58,6 +58,7 @@ const PendingMediaManager = ({ namespace, onFilesProcessed }) => {
     const [availableCollections, setAvailableCollections] = useState([]); // Available collections
     const [autoUpdatedSlugs, setAutoUpdatedSlugs] = useState({}); // Track files with automatically updated slugs
     const [validatingSlugs, setValidatingSlugs] = useState({}); // Track files with slugs being validated
+    const [fieldErrors, setFieldErrors] = useState({}); // Track validation errors for each field
 
     const { addNotification } = useGlobalNotifications();
 
@@ -81,6 +82,61 @@ const PendingMediaManager = ({ namespace, onFilesProcessed }) => {
     const slugValidationTimers = useRef({});
     const manualSlugValidationTimers = useRef({});
 
+    // Validate individual field
+    const validateField = (fileId, fieldName, value) => {
+        const errors = { ...fieldErrors };
+        if (!errors[fileId]) errors[fileId] = {};
+
+        switch (fieldName) {
+            case 'title':
+                if (!value || value.trim().length === 0) {
+                    errors[fileId].title = 'Title is required';
+                } else if (value.length > 255) {
+                    errors[fileId].title = 'Title must be less than 255 characters';
+                } else {
+                    delete errors[fileId].title;
+                }
+                break;
+
+            case 'slug':
+                if (value && !/^[a-z0-9-]+$/.test(value)) {
+                    errors[fileId].slug = 'Slug can only contain lowercase letters, numbers, and hyphens';
+                } else if (value && value.length > 255) {
+                    errors[fileId].slug = 'Slug must be less than 255 characters';
+                } else {
+                    delete errors[fileId].slug;
+                }
+                break;
+
+            case 'tags':
+                if (!value || value.length === 0) {
+                    errors[fileId].tags = 'At least one tag is required';
+                } else {
+                    delete errors[fileId].tags;
+                }
+                break;
+
+            case 'description':
+                if (value && value.length > 1000) {
+                    errors[fileId].description = 'Description must be less than 1000 characters';
+                } else {
+                    delete errors[fileId].description;
+                }
+                break;
+
+            default:
+                break;
+        }
+
+        // Clean up empty error objects
+        if (Object.keys(errors[fileId]).length === 0) {
+            delete errors[fileId];
+        }
+
+        setFieldErrors(errors);
+        return !errors[fileId] || !errors[fileId][fieldName];
+    };
+
     // Update form data for a specific file
     const updateFormData = (fileId, field, value) => {
         setFileFormData(prev => {
@@ -99,6 +155,15 @@ const PendingMediaManager = ({ namespace, onFilesProcessed }) => {
                 [fileId]: updatedData
             };
         });
+
+        // Validate the field
+        validateField(fileId, field, value);
+
+        // If title changed, also validate the auto-generated slug
+        if (field === 'title') {
+            const newSlug = generateSlug(value);
+            validateField(fileId, 'slug', newSlug);
+        }
 
         // If title changed, validate slug with backend after debounce
         if (field === 'title' && value.trim()) {
@@ -292,8 +357,25 @@ const PendingMediaManager = ({ namespace, onFilesProcessed }) => {
     // Mark file for approval
     const handleMarkForApproval = async (file) => {
         const formData = fileFormData[file.id];
-        if (!formData || !formData.title.trim()) {
-            addNotification('Title is required', 'error');
+
+        // Validate all fields before marking for approval
+        let hasErrors = false;
+
+        if (!validateField(file.id, 'title', formData?.title)) {
+            hasErrors = true;
+        }
+        if (!validateField(file.id, 'tags', formData?.tags)) {
+            hasErrors = true;
+        }
+        if (!validateField(file.id, 'slug', formData?.slug)) {
+            hasErrors = true;
+        }
+        if (!validateField(file.id, 'description', formData?.description)) {
+            hasErrors = true;
+        }
+
+        if (hasErrors) {
+            addNotification('Please fix validation errors before marking for approval', 'error');
             return;
         }
 
@@ -459,22 +541,10 @@ const PendingMediaManager = ({ namespace, onFilesProcessed }) => {
 
     // Individual file actions
     const handleApproveFile = async (file) => {
-        try {
-            const approvalData = {
-                title: file.aiSuggestedTitle || file.originalFilename,
-                description: '',
-                tagIds: [],
-                accessLevel: 'public'
-            };
-
-            await mediaApi.pendingFiles.approve(file.id, approvalData);
-            addNotification(`${file.originalFilename} approved successfully`, 'success');
-            loadPendingFiles();
-            if (onFilesProcessed) onFilesProcessed();
-        } catch (error) {
-            console.error('Failed to approve file:', error);
-            addNotification(`Failed to approve ${file.originalFilename}`, 'error');
-        }
+        // This function should not be used anymore as it doesn't handle tags
+        // All approvals should go through the form-based approval process
+        addNotification('Please use the approval form to assign tags before approving files', 'warning');
+        return;
     };
 
     const handleMarkForRejection = (file) => {
@@ -494,20 +564,58 @@ const PendingMediaManager = ({ namespace, onFilesProcessed }) => {
         const rejectedFiles = markedFileIds.filter(id => markedFiles[id].action === 'reject');
 
         try {
+            // Validate approved files have required tags
+            for (const fileId of approvedFiles) {
+                const formData = fileFormData[fileId];
+                if (!formData || !formData.tags || formData.tags.length === 0) {
+                    const file = pendingFiles.find(f => f.id === fileId);
+                    const filename = file ? file.originalFilename : 'Unknown file';
+                    addNotification(`${filename} cannot be approved: at least one tag is required`, 'error');
+                    return;
+                }
+            }
+
             // Process approved files
+            const approvalErrors = [];
             for (const fileId of approvedFiles) {
                 const file = pendingFiles.find(f => f.id === fileId);
                 const formData = fileFormData[fileId];
 
                 if (file && formData) {
-                    await mediaApi.pendingFiles.approve(fileId, {
-                        title: formData.title,
-                        slug: formData.slug,
-                        tags: formData.tags || [],
-                        accessLevel: formData.accessLevel,
-                        collectionId: selectedCollection === 'new' ? null : selectedCollection,
-                        collectionName: selectedCollection === 'new' ? newCollectionName : null
-                    })();
+                    try {
+                        await mediaApi.pendingFiles.approve(fileId, {
+                            title: formData.title,
+                            slug: formData.slug,
+                            tag_ids: formData.tags || [],
+                            access_level: formData.accessLevel,
+                            collection_id: selectedCollection === 'new' ? null : selectedCollection,
+                            collection_name: selectedCollection === 'new' ? newCollectionName : null
+                        })();
+                    } catch (error) {
+                        console.error(`Failed to approve ${file.originalFilename}:`, error);
+
+                        // Handle validation errors from server
+                        if (error.response?.data) {
+                            const serverErrors = error.response.data;
+                            const errors = { ...fieldErrors };
+                            if (!errors[fileId]) errors[fileId] = {};
+
+                            // Map server field errors to frontend fields
+                            if (serverErrors.title) {
+                                errors[fileId].title = Array.isArray(serverErrors.title) ? serverErrors.title[0] : serverErrors.title;
+                            }
+                            if (serverErrors.tag_ids) {
+                                errors[fileId].tags = Array.isArray(serverErrors.tag_ids) ? serverErrors.tag_ids[0] : serverErrors.tag_ids;
+                            }
+                            if (serverErrors.slug) {
+                                errors[fileId].slug = Array.isArray(serverErrors.slug) ? serverErrors.slug[0] : serverErrors.slug;
+                            }
+
+                            setFieldErrors(errors);
+                        }
+
+                        approvalErrors.push(`${file.originalFilename}: ${error.response?.data?.detail || error.message}`);
+                    }
                 }
             }
 
@@ -516,10 +624,22 @@ const PendingMediaManager = ({ namespace, onFilesProcessed }) => {
                 await mediaApi.pendingFiles.reject(fileId)();
             }
 
-            addNotification(
-                `Successfully processed ${approvedFiles.length} approved and ${rejectedFiles.length} rejected files`,
-                'success'
-            );
+            // Show appropriate notifications
+            const successfulApprovals = approvedFiles.length - approvalErrors.length;
+
+            if (successfulApprovals > 0 || rejectedFiles.length > 0) {
+                addNotification(
+                    `Successfully processed ${successfulApprovals} approved and ${rejectedFiles.length} rejected files`,
+                    'success'
+                );
+            }
+
+            if (approvalErrors.length > 0) {
+                approvalErrors.forEach(error => {
+                    addNotification(error, 'error');
+                });
+                return; // Don't clear form data if there were errors
+            }
 
             // Clear marked files and form data
             setMarkedFiles({});
@@ -784,53 +904,55 @@ const PendingMediaManager = ({ namespace, onFilesProcessed }) => {
 
                                 {/* Submit Section - positioned after approved and rejected files */}
                                 {Object.keys(markedFiles).length > 0 && (
-                                    <div className="mb-8 p-6 bg-blue-50 border border-blue-200 rounded-lg">
-                                        <h3 className="text-lg font-semibold text-blue-900 mb-4">
-                                            Submit Marked Files ({Object.keys(markedFiles).length})
-                                        </h3>
+                                    <div className="mx-4">
+                                        <div className="mb-4 p-6 bg-blue-50 border border-blue-200 rounded-lg">
+                                            <h3 className="text-lg font-semibold text-blue-900 mb-4">
+                                                Submit Marked Files ({Object.keys(markedFiles).length})
+                                            </h3>
 
-                                        <div className="space-y-4">
-                                            {/* Collection Selection */}
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                    Media Collection (Optional)
-                                                </label>
-                                                <div className="space-y-2">
-                                                    <select
-                                                        value={selectedCollection}
-                                                        onChange={(e) => setSelectedCollection(e.target.value)}
-                                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                    >
-                                                        <option value="">No Collection</option>
-                                                        {availableCollections.map(collection => (
-                                                            <option key={collection.id} value={collection.id}>
-                                                                {collection.name}
-                                                            </option>
-                                                        ))}
-                                                        <option value="new">Create New Collection</option>
-                                                    </select>
-
-                                                    {selectedCollection === 'new' && (
-                                                        <input
-                                                            type="text"
-                                                            value={newCollectionName}
-                                                            onChange={(e) => setNewCollectionName(e.target.value)}
-                                                            placeholder="Enter new collection name"
+                                            <div className="space-y-4">
+                                                {/* Collection Selection */}
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                        Media Collection (Optional)
+                                                    </label>
+                                                    <div className="space-y-2">
+                                                        <select
+                                                            value={selectedCollection}
+                                                            onChange={(e) => setSelectedCollection(e.target.value)}
                                                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                        />
-                                                    )}
-                                                </div>
-                                            </div>
+                                                        >
+                                                            <option value="">No Collection</option>
+                                                            {availableCollections.map(collection => (
+                                                                <option key={collection.id} value={collection.id}>
+                                                                    {collection.name}
+                                                                </option>
+                                                            ))}
+                                                            <option value="new">Create New Collection</option>
+                                                        </select>
 
-                                            {/* Submit Button */}
-                                            <div className="flex justify-end">
-                                                <button
-                                                    onClick={handleSubmitMarkedFiles}
-                                                    disabled={selectedCollection === 'new' && !newCollectionName.trim()}
-                                                    className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
-                                                >
-                                                    Submit All
-                                                </button>
+                                                        {selectedCollection === 'new' && (
+                                                            <input
+                                                                type="text"
+                                                                value={newCollectionName}
+                                                                onChange={(e) => setNewCollectionName(e.target.value)}
+                                                                placeholder="Enter new collection name"
+                                                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                            />
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                {/* Submit Button */}
+                                                <div className="flex justify-end">
+                                                    <button
+                                                        onClick={handleSubmitMarkedFiles}
+                                                        disabled={selectedCollection === 'new' && !newCollectionName.trim()}
+                                                        className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+                                                    >
+                                                        Submit All
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -896,9 +1018,18 @@ const PendingMediaManager = ({ namespace, onFilesProcessed }) => {
                                                                                     type="text"
                                                                                     value={formData.title || ''}
                                                                                     onChange={(e) => updateFormData(file.id, 'title', e.target.value)}
-                                                                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                                                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${fieldErrors[file.id]?.title
+                                                                                        ? 'border-red-300 bg-red-50'
+                                                                                        : 'border-gray-300'
+                                                                                        }`}
                                                                                     placeholder="Enter file title"
                                                                                 />
+                                                                                {fieldErrors[file.id]?.title && (
+                                                                                    <div className="mt-1 text-sm text-red-600 flex items-center gap-1">
+                                                                                        <AlertCircle className="w-4 h-4" />
+                                                                                        {fieldErrors[file.id].title}
+                                                                                    </div>
+                                                                                )}
                                                                             </div>
 
                                                                             {/* Slug */}
@@ -911,7 +1042,10 @@ const PendingMediaManager = ({ namespace, onFilesProcessed }) => {
                                                                                         type="text"
                                                                                         value={formData.slug || ''}
                                                                                         onChange={(e) => handleManualSlugChange(file.id, e.target.value)}
-                                                                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                                                        className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${fieldErrors[file.id]?.slug
+                                                                                            ? 'border-red-300 bg-red-50'
+                                                                                            : 'border-gray-300'
+                                                                                            }`}
                                                                                         placeholder="Enter or edit slug"
                                                                                     />
                                                                                     {validatingSlugs[file.id] && (
@@ -920,6 +1054,12 @@ const PendingMediaManager = ({ namespace, onFilesProcessed }) => {
                                                                                         </div>
                                                                                     )}
                                                                                 </div>
+                                                                                {fieldErrors[file.id]?.slug && (
+                                                                                    <div className="mt-1 text-sm text-red-600 flex items-center gap-1">
+                                                                                        <AlertCircle className="w-4 h-4" />
+                                                                                        {fieldErrors[file.id].slug}
+                                                                                    </div>
+                                                                                )}
                                                                                 {autoUpdatedSlugs[file.id] && (
                                                                                     <div className="mt-1 text-xs text-red-600 flex items-center gap-1">
                                                                                         <AlertCircle className="w-3 h-3" />
@@ -936,9 +1076,12 @@ const PendingMediaManager = ({ namespace, onFilesProcessed }) => {
 
                                                                         {/* Tags Section */}
                                                                         <div>
-                                                                            <h4 className="text-sm font-medium text-gray-700 mb-3">Tags</h4>
+                                                                            <h4 className="text-sm font-medium text-gray-700 mb-3">Tags *</h4>
 
-                                                                            <div className="bg-white p-4 rounded-md border border-gray-200">
+                                                                            <div className={`bg-white p-4 rounded-md border ${fieldErrors[file.id]?.tags
+                                                                                ? 'border-red-300 bg-red-50'
+                                                                                : 'border-gray-200'
+                                                                                }`}>
                                                                                 <MediaTagWidget
                                                                                     tags={formData.tags || []}
                                                                                     onChange={(tags) => updateFormData(file.id, 'tags', tags)}
@@ -946,6 +1089,12 @@ const PendingMediaManager = ({ namespace, onFilesProcessed }) => {
                                                                                     disabled={false}
                                                                                 />
                                                                             </div>
+                                                                            {fieldErrors[file.id]?.tags && (
+                                                                                <div className="mt-1 text-sm text-red-600 flex items-center gap-1">
+                                                                                    <AlertCircle className="w-4 h-4" />
+                                                                                    {fieldErrors[file.id].tags}
+                                                                                </div>
+                                                                            )}
                                                                         </div>
                                                                         <div className="mt-4 flex justify-end gap-3">
                                                                             <button
@@ -998,7 +1147,7 @@ const PendingMediaManager = ({ namespace, onFilesProcessed }) => {
                             </>
                         );
                     })()}
-                </div>
+                </div >
             )}
         </div>
     );

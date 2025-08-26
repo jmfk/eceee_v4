@@ -121,16 +121,48 @@ const MediaUploader = ({
 
             // Handle direct API response - now these are pending files
             setUploadResults(result.uploadedFiles || result.uploaded_files || []);
-            setUploadState('approval');
 
-            if (result.errors && result.errors.length > 0) {
-                setErrors(result.errors);
+            // Handle rejected files (duplicates)
+            const rejectedFiles = result.rejectedFiles || result.rejected_files || [];
+            const successCount = result.successCount || result.success_count || 0;
+            const rejectedCount = result.rejectedCount || result.rejected_count || 0;
+            const errorCount = result.errorCount || result.error_count || 0;
+
+            // Combine errors and rejected files for display
+            const allErrors = [...(result.errors || []), ...rejectedFiles];
+            setErrors(allErrors);
+
+            // Show appropriate notifications
+            if (rejectedCount > 0 && successCount === 0 && errorCount === 0) {
+                // All files were rejected as duplicates
                 addNotification(
-                    `${result.successCount || result.success_count || 0} files uploaded, ${result.errorCount || result.error_count || 0} failed`,
+                    `${rejectedCount} file${rejectedCount > 1 ? 's' : ''} rejected: identical files already exist`,
+                    'warning'
+                );
+                setUploadState('idle'); // Don't go to approval state if no files to approve
+                return;
+            } else if (rejectedCount > 0) {
+                // Some files rejected, some succeeded
+                addNotification(
+                    `${successCount} files uploaded, ${rejectedCount} rejected as duplicates${errorCount > 0 ? `, ${errorCount} failed` : ''}`,
+                    'warning'
+                );
+            } else if (errorCount > 0) {
+                // Some files failed with errors
+                addNotification(
+                    `${successCount} files uploaded, ${errorCount} failed`,
                     'warning'
                 );
             } else {
-                addNotification(`${result.successCount || result.success_count || result.uploadedFiles?.length || 0} files uploaded successfully`, 'success');
+                // All files succeeded
+                addNotification(`${successCount} files uploaded successfully`, 'success');
+            }
+
+            // Only go to approval state if there are files to approve
+            if (successCount > 0) {
+                setUploadState('approval');
+            } else {
+                setUploadState('idle');
             }
         } catch (error) {
             console.error('Upload error:', error);

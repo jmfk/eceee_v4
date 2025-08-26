@@ -6,6 +6,7 @@ AI suggestions, and bulk operations.
 """
 
 import logging
+import hashlib
 from typing import Dict, Any
 from django.conf import settings
 from django.db import models
@@ -273,7 +274,6 @@ class MediaUploadView(APIView):
         files = serializer.validated_data["files"]
         folder_path = serializer.validated_data.get("folder_path", "")
         namespace = serializer.validated_data["namespace"]
-        print("namespace", namespace)
         # Check namespace access
         if not self._has_namespace_access(request.user, namespace):
             SecurityAuditLogger.log_security_violation(
@@ -312,33 +312,91 @@ class MediaUploadView(APIView):
             # Use validated metadata
             validated_metadata = validation_result["metadata"]
             try:
-                # Upload to S3
+                # Calculate file hash first for duplicate detection
+                uploaded_file.seek(0)
+                file_content = uploaded_file.read()
+                uploaded_file.seek(0)
+                file_hash = hashlib.sha256(file_content).hexdigest()
+                # Check for existing files with same hash in MediaFile (approved files)
+                existing_media_file = MediaFile.objects.filter(
+                    file_hash=file_hash
+                ).first()
+
+                if existing_media_file:
+                    errors.append(
+                        {
+                            "filename": uploaded_file.name,
+                            "error": f"File rejected: identical file already exists as '{existing_media_file.title}'",
+                            "status": "rejected",
+                            "reason": "duplicate",
+                            "existing_file": {
+                                "id": str(existing_media_file.id),
+                                "title": existing_media_file.title,
+                                "slug": existing_media_file.slug,
+                                "created_at": existing_media_file.created_at.isoformat(),
+                            },
+                        }
+                    )
+                    SecurityAuditLogger.log_file_upload(
+                        request.user,
+                        {
+                            "filename": uploaded_file.name,
+                            "size": uploaded_file.size,
+                            "hash": file_hash,
+                            "rejection_reason": "duplicate_file",
+                        },
+                        success=False,
+                    )
+                    continue
+
+                # Check for existing files with same hash in PendingMediaFile (pending files)
+                existing_pending_file = PendingMediaFile.objects.filter(
+                    file_hash=file_hash, status__in=["pending", "approved"]
+                ).first()
+                if existing_pending_file:
+                    errors.append(
+                        {
+                            "filename": uploaded_file.name,
+                            "error": f"File rejected: identical file already pending approval (uploaded {existing_pending_file.created_at.strftime('%Y-%m-%d %H:%M')})",
+                            "status": "rejected",
+                            "reason": "duplicate_pending",
+                            "existing_file": {
+                                "id": str(existing_pending_file.id),
+                                "original_filename": existing_pending_file.original_filename,
+                                "status": existing_pending_file.status,
+                                "created_at": existing_pending_file.created_at.isoformat(),
+                            },
+                        }
+                    )
+                    SecurityAuditLogger.log_file_upload(
+                        request.user,
+                        {
+                            "filename": uploaded_file.name,
+                            "size": uploaded_file.size,
+                            "hash": file_hash,
+                            "rejection_reason": "duplicate_pending_file",
+                        },
+                        success=False,
+                    )
+                    continue
+
+                # Upload to S3 (will also detect S3-level duplicates)
                 upload_result = storage.upload_file(uploaded_file, folder_path)
 
-                # Skip if file already exists in approved media files
+                # Double-check if S3 detected existing file (shouldn't happen with our hash checks above)
                 if upload_result.get("existing_file"):
-                    existing_file = MediaFile.objects.filter(
-                        file_hash=upload_result["file_hash"]
-                    ).first()
-
-                    if existing_file:
-                        uploaded_files.append(
+                    if not existing_media_file and not existing_pending_file:
+                        pass  # add to pending
+                    else:
+                        logger.warning(
+                            f"S3 detected existing file that database checks missed: {upload_result['file_hash']}"
+                        )
+                        errors.append(
                             {
-                                "id": existing_file.id,
-                                "title": existing_file.title,
-                                "original_filename": existing_file.original_filename,
-                                "file_type": existing_file.file_type,
-                                "file_size": existing_file.file_size,
-                                "width": existing_file.width,
-                                "height": existing_file.height,
-                                "ai_suggestions": {
-                                    "tags": existing_file.ai_generated_tags,
-                                    "title": existing_file.ai_suggested_title,
-                                    "confidence_score": existing_file.ai_confidence_score,
-                                    "extracted_text": existing_file.ai_extracted_text,
-                                },
-                                "status": "exists",
-                                "message": "File already exists",
+                                "filename": uploaded_file.name,
+                                "error": "File rejected: identical file detected in storage",
+                                "status": "rejected",
+                                "reason": "duplicate_storage",
                             }
                         )
                         continue
@@ -421,16 +479,33 @@ class MediaUploadView(APIView):
                 logger.error(f"Upload failed for {uploaded_file.name}: {e}")
                 errors.append({"filename": uploaded_file.name, "error": str(e)})
 
+        # Separate rejected files from other errors
+        rejected_files = [
+            error for error in errors if error.get("status") == "rejected"
+        ]
+        other_errors = [error for error in errors if error.get("status") != "rejected"]
+
         response_data = {
             "uploaded_files": uploaded_files,
+            "rejected_files": rejected_files,
             "success_count": len(uploaded_files),
-            "error_count": len(errors),
+            "rejected_count": len(rejected_files),
+            "error_count": len(other_errors),
         }
 
-        if errors:
-            response_data["errors"] = errors
+        if other_errors:
+            response_data["errors"] = other_errors
 
-        return Response(response_data, status=status.HTTP_201_CREATED)
+        # Return appropriate status code
+        if len(uploaded_files) > 0:
+            # Some files were successfully uploaded
+            return Response(response_data, status=status.HTTP_201_CREATED)
+        elif len(rejected_files) > 0 and len(other_errors) == 0:
+            # All files were rejected due to duplicates (not an error, just rejected)
+            return Response(response_data, status=status.HTTP_200_OK)
+        else:
+            # All files failed with errors
+            return Response(response_data, status=status.HTTP_400_BAD_REQUEST)
 
     def _has_namespace_access(self, user, namespace):
         """

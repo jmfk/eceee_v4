@@ -34,6 +34,7 @@ import { generateThumbnailUrl, generateImgproxyUrl } from '../../utils/imgproxy'
 
 const MediaBrowser = ({
     onFileSelect,
+    onFilesLoaded,
     selectionMode = 'single', // 'single', 'multiple', 'none'
     fileTypes = [], // Filter by file types
     namespace,
@@ -107,6 +108,7 @@ const MediaBrowser = ({
             setFiles([]);
         } finally {
             setLoading(false);
+            if (onFilesLoaded) onFilesLoaded();
         }
     }, [searchQuery, memoizedFilters, namespace, memoizedFileTypes, addNotification]);
 
@@ -216,6 +218,7 @@ const MediaBrowser = ({
 
             // Handle direct API response
             const uploadedCount = result.uploadedFiles?.length || result.successCount || 0;
+            const rejectedCount = result.rejectedFiles?.length || result.rejectedCount || 0;
             const errorCount = result.errors?.length || result.errorCount || 0;
 
             if (uploadedCount > 0) {
@@ -223,8 +226,12 @@ const MediaBrowser = ({
                 loadFiles(true); // Refresh file list
             }
 
+            if (rejectedCount > 0) {
+                addNotification(`${rejectedCount} file${rejectedCount > 1 ? 's' : ''} rejected: identical files already exist`, 'warning');
+            }
+
             if (errorCount > 0) {
-                addNotification(`${errorCount} files failed to upload`, 'warning');
+                addNotification(`${errorCount} files failed to upload`, 'error');
             }
 
             setUploadState('complete');

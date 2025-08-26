@@ -146,7 +146,7 @@ class PendingMediaFile(models.Model):
     file_size = models.BigIntegerField(help_text="File size in bytes")
     content_type = models.CharField(max_length=100)
     file_hash = models.CharField(
-        max_length=64, help_text="SHA-256 hash for deduplication"
+        max_length=64, unique=True, help_text="SHA-256 hash for deduplication"
     )
 
     # Media-specific metadata

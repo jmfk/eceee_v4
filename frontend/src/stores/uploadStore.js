@@ -184,15 +184,22 @@ const useUploadStore = create(
                         get().updateGlobalProgress();
                     });
 
-                    // Upload successful
+                    // Check if file was rejected as duplicate
+                    const rejectedFiles = result.rejectedFiles || result.rejected_files || [];
+                    const wasRejected = rejectedFiles.some(rejected =>
+                        rejected.filename === nextItem.file.name
+                    );
+
+                    // Upload completed (successful or rejected)
                     set(state => ({
                         queue: state.queue.map(item =>
                             item.id === nextItem.id
                                 ? {
                                     ...item,
-                                    status: UPLOAD_STATUS.COMPLETED,
+                                    status: wasRejected ? UPLOAD_STATUS.FAILED : UPLOAD_STATUS.COMPLETED,
                                     progress: 100,
                                     result,
+                                    error: wasRejected ? rejectedFiles.find(r => r.filename === nextItem.file.name)?.error : null,
                                     completedAt: new Date()
                                 }
                                 : item

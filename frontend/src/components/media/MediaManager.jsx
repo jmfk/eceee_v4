@@ -21,6 +21,7 @@ import { mediaApi } from '../../api';
 const MediaManager = ({
     namespace,
     onFileSelect,
+    onFilesLoaded,
     selectionMode = 'single',
     fileTypes = []
 }) => {
@@ -56,6 +57,7 @@ const MediaManager = ({
 
     // Handle files processed (from pending manager)
     const handleFilesProcessed = () => {
+        console.log('handleFilesProcessed');
         loadPendingCount(); // Refresh pending count
     };
 
@@ -66,6 +68,17 @@ const MediaManager = ({
             loadPendingCount(); // Refresh count when viewing pending tab
         }
     };
+
+    const handleFilesLoaded = () => {
+        console.log('handleFilesLoaded');
+        loadPendingCount();
+        if (onFilesLoaded) onFilesLoaded();
+    };
+
+    useEffect(() => {
+        console.log('pendingCount', pendingCount);
+        if (pendingCount !== 0) setActiveTab('pending');
+    }, [pendingCount]);
 
     // Tab configuration
     const tabs = [
@@ -130,6 +143,7 @@ const MediaManager = ({
                 {activeTab === 'library' && (
                     <MediaBrowser
                         onFileSelect={onFileSelect}
+                        onFilesLoaded={handleFilesLoaded}
                         selectionMode={selectionMode}
                         fileTypes={fileTypes}
                         namespace={namespace}
