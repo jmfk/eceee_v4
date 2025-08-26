@@ -254,16 +254,33 @@ class PendingMediaFile(models.Model):
     def reject(self):
         """Reject this pending file and clean up storage."""
         from .storage import S3MediaStorage
+        import logging
 
-        # Delete from storage
-        try:
-            storage = S3MediaStorage()
-            storage.delete_file(self.file_path)
-        except Exception as e:
-            import logging
+        logger = logging.getLogger(__name__)
 
-            logger = logging.getLogger(__name__)
-            logger.error(f"Failed to delete rejected file {self.file_path}: {e}")
+        # Check if the same file exists in MediaFile (approved files)
+        # If it does, don't delete from S3 as it's still being used
+        existing_media_file = MediaFile.objects.filter(file_hash=self.file_hash).first()
+        
+        if existing_media_file:
+            logger.info(f"Not deleting S3 file {self.file_path} - same file exists in MediaFile: {existing_media_file.title}")
+        else:
+            # Check if other pending files with same hash exist
+            other_pending_files = PendingMediaFile.objects.filter(
+                file_hash=self.file_hash,
+                status__in=['pending', 'approved']
+            ).exclude(id=self.id).exists()
+            
+            if other_pending_files:
+                logger.info(f"Not deleting S3 file {self.file_path} - other pending files with same hash exist")
+            else:
+                # Safe to delete from S3 - no other references to this file
+                try:
+                    storage = S3MediaStorage()
+                    storage.delete_file(self.file_path)
+                    logger.info(f"Deleted rejected file from S3: {self.file_path}")
+                except Exception as e:
+                    logger.error(f"Failed to delete rejected file {self.file_path}: {e}")
 
         # Update status
         self.status = "rejected"
@@ -280,7 +297,9 @@ class PendingMediaFile(models.Model):
         """Clean up expired pending files."""
         from django.utils import timezone
         from .storage import S3MediaStorage
+        import logging
 
+        logger = logging.getLogger(__name__)
         expired_files = cls.objects.filter(
             status="pending", expires_at__lt=timezone.now()
         )
@@ -289,15 +308,30 @@ class PendingMediaFile(models.Model):
 
         for pending_file in expired_files:
             try:
-                # Delete from storage
-                storage.delete_file(pending_file.file_path)
+                # Check if the same file exists in MediaFile (approved files)
+                # If it does, don't delete from S3 as it's still being used
+                existing_media_file = MediaFile.objects.filter(file_hash=pending_file.file_hash).first()
+                
+                if existing_media_file:
+                    logger.info(f"Not deleting S3 file {pending_file.file_path} - same file exists in MediaFile: {existing_media_file.title}")
+                else:
+                    # Check if other pending files with same hash exist
+                    other_pending_files = cls.objects.filter(
+                        file_hash=pending_file.file_hash,
+                        status__in=['pending', 'approved']
+                    ).exclude(id=pending_file.id).exists()
+                    
+                    if other_pending_files:
+                        logger.info(f"Not deleting S3 file {pending_file.file_path} - other pending files with same hash exist")
+                    else:
+                        # Safe to delete from S3 - no other references to this file
+                        storage.delete_file(pending_file.file_path)
+                        logger.info(f"Deleted expired file from S3: {pending_file.file_path}")
+                
                 # Mark as expired
                 pending_file.status = "expired"
                 pending_file.save()
             except Exception as e:
-                import logging
-
-                logger = logging.getLogger(__name__)
                 logger.error(
                     f"Failed to cleanup expired file {pending_file.file_path}: {e}"
                 )

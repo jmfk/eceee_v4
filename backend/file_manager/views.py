@@ -436,24 +436,72 @@ class MediaUploadView(APIView):
                 namespace_obj = Namespace.objects.get(slug=namespace)
 
                 # Create PendingMediaFile record instead of MediaFile
-                pending_file = PendingMediaFile.objects.create(
-                    original_filename=uploaded_file.name,
-                    file_path=upload_result["file_path"],
-                    file_size=upload_result["file_size"],
-                    content_type=upload_result["content_type"],
-                    file_hash=upload_result["file_hash"],
-                    file_type=file_type,
-                    width=upload_result.get("width"),
-                    height=upload_result.get("height"),
-                    ai_generated_tags=ai_analysis.get("suggested_tags", []),
-                    ai_suggested_title=ai_analysis.get("suggested_title", ""),
-                    ai_extracted_text=ai_analysis.get("extracted_text", ""),
-                    ai_confidence_score=ai_analysis.get("confidence_score", 0.0),
-                    namespace=namespace_obj,
-                    folder_path=folder_path,
-                    uploaded_by=user,
-                    expires_at=expires_at,
-                )
+                try:
+                    pending_file = PendingMediaFile.objects.create(
+                        original_filename=uploaded_file.name,
+                        file_path=upload_result["file_path"],
+                        file_size=upload_result["file_size"],
+                        content_type=upload_result["content_type"],
+                        file_hash=upload_result["file_hash"],
+                        file_type=file_type,
+                        width=upload_result.get("width"),
+                        height=upload_result.get("height"),
+                        ai_generated_tags=ai_analysis.get("suggested_tags", []),
+                        ai_suggested_title=ai_analysis.get("suggested_title", ""),
+                        ai_extracted_text=ai_analysis.get("extracted_text", ""),
+                        ai_confidence_score=ai_analysis.get("confidence_score", 0.0),
+                        namespace=namespace_obj,
+                        folder_path=folder_path,
+                        uploaded_by=user,
+                        expires_at=expires_at,
+                    )
+                except Exception as db_error:
+                    # If PendingMediaFile creation fails, clean up the uploaded S3 file
+                    # unless it already exists in MediaFile or other PendingMediaFile
+                    logger.error(
+                        f"Failed to create PendingMediaFile for {uploaded_file.name}: {db_error}"
+                    )
+
+                    # Check if we should clean up S3 file
+                    should_cleanup = True
+
+                    # Don't cleanup if file exists in MediaFile
+                    if MediaFile.objects.filter(
+                        file_hash=upload_result["file_hash"]
+                    ).exists():
+                        should_cleanup = False
+                        logger.info(f"Not cleaning up S3 file - exists in MediaFile")
+
+                    # Don't cleanup if file exists in other PendingMediaFile
+                    elif PendingMediaFile.objects.filter(
+                        file_hash=upload_result["file_hash"],
+                        status__in=["pending", "approved"],
+                    ).exists():
+                        should_cleanup = False
+                        logger.info(
+                            f"Not cleaning up S3 file - exists in other PendingMediaFile"
+                        )
+
+                    if should_cleanup and not upload_result.get("existing_file"):
+                        try:
+                            storage.delete_file(upload_result["file_path"])
+                            logger.info(
+                                f"Cleaned up orphaned S3 file: {upload_result['file_path']}"
+                            )
+                        except Exception as cleanup_error:
+                            logger.error(
+                                f"Failed to cleanup S3 file {upload_result['file_path']}: {cleanup_error}"
+                            )
+
+                    # Add to errors and continue with next file
+                    errors.append(
+                        {
+                            "filename": uploaded_file.name,
+                            "error": f"Database error: {str(db_error)}",
+                            "status": "error",
+                        }
+                    )
+                    continue
 
                 uploaded_files.append(
                     {
