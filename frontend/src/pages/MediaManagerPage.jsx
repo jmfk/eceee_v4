@@ -54,7 +54,6 @@ const MediaManagerPage = () => {
   };
 
   const handleFilesLoaded = () => {
-    console.log('handleFilesLoaded');
   };
 
   if (loading) {
@@ -71,50 +70,55 @@ const MediaManagerPage = () => {
   }
 
   return (
-    <div className="max-w-7xl mx-auto p-6">
-      <div className="flex justify-between items-start mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Media Manager</h1>
-          <p className="text-gray-600">Upload, organize, and manage your media files</p>
-        </div>
+    <div className="h-screen flex flex-col">
+      {/* Fixed Header */}
+      <div className="flex-shrink-0 max-w-7xl mx-auto w-full p-6">
+        <div className="flex justify-between items-start mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Media Manager</h1>
+            <p className="text-gray-600">Upload, organize, and manage your media files</p>
+          </div>
 
-        <div className="flex items-center gap-3 mt-1">
-          <label htmlFor="namespace-select" className="font-medium text-gray-700">
-            Namespace:
-          </label>
-          <select
-            id="namespace-select"
-            value={selectedNamespace || ''}
-            onChange={(e) => setSelectedNamespace(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-md bg-white min-w-48 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="">Select a namespace...</option>
-            {namespaces.map((namespace) => (
-              <option key={namespace.id} value={namespace.slug}>
-                {namespace.name}
-              </option>
-            ))}
-          </select>
+          <div className="flex items-center gap-3 mt-1">
+            <label htmlFor="namespace-select" className="font-medium text-gray-700">
+              Namespace:
+            </label>
+            <select
+              id="namespace-select"
+              value={selectedNamespace || ''}
+              onChange={(e) => setSelectedNamespace(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-md bg-white min-w-48 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="">Select a namespace...</option>
+              {namespaces.map((namespace) => (
+                <option key={namespace.id} value={namespace.slug}>
+                  {namespace.name}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
-      {!selectedNamespace ? (
-        <div className="flex justify-center items-center min-h-96">
-          <div className="text-center">
-            <FolderOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-600 mb-2">Select a Namespace</h3>
-            <p className="text-gray-500">Please select a namespace to view and manage media files.</p>
+      {/* Scrollable Content Area */}
+      <div className="flex-1 max-w-7xl mx-auto w-full px-6 pb-6 min-h-0">
+        {!selectedNamespace ? (
+          <div className="flex justify-center items-center h-full">
+            <div className="text-center">
+              <FolderOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-gray-600 mb-2">Select a Namespace</h3>
+              <p className="text-gray-500">Please select a namespace to view and manage media files.</p>
+            </div>
           </div>
-        </div>
-      ) : (
-        <MediaManager
-          namespace={selectedNamespace}
-          onFileSelect={handleFileSelect}
-          onFilesLoaded={handleFilesLoaded}
-          selectionMode="multiple"
-        />
-      )}
-
+        ) : (
+          <MediaManager
+            namespace={selectedNamespace}
+            onFileSelect={handleFileSelect}
+            onFilesLoaded={handleFilesLoaded}
+            selectionMode="multiple"
+          />
+        )}
+      </div>
     </div>
   );
 };

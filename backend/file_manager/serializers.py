@@ -12,13 +12,58 @@ from content.models import Namespace
 from .models import MediaFile, MediaTag, MediaCollection, MediaUsage, PendingMediaFile
 
 
+def convert_tag_names_to_ids(tag_items, namespace, user):
+    """
+    Convert a list of tag names/IDs to actual tag IDs.
+    Creates new tags if they don't exist.
+
+    Args:
+        tag_items: List of tag names or UUIDs
+        namespace: Namespace object
+        user: User object for creating new tags
+
+    Returns:
+        List of tag UUID strings
+    """
+    import uuid
+
+    tag_ids = []
+
+    for tag_item in tag_items:
+        tag_item = str(tag_item).strip()
+        if not tag_item:
+            continue
+
+        # Check if it's already a UUID (tag ID)
+        try:
+            uuid.UUID(tag_item)
+            # It's a valid UUID, check if tag exists
+            if MediaTag.objects.filter(id=tag_item, namespace=namespace).exists():
+                tag_ids.append(tag_item)
+            else:
+                raise serializers.ValidationError(f"Tag with ID {tag_item} not found.")
+        except ValueError:
+            # It's a tag name, find or create the tag
+            tag, created = MediaTag.objects.get_or_create(
+                name=tag_item,
+                namespace=namespace,
+                defaults={
+                    "created_by": user,
+                    "slug": tag_item.lower().replace(" ", "-"),
+                },
+            )
+            tag_ids.append(str(tag.id))
+
+    return tag_ids
+
+
 class MediaTagSerializer(serializers.ModelSerializer):
     """Serializer for media tags."""
 
     created_by_name = serializers.CharField(
         source="created_by.username", read_only=True
     )
-    namespace_name = serializers.CharField(source="namespace.name", read_only=True)
+    namespace = serializers.CharField(source="namespace.slug", required=False)
 
     class Meta:
         model = MediaTag
@@ -29,7 +74,6 @@ class MediaTagSerializer(serializers.ModelSerializer):
             "color",
             "description",
             "namespace",
-            "namespace_name",
             "created_at",
             "created_by",
             "created_by_name",
@@ -39,21 +83,35 @@ class MediaTagSerializer(serializers.ModelSerializer):
             "created_at",
             "created_by",
             "created_by_name",
-            "namespace_name",
         ]
 
     def create(self, validated_data):
-        """Set created_by from request user and handle default namespace."""
+        """Set created_by from request user and handle namespace slug conversion."""
         from content.models import Namespace
+        from django.db import IntegrityError
 
         # Set created_by from request user
         validated_data["created_by"] = self.context["request"].user
 
-        # Set default namespace if none provided (like TagSerializer does)
-        if "namespace" not in validated_data or validated_data["namespace"] is None:
+        # Handle namespace conversion from slug to object
+        namespace_slug = validated_data.get("namespace").get("slug")
+        if namespace_slug:
+            try:
+                validated_data["namespace"] = Namespace.objects.get(slug=namespace_slug)
+            except Namespace.DoesNotExist:
+                raise serializers.ValidationError(
+                    f"Namespace '{namespace_slug}' not found."
+                )
+        else:
+            # Set default namespace if none provided
             validated_data["namespace"] = Namespace.get_default()
 
-        return super().create(validated_data)
+        # Check if tag with same name already exists in this namespace
+        existing_tag, _ = MediaTag.objects.get_or_create(
+            name=validated_data["name"], namespace=validated_data["namespace"]
+        )
+
+        return existing_tag
 
 
 class MediaUsageSerializer(serializers.ModelSerializer):
@@ -93,7 +151,7 @@ class MediaCollectionSerializer(serializers.ModelSerializer):
     last_modified_by_name = serializers.CharField(
         source="last_modified_by.username", read_only=True
     )
-    namespace_name = serializers.CharField(source="namespace.name", read_only=True)
+    namespace = serializers.CharField(source="namespace.slug", required=False)
     file_count = serializers.SerializerMethodField()
 
     class Meta:
@@ -104,7 +162,6 @@ class MediaCollectionSerializer(serializers.ModelSerializer):
             "slug",
             "description",
             "namespace",
-            "namespace_name",
             "access_level",
             "tags",
             "tag_ids",
@@ -124,7 +181,6 @@ class MediaCollectionSerializer(serializers.ModelSerializer):
             "created_by_name",
             "last_modified_by",
             "last_modified_by_name",
-            "namespace_name",
             "file_count",
         ]
 
@@ -134,9 +190,29 @@ class MediaCollectionSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         """Create collection with tags."""
+        from content.models import Namespace
+
         tag_ids = validated_data.pop("tag_ids", [])
         validated_data["created_by"] = self.context["request"].user
         validated_data["last_modified_by"] = self.context["request"].user
+
+        # Handle namespace conversion from slug to object
+        namespace_slug = validated_data.get("namespace")
+        if namespace_slug:
+            try:
+                if namespace_slug == "default":
+                    validated_data["namespace"] = Namespace.get_default()
+                else:
+                    validated_data["namespace"] = Namespace.objects.get(
+                        slug=namespace_slug
+                    )
+            except Namespace.DoesNotExist:
+                raise serializers.ValidationError(
+                    f"Namespace '{namespace_slug}' not found."
+                )
+        else:
+            # Set default namespace if none provided
+            validated_data["namespace"] = Namespace.get_default()
 
         collection = super().create(validated_data)
 
@@ -171,7 +247,7 @@ class MediaFileListSerializer(serializers.ModelSerializer):
     created_by_name = serializers.CharField(
         source="created_by.username", read_only=True
     )
-    namespace_name = serializers.CharField(source="namespace.name", read_only=True)
+    namespace = serializers.CharField(source="namespace.slug", read_only=True)
     file_size_human = serializers.CharField(read_only=True)
     dimensions = serializers.CharField(read_only=True)
     imgproxy_base_url = serializers.SerializerMethodField()
@@ -195,7 +271,6 @@ class MediaFileListSerializer(serializers.ModelSerializer):
             "dimensions",
             "access_level",
             "namespace",
-            "namespace_name",
             "tags",
             "imgproxy_base_url",
             "absolute_url",
@@ -254,7 +329,7 @@ class MediaFileDetailSerializer(serializers.ModelSerializer):
     last_modified_by_name = serializers.CharField(
         source="last_modified_by.username", read_only=True
     )
-    namespace_name = serializers.CharField(source="namespace.name", read_only=True)
+    namespace = serializers.CharField(source="namespace.slug", read_only=True)
     file_size_human = serializers.CharField(read_only=True)
     dimensions = serializers.CharField(read_only=True)
     file_url = serializers.SerializerMethodField()
@@ -284,7 +359,6 @@ class MediaFileDetailSerializer(serializers.ModelSerializer):
             "ai_extracted_text",
             "ai_confidence_score",
             "namespace",
-            "namespace_name",
             "access_level",
             "download_count",
             "last_accessed",
@@ -322,7 +396,7 @@ class MediaFileDetailSerializer(serializers.ModelSerializer):
             "created_by_name",
             "last_modified_by",
             "last_modified_by_name",
-            "namespace_name",
+            "namespace",
             "file_size_human",
             "dimensions",
             "file_url",
@@ -378,7 +452,10 @@ class MediaUploadSerializer(serializers.Serializer):
     def validate_namespace(self, value):
         """Validate namespace exists and user has access."""
         try:
-            namespace = Namespace.objects.get(slug=value)
+            if value == "default":
+                namespace = Namespace.get_default()
+            else:
+                namespace = Namespace.objects.get(slug=value)
             # Add permission check here if needed
             return namespace.slug
         except Namespace.DoesNotExist:
@@ -445,6 +522,19 @@ class MediaSearchSerializer(serializers.Serializer):
     min_size = serializers.IntegerField(required=False, min_value=0)
     max_size = serializers.IntegerField(required=False, min_value=0)
     namespace = serializers.CharField(required=False)
+
+    def validate_namespace(self, value):
+        """Validate namespace exists."""
+        if value:
+            try:
+                if value == "default":
+                    namespace = Namespace.get_default()
+                else:
+                    namespace = Namespace.objects.get(slug=value)
+                return namespace.slug
+            except Namespace.DoesNotExist:
+                raise serializers.ValidationError("Invalid namespace.")
+        return value
 
     def validate(self, data):
         """Cross-field validation."""
@@ -535,7 +625,7 @@ class PendingMediaFileListSerializer(serializers.ModelSerializer):
     uploaded_by_name = serializers.CharField(
         source="uploaded_by.username", read_only=True
     )
-    namespace_name = serializers.CharField(source="namespace.name", read_only=True)
+    namespace = serializers.CharField(source="namespace.slug", read_only=True)
     file_size_human = serializers.SerializerMethodField()
 
     class Meta:
@@ -552,7 +642,7 @@ class PendingMediaFileListSerializer(serializers.ModelSerializer):
             "created_at",
             "expires_at",
             "uploaded_by_name",
-            "namespace_name",
+            "namespace",
             "ai_suggested_title",
         ]
 
@@ -571,7 +661,7 @@ class PendingMediaFileDetailSerializer(serializers.ModelSerializer):
     uploaded_by_name = serializers.CharField(
         source="uploaded_by.username", read_only=True
     )
-    namespace_name = serializers.CharField(source="namespace.name", read_only=True)
+    namespace = serializers.CharField(source="namespace.slug", read_only=True)
     file_size_human = serializers.SerializerMethodField()
 
     class Meta:
@@ -592,7 +682,6 @@ class PendingMediaFileDetailSerializer(serializers.ModelSerializer):
             "ai_extracted_text",
             "ai_confidence_score",
             "namespace",
-            "namespace_name",
             "folder_path",
             "status",
             "created_at",
@@ -617,7 +706,7 @@ class MediaFileApprovalSerializer(serializers.Serializer):
     slug = serializers.SlugField(max_length=255, required=False, allow_blank=True)
     description = serializers.CharField(required=False, allow_blank=True)
     tag_ids = serializers.ListField(
-        child=serializers.UUIDField(), required=True, allow_empty=False
+        child=serializers.CharField(), required=True, allow_empty=False
     )
     access_level = serializers.ChoiceField(
         choices=MediaFile.ACCESS_LEVEL_CHOICES, default="public"
@@ -630,12 +719,26 @@ class MediaFileApprovalSerializer(serializers.Serializer):
         return value.strip()
 
     def validate_tag_ids(self, value):
-        """Validate that at least one tag is provided."""
+        """Validate that at least one tag is provided and convert tag names to IDs."""
         if not value or len(value) == 0:
             raise serializers.ValidationError(
                 "At least one tag is required to approve a file."
             )
-        return value
+
+        # Get namespace and user from context
+        namespace = self.context.get("namespace")
+        user = self.context.get("user")
+
+        if not namespace or not user:
+            raise serializers.ValidationError("Missing namespace or user context.")
+
+        # Convert tag names/IDs to actual tag IDs
+        tag_ids = convert_tag_names_to_ids(value, namespace, user)
+
+        if not tag_ids:
+            raise serializers.ValidationError("No valid tags provided.")
+
+        return tag_ids
 
 
 class BulkApprovalItemSerializer(serializers.Serializer):
@@ -646,18 +749,21 @@ class BulkApprovalItemSerializer(serializers.Serializer):
     slug = serializers.SlugField(max_length=255, required=False, allow_blank=True)
     description = serializers.CharField(required=False, allow_blank=True)
     tag_ids = serializers.ListField(
-        child=serializers.UUIDField(), required=True, allow_empty=False
+        child=serializers.CharField(), required=True, allow_empty=False
     )
     access_level = serializers.ChoiceField(
         choices=MediaFile.ACCESS_LEVEL_CHOICES, default="public"
     )
 
     def validate_tag_ids(self, value):
-        """Validate that at least one tag is provided."""
+        """Validate that at least one tag is provided and convert tag names to IDs."""
         if not value or len(value) == 0:
             raise serializers.ValidationError(
                 "At least one tag is required to approve a file."
             )
+
+        # Note: Tag conversion will be handled in the view for bulk operations
+        # since each file might be in a different namespace
         return value
 
 
@@ -669,3 +775,9 @@ class BulkApprovalSerializer(serializers.Serializer):
         allow_empty=False,
         max_length=50,  # Limit bulk operations
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Pass context to child serializers
+        if hasattr(self, "context"):
+            self.fields["approvals"].child.context = self.context
