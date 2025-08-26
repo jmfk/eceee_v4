@@ -53,7 +53,9 @@ const MediaManagerPage = () => {
     // Handle file selection - could open details modal, etc.
   };
 
-
+  const handleFilesLoaded = () => {
+    console.log('handleFilesLoaded');
+  };
 
   if (loading) {
     return (
@@ -108,6 +110,7 @@ const MediaManagerPage = () => {
         <MediaManager
           namespace={selectedNamespace}
           onFileSelect={handleFileSelect}
+          onFilesLoaded={handleFilesLoaded}
           selectionMode="multiple"
         />
       )}

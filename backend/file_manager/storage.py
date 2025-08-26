@@ -132,9 +132,9 @@ class S3MediaStorage:
             file_extension = os.path.splitext(file.name)[1].lower()
             s3_key = self._generate_s3_key(file_hash, file_extension, folder_path)
 
-            # Check if file already exists
+            # Check if file already exists in S3 storage
             if self._file_exists(s3_key):
-                logger.info(f"File already exists: {s3_key}")
+                logger.info(f"Duplicate file detected - already exists in S3: {s3_key}")
                 return {
                     "file_path": s3_key,
                     "file_hash": file_hash,
@@ -143,6 +143,7 @@ class S3MediaStorage:
                     "width": metadata.get("width"),
                     "height": metadata.get("height"),
                     "existing_file": True,
+                    "duplicate_detected": True,
                 }
 
             # Ensure bucket exists and get client
@@ -188,7 +189,12 @@ class S3MediaStorage:
     def _generate_s3_key(
         self, file_hash: str, extension: str, folder_path: str = ""
     ) -> str:
-        """Generate S3 key/path for file storage."""
+        """
+        Generate S3 key/path for file storage using hash as unique identifier.
+
+        This ensures that files with identical content will have the same S3 key,
+        preventing duplicate storage and enabling automatic deduplication.
+        """
         # Use first 2 characters of hash for directory structure
         prefix = file_hash[:2]
         middle = file_hash[2:4]

@@ -49,7 +49,7 @@ const MediaApprovalForm = ({
             initialApprovals[file.id] = {
                 title: file.aiSuggestions?.title || file.originalFilename?.replace(/\.[^/.]+$/, '') || '',
                 description: '',
-                tags: '',
+                tags: file.aiSuggestions?.tags ? file.aiSuggestions.tags.join(', ') : '',
                 accessLevel: 'public',
                 slug: '',
                 approved: true // Default to approved
@@ -98,16 +98,20 @@ const MediaApprovalForm = ({
                 break;
 
             case 'tags':
-                if (value) {
-                    const tags = value.split(',').map(tag => tag.trim()).filter(tag => tag);
-                    const invalidTags = tags.filter(tag => tag.length > 50);
-                    if (invalidTags.length > 0) {
-                        fileErrors.tags = 'Each tag must be less than 50 characters';
-                    } else {
-                        delete fileErrors.tags;
-                    }
+                if (!value || value.trim().length === 0) {
+                    fileErrors.tags = 'At least one tag is required';
                 } else {
-                    delete fileErrors.tags;
+                    const tags = value.split(',').map(tag => tag.trim()).filter(tag => tag);
+                    if (tags.length === 0) {
+                        fileErrors.tags = 'At least one tag is required';
+                    } else {
+                        const invalidTags = tags.filter(tag => tag.length > 50);
+                        if (invalidTags.length > 0) {
+                            fileErrors.tags = 'Each tag must be less than 50 characters';
+                        } else {
+                            delete fileErrors.tags;
+                        }
+                    }
                 }
                 break;
 
@@ -449,7 +453,7 @@ const MediaApprovalForm = ({
                                     {/* Tags Field */}
                                     <div className="mb-4">
                                         <label htmlFor={`tags-${file.id}`} className="block text-sm font-medium text-gray-700 mb-2">
-                                            Tags
+                                            Tags <span className="text-red-500">*</span>
                                         </label>
                                         <div className="space-y-2">
                                             <input
@@ -457,7 +461,7 @@ const MediaApprovalForm = ({
                                                 type="text"
                                                 value={currentApproval.tags || ''}
                                                 onChange={(e) => updateFileApproval(file.id, 'tags', e.target.value)}
-                                                placeholder="Enter tags (comma-separated)"
+                                                placeholder="Enter tags (comma-separated, required)"
                                                 className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${fileErrors.tags ? 'border-red-300 bg-red-50' : 'border-gray-300'
                                                     }`}
                                             />

@@ -617,7 +617,7 @@ class MediaFileApprovalSerializer(serializers.Serializer):
     slug = serializers.SlugField(max_length=255, required=False, allow_blank=True)
     description = serializers.CharField(required=False, allow_blank=True)
     tag_ids = serializers.ListField(
-        child=serializers.UUIDField(), required=False, allow_empty=True
+        child=serializers.UUIDField(), required=True, allow_empty=False
     )
     access_level = serializers.ChoiceField(
         choices=MediaFile.ACCESS_LEVEL_CHOICES, default="public"
@@ -629,6 +629,14 @@ class MediaFileApprovalSerializer(serializers.Serializer):
             raise serializers.ValidationError("Title cannot be empty.")
         return value.strip()
 
+    def validate_tag_ids(self, value):
+        """Validate that at least one tag is provided."""
+        if not value or len(value) == 0:
+            raise serializers.ValidationError(
+                "At least one tag is required to approve a file."
+            )
+        return value
+
 
 class BulkApprovalItemSerializer(serializers.Serializer):
     """Serializer for individual bulk approval item."""
@@ -638,11 +646,19 @@ class BulkApprovalItemSerializer(serializers.Serializer):
     slug = serializers.SlugField(max_length=255, required=False, allow_blank=True)
     description = serializers.CharField(required=False, allow_blank=True)
     tag_ids = serializers.ListField(
-        child=serializers.UUIDField(), required=False, allow_empty=True
+        child=serializers.UUIDField(), required=True, allow_empty=False
     )
     access_level = serializers.ChoiceField(
         choices=MediaFile.ACCESS_LEVEL_CHOICES, default="public"
     )
+
+    def validate_tag_ids(self, value):
+        """Validate that at least one tag is provided."""
+        if not value or len(value) == 0:
+            raise serializers.ValidationError(
+                "At least one tag is required to approve a file."
+            )
+        return value
 
 
 class BulkApprovalSerializer(serializers.Serializer):
