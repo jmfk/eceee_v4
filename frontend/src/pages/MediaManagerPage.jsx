@@ -2,18 +2,18 @@
  * MediaManagerPage Component
  * 
  * Main media management interface providing:
- * - File browser with grid/list views
- * - Upload functionality
+ * - Media Library tab (approved files)
+ * - Pending Files tab (awaiting approval)
+ * - Upload functionality with approval workflow
  * - Search and filtering
  * - File management operations
- * - Integration with existing layout patterns
  */
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Loader2, FolderOpen } from 'lucide-react';
 import { namespacesApi } from '../api';
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext';
-import MediaBrowser from '../components/media/MediaBrowser';
+import MediaManager from '../components/media/MediaManager';
 
 const MediaManagerPage = () => {
   const [namespaces, setNamespaces] = useState([]);
@@ -36,7 +36,7 @@ const MediaManagerPage = () => {
         // Auto-select first namespace or default
         if (namespaces.length > 0) {
           const defaultNamespace = namespaces.find(ns => ns.isDefault) || namespaces[0];
-          setSelectedNamespace(defaultNamespace.id);
+          setSelectedNamespace(defaultNamespace.slug);
         }
       } catch (error) {
         console.error('Error loading namespaces:', error);
@@ -88,7 +88,7 @@ const MediaManagerPage = () => {
           >
             <option value="">Select a namespace...</option>
             {namespaces.map((namespace) => (
-              <option key={namespace.id} value={namespace.id}>
+              <option key={namespace.id} value={namespace.slug}>
                 {namespace.name}
               </option>
             ))}
@@ -105,13 +105,11 @@ const MediaManagerPage = () => {
           </div>
         </div>
       ) : (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          <MediaBrowser
-            namespace={selectedNamespace}
-            onFileSelect={handleFileSelect}
-            selectionMode="multiple"
-          />
-        </div>
+        <MediaManager
+          namespace={selectedNamespace}
+          onFileSelect={handleFileSelect}
+          selectionMode="multiple"
+        />
       )}
 
     </div>

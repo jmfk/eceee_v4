@@ -110,6 +110,199 @@ class MediaCollection(models.Model):
         super().save(*args, **kwargs)
 
 
+class PendingMediaFile(models.Model):
+    """Temporary storage for uploaded files awaiting approval."""
+
+    # File type choices (shared with MediaFile)
+    FILE_TYPE_CHOICES = [
+        ("image", "Image"),
+        ("document", "Document"),
+        ("video", "Video"),
+        ("audio", "Audio"),
+        ("archive", "Archive"),
+        ("other", "Other"),
+    ]
+
+    # Access level choices (shared with MediaFile)
+    ACCESS_LEVEL_CHOICES = [
+        ("public", "Public"),
+        ("members", "Members Only"),
+        ("staff", "Staff Only"),
+        ("private", "Private"),
+    ]
+
+    # Status choices for approval workflow
+    STATUS_CHOICES = [
+        ("pending", "Pending Approval"),
+        ("approved", "Approved"),
+        ("rejected", "Rejected"),
+        ("expired", "Expired"),
+    ]
+
+    # File identity and storage
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    original_filename = models.CharField(max_length=255)
+    file_path = models.CharField(max_length=500, help_text="S3 key/path")
+    file_size = models.BigIntegerField(help_text="File size in bytes")
+    content_type = models.CharField(max_length=100)
+    file_hash = models.CharField(
+        max_length=64, help_text="SHA-256 hash for deduplication"
+    )
+
+    # Media-specific metadata
+    file_type = models.CharField(max_length=20, choices=FILE_TYPE_CHOICES)
+
+    # Image-specific fields
+    width = models.PositiveIntegerField(null=True, blank=True)
+    height = models.PositiveIntegerField(null=True, blank=True)
+
+    # AI-generated metadata
+    ai_generated_tags = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="AI-suggested tags based on content analysis",
+    )
+    ai_suggested_title = models.CharField(max_length=255, blank=True)
+    ai_extracted_text = models.TextField(
+        blank=True, help_text="Text extracted from images/documents via OCR"
+    )
+    ai_confidence_score = models.FloatField(
+        null=True, blank=True, help_text="AI confidence score for suggestions (0.0-1.0)"
+    )
+
+    # Organization
+    namespace = models.ForeignKey(
+        Namespace, on_delete=models.CASCADE, help_text="Namespace this file belongs to"
+    )
+    folder_path = models.CharField(
+        max_length=500, blank=True, help_text="Optional folder path"
+    )
+
+    # Approval workflow
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
+
+    # Timestamps and ownership
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(help_text="When this pending file expires")
+    uploaded_by = models.ForeignKey(
+        User, on_delete=models.PROTECT, related_name="pending_media_files"
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["namespace", "status"]),
+            models.Index(fields=["uploaded_by", "status"]),
+            models.Index(fields=["status", "expires_at"]),
+            models.Index(fields=["file_hash"]),
+        ]
+
+    def __str__(self):
+        return f"{self.original_filename} ({self.status})"
+
+    def approve_and_create_media_file(
+        self, title, slug=None, description="", tags=None, access_level="public"
+    ):
+        """
+        Approve this pending file and create a MediaFile instance.
+
+        Args:
+            title: Title for the media file
+            slug: Optional slug (auto-generated if not provided)
+            description: Optional description
+            tags: List of tag IDs to associate
+            access_level: Access level for the file
+
+        Returns:
+            MediaFile instance
+        """
+        from django.utils import timezone
+
+        # Create the MediaFile
+        media_file = MediaFile.objects.create(
+            title=title,
+            slug=slug,
+            description=description,
+            original_filename=self.original_filename,
+            file_path=self.file_path,
+            file_size=self.file_size,
+            content_type=self.content_type,
+            file_hash=self.file_hash,
+            file_type=self.file_type,
+            width=self.width,
+            height=self.height,
+            ai_generated_tags=self.ai_generated_tags,
+            ai_suggested_title=self.ai_suggested_title,
+            ai_extracted_text=self.ai_extracted_text,
+            ai_confidence_score=self.ai_confidence_score,
+            namespace=self.namespace,
+            access_level=access_level,
+            created_by=self.uploaded_by,
+            last_modified_by=self.uploaded_by,
+        )
+
+        # Associate tags if provided
+        if tags:
+            media_file.tags.set(tags)
+
+        # Update status
+        self.status = "approved"
+        self.save()
+
+        return media_file
+
+    def reject(self):
+        """Reject this pending file and clean up storage."""
+        from .storage import S3MediaStorage
+
+        # Delete from storage
+        try:
+            storage = S3MediaStorage()
+            storage.delete_file(self.file_path)
+        except Exception as e:
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to delete rejected file {self.file_path}: {e}")
+
+        # Update status
+        self.status = "rejected"
+        self.save()
+
+    def is_expired(self):
+        """Check if this pending file has expired."""
+        from django.utils import timezone
+
+        return timezone.now() > self.expires_at
+
+    @classmethod
+    def cleanup_expired(cls):
+        """Clean up expired pending files."""
+        from django.utils import timezone
+        from .storage import S3MediaStorage
+
+        expired_files = cls.objects.filter(
+            status="pending", expires_at__lt=timezone.now()
+        )
+
+        storage = S3MediaStorage()
+
+        for pending_file in expired_files:
+            try:
+                # Delete from storage
+                storage.delete_file(pending_file.file_path)
+                # Mark as expired
+                pending_file.status = "expired"
+                pending_file.save()
+            except Exception as e:
+                import logging
+
+                logger = logging.getLogger(__name__)
+                logger.error(
+                    f"Failed to cleanup expired file {pending_file.file_path}: {e}"
+                )
+
+
 class MediaFile(models.Model):
     """Core media file model with S3 storage integration."""
 

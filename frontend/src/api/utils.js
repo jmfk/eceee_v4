@@ -120,7 +120,6 @@ export const wrapApiCall = (apiCall, operationName) => {
             const processedResponse = processResponse(response);
             return processedResponse;
         } catch (error) {
-
             throw handleApiError(error, `${operationName} failed`, {
                 operation: operationName,
                 arguments: args

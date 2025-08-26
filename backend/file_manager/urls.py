@@ -14,6 +14,8 @@ from .views import (
     MediaFileBySlugView,
     MediaFileByUUIDView,
     MediaFileDownloadView,
+    PendingMediaFileViewSet,
+    MediaSlugValidationView,
 )
 
 app_name = "file_manager"
@@ -23,6 +25,7 @@ router = DefaultRouter()
 router.register(r"files", MediaFileViewSet, basename="mediafile")
 router.register(r"tags", MediaTagViewSet, basename="mediatag")
 router.register(r"collections", MediaCollectionViewSet, basename="mediacollection")
+router.register(r"pending-files", PendingMediaFileViewSet, basename="pendingmediafile")
 
 urlpatterns = [
     # Include router URLs
@@ -32,6 +35,7 @@ urlpatterns = [
     path("search/", MediaSearchView.as_view(), name="media-search"),
     # AI and bulk operation endpoints
     path("ai-suggestions/", MediaAISuggestionsView.as_view(), name="ai-suggestions"),
+    path("validate-slug/", MediaSlugValidationView.as_view(), name="validate-slug"),
     # path('bulk-operations/', BulkMediaOperationsView.as_view(), name='bulk-operations'),
     # SEO-friendly file access URLs
     path(

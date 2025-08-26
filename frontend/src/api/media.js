@@ -213,8 +213,9 @@ export const mediaTagsApi = {
      * @param {Object} params - Query parameters
      * @returns {Promise} API response with tags
      */
-    list: (params = {}) => wrapApiCall(() =>
-        apiClient.get(endpoints.media.tags, { params })
+    list: (params = {}) => wrapApiCall(() => {
+        return apiClient.get(endpoints.media.tags, { params })
+    }
     ),
 
     /**
@@ -413,6 +414,86 @@ export const mediaBulkOperationsApi = {
 };
 
 /**
+ * Pending Media Files API
+ */
+export const pendingMediaFilesApi = {
+    /**
+     * List pending media files
+     * @param {Object} params - Query parameters
+     * @returns {Promise} API response with pending files list
+     */
+    list: (params = {}) => {
+        return wrapApiCall(() => {
+            return apiClient.get(endpoints.media.pendingFiles, { params });
+        })();
+    },
+
+    /**
+     * Get detailed information about a specific pending media file
+     * @param {string} id - Pending media file ID
+     * @returns {Promise} API response with pending file details
+     */
+    get: (id) => wrapApiCall(() =>
+        apiClient.get(endpoints.media.pendingFile(id))
+    ),
+
+    /**
+     * Approve a pending media file
+     * @param {string} id - Pending media file ID
+     * @param {Object} approvalData - Approval data (title, slug, description, etc.)
+     * @returns {Promise} API response with created media file
+     */
+    approve: (id, approvalData) => wrapApiCall(() =>
+        apiClient.post(endpoints.media.approvePendingFile(id), approvalData)
+    ),
+
+    /**
+     * Reject a pending media file
+     * @param {string} id - Pending media file ID
+     * @returns {Promise} API response
+     */
+    reject: (id) => wrapApiCall(() =>
+        apiClient.post(endpoints.media.rejectPendingFile(id))
+    ),
+
+    /**
+     * Bulk approve multiple pending files
+     * @param {Array} approvals - Array of approval objects
+     * @returns {Promise} API response with bulk operation results
+     */
+    bulkApprove: (approvals) => wrapApiCall(() =>
+        apiClient.post(endpoints.media.bulkApprovePendingFiles, { approvals })
+    ),
+
+    /**
+     * Bulk reject multiple pending files
+     * @param {Array} fileIds - Array of pending file IDs
+     * @returns {Promise} API response with bulk operation results
+     */
+    bulkReject: (fileIds) => wrapApiCall(() =>
+        apiClient.post(endpoints.media.bulkRejectPendingFiles, { file_ids: fileIds })
+    ),
+};
+
+/**
+ * Slug Validation API
+ */
+export const slugValidationApi = {
+    /**
+     * Validate slug uniqueness and get alternative if needed
+     * @param {Object} data - Validation data
+     * @param {string} data.title - Original title
+     * @param {string} data.namespace - Namespace to check within
+     * @returns {Promise} API response with validated slug
+     */
+    validate: (data) => {
+        return wrapApiCall(() => {
+            return apiClient.post(endpoints.media.validateSlug, data);
+        })();
+    },
+};
+
+/**
  * Unified Media API
  * Combines all media-related API functions
  */
@@ -424,6 +505,8 @@ export const mediaApi = {
     collections: mediaCollectionsApi,
     ai: mediaAIApi,
     bulkOperations: mediaBulkOperationsApi,
+    pendingFiles: pendingMediaFilesApi,
+    validateSlug: slugValidationApi.validate,
 };
 
 export default mediaApi;

@@ -20,7 +20,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 
-from .models import MediaFile, MediaTag, MediaCollection, MediaUsage
+from .models import MediaFile, MediaTag, MediaCollection, MediaUsage, PendingMediaFile
 from .serializers import (
     MediaFileListSerializer,
     MediaFileDetailSerializer,
@@ -30,6 +30,10 @@ from .serializers import (
     MediaSearchSerializer,
     AIMediaSuggestionsSerializer,
     BulkOperationSerializer,
+    PendingMediaFileListSerializer,
+    PendingMediaFileDetailSerializer,
+    MediaFileApprovalSerializer,
+    BulkApprovalSerializer,
 )
 from .storage import storage
 from .ai_services import ai_service
@@ -43,15 +47,41 @@ class MediaTagViewSet(viewsets.ModelViewSet):
     serializer_class = MediaTagSerializer
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_fields = ["namespace", "created_by"]
-    search_fields = ["name", "description"]
+    filterset_fields = ["created_by"]
+    search_fields = ["name", "slug"]
     ordering_fields = ["name", "created_at"]
     ordering = ["name"]
 
     def get_queryset(self):
         """Filter tags by user's accessible namespaces."""
-        # TODO: Add proper namespace filtering based on user permissions
-        return MediaTag.objects.select_related("namespace", "created_by")
+        from content.models import Namespace
+        from django.shortcuts import get_object_or_404
+
+        queryset = MediaTag.objects.select_related("namespace", "created_by")
+
+        # Handle namespace filtering (supports both ID and slug, including "default")
+        namespace_param = self.request.query_params.get("namespace")
+        if namespace_param:
+            try:
+                # Try to parse as integer ID first
+                namespace_id = int(namespace_param)
+                queryset = queryset.filter(namespace_id=namespace_id)
+            except ValueError:
+                # If not an integer, treat as slug (including "default")
+                if namespace_param == "default":
+                    # Handle "default" specially to get the default namespace
+                    default_namespace = Namespace.get_default()
+                    queryset = queryset.filter(namespace=default_namespace)
+                else:
+                    # Handle other slugs
+                    namespace = get_object_or_404(Namespace, slug=namespace_param)
+                    queryset = queryset.filter(namespace=namespace)
+        else:
+            # Use default namespace if none specified (like TagViewSet does)
+            default_namespace = Namespace.get_default()
+            queryset = queryset.filter(namespace=default_namespace)
+
+        return queryset
 
     def perform_create(self, serializer):
         """Set created_by when creating tag."""
@@ -81,7 +111,7 @@ class MediaFileViewSet(viewsets.ModelViewSet):
     """ViewSet for managing media files with security controls."""
 
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_fields = ["file_type", "access_level", "namespace", "created_by"]
+    filterset_fields = ["file_type", "access_level", "created_by"]
     search_fields = ["title", "description", "original_filename", "ai_extracted_text"]
     ordering_fields = ["title", "created_at", "updated_at", "file_size"]
     ordering = ["-created_at"]
@@ -100,32 +130,49 @@ class MediaFileViewSet(viewsets.ModelViewSet):
 
         # Staff users see all files
         if user.is_staff:
-            return MediaFile.objects.select_related(
+            queryset = MediaFile.objects.select_related(
                 "namespace", "created_by", "last_modified_by"
             ).prefetch_related("tags", "collections")
+        else:
+            # Regular users only see files from accessible namespaces
+            from content.models import Namespace
 
-        # Regular users only see files from accessible namespaces
-        from content.models import Namespace
+            # Get namespaces the user can access
+            accessible_namespaces = Namespace.objects.filter(
+                models.Q(created_by=user) | models.Q(is_active=True)
+            )
 
-        # Get namespaces the user can access
-        accessible_namespaces = Namespace.objects.filter(
-            models.Q(created_by=user) | models.Q(is_active=True)
-        )
+            queryset = (
+                MediaFile.objects.filter(namespace__in=accessible_namespaces)
+                .select_related("namespace", "created_by", "last_modified_by")
+                .prefetch_related("tags", "collections")
+            )
 
-        queryset = (
-            MediaFile.objects.filter(namespace__in=accessible_namespaces)
-            .select_related("namespace", "created_by", "last_modified_by")
-            .prefetch_related("tags", "collections")
-        )
+            # Further filter by access level
+            from django.db.models import Q
 
-        # Further filter by access level
-        from django.db.models import Q
+            queryset = queryset.filter(
+                Q(access_level="public")
+                | Q(access_level="members")
+                | Q(access_level="private", created_by=user)
+            )
 
-        queryset = queryset.filter(
-            Q(access_level="public")
-            | Q(access_level="members")
-            | Q(access_level="private", created_by=user)
-        )
+        # Filter by namespace if provided (supports both slug and ID)
+        namespace_param = self.request.query_params.get("namespace")
+        if namespace_param:
+            try:
+                # Try to parse as integer (ID)
+                namespace_id = int(namespace_param)
+                queryset = queryset.filter(namespace_id=namespace_id)
+            except ValueError:
+                # If not an integer, treat as slug
+                from content.models import Namespace
+
+                try:
+                    namespace = Namespace.objects.get(slug=namespace_param)
+                    queryset = queryset.filter(namespace=namespace)
+                except Namespace.DoesNotExist:
+                    queryset = queryset.none()
 
         return queryset
 
@@ -226,7 +273,7 @@ class MediaUploadView(APIView):
         files = serializer.validated_data["files"]
         folder_path = serializer.validated_data.get("folder_path", "")
         namespace = serializer.validated_data["namespace"]
-
+        print("namespace", namespace)
         # Check namespace access
         if not self._has_namespace_access(request.user, namespace):
             SecurityAuditLogger.log_security_violation(
@@ -268,7 +315,7 @@ class MediaUploadView(APIView):
                 # Upload to S3
                 upload_result = storage.upload_file(uploaded_file, folder_path)
 
-                # Skip if file already exists
+                # Skip if file already exists in approved media files
                 if upload_result.get("existing_file"):
                     existing_file = MediaFile.objects.filter(
                         file_hash=upload_result["file_hash"]
@@ -279,6 +326,17 @@ class MediaUploadView(APIView):
                             {
                                 "id": existing_file.id,
                                 "title": existing_file.title,
+                                "original_filename": existing_file.original_filename,
+                                "file_type": existing_file.file_type,
+                                "file_size": existing_file.file_size,
+                                "width": existing_file.width,
+                                "height": existing_file.height,
+                                "ai_suggestions": {
+                                    "tags": existing_file.ai_generated_tags,
+                                    "title": existing_file.ai_suggested_title,
+                                    "confidence_score": existing_file.ai_confidence_score,
+                                    "extracted_text": existing_file.ai_extracted_text,
+                                },
                                 "status": "exists",
                                 "message": "File already exists",
                             }
@@ -306,19 +364,21 @@ class MediaUploadView(APIView):
                 else:
                     file_type = "other"
 
-                # Get user for file ownership (use admin user if anonymous for debugging)
-                from django.contrib.auth.models import User
+                # Get user for file ownership
+                user = request.user
 
-                user = (
-                    request.user
-                    if request.user.is_authenticated
-                    else User.objects.get(id=1)
-                )
+                # Set expiration time (24 hours from now)
+                from django.utils import timezone
+                from datetime import timedelta
 
-                # Create MediaFile record
-                media_file = MediaFile.objects.create(
-                    title=ai_analysis.get("suggested_title") or uploaded_file.name,
-                    slug=ai_analysis.get("suggested_slug") or uploaded_file.name,
+                expires_at = timezone.now() + timedelta(hours=24)
+
+                from content.models import Namespace
+
+                namespace_obj = Namespace.objects.get(slug=namespace)
+
+                # Create PendingMediaFile record instead of MediaFile
+                pending_file = PendingMediaFile.objects.create(
                     original_filename=uploaded_file.name,
                     file_path=upload_result["file_path"],
                     file_size=upload_result["file_size"],
@@ -331,23 +391,29 @@ class MediaUploadView(APIView):
                     ai_suggested_title=ai_analysis.get("suggested_title", ""),
                     ai_extracted_text=ai_analysis.get("extracted_text", ""),
                     ai_confidence_score=ai_analysis.get("confidence_score", 0.0),
-                    namespace=namespace,
-                    created_by=user,
-                    last_modified_by=user,
+                    namespace=namespace_obj,
+                    folder_path=folder_path,
+                    uploaded_by=user,
+                    expires_at=expires_at,
                 )
 
                 uploaded_files.append(
                     {
-                        "id": media_file.id,
-                        "title": media_file.title,
-                        "file_type": media_file.file_type,
-                        "file_size": media_file.file_size,
+                        "id": pending_file.id,
+                        "original_filename": pending_file.original_filename,
+                        "file_type": pending_file.file_type,
+                        "file_size": pending_file.file_size,
+                        "width": pending_file.width,
+                        "height": pending_file.height,
                         "ai_suggestions": {
                             "tags": ai_analysis.get("suggested_tags", []),
                             "title": ai_analysis.get("suggested_title", ""),
-                            "confidence": ai_analysis.get("confidence_score", 0.0),
+                            "confidence_score": ai_analysis.get(
+                                "confidence_score", 0.0
+                            ),
+                            "extracted_text": ai_analysis.get("extracted_text", ""),
                         },
-                        "status": "uploaded",
+                        "status": "pending_approval",
                     }
                 )
 
@@ -397,6 +463,7 @@ class MediaSearchView(APIView):
 
     def get(self, request):
         """Search media files with advanced filters."""
+
         serializer = MediaSearchSerializer(data=request.query_params)
 
         if not serializer.is_valid():
@@ -434,7 +501,7 @@ class MediaSearchView(APIView):
             queryset = queryset.filter(access_level=filters["access_level"])
 
         if filters.get("namespace"):
-            queryset = queryset.filter(namespace=filters["namespace"])
+            queryset = queryset.filter(namespace__slug=filters["namespace"])
 
         if filters.get("created_after"):
             queryset = queryset.filter(created_at__gte=filters["created_after"])
@@ -667,3 +734,393 @@ class MediaFileDownloadView(APIView):
 
         except (Namespace.DoesNotExist, MediaFile.DoesNotExist):
             raise Http404("Media file not found")
+
+
+class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
+    """ViewSet for managing pending media files awaiting approval."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        """Filter pending files by user and namespace access."""
+        queryset = PendingMediaFile.objects.filter(status="pending")
+
+        # Filter by namespace if provided (supports both slug and ID)
+        namespace_param = self.request.query_params.get("namespace")
+        if namespace_param:
+            try:
+                # Try to parse as integer (ID)
+                namespace_id = int(namespace_param)
+                queryset = queryset.filter(namespace_id=namespace_id)
+            except ValueError:
+                # If not an integer, treat as slug
+                from content.models import Namespace
+
+                try:
+                    namespace = Namespace.objects.get(slug=namespace_param)
+                    queryset = queryset.filter(namespace=namespace)
+                except Namespace.DoesNotExist:
+                    # If namespace slug doesn't exist, return empty queryset
+                    queryset = queryset.none()
+
+        # Users can only see their own pending files unless they're staff
+        if not self.request.user.is_staff:
+            queryset = queryset.filter(uploaded_by=self.request.user)
+
+        return queryset.order_by("-created_at")
+
+    def get_serializer_class(self):
+        """Return appropriate serializer based on action."""
+        if self.action == "list":
+            return PendingMediaFileListSerializer
+        return PendingMediaFileDetailSerializer
+
+    @action(
+        detail=True, methods=["get"], permission_classes=[permissions.IsAuthenticated]
+    )
+    def preview(self, request, pk=None):
+        """Get preview/thumbnail of pending media file."""
+        try:
+            pending_file = self.get_object()
+
+            # Check if user has access to this file
+            if not request.user.is_staff and pending_file.uploaded_by != request.user:
+                return Response(
+                    {"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN
+                )
+
+            # For images, serve the actual file
+            if pending_file.file_type == "image":
+                from django.http import HttpResponse
+                from .storage import storage
+
+                try:
+                    # Get file from storage
+                    file_content = storage.get_file_content(pending_file.file_path)
+
+                    response = HttpResponse(
+                        file_content, content_type=pending_file.content_type
+                    )
+                    response["Content-Disposition"] = (
+                        f'inline; filename="{pending_file.original_filename}"'
+                    )
+                    return response
+
+                except Exception as e:
+                    logger.error(f"Error serving pending file preview: {str(e)}")
+                    return Response(
+                        {"error": "File not found"}, status=status.HTTP_404_NOT_FOUND
+                    )
+            else:
+                return Response(
+                    {"error": "Preview not available for this file type"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        except Exception as e:
+            logger.error(f"Error in preview action: {str(e)}")
+            return Response(
+                {"error": "Internal server error"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @action(detail=True, methods=["post"])
+    def approve(self, request, pk=None):
+        """Approve a pending file and create a MediaFile."""
+        pending_file = self.get_object()
+
+        # Validate input data
+        serializer = MediaFileApprovalSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            # Create the approved media file
+            media_file = pending_file.approve_and_create_media_file(
+                title=serializer.validated_data["title"],
+                slug=serializer.validated_data.get("slug"),
+                description=serializer.validated_data.get("description", ""),
+                tags=serializer.validated_data.get("tag_ids", []),
+                access_level=serializer.validated_data.get("access_level", "public"),
+            )
+
+            # Return the created media file
+            media_serializer = MediaFileDetailSerializer(media_file)
+            return Response(
+                {"status": "approved", "media_file": media_serializer.data},
+                status=status.HTTP_201_CREATED,
+            )
+
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to approve file: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+    @action(detail=True, methods=["post"])
+    def reject(self, request, pk=None):
+        """Reject a pending file and clean up storage."""
+        pending_file = self.get_object()
+
+        try:
+            pending_file.reject()
+            return Response(
+                {
+                    "status": "rejected",
+                    "message": "File has been rejected and removed from storage",
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to reject file: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+    @action(detail=False, methods=["post"])
+    def bulk_approve(self, request):
+        """Approve multiple pending files at once."""
+        serializer = BulkApprovalSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        approvals = serializer.validated_data["approvals"]
+        results = []
+
+        for approval_data in approvals:
+            try:
+                pending_file = PendingMediaFile.objects.get(
+                    id=approval_data["pending_file_id"], status="pending"
+                )
+
+                # Check permissions
+                if (
+                    not request.user.is_staff
+                    and pending_file.uploaded_by != request.user
+                ):
+                    results.append(
+                        {
+                            "pending_file_id": approval_data["pending_file_id"],
+                            "status": "error",
+                            "error": "Permission denied",
+                        }
+                    )
+                    continue
+
+                # Approve the file
+                media_file = pending_file.approve_and_create_media_file(
+                    title=approval_data["title"],
+                    slug=approval_data.get("slug"),
+                    description=approval_data.get("description", ""),
+                    tags=approval_data.get("tag_ids", []),
+                    access_level=approval_data.get("access_level", "public"),
+                )
+
+                results.append(
+                    {
+                        "pending_file_id": approval_data["pending_file_id"],
+                        "status": "approved",
+                        "media_file_id": media_file.id,
+                    }
+                )
+
+            except PendingMediaFile.DoesNotExist:
+                results.append(
+                    {
+                        "pending_file_id": approval_data["pending_file_id"],
+                        "status": "error",
+                        "error": "Pending file not found",
+                    }
+                )
+            except Exception as e:
+                results.append(
+                    {
+                        "pending_file_id": approval_data["pending_file_id"],
+                        "status": "error",
+                        "error": str(e),
+                    }
+                )
+
+        return Response(
+            {
+                "results": results,
+                "summary": {
+                    "total": len(approvals),
+                    "approved": len([r for r in results if r["status"] == "approved"]),
+                    "errors": len([r for r in results if r["status"] == "error"]),
+                },
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    @action(detail=False, methods=["post"])
+    def bulk_reject(self, request):
+        """Reject multiple pending files at once."""
+        file_ids = request.data.get("file_ids", [])
+
+        if not file_ids:
+            return Response(
+                {"error": "No file IDs provided"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        results = []
+
+        for file_id in file_ids:
+            try:
+                pending_file = PendingMediaFile.objects.get(
+                    id=file_id, status="pending"
+                )
+
+                # Check permissions
+                if (
+                    not request.user.is_staff
+                    and pending_file.uploaded_by != request.user
+                ):
+                    results.append(
+                        {
+                            "file_id": file_id,
+                            "status": "error",
+                            "error": "Permission denied",
+                        }
+                    )
+                    continue
+
+                pending_file.reject()
+                results.append({"file_id": file_id, "status": "rejected"})
+
+            except PendingMediaFile.DoesNotExist:
+                results.append(
+                    {
+                        "file_id": file_id,
+                        "status": "error",
+                        "error": "Pending file not found",
+                    }
+                )
+            except Exception as e:
+                results.append({"file_id": file_id, "status": "error", "error": str(e)})
+
+        return Response(
+            {
+                "results": results,
+                "summary": {
+                    "total": len(file_ids),
+                    "rejected": len([r for r in results if r["status"] == "rejected"]),
+                    "errors": len([r for r in results if r["status"] == "error"]),
+                },
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class MediaSlugValidationView(APIView):
+    """Validate slug uniqueness and generate alternatives if needed."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        """
+        Validate slug uniqueness and return a unique slug.
+
+        Expected payload:
+        {
+            "title": "My Article Title",
+            "namespace": "blog",
+            "current_slugs": ["existing-slug-1", "existing-slug-2"]  # Optional: current session slugs
+        }
+
+        Returns:
+        {
+            "slug": "my-article-title-2"  # Original or alternative if conflict
+        }
+        """
+        try:
+            # Handle both DRF request.data and regular request.POST/request.body
+            if hasattr(request, "data"):
+                data = request.data
+            else:
+                import json
+
+                try:
+                    data = json.loads(request.body) if request.body else {}
+                except (json.JSONDecodeError, AttributeError):
+                    data = request.POST
+
+            title = str(data.get("title", "")).strip()
+            namespace_slug = str(data.get("namespace", "")).strip()
+            current_slugs = data.get("current_slugs", [])
+
+            if not title:
+                return Response(
+                    {"error": "Title is required"}, status=status.HTTP_400_BAD_REQUEST
+                )
+
+            if not namespace_slug:
+                return Response(
+                    {"error": "Namespace is required"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Validate current_slugs is a list
+            if not isinstance(current_slugs, list):
+                current_slugs = []
+
+            # Get namespace object by slug
+            from content.models import Namespace
+
+            try:
+                namespace = Namespace.objects.get(slug=namespace_slug)
+            except Namespace.DoesNotExist:
+                return Response(
+                    {"error": f"Namespace '{namespace_slug}' not found"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+            # Generate base slug from title
+            base_slug = self._generate_slug(title)
+
+            # Check for uniqueness and generate alternative if needed
+            unique_slug = self._get_unique_slug(base_slug, namespace, current_slugs)
+
+            return Response({"slug": unique_slug}, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            logger.error(f"Error validating slug: {str(e)}")
+            return Response(
+                {"error": "Internal server error"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    def _generate_slug(self, title):
+        """Generate a slug from title."""
+        import re
+
+        # Convert to lowercase and replace non-alphanumeric with hyphens
+        slug = re.sub(r"[^a-z0-9]+", "-", title.lower())
+        # Remove leading/trailing hyphens
+        slug = slug.strip("-")
+        return slug
+
+    def _get_unique_slug(self, base_slug, namespace, current_slugs=None):
+        """Get a unique slug by checking existing media files and current session slugs."""
+        if current_slugs is None:
+            current_slugs = []
+
+        # Check against existing media files in database
+        db_slugs = set(
+            MediaFile.objects.filter(namespace=namespace).values_list("slug", flat=True)
+        )
+
+        # Combine database slugs with current session slugs
+        all_existing_slugs = db_slugs | set(current_slugs)
+
+        # If base slug is unique, return it
+        if base_slug not in all_existing_slugs:
+            return base_slug
+
+        # Generate alternative with counter
+        counter = 2
+        while f"{base_slug}-{counter}" in all_existing_slugs:
+            counter += 1
+
+        return f"{base_slug}-{counter}"
