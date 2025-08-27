@@ -400,6 +400,25 @@ const MediaMetadataForm = ({
                                 </div>
                             </div>
 
+                            {/* Approval Details */}
+                            <div className="space-y-2 mb-3">
+                                {formData?.tags && formData.tags.length > 0 && (
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs font-medium text-gray-600">Tags:</span>
+                                        <div className="flex flex-wrap gap-1">
+                                            {formData.tags.map((tag, index) => (
+                                                <span
+                                                    key={index}
+                                                    className="inline-flex items-center px-1.5 py-0.5 text-xs bg-blue-100 text-blue-800 rounded"
+                                                >
+                                                    {typeof tag === 'string' ? tag : tag.name || tag.title}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
                             {/* Tags Field */}
                             <div className="mb-4">
                                 <label htmlFor={`tags-${file.id}`} className="block text-sm font-medium text-gray-700 mb-2">

@@ -23,6 +23,26 @@ export const extractErrorMessage = (error, defaultMessage = 'An error occurred')
             return error.response.data.detail
         }
 
+        // Check for structured errors array (media upload format)
+        if (error.response?.data?.errors && Array.isArray(error.response.data.errors)) {
+            const errors = error.response.data.errors
+            if (errors.length > 0) {
+                const firstError = errors[0]
+                let errorMessage = firstError.error || firstError.message || 'Unknown error'
+
+                // Make duplicate file errors more user-friendly
+                if (errorMessage.includes('duplicate key value violates unique constraint') &&
+                    errorMessage.includes('file_hash')) {
+                    errorMessage = 'This file already exists in the system (identical file detected)'
+                }
+
+                if (firstError.filename) {
+                    return `${firstError.filename}: ${errorMessage}`
+                }
+                return errorMessage
+            }
+        }
+
         // Check for field-specific validation errors (e.g., {"slug": ["error message"]})
         if (error.response?.data && typeof error.response.data === 'object') {
             const data = error.response.data
