@@ -1,6 +1,53 @@
 # Makefile for eceee_v4_test_1
 
-.PHONY: install backend frontend migrate createsuperuser sample-content sample-pages sample-data sample-clean migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only test lint docker-up docker-down restart clean
+.PHONY: help install backend frontend migrate createsuperuser sample-content sample-pages sample-data sample-clean migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only test lint docker-up docker-down restart clean
+
+# Default target - show help
+.DEFAULT_GOAL := help
+
+help: ## Show this help message
+	@echo "Available make targets:"
+	@echo ""
+	@echo "Development Environment:"
+	@echo "  install           Install backend and frontend dependencies"
+	@echo "  servers           Start database, Redis, MinIO, and ImgProxy services"
+	@echo "  backend           Start Django backend server"
+	@echo "  frontend          Start React frontend dev server"
+	@echo "  shell             Open bash shell in backend container"
+	@echo ""
+	@echo "Database Management:"
+	@echo "  migrations        Create Django migrations"
+	@echo "  migrate           Run Django migrations"
+	@echo "  requirements      Install backend requirements in container"
+	@echo ""
+	@echo "User Management:"
+	@echo "  createsuperuser   Create Django superuser"
+	@echo "  changepassword    Change admin password"
+	@echo ""
+	@echo "Sample Data:"
+	@echo "  sample-content    Create sample content (10 items)"
+	@echo "  sample-pages      Create sample pages"
+	@echo "  sample-data       Create both sample content and pages"
+	@echo "  sample-clean      Clean and recreate sample data"
+	@echo ""
+	@echo "Data Migration:"
+	@echo "  migrate-to-camelcase-dry  Dry run camelCase migration"
+	@echo "  migrate-to-camelcase      Run camelCase migration with backup"
+	@echo "  migrate-schemas-only      Migrate schemas only"
+	@echo "  migrate-pagedata-only     Migrate page data only"
+	@echo "  migrate-widgets-only      Migrate widgets only"
+	@echo ""
+	@echo "Testing & Quality:"
+	@echo "  backend-test      Run backend tests"
+	@echo "  lint              Lint frontend code"
+	@echo ""
+	@echo "Docker Management:"
+	@echo "  docker-up         Start all services with Docker Compose"
+	@echo "  docker-down       Stop all Docker Compose services"
+	@echo "  restart           Restart all Docker Compose services"
+	@echo "  clean             Clean Python, Node, and Docker artifacts"
+	@echo ""
+	@echo "Usage: make <target>"
 
 # Install backend and frontend dependencies
 install:
