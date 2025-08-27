@@ -39,6 +39,7 @@ import {
 } from 'lucide-react';
 import { mediaApi, mediaTagsApi, mediaCollectionsApi } from '../../api';
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext';
+import MediaSearchWidget from './MediaSearchWidget';
 
 const MediaPicker = ({
     mode = 'modal', // 'modal' | 'inline'
@@ -54,7 +55,7 @@ const MediaPicker = ({
 }) => {
     const [isOpen, setIsOpen] = useState(mode === 'inline');
     const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
-    const [searchQuery, setSearchQuery] = useState('');
+    const [searchTerms, setSearchTerms] = useState([]);
     const [files, setFiles] = useState([]);
     const [loading, setLoading] = useState(false);
     const [selectedFileIds, setSelectedFileIds] = useState(new Set(selectedFiles.map(f => f.id)));
@@ -87,7 +88,7 @@ const MediaPicker = ({
                 page,
                 pageSize: pagination.pageSize,
                 namespace,
-                search: searchQuery || undefined,
+                search: searchTerms.map(term => term.value).join(' ') || undefined,
                 fileType: filters.fileType || undefined,
                 accessLevel: filters.accessLevel || undefined,
                 ordering: '-created_at'
@@ -124,7 +125,7 @@ const MediaPicker = ({
         } finally {
             setLoading(false);
         }
-    }, [namespace, searchQuery, filters, fileTypes, pagination.pageSize, addNotification]);
+    }, [namespace, searchTerms, filters, fileTypes, pagination.pageSize, addNotification]);
 
     // Load filters data
     useEffect(() => {
@@ -187,8 +188,8 @@ const MediaPicker = ({
     };
 
     // Handle search
-    const handleSearch = (query) => {
-        setSearchQuery(query);
+    const handleSearchChange = (newSearchTerms) => {
+        setSearchTerms(newSearchTerms);
         setPagination(prev => ({ ...prev, page: 1 }));
     };
 
@@ -248,8 +249,8 @@ const MediaPicker = ({
             <div
                 key={file.id}
                 className={`relative group cursor-pointer border-2 rounded-lg overflow-hidden transition-all duration-200 ${isSelected
-                        ? 'border-blue-500 bg-blue-50 shadow-lg scale-105'
-                        : 'border-gray-200 hover:border-gray-300 hover:shadow-md'
+                    ? 'border-blue-500 bg-blue-50 shadow-lg scale-105'
+                    : 'border-gray-200 hover:border-gray-300 hover:shadow-md'
                     }`}
                 onClick={() => handleFileSelect(file)}
             >
@@ -326,8 +327,8 @@ const MediaPicker = ({
             <div
                 key={file.id}
                 className={`flex items-center gap-4 p-4 cursor-pointer border rounded-lg transition-all duration-200 ${isSelected
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                    ? 'border-blue-500 bg-blue-50'
+                    : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
                     }`}
                 onClick={() => handleFileSelect(file)}
             >
@@ -466,16 +467,12 @@ const MediaPicker = ({
             {/* Search and filters */}
             <div className="p-4 border-b border-gray-200 space-y-4">
                 {/* Search bar */}
-                <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                    <input
-                        type="text"
-                        placeholder="Search media files..."
-                        value={searchQuery}
-                        onChange={(e) => handleSearch(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                </div>
+                <MediaSearchWidget
+                    searchTerms={searchTerms}
+                    onChange={handleSearchChange}
+                    namespace={namespace}
+                    placeholder="Search media files..."
+                />
 
                 {/* Filters */}
                 <div className="flex items-center gap-4">
