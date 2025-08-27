@@ -38,7 +38,7 @@ describe('MediaSearchWidget', () => {
         await waitFor(() => {
             expect(screen.getByPlaceholderText('Search media files...')).toBeInTheDocument()
         })
-        expect(screen.getByText(/Type to search existing tags/)).toBeInTheDocument()
+        expect(screen.getByText(/Type to search existing tags.*Multiple tags work as AND filters/)).toBeInTheDocument()
     })
 
     it('displays existing search terms as pills', () => {
@@ -137,6 +137,88 @@ describe('MediaSearchWidget', () => {
 
         // Should not call onChange since it's a duplicate
         expect(mockOnChange).not.toHaveBeenCalled()
+    })
+
+    it('replaces existing text search term when adding new one', async () => {
+        const searchTerms = [
+            { value: 'old search', type: 'text' },
+            { value: 'nature', type: 'tag' }
+        ]
+
+        render(<MediaSearchWidget {...defaultProps} searchTerms={searchTerms} />)
+
+        // Wait for loading to complete
+        await waitFor(() => {
+            expect(screen.getByPlaceholderText('Search media files...')).toBeInTheDocument()
+        })
+
+        const input = screen.getByPlaceholderText('Search media files...')
+        fireEvent.change(input, { target: { value: 'new search' } })
+        fireEvent.keyDown(input, { key: 'Enter' })
+
+        // Should replace the old text term
+        await waitFor(() => {
+            expect(mockOnChange).toHaveBeenCalledWith([
+                { value: 'nature', type: 'tag' },
+                { value: 'new search', type: 'text' }
+            ])
+        })
+    })
+
+    it('allows multiple tags but only one text search', async () => {
+        const mockOnChange = vi.fn()
+        let currentSearchTerms = []
+
+        // Mock onChange to simulate state updates
+        const handleChange = (newTerms) => {
+            currentSearchTerms = newTerms
+            mockOnChange(newTerms)
+        }
+
+        const { rerender } = render(
+            <MediaSearchWidget
+                {...defaultProps}
+                searchTerms={currentSearchTerms}
+                onChange={handleChange}
+            />
+        )
+
+        // Wait for loading to complete
+        await waitFor(() => {
+            expect(screen.getByPlaceholderText('Search media files...')).toBeInTheDocument()
+        })
+
+        const input = screen.getByPlaceholderText('Search media files...')
+
+        // Add first tag
+        fireEvent.change(input, { target: { value: 'nature' } })
+        fireEvent.keyDown(input, { key: 'Enter' })
+
+        await waitFor(() => {
+            expect(mockOnChange).toHaveBeenCalledWith([
+                { value: 'nature', type: 'tag' }
+            ])
+        })
+
+        // Re-render with updated search terms
+        rerender(
+            <MediaSearchWidget
+                {...defaultProps}
+                searchTerms={currentSearchTerms}
+                onChange={handleChange}
+            />
+        )
+
+        // Add second tag
+        fireEvent.change(input, { target: { value: 'landscape' } })
+        fireEvent.keyDown(input, { key: 'Enter' })
+
+        await waitFor(() => {
+            expect(mockOnChange).toHaveBeenLastCalledWith([
+                { value: 'nature', type: 'tag' },
+                { value: 'landscape', type: 'tag' }
+            ])
+        })
     })
 
     it('handles disabled state', () => {

@@ -504,7 +504,18 @@ class MediaUploadSerializer(serializers.Serializer):
 class MediaSearchSerializer(serializers.Serializer):
     """Serializer for media search requests."""
 
+    # Legacy search field (for backward compatibility)
     q = serializers.CharField(required=False, allow_blank=True)
+
+    # New structured search fields
+    text_search = serializers.CharField(
+        required=False, allow_blank=True, max_length=255
+    )
+    tag_names = serializers.ListField(
+        child=serializers.CharField(max_length=100), required=False, allow_empty=True
+    )
+
+    # Existing fields
     file_type = serializers.ChoiceField(
         choices=MediaFile.FILE_TYPE_CHOICES, required=False, allow_blank=True
     )
@@ -549,6 +560,12 @@ class MediaSearchSerializer(serializers.Serializer):
                 raise serializers.ValidationError(
                     "created_after cannot be after created_before."
                 )
+
+        # Validate that both q and text_search are not provided (avoid confusion)
+        if data.get("q") and data.get("text_search"):
+            raise serializers.ValidationError(
+                "Cannot use both 'q' and 'text_search' parameters. Use 'text_search' for new implementations."
+            )
 
         return data
 

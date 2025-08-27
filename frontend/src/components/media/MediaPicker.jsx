@@ -88,7 +88,22 @@ const MediaPicker = ({
                 page,
                 pageSize: pagination.pageSize,
                 namespace,
-                search: searchTerms.map(term => term.value).join(' ') || undefined,
+                // Convert search terms to structured search parameters
+                ...((() => {
+                    const textTerms = searchTerms.filter(term => term.type === 'text');
+                    const tagTerms = searchTerms.filter(term => term.type === 'tag');
+                    const searchParams = {};
+
+                    if (textTerms.length > 0) {
+                        searchParams.text_search = textTerms[0].value;
+                    }
+
+                    if (tagTerms.length > 0) {
+                        searchParams.tag_names = tagTerms.map(term => term.value);
+                    }
+
+                    return searchParams;
+                })()),
                 fileType: filters.fileType || undefined,
                 accessLevel: filters.accessLevel || undefined,
                 ordering: '-created_at'

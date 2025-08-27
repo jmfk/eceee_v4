@@ -215,7 +215,7 @@ const MediaTagWidget = ({ tags = [], onChange, disabled = false, namespace }) =>
         <div className="space-y-2">
             {/* Selected Tags Display */}
             {tags.length > 0 && (
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 items-start">
                     {tags.map((tag, index) => (
                         <span
                             key={index}
@@ -240,7 +240,7 @@ const MediaTagWidget = ({ tags = [], onChange, disabled = false, namespace }) =>
             {/* Tag Input */}
             {!disabled && (
                 <div className="relative">
-                    <div className="flex">
+                    <div className="flex items-start">
                         <div className="relative flex-1">
                             {isSearching ? (
                                 <Loader2 className="w-4 h-4 text-blue-500 absolute left-3 top-1/2 transform -translate-y-1/2 animate-spin" />
@@ -290,7 +290,7 @@ const MediaTagWidget = ({ tags = [], onChange, disabled = false, namespace }) =>
                                     key={tag.id}
                                     type="button"
                                     onClick={() => handleSuggestionClick(tag)}
-                                    className={`w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center ${index === selectedIndex ? 'bg-blue-50 text-blue-700' : 'text-gray-900'
+                                    className={`w-full px-4 py-2 text-left hover:bg-gray-100 flex items-start ${index === selectedIndex ? 'bg-blue-50 text-blue-700' : 'text-gray-900'
                                         }`}
                                 >
                                     <Hash className="w-4 h-4 mr-2 text-gray-400" />
@@ -315,7 +315,7 @@ const MediaTagWidget = ({ tags = [], onChange, disabled = false, namespace }) =>
                                 <button
                                     type="button"
                                     onClick={() => addTag(inputValue.trim())}
-                                    className={`w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center ${suggestions.length > 0 ? 'border-t border-gray-200' : ''} ${selectedIndex === suggestions.length ? 'bg-blue-50 text-blue-700' : 'text-gray-900'
+                                    className={`w-full px-4 py-2 text-left hover:bg-gray-100 flex items-start ${suggestions.length > 0 ? 'border-t border-gray-200' : ''} ${selectedIndex === suggestions.length ? 'bg-blue-50 text-blue-700' : 'text-gray-900'
                                         }`}
                                 >
                                     <Plus className="w-4 h-4 mr-2 text-gray-400" />

@@ -660,8 +660,8 @@ class MediaSearchView(APIView):
         # Apply filters
         filters = serializer.validated_data
 
+        # Handle legacy search (q parameter) - for backward compatibility
         if filters.get("q"):
-            # Full-text search
             query = filters["q"]
             queryset = queryset.filter(
                 Q(title__icontains=query)
@@ -671,9 +671,22 @@ class MediaSearchView(APIView):
                 | Q(tags__name__icontains=query)
             ).distinct()
 
+        # Handle new structured search
+        # Text search - searches in title field only for exact matches
+        if filters.get("text_search"):
+            text_query = filters["text_search"]
+            queryset = queryset.filter(title__icontains=text_query)
+
+        # Tag search - must match ALL provided tags (AND logic)
+        if filters.get("tag_names"):
+            tag_names = filters["tag_names"]
+            for tag_name in tag_names:
+                queryset = queryset.filter(tags__name__iexact=tag_name)
+
         if filters.get("file_type"):
             queryset = queryset.filter(file_type=filters["file_type"])
 
+        # Legacy tags filter (by UUID) - for backward compatibility
         if filters.get("tags"):
             queryset = queryset.filter(tags__id__in=filters["tags"])
 

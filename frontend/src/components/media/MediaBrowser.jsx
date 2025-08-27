@@ -84,16 +84,26 @@ const MediaBrowser = ({
             const currentPagination = paginationRef.current;
             const currentPage = resetPage ? 1 : (customPage || currentPagination.page);
             const currentPageSize = customPageSize || currentPagination.pageSize;
-            // Convert search terms to search string for API
-            const searchQuery = searchTerms.map(term => term.value).join(' ');
+            // Convert search terms to structured search parameters
+            const textTerms = searchTerms.filter(term => term.type === 'text');
+            const tagTerms = searchTerms.filter(term => term.type === 'tag');
 
             const params = {
                 page: currentPage,
                 pageSize: currentPageSize,
-                search: searchQuery,
                 namespace: namespace,
                 ...memoizedFilters
             };
+
+            // Add text search (only one allowed)
+            if (textTerms.length > 0) {
+                params.text_search = textTerms[0].value;
+            }
+
+            // Add tag searches (multiple allowed, work as AND)
+            if (tagTerms.length > 0) {
+                params.tag_names = tagTerms.map(term => term.value);
+            }
 
             // Apply file type filter if specified
             if (memoizedFileTypes.length > 0) {
@@ -447,11 +457,11 @@ const MediaBrowser = ({
                         />
                     </div>
 
-                    <div className="flex items-center gap-2 flex-shrink-0">
+                    <div className="flex items-start gap-2 flex-shrink-0">
                         <select
                             value={filters.fileType}
                             onChange={(e) => handleFilterChange('fileType', e.target.value)}
-                            className="px-3 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            className="px-3 py-2 text-sm font-medium border border-gray-300 rounded-md bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent h-[38px]"
                         >
                             <option value="">All Types</option>
                             <option value="image">Images</option>
