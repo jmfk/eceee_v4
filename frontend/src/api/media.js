@@ -9,7 +9,7 @@
  * - AI-powered suggestions
  */
 
-import { wrapApiCall } from './utils';
+import { wrapApiCall, buildQueryParams } from './utils';
 import apiClient from './client';
 import { endpoints } from './endpoints';
 
@@ -188,9 +188,10 @@ export const mediaSearchApi = {
      * @returns {Promise} API response with search results
      */
     search: (searchParams = {}) => {
-        return wrapApiCall(() =>
-            apiClient.get(endpoints.media.search, { params: searchParams })
-        )();
+        return wrapApiCall(() => {
+            const queryString = buildQueryParams(searchParams);
+            return apiClient.get(`${endpoints.media.search}${queryString}`);
+        })();
     },
 
     /**

@@ -178,14 +178,34 @@ const MediaSearchWidget = ({
             type = existingTag ? 'tag' : 'text'
         }
 
-        // Create new search term object
-        const newTerm = {
-            value: normalizedValue,
-            type: type // 'tag' for existing tags, 'text' for free text
+        // Restrict to only one text search term
+        if (type === 'text') {
+            const existingTextTerms = searchTerms.filter(term => term.type === 'text')
+            if (existingTextTerms.length > 0) {
+                // Replace the existing text term
+                const newSearchTerms = searchTerms.filter(term => term.type !== 'text')
+                newSearchTerms.push({
+                    value: normalizedValue,
+                    type: 'text'
+                })
+                onChange(newSearchTerms)
+            } else {
+                // Add new text term
+                const newSearchTerms = [...searchTerms, {
+                    value: normalizedValue,
+                    type: 'text'
+                }]
+                onChange(newSearchTerms)
+            }
+        } else {
+            // Add tag normally
+            const newSearchTerms = [...searchTerms, {
+                value: normalizedValue,
+                type: type
+            }]
+            onChange(newSearchTerms)
         }
 
-        const newSearchTerms = [...searchTerms, newTerm]
-        onChange(newSearchTerms)
         setInputValue('')
         setShowSuggestions(false)
         setSelectedIndex(-1)
@@ -239,30 +259,6 @@ const MediaSearchWidget = ({
 
     return (
         <div className="space-y-2">
-            {/* Selected Search Terms Display */}
-            {searchTerms.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                    {searchTerms.map((term, index) => (
-                        <span
-                            key={index}
-                            className={getPillStyling(term)}
-                        >
-                            {getTermIcon(term)}
-                            {term.value}
-                            {!disabled && (
-                                <button
-                                    onClick={() => removeSearchTerm(term)}
-                                    className={`ml-2 ${term.type === 'tag' ? 'text-blue-600 hover:text-blue-800' : 'text-gray-600 hover:text-gray-800'}`}
-                                    type="button"
-                                >
-                                    <X className="w-3 h-3" />
-                                </button>
-                            )}
-                        </span>
-                    ))}
-                </div>
-            )}
-
             {/* Search Input */}
             {!disabled && (
                 <div className="relative">
@@ -354,6 +350,30 @@ const MediaSearchWidget = ({
                 </div>
             )}
 
+            {/* Selected Search Terms Display */}
+            {searchTerms.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                    {searchTerms.map((term, index) => (
+                        <span
+                            key={index}
+                            className={getPillStyling(term)}
+                        >
+                            {getTermIcon(term)}
+                            {term.value}
+                            {!disabled && (
+                                <button
+                                    onClick={() => removeSearchTerm(term)}
+                                    className={`ml-2 ${term.type === 'tag' ? 'text-blue-600 hover:text-blue-800' : 'text-gray-600 hover:text-gray-800'}`}
+                                    type="button"
+                                >
+                                    <X className="w-3 h-3" />
+                                </button>
+                            )}
+                        </span>
+                    ))}
+                </div>
+            )}
+
             {/* Help Text */}
             <p className="text-xs text-gray-500 mt-1">
                 {disabled
@@ -362,7 +382,7 @@ const MediaSearchWidget = ({
                         ? "Loading available tags..."
                         : isSearching
                             ? "Searching for tags..."
-                            : "Type to search existing tags (blue pills) or add free text search terms (gray pills). Press Enter or click + to add."
+                            : "Type to search existing tags (blue pills) or add one text search term (gray pill). Multiple tags work as AND filters."
                 }
             </p>
         </div>
