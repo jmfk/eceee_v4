@@ -32,6 +32,7 @@ import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext
 import BulkOperations from './BulkOperations';
 import OptimizedImage from './OptimizedImage';
 import MediaEditForm from './MediaEditForm';
+import MediaSearchWidget from './MediaSearchWidget';
 import { generateThumbnailUrl, generateImgproxyUrl } from '../../utils/imgproxy';
 import { extractErrorMessage } from '../../utils/errorHandling';
 
@@ -47,7 +48,7 @@ const MediaBrowser = ({
     const [loading, setLoading] = useState(false);
     const [viewMode, setViewMode] = useState('grid'); // 'grid', 'list'
     const [selectedFiles, setSelectedFiles] = useState([]);
-    const [searchQuery, setSearchQuery] = useState('');
+    const [searchTerms, setSearchTerms] = useState([]);
     const [filters, setFilters] = useState({
         fileType: '',
         tags: [],
@@ -83,6 +84,9 @@ const MediaBrowser = ({
             const currentPagination = paginationRef.current;
             const currentPage = resetPage ? 1 : (customPage || currentPagination.page);
             const currentPageSize = customPageSize || currentPagination.pageSize;
+            // Convert search terms to search string for API
+            const searchQuery = searchTerms.map(term => term.value).join(' ');
+
             const params = {
                 page: currentPage,
                 pageSize: currentPageSize,
@@ -114,7 +118,7 @@ const MediaBrowser = ({
             setLoading(false);
             if (onFilesLoaded) onFilesLoaded();
         }
-    }, [searchQuery, memoizedFilters, namespace, memoizedFileTypes, addNotification]);
+    }, [searchTerms, memoizedFilters, namespace, memoizedFileTypes, addNotification]);
 
     // Load files on mount and when dependencies change
     useEffect(() => {
@@ -122,7 +126,7 @@ const MediaBrowser = ({
         if (namespace) {
             loadFiles(true);
         }
-    }, [namespace, searchQuery]);
+    }, [namespace, searchTerms]);
 
     // File selection handlers
     const handleFileClick = (file) => {
@@ -171,8 +175,8 @@ const MediaBrowser = ({
     };
 
     // Search and filter handlers
-    const handleSearch = (event) => {
-        setSearchQuery(event.target.value);
+    const handleSearchChange = (newSearchTerms) => {
+        setSearchTerms(newSearchTerms);
     };
 
     const handleFilterChange = (filterType, value) => {
@@ -435,19 +439,15 @@ const MediaBrowser = ({
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row gap-4 p-4 bg-white border-b border-gray-200">
                     <div className="flex-1">
-                        <div className="relative">
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                            <input
-                                type="text"
-                                placeholder="Search media files..."
-                                value={searchQuery}
-                                onChange={handleSearch}
-                                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            />
-                        </div>
+                        <MediaSearchWidget
+                            searchTerms={searchTerms}
+                            onChange={handleSearchChange}
+                            namespace={namespace}
+                            placeholder="Search media files..."
+                        />
                     </div>
 
-                    <div className="flex gap-2">
+                    <div className="flex items-center gap-2 flex-shrink-0">
                         <select
                             value={filters.fileType}
                             onChange={(e) => handleFilterChange('fileType', e.target.value)}
@@ -460,35 +460,35 @@ const MediaBrowser = ({
                             <option value="document">Documents</option>
                             <option value="other">Other</option>
                         </select>
-                    </div>
 
-                    <div className="flex rounded-md border border-gray-300 overflow-hidden">
-                        <button
-                            onClick={() => setViewMode('grid')}
-                            className={`
-                                flex items-center gap-2 px-3 py-2 text-sm font-medium transition-colors
-                                ${viewMode === 'grid'
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-white text-gray-700 hover:bg-gray-50'
-                                }
-                            `}
-                        >
-                            <Grid3X3 className="w-4 h-4" />
-                            Grid
-                        </button>
-                        <button
-                            onClick={() => setViewMode('list')}
-                            className={`
-                                flex items-center gap-2 px-3 py-2 text-sm font-medium transition-colors border-l border-gray-300
-                                ${viewMode === 'list'
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-white text-gray-700 hover:bg-gray-50'
-                                }
-                            `}
-                        >
-                            <List className="w-4 h-4" />
-                            List
-                        </button>
+                        <div className="flex rounded-md border border-gray-300 overflow-hidden">
+                            <button
+                                onClick={() => setViewMode('grid')}
+                                className={`
+                                        flex items-center gap-2 px-3 py-2 text-sm font-medium transition-colors whitespace-nowrap
+                                        ${viewMode === 'grid'
+                                        ? 'bg-blue-600 text-white'
+                                        : 'bg-white text-gray-700 hover:bg-gray-50'
+                                    }
+                                    `}
+                            >
+                                <Grid3X3 className="w-4 h-4" />
+                                Grid
+                            </button>
+                            <button
+                                onClick={() => setViewMode('list')}
+                                className={`
+                                        flex items-center gap-2 px-3 py-2 text-sm font-medium transition-colors border-l border-gray-300 whitespace-nowrap
+                                        ${viewMode === 'list'
+                                        ? 'bg-blue-600 text-white'
+                                        : 'bg-white text-gray-700 hover:bg-gray-50'
+                                    }
+                                    `}
+                            >
+                                <List className="w-4 h-4" />
+                                List
+                            </button>
+                        </div>
                     </div>
                 </div>
 
