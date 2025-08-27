@@ -30,6 +30,7 @@ import {
 import { mediaApi } from '../../api';
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext';
 import MediaApprovalForm from './MediaApprovalForm';
+import { extractErrorMessage } from '../../utils/errorHandling';
 
 const MediaUploader = ({
     namespace,
@@ -166,9 +167,23 @@ const MediaUploader = ({
             }
         } catch (error) {
             console.error('Upload error:', error);
-            setErrors([{ file: 'Upload', error: error.message }]);
+
+            const errorMessage = extractErrorMessage(error, 'Upload failed');
+
+            // For display in the error section, create error details from the response
+            let errorDetails = [];
+            if (error.response?.data?.errors && Array.isArray(error.response.data.errors)) {
+                errorDetails = error.response.data.errors.map(err => ({
+                    file: err.filename || 'Unknown file',
+                    error: err.error || err.message || 'Unknown error'
+                }));
+            } else {
+                errorDetails = [{ file: 'Upload', error: errorMessage }];
+            }
+
+            setErrors(errorDetails);
             setUploadState('idle');
-            addNotification('Upload failed', 'error');
+            addNotification(errorMessage, 'error');
         }
     };
 

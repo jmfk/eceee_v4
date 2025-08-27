@@ -9,7 +9,7 @@ import logging
 import hashlib
 from typing import Dict, Any
 from django.conf import settings
-from django.db import models
+from django.db import models, IntegrityError
 from django.db.models import Q
 from django.http import HttpResponse, Http404
 from django.utils import timezone
@@ -60,25 +60,18 @@ class MediaTagViewSet(viewsets.ModelViewSet):
 
         queryset = MediaTag.objects.select_related("namespace", "created_by")
 
-        # Handle namespace filtering (supports both ID and slug, including "default")
+        # Handle namespace filtering by slug only
         namespace_param = self.request.query_params.get("namespace")
         if namespace_param:
-            try:
-                # Try to parse as integer ID first
-                namespace_id = int(namespace_param)
-                queryset = queryset.filter(namespace_id=namespace_id)
-            except ValueError:
-                # If not an integer, treat as slug (including "default")
-                if namespace_param == "default":
-                    # Handle "default" specially to get the default namespace
-                    default_namespace = Namespace.get_default()
-                    queryset = queryset.filter(namespace=default_namespace)
-                else:
-                    # Handle other slugs
-                    namespace = get_object_or_404(Namespace, slug=namespace_param)
-                    queryset = queryset.filter(namespace=namespace)
+            if namespace_param == "default":
+                # Handle "default" specially to get the default namespace
+                namespace = Namespace.get_default()
+            else:
+                # Handle other slugs
+                namespace = get_object_or_404(Namespace, slug=namespace_param)
+            queryset = queryset.filter(namespace=namespace)
         else:
-            # Use default namespace if none specified (like TagViewSet does)
+            # Use default namespace if none specified
             default_namespace = Namespace.get_default()
             queryset = queryset.filter(namespace=default_namespace)
 
@@ -158,22 +151,19 @@ class MediaFileViewSet(viewsets.ModelViewSet):
                 | Q(access_level="private", created_by=user)
             )
 
-        # Filter by namespace if provided (supports both slug and ID)
+        # Filter by namespace if provided (slug only)
         namespace_param = self.request.query_params.get("namespace")
         if namespace_param:
-            try:
-                # Try to parse as integer (ID)
-                namespace_id = int(namespace_param)
-                queryset = queryset.filter(namespace_id=namespace_id)
-            except ValueError:
-                # If not an integer, treat as slug
-                from content.models import Namespace
+            from content.models import Namespace
 
-                try:
+            try:
+                if namespace_param == "default":
+                    namespace = Namespace.get_default()
+                else:
                     namespace = Namespace.objects.get(slug=namespace_param)
-                    queryset = queryset.filter(namespace=namespace)
-                except Namespace.DoesNotExist:
-                    queryset = queryset.none()
+                queryset = queryset.filter(namespace=namespace)
+            except Namespace.DoesNotExist:
+                queryset = queryset.none()
 
         return queryset
 
@@ -223,7 +213,7 @@ class MediaFileViewSet(viewsets.ModelViewSet):
         # TODO: Add proper namespace filtering based on user permissions
         queryset = MediaFile.objects.select_related(
             "namespace", "created_by", "last_modified_by"
-        ).prefetch_related("tags", "collections", "thumbnails")
+        ).prefetch_related("tags", "collections")
 
         return queryset
 
@@ -273,13 +263,28 @@ class MediaUploadView(APIView):
 
         files = serializer.validated_data["files"]
         folder_path = serializer.validated_data.get("folder_path", "")
-        namespace = serializer.validated_data["namespace"]
+        namespace_slug = serializer.validated_data["namespace"]
+
+        # Get namespace object from slug
+        from content.models import Namespace
+
+        try:
+            if namespace_slug == "default":
+                namespace = Namespace.get_default()
+            else:
+                namespace = Namespace.objects.get(slug=namespace_slug)
+        except Namespace.DoesNotExist:
+            return Response(
+                {"error": f"Namespace '{namespace_slug}' not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
         # Check namespace access
         if not self._has_namespace_access(request.user, namespace):
             SecurityAuditLogger.log_security_violation(
                 request.user,
                 "unauthorized_namespace_access",
-                f"Attempted access to namespace: {namespace.id}",
+                f"Attempted access to namespace: {namespace.slug}",
             )
             return Response(
                 {"error": "Access denied to specified namespace"},
@@ -431,9 +436,7 @@ class MediaUploadView(APIView):
 
                 expires_at = timezone.now() + timedelta(hours=24)
 
-                from content.models import Namespace
-
-                namespace_obj = Namespace.objects.get(slug=namespace)
+                namespace_obj = namespace
 
                 # Create PendingMediaFile record instead of MediaFile
                 try:
@@ -455,6 +458,63 @@ class MediaUploadView(APIView):
                         uploaded_by=user,
                         expires_at=expires_at,
                     )
+                except IntegrityError as integrity_error:
+                    # Handle duplicate file hash constraint specifically
+                    if "file_hash" in str(integrity_error) and "uniq" in str(
+                        integrity_error
+                    ):
+                        # Check if there's an existing pending file with the same hash
+                        existing_pending = PendingMediaFile.objects.filter(
+                            file_hash=upload_result["file_hash"]
+                        ).first()
+
+                        if existing_pending:
+                            # Update the existing pending file with new upload data
+                            logger.info(
+                                f"Updating existing pending file for {uploaded_file.name} (hash: {upload_result['file_hash'][:16]}...)"
+                            )
+
+                            # Update the existing pending file
+                            existing_pending.original_filename = uploaded_file.name
+                            existing_pending.file_path = upload_result["file_path"]
+                            existing_pending.file_size = upload_result["file_size"]
+                            existing_pending.content_type = upload_result[
+                                "content_type"
+                            ]
+                            existing_pending.file_type = file_type
+                            existing_pending.width = upload_result.get("width")
+                            existing_pending.height = upload_result.get("height")
+                            existing_pending.ai_generated_tags = ai_analysis.get(
+                                "suggested_tags", []
+                            )
+                            existing_pending.ai_suggested_title = ai_analysis.get(
+                                "suggested_title", ""
+                            )
+                            existing_pending.ai_extracted_text = ai_analysis.get(
+                                "extracted_text", ""
+                            )
+                            existing_pending.ai_confidence_score = ai_analysis.get(
+                                "confidence_score", 0.0
+                            )
+                            existing_pending.namespace = namespace_obj
+                            existing_pending.folder_path = folder_path
+                            existing_pending.uploaded_by = user
+                            existing_pending.expires_at = expires_at
+                            existing_pending.status = (
+                                "pending"  # Reset status to pending
+                            )
+                            existing_pending.created_at = (
+                                timezone.now()
+                            )  # Update timestamp
+                            existing_pending.save()
+
+                            pending_file = existing_pending
+                        else:
+                            # This shouldn't happen, but handle it as a general error
+                            raise integrity_error
+                    else:
+                        # Re-raise if it's not the file_hash constraint
+                        raise integrity_error
                 except Exception as db_error:
                     # If PendingMediaFile creation fails, clean up the uploaded S3 file
                     # unless it already exists in MediaFile or other PendingMediaFile
@@ -868,23 +928,20 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
         """Filter pending files by user and namespace access."""
         queryset = PendingMediaFile.objects.filter(status="pending")
 
-        # Filter by namespace if provided (supports both slug and ID)
+        # Filter by namespace if provided (slug only)
         namespace_param = self.request.query_params.get("namespace")
         if namespace_param:
-            try:
-                # Try to parse as integer (ID)
-                namespace_id = int(namespace_param)
-                queryset = queryset.filter(namespace_id=namespace_id)
-            except ValueError:
-                # If not an integer, treat as slug
-                from content.models import Namespace
+            from content.models import Namespace
 
-                try:
+            try:
+                if namespace_param == "default":
+                    namespace = Namespace.get_default()
+                else:
                     namespace = Namespace.objects.get(slug=namespace_param)
-                    queryset = queryset.filter(namespace=namespace)
-                except Namespace.DoesNotExist:
-                    # If namespace slug doesn't exist, return empty queryset
-                    queryset = queryset.none()
+                queryset = queryset.filter(namespace=namespace)
+            except Namespace.DoesNotExist:
+                # If namespace slug doesn't exist, return empty queryset
+                queryset = queryset.none()
 
         # Users can only see their own pending files unless they're staff
         if not self.request.user.is_staff:
@@ -952,8 +1009,11 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
         """Approve a pending file and create a MediaFile."""
         pending_file = self.get_object()
 
-        # Validate input data
-        serializer = MediaFileApprovalSerializer(data=request.data)
+        # Validate input data with context
+        serializer = MediaFileApprovalSerializer(
+            data=request.data,
+            context={"namespace": pending_file.namespace, "user": request.user},
+        )
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -1031,12 +1091,21 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
                     )
                     continue
 
+                # Convert tag names to tag IDs for this specific file's namespace
+                from .serializers import convert_tag_names_to_ids
+
+                tag_ids = convert_tag_names_to_ids(
+                    approval_data.get("tag_ids", []),
+                    pending_file.namespace,
+                    request.user,
+                )
+
                 # Approve the file
                 media_file = pending_file.approve_and_create_media_file(
                     title=approval_data["title"],
                     slug=approval_data.get("slug"),
                     description=approval_data.get("description", ""),
-                    tags=approval_data.get("tag_ids", []),
+                    tags=tag_ids,
                     access_level=approval_data.get("access_level", "public"),
                 )
 

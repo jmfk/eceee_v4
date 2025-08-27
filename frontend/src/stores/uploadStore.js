@@ -211,6 +211,33 @@ const useUploadStore = create(
                 } catch (error) {
                     console.error('Upload failed:', error);
 
+                    // Extract detailed error information
+                    let errorMessage = error.message;
+
+                    if (error.response && error.response.data) {
+                        const responseData = error.response.data;
+
+                        // Look for specific error for this file
+                        if (responseData.errors && Array.isArray(responseData.errors)) {
+                            const fileError = responseData.errors.find(err =>
+                                err.filename === nextItem.file.name
+                            );
+                            if (fileError) {
+                                errorMessage = fileError.error;
+
+                                // Make duplicate file errors more user-friendly
+                                if (errorMessage.includes('duplicate key value violates unique constraint') &&
+                                    errorMessage.includes('file_hash')) {
+                                    errorMessage = 'This file already exists in the system (identical file detected)';
+                                }
+                            } else if (responseData.errors.length > 0) {
+                                errorMessage = responseData.errors[0].error;
+                            }
+                        } else if (responseData.message || responseData.error) {
+                            errorMessage = responseData.message || responseData.error;
+                        }
+                    }
+
                     const maxRetries = 3;
                     const shouldRetry = nextItem.retryCount < maxRetries;
 
@@ -220,7 +247,7 @@ const useUploadStore = create(
                                 ? {
                                     ...item,
                                     status: shouldRetry ? UPLOAD_STATUS.PENDING : UPLOAD_STATUS.FAILED,
-                                    error: error.message,
+                                    error: errorMessage,
                                     retryCount: item.retryCount + 1,
                                     progress: 0
                                 }

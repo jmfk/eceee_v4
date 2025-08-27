@@ -370,7 +370,7 @@ class APIOptimizer:
             if model.__name__ == "MediaFile":
                 queryset = queryset.select_related(
                     "namespace", "created_by", "last_modified_by"
-                ).prefetch_related("tags", "collections", "thumbnails")
+                ).prefetch_related("tags", "collections")
 
         return queryset
 

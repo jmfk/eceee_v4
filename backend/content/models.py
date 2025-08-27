@@ -27,7 +27,7 @@ class Namespace(models.Model):
         max_length=100, unique=True, help_text="Human-readable namespace name"
     )
     slug = models.SlugField(
-        max_length=50, unique=True, help_text="URL-safe namespace identifier"
+        max_length=100, unique=True, help_text="URL-safe namespace identifier"
     )
     description = models.TextField(
         blank=True, help_text="Description of this namespace"

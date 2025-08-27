@@ -57,7 +57,6 @@ const MediaManager = ({
 
     // Handle files processed (from pending manager)
     const handleFilesProcessed = () => {
-        console.log('handleFilesProcessed');
         loadPendingCount(); // Refresh pending count
     };
 
@@ -70,13 +69,11 @@ const MediaManager = ({
     };
 
     const handleFilesLoaded = () => {
-        console.log('handleFilesLoaded');
         loadPendingCount();
         if (onFilesLoaded) onFilesLoaded();
     };
 
     useEffect(() => {
-        console.log('pendingCount', pendingCount);
         if (pendingCount !== 0) setActiveTab('pending');
     }, [pendingCount]);
 
@@ -102,7 +99,7 @@ const MediaManager = ({
         <div className="h-full flex flex-col bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
             {/* Tab Navigation - Seamlessly integrated */}
             <div className="flex-shrink-0">
-                <div className="flex bg-white border-b border-gray-200">
+                <div className="flex bg-white border-b border-blue-600">
                     {tabs.map((tab) => {
                         const Icon = tab.icon;
                         const isActive = activeTab === tab.id;
@@ -115,7 +112,7 @@ const MediaManager = ({
                                     flex items-center gap-2 px-6 py-4 text-sm font-medium transition-all duration-200 border-b-2 relative -mb-px
                                     ${isActive
                                         ? 'text-blue-600 border-blue-600 bg-white'
-                                        : 'text-gray-500 border-transparent hover:text-gray-700 hover:border-gray-300 bg-gray-50/80 hover:bg-gray-50'
+                                        : 'text-gray-500 border-transparent hover:text-gray-700 hover:border-gray-300 hover:bg-gray-50'
                                     }
                                 `}
                             >
