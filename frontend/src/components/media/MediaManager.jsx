@@ -12,10 +12,12 @@ import React, { useState, useEffect } from 'react';
 import {
     Files,
     Clock,
-    Bell
+    Bell,
+    Folder
 } from 'lucide-react';
 import MediaBrowser from './MediaBrowser';
 import PendingMediaManager from './PendingMediaManager';
+import MediaCollectionManager from './MediaCollectionManager';
 import { mediaApi } from '../../api';
 
 const MediaManager = ({
@@ -86,6 +88,12 @@ const MediaManager = ({
             description: 'Browse approved media files'
         },
         {
+            id: 'collections',
+            label: 'Collections',
+            icon: Folder,
+            description: 'Organize files into collections'
+        },
+        {
             id: 'pending',
             label: 'Pending Files',
             icon: Clock,
@@ -96,7 +104,7 @@ const MediaManager = ({
     ];
 
     return (
-        <div className="h-full flex flex-col bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div className={`${activeTab === 'library' ? 'h-full' : ''} flex flex-col bg-white rounded-lg shadow-sm border border-gray-200`}>
             {/* Tab Navigation - Seamlessly integrated */}
             <div className="flex-shrink-0">
                 <div className="flex bg-white border-b border-blue-600">
@@ -145,6 +153,13 @@ const MediaManager = ({
                         fileTypes={fileTypes}
                         namespace={namespace}
                         showUploader={true} // MediaBrowser handles its own upload
+                    />
+                )}
+
+                {activeTab === 'collections' && (
+                    <MediaCollectionManager
+                        namespace={namespace}
+                        onCollectionSelect={onFileSelect} // Allow selecting collections if needed
                     />
                 )}
 
