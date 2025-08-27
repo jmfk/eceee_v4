@@ -200,12 +200,7 @@ class MediaCollectionSerializer(serializers.ModelSerializer):
         namespace_slug = validated_data.get("namespace")
         if namespace_slug:
             try:
-                if namespace_slug == "default":
-                    validated_data["namespace"] = Namespace.get_default()
-                else:
-                    validated_data["namespace"] = Namespace.objects.get(
-                        slug=namespace_slug
-                    )
+                validated_data["namespace"] = Namespace.objects.get(slug=namespace_slug)
             except Namespace.DoesNotExist:
                 raise serializers.ValidationError(
                     f"Namespace '{namespace_slug}' not found."
@@ -727,6 +722,10 @@ class MediaFileApprovalSerializer(serializers.Serializer):
     )
     access_level = serializers.ChoiceField(
         choices=MediaFile.ACCESS_LEVEL_CHOICES, default="public"
+    )
+    collection_id = serializers.UUIDField(required=False, allow_null=True)
+    collection_name = serializers.CharField(
+        max_length=255, required=False, allow_blank=True
     )
 
     def validate_title(self, value):

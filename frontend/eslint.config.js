@@ -3,6 +3,7 @@ import globals from 'globals'
 import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
 import { defineConfig, globalIgnores } from 'eslint/config'
+import apiRules from './.eslintrc-api-rules.js'
 
 export default defineConfig([
   globalIgnores(['dist']),
@@ -22,8 +23,12 @@ export default defineConfig([
         sourceType: 'module',
       },
     },
+    plugins: {
+      'api-rules': apiRules,
+    },
     rules: {
       'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      'api-rules/require-await-on-api-calls': 'error',
     },
   },
   // Node.js configuration files
