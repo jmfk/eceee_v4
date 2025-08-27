@@ -88,17 +88,139 @@ class MediaCollectionViewSet(viewsets.ModelViewSet):
     serializer_class = MediaCollectionSerializer
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_fields = ["namespace", "access_level", "created_by"]
+    filterset_fields = [
+        "access_level",
+        "created_by",
+    ]  # namespace handled manually in get_queryset
     search_fields = ["title", "description"]
     ordering_fields = ["title", "created_at", "updated_at"]
     ordering = ["-updated_at"]
 
     def get_queryset(self):
         """Filter collections by user's accessible namespaces."""
-        # TODO: Add proper namespace filtering based on user permissions
-        return MediaCollection.objects.select_related(
+        from content.models import Namespace
+        from django.shortcuts import get_object_or_404
+
+        queryset = MediaCollection.objects.select_related(
             "namespace", "created_by", "last_modified_by"
         ).prefetch_related("tags")
+
+        # Handle namespace filtering by slug only
+        namespace_slug = self.request.query_params.get("namespace")
+        if namespace_slug:
+            queryset = queryset.filter(namespace__slug=namespace_slug)
+        else:
+            # Use default namespace if none specified
+            default_namespace = Namespace.get_default()
+            queryset = queryset.filter(namespace=default_namespace)
+        return queryset
+
+    def perform_create(self, serializer):
+        """Set user fields when creating collection."""
+        serializer.save(
+            created_by=self.request.user, last_modified_by=self.request.user
+        )
+
+    def perform_update(self, serializer):
+        """Set last_modified_by when updating collection."""
+        serializer.save(last_modified_by=self.request.user)
+
+    @action(detail=True, methods=["post"])
+    def add_files(self, request, pk=None):
+        """Add files to a collection."""
+        collection = self.get_object()
+        file_ids = request.data.get("file_ids", [])
+
+        if not file_ids:
+            return Response(
+                {"error": "No file IDs provided"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Get files that exist and belong to the same namespace
+        files = MediaFile.objects.filter(
+            id__in=file_ids, namespace=collection.namespace
+        )
+
+        if not files.exists():
+            return Response(
+                {"error": "No valid files found"}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Add files to collection
+        collection.mediafile_set.add(*files)
+
+        return Response(
+            {
+                "message": f"Added {files.count()} files to collection",
+                "added_count": files.count(),
+            }
+        )
+
+    @action(detail=True, methods=["post"])
+    def remove_files(self, request, pk=None):
+        """Remove files from a collection."""
+        collection = self.get_object()
+        file_ids = request.data.get("file_ids", [])
+
+        if not file_ids:
+            return Response(
+                {"error": "No file IDs provided"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Get files that are in the collection
+        files = collection.mediafile_set.filter(id__in=file_ids)
+
+        if not files.exists():
+            return Response(
+                {"error": "No files found in collection"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Remove files from collection
+        collection.mediafile_set.remove(*files)
+
+        return Response(
+            {
+                "message": f"Removed {files.count()} files from collection",
+                "removed_count": files.count(),
+            }
+        )
+
+    @action(detail=True, methods=["get"])
+    def files(self, request, pk=None):
+        """Get files in a collection with pagination."""
+        collection = self.get_object()
+
+        # Get files with pagination
+        files = collection.mediafile_set.select_related(
+            "namespace", "created_by"
+        ).prefetch_related("tags", "collections")
+
+        # Apply search if provided
+        search = request.query_params.get("search")
+        if search:
+            files = files.filter(
+                models.Q(title__icontains=search)
+                | models.Q(description__icontains=search)
+                | models.Q(original_filename__icontains=search)
+            )
+
+        # Apply ordering
+        ordering = request.query_params.get("ordering", "-created_at")
+        files = files.order_by(ordering)
+
+        # Paginate
+        page = self.paginate_queryset(files)
+        if page is not None:
+            serializer = MediaFileListSerializer(
+                page, many=True, context={"request": request}
+            )
+            return self.get_paginated_response(serializer.data)
+
+        serializer = MediaFileListSerializer(
+            files, many=True, context={"request": request}
+        )
+        return Response(serializer.data)
 
 
 class MediaFileViewSet(viewsets.ModelViewSet):
@@ -939,7 +1061,12 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         """Filter pending files by user and namespace access."""
-        queryset = PendingMediaFile.objects.filter(status="pending")
+        # For approval/rejection actions, allow access to all statuses
+        if self.action in ["approve", "reject"]:
+            queryset = PendingMediaFile.objects.all()
+        else:
+            # For list/retrieve actions, only show pending files
+            queryset = PendingMediaFile.objects.filter(status="pending")
 
         # Filter by namespace if provided (slug only)
         namespace_param = self.request.query_params.get("namespace")
@@ -1020,7 +1147,92 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
     @action(detail=True, methods=["post"])
     def approve(self, request, pk=None):
         """Approve a pending file and create a MediaFile."""
-        pending_file = self.get_object()
+        try:
+            pending_file = self.get_object()
+        except (PendingMediaFile.DoesNotExist, Http404):
+            return Response(
+                {"error": "Pending file not found or already processed"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # If file is already approved, return success with existing media file
+        if pending_file.status == "approved":
+            # Find the corresponding media file
+            existing_file = MediaFile.objects.filter(
+                file_hash=pending_file.file_hash, namespace=pending_file.namespace
+            ).first()
+
+            if existing_file:
+                # Handle collection assignment if requested
+                collection_id = request.data.get("collection_id")
+                collection_name = request.data.get("collection_name")
+
+                if collection_id or collection_name:
+                    try:
+                        collection = self._get_or_create_collection(
+                            collection_id,
+                            collection_name,
+                            pending_file.namespace,
+                            request.user,
+                        )
+                        if collection:
+                            existing_file.collections.add(collection)
+                    except Exception as e:
+                        # Don't fail if collection assignment fails
+                        pass
+
+                media_serializer = MediaFileDetailSerializer(existing_file)
+                return Response(
+                    {
+                        "status": "approved",
+                        "media_file": media_serializer.data,
+                        "message": "File was already approved",
+                    },
+                    status=status.HTTP_200_OK,
+                )
+            else:
+                return Response(
+                    {"error": "File was approved but media file not found"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+        # Check if file with same hash already exists
+        existing_file = MediaFile.objects.filter(
+            file_hash=pending_file.file_hash, namespace=pending_file.namespace
+        ).first()
+
+        if existing_file:
+            # File already exists, just mark as approved and optionally add to collection
+            pending_file.status = "approved"
+            pending_file.save()
+
+            # Handle collection assignment if requested
+            collection_id = request.data.get("collection_id")
+            collection_name = request.data.get("collection_name")
+
+            if collection_id or collection_name:
+                try:
+                    collection = self._get_or_create_collection(
+                        collection_id,
+                        collection_name,
+                        pending_file.namespace,
+                        request.user,
+                    )
+                    if collection:
+                        existing_file.collections.add(collection)
+                except Exception as e:
+                    # Don't fail the approval if collection assignment fails
+                    pass
+
+            media_serializer = MediaFileDetailSerializer(existing_file)
+            return Response(
+                {
+                    "status": "approved",
+                    "media_file": media_serializer.data,
+                    "message": "File already exists, added to library",
+                },
+                status=status.HTTP_200_OK,
+            )
 
         # Validate input data with context
         serializer = MediaFileApprovalSerializer(
@@ -1040,6 +1252,24 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
                 access_level=serializer.validated_data.get("access_level", "public"),
             )
 
+            # Handle collection assignment
+            collection_id = serializer.validated_data.get("collection_id")
+            collection_name = serializer.validated_data.get("collection_name")
+
+            if collection_id or collection_name:
+                try:
+                    collection = self._get_or_create_collection(
+                        collection_id,
+                        collection_name,
+                        pending_file.namespace,
+                        request.user,
+                    )
+                    if collection:
+                        media_file.collections.add(collection)
+                except Exception as e:
+                    # Don't fail the approval if collection assignment fails
+                    pass
+
             # Return the created media file
             media_serializer = MediaFileDetailSerializer(media_file)
             return Response(
@@ -1052,6 +1282,30 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
                 {"error": f"Failed to approve file: {str(e)}"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+    def _get_or_create_collection(
+        self, collection_id, collection_name, namespace, user
+    ):
+        """Get existing collection or create new one."""
+        if collection_id:
+            try:
+                return MediaCollection.objects.get(
+                    id=collection_id, namespace=namespace
+                )
+            except MediaCollection.DoesNotExist:
+                return None
+        elif collection_name:
+            collection, created = MediaCollection.objects.get_or_create(
+                title=collection_name,
+                namespace=namespace,
+                defaults={
+                    "created_by": user,
+                    "last_modified_by": user,
+                    "access_level": "public",
+                },
+            )
+            return collection
+        return None
 
     @action(detail=True, methods=["post"])
     def reject(self, request, pk=None):
