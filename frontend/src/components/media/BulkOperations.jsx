@@ -32,6 +32,7 @@ import {
 import { mediaApi, mediaTagsApi, mediaCollectionsApi } from '../../api';
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext';
 import MediaTagWidget from './MediaTagWidget';
+import TagRemovalWidget from './TagRemovalWidget';
 
 const BulkOperations = ({
     selectedFiles = [],
@@ -53,6 +54,7 @@ const BulkOperations = ({
     const [newCollectionName, setNewCollectionName] = useState('');
     const [selectedTags, setSelectedTags] = useState([]);
     const [existingTagsFromFiles, setExistingTagsFromFiles] = useState([]);
+    const [tagsToRemove, setTagsToRemove] = useState([]);
 
     const { addNotification } = useGlobalNotifications();
 
@@ -173,10 +175,13 @@ const BulkOperations = ({
         // Reset and initialize tags based on operation
         if (operationId === 'add_tags') {
             setSelectedTags([]);
+            setTagsToRemove([]);
         } else if (operationId === 'remove_tags') {
-            setSelectedTags(existingTagsFromFiles);
+            setSelectedTags([]);
+            setTagsToRemove([]);
         } else {
             setSelectedTags([]);
+            setTagsToRemove([]);
         }
     };
 
@@ -227,8 +232,10 @@ const BulkOperations = ({
             }
 
             // Add tag data for tag operations
-            if (operation === 'add_tags' || operation === 'remove_tags') {
+            if (operation === 'add_tags') {
                 requestData.tag_names = selectedTags;
+            } else if (operation === 'remove_tags') {
+                requestData.tag_names = tagsToRemove;
             }
             // Call the bulk operations API
             const result = await mediaApi.bulkOperations.execute(requestData)();
@@ -272,8 +279,9 @@ const BulkOperations = ({
     const isOperationValid = () => {
         switch (operation) {
             case 'add_tags':
-            case 'remove_tags':
                 return selectedTags && selectedTags.length > 0;
+            case 'remove_tags':
+                return tagsToRemove && tagsToRemove.length > 0;
             case 'set_access_level':
                 return operationData.accessLevel;
             case 'add_to_collection':
@@ -315,25 +323,12 @@ const BulkOperations = ({
                             <label className={`block text-sm font-semibold mb-3 ${compact ? 'text-indigo-800' : 'text-gray-800'}`}>
                                 Remove Tags
                             </label>
-                            {existingTagsFromFiles.length > 0 ? (
-                                <div className="bg-white border border-indigo-200 rounded-lg p-4 shadow-md hover:shadow-lg transition-shadow duration-200">
-                                    <div className="mb-2 text-sm text-gray-600">
-                                        Select tags to remove from {selectedFiles.length} file{selectedFiles.length !== 1 ? 's' : ''}:
-                                    </div>
-                                    <MediaTagWidget
-                                        tags={selectedTags}
-                                        onChange={setSelectedTags}
-                                        namespace={namespace}
-                                        disabled={processing}
-                                    />
-                                </div>
-                            ) : (
-                                <div className="border border-gray-300 rounded-lg p-6 bg-gradient-to-br from-gray-50 to-gray-100 text-center shadow-md">
-                                    <div className="text-sm text-gray-500">
-                                        No tags found on the selected files.
-                                    </div>
-                                </div>
-                            )}
+                            <TagRemovalWidget
+                                selectedFiles={selectedFiles}
+                                namespace={namespace}
+                                onTagsToRemoveChange={setTagsToRemove}
+                                className="bg-white border border-indigo-200 rounded-lg p-4 shadow-md hover:shadow-lg transition-shadow duration-200"
+                            />
                         </div>
                     </div>
                 );
