@@ -21,6 +21,24 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Security Settings
 SECRET_KEY = config("SECRET_KEY", default="dev-secret-key-change-in-production-12345")
 DEBUG = config("DEBUG", default=True, cast=bool)
+
+# Security check for production secret key
+if not DEBUG and SECRET_KEY == "dev-secret-key-change-in-production-12345":
+    raise ValueError(
+        "SECURITY ERROR: Default development SECRET_KEY detected in production! "
+        "Set a strong SECRET_KEY environment variable for production deployment. "
+        "Generate one with: python -c 'from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())'"
+    )
+
+# Additional security validation for secret key strength
+if len(SECRET_KEY) < 50:
+    import logging
+
+    logger = logging.getLogger(__name__)
+    logger.warning(
+        f"SECRET_KEY is only {len(SECRET_KEY)} characters long. "
+        "For better security, use a key of at least 50 characters."
+    )
 # Dynamic hostname validation settings
 SKIP_HOST_VALIDATION_IN_DEBUG = config(
     "SKIP_HOST_VALIDATION_IN_DEBUG", default=False, cast=bool
@@ -244,7 +262,7 @@ CORS_ALLOW_ALL_ORIGINS = DEBUG  # Only in development
 
 # CSRF Configuration
 CSRF_TRUSTED_ORIGINS = config(
-    "CORS_ALLOWED_ORIGINS", default="http://localhost:3000,http://127.0.0.1:3000"
+    "CSRF_TRUSTED_ORIGINS", default="http://localhost:3000,http://127.0.0.1:3000"
 ).split(",")
 
 # CSRF Cookie settings for React frontend

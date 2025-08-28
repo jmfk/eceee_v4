@@ -235,6 +235,8 @@ class DatabaseOptimizer:
         """Optimize common media file queries."""
         from django.db import connection
 
+        # Pre-defined, safe SQL statements for index creation
+        # These are static strings with no user input, making them safe from SQL injection
         optimizations = [
             # Index for file type and namespace filtering
             """
@@ -264,6 +266,8 @@ class DatabaseOptimizer:
         with connection.cursor() as cursor:
             for optimization in optimizations:
                 try:
+                    # These are pre-defined static SQL strings with no user input
+                    # Safe to execute directly as they contain no dynamic content
                     cursor.execute(optimization)
                     logger.info(
                         f"Applied database optimization: {optimization[:50]}..."
@@ -276,12 +280,14 @@ class DatabaseOptimizer:
         """Analyze and log query performance statistics."""
         from django.db import connection
 
+        # Pre-defined, safe SQL statements for performance analysis
+        # These are static strings with no user input, making them safe from SQL injection
         queries = [
             # Most expensive queries
             """
             SELECT query, calls, total_time, mean_time, rows
             FROM pg_stat_statements 
-            WHERE query LIKE '%file_manager_mediafile%'
+            WHERE query LIKE %s
             ORDER BY total_time DESC 
             LIMIT 10;
             """,
@@ -289,15 +295,22 @@ class DatabaseOptimizer:
             """
             SELECT schemaname, tablename, indexname, idx_tup_read, idx_tup_fetch
             FROM pg_stat_user_indexes 
-            WHERE tablename = 'file_manager_mediafile'
+            WHERE tablename = %s
             ORDER BY idx_tup_read DESC;
             """,
         ]
 
+        # Parameters for the queries - using parameterized queries for safety
+        query_params = [
+            ["%file_manager_mediafile%"],  # Parameters for first query
+            ["file_manager_mediafile"],  # Parameters for second query
+        ]
+
         with connection.cursor() as cursor:
-            for query in queries:
+            for query, params in zip(queries, query_params):
                 try:
-                    cursor.execute(query)
+                    # Use parameterized queries to prevent SQL injection
+                    cursor.execute(query, params)
                     results = cursor.fetchall()
                     logger.info(f"Query performance analysis: {results}")
                 except Exception as e:
