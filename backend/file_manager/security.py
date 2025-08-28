@@ -233,14 +233,55 @@ class FileUploadValidator:
         try:
             actual_mime_type = magic.from_buffer(file_content, mime=True)
         except Exception as e:
-            logger.warning(f"Could not detect MIME type: {e}")
-            actual_mime_type = uploaded_file.content_type
+            logger.error(
+                f"Could not detect MIME type for file {uploaded_file.name}: {e}"
+            )
+            results["errors"].append(
+                "Unable to verify file type - file rejected for security"
+            )
+            results["is_valid"] = False
+            return
 
         # Check if MIME type is allowed
         if actual_mime_type not in cls.ALLOWED_MIME_TYPES:
             results["errors"].append(f"File type not allowed: {actual_mime_type}")
             results["is_valid"] = False
             return
+
+        # Cross-check client-provided content type with detected type
+        if (
+            uploaded_file.content_type
+            and uploaded_file.content_type != actual_mime_type
+        ):
+            # Allow some common variations and aliases
+            allowed_variations = {
+                "image/jpeg": ["image/jpg"],
+                "text/plain": ["text/x-plain"],
+                "application/octet-stream": list(
+                    cls.ALLOWED_MIME_TYPES.keys()
+                ),  # Generic binary type
+            }
+
+            is_valid_variation = False
+            for base_type, variations in allowed_variations.items():
+                if (
+                    actual_mime_type == base_type
+                    and uploaded_file.content_type in variations
+                ):
+                    is_valid_variation = True
+                    break
+                elif (
+                    uploaded_file.content_type == base_type
+                    and actual_mime_type in variations
+                ):
+                    is_valid_variation = True
+                    break
+
+            if not is_valid_variation:
+                results["warnings"].append(
+                    f"Content-Type mismatch: client reported {uploaded_file.content_type}, "
+                    f"detected {actual_mime_type}"
+                )
 
         # Verify file extension matches MIME type
         file_ext = os.path.splitext(uploaded_file.name)[1].lower()

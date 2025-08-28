@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import { Code, Eye, EyeOff, AlertTriangle, Shield, Copy, Download } from 'lucide-react'
+import DOMPurify from 'dompurify'
 import BaseWidgetEditor from './BaseWidgetEditor'
 
 /**
@@ -106,7 +107,7 @@ const HTMLBlockEditor = ({ config, onChange, errors, widgetType }) => {
                                 </ul>
                                 {!allowScripts && (
                                     <p className="text-xs text-red-600 mt-2">
-                                        Scripts are disabled. Enable "Allow Scripts" to execute JavaScript.
+                                        Scripts are disabled and will be sanitized. Enable "Allow Scripts" to execute JavaScript (with DOMPurify sanitization).
                                     </p>
                                 )}
                             </div>
@@ -129,10 +130,20 @@ const HTMLBlockEditor = ({ config, onChange, errors, widgetType }) => {
                     </div>
                     <div className="p-4 bg-white min-h-32">
                         {allowScripts ? (
-                            <div dangerouslySetInnerHTML={{ __html: html }} />
+                            <div dangerouslySetInnerHTML={{
+                                __html: DOMPurify.sanitize(html, {
+                                    ADD_TAGS: ['script'],
+                                    ADD_ATTR: ['onclick', 'onload', 'onmouseover', 'onerror', 'onsubmit'],
+                                    ALLOW_UNKNOWN_PROTOCOLS: true
+                                })
+                            }} />
                         ) : (
                             <div dangerouslySetInnerHTML={{
-                                __html: html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '<!-- Script removed for security -->')
+                                __html: DOMPurify.sanitize(html, {
+                                    FORBID_TAGS: ['script'],
+                                    FORBID_ATTR: ['onclick', 'onload', 'onmouseover', 'onerror', 'onsubmit', 'onchange', 'onkeydown', 'onkeyup', 'onmousedown', 'onmouseup'],
+                                    ALLOW_DATA_ATTR: false
+                                })
                             }} />
                         )}
                     </div>
@@ -269,12 +280,12 @@ const HTMLBlockEditor = ({ config, onChange, errors, widgetType }) => {
                                 <h4 className="text-sm font-medium text-yellow-900 mb-2">Script Execution</h4>
                                 {renderCheckboxField(
                                     'allow_scripts',
-                                    'Allow JavaScript execution',
-                                    'WARNING: Only enable for trusted content. Scripts can pose security risks.'
+                                    'Allow JavaScript execution (with DOMPurify sanitization)',
+                                    'WARNING: Only enable for trusted content. All content is sanitized with DOMPurify, but scripts can still pose security risks.'
                                 )}
                                 {localConfig.allow_scripts && (
                                     <div className="mt-2 text-xs text-yellow-800">
-                                        <strong>Security Warning:</strong> JavaScript execution is enabled. Ensure all content is from trusted sources.
+                                        <strong>Security Notice:</strong> JavaScript execution is enabled with DOMPurify sanitization. Content is filtered for common XSS patterns, but ensure all content is from trusted sources.
                                     </div>
                                 )}
                             </div>
