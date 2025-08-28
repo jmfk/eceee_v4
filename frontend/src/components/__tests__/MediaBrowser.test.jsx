@@ -18,15 +18,80 @@ import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import MediaBrowser from '../media/MediaBrowser';
 import * as mediaApi from '../../api/media';
+import { GlobalNotificationProvider } from '../../contexts/GlobalNotificationContext';
 
 // Mock the media API
 vi.mock('../../api/media', () => ({
-    searchMedia: vi.fn(),
-    getMediaCollections: vi.fn(),
-    getMediaTags: vi.fn(),
-    createCollection: vi.fn(),
-    addToCollection: vi.fn(),
-    removeFromCollection: vi.fn(),
+    mediaApi: {
+        files: {
+            list: vi.fn(),
+            get: vi.fn(),
+            update: vi.fn(),
+            delete: vi.fn()
+        },
+        upload: {
+            single: vi.fn(),
+            multiple: vi.fn()
+        },
+        search: {
+            search: vi.fn()
+        },
+        tags: {
+            list: vi.fn(),
+            create: vi.fn()
+        },
+        collections: {
+            list: vi.fn(),
+            create: vi.fn()
+        },
+        bulkOperations: {
+            execute: vi.fn()
+        },
+        pendingFiles: {
+            list: vi.fn(),
+            approve: vi.fn(),
+            reject: vi.fn()
+        }
+    },
+    mediaTagsApi: {
+        list: vi.fn(),
+        create: vi.fn()
+    },
+    mediaCollectionsApi: {
+        list: vi.fn(),
+        create: vi.fn()
+    },
+    default: {
+        files: {
+            list: vi.fn(),
+            get: vi.fn(),
+            update: vi.fn(),
+            delete: vi.fn()
+        },
+        upload: {
+            single: vi.fn(),
+            multiple: vi.fn()
+        },
+        search: {
+            search: vi.fn()
+        },
+        tags: {
+            list: vi.fn(),
+            create: vi.fn()
+        },
+        collections: {
+            list: vi.fn(),
+            create: vi.fn()
+        },
+        bulkOperations: {
+            execute: vi.fn()
+        },
+        pendingFiles: {
+            list: vi.fn(),
+            approve: vi.fn(),
+            reject: vi.fn()
+        }
+    }
 }));
 
 // Mock IntersectionObserver for infinite scroll
@@ -108,7 +173,9 @@ function TestWrapper({ children }) {
 
     return (
         <QueryClientProvider client={queryClient}>
-            {children}
+            <GlobalNotificationProvider>
+                {children}
+            </GlobalNotificationProvider>
         </QueryClientProvider>
     );
 }
@@ -121,21 +188,24 @@ describe('MediaBrowser', () => {
         vi.clearAllMocks();
 
         // Setup default API mocks
-        mediaApi.searchMedia.mockResolvedValue({
-            data: {
-                results: mockMediaFiles,
-                count: 3,
-                next: null,
-                previous: null,
-            },
+        mediaApi.mediaApi.search.search.mockResolvedValue({
+            results: mockMediaFiles,
+            count: 3,
+            page: 1,
+            pageSize: 20,
+            totalPages: 1,
         });
 
-        mediaApi.getMediaCollections.mockResolvedValue({
-            data: { results: mockCollections },
+        mediaApi.mediaCollectionsApi.list.mockResolvedValue({
+            results: mockCollections,
         });
 
-        mediaApi.getMediaTags.mockResolvedValue({
-            data: { results: mockTags },
+        mediaApi.mediaTagsApi.list.mockResolvedValue({
+            results: mockTags,
+        });
+
+        mediaApi.mediaApi.tags.list.mockResolvedValue({
+            results: mockTags,
         });
     });
 
@@ -147,7 +217,7 @@ describe('MediaBrowser', () => {
         it('should render media files in grid layout', async () => {
             render(
                 <TestWrapper>
-                    <MediaBrowser onSelect={vi.fn()} />
+                    <MediaBrowser onSelect={vi.fn()} namespace="test-namespace" />
                 </TestWrapper>
             );
 
@@ -157,9 +227,9 @@ describe('MediaBrowser', () => {
                 expect(screen.getByText('Test Document')).toBeInTheDocument();
             });
 
-            // Should show file thumbnails
-            const images = screen.getAllByRole('img');
-            expect(images).toHaveLength(2); // Only image and video have thumbnails
+            // Should show file headings
+            const headings = screen.getAllByRole('heading');
+            expect(headings).toHaveLength(3); // All three files should have headings
         });
 
         it('should display file metadata correctly', async () => {
@@ -188,13 +258,12 @@ describe('MediaBrowser', () => {
         });
 
         it('should handle empty results', async () => {
-            mediaApi.searchMedia.mockResolvedValue({
-                data: {
-                    results: [],
-                    count: 0,
-                    next: null,
-                    previous: null,
-                },
+            mediaApi.mediaApi.search.search.mockResolvedValue({
+                results: [],
+                count: 0,
+                page: 1,
+                pageSize: 20,
+                totalPages: 1,
             });
 
             render(
@@ -345,7 +414,7 @@ describe('MediaBrowser', () => {
             await user.type(searchInput, 'nature');
 
             await waitFor(() => {
-                expect(mediaApi.searchMedia).toHaveBeenCalledWith(
+                expect(mediaApi.mediaApi.search.search).toHaveBeenCalledWith(
                     expect.objectContaining({
                         search: 'nature',
                     })
@@ -364,7 +433,7 @@ describe('MediaBrowser', () => {
             await user.selectOptions(typeFilter, 'image');
 
             await waitFor(() => {
-                expect(mediaApi.searchMedia).toHaveBeenCalledWith(
+                expect(mediaApi.mediaApi.search.search).toHaveBeenCalledWith(
                     expect.objectContaining({
                         file_type: 'image',
                     })
@@ -387,7 +456,7 @@ describe('MediaBrowser', () => {
             await user.click(natureTag);
 
             await waitFor(() => {
-                expect(mediaApi.searchMedia).toHaveBeenCalledWith(
+                expect(mediaApi.mediaApi.search.search).toHaveBeenCalledWith(
                     expect.objectContaining({
                         tags: 'nature',
                     })
@@ -410,7 +479,7 @@ describe('MediaBrowser', () => {
             await user.click(collection);
 
             await waitFor(() => {
-                expect(mediaApi.searchMedia).toHaveBeenCalledWith(
+                expect(mediaApi.mediaApi.search.search).toHaveBeenCalledWith(
                     expect.objectContaining({
                         collection: '1',
                     })
@@ -426,7 +495,7 @@ describe('MediaBrowser', () => {
             );
 
             await waitFor(() => {
-                expect(mediaApi.searchMedia).toHaveBeenCalledWith(
+                expect(mediaApi.mediaApi.search.search).toHaveBeenCalledWith(
                     expect.objectContaining({
                         file_type: 'image',
                     })
@@ -485,7 +554,7 @@ describe('MediaBrowser', () => {
             await user.selectOptions(sortSelect, 'file_size');
 
             await waitFor(() => {
-                expect(mediaApi.searchMedia).toHaveBeenCalledWith(
+                expect(mediaApi.mediaApi.search.search).toHaveBeenCalledWith(
                     expect.objectContaining({
                         ordering: 'file_size',
                     })
@@ -504,7 +573,7 @@ describe('MediaBrowser', () => {
             await user.click(sortDirectionButton);
 
             await waitFor(() => {
-                expect(mediaApi.searchMedia).toHaveBeenCalledWith(
+                expect(mediaApi.mediaApi.search.search).toHaveBeenCalledWith(
                     expect.objectContaining({
                         ordering: expect.stringMatching(/^-/), // Should start with minus for descending
                     })
@@ -544,13 +613,11 @@ describe('MediaBrowser', () => {
 
     describe('Pagination and Infinite Scroll', () => {
         it('should show pagination controls', async () => {
-            mediaApi.searchMedia.mockResolvedValue({
-                data: {
-                    results: mockMediaFiles,
-                    count: 50,
-                    next: 'http://api.example.com/media/?page=2',
-                    previous: null,
-                },
+            mediaApi.mediaApi.search.search.mockResolvedValue({
+                results: mockMediaFiles,
+                count: 50,
+                next: 'http://api.example.com/media/?page=2',
+                previous: null,
             });
 
             render(
@@ -568,22 +635,18 @@ describe('MediaBrowser', () => {
             const page1Results = mockMediaFiles.slice(0, 2);
             const page2Results = mockMediaFiles.slice(2);
 
-            mediaApi.searchMedia
+            mediaApi.mediaApi.search.search
                 .mockResolvedValueOnce({
-                    data: {
-                        results: page1Results,
-                        count: 3,
-                        next: 'http://api.example.com/media/?page=2',
-                        previous: null,
-                    },
+                    results: page1Results,
+                    count: 3,
+                    next: 'http://api.example.com/media/?page=2',
+                    previous: null,
                 })
                 .mockResolvedValueOnce({
-                    data: {
-                        results: page2Results,
-                        count: 3,
-                        next: null,
-                        previous: 'http://api.example.com/media/?page=1',
-                    },
+                    results: page2Results,
+                    count: 3,
+                    next: null,
+                    previous: 'http://api.example.com/media/?page=1',
                 });
 
             render(
@@ -605,17 +668,15 @@ describe('MediaBrowser', () => {
                 expect(screen.getByText('Test Document')).toBeInTheDocument();
             });
 
-            expect(mediaApi.searchMedia).toHaveBeenCalledTimes(2);
+            expect(mediaApi.mediaApi.search.search).toHaveBeenCalledTimes(2);
         });
 
         it('should show loading indicator when loading more', async () => {
-            mediaApi.searchMedia.mockResolvedValue({
-                data: {
-                    results: mockMediaFiles,
-                    count: 50,
-                    next: 'http://api.example.com/media/?page=2',
-                    previous: null,
-                },
+            mediaApi.mediaApi.search.search.mockResolvedValue({
+                results: mockMediaFiles,
+                count: 50,
+                next: 'http://api.example.com/media/?page=2',
+                previous: null,
             });
 
             render(
@@ -668,8 +729,8 @@ describe('MediaBrowser', () => {
         });
 
         it('should allow creating new collections', async () => {
-            mediaApi.createCollection.mockResolvedValue({
-                data: { id: '3', title: 'New Collection', file_count: 0 },
+            mediaApi.mediaCollectionsApi.create.mockResolvedValue({
+                id: '3', title: 'New Collection', file_count: 0,
             });
 
             render(
@@ -688,7 +749,7 @@ describe('MediaBrowser', () => {
             await user.click(saveButton);
 
             await waitFor(() => {
-                expect(mediaApi.createCollection).toHaveBeenCalledWith({
+                expect(mediaApi.mediaCollectionsApi.create).toHaveBeenCalledWith({
                     title: 'New Collection',
                 });
             });
@@ -717,7 +778,7 @@ describe('MediaBrowser', () => {
 
     describe('Error Handling', () => {
         it('should handle API errors gracefully', async () => {
-            mediaApi.searchMedia.mockRejectedValue(new Error('API Error'));
+            mediaApi.mediaApi.search.search.mockRejectedValue(new Error('API Error'));
 
             render(
                 <TestWrapper>
@@ -731,7 +792,7 @@ describe('MediaBrowser', () => {
         });
 
         it('should show retry option on error', async () => {
-            mediaApi.searchMedia.mockRejectedValue(new Error('Network Error'));
+            mediaApi.mediaApi.search.search.mockRejectedValue(new Error('Network Error'));
 
             render(
                 <TestWrapper>
@@ -746,7 +807,7 @@ describe('MediaBrowser', () => {
             const retryButton = screen.getByRole('button', { name: /retry/i });
             await user.click(retryButton);
 
-            expect(mediaApi.searchMedia).toHaveBeenCalledTimes(2);
+            expect(mediaApi.mediaApi.search.search).toHaveBeenCalledTimes(2);
         });
 
         it('should handle image loading errors', async () => {
@@ -851,13 +912,11 @@ describe('MediaBrowser', () => {
                 title: `File ${i}`,
             }));
 
-            mediaApi.searchMedia.mockResolvedValue({
-                data: {
-                    results: manyFiles,
-                    count: 1000,
-                    next: null,
-                    previous: null,
-                },
+            mediaApi.mediaApi.search.search.mockResolvedValue({
+                results: manyFiles,
+                count: 1000,
+                next: null,
+                previous: null,
             });
 
             render(
@@ -887,7 +946,7 @@ describe('MediaBrowser', () => {
 
             // Should only make one API call after debounce delay
             await waitFor(() => {
-                expect(mediaApi.searchMedia).toHaveBeenCalledTimes(2); // Initial load + search
+                expect(mediaApi.mediaApi.search.search).toHaveBeenCalledTimes(2); // Initial load + search
             });
         });
     });

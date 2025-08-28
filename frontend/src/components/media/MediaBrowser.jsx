@@ -63,7 +63,7 @@ const MediaBrowser = ({
     });
     const [isDragOver, setIsDragOver] = useState(false);
     const [uploadState, setUploadState] = useState('idle'); // idle, uploading, complete
-    const [showBulkOperations, setShowBulkOperations] = useState(false);
+
     const [editingFile, setEditingFile] = useState(null);
     const [currentView, setCurrentView] = useState('library'); // 'library' | 'edit'
 
@@ -217,7 +217,6 @@ const MediaBrowser = ({
         // Refresh file list after bulk operation
         loadFiles(true);
         setSelectedFiles([]);
-        setShowBulkOperations(false);
     };
 
     // Upload handlers
@@ -506,9 +505,9 @@ const MediaBrowser = ({
     }
 
     return (
-        <div className="h-full flex flex-col overflow-hidden">
-            {/* Fixed Top Section - Header, Upload Area, Selection Info */}
-            <div className="flex-shrink-0">
+        <div className="flex flex-col">
+            {/* Header, Upload Area, Selection Info */}
+            <div>
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row gap-4 p-4 bg-white border-b border-gray-200">
                     <div className="flex-1">
@@ -620,103 +619,71 @@ const MediaBrowser = ({
                     </div>
                 )}
 
-                {/* Selection info */}
+                {/* Bulk Operations Interface */}
                 {selectedFiles.length > 0 && (
-                    <div className="flex justify-between items-center px-4 py-3 bg-blue-50 border-b border-blue-200">
-                        <p className="text-sm text-blue-700 font-medium">
-                            {selectedFiles.length} file(s) selected
-                        </p>
-                        <div className="flex items-center gap-2">
-                            <button
-                                onClick={() => setShowBulkOperations(true)}
-                                className="flex items-center gap-2 px-3 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                            >
-                                Bulk Actions
-                            </button>
-                            <button
-                                onClick={() => setSelectedFiles([])}
-                                className="flex items-center gap-1 px-3 py-1 text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded transition-colors"
-                            >
-                                <X className="w-3 h-3" />
-                                Clear Selection
-                            </button>
-                        </div>
-                    </div>
+                    <BulkOperations
+                        selectedFiles={selectedFiles}
+                        namespace={namespace}
+                        onOperationComplete={handleBulkOperationComplete}
+                        onClose={() => setSelectedFiles([])}
+                        className="border-0 shadow-none rounded-none bg-transparent p-0"
+                        compact={true}
+                        showSelectionHeader={true}
+                    />
                 )}
             </div>
 
-            {/* Scrollable Content Section */}
-            <div className="flex-1 flex flex-col min-h-0 h-0">
-                <div className="flex-1 overflow-y-auto h-full">
-                    {loading ? (
-                        <div className="flex items-center justify-center h-64">
-                            <div className="text-center">
-                                <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-600" />
-                                <p className="text-gray-600">Loading media files...</p>
-                            </div>
+            {/* Content Section */}
+            <div>
+                {loading ? (
+                    <div className="flex items-center justify-center h-64">
+                        <div className="text-center">
+                            <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-600" />
+                            <p className="text-gray-600">Loading media files...</p>
                         </div>
-                    ) : files.length === 0 ? (
-                        <div className="flex items-center justify-center h-64">
-                            <div className="text-center">
-                                <FolderOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                                <p className="text-gray-600">No files found</p>
-                            </div>
-                        </div>
-                    ) : (
-                        <>
-                            {viewMode === 'grid' ? renderGridView() : renderListView()}
-                        </>
-                    )}
-                </div>
-
-                {/* Fixed Pagination at bottom of scrollable area */}
-                {pagination.totalPages > 1 && (
-                    <div className="flex-shrink-0 flex justify-between items-center px-4 py-3 bg-gray-50 border-t border-gray-200">
-                        <button
-                            onClick={() => handlePageChange(pagination.page - 1)}
-                            disabled={pagination.page <= 1}
-                            className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                        >
-                            <ChevronLeft className="w-4 h-4" />
-                            Previous
-                        </button>
-
-                        <span className="text-sm text-gray-600">
-                            Page {pagination.page} of {pagination.totalPages} • {pagination.count} total files
-                        </span>
-
-                        <button
-                            onClick={() => handlePageChange(pagination.page + 1)}
-                            disabled={pagination.page >= pagination.totalPages}
-                            className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                        >
-                            Next
-                            <ChevronRight className="w-4 h-4" />
-                        </button>
                     </div>
+                ) : files.length === 0 ? (
+                    <div className="flex items-center justify-center h-64">
+                        <div className="text-center">
+                            <FolderOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                            <p className="text-gray-600">No files found</p>
+                        </div>
+                    </div>
+                ) : (
+                    <>
+                        {viewMode === 'grid' ? renderGridView() : renderListView()}
+                    </>
                 )}
             </div>
 
-            {/* Bulk Operations Modal */}
-            {showBulkOperations && selectedFiles.length > 0 && (
-                <div className="fixed inset-0 z-50 overflow-y-auto">
-                    <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-                        <div
-                            className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75"
-                            onClick={() => setShowBulkOperations(false)}
-                        />
+            {/* Pagination */}
+            {pagination.totalPages > 1 && (
+                <div className="flex justify-between items-center px-4 py-3 bg-gray-50 border-t border-gray-200">
+                    <button
+                        onClick={() => handlePageChange(pagination.page - 1)}
+                        disabled={pagination.page <= 1}
+                        className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                        <ChevronLeft className="w-4 h-4" />
+                        Previous
+                    </button>
 
-                        <div className="inline-block w-full max-w-2xl my-8 overflow-hidden text-left align-middle transition-all transform bg-white shadow-xl rounded-lg">
-                            <BulkOperations
-                                selectedFiles={selectedFiles}
-                                namespace={namespace}
-                                onOperationComplete={handleBulkOperationComplete}
-                                onClose={() => setShowBulkOperations(false)}
-                            />
-                        </div>
-                    </div>
+                    <span className="text-sm text-gray-600">
+                        Page {pagination.page} of {pagination.totalPages} • {pagination.count} total files
+                    </span>
+
+                    <button
+                        onClick={() => handlePageChange(pagination.page + 1)}
+                        disabled={pagination.page >= pagination.totalPages}
+                        className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                        Next
+                        <ChevronRight className="w-4 h-4" />
+                    </button>
                 </div>
             )}
+
+
 
         </div>
     );

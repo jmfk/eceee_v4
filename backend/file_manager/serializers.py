@@ -630,7 +630,7 @@ class BulkOperationSerializer(serializers.Serializer):
     tag_ids = serializers.ListField(
         child=serializers.UUIDField(), required=False, allow_empty=True
     )
-    collection_id = serializers.UUIDField(required=False)
+    collection_id = serializers.UUIDField(required=False, allow_null=True)
     access_level = serializers.ChoiceField(
         choices=MediaFile.ACCESS_LEVEL_CHOICES, required=False
     )
@@ -752,7 +752,7 @@ class MediaFileApprovalSerializer(serializers.Serializer):
     )
     collection_id = serializers.UUIDField(required=False, allow_null=True)
     collection_name = serializers.CharField(
-        max_length=255, required=False, allow_blank=True
+        max_length=255, required=False, allow_blank=True, allow_null=True
     )
 
     def validate_title(self, value):

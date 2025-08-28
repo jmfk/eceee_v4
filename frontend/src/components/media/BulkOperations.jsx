@@ -9,7 +9,7 @@
  * - Progress tracking and error handling
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     Tag,
     Trash2,
@@ -31,25 +31,58 @@ import {
 } from 'lucide-react';
 import { mediaApi, mediaTagsApi, mediaCollectionsApi } from '../../api';
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext';
+import MediaTagWidget from './MediaTagWidget';
 
 const BulkOperations = ({
     selectedFiles = [],
     namespace,
+    initialOperation = '',
     onOperationComplete,
     onClose,
-    className = ''
+    className = '',
+    compact = false,
+    showSelectionHeader = true
 }) => {
-    const [operation, setOperation] = useState('');
+    const [operation, setOperation] = useState(initialOperation);
     const [operationData, setOperationData] = useState({});
-    const [availableTags, setAvailableTags] = useState([]);
-    const [availableCollections, setAvailableCollections] = useState([]);
+    const [availableTags, setAvailableTags] = useState(null);
+    const [availableCollections, setAvailableCollections] = useState(null);
     const [processing, setProcessing] = useState(false);
     const [progress, setProgress] = useState({ completed: 0, total: 0, errors: [] });
     const [showProgress, setShowProgress] = useState(false);
-    const [newTagName, setNewTagName] = useState('');
     const [newCollectionName, setNewCollectionName] = useState('');
+    const [selectedTags, setSelectedTags] = useState([]);
+    const [existingTagsFromFiles, setExistingTagsFromFiles] = useState([]);
 
     const { addNotification } = useGlobalNotifications();
+
+    // Gather existing tags from selected files
+    const gatherExistingTags = useCallback(() => {
+        const allTags = new Set();
+        selectedFiles.forEach(file => {
+            if (file.tags && Array.isArray(file.tags)) {
+                file.tags.forEach(tag => {
+                    if (typeof tag === 'string') {
+                        allTags.add(tag);
+                    } else if (tag && tag.name) {
+                        allTags.add(tag.name);
+                    }
+                });
+            }
+        });
+        return Array.from(allTags);
+    }, [selectedFiles]);
+
+    // Update existing tags when selected files change
+    useEffect(() => {
+        const existingTags = gatherExistingTags();
+        setExistingTagsFromFiles(existingTags);
+
+        // For remove_tags operation, initialize with existing tags
+        if (operation === 'remove_tags') {
+            setSelectedTags(existingTags);
+        }
+    }, [selectedFiles, operation, gatherExistingTags]);
 
     // Load available tags and collections
     useEffect(() => {
@@ -62,11 +95,14 @@ const BulkOperations = ({
                     mediaCollectionsApi.list({ namespace })
                 ]);
 
-                setAvailableTags(tagsResult.results || tagsResult || []);
-                setAvailableCollections(collectionsResult.results || collectionsResult || []);
+                setAvailableTags(Array.isArray(tagsResult.results) ? tagsResult.results : Array.isArray(tagsResult) ? tagsResult : []);
+                setAvailableCollections(Array.isArray(collectionsResult.results) ? collectionsResult.results : Array.isArray(collectionsResult) ? collectionsResult : []);
             } catch (error) {
                 console.error('Failed to load data:', error);
                 addNotification('Failed to load tags and collections', 'error');
+                // Set empty arrays on error to prevent map errors
+                setAvailableTags([]);
+                setAvailableCollections([]);
             }
         };
 
@@ -133,30 +169,18 @@ const BulkOperations = ({
         setOperationData({});
         setProgress({ completed: 0, total: 0, errors: [] });
         setShowProgress(false);
-    };
 
-    // Create new tag
-    const createNewTag = async () => {
-        if (!newTagName.trim()) return;
-
-        try {
-            const newTag = await mediaTagsApi.create({
-                name: newTagName.trim(),
-                namespace: namespace
-            });
-            
-            setAvailableTags(prev => [...prev, newTag]);
-            setOperationData(prev => ({
-                ...prev,
-                tagIds: [...(prev.tagIds || []), newTag.id]
-            }));
-            setNewTagName('');
-            addNotification(`Tag "${newTag.name}" created`, 'success');
-        } catch (error) {
-            console.error('Failed to create tag:', error);
-            addNotification('Failed to create tag', 'error');
+        // Reset and initialize tags based on operation
+        if (operationId === 'add_tags') {
+            setSelectedTags([]);
+        } else if (operationId === 'remove_tags') {
+            setSelectedTags(existingTagsFromFiles);
+        } else {
+            setSelectedTags([]);
         }
     };
+
+
 
     // Create new collection
     const createNewCollection = async () => {
@@ -167,7 +191,7 @@ const BulkOperations = ({
                 title: newCollectionName.trim(),
                 namespace: namespace
             });
-            
+
             setAvailableCollections(prev => [...prev, newCollection]);
             setOperationData(prev => ({
                 ...prev,
@@ -196,6 +220,16 @@ const BulkOperations = ({
                 operation: operation,
                 ...operationData
             };
+
+            // Ensure collectionId is null instead of empty string for UUID validation
+            if (requestData.collectionId === '') {
+                requestData.collectionId = null;
+            }
+
+            // Add tag data for tag operations
+            if (operation === 'add_tags' || operation === 'remove_tags') {
+                requestData.tag_names = selectedTags;
+            }
 
             // Call the bulk operations API
             const result = await mediaApi.bulkOperations.execute(requestData);
@@ -240,7 +274,7 @@ const BulkOperations = ({
         switch (operation) {
             case 'add_tags':
             case 'remove_tags':
-                return operationData.tagIds && operationData.tagIds.length > 0;
+                return selectedTags && selectedTags.length > 0;
             case 'set_access_level':
                 return operationData.accessLevel;
             case 'add_to_collection':
@@ -257,82 +291,63 @@ const BulkOperations = ({
     const renderOperationForm = () => {
         switch (operation) {
             case 'add_tags':
-            case 'remove_tags':
                 return (
-                    <div className="space-y-4">
+                    <div className={compact ? "space-y-4" : "space-y-5"}>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Select Tags
+                            <label className={`block text-sm font-semibold mb-3 ${compact ? 'text-indigo-800' : 'text-gray-800'}`}>
+                                Add Tags
                             </label>
-                            <div className="space-y-2 max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-3">
-                                {availableTags.map(tag => (
-                                    <label key={tag.id} className="flex items-center space-x-2">
-                                        <input
-                                            type="checkbox"
-                                            checked={(operationData.tagIds || []).includes(tag.id)}
-                                            onChange={(e) => {
-                                                const tagIds = operationData.tagIds || [];
-                                                if (e.target.checked) {
-                                                    setOperationData(prev => ({
-                                                        ...prev,
-                                                        tagIds: [...tagIds, tag.id]
-                                                    }));
-                                                } else {
-                                                    setOperationData(prev => ({
-                                                        ...prev,
-                                                        tagIds: tagIds.filter(id => id !== tag.id)
-                                                    }));
-                                                }
-                                            }}
-                                            className="rounded border-gray-300"
-                                        />
-                                        <span
-                                            className="inline-block w-3 h-3 rounded-full"
-                                            style={{ backgroundColor: tag.color }}
-                                        />
-                                        <span className="text-sm">{tag.name}</span>
-                                    </label>
-                                ))}
+                            <div className="bg-white border border-indigo-200 rounded-lg p-4 shadow-md hover:shadow-lg transition-shadow duration-200">
+                                <MediaTagWidget
+                                    tags={selectedTags}
+                                    onChange={setSelectedTags}
+                                    namespace={namespace}
+                                    disabled={processing}
+                                />
                             </div>
                         </div>
+                    </div>
+                );
 
-                        {operation === 'add_tags' && (
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Create New Tag
-                                </label>
-                                <div className="flex gap-2">
-                                    <input
-                                        type="text"
-                                        value={newTagName}
-                                        onChange={(e) => setNewTagName(e.target.value)}
-                                        placeholder="Enter tag name"
-                                        className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        onKeyPress={(e) => e.key === 'Enter' && createNewTag()}
+            case 'remove_tags':
+                return (
+                    <div className={compact ? "space-y-4" : "space-y-5"}>
+                        <div>
+                            <label className={`block text-sm font-semibold mb-3 ${compact ? 'text-indigo-800' : 'text-gray-800'}`}>
+                                Remove Tags
+                            </label>
+                            {existingTagsFromFiles.length > 0 ? (
+                                <div className="bg-white border border-indigo-200 rounded-lg p-4 shadow-md hover:shadow-lg transition-shadow duration-200">
+                                    <div className="mb-2 text-sm text-gray-600">
+                                        Select tags to remove from {selectedFiles.length} file{selectedFiles.length !== 1 ? 's' : ''}:
+                                    </div>
+                                    <MediaTagWidget
+                                        tags={selectedTags}
+                                        onChange={setSelectedTags}
+                                        namespace={namespace}
+                                        disabled={processing}
                                     />
-                                    <button
-                                        type="button"
-                                        onClick={createNewTag}
-                                        disabled={!newTagName.trim()}
-                                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        <Plus className="w-4 h-4" />
-                                    </button>
                                 </div>
-                            </div>
-                        )}
+                            ) : (
+                                <div className="border border-gray-300 rounded-lg p-6 bg-gradient-to-br from-gray-50 to-gray-100 text-center shadow-md">
+                                    <div className="text-sm text-gray-500">
+                                        No tags found on the selected files.
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 );
 
             case 'set_access_level':
                 return (
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <div className={compact ? "space-y-4" : "space-y-5"}>
+                        <label className={`block text-sm font-semibold mb-3 ${compact ? 'text-indigo-800' : 'text-gray-800'}`}>
                             Select Access Level
                         </label>
-                        <div className="space-y-2">
+                        <div className="space-y-3">
                             {accessLevels.map(level => (
-                                <label key={level.value} className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+                                <label key={level.value} className="flex items-center space-x-3 p-4 bg-white border border-gray-200 rounded-lg hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 hover:border-indigo-300 cursor-pointer transition-all duration-200 shadow-sm hover:shadow-md">
                                     <input
                                         type="radio"
                                         name="accessLevel"
@@ -363,9 +378,9 @@ const BulkOperations = ({
             case 'add_to_collection':
             case 'remove_from_collection':
                 return (
-                    <div className="space-y-4">
+                    <div className={compact ? "space-y-4" : "space-y-5"}>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className={`block text-sm font-semibold mb-3 ${compact ? 'text-indigo-800' : 'text-gray-800'}`}>
                                 Select Collection
                             </label>
                             <select
@@ -374,10 +389,17 @@ const BulkOperations = ({
                                     ...prev,
                                     collectionId: e.target.value
                                 }))}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-full px-4 py-3 bg-white border border-indigo-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm shadow-md hover:shadow-lg transition-all duration-200"
                             >
-                                <option value="">Select a collection...</option>
-                                {availableCollections.map(collection => (
+                                <option value="">
+                                    {Array.isArray(availableCollections) && availableCollections.length > 0
+                                        ? 'Select a collection...'
+                                        : availableCollections === null
+                                            ? 'Loading collections...'
+                                            : 'No collections available'
+                                    }
+                                </option>
+                                {Array.isArray(availableCollections) && availableCollections.map(collection => (
                                     <option key={collection.id} value={collection.id}>
                                         {collection.title}
                                     </option>
@@ -387,23 +409,23 @@ const BulkOperations = ({
 
                         {operation === 'add_to_collection' && (
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                <label className={`block text-sm font-semibold mb-3 ${compact ? 'text-indigo-800' : 'text-gray-800'}`}>
                                     Create New Collection
                                 </label>
-                                <div className="flex gap-2">
+                                <div className="flex gap-3">
                                     <input
                                         type="text"
                                         value={newCollectionName}
                                         onChange={(e) => setNewCollectionName(e.target.value)}
                                         placeholder="Enter collection name"
-                                        className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        className="flex-1 px-4 py-3 bg-white border border-indigo-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm shadow-md hover:shadow-lg transition-all duration-200"
                                         onKeyPress={(e) => e.key === 'Enter' && createNewCollection()}
                                     />
                                     <button
                                         type="button"
                                         onClick={createNewCollection}
                                         disabled={!newCollectionName.trim()}
-                                        className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="px-4 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg hover:from-green-600 hover:to-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm transition-all duration-200 shadow-md hover:shadow-lg font-medium"
                                     >
                                         <Plus className="w-4 h-4" />
                                     </button>
@@ -415,16 +437,16 @@ const BulkOperations = ({
 
             case 'delete':
                 return (
-                    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                        <div className="flex items-center gap-3 mb-3">
-                            <AlertCircle className="w-5 h-5 text-red-600" />
-                            <h4 className="font-medium text-red-800">Confirm Deletion</h4>
+                    <div className={`bg-gradient-to-br from-red-50 to-pink-50 border border-red-200 rounded-lg shadow-md ${compact ? 'p-4' : 'p-5'}`}>
+                        <div className="flex items-center gap-3 mb-4">
+                            <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0" />
+                            <h4 className={`font-semibold text-red-800 ${compact ? 'text-base' : 'text-lg'}`}>Confirm Deletion</h4>
                         </div>
-                        <p className="text-red-700 mb-3">
-                            This action will permanently delete {selectedFiles.length} file{selectedFiles.length !== 1 ? 's' : ''} 
+                        <p className={`text-red-700 mb-4 leading-relaxed ${compact ? 'text-sm' : ''}`}>
+                            This action will permanently delete {selectedFiles.length} file{selectedFiles.length !== 1 ? 's' : ''}
                             and cannot be undone. All references to these files will be broken.
                         </p>
-                        <label className="flex items-center space-x-2">
+                        <label className="flex items-start space-x-3 cursor-pointer p-3 rounded-lg hover:bg-gradient-to-r hover:from-red-100 hover:to-pink-100 transition-all duration-200 hover:shadow-sm">
                             <input
                                 type="checkbox"
                                 checked={operationData.confirmDelete || false}
@@ -432,9 +454,9 @@ const BulkOperations = ({
                                     ...prev,
                                     confirmDelete: e.target.checked
                                 }))}
-                                className="rounded border-gray-300"
+                                className="rounded border-gray-300 text-red-600 focus:ring-red-500 mt-0.5 flex-shrink-0 w-4 h-4"
                             />
-                            <span className="text-sm text-red-700">
+                            <span className={`text-red-700 font-medium ${compact ? 'text-sm' : ''}`}>
                                 I understand this action cannot be undone
                             </span>
                         </label>
@@ -449,42 +471,62 @@ const BulkOperations = ({
     // Get operation button color
     const getOperationColor = (operationId) => {
         const op = operations.find(o => o.id === operationId);
-        return op ? op.color : 'bg-gray-600 hover:bg-gray-700';
+        return op ? op.color : 'bg-blue-50 hover:bg-gray-700';
     };
 
     return (
-        <div className={`bg-white border border-gray-200 rounded-lg shadow-lg ${className}`}>
-            {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-gray-200">
-                <div>
-                    <h3 className="text-lg font-semibold text-gray-900">Bulk Operations</h3>
-                    <p className="text-sm text-gray-600">
-                        {selectedFiles.length} file{selectedFiles.length !== 1 ? 's' : ''} selected
-                    </p>
+        <div className={`bg-gradient-to-br from-blue-50 to-indigo-100 border border-blue-200 rounded-lg shadow-lg`}>
+            {/* Selection Header */}
+            {showSelectionHeader && selectedFiles.length > 0 && (
+                <div className="bg-gradient-to-r from-blue-100 to-indigo-100 border-b border-blue-200">
+                    <div className="flex justify-between items-center px-4 py-3">
+                        <p className="text-sm text-blue-800 font-semibold">
+                            {selectedFiles.length} file(s) selected
+                        </p>
+                        <div className="flex items-center gap-2">
+                            <select
+                                value={operation}
+                                onChange={(e) => {
+                                    if (e.target.value) {
+                                        handleOperationSelect(e.target.value);
+                                    }
+                                }}
+                                className="px-3 py-2 text-sm bg-white border border-blue-300 rounded-md hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm transition-all duration-200"
+                            >
+                                <option value="">Bulk Actions</option>
+                                <option value="add_tags">Add Tags</option>
+                                <option value="remove_tags">Remove Tags</option>
+                                <option value="add_to_collection">Add to Collection</option>
+                                <option value="remove_from_collection">Remove from Collection</option>
+                                <option value="delete">Delete Files</option>
+                            </select>
+                            <button
+                                onClick={() => {
+                                    if (onClose) onClose();
+                                }}
+                                className="flex items-center gap-1 px-3 py-2 text-sm text-blue-700 hover:text-white hover:bg-blue-600 rounded-md transition-all duration-200 font-medium shadow-sm"
+                            >
+                                <X className="w-3 h-3" />
+                                Clear Selection
+                            </button>
+                        </div>
+                    </div>
                 </div>
-                {onClose && (
-                    <button
-                        onClick={onClose}
-                        className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-                    >
-                        <X className="w-5 h-5" />
-                    </button>
-                )}
-            </div>
+            )}
 
-            <div className="p-4">
+            <div className={compact ? "" : "p-0"}>
                 {!showProgress ? (
                     <>
-                        {/* Operation Selection */}
-                        {!operation && (
-                            <div className="space-y-3">
-                                <h4 className="font-medium text-gray-900 mb-3">Select Operation</h4>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {/* Operation Selection - only show if no initial operation and not showing selection header */}
+                        {!operation && !initialOperation && !showSelectionHeader && (
+                            <div className="p-6 space-y-4 bg-gradient-to-br from-white to-gray-50">
+                                <h4 className="font-bold text-gray-900 text-xl mb-4 text-center">Select Operation</h4>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     {operations.map(op => (
                                         <button
                                             key={op.id}
                                             onClick={() => handleOperationSelect(op.id)}
-                                            className={`flex items-center gap-3 p-4 text-left text-white rounded-lg transition-colors ${op.color}`}
+                                            className={`flex items-center gap-3 p-5 text-left text-white rounded-lg transition-all duration-200 hover:shadow-lg transform hover:-translate-y-1 hover:scale-105 ${op.color} shadow-md`}
                                         >
                                             {op.icon}
                                             <div>
@@ -499,27 +541,17 @@ const BulkOperations = ({
 
                         {/* Operation Form */}
                         {operation && (
-                            <div className="space-y-4">
-                                <div className="flex items-center justify-between">
-                                    <h4 className="font-medium text-gray-900">
-                                        {operations.find(op => op.id === operation)?.label}
-                                    </h4>
-                                    <button
-                                        onClick={() => setOperation('')}
-                                        className="text-sm text-gray-500 hover:text-gray-700"
-                                    >
-                                        ← Back to operations
-                                    </button>
+                            <div className={compact ? "px-4 pb-4" : "p-6"}>
+                                <div className="mt-5">
+                                    {renderOperationForm()}
                                 </div>
 
-                                {renderOperationForm()}
-
                                 {/* Action Buttons */}
-                                <div className="flex gap-3 pt-4 border-t border-gray-200">
+                                <div className={`flex gap-3 pt-5 mt-5 ${compact ? 'border-t border-indigo-200' : 'border-t border-gray-200'}`}>
                                     <button
                                         onClick={executeBulkOperation}
                                         disabled={!isOperationValid() || processing || (operation === 'delete' && !operationData.confirmDelete)}
-                                        className={`flex items-center gap-2 px-4 py-2 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${getOperationColor(operation)}`}
+                                        className={`flex items-center gap-2 px-6 py-3 text-white rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg transform hover:-translate-y-0.5 font-semibold ${getOperationColor(operation)} ${compact ? 'text-sm' : ''} shadow-md`}
                                     >
                                         {processing ? (
                                             <>
@@ -534,9 +566,13 @@ const BulkOperations = ({
                                         )}
                                     </button>
                                     <button
-                                        onClick={() => setOperation('')}
+                                        onClick={() => {
+                                            setShowProgress(false);
+                                            setOperation('');
+                                            setProgress({ completed: 0, total: 0, errors: [] });
+                                        }}
                                         disabled={processing}
-                                        className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors disabled:opacity-50"
+                                        className={`px-6 py-3 text-gray-700 bg-gradient-to-r from-gray-100 to-gray-200 rounded-lg hover:from-gray-200 hover:to-gray-300 transition-all duration-200 disabled:opacity-50 font-medium shadow-md hover:shadow-lg ${compact ? 'text-sm' : ''}`}
                                     >
                                         Cancel
                                     </button>
@@ -548,7 +584,7 @@ const BulkOperations = ({
                     /* Progress Display */
                     <div className="space-y-4">
                         <h4 className="font-medium text-gray-900">Operation Progress</h4>
-                        
+
                         <div className="space-y-3">
                             {/* Progress Bar */}
                             <div className="w-full bg-gray-200 rounded-full h-3">
@@ -557,7 +593,7 @@ const BulkOperations = ({
                                     style={{ width: `${(progress.completed / progress.total) * 100}%` }}
                                 />
                             </div>
-                            
+
                             <div className="flex justify-between text-sm text-gray-600">
                                 <span>{progress.completed} of {progress.total} files processed</span>
                                 <span>{Math.round((progress.completed / progress.total) * 100)}%</span>

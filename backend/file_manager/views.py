@@ -1245,6 +1245,7 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
     @action(detail=True, methods=["post"])
     def approve(self, request, pk=None):
         """Approve a pending file and create a MediaFile."""
+        print(f"approve: {pk}")
         try:
             pending_file = self.get_object()
         except (PendingMediaFile.DoesNotExist, Http404):
@@ -1252,7 +1253,7 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
                 {"error": "Pending file not found or already processed"},
                 status=status.HTTP_404_NOT_FOUND,
             )
-
+        print(f"pending_file: {pending_file.status}")
         # If file is already approved, return success with existing media file
         if pending_file.status == "approved":
             # Find the corresponding media file
@@ -1264,6 +1265,9 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
                 # Handle collection assignment if requested
                 collection_id = request.data.get("collection_id")
                 collection_name = request.data.get("collection_name")
+
+                print(f"collection_id: {collection_id}")
+                print(f"collection_name: {collection_name}")
 
                 if collection_id or collection_name:
                     try:
@@ -1299,6 +1303,8 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
             file_hash=pending_file.file_hash, namespace=pending_file.namespace
         ).first()
 
+        print(f"existing_file: {existing_file}")
+
         if existing_file:
             # File already exists, just mark as approved and optionally add to collection
             pending_file.status = "approved"
@@ -1307,6 +1313,9 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
             # Handle collection assignment if requested
             collection_id = request.data.get("collection_id")
             collection_name = request.data.get("collection_name")
+
+            print(f"collection_id: {collection_id}")
+            print(f"collection_name: {collection_name}")
 
             if collection_id or collection_name:
                 try:
@@ -1333,6 +1342,7 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
             )
 
         # Validate input data with context
+        print(f"MediaFileApprovalSerializer")
         serializer = MediaFileApprovalSerializer(
             data=request.data,
             context={"namespace": pending_file.namespace, "user": request.user},
@@ -1353,6 +1363,8 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
             # Handle collection assignment
             collection_id = serializer.validated_data.get("collection_id")
             collection_name = serializer.validated_data.get("collection_name")
+            print(f"collection_id: {collection_id}")
+            print(f"collection_name: {collection_name}")
 
             if collection_id or collection_name:
                 try:
