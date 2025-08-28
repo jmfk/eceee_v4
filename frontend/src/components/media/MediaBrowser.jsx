@@ -25,7 +25,8 @@ import {
     X,
     ChevronLeft,
     ChevronRight,
-    Edit3
+    Edit3,
+    ArrowLeft
 } from 'lucide-react';
 import { mediaApi } from '../../api';
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext';
@@ -64,6 +65,7 @@ const MediaBrowser = ({
     const [uploadState, setUploadState] = useState('idle'); // idle, uploading, complete
     const [showBulkOperations, setShowBulkOperations] = useState(false);
     const [editingFile, setEditingFile] = useState(null);
+    const [currentView, setCurrentView] = useState('library'); // 'library' | 'edit'
 
     const { addNotification } = useGlobalNotifications();
 
@@ -166,11 +168,13 @@ const MediaBrowser = ({
     const handleEditClick = (file, event) => {
         event.stopPropagation(); // Prevent file selection
         setEditingFile(file);
+        setCurrentView('edit');
     };
 
     // Handle edit form save
     const handleEditSave = (updatedFile) => {
         setEditingFile(null);
+        setCurrentView('library');
         // Refresh the file list to show updated data
         loadFiles(true);
     };
@@ -178,6 +182,13 @@ const MediaBrowser = ({
     // Handle edit form cancel
     const handleEditCancel = () => {
         setEditingFile(null);
+        setCurrentView('library');
+    };
+
+    // Handle back to library
+    const handleBackToLibrary = () => {
+        setEditingFile(null);
+        setCurrentView('library');
     };
 
     const isFileSelected = (file) => {
@@ -442,6 +453,58 @@ const MediaBrowser = ({
         </div>
     );
 
+    // Edit File View Component
+    const EditFileView = ({ file, namespace, onBack, onSave }) => {
+        return (
+            <div className="h-full flex flex-col bg-gray-50">
+                {/* Header */}
+                <div className="flex-shrink-0 bg-white border-b border-gray-200 px-6 py-4">
+                    <div className="flex items-center gap-4">
+                        <button
+                            onClick={onBack}
+                            className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+                        >
+                            <ArrowLeft className="w-4 h-4" />
+                            Back to Library
+                        </button>
+                        <div className="flex-1">
+                            <h2 className="text-xl font-semibold text-gray-900">Edit File</h2>
+                            <p className="text-sm text-gray-600 mt-1">
+                                Editing: {file.title || file.originalFilename}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 overflow-auto p-6">
+                    <div className="max-w-4xl mx-auto">
+                        <MediaEditForm
+                            file={file}
+                            namespace={namespace}
+                            onSave={onSave}
+                            onCancel={onBack}
+                            mode="edit"
+                            showHeader={false}
+                        />
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    // Conditional rendering based on current view
+    if (currentView === 'edit' && editingFile) {
+        return (
+            <EditFileView
+                file={editingFile}
+                namespace={namespace}
+                onBack={handleBackToLibrary}
+                onSave={handleEditSave}
+            />
+        );
+    }
+
     return (
         <div className="h-full flex flex-col overflow-hidden">
             {/* Fixed Top Section - Header, Upload Area, Selection Info */}
@@ -502,71 +565,59 @@ const MediaBrowser = ({
                     </div>
                 </div>
 
-                {/* Upload Area or Edit Form */}
+                {/* Upload Area */}
                 {showUploader && (
-                    editingFile ? (
-                        <div className="m-4">
-                            <MediaEditForm
-                                file={editingFile}
-                                namespace={namespace}
-                                onSave={handleEditSave}
-                                onCancel={handleEditCancel}
-                                mode="edit"
-                            />
-                        </div>
-                    ) : (
-                        <div
-                            className={`
+                    <div
+                        className={`
                                 m-4 border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-all duration-200
                                 ${isDragOver
-                                    ? 'border-blue-500 bg-blue-50 scale-105'
-                                    : 'border-gray-300 bg-gray-50 hover:border-blue-400 hover:bg-blue-50'
-                                }
+                                ? 'border-blue-500 bg-blue-50 scale-105'
+                                : 'border-gray-300 bg-gray-50 hover:border-blue-400 hover:bg-blue-50'
+                            }
                                 ${uploadState === 'uploading'
-                                    ? 'border-green-500 bg-green-50 pointer-events-none opacity-70'
-                                    : ''
-                                }
+                                ? 'border-green-500 bg-green-50 pointer-events-none opacity-70'
+                                : ''
+                            }
                             `}
-                            onDragOver={handleDragOver}
-                            onDragLeave={handleDragLeave}
-                            onDrop={handleDrop}
-                            onClick={() => document.getElementById('file-input').click()}
-                        >
-                            <div className="pointer-events-none">
-                                {uploadState === 'uploading' ? (
-                                    <div className="flex flex-col items-center gap-2">
-                                        <Loader2 className="w-6 h-6 animate-spin text-green-600" />
-                                        <p className="text-sm text-gray-700">Uploading files...</p>
+                        onDragOver={handleDragOver}
+                        onDragLeave={handleDragLeave}
+                        onDrop={handleDrop}
+                        onClick={() => document.getElementById('file-input').click()}
+                    >
+                        <div className="pointer-events-none">
+                            {uploadState === 'uploading' ? (
+                                <div className="flex flex-col items-center gap-2">
+                                    <Loader2 className="w-6 h-6 animate-spin text-green-600" />
+                                    <p className="text-sm text-gray-700">Uploading files...</p>
+                                </div>
+                            ) : uploadState === 'complete' ? (
+                                <div className="flex flex-col items-center gap-2">
+                                    <CheckCircle className="w-6 h-6 text-green-600" />
+                                    <p className="text-sm text-green-700 font-medium">Upload complete!</p>
+                                </div>
+                            ) : (
+                                <div className="flex flex-col items-center gap-2">
+                                    <FolderOpen className="w-8 h-8 text-gray-400" />
+                                    <div>
+                                        <p className="text-sm text-gray-700 mb-1">
+                                            <span className="font-semibold">Drag files here</span> or <span className="text-blue-600 underline">click to browse</span>
+                                        </p>
+                                        <p className="text-xs text-gray-500">
+                                            Supports images, documents, videos, and audio files
+                                        </p>
                                     </div>
-                                ) : uploadState === 'complete' ? (
-                                    <div className="flex flex-col items-center gap-2">
-                                        <CheckCircle className="w-6 h-6 text-green-600" />
-                                        <p className="text-sm text-green-700 font-medium">Upload complete!</p>
-                                    </div>
-                                ) : (
-                                    <div className="flex flex-col items-center gap-2">
-                                        <FolderOpen className="w-8 h-8 text-gray-400" />
-                                        <div>
-                                            <p className="text-sm text-gray-700 mb-1">
-                                                <span className="font-semibold">Drag files here</span> or <span className="text-blue-600 underline">click to browse</span>
-                                            </p>
-                                            <p className="text-xs text-gray-500">
-                                                Supports images, documents, videos, and audio files
-                                            </p>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                            <input
-                                id="file-input"
-                                type="file"
-                                multiple
-                                accept="image/*,application/pdf,.doc,.docx,video/*,audio/*"
-                                onChange={handleFileInputChange}
-                                className="hidden"
-                            />
+                                </div>
+                            )}
                         </div>
-                    )
+                        <input
+                            id="file-input"
+                            type="file"
+                            multiple
+                            accept="image/*,application/pdf,.doc,.docx,video/*,audio/*"
+                            onChange={handleFileInputChange}
+                            className="hidden"
+                        />
+                    </div>
                 )}
 
                 {/* Selection info */}
