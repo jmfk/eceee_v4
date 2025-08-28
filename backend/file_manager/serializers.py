@@ -153,6 +153,8 @@ class MediaCollectionSerializer(serializers.ModelSerializer):
     )
     namespace = serializers.CharField(source="namespace.slug", required=False)
     file_count = serializers.SerializerMethodField()
+    sample_images = serializers.SerializerMethodField()
+    slug = serializers.SlugField(required=False, allow_blank=True)
 
     class Meta:
         model = MediaCollection
@@ -166,6 +168,7 @@ class MediaCollectionSerializer(serializers.ModelSerializer):
             "tags",
             "tag_ids",
             "file_count",
+            "sample_images",
             "created_at",
             "updated_at",
             "created_by",
@@ -182,11 +185,35 @@ class MediaCollectionSerializer(serializers.ModelSerializer):
             "last_modified_by",
             "last_modified_by_name",
             "file_count",
+            "sample_images",
         ]
 
     def get_file_count(self, obj):
         """Get number of files in collection."""
         return obj.mediafile_set.count()
+
+    def get_sample_images(self, obj):
+        """Get sample images for thumbnail grid (max 16)."""
+        # Get image files from the collection
+        image_files = obj.mediafile_set.filter(file_type="image")[
+            :16
+        ]  # Limit to 16 images max
+
+        # Return simplified data for thumbnails
+        sample_images = []
+        for file in image_files:
+            # Get the file URL for images
+            imgproxy_url = file.get_file_url()
+            if imgproxy_url:
+                sample_images.append(
+                    {
+                        "id": str(file.id),
+                        "imgproxy_base_url": imgproxy_url,
+                        "title": file.title or file.original_filename,
+                    }
+                )
+
+        return sample_images
 
     def create(self, validated_data):
         """Create collection with tags."""
@@ -197,7 +224,7 @@ class MediaCollectionSerializer(serializers.ModelSerializer):
         validated_data["last_modified_by"] = self.context["request"].user
 
         # Handle namespace conversion from slug to object
-        namespace_slug = validated_data.get("namespace")
+        namespace_slug = validated_data.get("namespace").get("slug")
         if namespace_slug:
             try:
                 validated_data["namespace"] = Namespace.objects.get(slug=namespace_slug)

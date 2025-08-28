@@ -59,7 +59,10 @@ class MediaCollection(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     title = models.CharField(max_length=255)
-    slug = models.SlugField(max_length=255)
+    slug = models.SlugField(
+        max_length=255,
+        blank=True,
+    )
     description = models.TextField(blank=True)
 
     # Organization
@@ -106,8 +109,30 @@ class MediaCollection(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.slug:
-            self.slug = slugify(self.title)
+            self.slug = self._generate_unique_slug()
         super().save(*args, **kwargs)
+
+    def _generate_unique_slug(self):
+        """Generate a unique slug for the collection within its namespace."""
+        from django.utils.text import slugify
+
+        base_slug = slugify(self.title)
+        if not base_slug:
+            base_slug = "collection"
+
+        slug = base_slug
+        counter = 1
+
+        # Check for existing slugs in the same namespace
+        while (
+            MediaCollection.objects.filter(namespace=self.namespace, slug=slug)
+            .exclude(pk=self.pk)
+            .exists()
+        ):
+            slug = f"{base_slug}-{counter}"
+            counter += 1
+
+        return slug
 
 
 class PendingMediaFile(models.Model):
@@ -261,18 +286,25 @@ class PendingMediaFile(models.Model):
         # Check if the same file exists in MediaFile (approved files)
         # If it does, don't delete from S3 as it's still being used
         existing_media_file = MediaFile.objects.filter(file_hash=self.file_hash).first()
-        
+
         if existing_media_file:
-            logger.info(f"Not deleting S3 file {self.file_path} - same file exists in MediaFile: {existing_media_file.title}")
+            logger.info(
+                f"Not deleting S3 file {self.file_path} - same file exists in MediaFile: {existing_media_file.title}"
+            )
         else:
             # Check if other pending files with same hash exist
-            other_pending_files = PendingMediaFile.objects.filter(
-                file_hash=self.file_hash,
-                status__in=['pending', 'approved']
-            ).exclude(id=self.id).exists()
-            
+            other_pending_files = (
+                PendingMediaFile.objects.filter(
+                    file_hash=self.file_hash, status__in=["pending", "approved"]
+                )
+                .exclude(id=self.id)
+                .exists()
+            )
+
             if other_pending_files:
-                logger.info(f"Not deleting S3 file {self.file_path} - other pending files with same hash exist")
+                logger.info(
+                    f"Not deleting S3 file {self.file_path} - other pending files with same hash exist"
+                )
             else:
                 # Safe to delete from S3 - no other references to this file
                 try:
@@ -280,7 +312,9 @@ class PendingMediaFile(models.Model):
                     storage.delete_file(self.file_path)
                     logger.info(f"Deleted rejected file from S3: {self.file_path}")
                 except Exception as e:
-                    logger.error(f"Failed to delete rejected file {self.file_path}: {e}")
+                    logger.error(
+                        f"Failed to delete rejected file {self.file_path}: {e}"
+                    )
 
         # Update status
         self.status = "rejected"
@@ -310,24 +344,36 @@ class PendingMediaFile(models.Model):
             try:
                 # Check if the same file exists in MediaFile (approved files)
                 # If it does, don't delete from S3 as it's still being used
-                existing_media_file = MediaFile.objects.filter(file_hash=pending_file.file_hash).first()
-                
+                existing_media_file = MediaFile.objects.filter(
+                    file_hash=pending_file.file_hash
+                ).first()
+
                 if existing_media_file:
-                    logger.info(f"Not deleting S3 file {pending_file.file_path} - same file exists in MediaFile: {existing_media_file.title}")
+                    logger.info(
+                        f"Not deleting S3 file {pending_file.file_path} - same file exists in MediaFile: {existing_media_file.title}"
+                    )
                 else:
                     # Check if other pending files with same hash exist
-                    other_pending_files = cls.objects.filter(
-                        file_hash=pending_file.file_hash,
-                        status__in=['pending', 'approved']
-                    ).exclude(id=pending_file.id).exists()
-                    
+                    other_pending_files = (
+                        cls.objects.filter(
+                            file_hash=pending_file.file_hash,
+                            status__in=["pending", "approved"],
+                        )
+                        .exclude(id=pending_file.id)
+                        .exists()
+                    )
+
                     if other_pending_files:
-                        logger.info(f"Not deleting S3 file {pending_file.file_path} - other pending files with same hash exist")
+                        logger.info(
+                            f"Not deleting S3 file {pending_file.file_path} - other pending files with same hash exist"
+                        )
                     else:
                         # Safe to delete from S3 - no other references to this file
                         storage.delete_file(pending_file.file_path)
-                        logger.info(f"Deleted expired file from S3: {pending_file.file_path}")
-                
+                        logger.info(
+                            f"Deleted expired file from S3: {pending_file.file_path}"
+                        )
+
                 # Mark as expired
                 pending_file.status = "expired"
                 pending_file.save()

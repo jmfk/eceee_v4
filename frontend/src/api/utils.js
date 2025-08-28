@@ -39,13 +39,17 @@ export const handleApiError = (error, defaultMessage = 'API request failed', con
  * Build query parameters string from object
  * @param {Object} params - Parameters object
  * @returns {string} URL query string
+ * 
+ * Note: Arrays are handled Django-style with repeated parameter names:
+ * { tag_names: ['tag1', 'tag2'] } → ?tag_names=tag1&tag_names=tag2
+ * NOT PHP-style: ?tag_names[]=tag1&tag_names[]=tag2
  */
 export const buildQueryParams = (params = {}) => {
     const searchParams = new URLSearchParams()
 
     Object.entries(params).forEach(([key, value]) => {
         if (value !== null && value !== undefined && value !== '') {
-            // Handle arrays by adding multiple entries
+            // Handle arrays by adding multiple entries (Django-style repeated params)
             if (Array.isArray(value)) {
                 value.forEach(item => searchParams.append(key, item))
             } else {

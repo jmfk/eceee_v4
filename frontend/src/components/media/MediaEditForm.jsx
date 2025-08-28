@@ -26,7 +26,8 @@ const MediaEditForm = ({
     namespace,
     onSave,
     onCancel,
-    mode = 'edit' // 'edit' for approved files, 'approve' for pending files
+    mode = 'edit', // 'edit' for approved files, 'approve' for pending files
+    showHeader = true // Whether to show the header with title and close button
 }) => {
     const [formData, setFormData] = useState({
         title: '',
@@ -272,17 +273,19 @@ const MediaEditForm = ({
 
     return (
         <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-6 mb-6">
-            <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-semibold text-gray-900">
-                    {mode === 'approve' ? 'Approve File' : 'Edit File'}
-                </h3>
-                <button
-                    onClick={onCancel}
-                    className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
-                >
-                    <X className="w-5 h-5" />
-                </button>
-            </div>
+            {showHeader && (
+                <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-lg font-semibold text-gray-900">
+                        {mode === 'approve' ? 'Approve File' : 'Edit File'}
+                    </h3>
+                    <button
+                        onClick={onCancel}
+                        className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                    >
+                        <X className="w-5 h-5" />
+                    </button>
+                </div>
+            )}
 
             <div className="flex gap-6">
                 {/* File Preview */}

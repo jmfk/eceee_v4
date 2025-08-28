@@ -7,6 +7,18 @@
  * - Advanced search and filtering
  * - Tag and collection management
  * - AI-powered suggestions
+ * 
+ * IMPORTANT: Django Parameter Handling
+ * When sending multiple values for the same parameter (like multiple tags),
+ * Django expects repeated parameter names, NOT array notation:
+ * ✅ CORRECT: ?tag_names=tag1&tag_names=tag2&tag_names=tag3
+ * ❌ WRONG:   ?tag_names[]=tag1&tag_names[]=tag2&tag_names[]=tag3 (PHP style)
+ * 
+ * Use arrays in params object: { tag_names: ['tag1', 'tag2', 'tag3'] }
+ * 
+ * NOTE: We use buildQueryParams() instead of axios params to avoid axios
+ * converting arrays to PHP-style notation. All list endpoints manually
+ * build query strings to ensure Django-compatible parameter serialization.
  */
 
 import { wrapApiCall, buildQueryParams } from './utils';
@@ -29,9 +41,11 @@ export const mediaFilesApi = {
      * @param {string} params.ordering - Sort order
      * @returns {Promise} API response with file list
      */
-    list: (params = {}) => wrapApiCall(() =>
-        apiClient.get(endpoints.media.files, { params })
-    ),
+    list: (params = {}) => wrapApiCall(() => {
+        // Use our custom buildQueryParams to handle Django-style array parameters
+        const queryString = buildQueryParams(params);
+        return apiClient.get(`${endpoints.media.files}${queryString}`);
+    }),
 
     /**
      * Get detailed information about a specific media file
@@ -215,9 +229,10 @@ export const mediaTagsApi = {
      * @returns {Promise} API response with tags
      */
     list: (params = {}) => wrapApiCall(() => {
-        return apiClient.get(endpoints.media.tags, { params })
-    }
-    ),
+        // Use our custom buildQueryParams to handle Django-style array parameters
+        const queryString = buildQueryParams(params);
+        return apiClient.get(`${endpoints.media.tags}${queryString}`);
+    }),
 
     /**
      * Create a new media tag
@@ -261,9 +276,11 @@ export const mediaCollectionsApi = {
      * @param {Object} params - Query parameters
      * @returns {Promise} API response with collections
      */
-    list: (params = {}) => wrapApiCall(() =>
-        apiClient.get(endpoints.media.collections, { params })
-    ),
+    list: (params = {}) => wrapApiCall(() => {
+        // Use our custom buildQueryParams to handle Django-style array parameters
+        const queryString = buildQueryParams(params);
+        return apiClient.get(`${endpoints.media.collections}${queryString}`);
+    }),
 
     /**
      * Get detailed information about a collection
@@ -314,7 +331,7 @@ export const mediaCollectionsApi = {
      * @returns {Promise} API response
      */
     addFiles: (id, fileIds) => wrapApiCall(() =>
-        apiClient.post(`${endpoints.media.collection(id)}add_files/`, {
+        apiClient.post(`${endpoints.media.collection(id)}/add_files/`, {
             file_ids: fileIds
         })
     ),
@@ -330,6 +347,18 @@ export const mediaCollectionsApi = {
             file_ids: fileIds
         })
     ),
+
+    /**
+     * Get files in a collection
+     * @param {string} id - Collection ID
+     * @param {Object} params - Query parameters (page, page_size, etc.)
+     * @returns {Promise} API response with files in collection
+     */
+    getFiles: (id, params = {}) => wrapApiCall(() => {
+        // Use our custom buildQueryParams to handle Django-style array parameters
+        const queryString = buildQueryParams(params);
+        return apiClient.get(`${endpoints.media.collection(id)}/files/${queryString}`);
+    }),
 };
 
 /**
@@ -425,7 +454,9 @@ export const pendingMediaFilesApi = {
      */
     list: (params = {}) => {
         return wrapApiCall(() => {
-            return apiClient.get(endpoints.media.pendingFiles, { params });
+            // Use our custom buildQueryParams to handle Django-style array parameters
+            const queryString = buildQueryParams(params);
+            return apiClient.get(`${endpoints.media.pendingFiles}${queryString}`);
         })();
     },
 

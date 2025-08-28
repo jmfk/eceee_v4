@@ -88,11 +88,7 @@ class MediaCollectionViewSet(viewsets.ModelViewSet):
     serializer_class = MediaCollectionSerializer
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_fields = [
-        "access_level",
-        "created_by",
-    ]  # namespace handled manually in get_queryset
-    search_fields = ["title", "description"]
+    search_fields = ["title", "slug"]
     ordering_fields = ["title", "created_at", "updated_at"]
     ordering = ["-updated_at"]
 
@@ -124,6 +120,66 @@ class MediaCollectionViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         """Set last_modified_by when updating collection."""
         serializer.save(last_modified_by=self.request.user)
+
+    @action(detail=True, methods=["get"])
+    def files(self, request, pk=None):
+        """Get files in this collection."""
+        collection = self.get_object()
+
+        # Get files in this collection with proper permissions
+        files = (
+            MediaFile.objects.filter(
+                collections=collection, namespace=collection.namespace
+            )
+            .select_related("namespace", "created_by", "last_modified_by")
+            .prefetch_related("tags", "collections")
+        )
+
+        # Apply user permissions (same logic as MediaFileViewSet)
+        user = request.user
+        if not user.is_staff:
+            from content.models import Namespace
+
+            # Get namespaces the user can access
+            accessible_namespaces = Namespace.objects.filter(
+                models.Q(created_by=user) | models.Q(is_active=True)
+            )
+            files = files.filter(namespace__in=accessible_namespaces)
+
+            # Further filter by access level
+            from django.db.models import Q
+
+            files = files.filter(
+                Q(access_level="public")
+                | Q(access_level="members")
+                | Q(access_level="private", created_by=user)
+            )
+
+        # Apply pagination
+        page_size = min(int(request.query_params.get("page_size", 20)), 100)
+        page = int(request.query_params.get("page", 1))
+
+        from django.core.paginator import Paginator
+
+        paginator = Paginator(files, page_size)
+        page_obj = paginator.get_page(page)
+
+        # Serialize the files
+        from .serializers import MediaFileListSerializer
+
+        serializer = MediaFileListSerializer(page_obj.object_list, many=True)
+
+        return Response(
+            {
+                "results": serializer.data,
+                "count": paginator.count,
+                "next": page_obj.has_next(),
+                "previous": page_obj.has_previous(),
+                "page": page,
+                "page_size": page_size,
+                "total_pages": paginator.num_pages,
+            }
+        )
 
     @action(detail=True, methods=["post"])
     def add_files(self, request, pk=None):
@@ -228,7 +284,13 @@ class MediaFileViewSet(viewsets.ModelViewSet):
 
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ["file_type", "access_level", "created_by"]
-    search_fields = ["title", "description", "original_filename", "ai_extracted_text"]
+    search_fields = [
+        "title",
+        "slug",
+        "description",
+        "original_filename",
+        "ai_extracted_text",
+    ]
     ordering_fields = ["title", "created_at", "updated_at", "file_size"]
     ordering = ["-created_at"]
 
@@ -239,7 +301,16 @@ class MediaFileViewSet(viewsets.ModelViewSet):
         return [MediaFilePermission()]
 
     def get_queryset(self):
-        """Filter queryset based on user permissions and namespace access."""
+        """
+        Filter queryset based on user permissions and namespace access.
+
+        Supports filtering by:
+        - namespace: Filter by namespace slug
+        - tag_names: Filter by tag names (AND logic for multiple tags)
+        - collection: Exclude files already in this collection (shows potential additions)
+        - file_type: Filter by file type (image, video, audio, document, etc.)
+        - text_search: Search across title, description, filename, and AI text
+        """
         from .security import SecurityAuditLogger
 
         user = self.request.user
@@ -287,6 +358,42 @@ class MediaFileViewSet(viewsets.ModelViewSet):
             except Namespace.DoesNotExist:
                 queryset = queryset.none()
 
+        # Filter by tags if provided (Django-style repeated parameters)
+        tag_names = self.request.query_params.getlist("tag_names")
+        if tag_names:
+            # Filter files that have ALL specified tags (AND logic)
+            for tag_name in tag_names:
+                queryset = queryset.filter(tags__name=tag_name)
+            # Remove duplicates that might occur from multiple tag joins
+            queryset = queryset.distinct()
+
+        # Filter by collection if provided - EXCLUDE files already in the collection
+        # This shows potential files that can be added to the collection
+        collection_param = self.request.query_params.get("collection")
+        if collection_param:
+            try:
+                # Exclude files that are already in this collection
+                queryset = queryset.exclude(collections__id=collection_param)
+            except (ValueError, TypeError):
+                pass
+
+        # Filter by file type if provided
+        file_type = self.request.query_params.get("file_type")
+        if file_type:
+            queryset = queryset.filter(file_type=file_type)
+
+        # Text search across multiple fields
+        text_search = self.request.query_params.get("text_search")
+        if text_search:
+            from django.db.models import Q
+
+            queryset = queryset.filter(
+                Q(title__icontains=text_search)
+                | Q(description__icontains=text_search)
+                | Q(original_filename__icontains=text_search)
+                | Q(ai_extracted_text__icontains=text_search)
+            )
+
         return queryset
 
     def perform_create(self, serializer):
@@ -329,15 +436,6 @@ class MediaFileViewSet(viewsets.ModelViewSet):
         if self.action == "list":
             return MediaFileListSerializer
         return MediaFileDetailSerializer
-
-    def get_queryset(self):
-        """Filter files by user's accessible namespaces."""
-        # TODO: Add proper namespace filtering based on user permissions
-        queryset = MediaFile.objects.select_related(
-            "namespace", "created_by", "last_modified_by"
-        ).prefetch_related("tags", "collections")
-
-        return queryset
 
     def perform_update(self, serializer):
         """Set last_modified_by when updating file."""
