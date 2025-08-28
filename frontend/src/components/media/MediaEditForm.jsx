@@ -40,11 +40,19 @@ const MediaEditForm = ({
     const [saving, setSaving] = useState(false);
     const [availableTags, setAvailableTags] = useState([]);
 
+
+    // Local file state (to avoid triggering onSave/exit)
+    const [localFile, setLocalFile] = useState(file);
+
     const { addNotification } = useGlobalNotifications();
 
-    // Initialize form data
+
+
+    // Initialize form data and local file state
     useEffect(() => {
         if (file) {
+            // Update local file state
+            setLocalFile(file);
             // Convert tags to array of tag NAMES for MediaTagWidget
             let tagsArray = [];
 
@@ -75,12 +83,13 @@ const MediaEditForm = ({
         }
     }, [file]);
 
-    // Load available tags
+    // Load available tags and collections
     useEffect(() => {
         const loadTags = async () => {
             if (!namespace) return;
 
             try {
+                // Load tags
                 const tags = await mediaTagsApi.list({ namespace });
                 const tagsList = tags.results || tags || [];
                 setAvailableTags(Array.isArray(tagsList) ? tagsList : []);
@@ -180,6 +189,8 @@ const MediaEditForm = ({
         updateFormData('tags', newTags);
     };
 
+
+
     // Save form data
     const handleSave = async () => {
         // Validate all fields
@@ -251,7 +262,12 @@ const MediaEditForm = ({
             }
 
             addNotification('File updated successfully', 'success');
-            onSave(result);
+            // Merge the API result with our local collection changes
+            const finalResult = {
+                ...result,
+                collections: localFile.collections
+            };
+            onSave(finalResult);
         } catch (error) {
             console.error('Failed to save file:', error);
             addNotification('Failed to save file', 'error');
@@ -400,6 +416,9 @@ const MediaEditForm = ({
                             </div>
                         )}
                     </div>
+
+
+
 
 
                     {/* AI Confidence Score */}

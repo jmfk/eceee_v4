@@ -165,10 +165,18 @@ const MediaBrowser = ({
     };
 
     // Handle edit button click
-    const handleEditClick = (file, event) => {
+    const handleEditClick = async (file, event) => {
         event.stopPropagation(); // Prevent file selection
-        setEditingFile(file);
-        setCurrentView('edit');
+
+        try {
+            // Fetch full file details including collections
+            const detailedFile = await mediaApi.files.get(file.id)();
+            setEditingFile(detailedFile);
+            setCurrentView('edit');
+        } catch (error) {
+            console.error('Failed to fetch file details:', error);
+            addNotification('Failed to load file details', 'error');
+        }
     };
 
     // Handle edit form save
