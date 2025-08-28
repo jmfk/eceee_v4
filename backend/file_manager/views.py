@@ -1245,7 +1245,7 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
     @action(detail=True, methods=["post"])
     def approve(self, request, pk=None):
         """Approve a pending file and create a MediaFile."""
-        print(f"approve: {pk}")
+
         try:
             pending_file = self.get_object()
         except (PendingMediaFile.DoesNotExist, Http404):
@@ -1253,7 +1253,7 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
                 {"error": "Pending file not found or already processed"},
                 status=status.HTTP_404_NOT_FOUND,
             )
-        print(f"pending_file: {pending_file.status}")
+
         # If file is already approved, return success with existing media file
         if pending_file.status == "approved":
             # Find the corresponding media file
@@ -1265,9 +1265,6 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
                 # Handle collection assignment if requested
                 collection_id = request.data.get("collection_id")
                 collection_name = request.data.get("collection_name")
-
-                print(f"collection_id: {collection_id}")
-                print(f"collection_name: {collection_name}")
 
                 if collection_id or collection_name:
                     try:
@@ -1303,8 +1300,6 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
             file_hash=pending_file.file_hash, namespace=pending_file.namespace
         ).first()
 
-        print(f"existing_file: {existing_file}")
-
         if existing_file:
             # File already exists, just mark as approved and optionally add to collection
             pending_file.status = "approved"
@@ -1313,9 +1308,6 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
             # Handle collection assignment if requested
             collection_id = request.data.get("collection_id")
             collection_name = request.data.get("collection_name")
-
-            print(f"collection_id: {collection_id}")
-            print(f"collection_name: {collection_name}")
 
             if collection_id or collection_name:
                 try:
@@ -1342,7 +1334,7 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
             )
 
         # Validate input data with context
-        print(f"MediaFileApprovalSerializer")
+
         serializer = MediaFileApprovalSerializer(
             data=request.data,
             context={"namespace": pending_file.namespace, "user": request.user},
@@ -1363,8 +1355,6 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
             # Handle collection assignment
             collection_id = serializer.validated_data.get("collection_id")
             collection_name = serializer.validated_data.get("collection_name")
-            print(f"collection_id: {collection_id}")
-            print(f"collection_name: {collection_name}")
 
             if collection_id or collection_name:
                 try:
@@ -1693,3 +1683,131 @@ class MediaSlugValidationView(APIView):
             counter += 1
 
         return f"{base_slug}-{counter}"
+
+
+class BulkMediaOperationsView(APIView):
+    """
+    API view for bulk operations on media files.
+
+    Supports operations like:
+    - Adding/removing tags
+    - Setting access levels
+    - Adding/removing from collections
+    - Deleting files
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        """Execute bulk operation on multiple files."""
+        from .serializers import BulkOperationSerializer
+        from .security import SecurityAuditLogger
+
+        serializer = BulkOperationSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        data = serializer.validated_data
+        file_ids = data["file_ids"]
+        operation = data["operation"]
+
+        # Get files that user has permission to modify
+        files = MediaFile.objects.filter(id__in=file_ids)
+
+        # Filter by permissions
+        if not request.user.is_staff:
+            # Regular users can only modify their own files or files in accessible namespaces
+            from content.models import Namespace
+
+            accessible_namespaces = Namespace.objects.filter(
+                models.Q(created_by=request.user) | models.Q(is_active=True)
+            )
+            files = files.filter(
+                models.Q(created_by=request.user)
+                | models.Q(namespace__in=accessible_namespaces)
+            )
+
+        results = []
+        successful_count = 0
+        errors = []
+
+        for file_obj in files:
+            try:
+                if operation == "add_tags":
+                    tag_names = data.get("tag_names", [])
+                    for tag_name in tag_names:
+                        tag, created = MediaTag.objects.get_or_create(
+                            name=tag_name, namespace=file_obj.namespace
+                        )
+                        file_obj.tags.add(tag)
+
+                elif operation == "remove_tags":
+                    tag_names = data.get("tag_names", [])
+                    for tag_name in tag_names:
+                        try:
+                            tag = MediaTag.objects.get(
+                                name=tag_name, namespace=file_obj.namespace
+                            )
+                            file_obj.tags.remove(tag)
+                        except MediaTag.DoesNotExist:
+                            pass
+
+                elif operation == "set_access_level":
+                    access_level = data.get("access_level")
+                    if access_level:
+                        file_obj.access_level = access_level
+                        file_obj.save()
+
+                elif operation == "add_to_collection":
+                    collection_id = data.get("collection_id")
+                    if collection_id:
+                        try:
+                            collection = MediaCollection.objects.get(id=collection_id)
+                            file_obj.collections.add(collection)
+                        except MediaCollection.DoesNotExist:
+                            errors.append(
+                                {
+                                    "file_id": str(file_obj.id),
+                                    "message": "Collection not found",
+                                }
+                            )
+                            continue
+
+                elif operation == "remove_from_collection":
+                    collection_id = data.get("collection_id")
+                    if collection_id:
+                        try:
+                            collection = MediaCollection.objects.get(id=collection_id)
+                            file_obj.collections.remove(collection)
+                        except MediaCollection.DoesNotExist:
+                            errors.append(
+                                {
+                                    "file_id": str(file_obj.id),
+                                    "message": "Collection not found",
+                                }
+                            )
+                            continue
+
+                elif operation == "delete":
+                    # Log the deletion for security audit
+                    SecurityAuditLogger.log_file_deletion(
+                        user=request.user,
+                        file_obj=file_obj,
+                        context={"bulk_operation": True},
+                    )
+                    file_obj.delete()
+
+                successful_count += 1
+                results.append({"file_id": str(file_obj.id), "status": "success"})
+
+            except Exception as e:
+                errors.append({"file_id": str(file_obj.id), "message": str(e)})
+
+        return Response(
+            {
+                "successful_count": successful_count,
+                "total_count": len(file_ids),
+                "results": results,
+                "errors": errors,
+            }
+        )
