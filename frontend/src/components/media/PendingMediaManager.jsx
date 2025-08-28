@@ -588,7 +588,7 @@ const PendingMediaManager = ({ namespace, onFilesProcessed }) => {
                             slug: formData.slug,
                             tag_ids: formData.tags || [],
                             access_level: formData.accessLevel,
-                            collection_id: selectedCollection === 'new' ? null : selectedCollection,
+                            collection_id: selectedCollection === 'new' ? null : (selectedCollection || null),
                             collection_name: selectedCollection === 'new' ? newCollectionName : null
                         })();
                     } catch (error) {

@@ -104,7 +104,7 @@ const MediaManager = ({
     ];
 
     return (
-        <div className={`${activeTab === 'library' ? 'h-full' : ''} flex flex-col bg-white rounded-lg shadow-sm border border-gray-200`}>
+        <div className="flex flex-col bg-white rounded-lg shadow-sm border border-gray-200">
             {/* Tab Navigation - Seamlessly integrated */}
             <div className="flex-shrink-0">
                 <div className="flex bg-white border-b border-blue-600">
@@ -144,7 +144,7 @@ const MediaManager = ({
             </div>
 
             {/* Tab Content */}
-            <div className="flex-1 overflow-hidden">
+            <div>
                 {activeTab === 'library' && (
                     <MediaBrowser
                         onFileSelect={onFileSelect}
