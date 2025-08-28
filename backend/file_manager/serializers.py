@@ -627,8 +627,8 @@ class BulkOperationSerializer(serializers.Serializer):
     operation = serializers.ChoiceField(choices=OPERATION_CHOICES)
 
     # Optional parameters based on operation
-    tag_ids = serializers.ListField(
-        child=serializers.UUIDField(), required=False, allow_empty=True
+    tag_names = serializers.ListField(
+        child=serializers.CharField(max_length=100), required=False, allow_empty=True
     )
     collection_id = serializers.UUIDField(required=False, allow_null=True)
     access_level = serializers.ChoiceField(
@@ -639,8 +639,8 @@ class BulkOperationSerializer(serializers.Serializer):
         """Validate operation parameters."""
         operation = data.get("operation")
 
-        if operation in ["add_tags", "remove_tags"] and not data.get("tag_ids"):
-            raise serializers.ValidationError("tag_ids required for tag operations.")
+        if operation in ["add_tags", "remove_tags"] and not data.get("tag_names"):
+            raise serializers.ValidationError("tag_names required for tag operations.")
 
         if operation in [
             "add_to_collection",

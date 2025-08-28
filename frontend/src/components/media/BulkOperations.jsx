@@ -91,8 +91,8 @@ const BulkOperations = ({
 
             try {
                 const [tagsResult, collectionsResult] = await Promise.all([
-                    mediaTagsApi.list({ namespace }),
-                    mediaCollectionsApi.list({ namespace })
+                    mediaTagsApi.list({ namespace })(),
+                    mediaCollectionsApi.list({ namespace })()
                 ]);
 
                 setAvailableTags(Array.isArray(tagsResult.results) ? tagsResult.results : Array.isArray(tagsResult) ? tagsResult : []);
@@ -230,9 +230,8 @@ const BulkOperations = ({
             if (operation === 'add_tags' || operation === 'remove_tags') {
                 requestData.tag_names = selectedTags;
             }
-
             // Call the bulk operations API
-            const result = await mediaApi.bulkOperations.execute(requestData);
+            const result = await mediaApi.bulkOperations.execute(requestData)();
 
             setProgress({
                 completed: result.successful_count || 0,
@@ -471,7 +470,7 @@ const BulkOperations = ({
     // Get operation button color
     const getOperationColor = (operationId) => {
         const op = operations.find(o => o.id === operationId);
-        return op ? op.color : 'bg-blue-50 hover:bg-gray-700';
+        return op ? op.color : 'bg-blue-50 hover:bg-gray-700 text-white';
     };
 
     return (
@@ -551,7 +550,7 @@ const BulkOperations = ({
                                     <button
                                         onClick={executeBulkOperation}
                                         disabled={!isOperationValid() || processing || (operation === 'delete' && !operationData.confirmDelete)}
-                                        className={`flex items-center gap-2 px-6 py-3 text-white rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg transform hover:-translate-y-0.5 font-semibold ${getOperationColor(operation)} ${compact ? 'text-sm' : ''} shadow-md`}
+                                        className={`flex items-center gap-2 px-6 py-3 text-white rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg transform hover:-translate-y-0.5 font-semibold ${getOperationColor(operation)} ${compact ? 'text-sm' : ''} shadow-md `}
                                     >
                                         {processing ? (
                                             <>
@@ -561,7 +560,7 @@ const BulkOperations = ({
                                         ) : (
                                             <>
                                                 {operations.find(op => op.id === operation)?.icon}
-                                                Execute Operation
+                                                {operations.find(op => op.id === operation)?.label}
                                             </>
                                         )}
                                     </button>
