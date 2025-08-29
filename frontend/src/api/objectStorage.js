@@ -110,6 +110,17 @@ export const objectTypesApi = {
             ...response,
             data: (response.data.results || response.data).map(convertKeysToCamel)
         }
+    },
+
+    /**
+     * Get object types that appear in main browser grid
+     */
+    async getMainBrowserTypes() {
+        const response = await api.get(`${BASE_URL}/object-types/main_browser_types/`)
+        return {
+            ...response,
+            data: (response.data.results || response.data).map(convertKeysToCamel)
+        }
     }
 }
 

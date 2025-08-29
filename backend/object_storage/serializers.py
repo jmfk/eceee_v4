@@ -24,12 +24,7 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
     """Serializer for Object Type Definitions"""
 
     created_by = UserSerializer(read_only=True)
-    allowed_child_types = serializers.SlugRelatedField(
-        many=True,
-        slug_field="name",
-        queryset=ObjectTypeDefinition.objects.filter(is_active=True),
-        required=False,
-    )
+    allowed_child_types = serializers.SerializerMethodField()
     schema_fields_count = serializers.SerializerMethodField()
     slots_count = serializers.SerializerMethodField()
     child_types_count = serializers.SerializerMethodField()
@@ -48,6 +43,7 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
             "slot_configuration",
             "allowed_child_types",
             "is_active",
+            "show_in_main_browser",
             "created_at",
             "updated_at",
             "created_by",
@@ -74,6 +70,20 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
     def get_instance_count(self, obj):
         """Return count of object instances of this type"""
         return obj.objectinstance_set.count()
+
+    def get_allowed_child_types(self, obj):
+        """Return full object data for allowed child types"""
+        child_types = obj.allowed_child_types.filter(is_active=True)
+        return [
+            {
+                "id": ct.id,
+                "name": ct.name,
+                "label": ct.label,
+                "iconImage": ct.icon_image.url if ct.icon_image else None,
+                "description": ct.description,
+            }
+            for ct in child_types
+        ]
 
     def validate_name(self, value):
         """Validate object type name"""

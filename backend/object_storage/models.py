@@ -81,6 +81,10 @@ class ObjectTypeDefinition(models.Model):
     is_active = models.BooleanField(
         default=True, help_text="Whether this object type is available for use"
     )
+    show_in_main_browser = models.BooleanField(
+        default=True,
+        help_text="Whether this object type appears in the main browser grid (False for sub-types only)",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     created_by = models.ForeignKey(User, on_delete=models.PROTECT)
