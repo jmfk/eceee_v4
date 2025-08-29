@@ -24,7 +24,7 @@ const ObjectListEditor = ({ config, onChange, onConfigChange }) => {
         queryFn: () => objectTypesApi.getActive()
     })
 
-    const objectTypes = typesResponse?.data || []
+    const objectTypes = typesResponse?.data?.results || typesResponse?.data || []
 
     useEffect(() => {
         onConfigChange?.(localConfig)

@@ -12,7 +12,7 @@ const Navbar = () => {
     { name: 'Home', href: '/', icon: Code },
     { name: 'About', href: '/about', icon: Cpu },
     { name: 'Pages', href: '/pages', icon: Grid3X3 },
-    { name: 'Objects', href: '/objects', icon: FolderOpen },
+    { name: 'Objects', href: '/objects', icon: Database },
     { name: 'Media', href: '/media', icon: FolderOpen },
     { name: 'Settings', href: '/settings', icon: Settings },
   ]

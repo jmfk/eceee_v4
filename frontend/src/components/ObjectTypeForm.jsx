@@ -44,7 +44,7 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting }) => {
         queryFn: () => objectTypesApi.list()
     })
 
-    const existingTypes = existingTypesResponse?.data || []
+    const existingTypes = existingTypesResponse?.data?.results || existingTypesResponse?.data || []
 
     useEffect(() => {
         if (objectType) {

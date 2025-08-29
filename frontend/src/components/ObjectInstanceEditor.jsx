@@ -52,8 +52,8 @@ const ObjectInstanceEditor = ({ instanceId, objectTypeId, onSave, onCancel, isVi
     })
 
     const objectType = objectTypeResponse?.data
-    const availableTypes = typesResponse?.data || []
-    const potentialParents = potentialParentsResponse?.data || []
+    const availableTypes = typesResponse?.data?.results || typesResponse?.data || []
+    const potentialParents = potentialParentsResponse?.data?.results || potentialParentsResponse?.data || []
 
     useEffect(() => {
         if (instanceResponse?.data) {

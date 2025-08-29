@@ -27,7 +27,7 @@ const ObjectTypeManager = () => {
         }
     })
 
-    const objectTypes = typesResponse?.data || []
+    const objectTypes = typesResponse?.data?.results || typesResponse?.data || []
 
     // Create object type mutation
     const createTypeMutation = useMutation({
