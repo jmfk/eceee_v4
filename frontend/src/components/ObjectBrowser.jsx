@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Search, Filter, Plus, FolderOpen, AlertCircle, Edit, Eye, Trash2, ChevronRight, ChevronDown } from 'lucide-react'
+import { Search, Filter, Plus, FolderOpen, AlertCircle, Edit, Eye, Trash2, ChevronRight, ChevronDown, Settings, X } from 'lucide-react'
 import { objectInstancesApi, objectTypesApi } from '../api/objectStorage'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import ObjectInstanceEditor from './ObjectInstanceEditor'
@@ -15,6 +15,13 @@ const ObjectBrowser = () => {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(null)
     const [expandedItems, setExpandedItems] = useState(new Set())
     const [viewMode, setViewMode] = useState('list') // 'list' or 'tree'
+    const [showAdvancedSearch, setShowAdvancedSearch] = useState(false)
+    const [advancedFilters, setAdvancedFilters] = useState({
+        level: '',
+        dateFrom: '',
+        dateTo: '',
+        publishedOnly: false
+    })
     const [selectedItems, setSelectedItems] = useState(new Set())
     const [showBulkActions, setShowBulkActions] = useState(false)
 
@@ -60,13 +67,25 @@ const ObjectBrowser = () => {
 
     // Fetch object instances
     const { data: instancesResponse, isLoading, error } = useQuery({
-        queryKey: ['objectInstances', searchTerm, selectedType, statusFilter],
+        queryKey: ['objectInstances', searchTerm, selectedType, statusFilter, advancedFilters],
         queryFn: () => {
             const params = {}
             if (searchTerm) params.search = searchTerm
             if (selectedType) params.objectType = selectedType
             if (statusFilter) params.status = statusFilter
-            return objectInstancesApi.list(params)
+            
+            // Add advanced filters if any are set
+            if (advancedFilters.level) params.level = advancedFilters.level
+            if (advancedFilters.dateFrom) params.dateFrom = advancedFilters.dateFrom
+            if (advancedFilters.dateTo) params.dateTo = advancedFilters.dateTo
+            if (advancedFilters.publishedOnly) params.publishedOnly = 'true'
+            
+            // Use search endpoint if we have search term or advanced filters
+            if (searchTerm || Object.values(advancedFilters).some(v => v)) {
+                return objectInstancesApi.search(searchTerm, params)
+            } else {
+                return objectInstancesApi.list(params)
+            }
         }
     })
 
@@ -174,9 +193,22 @@ const ObjectBrowser = () => {
                             <option value="draft">Draft</option>
                             <option value="published">Published</option>
                             <option value="archived">Archived</option>
-                        </select>
+                                            </select>
                     </div>
-
+                    
+                    {/* Advanced Search Toggle */}
+                    <button
+                        onClick={() => setShowAdvancedSearch(!showAdvancedSearch)}
+                        className={`px-3 py-2 border rounded-md text-sm flex items-center transition-colors ${
+                            showAdvancedSearch 
+                                ? 'bg-blue-100 border-blue-300 text-blue-700' 
+                                : 'border-gray-300 text-gray-600 hover:text-gray-900'
+                        }`}
+                    >
+                        <Settings className="h-4 w-4 mr-2" />
+                        Advanced
+                    </button>
+                    
                     {/* View Mode Toggle */}
                     <div className="flex bg-gray-100 rounded-md p-1">
                         <button
@@ -199,6 +231,96 @@ const ObjectBrowser = () => {
                         </button>
                     </div>
                 </div>
+
+                {/* Advanced Search Panel */}
+                {showAdvancedSearch && (
+                    <div className="bg-gray-50 border border-gray-200 rounded-md p-4 space-y-4">
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-sm font-medium text-gray-900">Advanced Search Filters</h3>
+                            <button
+                                onClick={() => {
+                                    setAdvancedFilters({
+                                        level: '',
+                                        dateFrom: '',
+                                        dateTo: '',
+                                        publishedOnly: false
+                                    })
+                                }}
+                                className="text-xs text-gray-500 hover:text-gray-700"
+                            >
+                                Clear All
+                            </button>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                    Hierarchy Level
+                                </label>
+                                <select
+                                    value={advancedFilters.level}
+                                    onChange={(e) => setAdvancedFilters(prev => ({ ...prev, level: e.target.value }))}
+                                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
+                                >
+                                    <option value="">Any Level</option>
+                                    <option value="0">Root (Level 0)</option>
+                                    <option value="1">Level 1</option>
+                                    <option value="2">Level 2</option>
+                                    <option value="3">Level 3</option>
+                                    <option value="4">Level 4+</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                    Created From
+                                </label>
+                                <input
+                                    type="date"
+                                    value={advancedFilters.dateFrom}
+                                    onChange={(e) => setAdvancedFilters(prev => ({ ...prev, dateFrom: e.target.value }))}
+                                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
+                                />
+                            </div>
+                            
+                            <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                    Created To
+                                </label>
+                                <input
+                                    type="date"
+                                    value={advancedFilters.dateTo}
+                                    onChange={(e) => setAdvancedFilters(prev => ({ ...prev, dateTo: e.target.value }))}
+                                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
+                                />
+                            </div>
+                            
+                            <div className="flex items-end">
+                                <div className="flex items-center">
+                                    <input
+                                        type="checkbox"
+                                        checked={advancedFilters.publishedOnly}
+                                        onChange={(e) => setAdvancedFilters(prev => ({ ...prev, publishedOnly: e.target.checked }))}
+                                        className="h-3 w-3 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                    />
+                                    <label className="ml-2 text-xs text-gray-700">
+                                        Published only
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {/* Search Stats */}
+                        {instancesResponse?.count !== undefined && (
+                            <div className="text-xs text-gray-600 pt-2 border-t border-gray-200">
+                                {instancesResponse.count} result{instancesResponse.count !== 1 ? 's' : ''} found
+                                {instancesResponse.query && (
+                                    <span> for "{instancesResponse.query}"</span>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 {/* Bulk Actions Bar */}
                 {selectedItems.size > 0 && (

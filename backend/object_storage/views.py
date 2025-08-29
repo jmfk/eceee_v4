@@ -259,6 +259,98 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
     @action(detail=False, methods=["get"])
+    def search(self, request):
+        """Advanced search across objects with multiple criteria"""
+        query = request.query_params.get('q', '')
+        
+        # Start with all instances
+        instances = self.get_queryset()
+        
+        # Text search across multiple fields
+        if query:
+            instances = instances.filter(
+                Q(title__icontains=query) |
+                Q(slug__icontains=query) |
+                Q(data__icontains=query) |
+                Q(object_type__label__icontains=query) |
+                Q(object_type__name__icontains=query)
+            )
+        
+        # Filter by object type
+        object_type = request.query_params.get('type')
+        if object_type:
+            try:
+                obj_type = ObjectTypeDefinition.objects.get(name=object_type)
+                instances = instances.filter(object_type=obj_type)
+            except ObjectTypeDefinition.DoesNotExist:
+                return Response(
+                    {'error': 'Object type not found'}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+        
+        # Filter by status
+        status_filter = request.query_params.get('status')
+        if status_filter and status_filter != 'all':
+            instances = instances.filter(status=status_filter)
+        
+        # Filter by hierarchy level
+        level = request.query_params.get('level')
+        if level:
+            try:
+                instances = instances.filter(level=int(level))
+            except ValueError:
+                pass
+        
+        # Filter by published status
+        published_only = request.query_params.get('published_only', '').lower() == 'true'
+        if published_only:
+            now = timezone.now()
+            instances = instances.filter(
+                Q(status="published") &
+                (Q(publish_date__isnull=True) | Q(publish_date__lte=now)) &
+                (Q(unpublish_date__isnull=True) | Q(unpublish_date__gt=now))
+            )
+        
+        # Order results by relevance
+        if query:
+            # Use database functions for better relevance scoring
+            from django.db.models import Case, When, IntegerField
+            instances = instances.annotate(
+                relevance=Case(
+                    When(title__icontains=query, then=3),
+                    When(slug__icontains=query, then=2),
+                    When(data__icontains=query, then=1),
+                    default=0,
+                    output_field=IntegerField()
+                )
+            ).order_by('-relevance', '-created_at')
+        else:
+            instances = instances.order_by('-created_at')
+        
+        # Apply pagination
+        limit = request.query_params.get('limit', '20')
+        try:
+            limit = min(int(limit), 100)  # Max 100 results
+            instances = instances[:limit]
+        except ValueError:
+            instances = instances[:20]
+        
+        serializer = self.get_serializer(instances, many=True)
+        
+        # Add search metadata
+        return Response({
+            'results': serializer.data,
+            'count': len(serializer.data),
+            'query': query,
+            'filters': {
+                'type': object_type,
+                'status': status_filter,
+                'level': level,
+                'published_only': published_only
+            }
+        })
+
+    @action(detail=False, methods=["get"])
     def published(self, request):
         """Get only published objects"""
         now = timezone.now()
