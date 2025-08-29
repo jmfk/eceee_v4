@@ -83,6 +83,13 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
         serializer = ObjectInstanceListSerializer(instances, many=True)
         return Response(serializer.data)
 
+    @action(detail=False, methods=["get"])
+    def active(self, request):
+        """Get only active object types"""
+        active_types = self.get_queryset().filter(is_active=True)
+        serializer = self.get_serializer(active_types, many=True)
+        return Response(serializer.data)
+
 
 class ObjectInstanceViewSet(viewsets.ModelViewSet):
     """ViewSet for managing Object Instances"""
@@ -261,94 +268,98 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["get"])
     def search(self, request):
         """Advanced search across objects with multiple criteria"""
-        query = request.query_params.get('q', '')
-        
+        query = request.query_params.get("q", "")
+
         # Start with all instances
         instances = self.get_queryset()
-        
+
         # Text search across multiple fields
         if query:
             instances = instances.filter(
-                Q(title__icontains=query) |
-                Q(slug__icontains=query) |
-                Q(data__icontains=query) |
-                Q(object_type__label__icontains=query) |
-                Q(object_type__name__icontains=query)
+                Q(title__icontains=query)
+                | Q(slug__icontains=query)
+                | Q(data__icontains=query)
+                | Q(object_type__label__icontains=query)
+                | Q(object_type__name__icontains=query)
             )
-        
+
         # Filter by object type
-        object_type = request.query_params.get('type')
+        object_type = request.query_params.get("type")
         if object_type:
             try:
                 obj_type = ObjectTypeDefinition.objects.get(name=object_type)
                 instances = instances.filter(object_type=obj_type)
             except ObjectTypeDefinition.DoesNotExist:
                 return Response(
-                    {'error': 'Object type not found'}, 
-                    status=status.HTTP_404_NOT_FOUND
+                    {"error": "Object type not found"}, status=status.HTTP_404_NOT_FOUND
                 )
-        
+
         # Filter by status
-        status_filter = request.query_params.get('status')
-        if status_filter and status_filter != 'all':
+        status_filter = request.query_params.get("status")
+        if status_filter and status_filter != "all":
             instances = instances.filter(status=status_filter)
-        
+
         # Filter by hierarchy level
-        level = request.query_params.get('level')
+        level = request.query_params.get("level")
         if level:
             try:
                 instances = instances.filter(level=int(level))
             except ValueError:
                 pass
-        
+
         # Filter by published status
-        published_only = request.query_params.get('published_only', '').lower() == 'true'
+        published_only = (
+            request.query_params.get("published_only", "").lower() == "true"
+        )
         if published_only:
             now = timezone.now()
             instances = instances.filter(
-                Q(status="published") &
-                (Q(publish_date__isnull=True) | Q(publish_date__lte=now)) &
-                (Q(unpublish_date__isnull=True) | Q(unpublish_date__gt=now))
+                Q(status="published")
+                & (Q(publish_date__isnull=True) | Q(publish_date__lte=now))
+                & (Q(unpublish_date__isnull=True) | Q(unpublish_date__gt=now))
             )
-        
+
         # Order results by relevance
         if query:
             # Use database functions for better relevance scoring
             from django.db.models import Case, When, IntegerField
+
             instances = instances.annotate(
                 relevance=Case(
                     When(title__icontains=query, then=3),
                     When(slug__icontains=query, then=2),
                     When(data__icontains=query, then=1),
                     default=0,
-                    output_field=IntegerField()
+                    output_field=IntegerField(),
                 )
-            ).order_by('-relevance', '-created_at')
+            ).order_by("-relevance", "-created_at")
         else:
-            instances = instances.order_by('-created_at')
-        
+            instances = instances.order_by("-created_at")
+
         # Apply pagination
-        limit = request.query_params.get('limit', '20')
+        limit = request.query_params.get("limit", "20")
         try:
             limit = min(int(limit), 100)  # Max 100 results
             instances = instances[:limit]
         except ValueError:
             instances = instances[:20]
-        
+
         serializer = self.get_serializer(instances, many=True)
-        
+
         # Add search metadata
-        return Response({
-            'results': serializer.data,
-            'count': len(serializer.data),
-            'query': query,
-            'filters': {
-                'type': object_type,
-                'status': status_filter,
-                'level': level,
-                'published_only': published_only
+        return Response(
+            {
+                "results": serializer.data,
+                "count": len(serializer.data),
+                "query": query,
+                "filters": {
+                    "type": object_type,
+                    "status": status_filter,
+                    "level": level,
+                    "published_only": published_only,
+                },
             }
-        })
+        )
 
     @action(detail=False, methods=["get"])
     def published(self, request):
@@ -362,6 +373,112 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
 
         serializer = self.get_serializer(published_instances, many=True)
         return Response(serializer.data)
+
+    @action(detail=False, methods=["get"], url_path="by-type/(?P<type_name>[^/.]+)")
+    def by_type(self, request, type_name=None):
+        """Get objects by type name"""
+        try:
+            obj_type = ObjectTypeDefinition.objects.get(name=type_name)
+        except ObjectTypeDefinition.DoesNotExist:
+            return Response(
+                {"error": "Object type not found"}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        instances = self.get_queryset().filter(object_type=obj_type)
+
+        # Apply additional filters from query params
+        status_filter = request.query_params.get("status")
+        if status_filter:
+            instances = instances.filter(status=status_filter)
+
+        parent_id = request.query_params.get("parent")
+        if parent_id:
+            try:
+                instances = instances.filter(parent_id=int(parent_id))
+            except (ValueError, TypeError):
+                return Response(
+                    {"error": "Invalid parent ID"}, status=status.HTTP_400_BAD_REQUEST
+                )
+
+        serializer = self.get_serializer(instances, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=["post"], url_path="bulk-operations")
+    def bulk_operations(self, request):
+        """Perform bulk operations on multiple objects"""
+        operation = request.data.get("operation")
+        object_ids = request.data.get("object_ids", [])
+
+        if not operation:
+            return Response(
+                {"error": "Operation is required"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not object_ids:
+            return Response(
+                {"error": "Object IDs are required"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Get objects that exist and user has permission for
+        objects = self.get_queryset().filter(id__in=object_ids)
+
+        if not objects.exists():
+            return Response(
+                {"error": "No valid objects found"}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        results = []
+        errors = []
+
+        try:
+            for obj in objects:
+                try:
+                    if operation == "publish":
+                        obj.status = "published"
+                        obj.save()
+                        obj.create_version(request.user, "Bulk published via API")
+                        results.append({"id": obj.id, "status": "published"})
+
+                    elif operation == "unpublish":
+                        obj.status = "draft"
+                        obj.save()
+                        obj.create_version(request.user, "Bulk unpublished via API")
+                        results.append({"id": obj.id, "status": "unpublished"})
+
+                    elif operation == "delete":
+                        obj_id = obj.id
+                        obj.delete()
+                        results.append({"id": obj_id, "status": "deleted"})
+
+                    elif operation == "archive":
+                        obj.status = "archived"
+                        obj.save()
+                        obj.create_version(request.user, "Bulk archived via API")
+                        results.append({"id": obj.id, "status": "archived"})
+
+                    else:
+                        errors.append(
+                            {"id": obj.id, "error": f"Unknown operation: {operation}"}
+                        )
+
+                except Exception as e:
+                    errors.append({"id": obj.id, "error": str(e)})
+
+            return Response(
+                {
+                    "operation": operation,
+                    "results": results,
+                    "errors": errors,
+                    "total_processed": len(results),
+                    "total_errors": len(errors),
+                }
+            )
+
+        except Exception as e:
+            return Response(
+                {"error": f"Bulk operation failed: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
 
 class ObjectVersionViewSet(viewsets.ReadOnlyModelViewSet):
