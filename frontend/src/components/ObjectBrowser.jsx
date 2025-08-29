@@ -56,7 +56,7 @@ const ObjectBrowser = () => {
         queryFn: () => objectTypesApi.getActive()
     })
 
-    const objectTypes = typesResponse?.data || []
+    const objectTypes = typesResponse?.data?.results || typesResponse?.data || []
 
     // Fetch object instances
     const { data: instancesResponse, isLoading, error } = useQuery({
@@ -70,7 +70,7 @@ const ObjectBrowser = () => {
         }
     })
 
-    const instances = instancesResponse?.data || []
+    const instances = instancesResponse?.data?.results || instancesResponse?.data || []
 
     // Selection handlers
     const toggleItemSelection = (itemId) => {
