@@ -78,12 +78,21 @@ class ObjectTypeDefinition(models.Model):
         symmetrical=False,
         help_text="Object types that can be children of this type",
     )
+
+    HIERARCHY_LEVEL_CHOICES = [
+        ("top_level_only", "Top-level only"),
+        ("sub_object_only", "Sub-object only"),
+        ("both", "Both levels"),
+    ]
+
+    hierarchy_level = models.CharField(
+        max_length=20,
+        choices=HIERARCHY_LEVEL_CHOICES,
+        default="both",
+        help_text="Where this object type can appear in the content hierarchy",
+    )
     is_active = models.BooleanField(
         default=True, help_text="Whether this object type is available for use"
-    )
-    show_in_main_browser = models.BooleanField(
-        default=True,
-        help_text="Whether this object type appears in the main browser grid (False for sub-types only)",
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

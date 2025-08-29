@@ -25,6 +25,12 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
 
     created_by = UserSerializer(read_only=True)
     allowed_child_types = serializers.SerializerMethodField()
+    allowed_child_types_input = serializers.ListField(
+        child=serializers.CharField(),
+        write_only=True,
+        required=False,
+        help_text="List of object type names that can be children of this type",
+    )
     schema_fields_count = serializers.SerializerMethodField()
     slots_count = serializers.SerializerMethodField()
     child_types_count = serializers.SerializerMethodField()
@@ -42,8 +48,9 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
             "schema",
             "slot_configuration",
             "allowed_child_types",
+            "allowed_child_types_input",
+            "hierarchy_level",
             "is_active",
-            "show_in_main_browser",
             "created_at",
             "updated_at",
             "created_by",
@@ -162,6 +169,62 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
 
         return value
 
+    def validate_allowed_child_types_input(self, value):
+        """Validate that all child type names exist and are active"""
+        if not value:
+            return value
+
+        # Check that all provided names exist and are active
+        existing_types = ObjectTypeDefinition.objects.filter(
+            name__in=value, is_active=True
+        ).values_list("name", flat=True)
+
+        invalid_names = set(value) - set(existing_types)
+        if invalid_names:
+            raise serializers.ValidationError(
+                f"The following object types do not exist or are inactive: {', '.join(invalid_names)}"
+            )
+
+        return value
+
+    def create(self, validated_data):
+        """Create object type with allowed child types"""
+        allowed_child_types_names = validated_data.pop("allowed_child_types_input", [])
+
+        # Create the object type instance
+        instance = super().create(validated_data)
+
+        # Set the allowed child types
+        if allowed_child_types_names:
+            child_types = ObjectTypeDefinition.objects.filter(
+                name__in=allowed_child_types_names, is_active=True
+            )
+            instance.allowed_child_types.set(child_types)
+
+        return instance
+
+    def update(self, instance, validated_data):
+        """Update object type with allowed child types"""
+        allowed_child_types_names = validated_data.pop(
+            "allowed_child_types_input", None
+        )
+
+        # Update the instance fields
+        instance = super().update(instance, validated_data)
+
+        # Update the allowed child types if provided
+        if allowed_child_types_names is not None:
+            if allowed_child_types_names:
+                child_types = ObjectTypeDefinition.objects.filter(
+                    name__in=allowed_child_types_names, is_active=True
+                )
+                instance.allowed_child_types.set(child_types)
+            else:
+                # Clear all child types if empty list is provided
+                instance.allowed_child_types.clear()
+
+        return instance
+
 
 class ObjectTypeDefinitionListSerializer(serializers.ModelSerializer):
     """Simplified serializer for object type lists"""
@@ -170,6 +233,7 @@ class ObjectTypeDefinitionListSerializer(serializers.ModelSerializer):
         source="created_by.username", read_only=True
     )
     instance_count = serializers.SerializerMethodField()
+    allowed_child_types = serializers.SerializerMethodField()
 
     class Meta:
         model = ObjectTypeDefinition
@@ -180,17 +244,33 @@ class ObjectTypeDefinitionListSerializer(serializers.ModelSerializer):
             "plural_label",
             "description",
             "icon_image",
+            "hierarchy_level",
             "is_active",
             "created_at",
             "updated_at",
             "created_by_name",
             "instance_count",
+            "allowed_child_types",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
 
     def get_instance_count(self, obj):
         """Return count of object instances of this type"""
         return obj.objectinstance_set.count()
+
+    def get_allowed_child_types(self, obj):
+        """Return full object data for allowed child types"""
+        child_types = obj.allowed_child_types.filter(is_active=True)
+        return [
+            {
+                "id": ct.id,
+                "name": ct.name,
+                "label": ct.label,
+                "iconImage": ct.icon_image.url if ct.icon_image else None,
+                "description": ct.description,
+            }
+            for ct in child_types
+        ]
 
 
 class ObjectInstanceSerializer(serializers.ModelSerializer):

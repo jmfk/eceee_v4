@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Plus, Trash2, Settings, Hash, Type, Calendar, ToggleLeft } from 'lucide-react'
 import { objectTypesApi } from '../api/objectStorage'
 import VisualSchemaEditor from './VisualSchemaEditor'
+import InlineImageUpload from './InlineImageUpload'
 import { validateFieldName } from '../utils/schemaValidation'
 
 const FIELD_TYPES = [
@@ -32,6 +33,7 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting }) => {
         schema: { fields: [] },
         slotConfiguration: { slots: [] },
         allowedChildTypes: [],
+        hierarchyLevel: 'both', // 'top_level_only', 'sub_object_only', 'both'
         metadata: {}
     })
 
@@ -47,7 +49,15 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting }) => {
     const existingTypes = existingTypesResponse?.data?.results || existingTypesResponse?.data || []
 
     useEffect(() => {
+
         if (objectType) {
+            // Convert allowedChildTypes from object array to name array for form handling
+            const allowedChildTypeNames = objectType.allowedChildTypes
+                ? objectType.allowedChildTypes.map(childType =>
+                    typeof childType === 'string' ? childType : childType.name
+                )
+                : []
+
             setFormData({
                 name: objectType.name || '',
                 label: objectType.label || '',
@@ -56,11 +66,36 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting }) => {
                 isActive: objectType.isActive ?? true,
                 schema: objectType.schema || { fields: [] },
                 slotConfiguration: objectType.slotConfiguration || { slots: [] },
-                allowedChildTypes: objectType.allowedChildTypes || [],
+                allowedChildTypes: allowedChildTypeNames,
+                hierarchyLevel: objectType.hierarchyLevel || 'both',
                 metadata: objectType.metadata || {}
             })
         }
     }, [objectType])
+
+    // Only reset tab to 'basic' when creating a new object type (objectType becomes null)
+    // or when switching to a different object type (different ID)
+    const [previousObjectTypeId, setPreviousObjectTypeId] = useState(null)
+
+    useEffect(() => {
+        const currentObjectTypeId = objectType?.id || null
+
+        // Reset to basic tab only when:
+        // 1. Creating new (objectType becomes null from having an ID)
+        // 2. Switching to a different object type (different ID)
+        if (previousObjectTypeId !== currentObjectTypeId) {
+            if (!currentObjectTypeId) {
+                // Creating new object type
+                setActiveTab('basic')
+            } else if (previousObjectTypeId && previousObjectTypeId !== currentObjectTypeId) {
+                // Switching to different existing object type
+                setActiveTab('basic')
+            }
+            // If going from null to an ID (editing existing), preserve current tab
+        }
+
+        setPreviousObjectTypeId(currentObjectTypeId)
+    }, [objectType?.id, previousObjectTypeId])
 
     const handleInputChange = (field, value) => {
         setFormData(prev => ({ ...prev, [field]: value }))
@@ -141,10 +176,13 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting }) => {
         return Object.keys(newErrors).length === 0
     }
 
-    const handleSubmit = (e) => {
+
+
+    const handleSubmit = async (e) => {
         e.preventDefault()
 
         if (validateForm()) {
+            // Submit as JSON data - image URL is already handled by InlineImageUpload
             onSubmit(formData)
         }
     }
@@ -176,8 +214,8 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting }) => {
                             type="button"
                             onClick={() => setActiveTab(tab.id)}
                             className={`py-2 px-1 border-b-2 font-medium text-sm ${activeTab === tab.id
-                                    ? 'border-blue-500 text-blue-600'
-                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                ? 'border-blue-500 text-blue-600'
+                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                                 }`}
                         >
                             {tab.label}
@@ -271,6 +309,30 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting }) => {
                             placeholder="Describe what this object type represents..."
                         />
                     </div>
+
+                    {/* Icon Image Upload */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-3">
+                            Icon Image
+                        </label>
+                        {objectType?.id ? (
+                            <InlineImageUpload
+                                currentImageUrl={objectType?.iconImage}
+                                objectTypeId={objectType?.id}
+                                placeholder="Upload icon image"
+                                disabled={isSubmitting}
+                            />
+                        ) : (
+                            <div className="bg-gray-50 border border-gray-200 rounded-md p-4 text-center">
+                                <p className="text-gray-500 text-sm">
+                                    Save the object type first to upload an icon image
+                                </p>
+                            </div>
+                        )}
+                        {errors.iconImage && (
+                            <p className="text-red-600 text-sm mt-1">{errors.iconImage}</p>
+                        )}
+                    </div>
                 </div>
             )}
 
@@ -306,34 +368,107 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting }) => {
 
             {/* Relationships Tab */}
             {activeTab === 'relationships' && (
-                <div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">Child Type Relationships</h3>
-                    <p className="text-gray-600 mb-6">
-                        Select which object types can be children of this type in hierarchical structures.
-                    </p>
-                    <ChildTypeSelector
-                        selectedTypes={formData.allowedChildTypes}
-                        availableTypes={existingTypes.filter(type => type.name !== formData.name)}
-                        onChange={(types) => handleInputChange('allowedChildTypes', types)}
-                    />
+                <div className="space-y-8">
+                    {/* Hierarchy Level Configuration */}
+                    <div>
+                        <h3 className="text-lg font-medium text-gray-900 mb-4">Hierarchy Level</h3>
+                        <p className="text-gray-600 mb-6">
+                            Configure where this object type can appear in the content hierarchy.
+                        </p>
+
+                        <div className="space-y-3">
+                            <label className="flex items-center">
+                                <input
+                                    type="radio"
+                                    name="hierarchyLevel"
+                                    value="top_level_only"
+                                    checked={formData.hierarchyLevel === 'top_level_only'}
+                                    onChange={(e) => handleInputChange('hierarchyLevel', e.target.value)}
+                                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                                />
+                                <div className="ml-3">
+                                    <span className="text-sm font-medium text-gray-900">Top-level only</span>
+                                    <p className="text-sm text-gray-500">Can only exist at the root level, cannot be a child of other objects</p>
+                                </div>
+                            </label>
+
+                            <label className="flex items-center">
+                                <input
+                                    type="radio"
+                                    name="hierarchyLevel"
+                                    value="sub_object_only"
+                                    checked={formData.hierarchyLevel === 'sub_object_only'}
+                                    onChange={(e) => handleInputChange('hierarchyLevel', e.target.value)}
+                                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                                />
+                                <div className="ml-3">
+                                    <span className="text-sm font-medium text-gray-900">Sub-object only</span>
+                                    <p className="text-sm text-gray-500">Must be a child of another object, cannot exist at root level</p>
+                                </div>
+                            </label>
+
+                            <label className="flex items-center">
+                                <input
+                                    type="radio"
+                                    name="hierarchyLevel"
+                                    value="both"
+                                    checked={formData.hierarchyLevel === 'both'}
+                                    onChange={(e) => handleInputChange('hierarchyLevel', e.target.value)}
+                                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                                />
+                                <div className="ml-3">
+                                    <span className="text-sm font-medium text-gray-900">Both levels</span>
+                                    <p className="text-sm text-gray-500">Can exist at root level or as a child of other objects</p>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    {/* Child Type Selection */}
+                    <div>
+                        <h3 className="text-lg font-medium text-gray-900 mb-4">Allowed Child Types</h3>
+                        <p className="text-gray-600 mb-6">
+                            Select which object types can be children of this type in hierarchical structures.
+                        </p>
+                        <ChildTypeSelector
+                            selectedTypes={formData.allowedChildTypes}
+                            availableTypes={existingTypes.filter(type =>
+                                type.name !== formData.name &&
+                                (type.hierarchyLevel === 'sub_object_only' || type.hierarchyLevel === 'both')
+                            )}
+                            onChange={(types) => handleInputChange('allowedChildTypes', types)}
+                            hierarchyLevel={formData.hierarchyLevel}
+                        />
+                    </div>
                 </div>
             )}
 
             {/* Form Actions */}
-            <div className="flex justify-end space-x-3 pt-6 border-t">
+            <div className="flex justify-end space-x-3 px-6 py-4 border-t bg-gray-50">
                 <button
                     type="button"
                     onClick={onCancel}
-                    className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
+                    className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                    disabled={isSubmitting}
                 >
                     Cancel
                 </button>
                 <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
-                    {isSubmitting ? 'Saving...' : (objectType ? 'Update' : 'Create')}
+                    {isSubmitting ? (
+                        <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                            Saving...
+                        </>
+                    ) : (
+                        <>
+                            <Settings className="w-4 h-4 mr-2" />
+                            {objectType ? 'Update Object Type' : 'Create Object Type'}
+                        </>
+                    )}
                 </button>
             </div>
         </form>
@@ -458,7 +593,8 @@ const SlotEditor = ({ slots = [], onChange, errors }) => {
 }
 
 // Child Type Selector Component
-const ChildTypeSelector = ({ selectedTypes, availableTypes, onChange }) => {
+const ChildTypeSelector = ({ selectedTypes, availableTypes, onChange, hierarchyLevel }) => {
+
     const toggleType = (typeName) => {
         const isSelected = selectedTypes.includes(typeName)
         if (isSelected) {
@@ -468,25 +604,49 @@ const ChildTypeSelector = ({ selectedTypes, availableTypes, onChange }) => {
         }
     }
 
+
+
     return (
         <div className="space-y-2">
             {availableTypes.length === 0 ? (
-                <p className="text-gray-500 italic">No other object types available</p>
+                <div className="bg-gray-50 border border-gray-200 rounded-md p-4">
+                    <p className="text-gray-500 text-sm">
+                        No object types available as children. Only object types configured as "Sub-object only" or "Both levels" can be children of other types.
+                    </p>
+                </div>
             ) : (
-                availableTypes.map((type) => (
-                    <div key={type.name} className="flex items-center">
-                        <input
-                            type="checkbox"
-                            checked={selectedTypes.includes(type.name)}
-                            onChange={() => toggleType(type.name)}
-                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                        />
-                        <label className="ml-3 text-sm text-gray-700">
-                            <span className="font-medium">{type.label}</span>
-                            <span className="text-gray-500 ml-2">({type.name})</span>
-                        </label>
-                    </div>
-                ))
+                <>
+                    <p className="text-sm text-gray-600 mb-4">
+                        {availableTypes.length} object type{availableTypes.length !== 1 ? 's' : ''} available as potential children:
+                    </p>
+                    {availableTypes.map((type) => (
+                        <div key={type.name} className="flex items-center p-3 bg-gray-50 rounded-md hover:bg-gray-100 transition-colors">
+                            <input
+                                type="checkbox"
+                                checked={selectedTypes.includes(type.name)}
+                                onChange={() => toggleType(type.name)}
+                                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                            />
+                            <div className="ml-3 flex-1">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <span className="font-medium text-gray-900">{type.label}</span>
+                                        <span className="text-gray-500 ml-2">({type.name})</span>
+                                    </div>
+                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${type.hierarchyLevel === 'sub_object_only'
+                                        ? 'bg-orange-100 text-orange-800'
+                                        : 'bg-blue-100 text-blue-800'
+                                        }`}>
+                                        {type.hierarchyLevel === 'sub_object_only' ? 'Sub-object only' : 'Both levels'}
+                                    </span>
+                                </div>
+                                {type.description && (
+                                    <p className="text-sm text-gray-600 mt-1">{type.description}</p>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                </>
             )}
         </div>
     )
