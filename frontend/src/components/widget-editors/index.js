@@ -15,9 +15,13 @@ import CalendarEditor from './CalendarEditor'
 import FormsEditor from './FormsEditor'
 import GalleryEditor from './GalleryEditor'
 
+// Object storage widget editors
+import ObjectListEditor from './ObjectListEditor'
+
 // Export individual editors
 export { TextBlockEditor, ImageEditor, ButtonEditor, SpacerEditor, HTMLBlockEditor }
 export { NewsEditor, EventsEditor, CalendarEditor, FormsEditor, GalleryEditor }
+export { ObjectListEditor }
 
 /**
  * Widget Editor Registry
@@ -35,6 +39,8 @@ export const WIDGET_EDITORS = {
     'Calendar': CalendarEditor,
     'Forms': FormsEditor,
     'Gallery': GalleryEditor,
+    // Object storage widgets
+    'Object List': ObjectListEditor,
 }
 
 /**

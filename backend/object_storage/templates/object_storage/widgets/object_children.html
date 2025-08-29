@@ -1,0 +1,65 @@
+{% load static %}
+{% load widget_tags %}
+
+<div class="object-children-widget template-{{ config.display_template }}" data-widget-type="object-children">
+    {% if error %}
+        <div class="widget-error bg-red-50 border border-red-200 rounded-md p-4">
+            <p class="text-red-800 text-sm">{{ error }}</p>
+        </div>
+    {% elif children %}
+        <div class="children-container">
+            {% if parent_object %}
+                <header class="children-header mb-4">
+                    <h3 class="text-lg font-semibold text-gray-900">
+                        Related to: {{ parent_object.title }}
+                    </h3>
+                    <p class="text-sm text-gray-600">
+                        {{ children|length }} item{{ children|length|pluralize }}
+                    </p>
+                </header>
+            {% endif %}
+            
+            <div class="children-list">
+                {% for child in children %}
+                    <div class="child-item level-{{ child.level|sub:parent_object.level }}">
+                        <h4 class="child-title">
+                            <a href="{% url 'object_detail' child.object_type.name child.slug %}" class="text-decoration-none">
+                                {{ child.title }}
+                            </a>
+                        </h4>
+                        
+                        <div class="child-meta">
+                            <span class="child-type">{{ child.object_type.label }}</span>
+                            {% if child.publish_date %}
+                                <span class="child-date"> • {{ child.publish_date|date:"M j, Y" }}</span>
+                            {% endif %}
+                            <span class="child-level"> • Level {{ child.level }}</span>
+                        </div>
+                        
+                        {% comment %}
+                        Show excerpt if available
+                        {% endcomment %}
+                        {% for field_name, field_value in child.data.items %}
+                            {% if field_name in "content,description,summary,text" and field_value %}
+                                <div class="child-excerpt text-sm text-gray-600 mt-1">
+                                    {{ field_value|truncatewords:20 }}
+                                </div>
+                                {% break %}
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% else %}
+        <div class="widget-empty text-center py-6">
+            <p class="text-gray-600">
+                {% if parent_object %}
+                    No child items found for {{ parent_object.title }}.
+                {% else %}
+                    No related items found.
+                {% endif %}
+            </p>
+        </div>
+    {% endif %}
+</div>
