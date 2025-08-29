@@ -52,10 +52,16 @@ const ObjectEditor = ({ objectType, instance, onSave, onCancel }) => {
     // Fetch child types for sub-object tab
     const { data: childTypesResponse } = useQuery({
         queryKey: ['objectTypes', 'childTypes', actualObjectTypeId],
-        queryFn: () => objectTypesApi.list({
-            show_in_main_browser: false,
-            // Filter for types that can be children of current type
-        }),
+        queryFn: async () => {
+            // Get all object types and filter client-side for types that can be children
+            const response = await objectTypesApi.list({ is_active: true })
+            const allTypes = response.data.results || response.data
+            // Filter for types that can be children: 'sub_object_only' and 'both'
+            const childTypes = allTypes.filter(type =>
+                type.hierarchyLevel === 'sub_object_only' || type.hierarchyLevel === 'both'
+            )
+            return { ...response, data: childTypes }
+        },
         enabled: !!actualObjectTypeId && activeTab === 'subobjects'
     })
 
@@ -573,7 +579,7 @@ const ObjectEditor = ({ objectType, instance, onSave, onCancel }) => {
                                                         <button
                                                             onClick={() => {
                                                                 // TODO: Navigate to edit child object
-                                                                console.log('Edit child:', child)
+
                                                             }}
                                                             className="text-blue-600 hover:text-blue-800 text-sm font-medium"
                                                         >
@@ -582,7 +588,7 @@ const ObjectEditor = ({ objectType, instance, onSave, onCancel }) => {
                                                         <button
                                                             onClick={() => {
                                                                 // TODO: Delete child object
-                                                                console.log('Delete child:', child)
+
                                                             }}
                                                             className="text-red-600 hover:text-red-800 text-sm font-medium"
                                                         >

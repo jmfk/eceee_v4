@@ -6,12 +6,16 @@ Provides REST API endpoints for managing object types and instances.
 
 from django.shortcuts import get_object_or_404
 from rest_framework import viewsets, status, permissions
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.filters import SearchFilter, OrderingFilter
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Q, Count
 from django.utils import timezone
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
+import uuid
+import os
 
 from .models import ObjectTypeDefinition, ObjectInstance, ObjectVersion
 from .serializers import (
@@ -36,7 +40,7 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
     search_fields = ["name", "label", "plural_label", "description"]
     ordering_fields = ["name", "label", "created_at", "updated_at"]
     ordering = ["label"]
-    filterset_fields = ["is_active", "show_in_main_browser"]
+    filterset_fields = ["is_active", "hierarchy_level"]
 
     def get_serializer_class(self):
         """Return appropriate serializer based on action"""
@@ -51,7 +55,10 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["get"])
     def main_browser_types(self, request):
         """Get object types that should appear in the main browser grid"""
-        queryset = self.get_queryset().filter(is_active=True, show_in_main_browser=True)
+        # Show types that can appear at top level: 'top_level_only' and 'both'
+        queryset = self.get_queryset().filter(
+            is_active=True, hierarchy_level__in=["top_level_only", "both"]
+        )
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
@@ -506,3 +513,90 @@ class ObjectVersionViewSet(viewsets.ReadOnlyModelViewSet):
         if self.action == "list":
             return ObjectVersionListSerializer
         return ObjectVersionSerializer
+
+
+@api_view(["POST"])
+@permission_classes([permissions.IsAuthenticated])
+def upload_image(request):
+    """
+    Upload an image file and optionally save it directly to an object type.
+
+    If object_type_id is provided, the image will be saved directly to that object type.
+    Otherwise, returns the URL for manual handling.
+    """
+    if "image" not in request.FILES:
+        return Response(
+            {"error": "No image file provided"}, status=status.HTTP_400_BAD_REQUEST
+        )
+
+    image_file = request.FILES["image"]
+    object_type_id = request.data.get("object_type_id")
+
+    # Validate file type
+    allowed_types = ["image/jpeg", "image/png", "image/gif", "image/webp"]
+    if image_file.content_type not in allowed_types:
+        return Response(
+            {"error": f'Invalid file type. Allowed types: {", ".join(allowed_types)}'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # Validate file size (5MB max)
+    max_size = 5 * 1024 * 1024  # 5MB
+    if image_file.size > max_size:
+        return Response(
+            {"error": "File too large. Maximum size is 5MB"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # If object_type_id is provided, validate it exists
+    object_type = None
+    if object_type_id:
+        try:
+            object_type = ObjectTypeDefinition.objects.get(id=object_type_id)
+        except ObjectTypeDefinition.DoesNotExist:
+            return Response(
+                {"error": "Object type not found"}, status=status.HTTP_404_NOT_FOUND
+            )
+
+    try:
+        # Generate unique filename
+        file_extension = os.path.splitext(image_file.name)[1]
+        unique_filename = f"object_type_icons/{uuid.uuid4()}{file_extension}"
+
+        # Save the file
+        file_path = default_storage.save(
+            unique_filename, ContentFile(image_file.read())
+        )
+
+        # Get the full URL
+        file_url = default_storage.url(file_path)
+
+        # If object_type_id was provided, save the image to the object type
+        if object_type:
+            # Remove old image if it exists
+            if object_type.icon_image:
+                try:
+                    default_storage.delete(object_type.icon_image.name)
+                except:
+                    pass  # Ignore errors when deleting old image
+
+            # Save the new image path to the object type
+            object_type.icon_image.name = file_path
+            object_type.save(update_fields=["icon_image"])
+
+        return Response(
+            {
+                "url": file_url,
+                "filename": image_file.name,
+                "size": image_file.size,
+                "content_type": image_file.content_type,
+                "object_type_updated": bool(object_type),
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+    except Exception as e:
+        return Response(
+            {"error": f"Upload failed: {str(e)}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
