@@ -8,7 +8,7 @@
 import { api } from './client.js'
 import { convertKeysToCamel, convertKeysToSnake } from '../utils/caseConversion.js'
 
-const BASE_URL = '/api/objects/api'
+const BASE_URL = '/api/v1/objects/api'
 
 /**
  * Object Type Definition API
