@@ -139,6 +139,32 @@ class ObjectInstanceModelTest(TestCase):
         self.assertEqual(instance1.slug, "test-article")
         self.assertEqual(instance2.slug, "test-article-1")
 
+    def test_mptt_hierarchy(self):
+        """Test MPTT hierarchy functionality"""
+        # Create parent instance
+        parent = ObjectInstance.objects.create(
+            object_type=self.obj_type,
+            title="Parent Article",
+            data={"title": "Parent", "content": "Parent content"},
+            created_by=self.user,
+        )
+
+        # Create child instance
+        child = ObjectInstance.objects.create(
+            object_type=self.obj_type,
+            title="Child Article",
+            data={"title": "Child", "content": "Child content"},
+            parent=parent,
+            created_by=self.user,
+        )
+
+        # Test hierarchy
+        self.assertEqual(child.parent, parent)
+        self.assertEqual(child.level, 1)
+        self.assertEqual(parent.level, 0)
+        self.assertIn(child, parent.get_children())
+        self.assertIn(parent, child.get_ancestors())
+
     def test_version_creation(self):
         """Test version creation"""
         instance = ObjectInstance.objects.create(

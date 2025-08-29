@@ -162,7 +162,8 @@ class ObjectInstanceAdmin(admin.ModelAdmin):
         "object_type",
         "status",
         "is_published_display",
-        "parent_object",
+        "parent",
+        "level",
         "version",
         "created_by",
         "created_at",
@@ -173,7 +174,7 @@ class ObjectInstanceAdmin(admin.ModelAdmin):
         "created_at",
         "updated_at",
         "publish_date",
-        ("parent_object", admin.RelatedOnlyFieldListFilter),
+        ("parent", admin.RelatedOnlyFieldListFilter),
     ]
     search_fields = ["title", "slug", "data"]
     readonly_fields = [
@@ -199,7 +200,7 @@ class ObjectInstanceAdmin(admin.ModelAdmin):
         (
             "Hierarchy",
             {
-                "fields": ("parent_object",),
+                "fields": ("parent", "level"),
                 "description": "Set parent-child relationships",
             },
         ),
@@ -291,7 +292,7 @@ class ObjectInstanceAdmin(admin.ModelAdmin):
         return (
             super()
             .get_queryset(request)
-            .select_related("object_type", "parent_object", "created_by")
+            .select_related("object_type", "parent", "created_by")
         )
 
 

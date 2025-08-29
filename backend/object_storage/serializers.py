@@ -189,7 +189,7 @@ class ObjectInstanceSerializer(serializers.ModelSerializer):
     object_type = ObjectTypeDefinitionSerializer(read_only=True)
     object_type_id = serializers.IntegerField(write_only=True)
     created_by = UserSerializer(read_only=True)
-    parent_object = serializers.PrimaryKeyRelatedField(
+    parent = serializers.PrimaryKeyRelatedField(
         queryset=ObjectInstance.objects.all(), required=False, allow_null=True
     )
     is_published = serializers.SerializerMethodField()
@@ -206,7 +206,9 @@ class ObjectInstanceSerializer(serializers.ModelSerializer):
             "slug",
             "data",
             "status",
-            "parent_object",
+            "parent",
+            "level",
+            "tree_id",
             "widgets",
             "publish_date",
             "unpublish_date",
@@ -265,14 +267,14 @@ class ObjectInstanceSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         """Cross-field validation"""
         # Validate parent-child relationship
-        if attrs.get("parent_object") and attrs.get("object_type_id"):
-            parent = attrs["parent_object"]
+        if attrs.get("parent") and attrs.get("object_type_id"):
+            parent = attrs["parent"]
             object_type = ObjectTypeDefinition.objects.get(id=attrs["object_type_id"])
 
             if not parent.object_type.can_have_child_type(object_type):
                 raise serializers.ValidationError(
                     {
-                        "parent_object": f"Object type '{object_type.name}' cannot be a child of '{parent.object_type.name}'"
+                        "parent": f"Object type '{object_type.name}' cannot be a child of '{parent.object_type.name}'"
                     }
                 )
 
@@ -357,9 +359,7 @@ class ObjectInstanceListSerializer(serializers.ModelSerializer):
         source="created_by.username", read_only=True
     )
     is_published = serializers.SerializerMethodField()
-    parent_object_title = serializers.CharField(
-        source="parent_object.title", read_only=True
-    )
+    parent_title = serializers.CharField(source="parent.title", read_only=True)
 
     class Meta:
         model = ObjectInstance
@@ -370,8 +370,9 @@ class ObjectInstanceListSerializer(serializers.ModelSerializer):
             "title",
             "slug",
             "status",
-            "parent_object",
-            "parent_object_title",
+            "parent",
+            "parent_title",
+            "level",
             "publish_date",
             "unpublish_date",
             "version",
