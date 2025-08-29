@@ -21,7 +21,7 @@ export const objectTypesApi = {
         const response = await api.get(`${BASE_URL}/object-types/`, { params })
         return {
             ...response,
-            data: response.data.map(convertKeysToCamel)
+            data: (response.data.results || response.data).map(convertKeysToCamel)
         }
     },
 
@@ -97,7 +97,7 @@ export const objectTypesApi = {
         const response = await api.get(`${BASE_URL}/object-types/${id}/instances/`, { params })
         return {
             ...response,
-            data: response.data.map(convertKeysToCamel)
+            data: (response.data.results || response.data).map(convertKeysToCamel)
         }
     },
 
@@ -108,7 +108,7 @@ export const objectTypesApi = {
         const response = await api.get(`${BASE_URL}/object-types/active/`)
         return {
             ...response,
-            data: response.data.map(convertKeysToCamel)
+            data: (response.data.results || response.data).map(convertKeysToCamel)
         }
     }
 }
@@ -124,7 +124,7 @@ export const objectInstancesApi = {
         const response = await api.get(`${BASE_URL}/objects/`, { params })
         return {
             ...response,
-            data: response.data.map(convertKeysToCamel)
+            data: (response.data.results || response.data).map(convertKeysToCamel)
         }
     },
 
@@ -189,7 +189,7 @@ export const objectInstancesApi = {
         const response = await api.get(`${BASE_URL}/objects/${id}/versions/`)
         return {
             ...response,
-            data: response.data.map(convertKeysToCamel)
+            data: (response.data.results || response.data).map(convertKeysToCamel)
         }
     },
 
@@ -200,7 +200,7 @@ export const objectInstancesApi = {
         const response = await api.get(`${BASE_URL}/objects/${id}/children/`)
         return {
             ...response,
-            data: response.data.map(convertKeysToCamel)
+            data: (response.data.results || response.data).map(convertKeysToCamel)
         }
     },
 
@@ -211,7 +211,7 @@ export const objectInstancesApi = {
         const response = await api.get(`${BASE_URL}/objects/${id}/descendants/`)
         return {
             ...response,
-            data: response.data.map(convertKeysToCamel)
+            data: (response.data.results || response.data).map(convertKeysToCamel)
         }
     },
 
@@ -222,7 +222,7 @@ export const objectInstancesApi = {
         const response = await api.get(`${BASE_URL}/objects/${id}/ancestors/`)
         return {
             ...response,
-            data: response.data.map(convertKeysToCamel)
+            data: (response.data.results || response.data).map(convertKeysToCamel)
         }
     },
 
@@ -233,7 +233,7 @@ export const objectInstancesApi = {
         const response = await api.get(`${BASE_URL}/objects/${id}/siblings/`)
         return {
             ...response,
-            data: response.data.map(convertKeysToCamel)
+            data: (response.data.results || response.data).map(convertKeysToCamel)
         }
     },
 
@@ -244,7 +244,7 @@ export const objectInstancesApi = {
         const response = await api.get(`${BASE_URL}/objects/${id}/tree/`)
         return {
             ...response,
-            data: response.data.map(convertKeysToCamel)
+            data: (response.data.results || response.data).map(convertKeysToCamel)
         }
     },
 
@@ -255,7 +255,7 @@ export const objectInstancesApi = {
         const response = await api.get(`${BASE_URL}/objects/${id}/path_to_root/`)
         return {
             ...response,
-            data: response.data.map(convertKeysToCamel)
+            data: (response.data.results || response.data).map(convertKeysToCamel)
         }
     },
 
@@ -282,7 +282,7 @@ export const objectInstancesApi = {
         const response = await api.get(`${BASE_URL}/objects/published/`, { params })
         return {
             ...response,
-            data: response.data.map(convertKeysToCamel)
+            data: (response.data.results || response.data).map(convertKeysToCamel)
         }
     },
 
@@ -294,7 +294,7 @@ export const objectInstancesApi = {
         const response = await api.get(`${BASE_URL}/objects/by-type/${typeName}/`, { params: allParams })
         return {
             ...response,
-            data: response.data.map(convertKeysToCamel)
+            data: (response.data.results || response.data).map(convertKeysToCamel)
         }
     },
 
@@ -305,7 +305,7 @@ export const objectInstancesApi = {
         const response = await api.get(`${BASE_URL}/objects/roots/`, { params })
         return {
             ...response,
-            data: response.data.map(convertKeysToCamel)
+            data: (response.data.results || response.data).map(convertKeysToCamel)
         }
     },
 
@@ -317,7 +317,10 @@ export const objectInstancesApi = {
         const response = await api.get(`${BASE_URL}/objects/search/`, { params: allParams })
         return {
             ...response,
-            data: response.data.map(convertKeysToCamel)
+            data: response.data.results ? {
+                ...convertKeysToCamel(response.data),
+                results: response.data.results.map(convertKeysToCamel)
+            } : (response.data.results || response.data).map(convertKeysToCamel)
         }
     },
 
@@ -333,7 +336,7 @@ export const objectInstancesApi = {
         const response = await api.post(`${BASE_URL}/objects/bulk-operations/`, snakeCaseData)
         return {
             ...response,
-            data: response.data.map(convertKeysToCamel)
+            data: convertKeysToCamel(response.data)
         }
     }
 }
@@ -349,7 +352,7 @@ export const objectVersionsApi = {
         const response = await api.get(`${BASE_URL}/versions/`, { params })
         return {
             ...response,
-            data: response.data.map(convertKeysToCamel)
+            data: (response.data.results || response.data).map(convertKeysToCamel)
         }
     },
 
