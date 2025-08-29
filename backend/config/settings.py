@@ -152,6 +152,7 @@ LOCAL_APPS = [
     "core_widgets",  # Core widget types - can be disabled to use only custom widgets
     "example_custom_widgets",  # Example of custom site-specific widgets
     "file_manager",  # Comprehensive media file management system
+    "object_storage",  # Non-hierarchical object storage system
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS

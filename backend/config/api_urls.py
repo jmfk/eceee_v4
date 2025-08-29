@@ -50,4 +50,5 @@ urlpatterns = [
     path("webpages/", include("webpages.api_urls")),
     path("content/", include("content.urls")),
     path("media/", include("file_manager.urls")),
+    path("objects/", include("object_storage.urls")),
 ]
