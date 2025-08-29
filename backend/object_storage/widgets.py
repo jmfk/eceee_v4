@@ -128,7 +128,9 @@ class ObjectListWidget(BaseWidget):
     name = "Object List"
     description = "Display a filtered list of objects from the object storage system"
     template_name = "object_storage/widgets/object_list.html"
-    config_model: Type[BaseModel] = ObjectListConfig
+    @property
+    def configuration_model(self) -> Type[BaseModel]:
+        return ObjectListConfig
 
     widget_css = """
     .object-list-widget {
@@ -264,7 +266,9 @@ class ObjectDetailWidget(BaseWidget):
     name = "Object Detail"
     description = "Display a single object with full details and widgets"
     template_name = "object_storage/widgets/object_detail.html"
-    config_model: Type[BaseModel] = ObjectDetailConfig
+    @property
+    def configuration_model(self) -> Type[BaseModel]:
+        return ObjectDetailConfig
 
     widget_css = """
     .object-detail-widget {
@@ -359,7 +363,9 @@ class ObjectChildrenWidget(BaseWidget):
     name = "Object Children"
     description = "Display child objects in a hierarchical structure"
     template_name = "object_storage/widgets/object_children.html"
-    config_model: Type[BaseModel] = ObjectChildrenConfig
+    @property
+    def configuration_model(self) -> Type[BaseModel]:
+        return ObjectChildrenConfig
 
     widget_css = """
     .object-children-widget {
