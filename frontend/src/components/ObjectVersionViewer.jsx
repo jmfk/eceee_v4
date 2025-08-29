@@ -56,18 +56,17 @@ const ObjectVersionViewer = ({ instanceId, isVisible, onClose }) => {
                             </span>
                         )}
                     </div>
-                    
+
                     <div className="flex items-center space-x-2">
                         <button
                             onClick={() => {
                                 setCompareMode(!compareMode)
                                 setSelectedVersions([])
                             }}
-                            className={`px-3 py-1 text-sm rounded-md transition-colors ${
-                                compareMode
-                                    ? 'bg-blue-100 text-blue-700 border border-blue-300'
-                                    : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
-                            }`}
+                            className={`px-3 py-1 text-sm rounded-md transition-colors ${compareMode
+                                ? 'bg-blue-100 text-blue-700 border border-blue-300'
+                                : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
+                                }`}
                         >
                             <GitBranch className="h-4 w-4 mr-1" />
                             {compareMode ? 'Exit Compare' : 'Compare Versions'}
@@ -78,7 +77,7 @@ const ObjectVersionViewer = ({ instanceId, isVisible, onClose }) => {
                 {compareMode && (
                     <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
                         <p className="text-sm text-blue-800">
-                            Select up to 2 versions to compare. 
+                            Select up to 2 versions to compare.
                             {selectedVersions.length > 0 && (
                                 <span className="ml-2 font-medium">
                                     {selectedVersions.length} selected
@@ -111,7 +110,7 @@ const ObjectVersionViewer = ({ instanceId, isVisible, onClose }) => {
                                 <p className="text-gray-600">No version history available</p>
                             </div>
                         ) : compareMode && selectedVersions.length === 2 ? (
-                            <VersionComparison 
+                            <VersionComparison
                                 version1={getVersionById(selectedVersions[0])}
                                 version2={getVersionById(selectedVersions[1])}
                             />
@@ -141,9 +140,8 @@ const VersionItem = ({ version, isLatest, isSelected, onSelect, compareMode }) =
     const [expanded, setExpanded] = useState(false)
 
     return (
-        <div className={`border rounded-md p-4 transition-colors ${
-            isSelected ? 'border-blue-300 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
-        }`}>
+        <div className={`border rounded-md p-4 transition-colors ${isSelected ? 'border-blue-300 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+            }`}>
             <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
                     {compareMode && (
@@ -154,7 +152,7 @@ const VersionItem = ({ version, isLatest, isSelected, onSelect, compareMode }) =
                             className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                         />
                     )}
-                    
+
                     <div>
                         <div className="flex items-center space-x-2">
                             <span className="font-medium text-gray-900">
@@ -166,7 +164,7 @@ const VersionItem = ({ version, isLatest, isSelected, onSelect, compareMode }) =
                                 </span>
                             )}
                         </div>
-                        
+
                         <div className="flex items-center space-x-4 mt-1 text-sm text-gray-600">
                             <span className="flex items-center">
                                 <User className="h-3 w-3 mr-1" />
@@ -177,7 +175,7 @@ const VersionItem = ({ version, isLatest, isSelected, onSelect, compareMode }) =
                                 {new Date(version.createdAt).toLocaleDateString()}
                             </span>
                         </div>
-                        
+
                         {version.changeDescription && (
                             <p className="text-sm text-gray-700 mt-2">
                                 {version.changeDescription}
@@ -185,7 +183,7 @@ const VersionItem = ({ version, isLatest, isSelected, onSelect, compareMode }) =
                         )}
                     </div>
                 </div>
-                
+
                 <button
                     onClick={() => setExpanded(!expanded)}
                     className="text-gray-400 hover:text-gray-600"
@@ -203,7 +201,7 @@ const VersionItem = ({ version, isLatest, isSelected, onSelect, compareMode }) =
                             {JSON.stringify(version.data, null, 2)}
                         </pre>
                     </div>
-                    
+
                     {version.widgets && Object.keys(version.widgets).length > 0 && (
                         <div className="mt-3">
                             <h4 className="text-sm font-medium text-gray-900 mb-2">Widget Configuration</h4>
@@ -227,11 +225,11 @@ const VersionComparison = ({ version1, version2 }) => {
     const getFieldDifferences = (obj1, obj2) => {
         const keys = new Set([...Object.keys(obj1 || {}), ...Object.keys(obj2 || {})])
         const differences = []
-        
+
         keys.forEach(key => {
             const val1 = obj1?.[key]
             const val2 = obj2?.[key]
-            
+
             if (JSON.stringify(val1) !== JSON.stringify(val2)) {
                 differences.push({
                     field: key,
@@ -241,7 +239,7 @@ const VersionComparison = ({ version1, version2 }) => {
                 })
             }
         })
-        
+
         return differences
     }
 
@@ -254,25 +252,23 @@ const VersionComparison = ({ version1, version2 }) => {
                 <h3 className="text-lg font-medium text-gray-900">
                     Compare Versions {version1?.versionNumber} & {version2?.versionNumber}
                 </h3>
-                
+
                 <div className="flex bg-gray-100 rounded-md p-1">
                     <button
                         onClick={() => setCompareField('data')}
-                        className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-                            compareField === 'data' 
-                                ? 'bg-white text-gray-900 shadow-sm' 
-                                : 'text-gray-600 hover:text-gray-900'
-                        }`}
+                        className={`px-3 py-1 rounded text-sm font-medium transition-colors ${compareField === 'data'
+                            ? 'bg-white text-gray-900 shadow-sm'
+                            : 'text-gray-600 hover:text-gray-900'
+                            }`}
                     >
                         Data
                     </button>
                     <button
                         onClick={() => setCompareField('widgets')}
-                        className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-                            compareField === 'widgets' 
-                                ? 'bg-white text-gray-900 shadow-sm' 
-                                : 'text-gray-600 hover:text-gray-900'
-                        }`}
+                        className={`px-3 py-1 rounded text-sm font-medium transition-colors ${compareField === 'widgets'
+                            ? 'bg-white text-gray-900 shadow-sm'
+                            : 'text-gray-600 hover:text-gray-900'
+                            }`}
                     >
                         Widgets
                     </button>
@@ -290,7 +286,7 @@ const VersionComparison = ({ version1, version2 }) => {
                         <p className="text-sm text-gray-700 mt-2">{version1.changeDescription}</p>
                     )}
                 </div>
-                
+
                 <div className="bg-gray-50 rounded-md p-3">
                     <h4 className="font-medium text-gray-900">Version {version2?.versionNumber}</h4>
                     <p className="text-sm text-gray-600 mt-1">
@@ -307,7 +303,7 @@ const VersionComparison = ({ version1, version2 }) => {
                 <h4 className="font-medium text-gray-900 mb-3">
                     {compareField === 'data' ? 'Data' : 'Widget'} Changes
                 </h4>
-                
+
                 {(compareField === 'data' ? dataDifferences : widgetDifferences).length === 0 ? (
                     <p className="text-gray-600 text-sm italic">
                         No {compareField} changes between these versions
@@ -315,22 +311,20 @@ const VersionComparison = ({ version1, version2 }) => {
                 ) : (
                     <div className="space-y-2">
                         {(compareField === 'data' ? dataDifferences : widgetDifferences).map((diff, index) => (
-                            <div key={index} className={`p-3 rounded-md border-l-4 ${
-                                diff.type === 'added' ? 'bg-green-50 border-green-400' :
+                            <div key={index} className={`p-3 rounded-md border-l-4 ${diff.type === 'added' ? 'bg-green-50 border-green-400' :
                                 diff.type === 'removed' ? 'bg-red-50 border-red-400' :
-                                'bg-yellow-50 border-yellow-400'
-                            }`}>
+                                    'bg-yellow-50 border-yellow-400'
+                                }`}>
                                 <div className="flex items-center justify-between">
                                     <span className="font-medium text-gray-900">{diff.field}</span>
-                                    <span className={`text-xs px-2 py-1 rounded ${
-                                        diff.type === 'added' ? 'bg-green-100 text-green-800' :
+                                    <span className={`text-xs px-2 py-1 rounded ${diff.type === 'added' ? 'bg-green-100 text-green-800' :
                                         diff.type === 'removed' ? 'bg-red-100 text-red-800' :
-                                        'bg-yellow-100 text-yellow-800'
-                                    }`}>
+                                            'bg-yellow-100 text-yellow-800'
+                                        }`}>
                                         {diff.type}
                                     </span>
                                 </div>
-                                
+
                                 <div className="mt-2 grid grid-cols-2 gap-4 text-sm">
                                     <div>
                                         <span className="text-gray-600">Version {version1?.versionNumber}:</span>
@@ -338,7 +332,7 @@ const VersionComparison = ({ version1, version2 }) => {
                                             {diff.oldValue ? JSON.stringify(diff.oldValue, null, 2) : '(not set)'}
                                         </div>
                                     </div>
-                                    
+
                                     <div>
                                         <span className="text-gray-600">Version {version2?.versionNumber}:</span>
                                         <div className="mt-1 p-2 bg-white rounded border text-gray-900 font-mono text-xs">
@@ -352,7 +346,6 @@ const VersionComparison = ({ version1, version2 }) => {
                 )}
             </div>
         </div>
-        </Modal>
     )
 }
 
