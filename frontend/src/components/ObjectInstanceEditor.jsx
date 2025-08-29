@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Save, X, Eye, Calendar, User, Hash, Type, ToggleLeft, Image, FileText } from 'lucide-react'
+import { Save, X, Eye, Calendar, User, Hash, Type, ToggleLeft, Image, FileText, History } from 'lucide-react'
 import { objectInstancesApi, objectTypesApi } from '../api/objectStorage'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import Modal from './Modal'
+import ObjectVersionViewer from './ObjectVersionViewer'
 
 const ObjectInstanceEditor = ({ instanceId, objectTypeId, onSave, onCancel, isVisible }) => {
     const [formData, setFormData] = useState({
@@ -20,6 +21,7 @@ const ObjectInstanceEditor = ({ instanceId, objectTypeId, onSave, onCancel, isVi
 
     const [errors, setErrors] = useState({})
     const [activeTab, setActiveTab] = useState('content')
+    const [showVersions, setShowVersions] = useState(false)
 
     const queryClient = useQueryClient()
     const { addNotification } = useGlobalNotifications()
@@ -170,7 +172,8 @@ const ObjectInstanceEditor = ({ instanceId, objectTypeId, onSave, onCancel, isVi
                             { id: 'content', label: 'Content' },
                             { id: 'publishing', label: 'Publishing' },
                             { id: 'hierarchy', label: 'Hierarchy' },
-                            { id: 'widgets', label: 'Widgets' }
+                            { id: 'widgets', label: 'Widgets' },
+                            ...(instanceId ? [{ id: 'versions', label: 'Versions' }] : [])
                         ].map((tab) => (
                             <button
                                 key={tab.id}
@@ -368,6 +371,41 @@ const ObjectInstanceEditor = ({ instanceId, objectTypeId, onSave, onCancel, isVi
                                 )}
                             </div>
                         )}
+
+                        {/* Versions Tab */}
+                        {activeTab === 'versions' && instanceId && (
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-lg font-medium text-gray-900">Version History</h3>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowVersions(true)}
+                                        className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-md text-sm flex items-center transition-colors"
+                                    >
+                                        <History className="h-4 w-4 mr-2" />
+                                        View All Versions
+                                    </button>
+                                </div>
+                                
+                                <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+                                    <h4 className="text-sm font-medium text-blue-900 mb-2">Version Control</h4>
+                                    <p className="text-blue-800 text-sm">
+                                        This object has version control enabled. All changes are automatically tracked
+                                        and you can view the complete version history, compare changes between versions,
+                                        and restore previous versions if needed.
+                                    </p>
+                                </div>
+                                
+                                <div className="bg-gray-50 rounded-md p-4">
+                                    <h4 className="text-sm font-medium text-gray-900 mb-2">Current Version Info</h4>
+                                    <div className="text-sm text-gray-700 space-y-1">
+                                        <p><strong>Version:</strong> {formData.version || 'New'}</p>
+                                        <p><strong>Last Modified:</strong> {instanceResponse?.data?.updatedAt ? new Date(instanceResponse.data.updatedAt).toLocaleString() : 'Not saved yet'}</p>
+                                        <p><strong>Created By:</strong> {instanceResponse?.data?.createdBy || 'Current user'}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </>
                 )}
 
@@ -399,6 +437,15 @@ const ObjectInstanceEditor = ({ instanceId, objectTypeId, onSave, onCancel, isVi
                     </button>
                 </div>
             </form>
+            
+            {/* Version Viewer Modal */}
+            {showVersions && (
+                <ObjectVersionViewer
+                    instanceId={instanceId}
+                    isVisible={showVersions}
+                    onClose={() => setShowVersions(false)}
+                />
+            )}
         </Modal>
     )
 }
