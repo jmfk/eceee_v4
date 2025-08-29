@@ -36,7 +36,7 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
     search_fields = ["name", "label", "plural_label", "description"]
     ordering_fields = ["name", "label", "created_at", "updated_at"]
     ordering = ["label"]
-    filterset_fields = ["is_active"]
+    filterset_fields = ["is_active", "show_in_main_browser"]
 
     def get_serializer_class(self):
         """Return appropriate serializer based on action"""
@@ -47,6 +47,13 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         """Set the created_by field when creating"""
         serializer.save(created_by=self.request.user)
+
+    @action(detail=False, methods=["get"])
+    def main_browser_types(self, request):
+        """Get object types that should appear in the main browser grid"""
+        queryset = self.get_queryset().filter(is_active=True, show_in_main_browser=True)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
     @action(detail=True, methods=["get"])
     def schema(self, request, pk=None):
