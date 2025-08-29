@@ -182,8 +182,8 @@ const ObjectBrowser = () => {
                         <button
                             onClick={() => setViewMode('list')}
                             className={`px-3 py-1 rounded text-sm font-medium transition-colors ${viewMode === 'list'
-                                    ? 'bg-white text-gray-900 shadow-sm'
-                                    : 'text-gray-600 hover:text-gray-900'
+                                ? 'bg-white text-gray-900 shadow-sm'
+                                : 'text-gray-600 hover:text-gray-900'
                                 }`}
                         >
                             List View
@@ -191,8 +191,8 @@ const ObjectBrowser = () => {
                         <button
                             onClick={() => setViewMode('tree')}
                             className={`px-3 py-1 rounded text-sm font-medium transition-colors ${viewMode === 'tree'
-                                    ? 'bg-white text-gray-900 shadow-sm'
-                                    : 'text-gray-600 hover:text-gray-900'
+                                ? 'bg-white text-gray-900 shadow-sm'
+                                : 'text-gray-600 hover:text-gray-900'
                                 }`}
                         >
                             Tree View
@@ -426,7 +426,8 @@ const ObjectRow = ({ instance, isSelected, onSelect, onEdit, onDelete }) => {
                     </div>
                 </div>
             </div>
-            )
+        </div>
+    )
 }
 
-            export default ObjectBrowser
+export default ObjectBrowser

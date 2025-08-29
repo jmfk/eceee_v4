@@ -40,6 +40,7 @@ import PublicationTimeline from '../components/PublicationTimeline'
 import BulkPublishingOperations from '../components/BulkPublishingOperations'
 import NamespaceManager from '../components/NamespaceManager'
 import TagManager from '../components/TagManager'
+import ObjectTypeManager from '../components/ObjectTypeManager'
 import { extractErrorMessage } from '../utils/errorHandling.js'
 // Schema managers are no longer embedded in Settings; use dedicated pages under /schemas
 
@@ -342,6 +343,8 @@ const SettingsManager = () => {
                 return <ThemeEditor />
             case 'tags':
                 return <TagManager />
+            case 'object-types':
+                return <ObjectTypeManager />
 
             case 'versions':
                 return renderVersionManagement()
