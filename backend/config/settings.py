@@ -137,6 +137,8 @@ THIRD_PARTY_APPS = [
     # Development tools
     "django_extensions",
     "debug_toolbar",
+    # Tree management
+    "mptt",
     # Monitoring
     "django_prometheus",
 ]

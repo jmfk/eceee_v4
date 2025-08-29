@@ -18,6 +18,7 @@ from django.utils import timezone
 from django.urls import reverse
 from django.core.exceptions import ValidationError
 from django.utils.text import slugify
+from mptt.models import MPTTModel, TreeForeignKey
 import json
 
 
@@ -185,10 +186,11 @@ class ObjectTypeDefinition(models.Model):
         }
 
 
-class ObjectInstance(models.Model):
+class ObjectInstance(MPTTModel):
     """
     Actual instances of objects based on their type definitions.
     Contains dynamic data according to the object type's schema.
+    Uses MPTT for efficient tree structure management.
     """
 
     STATUS_CHOICES = [
@@ -215,11 +217,12 @@ class ObjectInstance(models.Model):
         default="draft",
         help_text="Publication status of this object",
     )
-    parent_object = models.ForeignKey(
+    parent = TreeForeignKey(
         "self",
         on_delete=models.CASCADE,
         blank=True,
         null=True,
+        related_name="children",
         help_text="Parent object for hierarchical relationships",
     )
     widgets = models.JSONField(
@@ -248,7 +251,7 @@ class ObjectInstance(models.Model):
             models.Index(fields=["object_type", "status"]),
             models.Index(fields=["slug", "object_type"]),
             models.Index(fields=["status", "publish_date"]),
-            models.Index(fields=["parent_object"]),
+            models.Index(fields=["parent"]),
             GinIndex(fields=["data"]),
             GinIndex(fields=["widgets"]),
         ]
@@ -257,6 +260,9 @@ class ObjectInstance(models.Model):
                 fields=["slug", "object_type"], name="unique_slug_per_object_type"
             )
         ]
+
+    class MPTTMeta:
+        order_insertion_by = ["title"]
 
     def __str__(self):
         return f"{self.object_type.label}: {self.title}"
@@ -287,7 +293,7 @@ class ObjectInstance(models.Model):
             self._validate_data_against_schema()
 
         # Validate parent-child relationship
-        if self.parent_object:
+        if self.parent:
             self._validate_parent_child_relationship()
 
         # Validate widgets against slot configuration
@@ -311,10 +317,10 @@ class ObjectInstance(models.Model):
 
     def _validate_parent_child_relationship(self):
         """Validate that the parent-child relationship is allowed."""
-        if not self.object_type.can_have_child_type(self.parent_object.object_type):
+        if not self.parent.object_type.can_have_child_type(self.object_type):
             raise ValidationError(
                 f"Object type '{self.object_type.name}' cannot be a child of "
-                f"'{self.parent_object.object_type.name}'"
+                f"'{self.parent.object_type.name}'"
             )
 
     def _validate_widgets_against_slots(self):
@@ -342,20 +348,36 @@ class ObjectInstance(models.Model):
 
         return True
 
-    def get_children(self):
-        """Get all child objects."""
-        return ObjectInstance.objects.filter(parent_object=self)
+    def get_root_objects(self):
+        """Get all root objects (objects without parents) of the same type."""
+        return ObjectInstance.objects.filter(
+            object_type=self.object_type, parent__isnull=True
+        )
 
-    def get_descendants(self):
-        """Get all descendant objects (children, grandchildren, etc.)."""
-        descendants = []
-        children = self.get_children()
+    def get_tree_objects(self):
+        """Get all objects in the same tree."""
+        if self.tree_id:
+            return ObjectInstance.objects.filter(tree_id=self.tree_id)
+        return ObjectInstance.objects.filter(pk=self.pk)
 
-        for child in children:
-            descendants.append(child)
-            descendants.extend(child.get_descendants())
+    def get_path_to_root(self):
+        """Get the path from this object to the root."""
+        return self.get_ancestors(include_self=True).reverse()
 
-        return descendants
+    def can_move_to_parent(self, new_parent):
+        """Check if this object can be moved to a new parent."""
+        if not new_parent:
+            return True
+
+        # Check if new parent allows this object type as child
+        if not new_parent.object_type.can_have_child_type(self.object_type):
+            return False
+
+        # Prevent moving to own descendant (would create circular reference)
+        if new_parent in self.get_descendants(include_self=True):
+            return False
+
+        return True
 
     def create_version(self, user, change_description=""):
         """Create a version snapshot of this object."""
@@ -377,7 +399,9 @@ class ObjectInstance(models.Model):
             "slug": self.slug,
             "data": self.data,
             "status": self.status,
-            "parent_object": self.parent_object.id if self.parent_object else None,
+            "parent": self.parent.id if self.parent else None,
+            "level": self.level,
+            "tree_id": self.tree_id,
             "widgets": self.widgets,
             "publish_date": self.publish_date,
             "unpublish_date": self.unpublish_date,
