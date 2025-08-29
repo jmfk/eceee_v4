@@ -1,0 +1,65 @@
+{% load static %}
+{% load widget_tags %}
+
+<div class="object-list-widget {{ widget_css_class }}" data-widget-type="object-list">
+    {% if error %}
+        <div class="widget-error bg-red-50 border border-red-200 rounded-md p-4">
+            <p class="text-red-800 text-sm">{{ error }}</p>
+        </div>
+    {% elif objects %}
+        <div class="objects-container">
+            {% for object in objects %}
+                <div class="object-item{% if config.show_hierarchy %} level-{{ object.level }}{% endif %}">
+                    {% if config.show_hierarchy and object.level > 0 %}
+                        <div class="hierarchy-indicator" style="margin-left: {{ object.level|mul:20 }}px;">
+                            <span class="hierarchy-line">└─</span>
+                        </div>
+                    {% endif %}
+                    
+                    <div class="object-content">
+                        <h3 class="object-title">
+                            {% if object.slug %}
+                                <a href="{% url 'object_detail' object.object_type.name object.slug %}" class="text-decoration-none">
+                                    {{ object.title }}
+                                </a>
+                            {% else %}
+                                {{ object.title }}
+                            {% endif %}
+                        </h3>
+                        
+                        {% if config.show_excerpt and object.excerpt %}
+                            <div class="object-excerpt">
+                                {{ object.excerpt|truncatewords:30 }}
+                            </div>
+                        {% endif %}
+                        
+                        <div class="object-meta">
+                            <span class="object-type">{{ object.object_type.label }}</span>
+                            {% if object.publish_date %}
+                                <span class="object-date"> • {{ object.publish_date|date:"M j, Y" }}</span>
+                            {% endif %}
+                            {% if config.show_hierarchy and object.parent %}
+                                <span class="object-parent"> • Child of: {{ object.parent.title }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+        
+        {% if objects|length == config.limit %}
+            <div class="widget-footer text-center mt-4">
+                <p class="text-sm text-gray-600">
+                    Showing {{ config.limit }} {{ object_type.plural_label|lower }}
+                    <a href="{% url 'object_list' object_type.name %}" class="text-blue-600 hover:text-blue-800 ml-2">
+                        View all →
+                    </a>
+                </p>
+            </div>
+        {% endif %}
+    {% else %}
+        <div class="widget-empty text-center py-8">
+            <p class="text-gray-600">No {{ object_type.plural_label|lower }} found.</p>
+        </div>
+    {% endif %}
+</div>

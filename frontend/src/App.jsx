@@ -10,6 +10,7 @@ import SystemSchemaPage from '@pages/SystemSchemaPage'
 import LayoutSchemaPage from '@pages/LayoutSchemaPage'
 import LayoutSchemaEditorPage from '@pages/LayoutSchemaEditorPage'
 import MediaManagerPage from '@pages/MediaManagerPage'
+import ObjectStoragePage from '@pages/ObjectStoragePage'
 import TreePageManager from '@components/TreePageManager'
 import PageEditor from '@components/PageEditor'
 import VersionTimelinePage from '@pages/VersionTimelinePage'
@@ -114,6 +115,19 @@ function App() {
                         </div>
                       </main>
                       <StatusBar customStatusContent={<span>Settings - Ready</span>} />
+                    </div>
+                  </PrivateRoute>
+                } />
+                <Route path="/objects" element={
+                  <PrivateRoute>
+                    <div className="fixed inset-0 bg-gray-50 flex flex-col">
+                      <Navbar />
+                      <main className="flex-1 overflow-hidden">
+                        <div className="h-full overflow-y-auto">
+                          <ObjectStoragePage />
+                        </div>
+                      </main>
+                      <StatusBar customStatusContent={<span>Object Storage - Ready</span>} />
                     </div>
                   </PrivateRoute>
                 } />
