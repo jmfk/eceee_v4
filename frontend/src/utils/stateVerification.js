@@ -128,8 +128,7 @@ export const clearValidationSyncLog = () => {
  */
 export const debugStateComparison = (currentState, expectedState, context = 'unknown') => {
     console.group(`🔍 State Debug: ${context}`)
-    console.log('Current State:', currentState)
-    console.log('Expected State:', expectedState)
+
 
     const differences = []
 
@@ -200,7 +199,7 @@ export const debugStateComparison = (currentState, expectedState, context = 'unk
     if (differences.length > 0) {
         console.warn('Differences found:', differences)
     } else {
-        console.log('✅ States match perfectly')
+
     }
 
     console.groupEnd()

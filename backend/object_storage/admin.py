@@ -67,10 +67,11 @@ class ObjectTypeDefinitionAdmin(admin.ModelAdmin):
                 "description": "Define which object types can be children of this type",
             },
         ),
-        ("Metadata", {"fields": ("metadata", "created_by"), "classes": ("collapse",)}),
         (
-            "Timestamps",
-            {"fields": ("created_at", "updated_at"), "classes": ("collapse",)},
+            "Metadata",
+            {
+                "fields": ("created_at", "updated_at", "created_by"),
+            },
         ),
     )
 
@@ -162,8 +163,6 @@ class ObjectInstanceAdmin(admin.ModelAdmin):
         "object_type",
         "status",
         "is_published_display",
-        "parent",
-        "level",
         "version",
         "created_by",
         "created_at",
@@ -174,12 +173,12 @@ class ObjectInstanceAdmin(admin.ModelAdmin):
         "created_at",
         "updated_at",
         "publish_date",
-        ("parent", admin.RelatedOnlyFieldListFilter),
     ]
-    search_fields = ["title", "slug", "data"]
+    search_fields = ["title", "slug"]
     readonly_fields = [
         "slug",
         "version",
+        "current_version",
         "created_at",
         "updated_at",
         "data_preview",
@@ -198,33 +197,22 @@ class ObjectInstanceAdmin(admin.ModelAdmin):
             },
         ),
         (
-            "Hierarchy",
+            "Version Control",
             {
-                "fields": ("parent", "level"),
-                "description": "Set parent-child relationships",
-            },
-        ),
-        (
-            "Content Data",
-            {
-                "fields": ("data", "data_preview"),
-                "description": "Object data according to its type schema",
-            },
-        ),
-        (
-            "Widget Configuration",
-            {
-                "fields": ("widgets", "widgets_preview"),
-                "description": "Widget configurations for display slots",
+                "fields": (
+                    "current_version",
+                    "version",
+                    "data_preview",
+                    "widgets_preview",
+                ),
+                "description": "Current version and content preview - edit content through versions",
             },
         ),
         (
             "Metadata",
-            {"fields": ("metadata", "version", "created_by"), "classes": ("collapse",)},
-        ),
-        (
-            "Timestamps",
-            {"fields": ("created_at", "updated_at"), "classes": ("collapse",)},
+            {
+                "fields": ("created_at", "updated_at", "created_by"),
+            },
         ),
     )
 
@@ -233,15 +221,8 @@ class ObjectInstanceAdmin(admin.ModelAdmin):
         if not change:  # Creating new object
             obj.created_by = request.user
         else:  # Updating existing object
-            # Create a version snapshot before saving changes
-            if obj.pk:
-                try:
-                    old_obj = ObjectInstance.objects.get(pk=obj.pk)
-                    if old_obj.data != obj.data or old_obj.widgets != obj.widgets:
-                        obj.version += 1
-                        old_obj.create_version(request.user, "Admin update")
-                except ObjectInstance.DoesNotExist:
-                    pass
+            # Version creation will be handled by the serializer when data/widgets change
+            pass
 
         super().save_model(request, obj, form, change)
 
@@ -333,7 +314,7 @@ class ObjectVersionAdmin(admin.ModelAdmin):
         ),
         (
             "Metadata",
-            {"fields": ("created_by", "created_at"), "classes": ("collapse",)},
+            {"fields": ("created_by", "created_at")},
         ),
     )
 

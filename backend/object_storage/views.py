@@ -67,19 +67,180 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
         """Get the schema for an object type"""
         obj_type = self.get_object()
         return Response(
-            {"schema": obj_type.schema, "fields": obj_type.get_schema_fields()}
+            {
+                "schema": obj_type.schema,
+                "properties": obj_type.schema.get("properties", {}),
+            }
         )
+
+    @action(detail=True, methods=["put"])
+    def update_basic_info(self, request, pk=None):
+        """Update basic information for an object type"""
+        obj_type = self.get_object()
+
+        # Define allowed basic info fields
+        allowed_fields = [
+            "name",
+            "label",
+            "plural_label",
+            "description",
+            "is_active",
+            "hierarchy_level",
+        ]
+
+        # Filter request data to only include basic info fields
+        basic_info_data = {}
+        for field in allowed_fields:
+            if field in request.data:
+                basic_info_data[field] = request.data[field]
+
+        if not basic_info_data:
+            return Response(
+                {"error": "No valid basic info fields provided"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            serializer = self.get_serializer(
+                obj_type, data=basic_info_data, partial=True
+            )
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+
+            return Response(
+                {
+                    "message": "Basic info updated successfully",
+                    "name": serializer.data.get("name"),
+                    "label": serializer.data.get("label"),
+                    "updated_at": serializer.data.get("updated_at"),
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to update basic info: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+    @action(detail=True, methods=["put"])
+    def update_slots(self, request, pk=None):
+        """Update widget slots configuration for an object type"""
+        obj_type = self.get_object()
+
+        # Validate that request.data contains a valid slot configuration
+        if not isinstance(request.data, dict) or "slots" not in request.data:
+            return Response(
+                {
+                    "error": "Invalid slot configuration format. Expected object with 'slots' array."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Validate that slots is an array
+        if not isinstance(request.data["slots"], list):
+            return Response(
+                {"error": "Invalid slot configuration. 'slots' must be an array."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Validate each slot has required fields
+        for i, slot in enumerate(request.data["slots"]):
+            if not isinstance(slot, dict):
+                return Response(
+                    {"error": f"Slot {i + 1} must be an object"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            if not slot.get("name") or not slot["name"].strip():
+                return Response(
+                    {"error": f"Slot {i + 1}: Slot Name is required"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            if not slot.get("label") or not slot["label"].strip():
+                return Response(
+                    {"error": f"Slot {i + 1}: Display Label is required"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        # Check for duplicate slot names
+        slot_names = [
+            slot["name"] for slot in request.data["slots"] if slot.get("name")
+        ]
+        if len(slot_names) != len(set(slot_names)):
+            return Response(
+                {"error": "Duplicate slot names are not allowed"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            # Wrap the slots in slot_configuration object
+            slot_config_data = {"slot_configuration": request.data}
+
+            serializer = self.get_serializer(
+                obj_type, data=slot_config_data, partial=True
+            )
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+
+            return Response(
+                {
+                    "message": "Widget slots updated successfully",
+                    "slotConfiguration": serializer.data.get("slot_configuration"),
+                    "updated_at": serializer.data.get("updated_at"),
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to update widget slots: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
     @action(detail=True, methods=["put"])
     def update_schema(self, request, pk=None):
         """Update the schema for an object type"""
         obj_type = self.get_object()
-        serializer = self.get_serializer(
-            obj_type, data={"schema": request.data}, partial=True
-        )
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(serializer.data)
+
+        # Validate that request.data contains a valid schema
+        if not isinstance(request.data, dict) or "properties" not in request.data:
+            return Response(
+                {
+                    "error": "Invalid schema format. Expected schema object with 'properties' object."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Validate that properties is an object
+        if not isinstance(request.data["properties"], dict):
+            return Response(
+                {"error": "Invalid schema format. 'properties' must be an object."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            serializer = self.get_serializer(
+                obj_type, data={"schema": request.data}, partial=True
+            )
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+
+            return Response(
+                {
+                    "message": "Schema updated successfully",
+                    "schema": serializer.data.get("schema"),
+                    "updated_at": serializer.data.get("updated_at"),
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to update schema: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
     @action(detail=True, methods=["get"])
     def instances(self, request, pk=None):
@@ -141,11 +302,55 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
         instance.status = "published"
         instance.save()
 
-        # Create version for publishing
-        instance.create_version(request.user, "Published via API")
+        # Create version for publishing (no data/widgets change, just status)
+        instance.create_version(request.user, change_description="Published via API")
 
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
+
+    @action(detail=True, methods=["put", "patch"])
+    def update_current_version(self, request, pk=None):
+        """Update the current version without creating a new version"""
+        instance = self.get_object()
+
+        # Extract data and widgets from request
+        data = request.data.get("data")
+        widgets = request.data.get("widgets")
+        change_description = request.data.get(
+            "change_description", "Updated current version via API"
+        )
+
+        if data is None and widgets is None:
+            return Response(
+                {"error": "At least 'data' or 'widgets' must be provided"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            # Update the current version
+            updated_version = instance.update_current_version(
+                request.user,
+                data=data,
+                widgets=widgets,
+                change_description=change_description,
+            )
+
+            # Return the updated instance data
+            serializer = self.get_serializer(instance)
+            return Response(
+                {
+                    "message": "Current version updated successfully",
+                    "version_id": updated_version.id,
+                    "version_number": updated_version.version_number,
+                    "object": serializer.data,
+                }
+            )
+
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to update current version: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
     @action(detail=True, methods=["get"])
     def versions(self, request, pk=None):
@@ -249,7 +454,7 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
             # Create version for the move
             instance.create_version(
                 request.user,
-                f"Moved to new parent: {new_parent.title if new_parent else 'root'}",
+                change_description=f"Moved to new parent: {new_parent.title if new_parent else 'root'}",
             )
 
             serializer = self.get_serializer(instance)
@@ -450,13 +655,17 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
                     if operation == "publish":
                         obj.status = "published"
                         obj.save()
-                        obj.create_version(request.user, "Bulk published via API")
+                        obj.create_version(
+                            request.user, change_description="Bulk published via API"
+                        )
                         results.append({"id": obj.id, "status": "published"})
 
                     elif operation == "unpublish":
                         obj.status = "draft"
                         obj.save()
-                        obj.create_version(request.user, "Bulk unpublished via API")
+                        obj.create_version(
+                            request.user, change_description="Bulk unpublished via API"
+                        )
                         results.append({"id": obj.id, "status": "unpublished"})
 
                     elif operation == "delete":
@@ -467,7 +676,9 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
                     elif operation == "archive":
                         obj.status = "archived"
                         obj.save()
-                        obj.create_version(request.user, "Bulk archived via API")
+                        obj.create_version(
+                            request.user, change_description="Bulk archived via API"
+                        )
                         results.append({"id": obj.id, "status": "archived"})
 
                     else:

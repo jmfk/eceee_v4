@@ -29,7 +29,7 @@ class DjangoTemplateRenderer {
 
         // Only show debug message in verbose mode to reduce console noise
         if (this.debug && window.TEMPLATE_DEBUG_VERBOSE) {
-            console.log('🐛 DjangoTemplateRenderer: Debug mode enabled - detailed error information will be shown');
+            // Debug mode enabled - detailed error information will be shown
         }
 
         // Expose global debug function
@@ -1203,9 +1203,11 @@ class DjangoTemplateRenderer {
                     stack: error?.stack,
                     name: error?.name
                 });
-                console.log('Template Structure:', structure);
-                console.log('Widget Config:', config);
-                console.log('Timestamp:', new Date().toISOString());
+                if (window.TEMPLATE_DEBUG_VERBOSE) {
+                    console.log('Template Structure:', structure);
+                    console.log('Widget Config:', config);
+                    console.log('Timestamp:', new Date().toISOString());
+                }
                 console.groupEnd();
             });
 
@@ -1223,7 +1225,7 @@ class DjangoTemplateRenderer {
         this.debug = enabled;
         // Only log debug mode changes in verbose mode
         if (window.TEMPLATE_DEBUG_VERBOSE) {
-            console.log(`🐛 DjangoTemplateRenderer: Debug mode ${enabled ? 'enabled' : 'disabled'}`);
+            // Debug mode ${enabled ? 'enabled' : 'disabled'}
         }
     }
 
@@ -1234,8 +1236,10 @@ class DjangoTemplateRenderer {
     static enableGlobalDebug(enabled = true) {
         if (typeof window !== 'undefined') {
             window.TEMPLATE_DEBUG_MODE = enabled;
-            console.log(`🐛 Global Template Debug Mode ${enabled ? 'enabled' : 'disabled'}`);
-            console.log('This affects new renderer instances. Call renderer.setDebugMode() for existing instances.');
+            if (window.TEMPLATE_DEBUG_VERBOSE) {
+                console.log(`🐛 Global Template Debug Mode ${enabled ? 'enabled' : 'disabled'}`);
+                console.log('This affects new renderer instances. Call renderer.setDebugMode() for existing instances.');
+            }
         }
     }
 

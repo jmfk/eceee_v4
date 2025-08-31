@@ -18,4 +18,5 @@ app_name = "object_storage"
 
 urlpatterns = [
     path("api/", include(router.urls)),
+    path("api/upload-image/", views.upload_image, name="upload_image"),
 ]

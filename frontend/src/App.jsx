@@ -4,13 +4,15 @@ import { Toaster, toast } from 'react-hot-toast'
 import { X } from 'lucide-react'
 import Navbar from '@components/Navbar'
 import HomePage from '@pages/HomePage'
-import AboutPage from '@pages/AboutPage'
+
 import SettingsManager from '@pages/SettingsManager'
 import SystemSchemaPage from '@pages/SystemSchemaPage'
 import LayoutSchemaPage from '@pages/LayoutSchemaPage'
 import LayoutSchemaEditorPage from '@pages/LayoutSchemaEditorPage'
 import MediaManagerPage from '@pages/MediaManagerPage'
-import ObjectStoragePage from '@pages/ObjectStoragePage'
+import ObjectBrowser from '@components/ObjectBrowser'
+import ObjectTypeEditorPage from '@pages/ObjectTypeEditorPage'
+import ObjectInstanceEditPage from '@pages/ObjectInstanceEditPage'
 import TreePageManager from '@components/TreePageManager'
 import PageEditor from '@components/PageEditor'
 import VersionTimelinePage from '@pages/VersionTimelinePage'
@@ -60,21 +62,7 @@ function App() {
                     </div>
                   </PrivateRoute>
                 } />
-                <Route path="/about" element={
-                  <PrivateRoute>
-                    <div className="fixed inset-0 bg-gray-50 flex flex-col">
-                      <Navbar />
-                      <main className="flex-1 overflow-hidden">
-                        <div className="h-full overflow-y-auto">
-                          <div className="container mx-auto px-4 py-8">
-                            <AboutPage />
-                          </div>
-                        </div>
-                      </main>
-                      <StatusBar customStatusContent={<span>About - Ready</span>} />
-                    </div>
-                  </PrivateRoute>
-                } />
+
                 <Route path="/pages" element={
                   <PrivateRoute>
                     <div className="fixed inset-0 bg-gray-50 flex flex-col">
@@ -124,13 +112,29 @@ function App() {
                       <Navbar />
                       <main className="flex-1 overflow-hidden">
                         <div className="h-full overflow-y-auto">
-                          <ObjectStoragePage />
+                          <ObjectBrowser />
                         </div>
                       </main>
                       <StatusBar customStatusContent={<span>Object Storage - Ready</span>} />
                     </div>
                   </PrivateRoute>
                 } />
+
+                {/* Object Type Editor Routes */}
+                <Route path="/settings/object-types/new/:tab?" element={
+                  <PrivateRoute>
+                    <ObjectTypeEditorPage />
+                  </PrivateRoute>
+                } />
+                <Route path="/settings/object-types/:id/:tab?" element={
+                  <PrivateRoute>
+                    <ObjectTypeEditorPage />
+                  </PrivateRoute>
+                } />
+
+                {/* Object Instance Editor Routes */}
+                <Route path="/objects/new/:objectTypeId/:tab?" element={<PrivateRoute><ObjectInstanceEditPage /></PrivateRoute>} />
+                <Route path="/objects/:instanceId/edit/:tab?" element={<PrivateRoute><ObjectInstanceEditPage /></PrivateRoute>} />
 
                 {/* Dedicated schema routes */}
                 <Route path="/schemas/system" element={

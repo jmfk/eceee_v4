@@ -35,7 +35,7 @@ const ObjectContentEditor = forwardRef(({ objectType, widgets = {}, onWidgetChan
 
     const handleEditWidget = (slotName, widgetIndex) => {
         // TODO: Open widget editor
-        console.log('Edit widget:', slotName, widgetIndex)
+
     }
 
     const handleDeleteWidget = (slotName, widgetIndex) => {

@@ -28,6 +28,10 @@ local_settings.py
 db.sqlite3
 db.sqlite3-journal
 
+# Media files (exclude content but keep structure)
+backend/media/*
+!backend/media/.gitkeep
+
 # Environment variables
 .env
 .env.local

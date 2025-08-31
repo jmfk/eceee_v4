@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 import { Search, ArrowLeft, Plus, Grid, List, AlertCircle, Image, FolderOpen } from 'lucide-react'
 import { objectTypesApi, objectInstancesApi } from '../api/objectStorage'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
@@ -7,7 +8,8 @@ import ObjectInstanceEditor from './ObjectInstanceEditor'
 import ObjectEditor from './ObjectEditor'
 
 const ObjectBrowser = () => {
-    const [currentView, setCurrentView] = useState('grid') // 'grid', 'list', 'edit'
+    const navigate = useNavigate()
+    const [currentView, setCurrentView] = useState('grid') // 'grid', 'list'
     const [selectedObjectType, setSelectedObjectType] = useState(null)
     const [searchTerm, setSearchTerm] = useState('')
     const [statusFilter, setStatusFilter] = useState('')
@@ -28,14 +30,22 @@ const ObjectBrowser = () => {
         queryKey: ['objectInstances', 'filtered', selectedObjectType?.id, searchTerm, statusFilter],
         queryFn: () => {
             const params = {}
-            if (selectedObjectType) params.objectType = selectedObjectType.id
+            if (selectedObjectType) params.type = selectedObjectType.name
             if (searchTerm) params.search = searchTerm
             if (statusFilter) params.status = statusFilter
 
             if (searchTerm) {
-                return objectInstancesApi.search(searchTerm, params)
+                // For search, use the regular search endpoint but filter results to top-level only
+                return objectInstancesApi.search(searchTerm, params).then(response => ({
+                    ...response,
+                    data: {
+                        ...response.data,
+                        results: (response.data.results || response.data).filter(item => !item.parent)
+                    }
+                }))
             } else {
-                return objectInstancesApi.list(params)
+                // Use dedicated roots endpoint for top-level objects
+                return objectInstancesApi.getRoots(params)
             }
         },
         enabled: currentView === 'list' && !!selectedObjectType
@@ -60,18 +70,14 @@ const ObjectBrowser = () => {
 
     const handleCreateNew = () => {
         if (selectedObjectType) {
-            setEditingInstance(null)
-            setCurrentView('edit')
+            navigate(`/objects/new/${selectedObjectType.id}/content`)
         } else {
-            // Show legacy editor for backward compatibility
-            setEditingInstance(null)
-            setShowLegacyEditor(true)
+            addNotification('Please select an object type first', 'warning')
         }
     }
 
     const handleEditInstance = (instance) => {
-        setEditingInstance(instance)
-        setCurrentView('edit')
+        navigate(`/objects/${instance.id}/edit/content`)
     }
 
     const handleEditCancel = () => {
@@ -131,85 +137,84 @@ const ObjectBrowser = () => {
     // Grid View - Object Type Selection
     if (currentView === 'grid') {
         return (
-            <div className="p-6">
-                <div className="mb-6">
-                    <div className="flex justify-between items-center mb-4">
-                        <div>
-                            <h2 className="text-xl font-bold text-gray-900 flex items-center">
-                                <FolderOpen className="h-5 w-5 mr-2" />
-                                Object Browser
-                            </h2>
-                            <p className="text-gray-600 mt-1">
-                                Select an object type to browse and manage
-                            </p>
-                        </div>
-                        <button
-                            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md flex items-center transition-colors"
-                            onClick={handleCreateNew}
-                        >
-                            <Plus className="h-4 w-4 mr-2" />
-                            New Object
-                        </button>
-                    </div>
-                </div>
-
-                {typesLoading ? (
-                    <div className="flex justify-center py-12">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                        {objectTypes.map((objectType) => (
-                            <div
-                                key={objectType.id}
-                                onClick={() => handleObjectTypeSelect(objectType)}
-                                className="bg-white border border-gray-200 rounded-lg p-6 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer"
+            <div className="min-h-full bg-gray-50">
+                <div className="max-w-7xl mx-auto px-6 py-6">
+                    <div className="mb-6">
+                        <div className="flex justify-between items-center mb-4">
+                            <div>
+                                <h1 className="text-2xl font-bold text-gray-900 flex items-center">
+                                    <FolderOpen className="h-6 w-6 mr-3" />
+                                    Browse and manage object instances across all types
+                                </h1>
+                            </div>
+                            <button
+                                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md flex items-center transition-colors"
+                                onClick={handleCreateNew}
                             >
-                                <div className="flex flex-col items-center text-center">
-                                    {objectType.iconImage ? (
-                                        <img
-                                            src={objectType.iconImage}
-                                            alt={objectType.label}
-                                            className="w-16 h-16 object-cover rounded-lg mb-3"
-                                        />
-                                    ) : (
-                                        <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center mb-3">
-                                            <Image className="h-8 w-8 text-gray-400" />
+                                <Plus className="h-4 w-4 mr-2" />
+                                New Object
+                            </button>
+                        </div>
+                    </div>
+
+                    {typesLoading ? (
+                        <div className="flex justify-center py-12">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                            {objectTypes.map((objectType) => (
+                                <div
+                                    key={objectType.id}
+                                    onClick={() => handleObjectTypeSelect(objectType)}
+                                    className="bg-white border border-gray-200 rounded-lg p-6 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer"
+                                >
+                                    <div className="flex flex-col items-center text-center">
+                                        {objectType.iconImage ? (
+                                            <img
+                                                src={objectType.iconImage}
+                                                alt={objectType.label}
+                                                className="w-16 h-16 object-cover rounded-lg mb-3"
+                                            />
+                                        ) : (
+                                            <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center mb-3">
+                                                <Image className="h-8 w-8 text-gray-400" />
+                                            </div>
+                                        )}
+                                        <h3 className="text-lg font-medium text-gray-900 mb-1">
+                                            {objectType.label}
+                                        </h3>
+                                        <p className="text-sm text-gray-500 mb-3 line-clamp-2">
+                                            {objectType.description || `Manage ${objectType.pluralLabel?.toLowerCase()}`}
+                                        </p>
+                                        <div className="text-xs text-gray-400">
+                                            {objectType.instanceCount || 0} items
                                         </div>
-                                    )}
-                                    <h3 className="text-lg font-medium text-gray-900 mb-1">
-                                        {objectType.label}
-                                    </h3>
-                                    <p className="text-sm text-gray-500 mb-3 line-clamp-2">
-                                        {objectType.description || `Manage ${objectType.pluralLabel?.toLowerCase()}`}
-                                    </p>
-                                    <div className="text-xs text-gray-400">
-                                        {objectType.instanceCount || 0} items
                                     </div>
                                 </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
+                            ))}
+                        </div>
+                    )}
 
-                {!typesLoading && objectTypes.length === 0 && (
-                    <div className="text-center py-12">
-                        <FolderOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                        <h3 className="text-lg font-medium text-gray-900 mb-2">No Object Types Available</h3>
-                        <p className="text-gray-500">
-                            Create object types in the admin interface to start managing content.
-                        </p>
-                    </div>
-                )}
+                    {!typesLoading && objectTypes.length === 0 && (
+                        <div className="text-center py-12">
+                            <FolderOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                            <h3 className="text-lg font-medium text-gray-900 mb-2">No Object Types Available</h3>
+                            <p className="text-gray-500">
+                                Create object types in the admin interface to start managing content.
+                            </p>
+                        </div>
+                    )}
 
-                {/* Legacy Editor Modal */}
-                <ObjectInstanceEditor
-                    instanceId={editingInstance?.id}
-                    objectTypeId={editingInstance?.objectType?.id}
-                    onSave={handleLegacyEditSave}
-                    onCancel={handleLegacyEditCancel}
-                    isVisible={showLegacyEditor}
-                />
+                    {/* Legacy Editor Modal */}
+                    <ObjectInstanceEditor
+                        instanceId={editingInstance?.id}
+                        objectTypeId={editingInstance?.objectType?.id}
+                        onSave={handleLegacyEditSave}
+                        onCancel={handleLegacyEditCancel}
+                        isVisible={showLegacyEditor}
+                    />
+                </div>
             </div>
         )
     }
@@ -217,127 +222,124 @@ const ObjectBrowser = () => {
     // List View - Objects of Selected Type
     if (currentView === 'list') {
         return (
-            <div className="p-6">
-                <div className="mb-6">
-                    <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center">
+            <div className="min-h-full bg-gray-50">
+                <div className="max-w-7xl mx-auto px-6 py-6">
+                    <div className="mb-6">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center">
+                                <div>
+                                    <div className="flex items-center mb-2">
+                                        <button
+                                            onClick={handleBackToGrid}
+                                            className="mr-3 p-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+                                            title="Back to content types"
+                                        >
+                                            <ArrowLeft className="h-4 w-4" />
+                                        </button>
+                                        <h1 className="text-2xl font-bold text-gray-900 flex items-center">
+                                            {selectedObjectType.iconImage ? (
+                                                <img
+                                                    src={selectedObjectType.iconImage}
+                                                    alt={selectedObjectType.label}
+                                                    className="w-8 h-8 object-cover rounded mr-3"
+                                                />
+                                            ) : (
+                                                <div className="w-8 h-8 bg-gray-100 rounded flex items-center justify-center mr-3">
+                                                    <Image className="h-5 w-5 text-gray-400" />
+                                                </div>
+                                            )}
+                                            {selectedObjectType.pluralLabel}
+                                        </h1>
+                                    </div>
+                                    <p className="text-gray-600 ml-9">
+                                        {selectedObjectType.description || `Browse and manage ${selectedObjectType.pluralLabel?.toLowerCase()}`}
+                                    </p>
+                                </div>
+                            </div>
                             <button
-                                onClick={handleBackToGrid}
-                                className="mr-4 p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
+                                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md flex items-center transition-colors"
+                                onClick={handleCreateNew}
                             >
-                                <ArrowLeft className="h-5 w-5" />
+                                <Plus className="h-4 w-4 mr-2" />
+                                New {selectedObjectType.label}
                             </button>
-                            <div>
-                                <h2 className="text-xl font-bold text-gray-900 flex items-center">
-                                    {selectedObjectType.iconImage ? (
-                                        <img
-                                            src={selectedObjectType.iconImage}
-                                            alt={selectedObjectType.label}
-                                            className="w-6 h-6 object-cover rounded mr-2"
+                        </div>
+
+                        {/* Search and Filters */}
+                        <div className="flex flex-col sm:flex-row gap-4">
+                            <div className="relative flex-1">
+                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                <input
+                                    type="text"
+                                    placeholder={`Search ${selectedObjectType.pluralLabel?.toLowerCase()}...`}
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                />
+                            </div>
+                            <select
+                                value={statusFilter}
+                                onChange={(e) => setStatusFilter(e.target.value)}
+                                className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            >
+                                <option value="">All Status</option>
+                                <option value="draft">Draft</option>
+                                <option value="published">Published</option>
+                                <option value="archived">Archived</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    {instancesLoading ? (
+                        <div className="flex justify-center py-12">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                        </div>
+                    ) : (
+                        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                            {instances.length > 0 ? (
+                                <div className="divide-y divide-gray-200">
+                                    {instances.map((instance) => (
+                                        <ObjectListItem
+                                            key={instance.id}
+                                            instance={instance}
+                                            onEdit={() => handleEditInstance(instance)}
+                                            onDelete={(instance) => {
+                                                // TODO: Implement delete functionality
+
+                                            }}
                                         />
-                                    ) : (
-                                        <Image className="h-5 w-5 mr-2" />
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="text-center py-12">
+                                    <FolderOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                                    <h3 className="text-lg font-medium text-gray-900 mb-2">
+                                        No {selectedObjectType.pluralLabel} Found
+                                    </h3>
+                                    <p className="text-gray-500 mb-4">
+                                        {searchTerm || statusFilter
+                                            ? 'Try adjusting your search or filters.'
+                                            : `Create your first ${selectedObjectType.label?.toLowerCase()} to get started.`
+                                        }
+                                    </p>
+                                    {!searchTerm && !statusFilter && (
+                                        <button
+                                            onClick={handleCreateNew}
+                                            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md transition-colors"
+                                        >
+                                            Create {selectedObjectType.label}
+                                        </button>
                                     )}
-                                    {selectedObjectType.pluralLabel}
-                                </h2>
-                                <p className="text-gray-600 mt-1">
-                                    {selectedObjectType.description || `Browse and manage ${selectedObjectType.pluralLabel?.toLowerCase()}`}
-                                </p>
-                            </div>
+                                </div>
+                            )}
                         </div>
-                        <button
-                            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md flex items-center transition-colors"
-                            onClick={handleCreateNew}
-                        >
-                            <Plus className="h-4 w-4 mr-2" />
-                            New {selectedObjectType.label}
-                        </button>
-                    </div>
-
-                    {/* Search and Filters */}
-                    <div className="flex flex-col sm:flex-row gap-4">
-                        <div className="relative flex-1">
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                            <input
-                                type="text"
-                                placeholder={`Search ${selectedObjectType.pluralLabel?.toLowerCase()}...`}
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            />
-                        </div>
-                        <select
-                            value={statusFilter}
-                            onChange={(e) => setStatusFilter(e.target.value)}
-                            className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        >
-                            <option value="">All Status</option>
-                            <option value="draft">Draft</option>
-                            <option value="published">Published</option>
-                            <option value="archived">Archived</option>
-                        </select>
-                    </div>
+                    )}
                 </div>
-
-                {instancesLoading ? (
-                    <div className="flex justify-center py-12">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                    </div>
-                ) : (
-                    <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-                        {instances.length > 0 ? (
-                            <div className="divide-y divide-gray-200">
-                                {instances.map((instance) => (
-                                    <ObjectListItem
-                                        key={instance.id}
-                                        instance={instance}
-                                        onEdit={() => handleEditInstance(instance)}
-                                        onDelete={(instance) => {
-                                            // TODO: Implement delete functionality
-                                            console.log('Delete:', instance)
-                                        }}
-                                    />
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="text-center py-12">
-                                <FolderOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                                <h3 className="text-lg font-medium text-gray-900 mb-2">
-                                    No {selectedObjectType.pluralLabel} Found
-                                </h3>
-                                <p className="text-gray-500 mb-4">
-                                    {searchTerm || statusFilter
-                                        ? 'Try adjusting your search or filters.'
-                                        : `Create your first ${selectedObjectType.label?.toLowerCase()} to get started.`
-                                    }
-                                </p>
-                                {!searchTerm && !statusFilter && (
-                                    <button
-                                        onClick={handleCreateNew}
-                                        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md transition-colors"
-                                    >
-                                        Create {selectedObjectType.label}
-                                    </button>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                )}
             </div>
         )
     }
 
-    // Edit View - New Object Editor
-    if (currentView === 'edit') {
-        return (
-            <ObjectEditor
-                objectType={selectedObjectType}
-                instance={editingInstance}
-                onSave={handleEditSave}
-                onCancel={handleEditCancel}
-            />
-        )
-    }
+
 
     return null
 }
