@@ -5,6 +5,7 @@ Provides REST API endpoints for managing object types and instances.
 """
 
 from django.shortcuts import get_object_or_404
+from django.core.exceptions import ValidationError
 from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
@@ -265,6 +266,79 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(active_types, many=True)
         return Response(serializer.data)
 
+    @action(
+        detail=True,
+        methods=["get"],
+        url_path="slots/(?P<slot_name>[^/.]+)/allowed-widgets",
+    )
+    def get_allowed_widgets_for_slot(self, request, pk=None, slot_name=None):
+        """Get allowed widget types for a specific slot"""
+        obj_type = self.get_object()
+
+        try:
+            allowed_widgets = obj_type.get_allowed_widgets_for_slot(slot_name)
+
+            # Convert to serializable format
+            widgets_data = []
+            for widget in allowed_widgets:
+                widgets_data.append(
+                    {
+                        "name": widget.name,
+                        "slug": widget.slug,
+                        "description": widget.description,
+                        "template_name": widget.template_name,
+                        "is_active": widget.is_active,
+                        "has_configuration_model": hasattr(
+                            widget, "configuration_model"
+                        ),
+                    }
+                )
+
+            return Response(
+                {
+                    "slot_name": slot_name,
+                    "allowed_widgets": widgets_data,
+                    "slot_config": obj_type.get_slot_configuration(slot_name),
+                }
+            )
+
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to get allowed widgets: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @action(detail=False, methods=["get"])
+    def available_widgets(self, request):
+        """Get all available widget types for slot configuration"""
+        from webpages.widget_registry import widget_type_registry
+
+        try:
+            all_widgets = widget_type_registry.list_widget_types()
+
+            widgets_data = []
+            for widget in all_widgets:
+                widgets_data.append(
+                    {
+                        "name": widget.name,
+                        "slug": widget.slug,
+                        "description": widget.description,
+                        "template_name": widget.template_name,
+                        "is_active": widget.is_active,
+                        "has_configuration_model": hasattr(
+                            widget, "configuration_model"
+                        ),
+                    }
+                )
+
+            return Response({"widgets": widgets_data, "count": len(widgets_data)})
+
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to get available widgets: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
 
 class ObjectInstanceViewSet(viewsets.ModelViewSet):
     """ViewSet for managing Object Instances"""
@@ -350,6 +424,52 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
             return Response(
                 {"error": f"Failed to update current version: {str(e)}"},
                 status=status.HTTP_400_BAD_REQUEST,
+            )
+
+    @action(detail=True, methods=["put", "patch"])
+    def update_widgets(self, request, pk=None):
+        """Update only the widgets for an object instance"""
+        instance = self.get_object()
+
+        # Extract widgets from request
+        new_widgets = request.data.get("widgets")
+        if new_widgets is None:
+            return Response(
+                {"error": "No widgets data provided"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            # Validate widgets against slots
+            serializer = self.get_serializer()
+            serializer._validate_widgets_against_slots(
+                new_widgets, instance.object_type
+            )
+
+            # Update current version with only widgets
+            updated_version = instance.update_current_version(
+                user=request.user,
+                widgets=new_widgets,
+                change_description=request.data.get(
+                    "change_description", "Widget update"
+                ),
+            )
+
+            return Response(
+                {
+                    "message": "Widgets updated successfully",
+                    "widgets": updated_version.widgets,
+                    "version_id": updated_version.id,
+                    "updated_at": updated_version.updated_at,
+                }
+            )
+
+        except ValidationError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to update widgets: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
     @action(detail=True, methods=["get"])

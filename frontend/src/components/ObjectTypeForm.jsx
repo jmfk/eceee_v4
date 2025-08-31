@@ -291,7 +291,6 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
         if (!schema || typeof schema !== 'object') {
             return 'Schema must be a valid object'
         }
-        console.log("schema", schema)
 
         // Check for properties object
         if (!schema.properties || typeof schema.properties !== 'object') {
@@ -307,8 +306,6 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
         if (schema.required && !Array.isArray(schema.required)) {
             return 'Schema "required" must be an array'
         }
-
-        console.log("schema.properties", schema.properties)
 
         // Validate each property in the properties object
         for (const [propName, propDef] of Object.entries(schema.properties)) {
@@ -368,13 +365,13 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
             setOriginalSchema(JSON.parse(JSON.stringify(formData.schema)))
             setHasUnsavedSchemaChanges(false)
 
-            console.log('Schema saved successfully:', response.data?.message)
+            // Schema saved successfully
 
             // TODO: Add success notification using global notification system
             // addNotification('Schema saved successfully', 'success')
 
         } catch (error) {
-            console.error('Failed to save schema:', error)
+            // Failed to save schema
             let errorMessage = 'Failed to save schema'
 
             if (error.response?.data?.error) {
@@ -423,10 +420,10 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
             setOriginalBasicInfo(JSON.parse(JSON.stringify(basicInfoData)))
             setHasUnsavedBasicChanges(false)
 
-            console.log('Basic info saved successfully:', response.data?.message)
+            // Basic info saved successfully
 
         } catch (error) {
-            console.error('Failed to save basic info:', error)
+            // Failed to save basic info
             let errorMessage = 'Failed to save basic info'
 
             if (error.response?.data?.error) {
@@ -488,10 +485,10 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
             setOriginalSlotConfiguration(JSON.parse(JSON.stringify(formData.slotConfiguration)))
             setHasUnsavedSlotsChanges(false)
 
-            console.log('Widget slots saved successfully:', response.data?.message)
+            // Widget slots saved successfully
 
         } catch (error) {
-            console.error('Failed to save widget slots:', error)
+            // Failed to save widget slots
             let errorMessage = 'Failed to save widget slots'
 
             if (error.response?.data?.error) {
@@ -1005,11 +1002,34 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
 
 // Slot Editor Component
 const SlotEditor = ({ slots = [], onChange, errors }) => {
+    const [availableWidgets, setAvailableWidgets] = useState([])
+    const [loadingWidgets, setLoadingWidgets] = useState(false)
+
+    // Fetch available widgets on component mount
+    useEffect(() => {
+        const fetchWidgets = async () => {
+            setLoadingWidgets(true)
+            try {
+                const response = await fetch('/api/v1/objects/api/object-types/available_widgets/')
+                if (response.ok) {
+                    const data = await response.json()
+                    setAvailableWidgets(data.widgets || [])
+                }
+            } catch (error) {
+                // Failed to fetch available widgets
+            } finally {
+                setLoadingWidgets(false)
+            }
+        }
+
+        fetchWidgets()
+    }, [])
+
     const addSlot = () => {
         const newSlot = {
             name: '',
             label: '',
-            allowedWidgets: [],
+            widgetControls: [],
             maxWidgets: null,
             required: false
         }
@@ -1084,7 +1104,7 @@ const SlotEditor = ({ slots = [], onChange, errors }) => {
                         </div>
                     </div>
 
-                    <div className="flex items-center space-x-4">
+                    <div className="flex items-center space-x-4 mb-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
                                 Max Widgets
@@ -1110,6 +1130,24 @@ const SlotEditor = ({ slots = [], onChange, errors }) => {
                                 Required slot
                             </label>
                         </div>
+                    </div>
+
+                    {/* Widget Control Definitions */}
+                    <div className="border-t border-gray-200 pt-4">
+                        <h5 className="text-sm font-medium text-gray-900 mb-3">Widget Control Definitions</h5>
+                        <p className="text-xs text-gray-500 mb-4">
+                            Configure individual widget types that can be used in this slot, including their settings and behavior.
+                        </p>
+
+                        {loadingWidgets ? (
+                            <div className="text-sm text-gray-500">Loading available widgets...</div>
+                        ) : (
+                            <WidgetControlManager
+                                widgetControls={slot.widgetControls || []}
+                                availableWidgets={availableWidgets}
+                                onChange={(newControls) => updateSlot(index, 'widgetControls', newControls)}
+                            />
+                        )}
                     </div>
                 </div>
             ))}
@@ -1181,6 +1219,347 @@ const ChildTypeSelector = ({ selectedTypes, availableTypes, onChange, hierarchyL
                         </div>
                     ))}
                 </>
+            )}
+        </div>
+    )
+}
+
+// Widget Control Manager Component
+const WidgetControlManager = ({ widgetControls = [], availableWidgets = [], onChange }) => {
+    const [selectedWidgetType, setSelectedWidgetType] = useState('')
+
+    const addWidgetControl = () => {
+        if (!selectedWidgetType) return
+
+        const selectedWidget = availableWidgets.find(w => w.slug === selectedWidgetType)
+        const newControl = {
+            id: `control_${Date.now()}`,
+            widgetType: selectedWidgetType,
+            label: selectedWidget?.name || '',
+            maxInstances: null,
+            required: false,
+            preCreate: false,
+            defaultConfig: {}
+        }
+        onChange([...widgetControls, newControl])
+        setSelectedWidgetType('') // Reset selection
+    }
+
+    const updateWidgetControl = (index, field, value) => {
+        const updatedControls = widgetControls.map((control, i) =>
+            i === index ? { ...control, [field]: value } : control
+        )
+        onChange(updatedControls)
+    }
+
+    const removeWidgetControl = (index) => {
+        onChange(widgetControls.filter((_, i) => i !== index))
+    }
+
+    const updateDefaultConfig = (index, configField, configValue) => {
+        const updatedControls = widgetControls.map((control, i) =>
+            i === index
+                ? {
+                    ...control,
+                    defaultConfig: {
+                        ...control.defaultConfig,
+                        [configField]: configValue
+                    }
+                }
+                : control
+        )
+        onChange(updatedControls)
+    }
+
+    const getSelectedWidget = (widgetType) => {
+        return availableWidgets.find(w => w.slug === widgetType)
+    }
+
+    return (
+        <div className="space-y-4">
+            {widgetControls.map((control, index) => {
+                const selectedWidget = getSelectedWidget(control.widgetType)
+
+                return (
+                    <div key={control.id || index} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                        <div className="flex justify-between items-start mb-4">
+                            <h6 className="font-medium text-gray-900">
+                                Widget Control {index + 1}
+                                {selectedWidget && (
+                                    <span className="ml-2 text-sm font-normal text-gray-600">
+                                        ({selectedWidget.name})
+                                    </span>
+                                )}
+                            </h6>
+                            <button
+                                type="button"
+                                onClick={() => removeWidgetControl(index)}
+                                className="text-red-600 hover:text-red-800"
+                            >
+                                <Trash2 className="h-4 w-4" />
+                            </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Widget Type Selection */}
+                            <div className="md:col-span-2">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Widget Type <span className="text-red-500">*</span>
+                                </label>
+                                <select
+                                    value={control.widgetType || ''}
+                                    onChange={(e) => updateWidgetControl(index, 'widgetType', e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                >
+                                    <option value="">Select widget type...</option>
+                                    {availableWidgets.map((widget) => (
+                                        <option key={widget.slug} value={widget.slug}>
+                                            {widget.name}
+                                        </option>
+                                    ))}
+                                </select>
+                                {selectedWidget?.description && (
+                                    <p className="text-xs text-gray-600 mt-1">{selectedWidget.description}</p>
+                                )}
+                            </div>
+
+                            {/* Label */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Display Label
+                                </label>
+                                <input
+                                    type="text"
+                                    value={control.label || ''}
+                                    onChange={(e) => updateWidgetControl(index, 'label', e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    placeholder="Custom label for this widget"
+                                />
+                            </div>
+
+                            {/* Max Instances */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Max Instances
+                                </label>
+                                <input
+                                    type="number"
+                                    value={control.maxInstances || ''}
+                                    onChange={(e) => updateWidgetControl(index, 'maxInstances', e.target.value ? parseInt(e.target.value) : null)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    placeholder="∞"
+                                    min="1"
+                                />
+                            </div>
+
+                            {/* Control Flags */}
+                            <div className="md:col-span-2">
+                                <div className="flex items-center space-x-6">
+                                    <label className="flex items-center">
+                                        <input
+                                            type="checkbox"
+                                            checked={control.required || false}
+                                            onChange={(e) => updateWidgetControl(index, 'required', e.target.checked)}
+                                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                        />
+                                        <span className="ml-2 text-sm text-gray-700">Required widget</span>
+                                    </label>
+
+                                    <label className="flex items-center">
+                                        <input
+                                            type="checkbox"
+                                            checked={control.preCreate || false}
+                                            onChange={(e) => updateWidgetControl(index, 'preCreate', e.target.checked)}
+                                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                        />
+                                        <span className="ml-2 text-sm text-gray-700">Auto-create on new objects</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            {/* Default Configuration */}
+                            {selectedWidget && (
+                                <div className="md:col-span-2">
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Default Configuration
+                                    </label>
+                                    <div className="bg-white border border-gray-200 rounded-md p-3 space-y-3">
+                                        {/* Common configuration fields */}
+                                        {selectedWidget.slug === 'text-block' && (
+                                            <>
+                                                <div>
+                                                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                                                        Default Title
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        value={control.defaultConfig?.title || ''}
+                                                        onChange={(e) => updateDefaultConfig(index, 'title', e.target.value)}
+                                                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                                                        placeholder="Enter default title..."
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                                                        Default Content
+                                                    </label>
+                                                    <textarea
+                                                        value={control.defaultConfig?.content || ''}
+                                                        onChange={(e) => updateDefaultConfig(index, 'content', e.target.value)}
+                                                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                                                        rows={3}
+                                                        placeholder="Enter default content..."
+                                                    />
+                                                </div>
+                                            </>
+                                        )}
+
+                                        {selectedWidget.slug === 'image' && (
+                                            <>
+                                                <div>
+                                                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                                                        Default Alt Text
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        value={control.defaultConfig?.alt || ''}
+                                                        onChange={(e) => updateDefaultConfig(index, 'alt', e.target.value)}
+                                                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                                                        placeholder="Enter default alt text..."
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                                                        Default Caption
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        value={control.defaultConfig?.caption || ''}
+                                                        onChange={(e) => updateDefaultConfig(index, 'caption', e.target.value)}
+                                                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                                                        placeholder="Enter default caption..."
+                                                    />
+                                                </div>
+                                            </>
+                                        )}
+
+                                        {selectedWidget.slug === 'button' && (
+                                            <>
+                                                <div>
+                                                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                                                        Default Button Text
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        value={control.defaultConfig?.text || ''}
+                                                        onChange={(e) => updateDefaultConfig(index, 'text', e.target.value)}
+                                                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                                                        placeholder="Enter default button text..."
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                                                        Default Button Style
+                                                    </label>
+                                                    <select
+                                                        value={control.defaultConfig?.style || 'primary'}
+                                                        onChange={(e) => updateDefaultConfig(index, 'style', e.target.value)}
+                                                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                                                    >
+                                                        <option value="primary">Primary</option>
+                                                        <option value="secondary">Secondary</option>
+                                                        <option value="outline">Outline</option>
+                                                    </select>
+                                                </div>
+                                            </>
+                                        )}
+
+                                        {/* Generic JSON editor for other widget types */}
+                                        {!['text-block', 'image', 'button'].includes(selectedWidget.slug) && (
+                                            <div>
+                                                <label className="block text-xs font-medium text-gray-600 mb-1">
+                                                    Default Configuration (JSON)
+                                                </label>
+                                                <textarea
+                                                    value={JSON.stringify(control.defaultConfig || {}, null, 2)}
+                                                    onChange={(e) => {
+                                                        try {
+                                                            const config = JSON.parse(e.target.value)
+                                                            updateWidgetControl(index, 'defaultConfig', config)
+                                                        } catch (err) {
+                                                            // Invalid JSON, ignore for now
+                                                        }
+                                                    }}
+                                                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded font-mono"
+                                                    rows={4}
+                                                    placeholder='{"key": "value"}'
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )
+            })}
+
+            {/* Add Widget Control - Select + Button */}
+            <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                <h6 className="text-sm font-medium text-gray-900 mb-3">Add Widget Control</h6>
+                <div className="flex items-center space-x-3">
+                    <div className="flex-1">
+                        <select
+                            value={selectedWidgetType}
+                            onChange={(e) => setSelectedWidgetType(e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        >
+                            <option value="">Select a widget type to add...</option>
+                            {availableWidgets
+                                .filter(widget => !widgetControls.some(control => control.widgetType === widget.slug))
+                                .map((widget) => (
+                                    <option key={widget.slug} value={widget.slug}>
+                                        {widget.name}
+                                    </option>
+                                ))}
+                        </select>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={addWidgetControl}
+                        disabled={!selectedWidgetType}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center"
+                    >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Add
+                    </button>
+                </div>
+                {selectedWidgetType && (
+                    <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
+                        <strong>{availableWidgets.find(w => w.slug === selectedWidgetType)?.name}</strong>: {availableWidgets.find(w => w.slug === selectedWidgetType)?.description}
+                    </div>
+                )}
+            </div>
+
+            {widgetControls.length > 0 && (
+                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                    <h6 className="text-sm font-medium text-blue-900 mb-1">
+                        Widget Controls Summary
+                    </h6>
+                    <div className="text-sm text-blue-800">
+                        {widgetControls.length} widget control(s) configured
+                        {widgetControls.filter(c => c.preCreate).length > 0 && (
+                            <span className="block">
+                                • {widgetControls.filter(c => c.preCreate).length} will be auto-created
+                            </span>
+                        )}
+                        {widgetControls.filter(c => c.required).length > 0 && (
+                            <span className="block">
+                                • {widgetControls.filter(c => c.required).length} are required
+                            </span>
+                        )}
+                    </div>
+                </div>
             )}
         </div>
     )

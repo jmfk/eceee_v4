@@ -236,19 +236,16 @@ const ObjectInstanceEditor = ({ instanceId, objectTypeId, onSave, onCancel, isVi
                                     <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
                                         <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
                                         Widget Slots
+                                        {objectType?.slotConfiguration?.slots && (
+                                            <span className="ml-2 text-sm font-normal text-gray-500">
+                                                {objectType.slotConfiguration.slots.length} slots configured
+                                            </span>
+                                        )}
                                     </h3>
-                                    <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-                                        <h4 className="text-sm font-medium text-blue-900 mb-2">Widget Configuration</h4>
-                                        <p className="text-blue-800 text-sm">
-                                            Widget slot configuration will be implemented in Phase 5.
-                                            This will allow adding widgets to the slots defined by the object type.
-                                        </p>
-                                    </div>
 
                                     {/* Show available slots */}
                                     {objectType?.slotConfiguration?.slots && (
                                         <div>
-                                            <h4 className="font-medium text-gray-900 mb-2">Available Slots:</h4>
                                             <div className="space-y-2">
                                                 {objectType.slotConfiguration.slots.map((slot) => (
                                                     <div key={slot.name} className="flex items-center justify-between p-3 bg-gray-50 rounded-md">

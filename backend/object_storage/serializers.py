@@ -143,7 +143,74 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
                     )
                 slot_names.add(slot["name"])
 
+                # Validate widget type restrictions
+                self._validate_widget_restrictions(slot)
+
         return value
+
+    def _validate_widget_restrictions(self, slot):
+        """Validate widget type restrictions for a slot."""
+        from webpages.widget_registry import widget_type_registry
+
+        available_widgets = {
+            widget.slug for widget in widget_type_registry.list_widget_types()
+        }
+
+        # Validate allowedWidgets
+        if "allowedWidgets" in slot:
+            if not isinstance(slot["allowedWidgets"], list):
+                raise serializers.ValidationError(
+                    f"Slot '{slot['name']}': allowedWidgets must be an array"
+                )
+
+            for widget_type in slot["allowedWidgets"]:
+                if widget_type not in available_widgets:
+                    raise serializers.ValidationError(
+                        f"Slot '{slot['name']}': widget type '{widget_type}' not found in registry"
+                    )
+
+        # Validate disallowedWidgets
+        if "disallowedWidgets" in slot:
+            if not isinstance(slot["disallowedWidgets"], list):
+                raise serializers.ValidationError(
+                    f"Slot '{slot['name']}': disallowedWidgets must be an array"
+                )
+
+            for widget_type in slot["disallowedWidgets"]:
+                if widget_type not in available_widgets:
+                    raise serializers.ValidationError(
+                        f"Slot '{slot['name']}': widget type '{widget_type}' not found in registry"
+                    )
+
+        # Validate maxWidgets
+        if "maxWidgets" in slot and slot["maxWidgets"] is not None:
+            if not isinstance(slot["maxWidgets"], int) or slot["maxWidgets"] < 0:
+                raise serializers.ValidationError(
+                    f"Slot '{slot['name']}': maxWidgets must be a positive integer or null"
+                )
+
+        # Validate preCreatedWidgets
+        if "preCreatedWidgets" in slot:
+            if not isinstance(slot["preCreatedWidgets"], list):
+                raise serializers.ValidationError(
+                    f"Slot '{slot['name']}': preCreatedWidgets must be an array"
+                )
+
+            for widget in slot["preCreatedWidgets"]:
+                if not isinstance(widget, dict):
+                    raise serializers.ValidationError(
+                        f"Slot '{slot['name']}': each pre-created widget must be an object"
+                    )
+
+                if "type" not in widget:
+                    raise serializers.ValidationError(
+                        f"Slot '{slot['name']}': pre-created widget missing 'type' field"
+                    )
+
+                if widget["type"] not in available_widgets:
+                    raise serializers.ValidationError(
+                        f"Slot '{slot['name']}': pre-created widget type '{widget['type']}' not found in registry"
+                    )
 
     def validate_allowed_child_types_input(self, value):
         """Validate that all child type names exist and are active"""
