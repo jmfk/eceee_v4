@@ -20,6 +20,7 @@ from django.core.exceptions import ValidationError
 from django.utils.text import slugify
 from mptt.models import MPTTModel, TreeForeignKey
 import json
+from utils.schema_system import validate_schema, get_field_types_for_django_choices
 
 
 class ObjectTypeDefinition(models.Model):
@@ -28,22 +29,10 @@ class ObjectTypeDefinition(models.Model):
     This is the blueprint for creating dynamic object types like 'news', 'blog', 'event'.
     """
 
-    FIELD_TYPES = [
-        ("text", "Text"),
-        ("rich_text", "Rich Text"),
-        ("number", "Number"),
-        ("date", "Date"),
-        ("datetime", "Date & Time"),
-        ("boolean", "Boolean"),
-        ("image", "Image"),
-        ("file", "File"),
-        ("url", "URL"),
-        ("email", "Email"),
-        ("choice", "Choice"),
-        ("multi_choice", "Multiple Choice"),
-        ("user_reference", "User Reference"),
-        ("object_reference", "Object Reference"),
-    ]
+    @property
+    def FIELD_TYPES(self):
+        """Dynamic field types from the registry"""
+        return get_field_types_for_django_choices()
 
     name = models.CharField(
         max_length=100,
@@ -126,27 +115,12 @@ class ObjectTypeDefinition(models.Model):
             self._validate_slot_configuration()
 
     def _validate_schema(self):
-        """Validate the schema JSON structure."""
-        if not isinstance(self.schema, dict):
-            raise ValidationError("Schema must be a JSON object")
-
-        if "fields" not in self.schema:
-            raise ValidationError("Schema must contain a 'fields' array")
-
-        if not isinstance(self.schema["fields"], list):
-            raise ValidationError("Schema 'fields' must be an array")
-
-        for field in self.schema["fields"]:
-            if not isinstance(field, dict):
-                raise ValidationError("Each schema field must be an object")
-
-            required_keys = ["name", "type"]
-            for key in required_keys:
-                if key not in field:
-                    raise ValidationError(f"Schema field missing required key: {key}")
-
-            if field["type"] not in [choice[0] for choice in self.FIELD_TYPES]:
-                raise ValidationError(f"Invalid field type: {field['type']}")
+        """Validate the schema JSON structure using the general schema system."""
+        try:
+            validate_schema(self.schema, "object_type")
+        except ValidationError:
+            # Re-raise as is - ValidationError is already the correct type
+            raise
 
     def _validate_slot_configuration(self):
         """Validate the slot configuration JSON structure."""
@@ -168,7 +142,26 @@ class ObjectTypeDefinition(models.Model):
 
     def get_schema_fields(self):
         """Return the list of schema fields for this object type."""
-        return self.schema.get("fields", [])
+        # Convert properties object to fields array for backward compatibility
+        properties = self.schema.get("properties", {})
+        required = self.schema.get("required", [])
+        property_order = self.schema.get("propertyOrder", [])
+
+        fields = []
+
+        # Use propertyOrder if available, otherwise use object keys
+        keys_to_process = property_order if property_order else list(properties.keys())
+
+        for prop_name in keys_to_process:
+            if prop_name in properties:
+                field = {
+                    "name": prop_name,
+                    "required": prop_name in required,
+                    **properties[prop_name],
+                }
+                fields.append(field)
+
+        return fields
 
     def get_slots(self):
         """Return the list of widget slots for this object type."""
@@ -221,9 +214,6 @@ class ObjectInstance(MPTTModel):
     slug = models.SlugField(
         max_length=300, help_text="URL-friendly identifier, unique within object type"
     )
-    data = models.JSONField(
-        default=dict, help_text="Object data according to the type's schema"
-    )
     status = models.CharField(
         max_length=20,
         choices=STATUS_CHOICES,
@@ -238,9 +228,13 @@ class ObjectInstance(MPTTModel):
         related_name="children",
         help_text="Parent object for hierarchical relationships",
     )
-    widgets = models.JSONField(
-        default=dict,
-        help_text="Widget configurations for each slot defined by the object type",
+    current_version = models.ForeignKey(
+        "ObjectVersion",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="current_for_objects",
+        help_text="The currently active version of this object",
     )
     publish_date = models.DateTimeField(
         blank=True, null=True, help_text="When this object should be published"
@@ -265,8 +259,7 @@ class ObjectInstance(MPTTModel):
             models.Index(fields=["slug", "object_type"]),
             models.Index(fields=["status", "publish_date"]),
             models.Index(fields=["parent"]),
-            GinIndex(fields=["data"]),
-            GinIndex(fields=["widgets"]),
+            models.Index(fields=["current_version"]),
         ]
         constraints = [
             models.UniqueConstraint(
@@ -279,6 +272,20 @@ class ObjectInstance(MPTTModel):
 
     def __str__(self):
         return f"{self.object_type.label}: {self.title}"
+
+    @property
+    def data(self):
+        """Get data from current version"""
+        if self.current_version:
+            return self.current_version.data
+        return {}
+
+    @property
+    def widgets(self):
+        """Get widgets from current version"""
+        if self.current_version:
+            return self.current_version.widgets
+        return {}
 
     def save(self, *args, **kwargs):
         """Override save to handle slug generation and validation."""
@@ -301,28 +308,28 @@ class ObjectInstance(MPTTModel):
         """Validate the object instance."""
         super().clean()
 
-        # Validate data against schema
-        if self.object_type_id and self.data:
-            self._validate_data_against_schema()
-
         # Validate parent-child relationship
         if self.parent:
             self._validate_parent_child_relationship()
 
-        # Validate widgets against slot configuration
-        if self.object_type_id and self.widgets:
-            self._validate_widgets_against_slots()
+        # Validate current version data if it exists
+        if self.current_version:
+            if self.object_type_id and self.current_version.data:
+                self._validate_data_against_schema()
+            if self.object_type_id and self.current_version.widgets:
+                self._validate_widgets_against_slots()
 
     def _validate_data_against_schema(self):
         """Validate the object data against its type's schema."""
         schema_fields = self.object_type.get_schema_fields()
+        version_data = self.current_version.data if self.current_version else {}
 
         for field_def in schema_fields:
             field_name = field_def["name"]
             field_required = field_def.get("required", False)
 
             if field_required and (
-                field_name not in self.data or not self.data[field_name]
+                field_name not in version_data or not version_data[field_name]
             ):
                 raise ValidationError(
                     f"Required field '{field_name}' is missing or empty"
@@ -337,14 +344,27 @@ class ObjectInstance(MPTTModel):
             )
 
     def _validate_widgets_against_slots(self):
-        """Validate widgets against the object type's slot configuration."""
-        allowed_slots = [slot["name"] for slot in self.object_type.get_slots()]
+        """Validate and normalize widgets against the object type's slot configuration.
 
-        for slot_name in self.widgets.keys():
-            if slot_name not in allowed_slots:
-                raise ValidationError(
-                    f"Widget slot '{slot_name}' is not defined for this object type"
-                )
+        This method:
+        1. Keeps extra slot information even if not in the object type definition
+        2. Creates missing slots with empty content if defined in the object type
+        3. Does not raise errors for missing or extra slots, just normalizes them
+        """
+        if not self.current_version:
+            return
+
+        defined_slots = [slot["name"] for slot in self.object_type.get_slots()]
+        version_widgets = self.current_version.widgets
+
+        # Ensure all defined slots exist in widgets (create empty ones if missing)
+        for slot_name in defined_slots:
+            if slot_name not in version_widgets:
+                version_widgets[slot_name] = []  # Create empty slot
+
+        # Note: We intentionally keep extra slots that aren't in the definition
+        # This allows for flexibility and prevents data loss when object type
+        # definitions change
 
     def is_published(self):
         """Check if the object is currently published."""
@@ -392,16 +412,80 @@ class ObjectInstance(MPTTModel):
 
         return True
 
-    def create_version(self, user, change_description=""):
-        """Create a version snapshot of this object."""
-        return ObjectVersion.objects.create(
+    def create_version(self, user, data=None, widgets=None, change_description=""):
+        """Create a new version of this object with the provided data and widgets.
+
+        Args:
+            user: User creating the version
+            data: Object data for this version
+            widgets: Widget configuration for this version
+            change_description: Description of changes
+        """
+        # Find the next available version number
+        max_version = (
+            self.versions.aggregate(max_version=models.Max("version_number"))[
+                "max_version"
+            ]
+            or 0
+        )
+        next_version = max_version + 1
+
+        # Use provided data/widgets or copy from current version
+        version_data = (
+            data
+            if data is not None
+            else (self.data.copy() if self.current_version else {})
+        )
+        version_widgets = (
+            widgets
+            if widgets is not None
+            else (self.widgets.copy() if self.current_version else {})
+        )
+
+        # Create the new version
+        new_version = ObjectVersion.objects.create(
             object=self,
-            version_number=self.version,
-            data=self.data.copy(),
-            widgets=self.widgets.copy(),
+            version_number=next_version,
+            data=version_data,
+            widgets=version_widgets,
             created_by=user,
             change_description=change_description,
         )
+
+        # Update current version pointer and version counter
+        self.current_version = new_version
+        self.version = next_version
+        self.save(update_fields=["current_version", "version"])
+
+        return new_version
+
+    def update_current_version(
+        self, user, data=None, widgets=None, change_description=""
+    ):
+        """Update the current version with new data and widgets (doesn't create new version).
+
+        Args:
+            user: User making the update
+            data: New object data (if None, keeps current data)
+            widgets: New widget configuration (if None, keeps current widgets)
+            change_description: Description of changes
+        """
+        if not self.current_version:
+            # No current version exists, create one
+            return self.create_version(
+                user, data=data, widgets=widgets, change_description=change_description
+            )
+
+        # Update the existing current version
+        if data is not None:
+            self.current_version.data = data
+        if widgets is not None:
+            self.current_version.widgets = widgets
+        if change_description:
+            self.current_version.change_description = change_description
+
+        self.current_version.save()
+        return self.current_version
 
     def to_dict(self):
         """Convert to dictionary for API serialization."""

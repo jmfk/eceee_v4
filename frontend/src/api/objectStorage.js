@@ -40,7 +40,15 @@ export const objectTypesApi = {
      * Create new object type
      */
     async create(data) {
+        // Always handle as JSON data - image uploads are handled separately
         const snakeCaseData = convertKeysToSnake(data)
+
+        // Handle allowed_child_types special case for backend compatibility
+        if (snakeCaseData.allowed_child_types) {
+            snakeCaseData.allowed_child_types_input = snakeCaseData.allowed_child_types
+            delete snakeCaseData.allowed_child_types
+        }
+
         const response = await api.post(`${BASE_URL}/object-types/`, snakeCaseData)
         return {
             ...response,
@@ -52,7 +60,15 @@ export const objectTypesApi = {
      * Update object type
      */
     async update(id, data) {
+        // Always handle as JSON data - image uploads are handled separately
         const snakeCaseData = convertKeysToSnake(data)
+
+        // Handle allowed_child_types special case for backend compatibility
+        if (snakeCaseData.allowed_child_types) {
+            snakeCaseData.allowed_child_types_input = snakeCaseData.allowed_child_types
+            delete snakeCaseData.allowed_child_types
+        }
+
         const response = await api.put(`${BASE_URL}/object-types/${id}/`, snakeCaseData)
         return {
             ...response,
@@ -72,6 +88,30 @@ export const objectTypesApi = {
      */
     async getSchema(id) {
         const response = await api.get(`${BASE_URL}/object-types/${id}/schema/`)
+        return {
+            ...response,
+            data: convertKeysToCamel(response.data)
+        }
+    },
+
+    /**
+     * Update basic info for object type
+     */
+    async updateBasicInfo(id, basicInfo) {
+        const snakeCaseData = convertKeysToSnake(basicInfo)
+        const response = await api.put(`${BASE_URL}/object-types/${id}/update_basic_info/`, snakeCaseData)
+        return {
+            ...response,
+            data: convertKeysToCamel(response.data)
+        }
+    },
+
+    /**
+     * Update widget slots for object type
+     */
+    async updateSlots(id, slotConfiguration) {
+        const snakeCaseData = convertKeysToSnake(slotConfiguration)
+        const response = await api.put(`${BASE_URL}/object-types/${id}/update_slots/`, snakeCaseData)
         return {
             ...response,
             data: convertKeysToCamel(response.data)
@@ -163,11 +203,23 @@ export const objectInstancesApi = {
     },
 
     /**
-     * Update object instance
+     * Update object instance (creates new version)
      */
     async update(id, data) {
         const snakeCaseData = convertKeysToSnake(data)
         const response = await api.put(`${BASE_URL}/objects/${id}/`, snakeCaseData)
+        return {
+            ...response,
+            data: convertKeysToCamel(response.data)
+        }
+    },
+
+    /**
+     * Update current version (doesn't create new version)
+     */
+    async updateCurrentVersion(id, data) {
+        const snakeCaseData = convertKeysToSnake(data)
+        const response = await api.put(`${BASE_URL}/objects/${id}/update_current_version/`, snakeCaseData)
         return {
             ...response,
             data: convertKeysToCamel(response.data)

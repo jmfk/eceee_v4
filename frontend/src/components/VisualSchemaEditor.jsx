@@ -1,5 +1,6 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 import { validateFieldName, validateSchemaShape } from '../utils/schemaValidation'
+import { getAllFieldTypes, getDefaultProps } from '../utils/fieldTypeRegistry'
 import {
   Plus,
   Trash2,
@@ -23,7 +24,8 @@ import {
 } from 'lucide-react'
 import SchemaFormPreview from './SchemaFormPreview'
 
-// Property type definitions with their configurations
+// Property type definitions - now using field type registry
+// Keeping old PROPERTY_TYPES for backward compatibility during transition
 const PROPERTY_TYPES = {
   string: {
     icon: Type,
@@ -169,7 +171,7 @@ const PROPERTY_TYPES = {
 }
 
 // Property configuration component
-function PropertyConfig({ property, index, totalCount, onUpdate, onDelete, onMoveUp, onMoveDown }) {
+function PropertyConfig({ property, index, totalCount, onUpdate, onDelete, onMoveUp, onMoveDown, allProperties = [] }) {
   const [isExpanded, setIsExpanded] = useState(false)
   const [localProperty, setLocalProperty] = useState(property)
 
@@ -179,7 +181,17 @@ function PropertyConfig({ property, index, totalCount, onUpdate, onDelete, onMov
     onUpdate(updated)
   }, [localProperty, onUpdate])
 
-  const typeInfo = PROPERTY_TYPES[property.uiType || 'string']
+  // Check if key is unique
+  const isKeyUnique = useCallback((key) => {
+    if (!key) return true
+
+    // Check if any other property has the same key
+    return !allProperties.some(prop => prop.key === key && prop._id !== property._id)
+  }, [allProperties, property._id])
+
+  // Get field type info from registry
+  const fieldTypes = getAllFieldTypes()
+  const typeInfo = fieldTypes.find(ft => ft.key === (property.uiType || property.fieldType || 'text'))
   const Icon = typeInfo?.icon || Type
 
   return (
@@ -210,6 +222,7 @@ function PropertyConfig({ property, index, totalCount, onUpdate, onDelete, onMov
         <div className="flex items-center space-x-2">
           {/* Sort buttons */}
           <button
+            type="button"
             onClick={(e) => { e.stopPropagation(); onMoveUp() }}
             className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             title="Move up"
@@ -218,6 +231,7 @@ function PropertyConfig({ property, index, totalCount, onUpdate, onDelete, onMov
             <ChevronUp className="w-4 h-4" />
           </button>
           <button
+            type="button"
             onClick={(e) => { e.stopPropagation(); onMoveDown() }}
             className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             title="Move down"
@@ -226,6 +240,7 @@ function PropertyConfig({ property, index, totalCount, onUpdate, onDelete, onMov
             <ChevronDown className="w-4 h-4" />
           </button>
           <button
+            type="button"
             onClick={(e) => { e.stopPropagation(); onDelete() }}
             className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
             title="Delete property"
@@ -246,7 +261,7 @@ function PropertyConfig({ property, index, totalCount, onUpdate, onDelete, onMov
               <label className="block text-sm font-medium mb-1">Property Key</label>
               <input
                 type="text"
-                className={`w-full border rounded px-3 py-2 text-sm ${property.key && !validateFieldName(property.key) ? 'border-red-500' : ''
+                className={`w-full border rounded px-3 py-2 text-sm ${(property.key && (!validateFieldName(property.key) || !isKeyUnique(property.key))) ? 'border-red-500' : ''
                   }`}
                 value={property.key || ''}
                 onChange={(e) => handleChange('key', e.target.value)}
@@ -255,6 +270,11 @@ function PropertyConfig({ property, index, totalCount, onUpdate, onDelete, onMov
               {property.key && !validateFieldName(property.key) && (
                 <div className="text-red-500 text-xs mt-1">
                   Key must be in camelCase (start with lowercase letter, followed by letters and numbers only)
+                </div>
+              )}
+              {property.key && validateFieldName(property.key) && !isKeyUnique(property.key) && (
+                <div className="text-red-500 text-xs mt-1">
+                  Property key "{property.key}" already exists. Please choose a unique name.
                 </div>
               )}
             </div>
@@ -415,6 +435,7 @@ function PropertyConfig({ property, index, totalCount, onUpdate, onDelete, onMov
                       placeholder={`Option ${index + 1}`}
                     />
                     <button
+                      type="button"
                       onClick={() => {
                         const newEnum = property.enum.filter((_, i) => i !== index)
                         handleChange('enum', newEnum)
@@ -426,6 +447,7 @@ function PropertyConfig({ property, index, totalCount, onUpdate, onDelete, onMov
                   </div>
                 ))}
                 <button
+                  type="button"
                   onClick={() => handleChange('enum', [...property.enum, `Option ${property.enum.length + 1}`])}
                   className="flex items-center space-x-1 text-blue-600 hover:bg-blue-50 px-2 py-1 rounded text-sm"
                 >
@@ -453,23 +475,49 @@ function PropertyConfig({ property, index, totalCount, onUpdate, onDelete, onMov
 }
 
 // Property type selector
-function PropertyTypeSelector({ onAddProperty }) {
+function PropertyTypeSelector({ onAddProperty, existingProperties = [] }) {
   const [isOpen, setIsOpen] = useState(false)
 
   const handleAddProperty = (typeKey) => {
-    const typeInfo = PROPERTY_TYPES[typeKey]
+    const fieldTypes = getAllFieldTypes()
+    const typeInfo = fieldTypes.find(ft => ft.key === typeKey)
+
+    if (!typeInfo) {
+      console.error(`Field type ${typeKey} not found in registry`)
+      return
+    }
+
     // Convert to camelCase: "Text Field" -> "textField"
-    const baseKey = typeInfo.label
+    let baseKey = typeInfo.label
       .toLowerCase()
       .replace(/[^a-z0-9\s]/g, '') // Remove special characters
       .split(/\s+/) // Split by spaces
       .map((word, index) => index === 0 ? word : word.charAt(0).toUpperCase() + word.slice(1))
       .join('')
 
+    // Ensure unique key by checking existing properties
+    const existingKeys = new Set()
+
+    // Get existing keys from the passed existingProperties
+    existingProperties.forEach(prop => {
+      if (prop.key) {
+        existingKeys.add(prop.key)
+      }
+    })
+
+    // Make key unique if it already exists
+    let uniqueKey = baseKey
+    let counter = 1
+    while (existingKeys.has(uniqueKey)) {
+      uniqueKey = `${baseKey}${counter}`
+      counter++
+    }
+
     const newProperty = {
-      ...typeInfo.defaultConfig,
-      uiType: typeKey,
-      key: baseKey,
+      ...getDefaultProps(typeKey),
+      fieldType: typeKey, // Use fieldType instead of uiType
+      uiType: typeKey,    // Keep uiType for internal use
+      key: uniqueKey,     // Use the unique key
       title: typeInfo.label,
       required: false
     }
@@ -480,6 +528,7 @@ function PropertyTypeSelector({ onAddProperty }) {
   return (
     <div className="relative">
       <button
+        type="button"
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-2.5 rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-sm hover:shadow-md font-medium text-sm"
       >
@@ -492,20 +541,21 @@ function PropertyTypeSelector({ onAddProperty }) {
           <div className="p-4">
             <div className="text-sm font-semibold text-gray-900 mb-3 text-center">Select Property Type</div>
             <div className="grid grid-cols-1 gap-2">
-              {Object.entries(PROPERTY_TYPES).map(([key, type]) => {
-                const Icon = type.icon
+              {getAllFieldTypes().map((fieldType) => {
+                const Icon = fieldType.icon
                 return (
                   <button
-                    key={key}
-                    onClick={() => handleAddProperty(key)}
+                    type="button"
+                    key={fieldType.key}
+                    onClick={() => handleAddProperty(fieldType.key)}
                     className="w-full flex items-center space-x-3 p-3 rounded-lg hover:bg-blue-50 text-left transition-colors group"
                   >
                     <div className="p-2 bg-gray-100 group-hover:bg-blue-100 rounded-lg transition-colors">
                       <Icon className="w-5 h-5 text-gray-600 group-hover:text-blue-600" />
                     </div>
                     <div className="flex-1">
-                      <div className="font-medium text-sm text-gray-900">{type.label}</div>
-                      <div className="text-xs text-gray-500">{type.description}</div>
+                      <div className="font-medium text-sm text-gray-900">{fieldType.label}</div>
+                      <div className="text-xs text-gray-500">{fieldType.description}</div>
                     </div>
                   </button>
                 )
@@ -529,9 +579,12 @@ function PropertyTypeSelector({ onAddProperty }) {
 export default function VisualSchemaEditor({ schema, onChange }) {
   const [properties, setProperties] = useState(() => {
     // Convert schema properties to internal format
+    console.log("Loading schema in VisualSchemaEditor:", schema)
     const schemaProps = schema?.properties || {}
     const required = schema?.required || []
     const propertyOrder = schema?.propertyOrder || []
+    console.log("Schema props:", schemaProps)
+    console.log("Property order:", propertyOrder)
 
     // If propertyOrder exists, use it to maintain order
     if (propertyOrder.length > 0) {
@@ -544,7 +597,7 @@ export default function VisualSchemaEditor({ schema, onChange }) {
             ...schemaProps[key],
             key,
             required: required.includes(key),
-            uiType: schemaProps[key].enum ? 'enum' : (schemaProps[key].format === 'textarea' ? 'textarea' : schemaProps[key].type),
+            uiType: schemaProps[key].fieldType || (schemaProps[key].enum ? 'choice' : (schemaProps[key].format === 'textarea' ? 'rich_text' : 'text')),
             _id: `prop-${index}-${key}` // Stable ID for React key
           })
         }
@@ -558,7 +611,7 @@ export default function VisualSchemaEditor({ schema, onChange }) {
             ...prop,
             key,
             required: required.includes(key),
-            uiType: prop.enum ? 'enum' : (prop.format === 'textarea' ? 'textarea' : prop.type),
+            uiType: prop.fieldType || (prop.enum ? 'choice' : (prop.format === 'textarea' ? 'rich_text' : 'text')),
             _id: `prop-${extraIndex}-${key}` // Stable ID for React key
           })
           extraIndex++
@@ -573,10 +626,48 @@ export default function VisualSchemaEditor({ schema, onChange }) {
       ...prop,
       key,
       required: required.includes(key),
-      uiType: prop.enum ? 'enum' : (prop.format === 'textarea' ? 'textarea' : prop.type),
+      uiType: prop.fieldType || (prop.enum ? 'choice' : (prop.format === 'textarea' ? 'rich_text' : 'text')),
       _id: `prop-${index}-${key}` // Stable ID for React key
     }))
   })
+
+  // Update properties when schema prop changes
+  useEffect(() => {
+    console.log("Schema prop changed:", schema)
+
+    const schemaProps = schema?.properties || {}
+    const required = schema?.required || []
+    const propertyOrder = schema?.propertyOrder || []
+
+    let newProperties = []
+
+    if (propertyOrder.length > 0) {
+      // Use propertyOrder for ordering
+      propertyOrder.forEach((key, index) => {
+        if (schemaProps[key]) {
+          newProperties.push({
+            ...schemaProps[key],
+            key,
+            required: required.includes(key),
+            uiType: schemaProps[key].fieldType || (schemaProps[key].enum ? 'choice' : (schemaProps[key].format === 'textarea' ? 'rich_text' : 'text')),
+            _id: `prop-${index}-${key}`
+          })
+        }
+      })
+    } else {
+      // Fallback to object key order
+      newProperties = Object.entries(schemaProps).map(([key, prop], index) => ({
+        ...prop,
+        key,
+        required: required.includes(key),
+        uiType: prop.fieldType || (prop.enum ? 'choice' : (prop.format === 'textarea' ? 'rich_text' : 'text')),
+        _id: `prop-${index}-${key}`
+      }))
+    }
+
+    console.log("Converted properties:", newProperties)
+    setProperties(newProperties)
+  }, [schema])
 
   const [viewMode, setViewMode] = useState('visual') // 'visual' or 'json'
   const [jsonError, setJsonError] = useState('')
@@ -618,28 +709,30 @@ export default function VisualSchemaEditor({ schema, onChange }) {
     const newSchema = {
       type: 'object',
       properties: {},
-      required: [],
-      propertyOrder: []
+      propertyOrder: [],
+      required: []
     }
 
+    // Convert internal properties format to JSON Schema format
     newProperties.forEach(prop => {
       const { key, required, uiType, _id, ...schemaProp } = prop
       if (key && validateFieldName(key)) {
-        newSchema.properties[key] = cleanProperty(schemaProp)
+        // Add fieldType to the property definition
+        const propertyWithFieldType = {
+          ...schemaProp,
+          fieldType: uiType || schemaProp.fieldType || 'text' // Use uiType as fieldType
+        }
+
+        // Add to properties object (not array) - key becomes the property name
+        newSchema.properties[key] = cleanProperty(propertyWithFieldType)
         newSchema.propertyOrder.push(key)
+
+        // Add to required array if property is required
         if (required) {
           newSchema.required.push(key)
         }
       }
     })
-
-    // Remove empty arrays/objects
-    if (newSchema.required.length === 0) {
-      delete newSchema.required
-    }
-    if (newSchema.propertyOrder.length === 0) {
-      delete newSchema.propertyOrder
-    }
 
     onChange(newSchema)
   }, [onChange])
@@ -651,6 +744,7 @@ export default function VisualSchemaEditor({ schema, onChange }) {
       _id: `prop-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
     }
     const updatedProperties = [...properties, propertyWithId]
+    console.log("updatedProperties", updatedProperties)
     setProperties(updatedProperties)
     updateSchema(updatedProperties)
   }, [properties, updateSchema])
@@ -692,6 +786,7 @@ export default function VisualSchemaEditor({ schema, onChange }) {
         <h3 className="text-lg font-medium">Schema Editor</h3>
         <div className="flex items-center space-x-2">
           <button
+            type="button"
             onClick={() => setViewMode('visual')}
             className={`flex items-center space-x-1 px-3 py-1 rounded ${viewMode === 'visual' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'
               }`}
@@ -700,6 +795,7 @@ export default function VisualSchemaEditor({ schema, onChange }) {
             <span>Visual</span>
           </button>
           <button
+            type="button"
             onClick={() => setViewMode('json')}
             className={`flex items-center space-x-1 px-3 py-1 rounded ${viewMode === 'json' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'
               }`}
@@ -719,7 +815,7 @@ export default function VisualSchemaEditor({ schema, onChange }) {
                 <div className="text-gray-500 text-sm">Add your first property to start building your schema</div>
               </div>
               <div className="flex justify-center pt-4 border-t border-gray-100">
-                <PropertyTypeSelector onAddProperty={handleAddProperty} />
+                <PropertyTypeSelector onAddProperty={handleAddProperty} existingProperties={properties} />
               </div>
             </div>
           ) : (
@@ -732,6 +828,7 @@ export default function VisualSchemaEditor({ schema, onChange }) {
                     property={property}
                     index={index}
                     totalCount={properties.length}
+                    allProperties={properties}
                     onUpdate={(updated) => handleUpdateProperty(index, updated)}
                     onDelete={() => handleDeleteProperty(index)}
                     onMoveUp={() => handleMoveProperty(index, 'up')}
@@ -742,7 +839,7 @@ export default function VisualSchemaEditor({ schema, onChange }) {
 
               {/* Add property button */}
               <div className="flex justify-center pt-4 border-t border-gray-100">
-                <PropertyTypeSelector onAddProperty={handleAddProperty} />
+                <PropertyTypeSelector onAddProperty={handleAddProperty} existingProperties={properties} />
               </div>
             </>
           )}

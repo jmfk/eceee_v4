@@ -17,7 +17,6 @@ const ObjectEditor = ({ objectType, instance, onSave, onCancel }) => {
         slug: '',
         data: {},
         status: 'draft',
-        parent: null,
         widgets: {},
         publishDate: '',
         unpublishDate: '',
@@ -42,12 +41,7 @@ const ObjectEditor = ({ objectType, instance, onSave, onCancel }) => {
         enabled: !!actualObjectTypeId
     })
 
-    // Fetch potential parent objects
-    const { data: potentialParentsResponse } = useQuery({
-        queryKey: ['objectInstances', 'forParent', actualObjectTypeId],
-        queryFn: () => objectInstancesApi.list({ objectType: actualObjectTypeId }),
-        enabled: !!actualObjectTypeId
-    })
+
 
     // Fetch child types for sub-object tab
     const { data: childTypesResponse } = useQuery({
@@ -73,7 +67,6 @@ const ObjectEditor = ({ objectType, instance, onSave, onCancel }) => {
     })
 
     const objectTypeDetails = objectTypeResponse?.data || objectType
-    const potentialParents = potentialParentsResponse?.data?.results || potentialParentsResponse?.data || []
     const childTypes = childTypesResponse?.data?.results || childTypesResponse?.data || []
     const childObjects = childObjectsResponse?.data?.results || childObjectsResponse?.data || []
 
@@ -86,7 +79,6 @@ const ObjectEditor = ({ objectType, instance, onSave, onCancel }) => {
                 slug: instance.slug || '',
                 data: instance.data || {},
                 status: instance.status || 'draft',
-                parent: instance.parent?.id || null,
                 widgets: instance.widgets || {},
                 publishDate: instance.publishDate ? instance.publishDate.slice(0, 16) : '',
                 unpublishDate: instance.unpublishDate ? instance.unpublishDate.slice(0, 16) : '',
@@ -197,13 +189,12 @@ const ObjectEditor = ({ objectType, instance, onSave, onCancel }) => {
     }
 
     const handleCreateSubObject = (childType) => {
-        // Create a new sub-object of the specified type with current object as parent
+        // Create a new sub-object of the specified type as a top-level object
         const newSubObjectData = {
             objectTypeId: childType.id,
             title: `New ${childType.label}`,
             data: {},
             status: 'draft',
-            parent: instance?.id, // Set current object as parent
             widgets: {},
             metadata: {}
         }
@@ -434,29 +425,7 @@ const ObjectEditor = ({ objectType, instance, onSave, onCancel }) => {
                                 </p>
                             </div>
 
-                            {/* Parent Selection */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Parent Object
-                                </label>
-                                <select
-                                    value={formData.parent || ''}
-                                    onChange={(e) => handleInputChange('parent', e.target.value || null)}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                >
-                                    <option value="">No parent (root level)</option>
-                                    {potentialParents
-                                        .filter(p => p.id !== instance?.id) // Don't allow self as parent
-                                        .map((parent) => (
-                                            <option key={parent.id} value={parent.id}>
-                                                {'  '.repeat(parent.level || 0)}{parent.title}
-                                            </option>
-                                        ))}
-                                </select>
-                                <p className="text-gray-500 text-sm mt-1">
-                                    Select a parent object to create hierarchical relationships
-                                </p>
-                            </div>
+
 
                             {/* Metadata */}
                             <div>

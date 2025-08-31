@@ -1,29 +1,20 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Plus, Trash2, Settings, Hash, Type, Calendar, ToggleLeft } from 'lucide-react'
+import { Plus, Trash2, Settings, Hash, Type, Calendar, ToggleLeft, Check } from 'lucide-react'
 import { objectTypesApi } from '../api/objectStorage'
 import VisualSchemaEditor from './VisualSchemaEditor'
 import InlineImageUpload from './InlineImageUpload'
 import { validateFieldName } from '../utils/schemaValidation'
+import { getAllFieldTypes } from '../utils/fieldTypeRegistry'
 
-const FIELD_TYPES = [
-    { value: 'text', label: 'Text', icon: Type },
-    { value: 'rich_text', label: 'Rich Text', icon: Type },
-    { value: 'number', label: 'Number', icon: Hash },
-    { value: 'date', label: 'Date', icon: Calendar },
-    { value: 'datetime', label: 'Date & Time', icon: Calendar },
-    { value: 'boolean', label: 'Boolean', icon: ToggleLeft },
-    { value: 'image', label: 'Image', icon: Type },
-    { value: 'file', label: 'File', icon: Type },
-    { value: 'url', label: 'URL', icon: Type },
-    { value: 'email', label: 'Email', icon: Type },
-    { value: 'choice', label: 'Choice', icon: Type },
-    { value: 'multi_choice', label: 'Multiple Choice', icon: Type },
-    { value: 'user_reference', label: 'User Reference', icon: Type },
-    { value: 'object_reference', label: 'Object Reference', icon: Type }
-]
+// Get field types from the registry
+const FIELD_TYPES = getAllFieldTypes().map(fieldType => ({
+    value: fieldType.key,
+    label: fieldType.label,
+    icon: fieldType.icon
+}))
 
-const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting }) => {
+const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTab = 'basic', onTabChange }) => {
     const [formData, setFormData] = useState({
         name: '',
         label: '',
@@ -38,7 +29,20 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting }) => {
     })
 
     const [errors, setErrors] = useState({})
-    const [activeTab, setActiveTab] = useState('basic')
+    const [hasUnsavedSchemaChanges, setHasUnsavedSchemaChanges] = useState(false)
+    const [originalSchema, setOriginalSchema] = useState(null)
+    const [isSavingSchema, setIsSavingSchema] = useState(false)
+    const [schemaError, setSchemaError] = useState(null)
+
+    const [hasUnsavedBasicChanges, setHasUnsavedBasicChanges] = useState(false)
+    const [originalBasicInfo, setOriginalBasicInfo] = useState(null)
+    const [isSavingBasicInfo, setIsSavingBasicInfo] = useState(false)
+    const [basicInfoError, setBasicInfoError] = useState(null)
+
+    const [hasUnsavedSlotsChanges, setHasUnsavedSlotsChanges] = useState(false)
+    const [originalSlotConfiguration, setOriginalSlotConfiguration] = useState(null)
+    const [isSavingSlots, setIsSavingSlots] = useState(false)
+    const [slotsError, setSlotsError] = useState(null)
 
     // Load existing object types for child type selection
     const { data: existingTypesResponse } = useQuery({
@@ -58,18 +62,58 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting }) => {
                 )
                 : []
 
+            const schema = objectType.schema || { fields: [] }
             setFormData({
                 name: objectType.name || '',
                 label: objectType.label || '',
                 pluralLabel: objectType.pluralLabel || '',
                 description: objectType.description || '',
                 isActive: objectType.isActive ?? true,
-                schema: objectType.schema || { fields: [] },
+                schema: schema,
                 slotConfiguration: objectType.slotConfiguration || { slots: [] },
                 allowedChildTypes: allowedChildTypeNames,
                 hierarchyLevel: objectType.hierarchyLevel || 'both',
                 metadata: objectType.metadata || {}
             })
+            setOriginalSchema(JSON.parse(JSON.stringify(schema))) // Deep copy
+            setHasUnsavedSchemaChanges(false)
+
+            // Track original basic info
+            const basicInfo = {
+                name: objectType.name || '',
+                label: objectType.label || '',
+                pluralLabel: objectType.pluralLabel || '',
+                description: objectType.description || '',
+                isActive: objectType.isActive ?? true,
+                hierarchyLevel: objectType.hierarchyLevel || 'both'
+            }
+            setOriginalBasicInfo(JSON.parse(JSON.stringify(basicInfo)))
+            setHasUnsavedBasicChanges(false)
+
+            // Track original slot configuration
+            const slotConfig = objectType.slotConfiguration || { slots: [] }
+            setOriginalSlotConfiguration(JSON.parse(JSON.stringify(slotConfig)))
+            setHasUnsavedSlotsChanges(false)
+        } else {
+            // For new object types
+            const emptySchema = { fields: [] }
+            setOriginalSchema(JSON.parse(JSON.stringify(emptySchema)))
+            setHasUnsavedSchemaChanges(false)
+
+            const emptyBasicInfo = {
+                name: '',
+                label: '',
+                pluralLabel: '',
+                description: '',
+                isActive: true,
+                hierarchyLevel: 'both'
+            }
+            setOriginalBasicInfo(JSON.parse(JSON.stringify(emptyBasicInfo)))
+            setHasUnsavedBasicChanges(false)
+
+            const emptySlotConfig = { slots: [] }
+            setOriginalSlotConfiguration(JSON.parse(JSON.stringify(emptySlotConfig)))
+            setHasUnsavedSlotsChanges(false)
         }
     }, [objectType])
 
@@ -85,11 +129,11 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting }) => {
         // 2. Switching to a different object type (different ID)
         if (previousObjectTypeId !== currentObjectTypeId) {
             if (!currentObjectTypeId) {
-                // Creating new object type
-                setActiveTab('basic')
+                // Creating new object type - navigate to basic tab if onTabChange is available
+                onTabChange?.('basic')
             } else if (previousObjectTypeId && previousObjectTypeId !== currentObjectTypeId) {
-                // Switching to different existing object type
-                setActiveTab('basic')
+                // Switching to different existing object type - navigate to basic tab
+                onTabChange?.('basic')
             }
             // If going from null to an ID (editing existing), preserve current tab
         }
@@ -115,6 +159,31 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting }) => {
         if (field === 'label' && !objectType) {
             const name = value.toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '')
             setFormData(prev => ({ ...prev, name }))
+        }
+
+        // Check if basic info has changed
+        if (['name', 'label', 'pluralLabel', 'description', 'isActive', 'hierarchyLevel'].includes(field)) {
+            setTimeout(() => {
+                const currentBasicInfo = {
+                    name: formData.name,
+                    label: formData.label,
+                    pluralLabel: formData.pluralLabel,
+                    description: formData.description,
+                    isActive: formData.isActive,
+                    hierarchyLevel: formData.hierarchyLevel
+                }
+
+                // Apply the current change
+                currentBasicInfo[field] = value
+
+                const hasChanges = JSON.stringify(currentBasicInfo) !== JSON.stringify(originalBasicInfo)
+                setHasUnsavedBasicChanges(hasChanges)
+
+                // Clear any existing basic info errors when user makes changes
+                if (basicInfoError) {
+                    setBasicInfoError(null)
+                }
+            }, 0)
         }
     }
 
@@ -189,14 +258,315 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting }) => {
 
     const handleSchemaChange = (newSchema) => {
         setFormData(prev => ({ ...prev, schema: newSchema }))
+
+        // Check if schema has changed from original
+        const hasChanges = JSON.stringify(newSchema) !== JSON.stringify(originalSchema)
+        setHasUnsavedSchemaChanges(hasChanges)
+
+        // Clear any existing schema errors when user makes changes
+        if (schemaError) {
+            setSchemaError(null)
+        }
     }
 
     const handleSlotChange = (slots) => {
+        const newSlotConfig = { slots }
         setFormData(prev => ({
             ...prev,
-            slotConfiguration: { slots }
+            slotConfiguration: newSlotConfig
         }))
+
+        // Check if slot configuration has changed
+        const hasChanges = JSON.stringify(newSlotConfig) !== JSON.stringify(originalSlotConfiguration)
+        setHasUnsavedSlotsChanges(hasChanges)
+
+        // Clear any existing slots errors when user makes changes
+        if (slotsError) {
+            setSlotsError(null)
+        }
     }
+
+    const validateSchema = (schema) => {
+        // Basic validation to match backend expectations
+        if (!schema || typeof schema !== 'object') {
+            return 'Schema must be a valid object'
+        }
+        console.log("schema", schema)
+
+        // Check for properties object
+        if (!schema.properties || typeof schema.properties !== 'object') {
+            return 'Schema must have a "properties" object'
+        }
+
+        // Validate propertyOrder if present
+        if (schema.propertyOrder && !Array.isArray(schema.propertyOrder)) {
+            return 'Schema "propertyOrder" must be an array'
+        }
+
+        // Validate required array if present
+        if (schema.required && !Array.isArray(schema.required)) {
+            return 'Schema "required" must be an array'
+        }
+
+        console.log("schema.properties", schema.properties)
+
+        // Validate each property in the properties object
+        for (const [propName, propDef] of Object.entries(schema.properties)) {
+            // Validate property name format
+            if (!/^[a-zA-Z][a-zA-Z0-9_]*$/.test(propName)) {
+                return `Property name "${propName}" is invalid. Names must start with a letter and contain only letters, numbers, and underscores.`
+            }
+
+            if (!propDef || typeof propDef !== 'object') {
+                return `Property "${propName}" must be a valid object`
+            }
+            if (!propDef.type || typeof propDef.type !== 'string') {
+                return `Property "${propName}" must have a valid type`
+            }
+        }
+
+        // Validate required array references
+        if (schema.required) {
+            for (const requiredProp of schema.required) {
+                if (!(requiredProp in schema.properties)) {
+                    return `Required property "${requiredProp}" not found in properties`
+                }
+            }
+        }
+
+        // Validate propertyOrder references
+        if (schema.propertyOrder) {
+            for (const orderedProp of schema.propertyOrder) {
+                if (!(orderedProp in schema.properties)) {
+                    return `PropertyOrder property "${orderedProp}" not found in properties`
+                }
+            }
+        }
+
+        return null // No errors
+    }
+
+    const handleSaveSchema = async () => {
+        if (!objectType || !hasUnsavedSchemaChanges || isSavingSchema) return
+
+        // Client-side validation before sending to backend
+        const validationError = validateSchema(formData.schema)
+        if (validationError) {
+            setSchemaError(`Schema validation error: ${validationError}`)
+            return
+        }
+
+        // Clear any previous errors
+        setSchemaError(null)
+        setIsSavingSchema(true)
+
+        try {
+            // Use the dedicated schema update endpoint
+            const response = await objectTypesApi.updateSchema(objectType.id, formData.schema)
+
+            // Update the original schema to reflect the save
+            setOriginalSchema(JSON.parse(JSON.stringify(formData.schema)))
+            setHasUnsavedSchemaChanges(false)
+
+            console.log('Schema saved successfully:', response.data?.message)
+
+            // TODO: Add success notification using global notification system
+            // addNotification('Schema saved successfully', 'success')
+
+        } catch (error) {
+            console.error('Failed to save schema:', error)
+            let errorMessage = 'Failed to save schema'
+
+            if (error.response?.data?.error) {
+                const backendError = error.response.data.error
+
+                // Handle specific validation errors with user-friendly messages
+                if (backendError.includes('Invalid schema format')) {
+                    errorMessage = 'Invalid schema format. Please ensure your schema has a valid properties array.'
+                } else if (backendError.includes('properties')) {
+                    errorMessage = 'Schema validation failed. Please check that all properties are properly configured.'
+                } else {
+                    errorMessage = backendError
+                }
+            }
+
+            // TODO: Add error notification using global notification system  
+            // addNotification(errorMessage, 'error')
+
+            // Set the error in state for display
+            setSchemaError(errorMessage)
+
+        } finally {
+            setIsSavingSchema(false)
+        }
+    }
+
+    const handleSaveBasicInfo = async () => {
+        if (!objectType || !hasUnsavedBasicChanges || isSavingBasicInfo) return
+
+        setIsSavingBasicInfo(true)
+
+        try {
+            const basicInfoData = {
+                name: formData.name,
+                label: formData.label,
+                pluralLabel: formData.pluralLabel,
+                description: formData.description,
+                isActive: formData.isActive,
+                hierarchyLevel: formData.hierarchyLevel
+            }
+
+            // Use the dedicated basic info update endpoint
+            const response = await objectTypesApi.updateBasicInfo(objectType.id, basicInfoData)
+
+            // Update the original basic info to reflect the save
+            setOriginalBasicInfo(JSON.parse(JSON.stringify(basicInfoData)))
+            setHasUnsavedBasicChanges(false)
+
+            console.log('Basic info saved successfully:', response.data?.message)
+
+        } catch (error) {
+            console.error('Failed to save basic info:', error)
+            let errorMessage = 'Failed to save basic info'
+
+            if (error.response?.data?.error) {
+                errorMessage = error.response.data.error
+            }
+
+            setBasicInfoError(errorMessage)
+
+        } finally {
+            setIsSavingBasicInfo(false)
+        }
+    }
+
+    const validateSlots = (slotConfiguration) => {
+        const slots = slotConfiguration.slots || []
+
+        for (let i = 0; i < slots.length; i++) {
+            const slot = slots[i]
+
+            if (!slot.name || slot.name.trim() === '') {
+                return `Slot ${i + 1}: Slot Name is required`
+            }
+
+            if (!slot.label || slot.label.trim() === '') {
+                return `Slot ${i + 1}: Display Label is required`
+            }
+
+            // Check for duplicate slot names
+            const duplicateIndex = slots.findIndex((s, idx) =>
+                idx !== i && s.name === slot.name && s.name.trim() !== ''
+            )
+            if (duplicateIndex !== -1) {
+                return `Slot ${i + 1}: Slot name "${slot.name}" is already used in Slot ${duplicateIndex + 1}`
+            }
+        }
+
+        return null // No errors
+    }
+
+    const handleSaveSlots = async () => {
+        if (!objectType || !hasUnsavedSlotsChanges || isSavingSlots) return
+
+        // Validate slots before saving
+        const validationError = validateSlots(formData.slotConfiguration)
+        if (validationError) {
+            setSlotsError(validationError)
+            return
+        }
+
+        // Clear any previous errors
+        setSlotsError(null)
+        setIsSavingSlots(true)
+
+        try {
+            // Use the dedicated slots update endpoint
+            const response = await objectTypesApi.updateSlots(objectType.id, formData.slotConfiguration)
+
+            // Update the original slot configuration to reflect the save
+            setOriginalSlotConfiguration(JSON.parse(JSON.stringify(formData.slotConfiguration)))
+            setHasUnsavedSlotsChanges(false)
+
+            console.log('Widget slots saved successfully:', response.data?.message)
+
+        } catch (error) {
+            console.error('Failed to save widget slots:', error)
+            let errorMessage = 'Failed to save widget slots'
+
+            if (error.response?.data?.error) {
+                const backendError = error.response.data.error
+
+                // Handle specific validation errors
+                if (backendError.includes('slot')) {
+                    errorMessage = 'Slot validation failed. Please check that all slots have valid names and labels.'
+                } else {
+                    errorMessage = backendError
+                }
+            }
+
+            setSlotsError(errorMessage)
+
+        } finally {
+            setIsSavingSlots(false)
+        }
+    }
+
+    // Navigation guard for unsaved changes
+    const handleTabChangeWithGuard = useCallback((newTab) => {
+        // Check for unsaved schema changes
+        if (activeTab === 'schema' && hasUnsavedSchemaChanges) {
+            const confirmLeave = window.confirm(
+                'You have unsaved schema changes. Do you want to leave without saving?'
+            )
+            if (!confirmLeave) {
+                return // Don't change tab
+            }
+        }
+
+        // Check for unsaved basic info changes
+        if (activeTab === 'basic' && hasUnsavedBasicChanges) {
+            const confirmLeave = window.confirm(
+                'You have unsaved basic info changes. Do you want to leave without saving?'
+            )
+            if (!confirmLeave) {
+                return // Don't change tab
+            }
+        }
+
+        // Check for unsaved slots changes
+        if (activeTab === 'slots' && hasUnsavedSlotsChanges) {
+            const confirmLeave = window.confirm(
+                'You have unsaved widget slots changes. Do you want to leave without saving?'
+            )
+            if (!confirmLeave) {
+                return // Don't change tab
+            }
+        }
+
+        onTabChange?.(newTab)
+    }, [activeTab, hasUnsavedSchemaChanges, hasUnsavedBasicChanges, hasUnsavedSlotsChanges, onTabChange])
+
+    // Browser navigation guard
+    useEffect(() => {
+        const handleBeforeUnload = (e) => {
+            if ((activeTab === 'schema' && hasUnsavedSchemaChanges) ||
+                (activeTab === 'basic' && hasUnsavedBasicChanges) ||
+                (activeTab === 'slots' && hasUnsavedSlotsChanges)) {
+                e.preventDefault()
+                const message = activeTab === 'schema'
+                    ? 'You have unsaved schema changes. Are you sure you want to leave?'
+                    : activeTab === 'basic'
+                        ? 'You have unsaved basic info changes. Are you sure you want to leave?'
+                        : 'You have unsaved widget slots changes. Are you sure you want to leave?'
+                e.returnValue = message
+                return e.returnValue
+            }
+        }
+
+        window.addEventListener('beforeunload', handleBeforeUnload)
+        return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+    }, [activeTab, hasUnsavedSchemaChanges, hasUnsavedBasicChanges, hasUnsavedSlotsChanges])
 
     return (
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -212,13 +582,22 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting }) => {
                         <button
                             key={tab.id}
                             type="button"
-                            onClick={() => setActiveTab(tab.id)}
+                            onClick={() => handleTabChangeWithGuard(tab.id)}
                             className={`py-2 px-1 border-b-2 font-medium text-sm ${activeTab === tab.id
                                 ? 'border-blue-500 text-blue-600'
                                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                                 }`}
                         >
                             {tab.label}
+                            {tab.id === 'schema' && hasUnsavedSchemaChanges && (
+                                <span className="ml-1 w-2 h-2 bg-orange-400 rounded-full inline-block" title="Unsaved changes" />
+                            )}
+                            {tab.id === 'basic' && hasUnsavedBasicChanges && (
+                                <span className="ml-1 w-2 h-2 bg-orange-400 rounded-full inline-block" title="Unsaved changes" />
+                            )}
+                            {tab.id === 'slots' && hasUnsavedSlotsChanges && (
+                                <span className="ml-1 w-2 h-2 bg-orange-400 rounded-full inline-block" title="Unsaved changes" />
+                            )}
                         </button>
                     ))}
                 </nav>
@@ -227,6 +606,34 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting }) => {
             {/* Basic Info Tab */}
             {activeTab === 'basic' && (
                 <div className="space-y-4">
+                    {/* Basic Info Error Display */}
+                    {basicInfoError && (
+                        <div className="bg-red-50 border border-red-200 rounded-md p-4 flex items-start">
+                            <div className="flex-shrink-0">
+                                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                                </svg>
+                            </div>
+                            <div className="ml-3">
+                                <h3 className="text-sm font-medium text-red-800">
+                                    Basic Info Validation Error
+                                </h3>
+                                <div className="mt-1 text-sm text-red-700">
+                                    {basicInfoError}
+                                </div>
+                                <div className="mt-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setBasicInfoError(null)}
+                                        className="text-sm text-red-600 hover:text-red-500 underline"
+                                    >
+                                        Dismiss
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -343,10 +750,38 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting }) => {
                     <p className="text-gray-600 mb-6">
                         Define the data fields that instances of this object type will have.
                     </p>
+
+                    {/* Schema Error Display */}
+                    {schemaError && (
+                        <div className="mb-6 bg-red-50 border border-red-200 rounded-md p-4 flex items-start">
+                            <div className="flex-shrink-0">
+                                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                                </svg>
+                            </div>
+                            <div className="ml-3">
+                                <h3 className="text-sm font-medium text-red-800">
+                                    Schema Validation Error
+                                </h3>
+                                <div className="mt-1 text-sm text-red-700">
+                                    {schemaError}
+                                </div>
+                                <div className="mt-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setSchemaError(null)}
+                                        className="text-sm text-red-600 hover:text-red-500 underline"
+                                    >
+                                        Dismiss
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     <VisualSchemaEditor
                         schema={formData.schema}
                         onChange={handleSchemaChange}
-                        fieldTypes={FIELD_TYPES}
                     />
                 </div>
             )}
@@ -358,6 +793,35 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting }) => {
                     <p className="text-gray-600 mb-6">
                         Define widget slots where content editors can add widgets to object instances.
                     </p>
+
+                    {/* Widget Slots Error Display */}
+                    {slotsError && (
+                        <div className="mb-6 bg-red-50 border border-red-200 rounded-md p-4 flex items-start">
+                            <div className="flex-shrink-0">
+                                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                                </svg>
+                            </div>
+                            <div className="ml-3">
+                                <h3 className="text-sm font-medium text-red-800">
+                                    Widget Slots Validation Error
+                                </h3>
+                                <div className="mt-1 text-sm text-red-700">
+                                    {slotsError}
+                                </div>
+                                <div className="mt-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setSlotsError(null)}
+                                        className="text-sm text-red-600 hover:text-red-500 underline"
+                                    >
+                                        Dismiss
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     <SlotEditor
                         slots={formData.slotConfiguration.slots}
                         onChange={handleSlotChange}
@@ -453,23 +917,87 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting }) => {
                 >
                     Cancel
                 </button>
-                <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                    {isSubmitting ? (
-                        <>
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                            Saving...
-                        </>
-                    ) : (
-                        <>
-                            <Settings className="w-4 h-4 mr-2" />
-                            {objectType ? 'Update Object Type' : 'Create Object Type'}
-                        </>
-                    )}
-                </button>
+
+                {activeTab === 'basic' && objectType ? (
+                    // Basic info-specific save button
+                    <button
+                        type="button"
+                        onClick={handleSaveBasicInfo}
+                        disabled={!hasUnsavedBasicChanges || isSavingBasicInfo}
+                        className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                        {isSavingBasicInfo ? (
+                            <>
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                Saving...
+                            </>
+                        ) : (
+                            <>
+                                <Settings className="w-4 h-4 mr-2" />
+                                Save Basic Info
+                            </>
+                        )}
+                    </button>
+                ) : activeTab === 'slots' && objectType ? (
+                    // Widget slots-specific save button
+                    <button
+                        type="button"
+                        onClick={handleSaveSlots}
+                        disabled={!hasUnsavedSlotsChanges || isSavingSlots}
+                        className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                        {isSavingSlots ? (
+                            <>
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                Saving...
+                            </>
+                        ) : (
+                            <>
+                                <Settings className="w-4 h-4 mr-2" />
+                                Save Widget Slots
+                            </>
+                        )}
+                    </button>
+                ) : activeTab === 'schema' && objectType ? (
+                    // Schema-specific save button
+                    <button
+                        type="button"
+                        onClick={handleSaveSchema}
+                        disabled={!hasUnsavedSchemaChanges || isSavingSchema}
+                        className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                        {isSavingSchema ? (
+                            <>
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                Saving...
+                            </>
+                        ) : (
+                            <>
+                                <Hash className="w-4 h-4 mr-2" />
+                                Save Schema
+                            </>
+                        )}
+                    </button>
+                ) : (
+                    // Regular form submit button for other tabs
+                    <button
+                        type="submit"
+                        disabled={isSubmitting}
+                        className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                        {isSubmitting ? (
+                            <>
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                Saving...
+                            </>
+                        ) : (
+                            <>
+                                <Settings className="w-4 h-4 mr-2" />
+                                {objectType ? 'Update Object Type' : 'Create Object Type'}
+                            </>
+                        )}
+                    </button>
+                )}
             </div>
         </form>
     )
@@ -523,12 +1051,15 @@ const SlotEditor = ({ slots = [], onChange, errors }) => {
                                 type="text"
                                 value={slot.name}
                                 onChange={(e) => updateSlot(index, 'name', e.target.value)}
-                                className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors[`slot_${index}_name`] ? 'border-red-300' : 'border-gray-300'
+                                className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${(errors[`slot_${index}_name`] || (!slot.name || !slot.name.trim())) ? 'border-red-300' : 'border-gray-300'
                                     }`}
                                 placeholder="e.g., main_content, sidebar"
                             />
                             {errors[`slot_${index}_name`] && (
                                 <p className="text-red-600 text-sm mt-1">{errors[`slot_${index}_name`]}</p>
+                            )}
+                            {(!slot.name || !slot.name.trim()) && (
+                                <p className="text-red-600 text-sm mt-1">Slot Name is required</p>
                             )}
                         </div>
 
@@ -540,12 +1071,15 @@ const SlotEditor = ({ slots = [], onChange, errors }) => {
                                 type="text"
                                 value={slot.label}
                                 onChange={(e) => updateSlot(index, 'label', e.target.value)}
-                                className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors[`slot_${index}_label`] ? 'border-red-300' : 'border-gray-300'
+                                className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${(errors[`slot_${index}_label`] || (!slot.label || !slot.label.trim())) ? 'border-red-300' : 'border-gray-300'
                                     }`}
                                 placeholder="e.g., Main Content, Sidebar"
                             />
                             {errors[`slot_${index}_label`] && (
                                 <p className="text-red-600 text-sm mt-1">{errors[`slot_${index}_label`]}</p>
+                            )}
+                            {(!slot.label || !slot.label.trim()) && (
+                                <p className="text-red-600 text-sm mt-1">Display Label is required</p>
                             )}
                         </div>
                     </div>

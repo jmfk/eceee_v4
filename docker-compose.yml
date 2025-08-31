@@ -57,7 +57,7 @@ services:
     volumes:
       - ./backend:/app
       - backend_static:/app/staticfiles
-      - backend_media:/app/media
+      - ./backend/media:/app/media
     ports:
       - "8000:8000"
     command: >
@@ -198,7 +198,6 @@ services:
 volumes:
   postgres_data:
   backend_static:
-  backend_media:
   frontend_node_modules:
   redis_data:
   mcp_logs:

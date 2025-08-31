@@ -216,14 +216,14 @@ export function compareWithServerData(currentState, serverData) {
 export function logChanges(currentState, originalState, context = 'Editor') {
     const changes = detectEditorChanges(currentState, originalState)
 
-    console.group(`🔍 ${context} Change Detection`)
-    console.log('Has changes:', changes.hasChanges)
-    console.log('Summary:', changes.summary)
-    console.log('Changed fields:', changes.changedFields)
-
-    if (changes.hasChanges) {
+    // Debug information available in changes object
+    if (changes.hasChanges && window.DEBUG_MODE) {
+        console.group(`🔍 ${context} Change Detection`)
+        console.log('Has changes:', changes.hasChanges)
+        console.log('Summary:', changes.summary)
+        console.log('Changed fields:', changes.changedFields)
         console.log('Detailed changes:', changes.changes)
-
+        
         if (changes.hasPageChanges) {
             console.log('📄 Page changes:', changes.changes.pageFields)
         }
@@ -231,9 +231,9 @@ export function logChanges(currentState, originalState, context = 'Editor') {
         if (changes.hasVersionChanges) {
             console.log('📝 Version changes:', changes.changes.versionFields)
         }
+        
+        console.groupEnd()
     }
-
-    console.groupEnd()
 
     return changes
 }

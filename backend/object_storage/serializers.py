@@ -8,6 +8,8 @@ following camelCase API conventions and existing patterns.
 from rest_framework import serializers
 from django.contrib.auth.models import User
 from .models import ObjectTypeDefinition, ObjectInstance, ObjectVersion
+from utils.schema_system import validate_schema
+from django.core.exceptions import ValidationError
 from django.utils import timezone
 
 
@@ -103,38 +105,12 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
         return value
 
     def validate_schema(self, value):
-        """Validate schema structure"""
-        if not isinstance(value, dict):
-            raise serializers.ValidationError("Schema must be a JSON object")
-
-        if "fields" not in value:
-            raise serializers.ValidationError("Schema must contain a 'fields' array")
-
-        if not isinstance(value["fields"], list):
-            raise serializers.ValidationError("Schema 'fields' must be an array")
-
-        # Validate each field in the schema
-        field_names = set()
-        for field in value["fields"]:
-            if not isinstance(field, dict):
-                raise serializers.ValidationError("Each schema field must be an object")
-
-            if "name" not in field or "type" not in field:
-                raise serializers.ValidationError(
-                    "Each schema field must have 'name' and 'type'"
-                )
-
-            if field["name"] in field_names:
-                raise serializers.ValidationError(
-                    f"Duplicate field name: {field['name']}"
-                )
-            field_names.add(field["name"])
-
-            valid_types = [choice[0] for choice in ObjectTypeDefinition.FIELD_TYPES]
-            if field["type"] not in valid_types:
-                raise serializers.ValidationError(
-                    f"Invalid field type: {field['type']}"
-                )
+        """Validate schema structure using the general schema system"""
+        try:
+            validate_schema(value, "object_type")
+        except ValidationError as e:
+            # Convert Django ValidationError to DRF ValidationError
+            raise serializers.ValidationError(str(e))
 
         return value
 
@@ -286,6 +262,10 @@ class ObjectInstanceSerializer(serializers.ModelSerializer):
     children_count = serializers.SerializerMethodField()
     version_count = serializers.SerializerMethodField()
 
+    # Custom fields for data and widgets (not stored on model, but handled in versions)
+    data = serializers.JSONField(required=False, allow_null=True)
+    widgets = serializers.JSONField(required=False, allow_null=True)
+
     class Meta:
         model = ObjectInstance
         fields = [
@@ -331,6 +311,16 @@ class ObjectInstanceSerializer(serializers.ModelSerializer):
     def get_version_count(self, obj):
         """Return count of versions"""
         return obj.versions.count()
+
+    def to_representation(self, instance):
+        """Add data and widgets from current version to the serialized output"""
+        data = super().to_representation(instance)
+
+        # Add data and widgets from current version
+        data["data"] = instance.data
+        data["widgets"] = instance.widgets
+
+        return data
 
     def validate_object_type_id(self, value):
         """Validate that object type exists and is active"""
@@ -394,26 +384,39 @@ class ObjectInstanceSerializer(serializers.ModelSerializer):
                 )
 
     def _validate_widgets_against_slots(self, widgets, object_type):
-        """Validate widgets against object type slots"""
-        allowed_slots = [slot["name"] for slot in object_type.get_slots()]
+        """Validate and normalize widgets against object type slots.
 
-        for slot_name in widgets.keys():
-            if slot_name not in allowed_slots:
-                raise serializers.ValidationError(
-                    {
-                        "widgets": f"Widget slot '{slot_name}' is not defined for this object type"
-                    }
-                )
+        This method:
+        1. Keeps extra slot information even if not in the object type definition
+        2. Creates missing slots with empty content if defined in the object type
+        3. Does not raise errors for missing or extra slots, just normalizes them
+        """
+        defined_slots = [slot["name"] for slot in object_type.get_slots()]
+
+        # Ensure all defined slots exist in widgets (create empty ones if missing)
+        for slot_name in defined_slots:
+            if slot_name not in widgets:
+                widgets[slot_name] = []  # Create empty slot
+
+        # Note: We intentionally keep extra slots that aren't in the definition
+        # This allows for flexibility and prevents data loss when object type
+        # definitions change
 
     def create(self, validated_data):
         """Create new object instance with version tracking"""
         user = self.context["request"].user
-        validated_data["created_by"] = user
 
+        # Extract data and widgets from validated_data
+        data = validated_data.pop("data", {})
+        widgets = validated_data.pop("widgets", {})
+
+        validated_data["created_by"] = user
         instance = super().create(validated_data)
 
-        # Create initial version
-        instance.create_version(user, "Initial version")
+        # Create initial version with the data and widgets
+        instance.create_version(
+            user, data=data, widgets=widgets, change_description="Initial version"
+        )
 
         return instance
 
@@ -421,21 +424,33 @@ class ObjectInstanceSerializer(serializers.ModelSerializer):
         """Update object instance with version tracking"""
         user = self.context["request"].user
 
+        # Extract data and widgets from validated_data
+        new_data = validated_data.pop("data", None)
+        new_widgets = validated_data.pop("widgets", None)
+
         # Check if data or widgets changed
-        data_changed = (
-            "data" in validated_data and validated_data["data"] != instance.data
-        )
-        widgets_changed = (
-            "widgets" in validated_data
-            and validated_data["widgets"] != instance.widgets
-        )
+        data_changed = new_data is not None and new_data != instance.data
+        widgets_changed = new_widgets is not None and new_widgets != instance.widgets
 
+        # Update basic instance fields first
+        instance = super().update(instance, validated_data)
+
+        # Create new version if data or widgets changed
         if data_changed or widgets_changed:
-            # Create version snapshot before updating
-            instance.create_version(user, "Update via API")
-            instance.version += 1
+            # Use current data/widgets if not provided in update
+            version_data = new_data if new_data is not None else instance.data
+            version_widgets = (
+                new_widgets if new_widgets is not None else instance.widgets
+            )
 
-        return super().update(instance, validated_data)
+            instance.create_version(
+                user,
+                data=version_data,
+                widgets=version_widgets,
+                change_description="Update via API",
+            )
+
+        return instance
 
 
 class ObjectInstanceListSerializer(serializers.ModelSerializer):

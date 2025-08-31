@@ -5,8 +5,40 @@ import { objectInstancesApi, objectTypesApi } from '../api/objectStorage'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import Modal from './Modal'
 import ObjectVersionViewer from './ObjectVersionViewer'
+import ObjectSchemaForm from './ObjectSchemaForm'
 
 const ObjectInstanceEditor = ({ instanceId, objectTypeId, onSave, onCancel, isVisible }) => {
+    // Helper function to convert object type schema to ObjectSchemaForm format
+    const getSchemaFromObjectType = (objectType) => {
+        if (!objectType?.schema?.properties) {
+            return { fields: [] }
+        }
+
+        const properties = objectType.schema.properties
+        const required = objectType.schema.required || []
+        const propertyOrder = objectType.schema.propertyOrder || []
+
+        // Use propertyOrder if available, otherwise use object keys
+        const keysToProcess = propertyOrder.length > 0 ? propertyOrder : Object.keys(properties)
+
+        const fields = keysToProcess.map(propName => {
+            // Skip 'title' field as it's handled by the model, not schema data
+            if (propName === 'title') {
+                return null
+            }
+
+            if (properties[propName]) {
+                return {
+                    name: propName,
+                    required: required.includes(propName),
+                    ...properties[propName]
+                }
+            }
+            return null
+        }).filter(Boolean)
+
+        return { fields }
+    }
     const [formData, setFormData] = useState({
         objectTypeId: objectTypeId || '',
         title: '',
@@ -170,9 +202,9 @@ const ObjectInstanceEditor = ({ instanceId, objectTypeId, onSave, onCancel, isVi
                     <nav className="-mb-px flex space-x-8">
                         {[
                             { id: 'content', label: 'Content' },
+                            { id: 'settings', label: 'Settings' },
                             { id: 'publishing', label: 'Publishing' },
-                            { id: 'hierarchy', label: 'Hierarchy' },
-                            { id: 'widgets', label: 'Widgets' },
+                            { id: 'subobjects', label: 'Sub-objects' },
                             ...(instanceId ? [{ id: 'versions', label: 'Versions' }] : [])
                         ].map((tab) => (
                             <button
@@ -180,8 +212,8 @@ const ObjectInstanceEditor = ({ instanceId, objectTypeId, onSave, onCancel, isVi
                                 type="button"
                                 onClick={() => setActiveTab(tab.id)}
                                 className={`py-2 px-1 border-b-2 font-medium text-sm ${activeTab === tab.id
-                                        ? 'border-blue-500 text-blue-600'
-                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                    ? 'border-blue-500 text-blue-600'
+                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                                     }`}
                             >
                                 {tab.label}
@@ -196,69 +228,166 @@ const ObjectInstanceEditor = ({ instanceId, objectTypeId, onSave, onCancel, isVi
                     </div>
                 ) : (
                     <>
-                        {/* Content Tab */}
+                        {/* Content Tab - Object Data & Widget Slots */}
                         {activeTab === 'content' && (
-                            <div className="space-y-4">
-                                {/* Object Type Selection */}
-                                {!instanceId && (
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                                            Object Type <span className="text-red-500">*</span>
-                                        </label>
-                                        <select
-                                            value={formData.objectTypeId}
-                                            onChange={(e) => handleInputChange('objectTypeId', e.target.value)}
-                                            className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.objectTypeId ? 'border-red-300' : 'border-gray-300'
-                                                }`}
-                                        >
-                                            <option value="">Select object type...</option>
-                                            {availableTypes.map((type) => (
-                                                <option key={type.id} value={type.id}>
-                                                    {type.label}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        {errors.objectTypeId && (
-                                            <p className="text-red-600 text-sm mt-1">{errors.objectTypeId}</p>
-                                        )}
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                {/* Left Column - Widget Slots */}
+                                <div className="space-y-4">
+                                    <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                                        <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
+                                        Widget Slots
+                                    </h3>
+                                    <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+                                        <h4 className="text-sm font-medium text-blue-900 mb-2">Widget Configuration</h4>
+                                        <p className="text-blue-800 text-sm">
+                                            Widget slot configuration will be implemented in Phase 5.
+                                            This will allow adding widgets to the slots defined by the object type.
+                                        </p>
                                     </div>
-                                )}
 
-                                {/* Title */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Title <span className="text-red-500">*</span>
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={formData.title}
-                                        onChange={(e) => handleInputChange('title', e.target.value)}
-                                        className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.title ? 'border-red-300' : 'border-gray-300'
-                                            }`}
-                                        placeholder="Enter object title..."
-                                    />
-                                    {errors.title && (
-                                        <p className="text-red-600 text-sm mt-1">{errors.title}</p>
+                                    {/* Show available slots */}
+                                    {objectType?.slotConfiguration?.slots && (
+                                        <div>
+                                            <h4 className="font-medium text-gray-900 mb-2">Available Slots:</h4>
+                                            <div className="space-y-2">
+                                                {objectType.slotConfiguration.slots.map((slot) => (
+                                                    <div key={slot.name} className="flex items-center justify-between p-3 bg-gray-50 rounded-md">
+                                                        <div>
+                                                            <span className="font-medium text-gray-900">{slot.label}</span>
+                                                            <span className="ml-2 text-sm text-gray-500">({slot.name})</span>
+                                                            {slot.required && (
+                                                                <span className="ml-2 text-xs bg-red-100 text-red-800 px-2 py-1 rounded">Required</span>
+                                                            )}
+                                                        </div>
+                                                        <span className="text-sm text-gray-500">
+                                                            {slot.maxWidgets ? `Max: ${slot.maxWidgets}` : 'Unlimited'}
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
                                     )}
                                 </div>
 
-                                {/* Dynamic Schema Fields */}
-                                {objectType?.schema?.fields && (
-                                    <div className="space-y-4">
-                                        <h3 className="text-lg font-medium text-gray-900 border-t pt-4">
-                                            {objectType.label} Fields
-                                        </h3>
-                                        {objectType.schema.fields.map((field) => (
-                                            <SchemaFieldInput
-                                                key={field.name}
-                                                field={field}
-                                                value={formData.data[field.name]}
-                                                onChange={(value) => handleDataFieldChange(field.name, value)}
-                                                error={errors[`data_${field.name}`]}
-                                            />
-                                        ))}
+                                {/* Right Column - Object Data */}
+                                <div className="space-y-4">
+                                    <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                                        <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                                        Object Data
+                                    </h3>
+
+                                    {/* Object Type Selection */}
+                                    {!instanceId && (
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                                Object Type <span className="text-red-500">*</span>
+                                            </label>
+                                            <select
+                                                value={formData.objectTypeId}
+                                                onChange={(e) => handleInputChange('objectTypeId', e.target.value)}
+                                                className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.objectTypeId ? 'border-red-300' : 'border-gray-300'
+                                                    }`}
+                                            >
+                                                <option value="">Select object type...</option>
+                                                {availableTypes.map((type) => (
+                                                    <option key={type.id} value={type.id}>
+                                                        {type.label}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            {errors.objectTypeId && (
+                                                <p className="text-red-600 text-sm mt-1">{errors.objectTypeId}</p>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Title */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Title <span className="text-red-500">*</span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={formData.title}
+                                            onChange={(e) => handleInputChange('title', e.target.value)}
+                                            className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.title ? 'border-red-300' : 'border-gray-300'
+                                                }`}
+                                            placeholder="Enter object title..."
+                                        />
+                                        {errors.title && (
+                                            <p className="text-red-600 text-sm mt-1">{errors.title}</p>
+                                        )}
                                     </div>
-                                )}
+
+                                    {/* Dynamic Schema Fields */}
+                                    {objectType?.schema?.properties && (
+                                        <div className="border-t pt-4 space-y-4">
+                                            <h4 className="font-medium text-gray-900">
+                                                {objectType.label} Fields
+                                            </h4>
+                                            <ObjectSchemaForm
+                                                schema={getSchemaFromObjectType(objectType)}
+                                                data={formData.data}
+                                                onChange={handleDataFieldChange}
+                                                errors={errors}
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+
+
+                        {/* Settings Tab */}
+                        {activeTab === 'settings' && (
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Parent Object
+                                    </label>
+                                    <select
+                                        value={formData.parent || ''}
+                                        onChange={(e) => handleInputChange('parent', e.target.value || null)}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    >
+                                        <option value="">No parent (root level)</option>
+                                        {potentialParents
+                                            .filter(p => p.id !== instanceId) // Don't allow self as parent
+                                            .map((parent) => (
+                                                <option key={parent.id} value={parent.id}>
+                                                    {'  '.repeat(parent.level)}{parent.title}
+                                                </option>
+                                            ))}
+                                    </select>
+                                    <p className="text-gray-500 text-xs mt-1">
+                                        Select a parent object to create hierarchical relationships
+                                    </p>
+                                </div>
+
+                                {/* Metadata */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Metadata (JSON)
+                                    </label>
+                                    <textarea
+                                        value={JSON.stringify(formData.metadata, null, 2)}
+                                        onChange={(e) => {
+                                            try {
+                                                const parsed = JSON.parse(e.target.value)
+                                                handleInputChange('metadata', parsed)
+                                            } catch (err) {
+                                                // Invalid JSON, don't update
+                                            }
+                                        }}
+                                        rows="6"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
+                                        placeholder="{}"
+                                    />
+                                    <p className="text-gray-500 text-xs mt-1">
+                                        Additional metadata for this object in JSON format
+                                    </p>
+                                </div>
                             </div>
                         )}
 
@@ -308,65 +437,27 @@ const ObjectInstanceEditor = ({ instanceId, objectTypeId, onSave, onCancel, isVi
                             </div>
                         )}
 
-                        {/* Hierarchy Tab */}
-                        {activeTab === 'hierarchy' && (
+                        {/* Sub-objects Tab */}
+                        {activeTab === 'subobjects' && (
                             <div className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Parent Object
-                                    </label>
-                                    <select
-                                        value={formData.parent || ''}
-                                        onChange={(e) => handleInputChange('parent', e.target.value || null)}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                    >
-                                        <option value="">No parent (root level)</option>
-                                        {potentialParents
-                                            .filter(p => p.id !== instanceId) // Don't allow self as parent
-                                            .map((parent) => (
-                                                <option key={parent.id} value={parent.id}>
-                                                    {'  '.repeat(parent.level)}{parent.title}
-                                                </option>
-                                            ))}
-                                    </select>
-                                    <p className="text-gray-500 text-xs mt-1">
-                                        Select a parent object to create hierarchical relationships
-                                    </p>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Widgets Tab */}
-                        {activeTab === 'widgets' && (
-                            <div className="space-y-4">
-                                <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-                                    <h3 className="text-lg font-medium text-blue-900 mb-2">Widget Configuration</h3>
-                                    <p className="text-blue-800">
-                                        Widget slot configuration will be implemented in Phase 5.
-                                        This will allow adding widgets to the slots defined by the object type.
+                                <div className="bg-gray-50 border border-gray-200 rounded-md p-4">
+                                    <h3 className="text-lg font-medium text-gray-900 mb-2">Sub-objects</h3>
+                                    <p className="text-gray-700">
+                                        Manage child objects and hierarchical relationships.
+                                        Sub-objects inherit context from their parent and can be organized in tree structures.
                                     </p>
                                 </div>
 
-                                {/* Show available slots */}
-                                {objectType?.slotConfiguration?.slots && (
+                                {instanceId ? (
                                     <div>
-                                        <h4 className="font-medium text-gray-900 mb-2">Available Slots:</h4>
-                                        <div className="space-y-2">
-                                            {objectType.slotConfiguration.slots.map((slot) => (
-                                                <div key={slot.name} className="flex items-center justify-between p-3 bg-gray-50 rounded-md">
-                                                    <div>
-                                                        <span className="font-medium text-gray-900">{slot.label}</span>
-                                                        <span className="ml-2 text-sm text-gray-500">({slot.name})</span>
-                                                        {slot.required && (
-                                                            <span className="ml-2 text-xs bg-red-100 text-red-800 px-2 py-1 rounded">Required</span>
-                                                        )}
-                                                    </div>
-                                                    <span className="text-sm text-gray-500">
-                                                        {slot.maxWidgets ? `Max: ${slot.maxWidgets}` : 'Unlimited'}
-                                                    </span>
-                                                </div>
-                                            ))}
+                                        <h4 className="font-medium text-gray-900 mb-2">Child Objects:</h4>
+                                        <div className="text-gray-500 text-sm">
+                                            Child object management will be implemented in a future phase.
                                         </div>
+                                    </div>
+                                ) : (
+                                    <div className="text-gray-500 text-sm">
+                                        Sub-objects can be managed after creating this object.
                                     </div>
                                 )}
                             </div>
@@ -386,7 +477,7 @@ const ObjectInstanceEditor = ({ instanceId, objectTypeId, onSave, onCancel, isVi
                                         View All Versions
                                     </button>
                                 </div>
-                                
+
                                 <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
                                     <h4 className="text-sm font-medium text-blue-900 mb-2">Version Control</h4>
                                     <p className="text-blue-800 text-sm">
@@ -395,7 +486,7 @@ const ObjectInstanceEditor = ({ instanceId, objectTypeId, onSave, onCancel, isVi
                                         and restore previous versions if needed.
                                     </p>
                                 </div>
-                                
+
                                 <div className="bg-gray-50 rounded-md p-4">
                                     <h4 className="text-sm font-medium text-gray-900 mb-2">Current Version Info</h4>
                                     <div className="text-sm text-gray-700 space-y-1">
@@ -437,7 +528,7 @@ const ObjectInstanceEditor = ({ instanceId, objectTypeId, onSave, onCancel, isVi
                     </button>
                 </div>
             </form>
-            
+
             {/* Version Viewer Modal */}
             {showVersions && (
                 <ObjectVersionViewer

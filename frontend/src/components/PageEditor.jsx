@@ -498,7 +498,7 @@ const PageEditor = () => {
             pageVersionData
         );
         if (changes.hasPageChanges || changes.hasVersionChanges) {
-            console.log('loadVersionsPreserveCurrent:: unsaved changes') // TODO
+            // TODO: Handle unsaved changes
             return;
         }
 
