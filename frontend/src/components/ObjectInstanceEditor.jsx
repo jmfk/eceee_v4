@@ -362,29 +362,6 @@ const ObjectInstanceEditor = ({ instanceId, objectTypeId, onSave, onCancel, isVi
                                     </p>
                                 </div>
 
-                                {/* Metadata */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Metadata (JSON)
-                                    </label>
-                                    <textarea
-                                        value={JSON.stringify(formData.metadata, null, 2)}
-                                        onChange={(e) => {
-                                            try {
-                                                const parsed = JSON.parse(e.target.value)
-                                                handleInputChange('metadata', parsed)
-                                            } catch (err) {
-                                                // Invalid JSON, don't update
-                                            }
-                                        }}
-                                        rows="6"
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
-                                        placeholder="{}"
-                                    />
-                                    <p className="text-gray-500 text-xs mt-1">
-                                        Additional metadata for this object in JSON format
-                                    </p>
-                                </div>
                             </div>
                         )}
 
@@ -489,7 +466,7 @@ const ObjectInstanceEditor = ({ instanceId, objectTypeId, onSave, onCancel, isVi
                                     <div className="text-sm text-gray-700 space-y-1">
                                         <p><strong>Version:</strong> {formData.version || 'New'}</p>
                                         <p><strong>Last Modified:</strong> {instanceResponse?.data?.updatedAt ? new Date(instanceResponse.data.updatedAt).toLocaleString() : 'Not saved yet'}</p>
-                                        <p><strong>Created By:</strong> {instanceResponse?.data?.createdBy || 'Current user'}</p>
+                                        <p><strong>Created By:</strong> {instanceResponse?.data?.createdBy?.username || instanceResponse?.data?.createdBy || 'Current user'}</p>
                                     </div>
                                 </div>
                             </div>

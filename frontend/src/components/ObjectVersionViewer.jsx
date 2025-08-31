@@ -168,7 +168,7 @@ const VersionItem = ({ version, isLatest, isSelected, onSelect, compareMode }) =
                         <div className="flex items-center space-x-4 mt-1 text-sm text-gray-600">
                             <span className="flex items-center">
                                 <User className="h-3 w-3 mr-1" />
-                                {version.createdBy}
+                                {version.createdBy?.username || version.createdBy || 'Unknown'}
                             </span>
                             <span className="flex items-center">
                                 <Calendar className="h-3 w-3 mr-1" />
@@ -280,7 +280,7 @@ const VersionComparison = ({ version1, version2 }) => {
                 <div className="bg-gray-50 rounded-md p-3">
                     <h4 className="font-medium text-gray-900">Version {version1?.versionNumber}</h4>
                     <p className="text-sm text-gray-600 mt-1">
-                        {version1?.createdBy} • {new Date(version1?.createdAt).toLocaleString()}
+                        {version1?.createdBy?.username || version1?.createdBy || 'Unknown'} • {new Date(version1?.createdAt).toLocaleString()}
                     </p>
                     {version1?.changeDescription && (
                         <p className="text-sm text-gray-700 mt-2">{version1.changeDescription}</p>
@@ -290,7 +290,7 @@ const VersionComparison = ({ version1, version2 }) => {
                 <div className="bg-gray-50 rounded-md p-3">
                     <h4 className="font-medium text-gray-900">Version {version2?.versionNumber}</h4>
                     <p className="text-sm text-gray-600 mt-1">
-                        {version2?.createdBy} • {new Date(version2?.createdAt).toLocaleString()}
+                        {version2?.createdBy?.username || version2?.createdBy || 'Unknown'} • {new Date(version2?.createdAt).toLocaleString()}
                     </p>
                     {version2?.changeDescription && (
                         <p className="text-sm text-gray-700 mt-2">{version2.changeDescription}</p>

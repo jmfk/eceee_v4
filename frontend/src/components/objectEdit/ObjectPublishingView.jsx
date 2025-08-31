@@ -206,7 +206,9 @@ const ObjectPublishingView = ({ objectType, instance, isNewInstance, onSave, onC
                                     </div>
                                     <div>
                                         <span className="font-medium text-gray-700">Created By:</span>
-                                        <span className="ml-2 text-gray-600">{instance.createdBy || 'Unknown'}</span>
+                                        <span className="ml-2 text-gray-600">
+                                            {instance.createdBy?.username || instance.createdBy?.firstName || 'Unknown'}
+                                        </span>
                                     </div>
                                     {instance.publishDate && (
                                         <div>

@@ -10,7 +10,6 @@ const ObjectSettingsView = ({ objectType, instance, isNewInstance, onSave, onCan
         metadata: instance?.metadata || {}
     })
     const [isDirty, setIsDirty] = useState(false)
-    const [metadataText, setMetadataText] = useState('')
 
     const queryClient = useQueryClient()
     const { addNotification } = useGlobalNotifications()
@@ -30,7 +29,6 @@ const ObjectSettingsView = ({ objectType, instance, isNewInstance, onSave, onCan
                 parent: instance.parent || null,
                 metadata: instance.metadata || {}
             })
-            setMetadataText(JSON.stringify(instance.metadata || {}, null, 2))
         }
     }, [instance])
 
@@ -66,25 +64,7 @@ const ObjectSettingsView = ({ objectType, instance, isNewInstance, onSave, onCan
         setIsDirty(true)
     }
 
-    const handleMetadataChange = (value) => {
-        setMetadataText(value)
-        try {
-            const parsed = JSON.parse(value)
-            handleInputChange('metadata', parsed)
-        } catch (err) {
-            // Invalid JSON, don't update formData
-        }
-    }
-
     const handleSave = () => {
-        // Validate metadata JSON
-        try {
-            JSON.parse(metadataText)
-        } catch (err) {
-            addNotification('Invalid JSON in metadata field', 'error')
-            return
-        }
-
         saveMutation.mutate(formData)
     }
 
@@ -121,22 +101,7 @@ const ObjectSettingsView = ({ objectType, instance, isNewInstance, onSave, onCan
                         </p>
                     </div>
 
-                    {/* Metadata */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Metadata (JSON)
-                        </label>
-                        <textarea
-                            value={metadataText}
-                            onChange={(e) => handleMetadataChange(e.target.value)}
-                            rows="8"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
-                            placeholder="{}"
-                        />
-                        <p className="text-gray-500 text-sm mt-1">
-                            Additional metadata for this object in JSON format
-                        </p>
-                    </div>
+
 
                     {/* Object Info (read-only) */}
                     {!isNewInstance && instance && (
