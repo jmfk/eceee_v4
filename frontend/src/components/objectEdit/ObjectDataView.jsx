@@ -23,7 +23,7 @@ const ObjectDataView = ({ objectType, instance, isNewInstance, onSave, onCancel 
     const { data: typesResponse } = useQuery({
         queryKey: ['objectTypes'],
         queryFn: () => objectTypesApi.getActive(),
-        enabled: isNewInstance
+        enabled: Boolean(isNewInstance)
     })
 
     const availableTypes = typesResponse?.data || []
