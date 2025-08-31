@@ -101,7 +101,7 @@ const ObjectVersionsView = ({ objectType, instance, isNewInstance, onSave, onCan
                             </div>
                             <div>
                                 <span className="font-medium text-gray-700">Created By:</span>
-                                <span className="ml-2 text-gray-600">{instance?.createdBy || 'Current user'}</span>
+                                <span className="ml-2 text-gray-600">{instance?.createdBy?.username || instance?.createdBy || 'Current user'}</span>
                             </div>
                         </div>
                     </div>
