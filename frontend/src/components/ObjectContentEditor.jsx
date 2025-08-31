@@ -13,24 +13,71 @@ const ObjectContentEditor = forwardRef(({ objectType, widgets = {}, onWidgetChan
         )
     }
 
-    const handleAddWidget = (slotName) => {
-        // For now, just add a placeholder widget
-        const newWidget = {
-            id: `widget_${Date.now()}`,
-            type: 'Text Block',
-            name: 'New Text Block',
-            config: {
-                content: 'Click to edit this content...'
+    const handleAddWidget = (slotName, widgetControlId = null) => {
+        const slot = objectType.slotConfiguration.slots.find(s => s.name === slotName)
+        if (!slot) return
+
+        let widgetToAdd = null
+
+        // If a specific widget control is specified, use it
+        if (widgetControlId) {
+            const widgetControl = slot.widgetControls?.find(c => c.id === widgetControlId)
+            if (widgetControl) {
+                widgetToAdd = {
+                    id: `widget_${Date.now()}`,
+                    type: widgetControl.label || getWidgetDisplayName(widgetControl.widgetType),
+                    slug: widgetControl.widgetType,
+                    config: widgetControl.defaultConfig || {},
+                    controlId: widgetControl.id
+                }
+            }
+        } else {
+            // Use the first available widget control or fallback to Text Block
+            const availableControls = slot.widgetControls || []
+            if (availableControls.length > 0) {
+                const firstControl = availableControls[0]
+                widgetToAdd = {
+                    id: `widget_${Date.now()}`,
+                    type: firstControl.label || getWidgetDisplayName(firstControl.widgetType),
+                    slug: firstControl.widgetType,
+                    config: firstControl.defaultConfig || {},
+                    controlId: firstControl.id
+                }
+            } else {
+                // Fallback for legacy slots without widget controls
+                widgetToAdd = {
+                    id: `widget_${Date.now()}`,
+                    type: 'Text Block',
+                    slug: 'text-block',
+                    config: {
+                        title: '',
+                        content: 'Click to edit this content...'
+                    }
+                }
             }
         }
 
-        const currentSlotWidgets = widgets[slotName] || []
-        const updatedWidgets = {
-            ...widgets,
-            [slotName]: [...currentSlotWidgets, newWidget]
-        }
+        if (widgetToAdd) {
+            const currentSlotWidgets = widgets[slotName] || []
+            const updatedWidgets = {
+                ...widgets,
+                [slotName]: [...currentSlotWidgets, widgetToAdd]
+            }
 
-        onWidgetChange?.(updatedWidgets)
+            onWidgetChange?.(updatedWidgets)
+        }
+    }
+
+    const getWidgetDisplayName = (widgetSlug) => {
+        const widgetMap = {
+            'text-block': 'Text Block',
+            'image': 'Image',
+            'button': 'Button',
+            'html-block': 'HTML Block',
+            'gallery': 'Gallery',
+            'spacer': 'Spacer'
+        }
+        return widgetMap[widgetSlug] || widgetSlug
     }
 
     const handleEditWidget = (slotName, widgetIndex) => {
@@ -114,21 +161,72 @@ const ObjectContentEditor = forwardRef(({ objectType, widgets = {}, onWidgetChan
                                 </span>
                             )}
                         </h4>
-                        <p className="text-xs text-gray-500 mt-1">
-                            {slot.description || `Slot: ${slot.name}`}
-                            {slot.maxWidgets && ` • Max: ${slot.maxWidgets}`}
-                        </p>
+                        {(slot.description || slot.maxWidgets) && (
+                            <p className="text-xs text-gray-500 mt-1">
+                                {slot.description}
+                                {slot.maxWidgets && (slot.description ? ` • Max: ${slot.maxWidgets}` : `Max: ${slot.maxWidgets}`)}
+                            </p>
+                        )}
                     </div>
-                    <button
-                        onClick={(e) => {
-                            e.stopPropagation()
-                            handleAddWidget(slot.name)
-                        }}
-                        className="bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-md transition-colors"
-                        title="Add widget"
-                    >
-                        <Plus className="h-3 w-3" />
-                    </button>
+                    {/* Add Widget Button - Smart based on available controls */}
+                    {(() => {
+                        const availableControls = slot.widgetControls || []
+
+                        if (availableControls.length === 0) {
+                            // No controls defined - simple add button
+                            return (
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation()
+                                        handleAddWidget(slot.name)
+                                    }}
+                                    className="bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-md transition-colors"
+                                    title="Add widget"
+                                >
+                                    <Plus className="h-3 w-3" />
+                                </button>
+                            )
+                        } else if (availableControls.length === 1) {
+                            // Single control - direct add button
+                            const control = availableControls[0]
+                            return (
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation()
+                                        handleAddWidget(slot.name, control.id)
+                                    }}
+                                    className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-md transition-colors flex items-center text-sm"
+                                    title={`Add ${control.label || getWidgetDisplayName(control.widgetType)}`}
+                                >
+                                    <Plus className="h-3 w-3 mr-1" />
+                                    {control.label || getWidgetDisplayName(control.widgetType)}
+                                </button>
+                            )
+                        } else {
+                            // Multiple controls - dropdown menu
+                            return (
+                                <div className="relative">
+                                    <select
+                                        onChange={(e) => {
+                                            if (e.target.value) {
+                                                handleAddWidget(slot.name, e.target.value)
+                                                e.target.value = '' // Reset
+                                            }
+                                        }}
+                                        className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-md transition-colors text-sm border-0 focus:ring-2 focus:ring-blue-500"
+                                        defaultValue=""
+                                    >
+                                        <option value="" disabled>Add Widget...</option>
+                                        {availableControls.map((control) => (
+                                            <option key={control.id} value={control.id} className="text-gray-900">
+                                                {control.label || getWidgetDisplayName(control.widgetType)}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )
+                        }
+                    })()}
                 </div>
 
                 <div className="space-y-2">
@@ -138,7 +236,18 @@ const ObjectContentEditor = forwardRef(({ objectType, widgets = {}, onWidgetChan
                         <div className="text-center py-6 text-gray-400 border-2 border-dashed border-gray-200 rounded-lg">
                             <Layout className="h-6 w-6 mx-auto mb-2" />
                             <p className="text-sm">No widgets in this slot</p>
-                            <p className="text-xs">Click the + button to add a widget</p>
+                            {(() => {
+                                const availableControls = slot.widgetControls || []
+                                if (availableControls.length > 0) {
+                                    return (
+                                        <p className="text-xs">
+                                            Available: {availableControls.map(c => c.label || getWidgetDisplayName(c.widgetType)).join(', ')}
+                                        </p>
+                                    )
+                                } else {
+                                    return <p className="text-xs">Click the + button to add a widget</p>
+                                }
+                            })()}
                         </div>
                     )}
                 </div>
@@ -148,13 +257,6 @@ const ObjectContentEditor = forwardRef(({ objectType, widgets = {}, onWidgetChan
 
     return (
         <div ref={ref} className="space-y-4">
-            <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-medium text-gray-900">Widget Slots</h3>
-                <div className="text-sm text-gray-500">
-                    {objectType.slotConfiguration.slots.length} slots configured
-                </div>
-            </div>
-
             <div className="space-y-4">
                 {objectType.slotConfiguration.slots.map(renderSlot)}
             </div>

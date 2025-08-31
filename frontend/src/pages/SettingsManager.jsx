@@ -41,6 +41,7 @@ import BulkPublishingOperations from '../components/BulkPublishingOperations'
 import NamespaceManager from '../components/NamespaceManager'
 import TagManager from '../components/TagManager'
 import ObjectTypeManager from '../components/ObjectTypeManager'
+import WidgetManager from '../components/WidgetManager'
 import { extractErrorMessage } from '../utils/errorHandling.js'
 // Schema managers are no longer embedded in Settings; use dedicated pages under /schemas
 
@@ -341,6 +342,8 @@ const SettingsManager = () => {
                 return <LayoutEditor />
             case 'themes':
                 return <ThemeEditor />
+            case 'widgets':
+                return <WidgetManager />
             case 'tags':
                 return <TagManager />
             case 'object-types':
@@ -371,7 +374,7 @@ const SettingsManager = () => {
             <div className="bg-white rounded-lg shadow p-6">
                 <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
                 <p className="text-gray-600 mt-2">
-                    Manage your website pages, layouts, themes, and widgets
+                    Manage your website pages, layouts, themes, widgets, and system settings
                 </p>
             </div>
 

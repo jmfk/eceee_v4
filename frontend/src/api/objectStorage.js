@@ -227,6 +227,20 @@ export const objectInstancesApi = {
     },
 
     /**
+     * Update only widgets (doesn't affect other object data)
+     */
+    async updateWidgets(id, widgets, changeDescription = 'Widget update') {
+        const response = await api.put(`${BASE_URL}/objects/${id}/update_widgets/`, {
+            widgets,
+            change_description: changeDescription
+        })
+        return {
+            ...response,
+            data: convertKeysToCamel(response.data)
+        }
+    },
+
+    /**
      * Delete object instance
      */
     async delete(id) {

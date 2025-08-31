@@ -5,7 +5,6 @@ import { Search, ArrowLeft, Plus, Grid, List, AlertCircle, Image, FolderOpen } f
 import { objectTypesApi, objectInstancesApi } from '../api/objectStorage'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import ObjectInstanceEditor from './ObjectInstanceEditor'
-import ObjectEditor from './ObjectEditor'
 
 const ObjectBrowser = () => {
     const navigate = useNavigate()
@@ -14,7 +13,6 @@ const ObjectBrowser = () => {
     const [searchTerm, setSearchTerm] = useState('')
     const [statusFilter, setStatusFilter] = useState('')
     const [editingInstance, setEditingInstance] = useState(null)
-    const [showLegacyEditor, setShowLegacyEditor] = useState(false)
 
     const { addNotification } = useGlobalNotifications()
 
@@ -94,18 +92,7 @@ const ObjectBrowser = () => {
         )
     }
 
-    const handleLegacyEditSave = (savedInstance) => {
-        setShowLegacyEditor(false)
-        addNotification(
-            `Object ${editingInstance ? 'updated' : 'created'} successfully`,
-            'success'
-        )
-    }
 
-    const handleLegacyEditCancel = () => {
-        setShowLegacyEditor(false)
-        setEditingInstance(null)
-    }
 
     // Error handling
     if (typesError && currentView === 'grid') {
@@ -206,14 +193,7 @@ const ObjectBrowser = () => {
                         </div>
                     )}
 
-                    {/* Legacy Editor Modal */}
-                    <ObjectInstanceEditor
-                        instanceId={editingInstance?.id}
-                        objectTypeId={editingInstance?.objectType?.id}
-                        onSave={handleLegacyEditSave}
-                        onCancel={handleLegacyEditCancel}
-                        isVisible={showLegacyEditor}
-                    />
+
                 </div>
             </div>
         )

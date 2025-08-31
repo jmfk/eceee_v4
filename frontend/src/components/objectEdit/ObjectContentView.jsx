@@ -11,6 +11,16 @@ const ObjectContentView = ({ objectType, instance, isNewInstance, onSave, onCanc
     const navigate = useNavigate()
     const { instanceId, objectTypeId, tab } = useParams()
 
+    // Track widget changes locally (don't auto-save)
+    const [localWidgets, setLocalWidgets] = useState(instance?.widgets || {})
+    const [hasWidgetChanges, setHasWidgetChanges] = useState(false)
+
+    // Update local widgets when instance changes
+    useEffect(() => {
+        setLocalWidgets(instance?.widgets || {})
+        setHasWidgetChanges(false)
+    }, [instance])
+
     // Helper function to convert object type schema to ObjectSchemaForm format
     const getSchemaFromObjectType = (objectType) => {
         if (!objectType?.schema?.properties) {
@@ -76,6 +86,9 @@ const ObjectContentView = ({ objectType, instance, isNewInstance, onSave, onCanc
                 widgets: instance.widgets || {},
                 metadata: instance.metadata || {}
             })
+            // Sync local widgets with instance
+            setLocalWidgets(instance.widgets || {})
+            setHasWidgetChanges(false)
         }
     }, [instance])
 
@@ -94,6 +107,7 @@ const ObjectContentView = ({ objectType, instance, isNewInstance, onSave, onCanc
             queryClient.invalidateQueries(['objectInstances'])
             queryClient.invalidateQueries(['objectInstance', instance?.id])
             setIsDirty(false)
+            setHasWidgetChanges(false)
 
             // Show success message based on save mode
             let successMessage
@@ -133,6 +147,9 @@ const ObjectContentView = ({ objectType, instance, isNewInstance, onSave, onCanc
             setErrors(prev => ({ ...prev, [field]: null }))
         }
     }
+
+    // Check if there are any unsaved changes (form data or widgets)
+    const hasUnsavedChanges = isDirty || hasWidgetChanges
 
     const handleDataFieldChange = (fieldName, value) => {
         setFormData(prev => ({
@@ -179,7 +196,13 @@ const ObjectContentView = ({ objectType, instance, isNewInstance, onSave, onCanc
             return
         }
 
-        saveMutation.mutate({ data: formData, mode })
+        // Include local widget changes in the save data
+        const saveData = {
+            ...formData,
+            widgets: localWidgets
+        }
+
+        saveMutation.mutate({ data: saveData, mode })
     }
 
     return (
@@ -198,9 +221,12 @@ const ObjectContentView = ({ objectType, instance, isNewInstance, onSave, onCanc
                             </h3>
                             <ObjectContentEditor
                                 objectType={objectType}
-                                instance={instance}
-                                onSave={() => { }} // Handle within this component
-                                onCancel={onCancel}
+                                widgets={localWidgets}
+                                onWidgetChange={(newWidgets) => {
+                                    setLocalWidgets(newWidgets)
+                                    setHasWidgetChanges(true)
+                                }}
+                                mode="object"
                             />
                         </div>
                     </div>
@@ -340,7 +366,7 @@ const ObjectContentView = ({ objectType, instance, isNewInstance, onSave, onCanc
                         <>
                             <button
                                 onClick={() => handleSave('update_current')}
-                                disabled={saveMutation.isPending || !isDirty}
+                                disabled={saveMutation.isPending || !hasUnsavedChanges}
                                 className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-colors"
                             >
                                 {saveMutation.isPending ? (
@@ -357,7 +383,7 @@ const ObjectContentView = ({ objectType, instance, isNewInstance, onSave, onCanc
                             </button>
                             <button
                                 onClick={() => handleSave('create_new')}
-                                disabled={saveMutation.isPending || !isDirty}
+                                disabled={saveMutation.isPending || !hasUnsavedChanges}
                                 className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-colors"
                             >
                                 {saveMutation.isPending ? (
@@ -378,7 +404,7 @@ const ObjectContentView = ({ objectType, instance, isNewInstance, onSave, onCanc
                     {isNewInstance && (
                         <button
                             onClick={() => handleSave('create_new')}
-                            disabled={saveMutation.isPending || !isDirty}
+                            disabled={saveMutation.isPending || !hasUnsavedChanges}
                             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-colors"
                         >
                             {saveMutation.isPending ? (
