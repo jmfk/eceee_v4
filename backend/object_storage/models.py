@@ -461,13 +461,18 @@ class ObjectInstance(MPTTModel):
 
         # Ensure slug is unique within the object type
         if is_new:  # New object
-            original_slug = self.slug
-            counter = 1
-            while ObjectInstance.objects.filter(
-                object_type=self.object_type, slug=self.slug
-            ).exists():
-                self.slug = f"{original_slug}-{counter}"
-                counter += 1
+            from django.db import transaction
+
+            with transaction.atomic():
+                original_slug = self.slug
+                counter = 1
+                while (
+                    ObjectInstance.objects.select_for_update()
+                    .filter(object_type=self.object_type, slug=self.slug)
+                    .exists()
+                ):
+                    self.slug = f"{original_slug}-{counter}"
+                    counter += 1
 
         super().save(*args, **kwargs)
 
@@ -718,7 +723,7 @@ class ObjectInstance(MPTTModel):
 
         # Create the new version
         new_version = ObjectVersion.objects.create(
-            object=self,
+            object_instance=self,
             version_number=next_version,
             data=version_data,
             widgets=version_widgets,
@@ -791,7 +796,7 @@ class ObjectVersion(models.Model):
     Stores snapshots of object data and widgets at specific points in time.
     """
 
-    object = models.ForeignKey(
+    object_instance = models.ForeignKey(
         ObjectInstance, on_delete=models.CASCADE, related_name="versions"
     )
     version_number = models.PositiveIntegerField()
@@ -808,23 +813,24 @@ class ObjectVersion(models.Model):
     class Meta:
         ordering = ["-version_number"]
         indexes = [
-            models.Index(fields=["object", "version_number"]),
+            models.Index(fields=["object_instance", "version_number"]),
             models.Index(fields=["created_at"]),
         ]
         constraints = [
             models.UniqueConstraint(
-                fields=["object", "version_number"], name="unique_version_per_object"
+                fields=["object_instance", "version_number"],
+                name="unique_version_per_object",
             )
         ]
 
     def __str__(self):
-        return f"{self.object.title} v{self.version_number}"
+        return f"{self.object_instance.title} v{self.version_number}"
 
     def to_dict(self):
         """Convert to dictionary for API serialization."""
         return {
             "id": self.id,
-            "object_id": self.object.id,
+            "object_id": self.object_instance.id,
             "version_number": self.version_number,
             "data": self.data,
             "widgets": self.widgets,

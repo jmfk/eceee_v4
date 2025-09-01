@@ -17,6 +17,11 @@ from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 import uuid
 import os
+import re
+import logging
+
+# Set up logger
+logger = logging.getLogger(__name__)
 
 from .models import ObjectTypeDefinition, ObjectInstance, ObjectVersion
 from .serializers import (
@@ -118,10 +123,19 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_200_OK,
             )
 
-        except Exception as e:
+        except ValidationError as e:
+            logger.warning(f"Validation error updating basic info: {str(e)}")
             return Response(
-                {"error": f"Failed to update basic info: {str(e)}"},
+                {"error": "Invalid data provided"},
                 status=status.HTTP_400_BAD_REQUEST,
+            )
+        except Exception as e:
+            logger.error(
+                f"Unexpected error updating basic info: {str(e)}", exc_info=True
+            )
+            return Response(
+                {"error": "Failed to update basic info due to server error"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
     @action(detail=True, methods=["put"])
@@ -194,10 +208,19 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_200_OK,
             )
 
-        except Exception as e:
+        except ValidationError as e:
+            logger.warning(f"Validation error updating widget slots: {str(e)}")
             return Response(
-                {"error": f"Failed to update widget slots: {str(e)}"},
+                {"error": "Invalid slot configuration provided"},
                 status=status.HTTP_400_BAD_REQUEST,
+            )
+        except Exception as e:
+            logger.error(
+                f"Unexpected error updating widget slots: {str(e)}", exc_info=True
+            )
+            return Response(
+                {"error": "Failed to update widget slots due to server error"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
     @action(detail=True, methods=["put"])
@@ -1041,9 +1064,22 @@ def upload_image(request):
             )
 
     try:
-        # Generate unique filename
-        file_extension = os.path.splitext(image_file.name)[1]
-        unique_filename = f"object_type_icons/{uuid.uuid4()}{file_extension}"
+        # Sanitize and validate file extension
+        file_extension = os.path.splitext(image_file.name)[1].lower()
+
+        # Whitelist allowed extensions
+        allowed_extensions = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"}
+        if file_extension not in allowed_extensions:
+            return Response(
+                {
+                    "error": f"Invalid file extension. Allowed: {', '.join(allowed_extensions)}"
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Sanitize extension to prevent path traversal
+        safe_extension = re.sub(r"[^a-zA-Z0-9.]", "", file_extension)
+        unique_filename = f"object_type_icons/{uuid.uuid4()}{safe_extension}"
 
         # Save the file
         file_path = default_storage.save(
@@ -1077,8 +1113,21 @@ def upload_image(request):
             status=status.HTTP_201_CREATED,
         )
 
-    except Exception as e:
+    except ValidationError as e:
+        logger.warning(f"File upload validation error: {str(e)}")
         return Response(
-            {"error": f"Upload failed: {str(e)}"},
+            {"error": "Invalid file format or content"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    except PermissionError as e:
+        logger.error(f"File upload permission error: {str(e)}")
+        return Response(
+            {"error": "Permission denied for file upload"},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error during file upload: {str(e)}", exc_info=True)
+        return Response(
+            {"error": "Upload failed due to server error"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )

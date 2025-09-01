@@ -249,8 +249,6 @@ class SchemaValidator:
         if "propertyOrder" in schema and not isinstance(schema["propertyOrder"], list):
             raise ValidationError("Schema 'propertyOrder' must be an array")
 
-        print("schema", schema)
-        print("schema['properties']", schema["properties"])
         # Validate each property
         for prop_name, prop_def in schema["properties"].items():
             SchemaValidator._validate_property(prop_name, prop_def)
@@ -269,9 +267,6 @@ class SchemaValidator:
 
         if not isinstance(prop_def, dict):
             raise ValidationError(f"Property '{prop_name}' must be an object")
-
-        print("prop_name", prop_name)
-        print("prop_def", prop_def)
 
         # Validate required fields
         if "type" not in prop_def:

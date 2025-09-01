@@ -414,16 +414,16 @@ class ObjectVersionAdmin(admin.ModelAdmin):
     """Admin interface for Object Versions."""
 
     list_display = [
-        "object",
+        "object_instance",
         "version_number",
         "created_by",
         "created_at",
         "change_description_short",
     ]
-    list_filter = ["created_at", "object__object_type"]
-    search_fields = ["object__title", "change_description"]
+    list_filter = ["created_at", "object_instance__object_type"]
+    search_fields = ["object_instance__title", "change_description"]
     readonly_fields = [
-        "object",
+        "object_instance",
         "version_number",
         "data",
         "widgets",
@@ -435,7 +435,7 @@ class ObjectVersionAdmin(admin.ModelAdmin):
     fieldsets = (
         (
             "Version Information",
-            {"fields": ("object", "version_number", "change_description")},
+            {"fields": ("object_instance", "version_number", "change_description")},
         ),
         (
             "Snapshot Data",
@@ -491,5 +491,7 @@ class ObjectVersionAdmin(admin.ModelAdmin):
         return (
             super()
             .get_queryset(request)
-            .select_related("object", "object__object_type", "created_by")
+            .select_related(
+                "object_instance", "object_instance__object_type", "created_by"
+            )
         )
