@@ -92,7 +92,7 @@ const ObjectBrowser = () => {
             const params = {}
             if (selectedObjectType) params.type = selectedObjectType.name
             if (searchTerm) params.search = searchTerm
-            if (statusFilter) params.status = statusFilter
+            if (statusFilter && statusFilter !== '') params.status = statusFilter
 
             if (searchTerm) {
                 // For search, use the regular search endpoint but filter results to top-level only
