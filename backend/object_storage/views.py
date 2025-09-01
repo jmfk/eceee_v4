@@ -243,6 +243,85 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+    @action(detail=True, methods=["put"])
+    def update_relationships(self, request, pk=None):
+        """Update relationships configuration for an object type"""
+        obj_type = self.get_object()
+
+        try:
+            # Extract relationships data
+            hierarchy_level = request.data.get("hierarchy_level")
+            allowed_child_types = request.data.get("allowed_child_types", [])
+
+            # Validate hierarchy level
+            if hierarchy_level and hierarchy_level not in [
+                "top_level_only",
+                "sub_object_only",
+                "both",
+            ]:
+                return Response(
+                    {
+                        "error": "Invalid hierarchy level. Must be 'top_level_only', 'sub_object_only', or 'both'"
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Update hierarchy level if provided
+            if hierarchy_level is not None:
+                obj_type.hierarchy_level = hierarchy_level
+
+            # Update allowed child types if provided
+            if allowed_child_types is not None:
+                # Validate that all child type names exist and are active
+                if allowed_child_types:
+                    existing_types = ObjectTypeDefinition.objects.filter(
+                        name__in=allowed_child_types, is_active=True
+                    ).values_list("name", flat=True)
+
+                    invalid_names = set(allowed_child_types) - set(existing_types)
+                    if invalid_names:
+                        return Response(
+                            {
+                                "error": f"Invalid child types: {', '.join(invalid_names)}"
+                            },
+                            status=status.HTTP_400_BAD_REQUEST,
+                        )
+
+                # Get the ObjectTypeDefinition instances
+                child_types = (
+                    ObjectTypeDefinition.objects.filter(
+                        name__in=allowed_child_types, is_active=True
+                    )
+                    if allowed_child_types
+                    else []
+                )
+
+                # Update the allowed child types
+                obj_type.allowed_child_types.set(child_types)
+
+            # Save the object type
+            obj_type.save()
+
+            # Return updated data
+            serializer = self.get_serializer(obj_type)
+            return Response(
+                {
+                    "message": "Relationships updated successfully",
+                    "hierarchy_level": obj_type.hierarchy_level,
+                    "allowed_child_types": [
+                        ct.name for ct in obj_type.allowed_child_types.all()
+                    ],
+                    "updated_at": serializer.data.get("updated_at"),
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to update relationships: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
     @action(detail=True, methods=["get"])
     def instances(self, request, pk=None):
         """Get all instances of this object type"""
@@ -394,35 +473,102 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
             "change_description", "Updated current version via API"
         )
 
-        if data is None and widgets is None:
+        # Extract other object fields that can be updated
+        title = request.data.get("title")
+        status = request.data.get("status")
+        parent = request.data.get("parent")
+        metadata = request.data.get("metadata")
+        publish_date = request.data.get("publish_date")
+        unpublish_date = request.data.get("unpublish_date")
+
+        # Check if we have at least one field to update
+        has_version_changes = data is not None or widgets is not None
+        has_object_changes = any(
+            [
+                title is not None,
+                status is not None,
+                parent is not None,
+                metadata is not None,
+                publish_date is not None,
+                unpublish_date is not None,
+            ]
+        )
+
+        if not has_version_changes and not has_object_changes:
             return Response(
-                {"error": "At least 'data' or 'widgets' must be provided"},
+                {"error": "At least one field must be provided for update"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         try:
-            # Update the current version
-            updated_version = instance.update_current_version(
-                request.user,
-                data=data,
-                widgets=widgets,
-                change_description=change_description,
-            )
+            # Update object fields first
+            object_updated = False
+            if has_object_changes:
+                if title is not None:
+                    instance.title = title
+                    object_updated = True
+                if status is not None:
+                    instance.status = status
+                    object_updated = True
+                if parent is not None:
+                    # Handle parent field (can be ID or None)
+                    if parent:
+                        try:
+                            parent_obj = ObjectInstance.objects.get(pk=parent)
+                            instance.parent = parent_obj
+                        except ObjectInstance.DoesNotExist:
+                            return Response(
+                                {
+                                    "error": f"Parent object with ID {parent} does not exist"
+                                },
+                                status=status.HTTP_400_BAD_REQUEST,
+                            )
+                    else:
+                        instance.parent = None
+                    object_updated = True
+                if metadata is not None:
+                    instance.metadata = metadata
+                    object_updated = True
+                if publish_date is not None:
+                    instance.publish_date = publish_date
+                    object_updated = True
+                if unpublish_date is not None:
+                    instance.unpublish_date = unpublish_date
+                    object_updated = True
+
+                if object_updated:
+                    instance.save()
+
+            # Update the current version if data or widgets changed
+            updated_version = None
+            if has_version_changes:
+                updated_version = instance.update_current_version(
+                    request.user,
+                    data=data,
+                    widgets=widgets,
+                    change_description=change_description,
+                )
 
             # Return the updated instance data
             serializer = self.get_serializer(instance)
-            return Response(
-                {
-                    "message": "Current version updated successfully",
-                    "version_id": updated_version.id,
-                    "version_number": updated_version.version_number,
-                    "object": serializer.data,
-                }
-            )
+            response_data = {
+                "message": "Object updated successfully",
+                "object": serializer.data,
+            }
+
+            if updated_version:
+                response_data.update(
+                    {
+                        "version_id": updated_version.id,
+                        "version_number": updated_version.version_number,
+                    }
+                )
+
+            return Response(response_data)
 
         except Exception as e:
             return Response(
-                {"error": f"Failed to update current version: {str(e)}"},
+                {"error": f"Failed to update object: {str(e)}"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 

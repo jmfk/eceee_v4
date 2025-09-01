@@ -7,7 +7,7 @@ import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext
 import ObjectContentEditor from '../ObjectContentEditor'
 import ObjectSchemaForm from '../ObjectSchemaForm'
 
-const ObjectContentView = ({ objectType, instance, isNewInstance, onSave, onCancel }) => {
+const ObjectContentView = ({ objectType, instance, parentId, isNewInstance, onSave, onCancel }) => {
     const navigate = useNavigate()
     const { instanceId, objectTypeId, tab } = useParams()
 
@@ -196,19 +196,27 @@ const ObjectContentView = ({ objectType, instance, isNewInstance, onSave, onCanc
             return
         }
 
-        // Include local widget changes in the save data
+        // Include local widget changes and parent ID in the save data
         const saveData = {
             ...formData,
-            widgets: localWidgets
+            widgets: localWidgets,
+            // Set parent if creating new instance and parentId is provided
+            ...(isNewInstance && parentId && { parent: parentId })
         }
-
         saveMutation.mutate({ data: saveData, mode })
     }
 
     return (
         <div className="space-y-6">
             <div className="bg-white rounded-lg shadow-sm border p-6">
-                <h2 className="text-xl font-semibold text-gray-900 mb-6">Object Content & Data</h2>
+                <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
+                    Object Content & Data
+                    {objectType && (
+                        <span className="ml-3 text-sm font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                            {objectType.label}
+                        </span>
+                    )}
+                </h2>
 
                 {/* Two Column Layout */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">

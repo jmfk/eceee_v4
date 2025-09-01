@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useParams, useNavigate, Link, Navigate } from 'react-router-dom'
+import { useParams, useNavigate, Link, Navigate, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
     ArrowLeft, Layout, FileText, Settings, Calendar, Users, History,
@@ -19,7 +19,12 @@ import ObjectVersionsView from '../components/objectEdit/ObjectVersionsView'
 const ObjectInstanceEditPage = () => {
     const { instanceId, objectTypeId, tab = 'content' } = useParams()
     const navigate = useNavigate()
+    const location = useLocation()
     const { addNotification } = useGlobalNotifications()
+
+    // Extract parent ID from URL search params for new sub-objects
+    const urlParams = new URLSearchParams(location.search)
+    const parentIdFromUrl = urlParams.get('parent')
 
     const isNewInstance = !instanceId && objectTypeId
     const isEditingInstance = !!instanceId
@@ -69,7 +74,14 @@ const ObjectInstanceEditPage = () => {
     }
 
     const handleBack = () => {
-        navigate('/objects')
+        // If this object has a parent (either from URL param or instance data), 
+        // navigate back to parent's sub-objects view
+        const actualParentId = parentIdFromUrl || instance?.parent?.id || instance?.parent
+        if (actualParentId) {
+            navigate(`/objects/${actualParentId}/edit/subobjects`)
+        } else {
+            navigate('/objects')
+        }
     }
 
     const getTabPath = (tabId) => {
@@ -83,10 +95,17 @@ const ObjectInstanceEditPage = () => {
         const commonProps = {
             objectType,
             instance,
+            parentId: parentIdFromUrl || instance?.parent?.id || instance?.parent,
             isNewInstance,
             onSave: () => {
                 addNotification('Object saved successfully', 'success')
-                navigate('/objects')
+                // Navigate back to parent's sub-objects view if this is a sub-object
+                const actualParentId = parentIdFromUrl || instance?.parent?.id || instance?.parent
+                if (actualParentId) {
+                    navigate(`/objects/${actualParentId}/edit/subobjects`)
+                } else {
+                    navigate('/objects')
+                }
             },
             onCancel: handleBack
         }
