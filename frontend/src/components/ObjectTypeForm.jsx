@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Plus, Trash2, Settings, Hash, Type, Calendar, ToggleLeft, Check } from 'lucide-react'
+import { Plus, Trash2, Settings, Hash, Type, Calendar, ToggleLeft, Check, Users } from 'lucide-react'
 import { objectTypesApi } from '../api/objectStorage'
 import VisualSchemaEditor from './VisualSchemaEditor'
 import InlineImageUpload from './InlineImageUpload'
@@ -43,6 +43,11 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
     const [originalSlotConfiguration, setOriginalSlotConfiguration] = useState(null)
     const [isSavingSlots, setIsSavingSlots] = useState(false)
     const [slotsError, setSlotsError] = useState(null)
+
+    const [hasUnsavedRelationshipsChanges, setHasUnsavedRelationshipsChanges] = useState(false)
+    const [originalRelationships, setOriginalRelationships] = useState(null)
+    const [isSavingRelationships, setIsSavingRelationships] = useState(false)
+    const [relationshipsError, setRelationshipsError] = useState(null)
 
     // Load existing object types for child type selection
     const { data: existingTypesResponse } = useQuery({
@@ -94,6 +99,14 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
             const slotConfig = objectType.slotConfiguration || { slots: [] }
             setOriginalSlotConfiguration(JSON.parse(JSON.stringify(slotConfig)))
             setHasUnsavedSlotsChanges(false)
+
+            // Track original relationships
+            const relationships = {
+                hierarchyLevel: objectType.hierarchyLevel || 'both',
+                allowedChildTypes: allowedChildTypeNames
+            }
+            setOriginalRelationships(JSON.parse(JSON.stringify(relationships)))
+            setHasUnsavedRelationshipsChanges(false)
         } else {
             // For new object types
             const emptySchema = { fields: [] }
@@ -159,6 +172,22 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
         if (field === 'label' && !objectType) {
             const name = value.toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '')
             setFormData(prev => ({ ...prev, name }))
+        }
+
+        // Track relationships changes
+        if (['hierarchyLevel', 'allowedChildTypes'].includes(field)) {
+            // Check if relationships have changed from original
+            const currentRelationships = {
+                hierarchyLevel: field === 'hierarchyLevel' ? value : formData.hierarchyLevel,
+                allowedChildTypes: field === 'allowedChildTypes' ? value : formData.allowedChildTypes
+            }
+            const hasChanges = JSON.stringify(currentRelationships) !== JSON.stringify(originalRelationships)
+            setHasUnsavedRelationshipsChanges(hasChanges)
+
+            // Clear any existing relationships errors when user makes changes
+            if (relationshipsError) {
+                setRelationshipsError(null)
+            }
         }
 
         // Check if basic info has changed
@@ -509,6 +538,41 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
         }
     }
 
+    const handleSaveRelationships = async () => {
+        if (!objectType || !hasUnsavedRelationshipsChanges || isSavingRelationships) return
+
+        setIsSavingRelationships(true)
+
+        try {
+            // Prepare relationships data
+            const relationshipsData = {
+                hierarchyLevel: formData.hierarchyLevel,
+                allowedChildTypes: formData.allowedChildTypes
+            }
+
+            // Use the dedicated relationships update endpoint
+            const response = await objectTypesApi.updateRelationships(objectType.id, relationshipsData)
+
+            // Update the original relationships to reflect the save
+            setOriginalRelationships(JSON.parse(JSON.stringify(relationshipsData)))
+            setHasUnsavedRelationshipsChanges(false)
+
+            // Relationships saved successfully
+            // TODO: Add success notification using global notification system
+            // addNotification('Relationships saved successfully', 'success')
+
+        } catch (error) {
+            console.error('Failed to save relationships:', error)
+            const errorMessage = error.response?.data?.error || 'Failed to save relationships'
+            setRelationshipsError(errorMessage)
+
+            // TODO: Add error notification using global notification system
+            // addNotification(errorMessage, 'error')
+        } finally {
+            setIsSavingRelationships(false)
+        }
+    }
+
     // Navigation guard for unsaved changes
     const handleTabChangeWithGuard = useCallback((newTab) => {
         // Check for unsaved schema changes
@@ -541,21 +605,34 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
             }
         }
 
+        // Check for unsaved relationships changes
+        if (activeTab === 'relationships' && hasUnsavedRelationshipsChanges) {
+            const confirmLeave = window.confirm(
+                'You have unsaved relationships changes. Do you want to leave without saving?'
+            )
+            if (!confirmLeave) {
+                return // Don't change tab
+            }
+        }
+
         onTabChange?.(newTab)
-    }, [activeTab, hasUnsavedSchemaChanges, hasUnsavedBasicChanges, hasUnsavedSlotsChanges, onTabChange])
+    }, [activeTab, hasUnsavedSchemaChanges, hasUnsavedBasicChanges, hasUnsavedSlotsChanges, hasUnsavedRelationshipsChanges, onTabChange])
 
     // Browser navigation guard
     useEffect(() => {
         const handleBeforeUnload = (e) => {
             if ((activeTab === 'schema' && hasUnsavedSchemaChanges) ||
                 (activeTab === 'basic' && hasUnsavedBasicChanges) ||
-                (activeTab === 'slots' && hasUnsavedSlotsChanges)) {
+                (activeTab === 'slots' && hasUnsavedSlotsChanges) ||
+                (activeTab === 'relationships' && hasUnsavedRelationshipsChanges)) {
                 e.preventDefault()
                 const message = activeTab === 'schema'
                     ? 'You have unsaved schema changes. Are you sure you want to leave?'
                     : activeTab === 'basic'
                         ? 'You have unsaved basic info changes. Are you sure you want to leave?'
-                        : 'You have unsaved widget slots changes. Are you sure you want to leave?'
+                        : activeTab === 'slots'
+                            ? 'You have unsaved widget slots changes. Are you sure you want to leave?'
+                            : 'You have unsaved relationships changes. Are you sure you want to leave?'
                 e.returnValue = message
                 return e.returnValue
             }
@@ -563,7 +640,7 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
 
         window.addEventListener('beforeunload', handleBeforeUnload)
         return () => window.removeEventListener('beforeunload', handleBeforeUnload)
-    }, [activeTab, hasUnsavedSchemaChanges, hasUnsavedBasicChanges, hasUnsavedSlotsChanges])
+    }, [activeTab, hasUnsavedSchemaChanges, hasUnsavedBasicChanges, hasUnsavedSlotsChanges, hasUnsavedRelationshipsChanges])
 
     return (
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -593,6 +670,9 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
                                 <span className="ml-1 w-2 h-2 bg-orange-400 rounded-full inline-block" title="Unsaved changes" />
                             )}
                             {tab.id === 'slots' && hasUnsavedSlotsChanges && (
+                                <span className="ml-1 w-2 h-2 bg-orange-400 rounded-full inline-block" title="Unsaved changes" />
+                            )}
+                            {tab.id === 'relationships' && hasUnsavedRelationshipsChanges && (
                                 <span className="ml-1 w-2 h-2 bg-orange-400 rounded-full inline-block" title="Unsaved changes" />
                             )}
                         </button>
@@ -972,6 +1052,26 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
                             <>
                                 <Hash className="w-4 h-4 mr-2" />
                                 Save Schema
+                            </>
+                        )}
+                    </button>
+                ) : activeTab === 'relationships' && objectType ? (
+                    // Relationships-specific save button
+                    <button
+                        type="button"
+                        onClick={handleSaveRelationships}
+                        disabled={!hasUnsavedRelationshipsChanges || isSavingRelationships}
+                        className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                        {isSavingRelationships ? (
+                            <>
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                Saving...
+                            </>
+                        ) : (
+                            <>
+                                <Users className="w-4 h-4 mr-2" />
+                                Save Relationships
                             </>
                         )}
                     </button>

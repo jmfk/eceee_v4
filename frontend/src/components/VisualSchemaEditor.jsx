@@ -265,6 +265,11 @@ function PropertyConfig({ property, index, totalCount, onUpdate, onDelete, onMov
                   }`}
                 value={property.key || ''}
                 onChange={(e) => handleChange('key', e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                  }
+                }}
                 placeholder="propertyName"
               />
               {property.key && !validateFieldName(property.key) && (
@@ -285,6 +290,11 @@ function PropertyConfig({ property, index, totalCount, onUpdate, onDelete, onMov
                 className="w-full border rounded px-3 py-2 text-sm"
                 value={property.title || ''}
                 onChange={(e) => handleChange('title', e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                  }
+                }}
                 placeholder="Display Name"
               />
             </div>
@@ -297,6 +307,11 @@ function PropertyConfig({ property, index, totalCount, onUpdate, onDelete, onMov
               className="w-full border rounded px-3 py-2 text-sm"
               value={property.description || ''}
               onChange={(e) => handleChange('description', e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                }
+              }}
               placeholder="Help text for this field"
             />
           </div>
@@ -314,6 +329,11 @@ function PropertyConfig({ property, index, totalCount, onUpdate, onDelete, onMov
                     handleChange('default', e.target.value)
                   } else {
                     handleChange('default', e.target.value ? parseFloat(e.target.value) : null)
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
                   }
                 }}
                 placeholder="Default value"
@@ -344,6 +364,11 @@ function PropertyConfig({ property, index, totalCount, onUpdate, onDelete, onMov
                   className="w-full border rounded px-3 py-2 text-sm"
                   value={property.minLength || ''}
                   onChange={(e) => handleChange('minLength', e.target.value ? parseInt(e.target.value) : null)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                    }
+                  }}
                   placeholder="0"
                   min="0"
                 />
@@ -355,6 +380,11 @@ function PropertyConfig({ property, index, totalCount, onUpdate, onDelete, onMov
                   className="w-full border rounded px-3 py-2 text-sm"
                   value={property.maxLength || ''}
                   onChange={(e) => handleChange('maxLength', e.target.value ? parseInt(e.target.value) : null)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                    }
+                  }}
                   placeholder="255"
                   min="0"
                 />
@@ -386,6 +416,11 @@ function PropertyConfig({ property, index, totalCount, onUpdate, onDelete, onMov
                   className="w-full border rounded px-3 py-2 text-sm"
                   value={property.minimum || ''}
                   onChange={(e) => handleChange('minimum', e.target.value ? parseFloat(e.target.value) : null)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                    }
+                  }}
                   placeholder="0"
                   step={property.type === 'integer' ? '1' : 'any'}
                 />
@@ -397,6 +432,11 @@ function PropertyConfig({ property, index, totalCount, onUpdate, onDelete, onMov
                   className="w-full border rounded px-3 py-2 text-sm"
                   value={property.maximum || ''}
                   onChange={(e) => handleChange('maximum', e.target.value ? parseFloat(e.target.value) : null)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                    }
+                  }}
                   placeholder="100"
                   step={property.type === 'integer' ? '1' : 'any'}
                 />
@@ -408,6 +448,11 @@ function PropertyConfig({ property, index, totalCount, onUpdate, onDelete, onMov
                   className="w-full border rounded px-3 py-2 text-sm"
                   value={property.multipleOf || ''}
                   onChange={(e) => handleChange('multipleOf', e.target.value ? parseFloat(e.target.value) : null)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                    }
+                  }}
                   placeholder="1"
                   step={property.type === 'integer' ? '1' : 'any'}
                   min="0"
@@ -431,6 +476,11 @@ function PropertyConfig({ property, index, totalCount, onUpdate, onDelete, onMov
                         const newEnum = [...property.enum]
                         newEnum[index] = e.target.value
                         handleChange('enum', newEnum)
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                        }
                       }}
                       placeholder={`Option ${index + 1}`}
                     />
@@ -598,7 +648,7 @@ export default function VisualSchemaEditor({ schema, onChange }) {
             key,
             required: required.includes(key),
             uiType: schemaProps[key].fieldType || (schemaProps[key].enum ? 'choice' : (schemaProps[key].format === 'textarea' ? 'rich_text' : 'text')),
-            _id: `prop-${index}-${key}` // Stable ID for React key
+            _id: `prop-${index}` // Stable ID for React key based on position
           })
         }
       })
@@ -612,7 +662,7 @@ export default function VisualSchemaEditor({ schema, onChange }) {
             key,
             required: required.includes(key),
             uiType: prop.fieldType || (prop.enum ? 'choice' : (prop.format === 'textarea' ? 'rich_text' : 'text')),
-            _id: `prop-${extraIndex}-${key}` // Stable ID for React key
+            _id: `prop-${extraIndex}` // Stable ID for React key based on position
           })
           extraIndex++
         }
@@ -627,7 +677,7 @@ export default function VisualSchemaEditor({ schema, onChange }) {
       key,
       required: required.includes(key),
       uiType: prop.fieldType || (prop.enum ? 'choice' : (prop.format === 'textarea' ? 'rich_text' : 'text')),
-      _id: `prop-${index}-${key}` // Stable ID for React key
+      _id: `prop-${index}` // Stable ID for React key based on position
     }))
   })
 
@@ -650,7 +700,7 @@ export default function VisualSchemaEditor({ schema, onChange }) {
             key,
             required: required.includes(key),
             uiType: schemaProps[key].fieldType || (schemaProps[key].enum ? 'choice' : (schemaProps[key].format === 'textarea' ? 'rich_text' : 'text')),
-            _id: `prop-${index}-${key}`
+            _id: `prop-${index}`
           })
         }
       })
@@ -661,7 +711,7 @@ export default function VisualSchemaEditor({ schema, onChange }) {
         key,
         required: required.includes(key),
         uiType: prop.fieldType || (prop.enum ? 'choice' : (prop.format === 'textarea' ? 'rich_text' : 'text')),
-        _id: `prop-${index}-${key}`
+        _id: `prop-${index}`
       }))
     }
 
@@ -824,7 +874,7 @@ export default function VisualSchemaEditor({ schema, onChange }) {
               <div className="space-y-4">
                 {properties.map((property, index) => (
                   <PropertyConfig
-                    key={property._id || `prop-${index}-${property.key}`}
+                    key={property._id}
                     property={property}
                     index={index}
                     totalCount={properties.length}

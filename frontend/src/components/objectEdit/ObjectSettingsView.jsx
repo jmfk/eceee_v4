@@ -3,10 +3,11 @@ import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
 import { Save, Settings as SettingsIcon } from 'lucide-react'
 import { objectInstancesApi } from '../../api/objectStorage'
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext'
+import ParentObjectSelector from '../ParentObjectSelector'
 
-const ObjectSettingsView = ({ objectType, instance, isNewInstance, onSave, onCancel }) => {
+const ObjectSettingsView = ({ objectType, instance, isNewInstance, parentId, onSave, onCancel }) => {
     const [formData, setFormData] = useState({
-        parent: instance?.parent || null,
+        parent: instance?.parent?.id || parentId || null,
         metadata: instance?.metadata || {}
     })
     const [isDirty, setIsDirty] = useState(false)
@@ -14,23 +15,23 @@ const ObjectSettingsView = ({ objectType, instance, isNewInstance, onSave, onCan
     const queryClient = useQueryClient()
     const { addNotification } = useGlobalNotifications()
 
-    // Fetch potential parent objects
-    const { data: potentialParentsResponse } = useQuery({
-        queryKey: ['objectInstances', 'potential-parents', objectType?.id],
-        queryFn: () => objectInstancesApi.getByType(objectType?.name || ''),
-        enabled: !!objectType
-    })
-
-    const potentialParents = potentialParentsResponse?.data || []
+    // Parent object selection is now handled by ParentObjectSelector component
 
     useEffect(() => {
         if (instance) {
+            const parentValue = instance.parent?.id || parentId || null
             setFormData({
-                parent: instance.parent || null,
+                parent: parentValue,
                 metadata: instance.metadata || {}
             })
+        } else if (isNewInstance && parentId) {
+            // For new instances with parent parameter, set the parent automatically
+            setFormData(prev => ({
+                ...prev,
+                parent: parentId
+            }))
         }
-    }, [instance])
+    }, [instance, parentId, isNewInstance])
 
     // Save mutation
     const saveMutation = useMutation({
@@ -43,7 +44,15 @@ const ObjectSettingsView = ({ objectType, instance, isNewInstance, onSave, onCan
                     ...data
                 })
             } else {
-                return objectInstancesApi.update(instance.id, data)
+                // For updates, include required fields along with the settings data
+                const updateData = {
+                    objectTypeId: objectType?.id,
+                    title: instance?.title,
+                    data: instance?.data || {},
+                    status: instance?.status || 'draft',
+                    ...data
+                }
+                return objectInstancesApi.update(instance.id, updateData)
             }
         },
         onSuccess: () => {
@@ -54,7 +63,20 @@ const ObjectSettingsView = ({ objectType, instance, isNewInstance, onSave, onCan
         },
         onError: (error) => {
             console.error('Save failed:', error)
-            const errorMessage = error.response?.data?.error || 'Failed to save settings'
+
+            // Handle validation errors
+            let errorMessage = 'Failed to save settings'
+            if (error.response?.data) {
+                const data = error.response.data
+                if (data.parent && Array.isArray(data.parent)) {
+                    errorMessage = `Parent validation error: ${data.parent[0]}`
+                } else if (data.error) {
+                    errorMessage = data.error
+                } else if (data.message) {
+                    errorMessage = data.message
+                }
+            }
+
             addNotification(errorMessage, 'error')
         }
     })
@@ -78,28 +100,21 @@ const ObjectSettingsView = ({ objectType, instance, isNewInstance, onSave, onCan
 
                 <div className="space-y-6">
                     {/* Parent Object */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Parent Object
-                        </label>
-                        <select
-                            value={formData.parent || ''}
-                            onChange={(e) => handleInputChange('parent', e.target.value || null)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        >
-                            <option value="">No parent (root level)</option>
-                            {potentialParents
-                                .filter(p => p.id !== instance?.id) // Don't allow self as parent
-                                .map((parent) => (
-                                    <option key={parent.id} value={parent.id}>
-                                        {'  '.repeat(parent.level || 0)}{parent.title}
-                                    </option>
-                                ))}
-                        </select>
-                        <p className="text-gray-500 text-sm mt-1">
-                            Select a parent object to create hierarchical relationships
-                        </p>
-                    </div>
+                    <ParentObjectSelector
+                        value={formData.parent}
+                        onChange={(parentId) => {
+                            handleInputChange('parent', parentId)
+                            // Auto-save when parent changes
+                            const autoSaveData = {
+                                parent: parentId,
+                                metadata: formData.metadata
+                            }
+                            saveMutation.mutate(autoSaveData)
+                        }}
+                        currentObjectType={objectType}
+                        currentObjectId={instance?.id}
+                        placeholder="Search for parent object..."
+                    />
 
 
 

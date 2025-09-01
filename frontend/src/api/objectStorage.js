@@ -119,6 +119,18 @@ export const objectTypesApi = {
     },
 
     /**
+     * Update relationships for object type
+     */
+    async updateRelationships(id, relationshipsData) {
+        const snakeCaseData = convertKeysToSnake(relationshipsData)
+        const response = await api.put(`${BASE_URL}/object-types/${id}/update_relationships/`, snakeCaseData)
+        return {
+            ...response,
+            data: convertKeysToCamel(response.data)
+        }
+    },
+
+    /**
      * Update schema for object type
      */
     async updateSchema(id, schema) {

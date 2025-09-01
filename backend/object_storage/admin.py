@@ -8,6 +8,8 @@ from django.contrib import admin
 from django.utils.html import format_html
 from django.urls import reverse
 from django.utils.safestring import mark_safe
+from django.db import models
+from django.forms import ModelChoiceField
 import json
 
 from .models import ObjectTypeDefinition, ObjectInstance, ObjectVersion
@@ -145,13 +147,69 @@ class ObjectVersionInline(admin.TabularInline):
 
     model = ObjectVersion
     extra = 0
-    readonly_fields = ["version_number", "created_by", "created_at"]
-    fields = ["version_number", "change_description", "created_by", "created_at"]
+    readonly_fields = ["version_number", "created_by", "created_at", "version_link"]
+    fields = [
+        "version_number",
+        "version_link",
+        "change_description",
+        "created_by",
+        "created_at",
+    ]
     can_delete = False
 
     def has_add_permission(self, request, obj=None):
         """Versions are created automatically, not manually."""
         return False
+
+    def version_link(self, obj):
+        """Display a link to view the object version in admin."""
+        if obj.pk:
+            url = reverse("admin:object_storage_objectversion_change", args=[obj.pk])
+            return format_html('<a href="{}">View Version</a>', url)
+        return "Not saved yet"
+
+    version_link.short_description = "View"
+
+
+class SubObjectInline(admin.TabularInline):
+    """Inline admin for managing sub-objects (children)."""
+
+    model = ObjectInstance
+    fk_name = "parent"
+    extra = 0
+    fields = ["object_type", "title", "status", "is_published_display_inline"]
+    readonly_fields = ["is_published_display_inline"]
+
+    def is_published_display_inline(self, obj):
+        """Display publication status in inline."""
+        if not obj.pk:
+            return "-"
+        if obj.is_published():
+            return format_html('<span style="color: green;">✓ Published</span>')
+        else:
+            return format_html('<span style="color: red;">✗ Draft</span>')
+
+    is_published_display_inline.short_description = "Published"
+
+    def get_queryset(self, request):
+        """Optimize queryset for inline display."""
+        return super().get_queryset(request).select_related("object_type")
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        """Filter object types to only show allowed child types."""
+        if db_field.name == "object_type":
+            # Get the parent object from the request
+            parent_id = request.resolver_match.kwargs.get("object_id")
+            if parent_id:
+                try:
+                    parent = ObjectInstance.objects.get(pk=parent_id)
+                    # Filter to only allowed child types
+                    kwargs["queryset"] = parent.object_type.allowed_child_types.filter(
+                        is_active=True
+                    )
+                except ObjectInstance.DoesNotExist:
+                    pass
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
 
 @admin.register(ObjectInstance)
@@ -159,8 +217,10 @@ class ObjectInstanceAdmin(admin.ModelAdmin):
     """Admin interface for Object Instances."""
 
     list_display = [
-        "title",
+        "hierarchical_title",
         "object_type",
+        "parent_link",
+        "children_count",
         "status",
         "is_published_display",
         "version",
@@ -170,6 +230,8 @@ class ObjectInstanceAdmin(admin.ModelAdmin):
     list_filter = [
         "object_type",
         "status",
+        "parent",
+        "level",
         "created_at",
         "updated_at",
         "publish_date",
@@ -179,16 +241,26 @@ class ObjectInstanceAdmin(admin.ModelAdmin):
         "slug",
         "version",
         "current_version",
+        "level",
+        "tree_id",
         "created_at",
         "updated_at",
         "data_preview",
         "widgets_preview",
         "is_published_display",
+        "children_count",
     ]
-    inlines = [ObjectVersionInline]
+    inlines = [ObjectVersionInline, SubObjectInline]
 
     fieldsets = (
         ("Basic Information", {"fields": ("object_type", "title", "slug", "status")}),
+        (
+            "Hierarchy",
+            {
+                "fields": ("parent", "level", "tree_id", "children_count"),
+                "description": "Parent-child relationships and tree structure",
+            },
+        ),
         (
             "Publishing",
             {
@@ -267,6 +339,66 @@ class ObjectInstanceAdmin(admin.ModelAdmin):
         return mark_safe(html)
 
     widgets_preview.short_description = "Widgets Preview"
+
+    def hierarchical_title(self, obj):
+        """Display title with indentation to show hierarchy."""
+        indent = "—" * (obj.level or 0) * 2
+        if indent:
+            return format_html("{} {}", indent, obj.title)
+        return obj.title
+
+    hierarchical_title.short_description = "Title"
+    hierarchical_title.admin_order_field = "title"
+
+    def parent_link(self, obj):
+        """Display a link to the parent object."""
+        if obj.parent:
+            url = reverse(
+                "admin:object_storage_objectinstance_change", args=[obj.parent.pk]
+            )
+            return format_html('<a href="{}">{}</a>', url, obj.parent.title)
+        return "—"
+
+    parent_link.short_description = "Parent"
+    parent_link.admin_order_field = "parent__title"
+
+    def children_count(self, obj):
+        """Display count of child objects."""
+        count = obj.children.count()
+        if count > 0:
+            # Link to filtered view showing only children
+            url = f"/admin/object_storage/objectinstance/?parent__id__exact={obj.pk}"
+            return format_html('<a href="{}">{} children</a>', url, count)
+        return "0"
+
+    children_count.short_description = "Children"
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        """Customize the parent field to show only valid parents."""
+        if db_field.name == "parent":
+            # Get current object type from the form
+            obj_id = request.resolver_match.kwargs.get("object_id")
+            if obj_id:
+                try:
+                    current_obj = ObjectInstance.objects.select_related(
+                        "object_type"
+                    ).get(pk=obj_id)
+                    # Filter to only show objects that can have this object type as child
+                    valid_parent_types = ObjectTypeDefinition.objects.filter(
+                        allowed_child_types=current_obj.object_type
+                    )
+                    kwargs["queryset"] = ObjectInstance.objects.filter(
+                        object_type__in=valid_parent_types
+                    ).exclude(
+                        pk=obj_id
+                    )  # Don't allow self as parent
+                except ObjectInstance.DoesNotExist:
+                    pass
+            else:
+                # For new objects, we can't filter yet since we don't know the object type
+                kwargs["queryset"] = ObjectInstance.objects.all()
+
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     def get_queryset(self, request):
         """Optimize queries by selecting related objects."""
