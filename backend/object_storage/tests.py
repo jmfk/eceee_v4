@@ -26,11 +26,21 @@ class ObjectTypeDefinitionModelTest(TestCase):
             plural_label="News Articles",
             description="News articles and announcements",
             schema={
-                "fields": [
-                    {"name": "title", "type": "text", "required": True},
-                    {"name": "content", "type": "rich_text", "required": True},
-                    {"name": "publish_date", "type": "datetime", "required": False},
-                ]
+                "type": "object",
+                "properties": {
+                    "title": {"type": "string", "field_type": "text", "title": "Title"},
+                    "content": {
+                        "type": "string",
+                        "field_type": "rich_text",
+                        "title": "Content",
+                    },
+                    "publish_date": {
+                        "type": "string",
+                        "field_type": "datetime",
+                        "title": "Publish Date",
+                    },
+                },
+                "required": ["title", "content"],
             },
             slot_configuration={
                 "slots": [
@@ -54,9 +64,14 @@ class ObjectTypeDefinitionModelTest(TestCase):
             name="test",
             label="Test",
             plural_label="Tests",
-            schema={"fields": [{"name": "title", "type": "text", "required": True}]},
-            slot_configuration={},  # Provide empty dict to satisfy field requirement
-            metadata={},  # Provide empty dict to satisfy field requirement
+            schema={
+                "type": "object",
+                "properties": {
+                    "title": {"type": "string", "field_type": "text", "title": "Title"}
+                },
+            },
+            slot_configuration={"slots": []},  # Provide valid empty slot configuration
+            metadata={"version": "1.0"},  # Provide valid metadata
             created_by=self.user,
         )
         obj_type.full_clean()  # Should not raise ValidationError
@@ -80,10 +95,16 @@ class ObjectInstanceModelTest(TestCase):
             label="News Article",
             plural_label="News Articles",
             schema={
-                "fields": [
-                    {"name": "title", "type": "text", "required": True},
-                    {"name": "content", "type": "rich_text", "required": True},
-                ]
+                "type": "object",
+                "properties": {
+                    "title": {"type": "string", "field_type": "text", "title": "Title"},
+                    "content": {
+                        "type": "string",
+                        "field_type": "rich_text",
+                        "title": "Content",
+                    },
+                },
+                "required": ["title", "content"],
             },
             created_by=self.user,
         )
@@ -93,12 +114,18 @@ class ObjectInstanceModelTest(TestCase):
         instance = ObjectInstance.objects.create(
             object_type=self.obj_type,
             title="Test News Article",
+            status="draft",
+            created_by=self.user,
+        )
+
+        # Create initial version with data
+        instance.create_version(
+            user=self.user,
             data={
                 "title": "Test News Article",
                 "content": "This is a test news article content.",
             },
-            status="draft",
-            created_by=self.user,
+            change_description="Initial version",
         )
 
         self.assertEqual(instance.title, "Test News Article")
@@ -106,13 +133,13 @@ class ObjectInstanceModelTest(TestCase):
         self.assertEqual(instance.version, 1)
         self.assertFalse(instance.is_published())
         self.assertTrue(instance.slug)  # Slug should be auto-generated
+        self.assertEqual(instance.data["title"], "Test News Article")
 
     def test_slug_generation(self):
         """Test automatic slug generation"""
         instance = ObjectInstance.objects.create(
             object_type=self.obj_type,
             title="Test News Article with Spaces",
-            data={"title": "Test", "content": "Content"},
             created_by=self.user,
         )
 
@@ -124,7 +151,6 @@ class ObjectInstanceModelTest(TestCase):
         instance1 = ObjectInstance.objects.create(
             object_type=self.obj_type,
             title="Test Article",
-            data={"title": "Test", "content": "Content"},
             created_by=self.user,
         )
 
@@ -132,7 +158,6 @@ class ObjectInstanceModelTest(TestCase):
         instance2 = ObjectInstance.objects.create(
             object_type=self.obj_type,
             title="Test Article",
-            data={"title": "Test 2", "content": "Content 2"},
             created_by=self.user,
         )
 
@@ -145,7 +170,6 @@ class ObjectInstanceModelTest(TestCase):
         parent = ObjectInstance.objects.create(
             object_type=self.obj_type,
             title="Parent Article",
-            data={"title": "Parent", "content": "Parent content"},
             created_by=self.user,
         )
 
@@ -153,7 +177,6 @@ class ObjectInstanceModelTest(TestCase):
         child = ObjectInstance.objects.create(
             object_type=self.obj_type,
             title="Child Article",
-            data={"title": "Child", "content": "Child content"},
             parent=parent,
             created_by=self.user,
         )
@@ -170,16 +193,20 @@ class ObjectInstanceModelTest(TestCase):
         instance = ObjectInstance.objects.create(
             object_type=self.obj_type,
             title="Test Article",
-            data={"title": "Test", "content": "Content"},
             created_by=self.user,
         )
 
-        # Create a version
-        version = instance.create_version(self.user, "Initial version")
+        # Create a version with data
+        version = instance.create_version(
+            user=self.user,
+            data={"title": "Test", "content": "Content"},
+            change_description="Initial version",
+        )
 
-        self.assertEqual(version.object, instance)
+        self.assertEqual(version.object_instance, instance)
         self.assertEqual(version.version_number, 1)
-        self.assertEqual(version.data, instance.data)
+        self.assertEqual(version.data, {"title": "Test", "content": "Content"})
+        self.assertEqual(instance.data, {"title": "Test", "content": "Content"})
 
 
 @override_settings(
@@ -269,7 +296,6 @@ class ObjectStorageAPITest(APITestCase):
         instance = ObjectInstance.objects.create(
             object_type=obj_type,
             title="Test News",
-            data={"title": "Test"},
             status="draft",
             created_by=self.user,
         )
