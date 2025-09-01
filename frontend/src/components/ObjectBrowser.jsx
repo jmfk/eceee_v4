@@ -1,20 +1,82 @@
-import React, { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { useNavigate } from 'react-router-dom'
-import { Search, ArrowLeft, Plus, Grid, List, AlertCircle, Image, FolderOpen } from 'lucide-react'
+import React, { useState, useEffect } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useNavigate, useSearchParams, useParams } from 'react-router-dom'
+import { Search, ArrowLeft, Plus, Grid, List, AlertCircle, Image, FolderOpen, Trash2 } from 'lucide-react'
 import { objectTypesApi, objectInstancesApi } from '../api/objectStorage'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import ObjectInstanceEditor from './ObjectInstanceEditor'
+import DeleteConfirmationModal from './DeleteConfirmationModal'
 
 const ObjectBrowser = () => {
     const navigate = useNavigate()
+    const [searchParams] = useSearchParams()
+    const { typeName } = useParams()
     const [currentView, setCurrentView] = useState('grid') // 'grid', 'list'
     const [selectedObjectType, setSelectedObjectType] = useState(null)
     const [searchTerm, setSearchTerm] = useState('')
     const [statusFilter, setStatusFilter] = useState('')
     const [editingInstance, setEditingInstance] = useState(null)
+    const [deleteModal, setDeleteModal] = useState({ isOpen: false, instance: null })
 
     const { addNotification } = useGlobalNotifications()
+    const queryClient = useQueryClient()
+
+    // Handle URL parameters for type filtering (both route params and search params)
+    useEffect(() => {
+        const typeParam = typeName || searchParams.get('type')
+        if (typeParam) {
+            // Find the object type by name or ID and switch to list view
+            const fetchObjectType = async () => {
+                try {
+                    let objectType = null
+
+                    if (typeName) {
+                        // If we have a type name, we need to find the object type by name
+                        // Since there's no direct getByName API, we'll list all and find by name
+                        const allTypesResponse = await objectTypesApi.list()
+                        const allTypes = allTypesResponse.data.results || allTypesResponse.data
+                        objectType = allTypes.find(type => type.name === typeName)
+                    } else {
+                        // If we have an ID from search params, get by ID
+                        const response = await objectTypesApi.get(typeParam)
+                        objectType = response.data
+                    }
+
+                    if (objectType) {
+                        setSelectedObjectType(objectType)
+                        setCurrentView('list')
+                        setSearchTerm('')
+                        setStatusFilter('')
+                    }
+                } catch (error) {
+                    console.error('Failed to load object type from URL:', error)
+                    // If type not found, stay on grid view
+                }
+            }
+            fetchObjectType()
+        } else {
+            // No type parameter, ensure we're in grid view
+            setCurrentView('grid')
+            setSelectedObjectType(null)
+        }
+    }, [typeName, searchParams])
+
+    // Delete mutation
+    const deleteMutation = useMutation({
+        mutationFn: (instanceId) => objectInstancesApi.delete(instanceId),
+        onSuccess: () => {
+            queryClient.invalidateQueries(['objectInstances'])
+            queryClient.invalidateQueries(['objectInstance'])
+            addNotification('Object deleted successfully', 'success')
+            setDeleteModal({ isOpen: false, instance: null })
+        },
+        onError: (error) => {
+            console.error('Delete failed:', error)
+            const errorMessage = error.response?.data?.error || 'Failed to delete object'
+            addNotification(errorMessage, 'error')
+            setDeleteModal({ isOpen: false, instance: null })
+        }
+    })
 
     // Fetch object types for grid view
     const { data: objectTypesResponse, isLoading: typesLoading, error: typesError } = useQuery({
@@ -57,6 +119,8 @@ const ObjectBrowser = () => {
         setCurrentView('list')
         setSearchTerm('')
         setStatusFilter('')
+        // Update URL to reflect the selected type using the clean path
+        navigate(`/objects/${objectType.name}`)
     }
 
     const handleBackToGrid = () => {
@@ -64,6 +128,8 @@ const ObjectBrowser = () => {
         setSelectedObjectType(null)
         setSearchTerm('')
         setStatusFilter('')
+        // Clear URL parameters
+        navigate('/objects')
     }
 
     const handleCreateNew = () => {
@@ -76,6 +142,20 @@ const ObjectBrowser = () => {
 
     const handleEditInstance = (instance) => {
         navigate(`/objects/${instance.id}/edit/content`)
+    }
+
+    const handleDeleteInstance = (instance) => {
+        setDeleteModal({ isOpen: true, instance })
+    }
+
+    const handleConfirmDelete = () => {
+        if (deleteModal.instance) {
+            deleteMutation.mutate(deleteModal.instance.id)
+        }
+    }
+
+    const handleCloseDeleteModal = () => {
+        setDeleteModal({ isOpen: false, instance: null })
     }
 
     const handleEditCancel = () => {
@@ -283,10 +363,7 @@ const ObjectBrowser = () => {
                                             key={instance.id}
                                             instance={instance}
                                             onEdit={() => handleEditInstance(instance)}
-                                            onDelete={(instance) => {
-                                                // TODO: Implement delete functionality
-
-                                            }}
+                                            onDelete={() => handleDeleteInstance(instance)}
                                         />
                                     ))}
                                 </div>
@@ -316,12 +393,171 @@ const ObjectBrowser = () => {
                     )}
                 </div>
             </div>
+
         )
     }
 
+    // Render the modal at component level
+    const renderModal = () => (
+        <DeleteConfirmationModal
+            isOpen={deleteModal.isOpen}
+            onClose={handleCloseDeleteModal}
+            onConfirm={handleConfirmDelete}
+            title="Delete Object"
+            itemName={deleteModal.instance?.title}
+            message={`Are you sure you want to delete "${deleteModal.instance?.title}"?`}
+            warningText={deleteModal.instance?.children?.length > 0 ? "This object has sub-objects that will also be deleted." : null}
+            isDeleting={deleteMutation.isPending}
+            deleteButtonText="Delete Object"
+        />
+    )
 
+    // Main component render with modal
+    return (
+        <>
+            {/* Grid View - Object Type Selection */}
+            {currentView === 'grid' && (
+                <div className="min-h-full bg-gray-50">
+                    <div className="max-w-7xl mx-auto px-6 py-6">
+                        <div className="mb-6">
+                            <div className="flex justify-between items-center mb-4">
+                                <div>
+                                    <h1 className="text-2xl font-bold text-gray-900">Objects</h1>
+                                    <p className="text-gray-600 mt-1">Select an object type to view and manage objects</p>
+                                </div>
+                            </div>
+                        </div>
 
-    return null
+                        {typesLoading ? (
+                            <div className="flex justify-center py-12">
+                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                                {objectTypes.map((objectType) => (
+                                    <div
+                                        key={objectType.id}
+                                        onClick={() => handleObjectTypeSelect(objectType)}
+                                        className="bg-white border border-gray-200 rounded-lg p-6 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer"
+                                    >
+                                        <div className="flex flex-col items-center text-center">
+                                            {objectType.iconImage ? (
+                                                <img
+                                                    src={objectType.iconImage}
+                                                    alt={objectType.label}
+                                                    className="w-16 h-16 object-cover rounded-lg mb-3"
+                                                />
+                                            ) : (
+                                                <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center mb-3">
+                                                    <Image className="h-8 w-8 text-gray-400" />
+                                                </div>
+                                            )}
+                                            <h3 className="text-lg font-medium text-gray-900 mb-1">
+                                                {objectType.label}
+                                            </h3>
+                                            <p className="text-sm text-gray-500 mb-3 line-clamp-2">
+                                                {objectType.description || `Manage ${objectType.pluralLabel?.toLowerCase()}`}
+                                            </p>
+                                            <div className="text-xs text-gray-400">
+                                                Click to view objects
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* List View - Objects of Selected Type */}
+            {currentView === 'list' && (
+                <div className="min-h-full bg-gray-50">
+                    <div className="max-w-7xl mx-auto px-6 py-6">
+                        <div className="mb-6">
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center">
+                                    <button
+                                        onClick={handleBackToGrid}
+                                        className="mr-4 p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
+                                    >
+                                        <ArrowLeft className="h-5 w-5" />
+                                    </button>
+                                    <div>
+                                        <h1 className="text-2xl font-bold text-gray-900 flex items-center">
+                                            {selectedObjectType?.iconImage ? (
+                                                <img
+                                                    src={selectedObjectType.iconImage}
+                                                    alt={selectedObjectType.label}
+                                                    className="w-8 h-8 object-cover rounded mr-3"
+                                                />
+                                            ) : (
+                                                <FolderOpen className="h-8 w-8 mr-3 text-gray-400" />
+                                            )}
+                                            {selectedObjectType?.pluralLabel}
+                                        </h1>
+                                        <p className="text-gray-600 mt-1">
+                                            {selectedObjectType?.description || `Manage ${selectedObjectType?.pluralLabel?.toLowerCase()}`}
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={handleCreateNew}
+                                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center"
+                                >
+                                    <Plus className="h-4 w-4 mr-2" />
+                                    Create {selectedObjectType?.label}
+                                </button>
+                            </div>
+                        </div>
+
+                        {instancesLoading ? (
+                            <div className="flex justify-center py-12">
+                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                            </div>
+                        ) : (
+                            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                                {instances.length > 0 ? (
+                                    <div className="divide-y divide-gray-200">
+                                        {instances.map((instance) => (
+                                            <ObjectListItem
+                                                key={instance.id}
+                                                instance={instance}
+                                                onEdit={() => handleEditInstance(instance)}
+                                                onDelete={() => handleDeleteInstance(instance)}
+                                            />
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-12">
+                                        <FolderOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                                        <h3 className="text-lg font-medium text-gray-900 mb-2">
+                                            No {selectedObjectType?.pluralLabel?.toLowerCase()} found
+                                        </h3>
+                                        <p className="text-gray-600 mb-6">
+                                            Get started by creating your first {selectedObjectType?.label?.toLowerCase()}.
+                                        </p>
+                                        {selectedObjectType && (
+                                            <button
+                                                onClick={handleCreateNew}
+                                                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors inline-flex items-center"
+                                            >
+                                                <Plus className="h-4 w-4 mr-2" />
+                                                Create {selectedObjectType.label}
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* Delete Confirmation Modal */}
+            {renderModal()}
+        </>
+    )
 }
 
 // Object List Item Component

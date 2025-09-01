@@ -218,28 +218,107 @@ const ObjectContentView = ({ objectType, instance, parentId, isNewInstance, onSa
                     )}
                 </h2>
 
-                {/* Two Column Layout */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    {/* Left Column - Widget Slots */}
-                    <div className="space-y-6">
-                        <div>
-                            <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
-                                <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
-                                Widget Slots
-                            </h3>
-                            <ObjectContentEditor
-                                objectType={objectType}
-                                widgets={localWidgets}
-                                onWidgetChange={(newWidgets) => {
-                                    setLocalWidgets(newWidgets)
-                                    setHasWidgetChanges(true)
-                                }}
-                                mode="object"
-                            />
+                {/* Conditional Layout - Two columns if widget slots exist, single column if not */}
+                {objectType?.slotConfiguration?.slots && objectType.slotConfiguration.slots.length > 0 ? (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        {/* Left Column - Widget Slots */}
+                        <div className="space-y-6">
+                            <div>
+                                <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                                    <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
+                                    Widget Slots
+                                </h3>
+                                <ObjectContentEditor
+                                    objectType={objectType}
+                                    widgets={localWidgets}
+                                    onWidgetChange={(newWidgets) => {
+                                        setLocalWidgets(newWidgets)
+                                        setHasWidgetChanges(true)
+                                    }}
+                                    mode="object"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Right Column - Object Data */}
+                        <div className="space-y-6">
+                            <div>
+                                <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                                    <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                                    Object Data
+                                </h3>
+                            </div>
+
+                            {/* Object Type Selection (only for new instances) */}
+                            {isNewInstance && (
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Object Type <span className="text-red-500">*</span>
+                                    </label>
+                                    <select
+                                        value={formData.objectTypeId}
+                                        onChange={(e) => handleInputChange('objectTypeId', e.target.value)}
+                                        className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.objectTypeId ? 'border-red-300' : 'border-gray-300'
+                                            }`}
+                                    >
+                                        <option value="">Select object type...</option>
+                                        {availableTypes.map((type) => (
+                                            <option key={type.id} value={type.id}>
+                                                {type.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    {errors.objectTypeId && (
+                                        <p className="text-red-600 text-sm mt-1 flex items-center">
+                                            <AlertCircle className="h-4 w-4 mr-1" />
+                                            {errors.objectTypeId}
+                                        </p>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Title - Model Field */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Object Title <span className="text-red-500">*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    value={formData.title}
+                                    onChange={(e) => handleInputChange('title', e.target.value)}
+                                    className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.title ? 'border-red-300' : 'border-gray-300'
+                                        }`}
+                                    placeholder="Enter object title..."
+                                />
+                                {errors.title && (
+                                    <p className="text-red-600 text-sm mt-1 flex items-center">
+                                        <AlertCircle className="h-4 w-4 mr-1" />
+                                        {errors.title}
+                                    </p>
+                                )}
+                                <p className="text-gray-500 text-sm mt-1">
+                                    This is the object's display title (stored on the object, not in schema data)
+                                </p>
+                            </div>
+
+                            {/* Dynamic Schema Fields */}
+                            {objectType && (
+                                <div className="border-t pt-4">
+                                    <h4 className="font-medium text-gray-900 mb-4">
+                                        {objectType.label} Fields
+                                    </h4>
+                                    <ObjectSchemaForm
+                                        schema={getSchemaFromObjectType(objectType)}
+                                        data={formData.data}
+                                        onChange={handleDataFieldChange}
+                                        errors={errors}
+                                    />
+                                </div>
+                            )}
                         </div>
                     </div>
-
-                    {/* Right Column - Object Data */}
+                ) : (
+                    /* Single Column - Object Data Only */
                     <div className="space-y-6">
                         <div>
                             <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
@@ -315,7 +394,7 @@ const ObjectContentView = ({ objectType, instance, parentId, isNewInstance, onSa
                             </div>
                         )}
                     </div>
-                </div>
+                )}
             </div>
 
             {/* Save Options (only for existing instances) */}
