@@ -423,12 +423,12 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
     """ViewSet for managing Object Instances"""
 
     queryset = ObjectInstance.objects.select_related(
-        "object_type", "created_by", "parent"
+        "object_type", "created_by", "parent", "current_version"
     ).prefetch_related("versions")
     serializer_class = ObjectInstanceSerializer
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    search_fields = ["title", "slug", "data"]
+    search_fields = ["title", "slug", "current_version__data"]
     ordering_fields = ["title", "created_at", "updated_at", "publish_date"]
     ordering = ["-created_at"]
     filterset_fields = ["object_type", "status", "parent", "level"]
@@ -735,6 +735,7 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
     def roots(self, request):
         """Get all root objects (objects without parents)"""
         object_type = request.query_params.get("type")
+        status_filter = request.query_params.get("status")
 
         roots = self.get_queryset().filter(parent__isnull=True)
 
@@ -746,6 +747,10 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
                 return Response(
                     {"error": "Object type not found"}, status=status.HTTP_404_NOT_FOUND
                 )
+
+        # Filter by status
+        if status_filter and status_filter != "all":
+            roots = roots.filter(status=status_filter)
 
         serializer = self.get_serializer(roots, many=True)
         return Response(serializer.data)
@@ -763,7 +768,7 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
             instances = instances.filter(
                 Q(title__icontains=query)
                 | Q(slug__icontains=query)
-                | Q(data__icontains=query)
+                | Q(current_version__data__icontains=query)
                 | Q(object_type__label__icontains=query)
                 | Q(object_type__name__icontains=query)
             )
@@ -813,7 +818,7 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
                 relevance=Case(
                     When(title__icontains=query, then=3),
                     When(slug__icontains=query, then=2),
-                    When(data__icontains=query, then=1),
+                    When(current_version__data__icontains=query, then=1),
                     default=0,
                     output_field=IntegerField(),
                 )
