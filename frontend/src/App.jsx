@@ -119,6 +119,19 @@ function App() {
                     </div>
                   </PrivateRoute>
                 } />
+                <Route path="/objects/:typeName" element={
+                  <PrivateRoute>
+                    <div className="fixed inset-0 bg-gray-50 flex flex-col">
+                      <Navbar />
+                      <main className="flex-1 overflow-hidden">
+                        <div className="h-full overflow-y-auto">
+                          <ObjectBrowser />
+                        </div>
+                      </main>
+                      <StatusBar customStatusContent={<span>Object Storage - Ready</span>} />
+                    </div>
+                  </PrivateRoute>
+                } />
 
                 {/* Object Type Editor Routes */}
                 <Route path="/settings/object-types/new/:tab?" element={

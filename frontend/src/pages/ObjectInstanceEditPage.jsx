@@ -54,12 +54,26 @@ const ObjectInstanceEditPage = () => {
     const objectType = objectTypeResponse?.data
     const instance = instanceResponse?.data
 
+    // Generate sub-objects tab label with allowed child types
+    const getSubObjectsLabel = () => {
+        const allowedChildTypes = objectType?.allowedChildTypes || []
+        if (allowedChildTypes.length === 1) {
+            return allowedChildTypes[0].label
+        } else if (allowedChildTypes.length <= 3) {
+            const typeNames = allowedChildTypes.map(t => t.label).join(', ')
+            return typeNames
+        } else {
+            return `${allowedChildTypes.length} types`
+        }
+    }
+
     // Tab definitions with routing
     const tabs = [
         { id: 'content', label: 'Content', icon: Layout },
+        // Only show sub-objects tab if there are allowed child types
+        ...((objectType?.allowedChildTypes || []).length > 0 ? [{ id: 'subobjects', label: getSubObjectsLabel(), icon: Users }] : []),
         { id: 'settings', label: 'Settings', icon: Settings },
         { id: 'publishing', label: 'Publishing', icon: Calendar },
-        { id: 'subobjects', label: 'Sub-objects', icon: Users },
         ...(isEditingInstance ? [{ id: 'versions', label: 'Versions', icon: History }] : [])
     ]
 
@@ -80,7 +94,13 @@ const ObjectInstanceEditPage = () => {
         if (actualParentId) {
             navigate(`/objects/${actualParentId}/edit/subobjects`)
         } else {
-            navigate('/objects')
+            // If no parent, go to the list view filtered by this object's type
+            const objectTypeName = objectType?.name
+            if (objectTypeName) {
+                navigate(`/objects/${objectTypeName}`)
+            } else {
+                navigate('/objects')
+            }
         }
     }
 
@@ -104,7 +124,13 @@ const ObjectInstanceEditPage = () => {
                 if (actualParentId) {
                     navigate(`/objects/${actualParentId}/edit/subobjects`)
                 } else {
-                    navigate('/objects')
+                    // If no parent, go to the list view filtered by this object's type
+                    const objectTypeName = objectType?.name
+                    if (objectTypeName) {
+                        navigate(`/objects/${objectTypeName}`)
+                    } else {
+                        navigate('/objects')
+                    }
                 }
             },
             onCancel: handleBack

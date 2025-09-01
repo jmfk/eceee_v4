@@ -202,9 +202,9 @@ const ObjectInstanceEditor = ({ instanceId, objectTypeId, onSave, onCancel, isVi
                     <nav className="-mb-px flex space-x-8">
                         {[
                             { id: 'content', label: 'Content' },
+                            { id: 'subobjects', label: 'Sub-objects' },
                             { id: 'settings', label: 'Settings' },
                             { id: 'publishing', label: 'Publishing' },
-                            { id: 'subobjects', label: 'Sub-objects' },
                             ...(instanceId ? [{ id: 'versions', label: 'Versions' }] : [])
                         ].map((tab) => (
                             <button
@@ -334,7 +334,31 @@ const ObjectInstanceEditor = ({ instanceId, objectTypeId, onSave, onCancel, isVi
                             </div>
                         )}
 
+                        {/* Sub-objects Tab */}
+                        {activeTab === 'subobjects' && (
+                            <div className="space-y-4">
+                                <div className="bg-gray-50 border border-gray-200 rounded-md p-4">
+                                    <h3 className="text-lg font-medium text-gray-900 mb-2">Sub-objects</h3>
+                                    <p className="text-gray-700">
+                                        Manage child objects and hierarchical relationships.
+                                        Sub-objects inherit context from their parent and can be organized in tree structures.
+                                    </p>
+                                </div>
 
+                                {instanceId ? (
+                                    <div>
+                                        <h4 className="font-medium text-gray-900 mb-2">Child Objects:</h4>
+                                        <div className="text-gray-500 text-sm">
+                                            Child object management will be implemented in a future phase.
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="text-gray-500 text-sm">
+                                        Sub-objects can be managed after creating this object.
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
                         {/* Settings Tab */}
                         {activeTab === 'settings' && (
@@ -408,32 +432,6 @@ const ObjectInstanceEditor = ({ instanceId, objectTypeId, onSave, onCancel, isVi
                                         />
                                     </div>
                                 </div>
-                            </div>
-                        )}
-
-                        {/* Sub-objects Tab */}
-                        {activeTab === 'subobjects' && (
-                            <div className="space-y-4">
-                                <div className="bg-gray-50 border border-gray-200 rounded-md p-4">
-                                    <h3 className="text-lg font-medium text-gray-900 mb-2">Sub-objects</h3>
-                                    <p className="text-gray-700">
-                                        Manage child objects and hierarchical relationships.
-                                        Sub-objects inherit context from their parent and can be organized in tree structures.
-                                    </p>
-                                </div>
-
-                                {instanceId ? (
-                                    <div>
-                                        <h4 className="font-medium text-gray-900 mb-2">Child Objects:</h4>
-                                        <div className="text-gray-500 text-sm">
-                                            Child object management will be implemented in a future phase.
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="text-gray-500 text-sm">
-                                        Sub-objects can be managed after creating this object.
-                                    </div>
-                                )}
                             </div>
                         )}
 
