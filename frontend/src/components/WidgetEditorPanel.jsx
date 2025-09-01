@@ -3,6 +3,7 @@ import { X, Save, RotateCcw } from 'lucide-react'
 import ValidatedInput from './validation/ValidatedInput.jsx'
 import { getWidgetSchema, validateWidgetConfiguration } from '../api/widgetSchemas.js'
 import { widgetsApi } from '../api'
+import { getWidgetEditor } from './widget-editors'
 
 /**
  * WidgetEditorPanel - Slide-out panel for editing widgets
@@ -527,6 +528,44 @@ const WidgetEditorPanel = forwardRef(({
                         ) : (
                             <div className="space-y-4">
                                 {(() => {
+                                    // Check if we have a specialized editor for this widget type
+                                    const SpecializedEditor = widgetTypeName ? getWidgetEditor(widgetTypeName) : null
+                                    
+                                    if (SpecializedEditor) {
+                                        // Use the specialized widget editor
+                                        return (
+                                            <SpecializedEditor
+                                                config={config}
+                                                onChange={(newConfig) => {
+                                                    setConfig(newConfig)
+                                                    
+                                                    // Check if we have changes compared to original
+                                                    const hasActualChanges = JSON.stringify(newConfig) !== JSON.stringify(originalConfig)
+                                                    setHasChanges(hasActualChanges)
+                                                    
+                                                    // Notify parent about unsaved changes state
+                                                    if (onUnsavedChanges) {
+                                                        onUnsavedChanges(hasActualChanges)
+                                                    }
+                                                    
+                                                    // Trigger widget validation
+                                                    validateWidget(newConfig)
+                                                    
+                                                    // Trigger real-time preview update
+                                                    triggerRealTimeUpdate(newConfig)
+                                                }}
+                                                validation={validationResults}
+                                                isValidating={isValidating}
+                                                widgetType={{ 
+                                                    name: widgetTypeName,
+                                                    configurationSchema: fetchedSchema || schema
+                                                }}
+                                                errors={validationResults}
+                                            />
+                                        )
+                                    }
+                                    
+                                    // Fall back to generic form generation from schema
                                     const activeSchema = fetchedSchema || schema
                                     return activeSchema?.properties ? (
                                         Object.entries(activeSchema.properties).map(([fieldName, fieldSchema]) =>

@@ -1,6 +1,9 @@
 // Base widget editor
 export { default as BaseWidgetEditor } from './BaseWidgetEditor'
 
+// Default/fallback editor
+import DefaultEditor from './DefaultEditor'
+
 // Core widget editors
 import TextBlockEditor from './TextBlockEditor'
 import ImageEditor from './ImageEditor'
@@ -19,7 +22,7 @@ import GalleryEditor from './GalleryEditor'
 import ObjectListEditor from './ObjectListEditor'
 
 // Export individual editors
-export { TextBlockEditor, ImageEditor, ButtonEditor, SpacerEditor, HTMLBlockEditor }
+export { DefaultEditor, TextBlockEditor, ImageEditor, ButtonEditor, SpacerEditor, HTMLBlockEditor }
 export { NewsEditor, EventsEditor, CalendarEditor, FormsEditor, GalleryEditor }
 export { ObjectListEditor }
 
@@ -41,13 +44,15 @@ export const WIDGET_EDITORS = {
     'Gallery': GalleryEditor,
     // Object storage widgets
     'Object List': ObjectListEditor,
+    // Default/fallback editor
+    'Default': DefaultEditor,
 }
 
 /**
  * Get the appropriate editor component for a widget type
  * @param {string} widgetTypeName - The name of the widget type
- * @returns {React.Component|null} - The editor component or null if not found
+ * @returns {React.Component} - The editor component or DefaultEditor if not found
  */
 export const getWidgetEditor = (widgetTypeName) => {
-    return WIDGET_EDITORS[widgetTypeName] || null
+    return WIDGET_EDITORS[widgetTypeName] || DefaultEditor
 } 
