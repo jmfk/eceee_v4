@@ -242,7 +242,7 @@ const ObjectInstanceEditPage = () => {
             </div>
 
             {/* Content */}
-            <div className="max-w-7xl mx-auto px-6 py-6">
+            <div className="mx-auto">
                 {renderTabContent()}
             </div>
 

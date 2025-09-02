@@ -25,6 +25,7 @@ import { WIDGET_ACTIONS } from '../utils/widgetConstants'
 import { useNotificationContext } from './NotificationManager'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import ContentEditor from './ContentEditor'
+import ContentEditorWithWidgetFactory from './ContentEditorWithWidgetFactory'
 import ErrorTodoSidebar from './ErrorTodoSidebar'
 import SchemaDrivenForm from './SchemaDrivenForm'
 import LayoutSelector from './LayoutSelector'
@@ -190,6 +191,9 @@ const PageEditor = () => {
     const [currentVersion, setCurrentVersion] = useState(null)
     const [availableVersions, setAvailableVersions] = useState([])
 
+    // Editor type selection state
+    const [useWidgetFactory, setUseWidgetFactory] = useState(true)
+
     // Guard: only consider layout/rendering ready once the intended version is resolved
     // Note: API returns 'id' but we need to check against currentVersion.id
     const isVersionReady = isNewPage || (
@@ -207,6 +211,14 @@ const PageEditor = () => {
     const [editingWidget, setEditingWidget] = useState(null)
     const [widgetHasUnsavedChanges, setWidgetHasUnsavedChanges] = useState(false)
     const widgetEditorRef = useRef(null)
+
+    // Ref to track current editing widget for callbacks
+    const editingWidgetRef = useRef(null)
+
+    // Sync editingWidget state with ref for callbacks
+    useEffect(() => {
+        editingWidgetRef.current = editingWidget
+    }, [editingWidget])
 
     // Validation To-Do sidebar state
     const [errorTodoItems, setErrorTodoItems] = useState([])
@@ -934,9 +946,16 @@ const PageEditor = () => {
 
     // Widget editor handlers
     const handleOpenWidgetEditor = useCallback((widgetData) => {
-        setEditingWidget(widgetData)
-        setWidgetEditorOpen(true)
-        setWidgetHasUnsavedChanges(false) // Reset unsaved changes when opening new widget
+        const currentEditingWidget = editingWidgetRef.current
+        if (currentEditingWidget && widgetData && currentEditingWidget.id === widgetData.id) {
+            setWidgetEditorOpen(false)
+            setEditingWidget(null)
+            setWidgetHasUnsavedChanges(false)
+        } else {
+            setEditingWidget(widgetData)
+            setWidgetEditorOpen(true)
+            setWidgetHasUnsavedChanges(false)
+        }
     }, [])
 
     const handleCloseWidgetEditor = useCallback(() => {
@@ -1224,6 +1243,7 @@ const PageEditor = () => {
                                                 </div>
                                             </div>
                                         )}
+
                                         {isLoadingLayout ? (
                                             <div className="h-full flex items-center justify-center bg-gray-50">
                                                 <div className="text-center">
@@ -1232,20 +1252,39 @@ const PageEditor = () => {
                                                 </div>
                                             </div>
                                         ) : (
-                                            <ContentEditor
-                                                key={`${webpageData?.id}-${pageVersionData?.versionId || 'current'}`}
-                                                ref={contentEditorRef}
-                                                webpageData={webpageData}
-                                                pageVersionData={pageVersionData}
-                                                onUpdate={updatePageData}
-                                                isNewPage={isNewPage}
-                                                layoutJson={layoutData}
-                                                editable={true}
-                                                onDirtyChange={(isDirty, reason) => {
-                                                    setIsDirty(isDirty);
-                                                }}
-                                                onOpenWidgetEditor={handleOpenWidgetEditor}
-                                            />
+                                            <>
+                                                {useWidgetFactory ? (
+                                                    <ContentEditorWithWidgetFactory
+                                                        key={`wf-${webpageData?.id}-${pageVersionData?.versionId || 'current'}`}
+                                                        ref={contentEditorRef}
+                                                        webpageData={webpageData}
+                                                        pageVersionData={pageVersionData}
+                                                        onUpdate={updatePageData}
+                                                        isNewPage={isNewPage}
+                                                        layoutJson={layoutData}
+                                                        editable={true}
+                                                        onDirtyChange={(isDirty, reason) => {
+                                                            setIsDirty(isDirty);
+                                                        }}
+                                                        onOpenWidgetEditor={handleOpenWidgetEditor}
+                                                    />
+                                                ) : (
+                                                    <ContentEditor
+                                                        key={`legacy-${webpageData?.id}-${pageVersionData?.versionId || 'current'}`}
+                                                        ref={contentEditorRef}
+                                                        webpageData={webpageData}
+                                                        pageVersionData={pageVersionData}
+                                                        onUpdate={updatePageData}
+                                                        isNewPage={isNewPage}
+                                                        layoutJson={layoutData}
+                                                        editable={true}
+                                                        onDirtyChange={(isDirty, reason) => {
+                                                            setIsDirty(isDirty);
+                                                        }}
+                                                        onOpenWidgetEditor={handleOpenWidgetEditor}
+                                                    />
+                                                )}
+                                            </>
                                         )}
                                     </>
                                 )}

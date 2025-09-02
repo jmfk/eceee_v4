@@ -213,267 +213,252 @@ const ObjectSubObjectsView = ({ objectType, instance, isNewInstance, onSave, onC
     )
 
 
-    // Add error boundary logic
-    try {
-        return (
-            <div className="space-y-6">
+    return (
+        <div className="h-full flex relative">
+            <div className="flex-1 min-w-0">
+                <div className="space-y-6">
+                    <div className="bg-white p-6">
+                        <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
+                            <Users className="h-5 w-5 mr-2" />
+                            Sub-objects & Hierarchy
+                            {objectType && (
+                                <span className="ml-3 text-sm font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                                    {objectType.label}
+                                </span>
+                            )}
+                        </h2>
 
-                <div className="bg-white rounded-lg shadow-sm border p-6">
-                    <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
-                        <Users className="h-5 w-5 mr-2" />
-                        Sub-objects & Hierarchy
-                        {objectType && (
-                            <span className="ml-3 text-sm font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                                {objectType.label}
-                            </span>
-                        )}
-                    </h2>
+                        <div className="space-y-6">
 
-                    <div className="space-y-6">
-
-                        {isNewInstance ? (
-                            /* New Instance - Can't have children yet */
-                            <div className="text-center py-12 bg-gray-50 rounded-lg">
-                                <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                                <h3 className="text-lg font-medium text-gray-900 mb-2">No Sub-objects Yet</h3>
-                                <p className="text-gray-600 mb-4">
-                                    Sub-objects can be created after saving this {objectType?.label?.toLowerCase()}.
-                                </p>
-                                <button
-                                    onClick={onSave}
-                                    className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
-                                >
-                                    Save to Enable Sub-objects
-                                </button>
-                            </div>
-                        ) : (
-                            /* Existing Instance - Show children and creation options */
-                            <div className="space-y-6">
-                                {/* Controls Section */}
-                                <div className="flex items-center justify-between mb-6">
-                                    {/* View and Filter Controls */}
-                                    <div className="flex items-center space-x-4">
-                                        {/* View Mode Toggle */}
-                                        <div className="flex bg-gray-100 rounded-lg p-1">
-                                            <button
-                                                onClick={() => setViewMode('list')}
-                                                className={`p-2 rounded-md transition-colors ${viewMode === 'list'
-                                                    ? 'bg-white text-gray-900 shadow-sm'
-                                                    : 'text-gray-500 hover:text-gray-700'
-                                                    }`}
-                                                title="List view"
-                                            >
-                                                <List className="w-4 h-4" />
-                                            </button>
-                                            <button
-                                                onClick={() => setViewMode('grid')}
-                                                className={`p-2 rounded-md transition-colors ${viewMode === 'grid'
-                                                    ? 'bg-white text-gray-900 shadow-sm'
-                                                    : 'text-gray-500 hover:text-gray-700'
-                                                    }`}
-                                                title="Grid view"
-                                            >
-                                                <Grid3X3 className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                        {/* Filters and Options */}
-                                        {children.length > 0 && (
-                                            <div className="flex items-center space-x-3">
-                                                {/* Group by Type Toggle */}
-                                                {childObjectTypes.length > 1 && (
-                                                    <label className="flex items-center space-x-2 text-sm">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={groupByType}
-                                                            onChange={(e) => setGroupByType(e.target.checked)}
-                                                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                                        />
-                                                        <span className="text-gray-700">Group by type</span>
-                                                    </label>
-                                                )}
-
-                                                {/* Object Type Filter */}
-                                                {childObjectTypes.length > 1 && !groupByType && (
-                                                    <select
-                                                        value={filterType}
-                                                        onChange={(e) => setFilterType(e.target.value)}
-                                                        className="text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                                    >
-                                                        <option value="all">All types</option>
-                                                        {childObjectTypes.map(type => (
-                                                            <option key={type.id} value={type.id}>{type.label}</option>
-                                                        ))}
-                                                    </select>
-                                                )}
-
-                                                {/* Status Filter */}
-                                                <select
-                                                    value={filterStatus}
-                                                    onChange={(e) => setFilterStatus(e.target.value)}
-                                                    className="text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            {isNewInstance ? (
+                                /* New Instance - Can't have children yet */
+                                <div className="text-center py-12 bg-gray-50 rounded-lg">
+                                    <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                                    <h3 className="text-lg font-medium text-gray-900 mb-2">No Sub-objects Yet</h3>
+                                    <p className="text-gray-600 mb-4">
+                                        Sub-objects can be created after saving this {objectType?.label?.toLowerCase()}.
+                                    </p>
+                                    <button
+                                        onClick={onSave}
+                                        className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+                                    >
+                                        Save to Enable Sub-objects
+                                    </button>
+                                </div>
+                            ) : (
+                                /* Existing Instance - Show children and creation options */
+                                <div className="space-y-6">
+                                    {/* Controls Section */}
+                                    <div className="flex items-center justify-between mb-6">
+                                        {/* View and Filter Controls */}
+                                        <div className="flex items-center space-x-4">
+                                            {/* View Mode Toggle */}
+                                            <div className="flex bg-gray-100 rounded-lg p-1">
+                                                <button
+                                                    onClick={() => setViewMode('list')}
+                                                    className={`p-2 rounded-md transition-colors ${viewMode === 'list'
+                                                        ? 'bg-white text-gray-900 shadow-sm'
+                                                        : 'text-gray-500 hover:text-gray-700'
+                                                        }`}
+                                                    title="List view"
                                                 >
-                                                    <option value="all">All status</option>
-                                                    <option value="draft">Draft</option>
-                                                    <option value="published">Published</option>
-                                                </select>
+                                                    <List className="w-4 h-4" />
+                                                </button>
+                                                <button
+                                                    onClick={() => setViewMode('grid')}
+                                                    className={`p-2 rounded-md transition-colors ${viewMode === 'grid'
+                                                        ? 'bg-white text-gray-900 shadow-sm'
+                                                        : 'text-gray-500 hover:text-gray-700'
+                                                        }`}
+                                                    title="Grid view"
+                                                >
+                                                    <Grid3X3 className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                            {/* Filters and Options */}
+                                            {children.length > 0 && (
+                                                <div className="flex items-center space-x-3">
+                                                    {/* Group by Type Toggle */}
+                                                    {childObjectTypes.length > 1 && (
+                                                        <label className="flex items-center space-x-2 text-sm">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={groupByType}
+                                                                onChange={(e) => setGroupByType(e.target.checked)}
+                                                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                            />
+                                                            <span className="text-gray-700">Group by type</span>
+                                                        </label>
+                                                    )}
 
-                                                {/* Sort Options */}
-                                                <div className="flex items-center space-x-1">
+                                                    {/* Object Type Filter */}
+                                                    {childObjectTypes.length > 1 && !groupByType && (
+                                                        <select
+                                                            value={filterType}
+                                                            onChange={(e) => setFilterType(e.target.value)}
+                                                            className="text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                        >
+                                                            <option value="all">All types</option>
+                                                            {childObjectTypes.map(type => (
+                                                                <option key={type.id} value={type.id}>{type.label}</option>
+                                                            ))}
+                                                        </select>
+                                                    )}
+
+                                                    {/* Status Filter */}
                                                     <select
-                                                        value={sortBy}
-                                                        onChange={(e) => setSortBy(e.target.value)}
+                                                        value={filterStatus}
+                                                        onChange={(e) => setFilterStatus(e.target.value)}
                                                         className="text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                                     >
-                                                        <option value="title">Sort by Title</option>
-                                                        <option value="created">Sort by Created</option>
-                                                        <option value="status">Sort by Status</option>
+                                                        <option value="all">All status</option>
+                                                        <option value="draft">Draft</option>
+                                                        <option value="published">Published</option>
                                                     </select>
-                                                    <button
-                                                        onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                                                        className="p-1.5 text-gray-500 hover:text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
-                                                        title={`Sort ${sortOrder === 'asc' ? 'descending' : 'ascending'}`}
-                                                    >
-                                                        {sortOrder === 'asc' ? <SortAsc className="w-4 h-4" /> : <SortDesc className="w-4 h-4" />}
-                                                    </button>
+
+                                                    {/* Sort Options */}
+                                                    <div className="flex items-center space-x-1">
+                                                        <select
+                                                            value={sortBy}
+                                                            onChange={(e) => setSortBy(e.target.value)}
+                                                            className="text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                        >
+                                                            <option value="title">Sort by Title</option>
+                                                            <option value="created">Sort by Created</option>
+                                                            <option value="status">Sort by Status</option>
+                                                        </select>
+                                                        <button
+                                                            onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                                                            className="p-1.5 text-gray-500 hover:text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
+                                                            title={`Sort ${sortOrder === 'asc' ? 'descending' : 'ascending'}`}
+                                                        >
+                                                            {sortOrder === 'asc' ? <SortAsc className="w-4 h-4" /> : <SortDesc className="w-4 h-4" />}
+                                                        </button>
+                                                    </div>
                                                 </div>
+                                            )}
+                                        </div>
+
+                                        {/* Add Sub-object Button */}
+                                        <ObjectTypeSelector
+                                            allowedChildTypes={allowedChildTypes}
+                                            onSelect={handleCreateSubObject}
+                                            parentId={instance.id}
+                                            placeholder="Add sub-object"
+                                        />
+                                    </div>
+
+                                    {/* Existing Children */}
+                                    <div>
+
+                                        {childrenLoading ? (
+                                            <div className="flex justify-center py-8">
+                                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                                            </div>
+                                        ) : filteredAndSortedChildren.length > 0 ? (
+                                            groupByType && groupedChildren ? (
+                                                /* Grouped View */
+                                                <div className="space-y-6">
+                                                    {groupedChildren.map((group) => (
+                                                        <div key={group.type} className="space-y-3">
+                                                            {/* Group Header */}
+                                                            <div className="flex items-center space-x-3 pb-2 border-b border-gray-200">
+                                                                {group.type?.iconImage ? (
+                                                                    <img
+                                                                        src={group.type.iconImage}
+                                                                        alt={group.label}
+                                                                        className="w-6 h-6 object-cover rounded"
+                                                                    />
+                                                                ) : (
+                                                                    <div className="w-6 h-6 bg-blue-100 rounded flex items-center justify-center">
+                                                                        <span className="text-blue-600 font-medium text-xs">
+                                                                            {group.label.charAt(0)}
+                                                                        </span>
+                                                                    </div>
+                                                                )}
+                                                                <h3 className="font-medium text-gray-900">{group.label}</h3>
+                                                                <span className="text-sm text-gray-500">({group.children.length})</span>
+                                                            </div>
+                                                            {/* Group Items */}
+                                                            <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4' : 'space-y-2'}>
+                                                                {group.children.map((child) => (
+                                                                    <SubObjectItem key={child.id} child={child} viewMode={viewMode} />
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                /* Regular View */
+                                                <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4' : 'space-y-2'}>
+                                                    {filteredAndSortedChildren.map((child) => (
+                                                        <SubObjectItem key={child.id} child={child} viewMode={viewMode} />
+                                                    ))}
+                                                </div>
+                                            )
+                                        ) : children.length > 0 ? (
+                                            <div className="text-center py-8 bg-gray-50 rounded-lg">
+                                                <Filter className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                                                <p className="text-gray-600">
+                                                    No sub-objects match the current filters.
+                                                </p>
+                                                <button
+                                                    onClick={() => {
+                                                        setFilterType('all')
+                                                        setFilterStatus('all')
+                                                    }}
+                                                    className="mt-2 text-blue-600 hover:text-blue-800 text-sm font-medium"
+                                                >
+                                                    Clear filters
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <div className="text-center py-8 bg-gray-50 rounded-lg">
+                                                <Users className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                                                <p className="text-gray-600">
+                                                    No sub-objects created yet.
+                                                    {allowedChildTypes.length > 0
+                                                        ? ' Use the "Add sub-object" button above to create new sub-objects.'
+                                                        : ' This object type does not allow child objects.'
+                                                    }
+                                                </p>
                                             </div>
                                         )}
                                     </div>
 
-                                    {/* Add Sub-object Button */}
-                                    <ObjectTypeSelector
-                                        allowedChildTypes={allowedChildTypes}
-                                        onSelect={handleCreateSubObject}
-                                        parentId={instance.id}
-                                        placeholder="Add sub-object"
-                                    />
+
                                 </div>
-
-                                {/* Existing Children */}
-                                <div>
-
-                                    {childrenLoading ? (
-                                        <div className="flex justify-center py-8">
-                                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                                        </div>
-                                    ) : filteredAndSortedChildren.length > 0 ? (
-                                        groupByType && groupedChildren ? (
-                                            /* Grouped View */
-                                            <div className="space-y-6">
-                                                {groupedChildren.map((group) => (
-                                                    <div key={group.type} className="space-y-3">
-                                                        {/* Group Header */}
-                                                        <div className="flex items-center space-x-3 pb-2 border-b border-gray-200">
-                                                            {group.type?.iconImage ? (
-                                                                <img
-                                                                    src={group.type.iconImage}
-                                                                    alt={group.label}
-                                                                    className="w-6 h-6 object-cover rounded"
-                                                                />
-                                                            ) : (
-                                                                <div className="w-6 h-6 bg-blue-100 rounded flex items-center justify-center">
-                                                                    <span className="text-blue-600 font-medium text-xs">
-                                                                        {group.label.charAt(0)}
-                                                                    </span>
-                                                                </div>
-                                                            )}
-                                                            <h3 className="font-medium text-gray-900">{group.label}</h3>
-                                                            <span className="text-sm text-gray-500">({group.children.length})</span>
-                                                        </div>
-                                                        {/* Group Items */}
-                                                        <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4' : 'space-y-2'}>
-                                                            {group.children.map((child) => (
-                                                                <SubObjectItem key={child.id} child={child} viewMode={viewMode} />
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        ) : (
-                                            /* Regular View */
-                                            <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4' : 'space-y-2'}>
-                                                {filteredAndSortedChildren.map((child) => (
-                                                    <SubObjectItem key={child.id} child={child} viewMode={viewMode} />
-                                                ))}
-                                            </div>
-                                        )
-                                    ) : children.length > 0 ? (
-                                        <div className="text-center py-8 bg-gray-50 rounded-lg">
-                                            <Filter className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                                            <p className="text-gray-600">
-                                                No sub-objects match the current filters.
-                                            </p>
-                                            <button
-                                                onClick={() => {
-                                                    setFilterType('all')
-                                                    setFilterStatus('all')
-                                                }}
-                                                className="mt-2 text-blue-600 hover:text-blue-800 text-sm font-medium"
-                                            >
-                                                Clear filters
-                                            </button>
-                                        </div>
-                                    ) : (
-                                        <div className="text-center py-8 bg-gray-50 rounded-lg">
-                                            <Users className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                                            <p className="text-gray-600">
-                                                No sub-objects created yet.
-                                                {allowedChildTypes.length > 0
-                                                    ? ' Use the "Add sub-object" button above to create new sub-objects.'
-                                                    : ' This object type does not allow child objects.'
-                                                }
-                                            </p>
-                                        </div>
-                                    )}
-                                </div>
-
-
-                            </div>
-                        )}
+                            )}
+                        </div>
                     </div>
-                </div>
 
-                {/* Action Buttons */}
-                <div className="flex justify-end space-x-4">
-                    <button
-                        type="button"
-                        onClick={onCancel}
-                        className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
-                    >
-                        Back to Objects
-                    </button>
-                </div>
+                    {/* Action Buttons */}
+                    <div className="flex justify-end space-x-4">
+                        <button
+                            type="button"
+                            onClick={onCancel}
+                            className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+                        >
+                            Back to Objects
+                        </button>
+                    </div>
 
-                {/* Delete Confirmation Modal */}
-                <DeleteConfirmationModal
-                    isOpen={deleteModal.isOpen}
-                    onClose={handleCloseDeleteModal}
-                    onConfirm={handleConfirmDelete}
-                    title="Delete Sub-object"
-                    itemName={deleteModal.child?.title}
-                    message={`Are you sure you want to delete "${deleteModal.child?.title}"?`}
-                    warningText="This action will also delete any sub-objects it contains."
-                    isDeleting={deleteMutation.isPending}
-                    deleteButtonText="Delete Sub-object"
-                />
-            </div>
-        )
-    } catch (error) {
-        console.error('ObjectSubObjectsView render error:', error)
-        return (
-            <div className="space-y-6">
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                    <h3 className="text-red-800 font-medium">Component Error</h3>
-                    <p className="text-red-600 text-sm mt-1">
-                        An error occurred while rendering the Sub-objects view: {error.message}
-                    </p>
-                    <pre className="text-xs text-red-500 mt-2 overflow-auto">
-                        {error.stack}
-                    </pre>
+                    {/* Delete Confirmation Modal */}
+                    <DeleteConfirmationModal
+                        isOpen={deleteModal.isOpen}
+                        onClose={handleCloseDeleteModal}
+                        onConfirm={handleConfirmDelete}
+                        title="Delete Sub-object"
+                        itemName={deleteModal.child?.title}
+                        message={`Are you sure you want to delete "${deleteModal.child?.title}"?`}
+                        warningText="This action will also delete any sub-objects it contains."
+                        isDeleting={deleteMutation.isPending}
+                        deleteButtonText="Delete Sub-object"
+                    />
                 </div>
             </div>
-        )
-    }
+        </div>
+    )
 }
 
 export default ObjectSubObjectsView

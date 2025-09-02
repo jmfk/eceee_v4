@@ -1,12 +1,19 @@
-import React, { forwardRef, useState, useMemo } from 'react'
+import React, { forwardRef, useState, useMemo, useRef, useCallback, useImperativeHandle } from 'react'
 import { Layout, Plus, Settings, Trash2, Eye, Check, X } from 'lucide-react'
 import { WidgetFactory } from './widgets'
 import { useWidgets, getWidgetDisplayName, createDefaultWidgetConfig } from '../hooks/useWidgets'
 import { convertAllWidgetsToNewFormat } from '../utils/widgetFormatConverter'
+import WidgetEditorPanel from './WidgetEditorPanel'
 
 const ObjectContentEditor = forwardRef(({ objectType, widgets = {}, onWidgetChange, mode = 'object' }, ref) => {
     const [selectedSlot, setSelectedSlot] = useState(null)
     const [selectedWidgets, setSelectedWidgets] = useState({}) // For bulk operations
+
+    // Widget editor panel state
+    const [widgetEditorOpen, setWidgetEditorOpen] = useState(false)
+    const [editingWidget, setEditingWidget] = useState(null)
+    const [widgetHasUnsavedChanges, setWidgetHasUnsavedChanges] = useState(false)
+    const widgetEditorRef = useRef(null)
 
     // Ensure all widgets are in new format
     const normalizedWidgets = useMemo(() => {
@@ -97,9 +104,55 @@ const ObjectContentEditor = forwardRef(({ objectType, widgets = {}, onWidgetChan
 
     // Remove redundant function - use the shared one from useWidgets hook
 
+    // Widget editor handlers
+    const handleOpenWidgetEditor = useCallback((widgetData) => {
+        // Toggle functionality: check if the same widget is already being edited
+        // Use widget ID as primary identifier, only if both widgets have IDs
+        const isSameWidget = editingWidget &&
+            widgetData.id &&
+            editingWidget.id &&
+            editingWidget.id === widgetData.id;
+
+        if (isSameWidget) {
+            setWidgetEditorOpen(false)
+            setEditingWidget(null)
+            setWidgetHasUnsavedChanges(false)
+        } else {
+            // Open panel with new widget
+            setEditingWidget(widgetData)
+            setWidgetEditorOpen(true)
+            setWidgetHasUnsavedChanges(false)
+        }
+    }, [editingWidget])
+
+    const handleCloseWidgetEditor = useCallback(() => {
+        setWidgetEditorOpen(false)
+        setEditingWidget(null)
+        setWidgetHasUnsavedChanges(false)
+    }, [])
+
+    const handleSaveWidget = useCallback((updatedWidget) => {
+        if (!editingWidget || !onWidgetChange) return
+
+        // Update the widget in the widgets object
+        const updatedWidgets = { ...normalizedWidgets }
+        const slotName = editingWidget.slotName || 'main'
+
+        if (updatedWidgets[slotName]) {
+            updatedWidgets[slotName] = updatedWidgets[slotName].map(w =>
+                w.id === editingWidget.id ? updatedWidget : w
+            )
+        }
+
+        onWidgetChange(updatedWidgets)
+        setWidgetHasUnsavedChanges(false)
+        handleCloseWidgetEditor()
+    }, [editingWidget, normalizedWidgets, onWidgetChange, handleCloseWidgetEditor])
+
     const handleEditWidget = (slotName, widgetIndex, widget) => {
-        // TODO: Open widget editor with the specific widget
-        // console.log('Edit widget:', { slotName, widgetIndex, widget })
+        // Add slotName to widget data for editor
+        const widgetWithSlot = { ...widget, slotName }
+        handleOpenWidgetEditor(widgetWithSlot)
     }
 
     const handleDeleteWidget = (slotName, widgetIndex, widget) => {
@@ -335,9 +388,21 @@ const ObjectContentEditor = forwardRef(({ objectType, widgets = {}, onWidgetChan
         }, 0)
     }, [normalizedWidgets, objectType?.slotConfiguration?.slots])
 
+    // Expose widget editor functionality to parent
+    useImperativeHandle(ref, () => ({
+        // Widget editor state
+        widgetEditorOpen,
+        editingWidget,
+        widgetHasUnsavedChanges,
+        widgetEditorRef,
+        // Widget editor handlers
+        handleOpenWidgetEditor,
+        handleCloseWidgetEditor,
+        handleSaveWidget
+    }), [widgetEditorOpen, editingWidget, widgetHasUnsavedChanges, handleOpenWidgetEditor, handleCloseWidgetEditor, handleSaveWidget])
+
     return (
         <div ref={ref} className="space-y-4">
-
             {/* Slots */}
             <div className="space-y-4">
                 {objectType.slotConfiguration.slots.map(renderSlot)}
