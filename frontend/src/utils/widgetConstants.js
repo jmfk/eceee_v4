@@ -3,5 +3,7 @@ export const WIDGET_ACTIONS = {
     REMOVE: 'remove',
     UPDATE: 'update',
     EDIT: 'edit',
-    CLEAR: 'clear'
+    CLEAR: 'clear',
+    MOVE_UP: 'move_up',
+    MOVE_DOWN: 'move_down'
 };

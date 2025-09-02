@@ -6,7 +6,6 @@ import { convertAllWidgetsToNewFormat } from '../utils/widgetFormatConverter'
 import WidgetEditorPanel from './WidgetEditorPanel'
 
 const ObjectContentEditor = forwardRef(({ objectType, widgets = {}, onWidgetChange, mode = 'object' }, ref) => {
-    const [selectedSlot, setSelectedSlot] = useState(null)
     const [selectedWidgets, setSelectedWidgets] = useState({}) // For bulk operations
 
     // Widget editor panel state
@@ -181,6 +180,50 @@ const ObjectContentEditor = forwardRef(({ objectType, widgets = {}, onWidgetChan
         }
     }
 
+    // Move widget up in the slot
+    const handleMoveWidgetUp = (slotName, widgetIndex, widget) => {
+        if (widgetIndex <= 0) return // Can't move the first widget up
+
+        const currentSlotWidgets = [...(normalizedWidgets[slotName] || [])]
+        if (currentSlotWidgets.length <= 1) return
+
+        // Swap with previous widget
+        const temp = currentSlotWidgets[widgetIndex]
+        currentSlotWidgets[widgetIndex] = currentSlotWidgets[widgetIndex - 1]
+        currentSlotWidgets[widgetIndex - 1] = temp
+
+        const updatedWidgets = {
+            ...normalizedWidgets,
+            [slotName]: currentSlotWidgets
+        }
+
+        // Notify parent component of the change
+        if (onWidgetChange) {
+            onWidgetChange(updatedWidgets)
+        }
+    }
+
+    // Move widget down in the slot
+    const handleMoveWidgetDown = (slotName, widgetIndex, widget) => {
+        const currentSlotWidgets = [...(normalizedWidgets[slotName] || [])]
+        if (widgetIndex >= currentSlotWidgets.length - 1) return // Can't move the last widget down
+
+        // Swap with next widget
+        const temp = currentSlotWidgets[widgetIndex]
+        currentSlotWidgets[widgetIndex] = currentSlotWidgets[widgetIndex + 1]
+        currentSlotWidgets[widgetIndex + 1] = temp
+
+        const updatedWidgets = {
+            ...normalizedWidgets,
+            [slotName]: currentSlotWidgets
+        }
+
+        // Notify parent component of the change
+        if (onWidgetChange) {
+            onWidgetChange(updatedWidgets)
+        }
+    }
+
     // Toggle widget selection for bulk operations
     const handleToggleWidgetSelection = (slotName, widgetIndex, widget) => {
         const widgetKey = `${slotName}-${widgetIndex}`
@@ -250,23 +293,20 @@ const ObjectContentEditor = forwardRef(({ objectType, widgets = {}, onWidgetChan
     const renderWidget = (widget, slotName, index) => {
         const widgetKey = `${slotName}-${index}`
         const isSelected = !!selectedWidgets[widgetKey]
+        const slotWidgets = normalizedWidgets[slotName] || []
 
         return (
             <div key={widget.id || index} className="relative">
-                <button
-                    onClick={() => handleToggleWidgetSelection(slotName, index, widget)}
-                    className={`absolute top-2 left-2 z-10 p-1 rounded transition-colors ${isSelected ? 'text-blue-600 bg-white shadow-sm' : 'text-gray-400 hover:text-gray-600 bg-white/80'
-                        }`}
-                    title="Select for bulk operations"
-                >
-                    {isSelected ? <Check className="h-3 w-3" /> : <div className="h-3 w-3 border border-gray-300 rounded-sm bg-white" />}
-                </button>
                 <WidgetFactory
                     widget={widget}
                     slotName={slotName}
                     index={index}
                     onEdit={handleEditWidget}
                     onDelete={handleDeleteWidget}
+                    onMoveUp={handleMoveWidgetUp}
+                    onMoveDown={handleMoveWidgetDown}
+                    canMoveUp={index > 0}
+                    canMoveDown={index < slotWidgets.length - 1}
                     mode="editor"
                     showControls={true}
                     className={`mb-2 ${isSelected ? 'ring-2 ring-blue-500' : ''}`}
@@ -277,15 +317,13 @@ const ObjectContentEditor = forwardRef(({ objectType, widgets = {}, onWidgetChan
 
     const renderSlot = (slot) => {
         const slotWidgets = normalizedWidgets[slot.name] || []
-        const isSelected = selectedSlot === slot.name
         const slotSelections = Object.keys(selectedWidgets).filter(key => key.startsWith(`${slot.name}-`))
         const hasSelections = slotSelections.length > 0
 
         return (
             <div
                 key={slot.name}
-                className={`border rounded-lg p-4 transition-colors ${isSelected ? 'border-blue-300 bg-blue-50' : 'border-gray-200 bg-white'}`}
-                onClick={() => setSelectedSlot(slot.name)}
+                className="border p-4 transition-colors border-gray-200"
             >
                 {/* Slot Header */}
                 <div className="flex items-center justify-between mb-3">
@@ -314,25 +352,6 @@ const ObjectContentEditor = forwardRef(({ objectType, widgets = {}, onWidgetChan
 
                     {/* Action Buttons */}
                     <div className="flex items-center space-x-2">
-                        {/* Bulk Actions (show when widgets are selected) */}
-                        {hasSelections && (
-                            <div className="flex items-center space-x-1 mr-2">
-                                <span className="text-xs text-gray-500">
-                                    {slotSelections.length} selected
-                                </span>
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation()
-                                        handleDeleteSelectedWidgets()
-                                    }}
-                                    className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
-                                    title="Delete selected widgets"
-                                >
-                                    <Trash2 className="h-3 w-3" />
-                                </button>
-                            </div>
-                        )}
-
                         {/* Add Widget Dropdown */}
                         <div className="relative">
                             <select
