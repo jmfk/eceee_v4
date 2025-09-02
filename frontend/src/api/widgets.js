@@ -88,7 +88,33 @@ export const widgetsApi = {
             ? endpoints.widgets.typesWithJson
             : endpoints.widgets.types
         return api.get(endpoint)
-    }, 'widgets.getTypes')
+    }, 'widgets.getTypes'),
+
+    /**
+     * Render widget preview
+     * @param {string} widgetType - Widget type slug
+     * @param {Object} configuration - Widget configuration
+     * @param {Object} context - Additional render context
+     * @returns {Promise<Object>} Preview render response with HTML, CSS, and variables
+     */
+    renderPreview: wrapApiCall(async (widgetType, configuration, context = {}) => {
+        return api.post(`/api/webpages/widgets/types/${widgetType}/preview/`, {
+            configuration,
+            context
+        })
+    }, 'widgets.renderPreview'),
+
+    /**
+     * Validate widget configuration
+     * @param {string} widgetType - Widget type slug
+     * @param {Object} configuration - Widget configuration to validate
+     * @returns {Promise<Object>} Validation result
+     */
+    validateConfiguration: wrapApiCall(async (widgetType, configuration) => {
+        return api.post(`/api/webpages/widgets/types/${widgetType}/validate/`, {
+            configuration
+        })
+    }, 'widgets.validateConfiguration')
 }
 
 export default widgetsApi
