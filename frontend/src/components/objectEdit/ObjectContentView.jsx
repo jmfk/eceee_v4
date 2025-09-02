@@ -220,14 +220,10 @@ const ObjectContentView = ({ objectType, instance, parentId, isNewInstance, onSa
 
                 {/* Conditional Layout - Two columns if widget slots exist, single column if not */}
                 {objectType?.slotConfiguration?.slots && objectType.slotConfiguration.slots.length > 0 ? (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         {/* Left Column - Widget Slots */}
-                        <div className="space-y-6">
+                        <div className="space-y-6 border-r pr-6 border-gray-200">
                             <div>
-                                <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
-                                    <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
-                                    Widget Slots
-                                </h3>
                                 <ObjectContentEditor
                                     objectType={objectType}
                                     widgets={localWidgets}
@@ -242,13 +238,6 @@ const ObjectContentView = ({ objectType, instance, parentId, isNewInstance, onSa
 
                         {/* Right Column - Object Data */}
                         <div className="space-y-6">
-                            <div>
-                                <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
-                                    <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-                                    Object Data
-                                </h3>
-                            </div>
-
                             {/* Object Type Selection (only for new instances) */}
                             {isNewInstance && (
                                 <div>

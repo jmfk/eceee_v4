@@ -1110,13 +1110,15 @@ const SlotEditor = ({ slots = [], onChange, errors }) => {
         const fetchWidgets = async () => {
             setLoadingWidgets(true)
             try {
-                const response = await fetch('/api/v1/objects/api/object-types/available_widgets/')
-                if (response.ok) {
-                    const data = await response.json()
-                    setAvailableWidgets(data.widgets || [])
-                }
+                // Import the authenticated API client
+                const { widgetsApi } = await import('../api')
+                // Use the correct endpoint with authentication
+                const data = await widgetsApi.getTypes(true) // Include template JSON
+                // console.log('Fetched widget types for object type form:', data)
+                setAvailableWidgets(data || [])
             } catch (error) {
-                // Failed to fetch available widgets
+                console.error('Failed to fetch available widgets:', error)
+                setAvailableWidgets([])
             } finally {
                 setLoadingWidgets(false)
             }
@@ -1245,6 +1247,7 @@ const SlotEditor = ({ slots = [], onChange, errors }) => {
                             <WidgetControlManager
                                 widgetControls={slot.widgetControls || []}
                                 availableWidgets={availableWidgets}
+                                loadingWidgets={loadingWidgets}
                                 onChange={(newControls) => updateSlot(index, 'widgetControls', newControls)}
                             />
                         )}
@@ -1325,17 +1328,21 @@ const ChildTypeSelector = ({ selectedTypes, availableTypes, onChange, hierarchyL
 }
 
 // Widget Control Manager Component
-const WidgetControlManager = ({ widgetControls = [], availableWidgets = [], onChange }) => {
+const WidgetControlManager = ({ widgetControls = [], availableWidgets = [], loadingWidgets = false, onChange }) => {
     const [selectedWidgetType, setSelectedWidgetType] = useState('')
 
     const addWidgetControl = () => {
         if (!selectedWidgetType) return
 
-        const selectedWidget = availableWidgets.find(w => w.slug === selectedWidgetType)
+        const selectedWidget = availableWidgets.find(w => {
+            const widgetType = w.type || w.slug || w.widget_type
+            return widgetType === selectedWidgetType
+        })
+        const widgetName = selectedWidget?.display_name || selectedWidget?.name || selectedWidget?.label || selectedWidgetType
         const newControl = {
             id: `control_${Date.now()}`,
             widgetType: selectedWidgetType,
-            label: selectedWidget?.name || '',
+            label: widgetName,
             maxInstances: null,
             required: false,
             preCreate: false,
@@ -1343,6 +1350,37 @@ const WidgetControlManager = ({ widgetControls = [], availableWidgets = [], onCh
         }
         onChange([...widgetControls, newControl])
         setSelectedWidgetType('') // Reset selection
+    }
+
+    // Add all available widget types as controls
+    const addAllWidgetControls = () => {
+        const newControls = []
+
+        // Get widgets that aren't already added
+        const availableToAdd = availableWidgets.filter(widget => {
+            const widgetType = widget.type || widget.slug || widget.widget_type
+            return !widgetControls.some(control => control.widgetType === widgetType)
+        })
+
+        // Create controls for all available widgets
+        availableToAdd.forEach(widget => {
+            const widgetType = widget.type || widget.slug || widget.widget_type
+            const widgetName = widget.display_name || widget.name || widget.label || widgetType
+            const newControl = {
+                id: `control_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                widgetType: widgetType,
+                label: widgetName,
+                maxInstances: null,
+                required: false,
+                preCreate: false,
+                defaultConfig: {}
+            }
+            newControls.push(newControl)
+        })
+
+        if (newControls.length > 0) {
+            onChange([...widgetControls, ...newControls])
+        }
     }
 
     const updateWidgetControl = (index, field, value) => {
@@ -1606,7 +1644,28 @@ const WidgetControlManager = ({ widgetControls = [], availableWidgets = [], onCh
 
             {/* Add Widget Control - Select + Button */}
             <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                <h6 className="text-sm font-medium text-gray-900 mb-3">Add Widget Control</h6>
+                <div className="flex items-center justify-between mb-3">
+                    <h6 className="text-sm font-medium text-gray-900">Add Widget Control</h6>
+                    {/* Add All Button */}
+                    {availableWidgets.length > 0 && (
+                        <button
+                            type="button"
+                            onClick={addAllWidgetControls}
+                            disabled={loadingWidgets || availableWidgets.filter(widget => {
+                                const widgetType = widget.type || widget.slug || widget.widget_type
+                                return !widgetControls.some(control => control.widgetType === widgetType)
+                            }).length === 0}
+                            className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center"
+                            title="Add all available widget types as controls"
+                        >
+                            <Plus className="h-3 w-3 mr-1" />
+                            Add All ({availableWidgets.filter(widget => {
+                                const widgetType = widget.type || widget.slug || widget.widget_type
+                                return !widgetControls.some(control => control.widgetType === widgetType)
+                            }).length})
+                        </button>
+                    )}
+                </div>
                 <div className="flex items-center space-x-3">
                     <div className="flex-1">
                         <select
@@ -1614,14 +1673,26 @@ const WidgetControlManager = ({ widgetControls = [], availableWidgets = [], onCh
                             onChange={(e) => setSelectedWidgetType(e.target.value)}
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         >
-                            <option value="">Select a widget type to add...</option>
+                            <option value="">
+                                {loadingWidgets ? 'Loading widgets...' :
+                                    availableWidgets.length === 0 ? 'No widgets available' :
+                                        'Select a widget type to add...'}
+                            </option>
                             {availableWidgets
-                                .filter(widget => !widgetControls.some(control => control.widgetType === widget.slug))
-                                .map((widget) => (
-                                    <option key={widget.slug} value={widget.slug}>
-                                        {widget.name}
-                                    </option>
-                                ))}
+                                .filter(widget => {
+                                    const widgetType = widget.type || widget.slug || widget.widget_type
+                                    return !widgetControls.some(control => control.widgetType === widgetType)
+                                })
+                                .map((widget, index) => {
+                                    const widgetType = widget.type || widget.slug || widget.widget_type
+                                    const widgetName = widget.display_name || widget.name || widget.label || widgetType
+                                    // console.log(`Widget ${index}:`, { widgetType, widgetName, widget })
+                                    return (
+                                        <option key={widgetType || index} value={widgetType}>
+                                            {widgetName}
+                                        </option>
+                                    )
+                                })}
                         </select>
                     </div>
                     <button

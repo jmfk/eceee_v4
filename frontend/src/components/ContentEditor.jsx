@@ -47,115 +47,11 @@ const ContentEditor = forwardRef(({
     console.warn("ContentEditor: No valid page data provided - component may not render properly");
   }
 
-  // Create a widget DOM element with proper memory management
+  // Create a widget DOM element using the shared widget renderer
   const createWidgetElement = useCallback((widget) => {
-    try {
-      // Validate widget object
-      if (!widget || typeof widget !== 'object' || !widget.type) {
-        throw new Error('Invalid widget object');
-      }
-
-      const element = document.createElement('div');
-      element.className = 'widget-item bg-white border border-gray-200 rounded-lg p-4 mb-3 shadow-sm';
-
-      // Add widget data attributes (sanitized)
-      const widgetType = String(widget.type).replace(/[^a-zA-Z0-9-_]/g, '');
-      element.setAttribute('data-widget-type', widgetType);
-
-      if (widget.id) {
-        const widgetId = String(widget.id).replace(/[^a-zA-Z0-9-_]/g, '');
-        element.setAttribute('data-widget-id', widgetId);
-      }
-
-      // Create widget content based on type with XSS protection
-      const escapeHtml = (text) => {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-      };
-
-      let content = '';
-
-      switch (widget.type) {
-        case 'text':
-        case 'text-block':
-          content = `
-            <div class="text-widget">
-              ${widget.config?.title ? `<h3 class="font-semibold text-gray-900 mb-2">${escapeHtml(widget.config.title)}</h3>` : ''}
-              <div class="text-gray-700">${widget.config?.content || 'Text content will appear here...'}</div>
-            </div>
-          `;
-          break;
-
-        case 'image':
-          const imgSrc = widget.config?.image_url ? escapeHtml(widget.config.image_url) : '';
-          const altText = widget.config?.alt_text ? escapeHtml(widget.config.alt_text) : 'Image';
-          const caption = widget.config?.caption ? escapeHtml(widget.config.caption) : '';
-          content = `
-            <div class="image-widget text-center">
-              ${imgSrc ? `<img src="${imgSrc}" alt="${altText}" class="max-w-full h-auto rounded" />` : '<div class="bg-gray-200 h-32 rounded flex items-center justify-center text-gray-500">Image placeholder</div>'}
-              ${caption ? `<p class="text-sm text-gray-600 mt-2">${caption}</p>` : ''}
-            </div>
-          `;
-          break;
-
-        case 'button':
-          const buttonText = widget.config?.text ? escapeHtml(widget.config.text) : 'Button';
-          const buttonUrl = widget.config?.url ? escapeHtml(widget.config.url) : '#';
-          content = `
-            <div class="button-widget text-center">
-              <a href="${buttonUrl}" class="inline-block bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition-colors">
-                ${buttonText}
-              </a>
-            </div>
-          `;
-          break;
-
-        case 'spacer':
-          const height = widget.config?.height === 'custom' ? widget.config?.custom_height :
-            widget.config?.height === 'small' ? '16px' :
-              widget.config?.height === 'large' ? '64px' : '32px';
-          content = `
-            <div class="spacer-widget" style="height: ${height};">
-              <div class="h-full border-l-2 border-r-2 border-dashed border-gray-300 bg-gray-100 opacity-50 flex items-center justify-center">
-                <span class="text-xs text-gray-500">Spacer (${height})</span>
-              </div>
-            </div>
-          `;
-          break;
-
-        case 'html-block':
-          content = `
-            <div class="html-widget">
-              ${widget.config?.html_content || '<div class="text-gray-500 italic">HTML content will appear here...</div>'}
-            </div>
-          `;
-          break;
-
-        default:
-          content = `
-            <div class="generic-widget text-center p-4 bg-gray-50 border-2 border-dashed border-gray-300 rounded">
-              <div class="text-sm font-medium text-gray-700">${escapeHtml(widget.type)} Widget</div>
-              <div class="text-xs text-gray-500 mt-1">Widget content will appear here</div>
-            </div>
-          `;
-      }
-
-      element.innerHTML = content;
-      return element;
-    } catch (error) {
-      console.error('ContentEditor: Error creating widget element', error);
-
-      // Return a safe fallback element
-      const fallback = document.createElement('div');
-      fallback.className = 'widget-item bg-red-50 border border-red-200 rounded-lg p-4 mb-3';
-      fallback.innerHTML = `
-        <div class="text-red-600 text-sm">
-          <strong>Widget Error:</strong> Unable to render widget
-        </div>
-      `;
-      return fallback;
-    }
+    // Import the shared widget renderer utility
+    const { createWidgetElement: createSharedWidgetElement } = require('../utils/widgetRenderer');
+    return createSharedWidgetElement(widget);
   }, []);
 
   // Memoize the layout renderer to prevent unnecessary re-creation
@@ -716,6 +612,8 @@ const ContentEditor = forwardRef(({
       </div>
     );
   }
+  // console.log('webpageData', webpageData)
+  console.log('widgets', pageVersionData.widgets)
 
   return (
     <div className={`content-editor relative h-full flex flex-col ${className}`}>
