@@ -22,7 +22,7 @@ import logging
 
 from ..widget_registry import widget_type_registry
 from ..models import PageVersion
-from .widget_type_views import format_pydantic_errors
+from ..views.widget_type_views import format_pydantic_errors
 
 logger = logging.getLogger(__name__)
 
