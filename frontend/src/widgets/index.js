@@ -6,6 +6,10 @@
  * object-specific components, hooks, and utilities.
  */
 
+// === ABSTRACTION LAYER ===
+// Widget System Abstraction Layer for Editor Independence
+export * from './abstraction'
+
 // === SHARED COMPONENTS AND UTILITIES ===
 // Core shared functionality that works across all contexts
 export * from './shared'
