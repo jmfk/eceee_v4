@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Save, AlertCircle } from 'lucide-react'
@@ -6,6 +6,7 @@ import { objectInstancesApi, objectTypesApi } from '../../api/objectStorage'
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext'
 import ObjectContentEditor from '../ObjectContentEditor'
 import ObjectSchemaForm from '../ObjectSchemaForm'
+import WidgetEditorPanel from '../WidgetEditorPanel'
 
 const ObjectContentView = ({ objectType, instance, parentId, isNewInstance, onSave, onCancel }) => {
     const navigate = useNavigate()
@@ -13,6 +14,14 @@ const ObjectContentView = ({ objectType, instance, parentId, isNewInstance, onSa
 
     // Track widget changes locally (don't auto-save)
     const [localWidgets, setLocalWidgets] = useState(instance?.widgets || {})
+
+    // Widget editor ref and state
+    const objectContentEditorRef = useRef(null)
+    const [widgetEditorUI, setWidgetEditorUI] = useState({
+        isOpen: false,
+        editingWidget: null,
+        hasUnsavedChanges: false
+    })
     const [hasWidgetChanges, setHasWidgetChanges] = useState(false)
 
     // Update local widgets when instance changes
@@ -20,6 +29,50 @@ const ObjectContentView = ({ objectType, instance, parentId, isNewInstance, onSa
         setLocalWidgets(instance?.widgets || {})
         setHasWidgetChanges(false)
     }, [instance])
+
+    // Handle real-time widget updates from WidgetEditorPanel
+    const handleRealTimeWidgetUpdate = useCallback((updatedWidget) => {
+        if (!updatedWidget || !updatedWidget.slotName) return
+
+        // Update local widgets state for real-time preview
+        setLocalWidgets(prevWidgets => {
+            const newWidgets = { ...prevWidgets }
+            const slotName = updatedWidget.slotName
+
+            if (newWidgets[slotName]) {
+                newWidgets[slotName] = newWidgets[slotName].map(widget =>
+                    widget.id === updatedWidget.id ? updatedWidget : widget
+                )
+            }
+
+            return newWidgets
+        })
+
+        // Mark as having changes but don't auto-save
+        setHasWidgetChanges(true)
+    }, [])
+
+    // Sync widget editor state with ObjectContentEditor
+    useEffect(() => {
+        const updateWidgetEditorState = () => {
+            if (objectContentEditorRef.current) {
+                const editorState = objectContentEditorRef.current
+                setWidgetEditorUI({
+                    isOpen: editorState.widgetEditorOpen || false,
+                    editingWidget: editorState.editingWidget || null,
+                    hasUnsavedChanges: editorState.widgetHasUnsavedChanges || false,
+                    widgetEditorRef: editorState.widgetEditorRef,
+                    handleCloseWidgetEditor: editorState.handleCloseWidgetEditor,
+                    handleSaveWidget: editorState.handleSaveWidget
+                })
+            }
+        }
+
+        // Set up polling to sync state (since we can't use React context here)
+        const interval = setInterval(updateWidgetEditorState, 100)
+
+        return () => clearInterval(interval)
+    }, [])
 
     // Helper function to convert object type schema to ObjectSchemaForm format
     const getSchemaFromObjectType = (objectType) => {
@@ -206,298 +259,324 @@ const ObjectContentView = ({ objectType, instance, parentId, isNewInstance, onSa
         saveMutation.mutate({ data: saveData, mode })
     }
 
+    // Get widget editor state from ObjectContentEditor
+    const editorState = objectContentEditorRef.current
+    const isWidgetEditorOpen = editorState?.widgetEditorOpen || false
+
     return (
-        <div className="space-y-6">
-            <div className="bg-white rounded-lg shadow-sm border p-6">
-                <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
-                    Object Content & Data
-                    {objectType && (
-                        <span className="ml-3 text-sm font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                            {objectType.label}
-                        </span>
-                    )}
-                </h2>
+        <div className="h-full flex relative">
+            {/* Main Content Area */}
+            <div className={`flex-1 min-w-0 transition-all duration-300 ${isWidgetEditorOpen ? 'mr-0' : ''}`}>
+                <div className="space-y-6">
+                    <div className="bg-white p-6">
+                        <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
+                            Object Content & Data
+                            {objectType && (
+                                <span className="ml-3 text-sm font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                                    {objectType.label}
+                                </span>
+                            )}
+                        </h2>
 
-                {/* Conditional Layout - Two columns if widget slots exist, single column if not */}
-                {objectType?.slotConfiguration?.slots && objectType.slotConfiguration.slots.length > 0 ? (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        {/* Left Column - Widget Slots */}
-                        <div className="space-y-6 border-r pr-6 border-gray-200">
-                            <div>
-                                <ObjectContentEditor
-                                    objectType={objectType}
-                                    widgets={localWidgets}
-                                    onWidgetChange={(newWidgets) => {
-                                        setLocalWidgets(newWidgets)
-                                        setHasWidgetChanges(true)
-                                    }}
-                                    mode="object"
-                                />
-                            </div>
-                        </div>
+                        {/* Conditional Layout - Two columns if widget slots exist, single column if not */}
+                        {objectType?.slotConfiguration?.slots && objectType.slotConfiguration.slots.length > 0 ? (
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                {/* Left Column - Widget Slots */}
+                                <div className="space-y-6 border-r pr-6 border-gray-200">
+                                    <div>
+                                        <ObjectContentEditor
+                                            ref={objectContentEditorRef}
+                                            objectType={objectType}
+                                            widgets={localWidgets}
+                                            onWidgetChange={(newWidgets) => {
+                                                setLocalWidgets(newWidgets)
+                                                setHasWidgetChanges(true)
+                                            }}
+                                            mode="object"
+                                        />
+                                    </div>
+                                </div>
 
-                        {/* Right Column - Object Data */}
-                        <div className="space-y-6">
-                            {/* Object Type Selection (only for new instances) */}
-                            {isNewInstance && (
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Object Type <span className="text-red-500">*</span>
-                                    </label>
-                                    <select
-                                        value={formData.objectTypeId}
-                                        onChange={(e) => handleInputChange('objectTypeId', e.target.value)}
-                                        className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.objectTypeId ? 'border-red-300' : 'border-gray-300'
-                                            }`}
-                                    >
-                                        <option value="">Select object type...</option>
-                                        {availableTypes.map((type) => (
-                                            <option key={type.id} value={type.id}>
-                                                {type.label}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    {errors.objectTypeId && (
-                                        <p className="text-red-600 text-sm mt-1 flex items-center">
-                                            <AlertCircle className="h-4 w-4 mr-1" />
-                                            {errors.objectTypeId}
+                                {/* Right Column - Object Data */}
+                                <div className="space-y-6">
+                                    {/* Object Type Selection (only for new instances) */}
+                                    {isNewInstance && (
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Object Type <span className="text-red-500">*</span>
+                                            </label>
+                                            <select
+                                                value={formData.objectTypeId}
+                                                onChange={(e) => handleInputChange('objectTypeId', e.target.value)}
+                                                className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.objectTypeId ? 'border-red-300' : 'border-gray-300'
+                                                    }`}
+                                            >
+                                                <option value="">Select object type...</option>
+                                                {availableTypes.map((type) => (
+                                                    <option key={type.id} value={type.id}>
+                                                        {type.label}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            {errors.objectTypeId && (
+                                                <p className="text-red-600 text-sm mt-1 flex items-center">
+                                                    <AlertCircle className="h-4 w-4 mr-1" />
+                                                    {errors.objectTypeId}
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Title - Model Field */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            Object Title <span className="text-red-500">*</span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={formData.title}
+                                            onChange={(e) => handleInputChange('title', e.target.value)}
+                                            className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.title ? 'border-red-300' : 'border-gray-300'
+                                                }`}
+                                            placeholder="Enter object title..."
+                                        />
+                                        {errors.title && (
+                                            <p className="text-red-600 text-sm mt-1 flex items-center">
+                                                <AlertCircle className="h-4 w-4 mr-1" />
+                                                {errors.title}
+                                            </p>
+                                        )}
+                                        <p className="text-gray-500 text-sm mt-1">
+                                            This is the object's display title (stored on the object, not in schema data)
                                         </p>
+                                    </div>
+
+                                    {/* Dynamic Schema Fields */}
+                                    {objectType && (
+                                        <div className="border-t pt-4">
+                                            <h4 className="font-medium text-gray-900 mb-4">
+                                                {objectType.label} Fields
+                                            </h4>
+                                            <ObjectSchemaForm
+                                                schema={getSchemaFromObjectType(objectType)}
+                                                data={formData.data}
+                                                onChange={handleDataFieldChange}
+                                                errors={errors}
+                                            />
+                                        </div>
                                     )}
                                 </div>
-                            )}
-
-                            {/* Title - Model Field */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Object Title <span className="text-red-500">*</span>
-                                </label>
-                                <input
-                                    type="text"
-                                    value={formData.title}
-                                    onChange={(e) => handleInputChange('title', e.target.value)}
-                                    className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.title ? 'border-red-300' : 'border-gray-300'
-                                        }`}
-                                    placeholder="Enter object title..."
-                                />
-                                {errors.title && (
-                                    <p className="text-red-600 text-sm mt-1 flex items-center">
-                                        <AlertCircle className="h-4 w-4 mr-1" />
-                                        {errors.title}
-                                    </p>
-                                )}
-                                <p className="text-gray-500 text-sm mt-1">
-                                    This is the object's display title (stored on the object, not in schema data)
-                                </p>
                             </div>
-
-                            {/* Dynamic Schema Fields */}
-                            {objectType && (
-                                <div className="border-t pt-4">
-                                    <h4 className="font-medium text-gray-900 mb-4">
-                                        {objectType.label} Fields
-                                    </h4>
-                                    <ObjectSchemaForm
-                                        schema={getSchemaFromObjectType(objectType)}
-                                        data={formData.data}
-                                        onChange={handleDataFieldChange}
-                                        errors={errors}
-                                    />
+                        ) : (
+                            /* Single Column - Object Data Only */
+                            <div className="space-y-6">
+                                <div>
+                                    <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                                        <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                                        Object Data
+                                    </h3>
                                 </div>
-                            )}
-                        </div>
-                    </div>
-                ) : (
-                    /* Single Column - Object Data Only */
-                    <div className="space-y-6">
-                        <div>
-                            <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
-                                <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-                                Object Data
-                            </h3>
-                        </div>
 
-                        {/* Object Type Selection (only for new instances) */}
-                        {isNewInstance && (
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Object Type <span className="text-red-500">*</span>
-                                </label>
-                                <select
-                                    value={formData.objectTypeId}
-                                    onChange={(e) => handleInputChange('objectTypeId', e.target.value)}
-                                    className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.objectTypeId ? 'border-red-300' : 'border-gray-300'
-                                        }`}
-                                >
-                                    <option value="">Select object type...</option>
-                                    {availableTypes.map((type) => (
-                                        <option key={type.id} value={type.id}>
-                                            {type.label}
-                                        </option>
-                                    ))}
-                                </select>
-                                {errors.objectTypeId && (
-                                    <p className="text-red-600 text-sm mt-1 flex items-center">
-                                        <AlertCircle className="h-4 w-4 mr-1" />
-                                        {errors.objectTypeId}
+                                {/* Object Type Selection (only for new instances) */}
+                                {isNewInstance && (
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            Object Type <span className="text-red-500">*</span>
+                                        </label>
+                                        <select
+                                            value={formData.objectTypeId}
+                                            onChange={(e) => handleInputChange('objectTypeId', e.target.value)}
+                                            className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.objectTypeId ? 'border-red-300' : 'border-gray-300'
+                                                }`}
+                                        >
+                                            <option value="">Select object type...</option>
+                                            {availableTypes.map((type) => (
+                                                <option key={type.id} value={type.id}>
+                                                    {type.label}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        {errors.objectTypeId && (
+                                            <p className="text-red-600 text-sm mt-1 flex items-center">
+                                                <AlertCircle className="h-4 w-4 mr-1" />
+                                                {errors.objectTypeId}
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Title - Model Field */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Object Title <span className="text-red-500">*</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={formData.title}
+                                        onChange={(e) => handleInputChange('title', e.target.value)}
+                                        className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.title ? 'border-red-300' : 'border-gray-300'
+                                            }`}
+                                        placeholder="Enter object title..."
+                                    />
+                                    {errors.title && (
+                                        <p className="text-red-600 text-sm mt-1 flex items-center">
+                                            <AlertCircle className="h-4 w-4 mr-1" />
+                                            {errors.title}
+                                        </p>
+                                    )}
+                                    <p className="text-gray-500 text-sm mt-1">
+                                        This is the object's display title (stored on the object, not in schema data)
                                     </p>
+                                </div>
+
+                                {/* Dynamic Schema Fields */}
+                                {objectType && (
+                                    <div className="border-t pt-4">
+                                        <h4 className="font-medium text-gray-900 mb-4">
+                                            {objectType.label} Fields
+                                        </h4>
+                                        <ObjectSchemaForm
+                                            schema={getSchemaFromObjectType(objectType)}
+                                            data={formData.data}
+                                            onChange={handleDataFieldChange}
+                                            errors={errors}
+                                        />
+                                    </div>
                                 )}
                             </div>
                         )}
-
-                        {/* Title - Model Field */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Object Title <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                                type="text"
-                                value={formData.title}
-                                onChange={(e) => handleInputChange('title', e.target.value)}
-                                className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.title ? 'border-red-300' : 'border-gray-300'
-                                    }`}
-                                placeholder="Enter object title..."
-                            />
-                            {errors.title && (
-                                <p className="text-red-600 text-sm mt-1 flex items-center">
-                                    <AlertCircle className="h-4 w-4 mr-1" />
-                                    {errors.title}
-                                </p>
-                            )}
-                            <p className="text-gray-500 text-sm mt-1">
-                                This is the object's display title (stored on the object, not in schema data)
-                            </p>
-                        </div>
-
-                        {/* Dynamic Schema Fields */}
-                        {objectType && (
-                            <div className="border-t pt-4">
-                                <h4 className="font-medium text-gray-900 mb-4">
-                                    {objectType.label} Fields
-                                </h4>
-                                <ObjectSchemaForm
-                                    schema={getSchemaFromObjectType(objectType)}
-                                    data={formData.data}
-                                    onChange={handleDataFieldChange}
-                                    errors={errors}
-                                />
-                            </div>
-                        )}
                     </div>
-                )}
-            </div>
 
-            {/* Save Options (only for existing instances) */}
-            {!isNewInstance && (
-                <div className="bg-gray-50 rounded-lg border p-4">
-                    <h3 className="text-sm font-medium text-gray-900 mb-3">Save Options</h3>
-                    <div className="space-y-2">
-                        <label className="flex items-center">
-                            <input
-                                type="radio"
-                                name="saveMode"
-                                value="update_current"
-                                checked={saveMode === 'update_current'}
-                                onChange={(e) => setSaveMode(e.target.value)}
-                                className="mr-2"
-                            />
-                            <div>
-                                <span className="text-sm font-medium text-gray-900">Update Current Version</span>
-                                <p className="text-xs text-gray-600">
-                                    Save changes to the existing version (v{instance?.version || 1})
-                                </p>
-                            </div>
-                        </label>
-                        <label className="flex items-center">
-                            <input
-                                type="radio"
-                                name="saveMode"
-                                value="create_new"
-                                checked={saveMode === 'create_new'}
-                                onChange={(e) => setSaveMode(e.target.value)}
-                                className="mr-2"
-                            />
-                            <div>
-                                <span className="text-sm font-medium text-gray-900">Create New Version</span>
-                                <p className="text-xs text-gray-600">
-                                    Save changes as a new version (v{(instance?.version || 1) + 1})
-                                </p>
-                            </div>
-                        </label>
-                    </div>
-                </div>
-            )}
-
-            {/* Action Buttons */}
-            <div className="flex justify-between items-center">
-                <button
-                    type="button"
-                    onClick={onCancel}
-                    className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
-                >
-                    Cancel
-                </button>
-
-                <div className="flex space-x-3">
+                    {/* Save Options (only for existing instances) */}
                     {!isNewInstance && (
-                        <>
-                            <button
-                                onClick={() => handleSave('update_current')}
-                                disabled={saveMutation.isPending || !hasUnsavedChanges}
-                                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-colors"
-                            >
-                                {saveMutation.isPending ? (
-                                    <>
-                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                                        Saving...
-                                    </>
-                                ) : (
-                                    <>
-                                        <Save className="h-4 w-4 mr-2" />
-                                        Update Current (v{instance?.version || 1})
-                                    </>
-                                )}
-                            </button>
-                            <button
-                                onClick={() => handleSave('create_new')}
-                                disabled={saveMutation.isPending || !hasUnsavedChanges}
-                                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-colors"
-                            >
-                                {saveMutation.isPending ? (
-                                    <>
-                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                                        Saving...
-                                    </>
-                                ) : (
-                                    <>
-                                        <Save className="h-4 w-4 mr-2" />
-                                        New Version (v{(instance?.version || 1) + 1})
-                                    </>
-                                )}
-                            </button>
-                        </>
+                        <div className="bg-white p-6">
+                            <h3 className="text-sm font-medium text-gray-900 mb-3">Save Options</h3>
+                            <div className="space-y-2">
+                                <label className="flex items-center">
+                                    <input
+                                        type="radio"
+                                        name="saveMode"
+                                        value="update_current"
+                                        checked={saveMode === 'update_current'}
+                                        onChange={(e) => setSaveMode(e.target.value)}
+                                        className="mr-2"
+                                    />
+                                    <div>
+                                        <span className="text-sm font-medium text-gray-900">Update Current Version</span>
+                                        <p className="text-xs text-gray-600">
+                                            Save changes to the existing version (v{instance?.version || 1})
+                                        </p>
+                                    </div>
+                                </label>
+                                <label className="flex items-center">
+                                    <input
+                                        type="radio"
+                                        name="saveMode"
+                                        value="create_new"
+                                        checked={saveMode === 'create_new'}
+                                        onChange={(e) => setSaveMode(e.target.value)}
+                                        className="mr-2"
+                                    />
+                                    <div>
+                                        <span className="text-sm font-medium text-gray-900">Create New Version</span>
+                                        <p className="text-xs text-gray-600">
+                                            Save changes as a new version (v{(instance?.version || 1) + 1})
+                                        </p>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
                     )}
 
-                    {isNewInstance && (
+                    {/* Action Buttons */}
+                    <div className="flex justify-between items-center">
                         <button
-                            onClick={() => handleSave('create_new')}
-                            disabled={saveMutation.isPending || !hasUnsavedChanges}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-colors"
+                            type="button"
+                            onClick={onCancel}
+                            className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
                         >
-                            {saveMutation.isPending ? (
+                            Cancel
+                        </button>
+
+                        <div className="flex space-x-3">
+                            {!isNewInstance && (
                                 <>
-                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                                    Creating...
-                                </>
-                            ) : (
-                                <>
-                                    <Save className="h-4 w-4 mr-2" />
-                                    Create
+                                    <button
+                                        onClick={() => handleSave('update_current')}
+                                        disabled={saveMutation.isPending || !hasUnsavedChanges}
+                                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-colors"
+                                    >
+                                        {saveMutation.isPending ? (
+                                            <>
+                                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                                Saving...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Save className="h-4 w-4 mr-2" />
+                                                Update Current (v{instance?.version || 1})
+                                            </>
+                                        )}
+                                    </button>
+                                    <button
+                                        onClick={() => handleSave('create_new')}
+                                        disabled={saveMutation.isPending || !hasUnsavedChanges}
+                                        className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-colors"
+                                    >
+                                        {saveMutation.isPending ? (
+                                            <>
+                                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                                Saving...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Save className="h-4 w-4 mr-2" />
+                                                New Version (v{(instance?.version || 1) + 1})
+                                            </>
+                                        )}
+                                    </button>
                                 </>
                             )}
-                        </button>
-                    )}
+
+                            {isNewInstance && (
+                                <button
+                                    onClick={() => handleSave('create_new')}
+                                    disabled={saveMutation.isPending || !hasUnsavedChanges}
+                                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-colors"
+                                >
+                                    {saveMutation.isPending ? (
+                                        <>
+                                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                            Creating...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Save className="h-4 w-4 mr-2" />
+                                            Create
+                                        </>
+                                    )}
+                                </button>
+                            )}
+                        </div>
+                    </div>
                 </div>
             </div>
+
+            {/* Widget Editor Panel - positioned at top level for full-screen slide-out */}
+            {widgetEditorUI && (
+                <WidgetEditorPanel
+                    ref={widgetEditorUI.widgetEditorRef}
+                    isOpen={widgetEditorUI.isOpen}
+                    onClose={widgetEditorUI.handleCloseWidgetEditor}
+                    onSave={widgetEditorUI.handleSaveWidget}
+                    onRealTimeUpdate={handleRealTimeWidgetUpdate}
+                    onUnsavedChanges={(hasChanges) => {
+                        setWidgetEditorUI(prev => ({ ...prev, hasUnsavedChanges: hasChanges }))
+                    }}
+                    widgetData={widgetEditorUI.editingWidget}
+                    title={widgetEditorUI.editingWidget ? `Edit ${widgetEditorUI.editingWidget.name || widgetEditorUI.editingWidget.type}` : 'Edit Widget'}
+                />
+            )}
         </div>
     )
 }
