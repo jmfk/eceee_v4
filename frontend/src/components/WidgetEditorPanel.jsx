@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react'
-import { X, Save, RotateCcw } from 'lucide-react'
+import { X, Save, RotateCcw, Eye } from 'lucide-react'
 import ValidatedInput from './validation/ValidatedInput.jsx'
 import { getWidgetSchema, validateWidgetConfiguration } from '../api/widgetSchemas.js'
 import { widgetsApi } from '../api'
+import { getWidgetEditor } from './widget-editors'
+import { WidgetPreview } from './widget-preview'
 
 /**
  * WidgetEditorPanel - Slide-out panel for editing widgets
@@ -39,6 +41,7 @@ const WidgetEditorPanel = forwardRef(({
     const [schemaError, setSchemaError] = useState(null)
     const [panelWidth, setPanelWidth] = useState(400) // Default width in pixels
     const [isResizing, setIsResizing] = useState(false)
+    const [showPreview, setShowPreview] = useState(false) // Preview visibility state
 
     const panelRef = useRef(null)
     const resizeRef = useRef(null)
@@ -502,12 +505,25 @@ const WidgetEditorPanel = forwardRef(({
                     {/* Header */}
                     <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50">
                         <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
-                        <button
-                            onClick={handleClose}
-                            className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
-                        >
-                            <X className="w-5 h-5" />
-                        </button>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setShowPreview(!showPreview)}
+                                className={`p-1.5 rounded transition-colors ${
+                                    showPreview 
+                                        ? 'bg-blue-100 text-blue-600' 
+                                        : 'text-gray-400 hover:text-gray-600'
+                                }`}
+                                title={showPreview ? 'Hide preview' : 'Show preview'}
+                            >
+                                <Eye className="w-5 h-5" />
+                            </button>
+                            <button
+                                onClick={handleClose}
+                                className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
                     </div>
 
                     {/* Form content - scrollable */}
@@ -527,6 +543,44 @@ const WidgetEditorPanel = forwardRef(({
                         ) : (
                             <div className="space-y-4">
                                 {(() => {
+                                    // Check if we have a specialized editor for this widget type
+                                    const SpecializedEditor = widgetTypeName ? getWidgetEditor(widgetTypeName) : null
+                                    
+                                    if (SpecializedEditor) {
+                                        // Use the specialized widget editor
+                                        return (
+                                            <SpecializedEditor
+                                                config={config}
+                                                onChange={(newConfig) => {
+                                                    setConfig(newConfig)
+                                                    
+                                                    // Check if we have changes compared to original
+                                                    const hasActualChanges = JSON.stringify(newConfig) !== JSON.stringify(originalConfig)
+                                                    setHasChanges(hasActualChanges)
+                                                    
+                                                    // Notify parent about unsaved changes state
+                                                    if (onUnsavedChanges) {
+                                                        onUnsavedChanges(hasActualChanges)
+                                                    }
+                                                    
+                                                    // Trigger widget validation
+                                                    validateWidget(newConfig)
+                                                    
+                                                    // Trigger real-time preview update
+                                                    triggerRealTimeUpdate(newConfig)
+                                                }}
+                                                validation={validationResults}
+                                                isValidating={isValidating}
+                                                widgetType={{ 
+                                                    name: widgetTypeName,
+                                                    configurationSchema: fetchedSchema || schema
+                                                }}
+                                                errors={validationResults}
+                                            />
+                                        )
+                                    }
+                                    
+                                    // Fall back to generic form generation from schema
                                     const activeSchema = fetchedSchema || schema
                                     return activeSchema?.properties ? (
                                         Object.entries(activeSchema.properties).map(([fieldName, fieldSchema]) =>
@@ -541,6 +595,20 @@ const WidgetEditorPanel = forwardRef(({
                             </div>
                         )}
                     </div>
+
+                    {/* Widget Preview */}
+                    {showPreview && widgetTypeSlug && (
+                        <div className="border-t border-gray-200">
+                            <WidgetPreview
+                                widgetType={widgetTypeSlug}
+                                configuration={config}
+                                showControls={false}
+                                autoRefresh={true}
+                                refreshInterval={500}
+                                className="h-64"
+                            />
+                        </div>
+                    )}
 
                     {/* Footer with action buttons */}
                     {showValidationWarning && (

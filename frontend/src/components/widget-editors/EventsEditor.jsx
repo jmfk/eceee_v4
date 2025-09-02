@@ -35,9 +35,9 @@ const EventsEditor = ({ config, onChange, errors, widgetType }) => {
     }
 
     // Calculate event duration
-    const getEventDuration = (startDate, endDate) => {
-        const start = startDate || config?.start_date
-        const end = endDate || config?.end_date
+    const getEventDuration = (startDateParam, endDateParam) => {
+        const start = startDateParam || config?.start_date
+        const end = endDateParam || config?.end_date
 
         if (!start || !end) return null
 

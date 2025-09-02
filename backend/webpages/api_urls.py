@@ -70,5 +70,7 @@ urlpatterns = [
         name="page-version-render",
     ),
     path("pages/preview/", render_page_preview, name="page-preview"),
+    # Include widget API endpoints
+    path("widgets/", include("webpages.api.urls")),
     path("", include(router.urls)),
 ]
