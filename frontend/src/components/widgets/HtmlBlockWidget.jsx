@@ -45,6 +45,7 @@ const HtmlBlockWidget = ({ config = {}, mode = 'preview' }) => {
 
     return (
         <div className="html-widget">
+            <div className="html-widget-content">hej</div>
             <div dangerouslySetInnerHTML={{ __html: getSafeHtmlContent() }} />
         </div>
     )

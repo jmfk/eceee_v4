@@ -39,7 +39,7 @@ This directory contains a shared widget system that can be used by both ContentE
 2. **Widget Registry** (`widgetRegistry.js`)
    - Maps widget type strings to React components
    - Provides utility functions for widget type checking
-   - Supports both new and legacy widget type formats
+   - All widgets now use the new namespaced format
 
 3. **Widget Renderer Utility** (`../utils/widgetRenderer.js`)
    - DOM-based widget rendering for LayoutRenderer
@@ -115,13 +115,7 @@ The system supports the following widget types:
 - `core_widgets.HtmlBlockWidget` - Raw HTML content (sanitized)
 - `core_widgets.GalleryWidget` - Image galleries with grid layouts
 
-Legacy widget types are also supported:
-- `text`, `text-block` → TextBlockWidget
-- `image` → ImageWidget
-- `button` → ButtonWidget
-- `spacer` → SpacerWidget
-- `html-block` → HtmlBlockWidget
-- `gallery` → GalleryWidget
+All widgets now use the new namespaced format. Legacy formats have been migrated.
 
 ## Widget Configuration
 

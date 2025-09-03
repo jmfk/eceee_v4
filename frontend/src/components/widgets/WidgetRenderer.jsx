@@ -19,9 +19,8 @@ const WidgetRenderer = ({ widget, mode = 'preview', className = '' }) => {
         )
     }
 
-    // Get the appropriate widget component (NEW FORMAT ONLY)
+    // Get the appropriate widget component
     const WidgetComponent = getNewFormatWidgetComponent(widget.type)
-
     if (WidgetComponent) {
         // Use the dedicated widget component
         return (
@@ -45,7 +44,7 @@ const WidgetRenderer = ({ widget, mode = 'preview', className = '' }) => {
                 <Layout className="h-6 w-6 mx-auto mb-2 text-gray-400" />
                 <div className="text-sm font-medium text-gray-700">{widgetTypeName}</div>
                 <div className="text-xs text-gray-500 mt-1">
-                    {config.title || config.content || 'Widget content will appear here'}
+                    {config.title || config.content || 'Widget content will appear here 3'}
                 </div>
             </div>
         </div>

@@ -2,7 +2,7 @@ import React, { forwardRef, useState, useMemo, useRef, useCallback, useImperativ
 import { Layout, Plus, Settings, Trash2, Eye, Check, X } from 'lucide-react'
 import { WidgetFactory } from './widgets'
 import { useWidgets, getWidgetDisplayName, createDefaultWidgetConfig } from '../hooks/useWidgets'
-import { convertAllWidgetsToNewFormat } from '../utils/widgetFormatConverter'
+
 import WidgetEditorPanel from './WidgetEditorPanel'
 
 const ObjectContentEditor = forwardRef(({ objectType, widgets = {}, onWidgetChange, mode = 'object' }, ref) => {
@@ -14,9 +14,9 @@ const ObjectContentEditor = forwardRef(({ objectType, widgets = {}, onWidgetChan
     const [widgetHasUnsavedChanges, setWidgetHasUnsavedChanges] = useState(false)
     const widgetEditorRef = useRef(null)
 
-    // Ensure all widgets are in new format
+    // Use widgets directly since migration is complete
     const normalizedWidgets = useMemo(() => {
-        return convertAllWidgetsToNewFormat(widgets)
+        return widgets
     }, [widgets])
 
     // Use the shared widget hook (but we'll override widgetTypes with object type's configuration)

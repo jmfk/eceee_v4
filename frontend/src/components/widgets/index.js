@@ -13,11 +13,11 @@ export { default as WidgetFactory } from './WidgetFactory'
 // Export widget registry utilities
 export {
     WIDGET_COMPONENTS,
-    NEW_FORMAT_WIDGET_COMPONENTS,
     getWidgetComponent,
-    getNewFormatWidgetComponent,
     getAvailableWidgetTypes,
-    getNewFormatWidgetTypes,
     isWidgetTypeSupported,
+    // Legacy aliases for backward compatibility
+    getNewFormatWidgetComponent,
+    getNewFormatWidgetTypes,
     isNewFormatWidgetTypeSupported
 } from './widgetRegistry'
