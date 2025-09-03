@@ -10,6 +10,7 @@ import LayoutRendererWithWidgetFactory from './LayoutRendererWithWidgetFactory';
 import { WIDGET_ACTIONS } from '../utils/widgetConstants';
 import { useNotificationContext } from './NotificationManager';
 import WidgetFactory from './widgets/WidgetFactory';
+import useWidgetStore from '../stores/widgetStore';
 
 const ContentEditorWithWidgetFactory = forwardRef(({
     layoutJson,
@@ -34,19 +35,40 @@ const ContentEditorWithWidgetFactory = forwardRef(({
     // Get notification context for confirmation dialogs
     const { showConfirm } = useNotificationContext();
 
-    // Use ref to store current widgets for immediate access (avoids stale closure issues)
-    const currentWidgetsRef = useRef(pageVersionData?.widgets || {});
-
-    // Update ref when pageVersionData changes
-    useEffect(() => {
-        currentWidgetsRef.current = pageVersionData?.widgets || {};
-    }, [pageVersionData?.widgets]);
-
-    // Helper to get current widgets (always fresh)
-    const getCurrentWidgets = useCallback(() => currentWidgetsRef.current, []);
+    // Use Zustand store for centralized widget state management
+    const {
+        widgets: storeWidgets,
+        initializePage,
+        updateWidget,
+        addWidget,
+        removeWidget,
+        moveWidget,
+        clearSlot,
+        replaceAllWidgets,
+        getAllWidgets
+    } = useWidgetStore();
 
     // Get page ID from webpageData
     const pageId = webpageData?.id;
+
+    // Ref for tracking widget changes
+    const widgetsRef = useRef(null);
+
+    // Initialize store when page data is available
+    useEffect(() => {
+        if (pageId && pageVersionData?.widgets) {
+            initializePage(pageId, pageVersionData.widgets);
+        }
+    }, [pageId, pageVersionData?.widgets, initializePage]);
+
+    // Sync store with pageVersionData changes
+    useEffect(() => {
+        if (pageVersionData?.widgets) {
+            replaceAllWidgets(pageVersionData.widgets);
+            // Reset the ref to force re-render after store sync
+            widgetsRef.current = null;
+        }
+    }, [pageVersionData?.widgets, replaceAllWidgets]);
 
     // Handle widget actions - pass widget to PageEditor which handles toggle logic
     const handleWidgetEdit = useCallback((slotName, index, widget) => {
@@ -64,19 +86,18 @@ const ContentEditorWithWidgetFactory = forwardRef(({
         });
 
         if (confirmed && onUpdate) {
-            const currentWidgets = getCurrentWidgets();
-            const updatedWidgets = { ...currentWidgets };
-            if (updatedWidgets[slotName]) {
-                updatedWidgets[slotName] = updatedWidgets[slotName].filter(w => w.id !== widget.id);
-            }
+            // Update store immediately
+            removeWidget(slotName, widget.id);
 
+            // Get updated widgets and notify parent
+            const updatedWidgets = getAllWidgets();
             onUpdate({ widgets: updatedWidgets });
 
             if (onDirtyChange) {
                 onDirtyChange(true, `removed widget from slot ${slotName}`);
             }
         }
-    }, [getCurrentWidgets, onUpdate, onDirtyChange, showConfirm]);
+    }, [removeWidget, getAllWidgets, onUpdate, onDirtyChange, showConfirm]);
 
     // Preview functionality removed from PageEditor
     const handleWidgetPreview = useCallback(() => {
@@ -85,21 +106,13 @@ const ContentEditorWithWidgetFactory = forwardRef(({
 
     // Move widget up in the slot
     const handleWidgetMoveUp = useCallback((slotName, index, widget) => {
-        const currentWidgets = getCurrentWidgets();
-        const slotWidgets = currentWidgets[slotName] || [];
-        if (index <= 0 || slotWidgets.length <= 1) return; // Can't move the first widget up
+        if (index <= 0) return; // Can't move the first widget up
 
-        // Create new array with swapped widgets
-        const updatedSlotWidgets = [...slotWidgets];
-        const temp = updatedSlotWidgets[index];
-        updatedSlotWidgets[index] = updatedSlotWidgets[index - 1];
-        updatedSlotWidgets[index - 1] = temp;
+        // Update store immediately
+        moveWidget(slotName, index, index - 1);
 
-        const updatedWidgets = {
-            ...currentWidgets,
-            [slotName]: updatedSlotWidgets
-        };
-
+        // Get updated widgets and notify parent
+        const updatedWidgets = getAllWidgets();
         if (onUpdate) {
             onUpdate({ widgets: updatedWidgets });
         }
@@ -107,26 +120,18 @@ const ContentEditorWithWidgetFactory = forwardRef(({
         if (onDirtyChange) {
             onDirtyChange(true, `moved widget up in slot ${slotName}`);
         }
-    }, [getCurrentWidgets, onUpdate, onDirtyChange]);
+    }, [moveWidget, getAllWidgets, onUpdate, onDirtyChange]);
 
     // Move widget down in the slot
     const handleWidgetMoveDown = useCallback((slotName, index, widget) => {
-        const currentWidgets = getCurrentWidgets();
-        const slotWidgets = currentWidgets[slotName] || [];
-
+        const slotWidgets = storeWidgets[slotName] || [];
         if (index >= slotWidgets.length - 1) return; // Can't move the last widget down
 
-        // Create new array with swapped widgets
-        const updatedSlotWidgets = [...slotWidgets];
-        const temp = updatedSlotWidgets[index];
-        updatedSlotWidgets[index] = updatedSlotWidgets[index + 1];
-        updatedSlotWidgets[index + 1] = temp;
+        // Update store immediately
+        moveWidget(slotName, index, index + 1);
 
-        const updatedWidgets = {
-            ...currentWidgets,
-            [slotName]: updatedSlotWidgets
-        };
-
+        // Get updated widgets and notify parent
+        const updatedWidgets = getAllWidgets();
         if (onUpdate) {
             onUpdate({ widgets: updatedWidgets });
         }
@@ -134,7 +139,7 @@ const ContentEditorWithWidgetFactory = forwardRef(({
         if (onDirtyChange) {
             onDirtyChange(true, `moved widget down in slot ${slotName}`);
         }
-    }, [getCurrentWidgets, onUpdate, onDirtyChange]);
+    }, [storeWidgets, moveWidget, getAllWidgets, onUpdate, onDirtyChange]);
 
     // Memoize the layout renderer with WidgetFactory integration
     const layoutRenderer = useMemo(() => {
@@ -235,44 +240,30 @@ const ContentEditorWithWidgetFactory = forwardRef(({
                     return;
                 }
 
-                const currentWidgets = getCurrentWidgets();
-
-                let updatedWidgets = { ...currentWidgets };
-
+                // Use store for immediate updates
                 switch (action) {
                     case WIDGET_ACTIONS.ADD:
-                        if (!updatedWidgets[slotName]) {
-                            updatedWidgets[slotName] = [];
-                        }
-                        updatedWidgets[slotName] = [...updatedWidgets[slotName], widgetData];
+                        addWidget(slotName, widgetData);
                         break;
 
                     case WIDGET_ACTIONS.REMOVE:
-                        if (updatedWidgets[slotName]) {
-                            updatedWidgets[slotName] = updatedWidgets[slotName].filter(
-                                widget => widget.id !== widgetData
-                            );
-                        }
+                        removeWidget(slotName, widgetData); // widgetData is the widget ID for remove
                         break;
 
                     case WIDGET_ACTIONS.CLEAR:
-                        updatedWidgets[slotName] = [];
+                        clearSlot(slotName);
                         break;
 
                     case WIDGET_ACTIONS.UPDATE:
                     case WIDGET_ACTIONS.EDIT:
-                        if (updatedWidgets[slotName]) {
-                            updatedWidgets[slotName] = updatedWidgets[slotName].map(
-                                widget => widget.id === widgetData.id ? widgetData : widget
-                            );
-                        }
+                        updateWidget(slotName, widgetData.id, widgetData);
                         break;
 
                     case WIDGET_ACTIONS.MOVE_UP:
                     case WIDGET_ACTIONS.MOVE_DOWN:
                         // For move operations, widgetData should contain the reordered array
                         if (Array.isArray(widgetData)) {
-                            updatedWidgets[slotName] = widgetData;
+                            replaceAllWidgets({ ...storeWidgets, [slotName]: widgetData });
                         }
                         break;
 
@@ -281,6 +272,8 @@ const ContentEditorWithWidgetFactory = forwardRef(({
                         return;
                 }
 
+                // Get updated widgets from store and notify parent
+                const updatedWidgets = getAllWidgets();
                 onUpdate({ widgets: updatedWidgets });
 
                 if (onDirtyChange && action !== WIDGET_ACTIONS.UPDATE) {
@@ -289,7 +282,7 @@ const ContentEditorWithWidgetFactory = forwardRef(({
             }
         });
 
-    }, [layoutRenderer, onDirtyChange, onUpdate, getCurrentWidgets, webpageData, pageVersionData]);
+    }, [layoutRenderer, onDirtyChange, onUpdate, addWidget, removeWidget, clearSlot, updateWidget, replaceAllWidgets, getAllWidgets, storeWidgets, webpageData, pageVersionData]);
 
     // Cleanup function for event listeners and React roots
     const cleanupEventListeners = useCallback(() => {
@@ -342,28 +335,29 @@ const ContentEditorWithWidgetFactory = forwardRef(({
         }
     }, [layoutJson, layoutRenderer, cleanupEventListeners]);
 
-    // Update widgets when widgets prop changes
-    const widgetsRef = useRef(null);
-    const currentWidgets = pageVersionData?.widgets || {}; // Use pageVersionData for rendering
-    const widgetsJsonString = JSON.stringify(currentWidgets);
+    // Update widgets when store widgets change
+    const widgetsJsonString = JSON.stringify(storeWidgets);
 
     useEffect(() => {
-        if (!layoutRenderer || !currentWidgets) {
+        if (!layoutRenderer) {
+            return;
+        }
+
+        // Check if storeWidgets has any content
+        if (!storeWidgets || Object.keys(storeWidgets).length === 0) {
             return;
         }
 
         // Skip if widgets content hasn't actually changed
-        if (widgetsRef.current === widgetsJsonString) {
-            return;
-        }
+
 
         widgetsRef.current = widgetsJsonString;
 
         // Load widget data and update slots
         const updateSlots = () => {
-            layoutRenderer.loadWidgetData(currentWidgets);
+            layoutRenderer.loadWidgetData(storeWidgets);
 
-            Object.entries(currentWidgets).forEach(([slotName, slotWidgets]) => {
+            Object.entries(storeWidgets).forEach(([slotName, slotWidgets]) => {
                 try {
                     layoutRenderer.updateSlot(slotName, slotWidgets);
                 } catch (error) {
@@ -378,7 +372,7 @@ const ContentEditorWithWidgetFactory = forwardRef(({
         return () => {
             clearTimeout(timeoutId);
         };
-    }, [widgetsJsonString, layoutRenderer, pageVersionData?.widgets]);
+    }, [widgetsJsonString, layoutRenderer, storeWidgets]);
 
     // Inject CSS styles for WidgetFactory integration
     useEffect(() => {
@@ -449,7 +443,7 @@ const ContentEditorWithWidgetFactory = forwardRef(({
     }, [layoutRenderer]);
 
     const saveWidgets = useCallback((options = {}) => {
-        const currentWidgets = getCurrentWidgets();
+        const currentWidgets = getAllWidgets();
 
         if (!currentWidgets) {
             console.warn("⚠️ SAVE SIGNAL: currentWidgets not available");
@@ -462,7 +456,7 @@ const ContentEditorWithWidgetFactory = forwardRef(({
             console.error("❌ SAVE SIGNAL: ContentEditorWithWidgetFactory save failed", error);
             throw error;
         }
-    }, [getCurrentWidgets]);
+    }, [getAllWidgets]);
 
     // Cleanup on unmount
     useEffect(() => {
