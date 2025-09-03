@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Layout, Settings, Trash2, Eye, ChevronUp, ChevronDown } from 'lucide-react'
+import { Layout, Settings, Trash2, ChevronUp, ChevronDown } from 'lucide-react'
 import WidgetRenderer from './WidgetRenderer'
 
 /**
@@ -13,7 +13,6 @@ const WidgetFactory = ({
     index,
     onEdit,
     onDelete,
-    onPreview,
     onMoveUp,
     onMoveDown,
     canMoveUp = false,
@@ -36,11 +35,7 @@ const WidgetFactory = ({
         }
     }
 
-    const handlePreview = () => {
-        if (onPreview) {
-            onPreview(widget)
-        }
-    }
+
 
     const handleMoveUp = () => {
         if (onMoveUp && canMoveUp) {
@@ -95,15 +90,7 @@ const WidgetFactory = ({
                                 <ChevronDown className="h-4 w-4" />
                             </button>
                         )}
-                        {onPreview && (
-                            <button
-                                onClick={handlePreview}
-                                className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 transition-colors rounded"
-                                title="Preview widget"
-                            >
-                                <Eye className="h-4 w-4" />
-                            </button>
-                        )}
+
                         {onEdit && (
                             <button
                                 onClick={handleEdit}
@@ -125,10 +112,7 @@ const WidgetFactory = ({
                     </div>
                 )}
 
-                {/* Widget Type Info */}
-                {/* <div className="text-xs text-gray-500 mb-2">
-                    Type: {widget.type}
-                </div> */}
+
 
                 {/* Widget Content */}
                 <WidgetRenderer widget={widget} mode="preview" />

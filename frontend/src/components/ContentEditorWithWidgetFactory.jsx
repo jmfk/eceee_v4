@@ -15,7 +15,6 @@ import useWidgetStore from '../stores/widgetStore';
 const ContentEditorWithWidgetFactory = forwardRef(({
     layoutJson,
     editable = false,
-    onSlotClick,
     onDirtyChange,
     className = '',
     webpageData,
@@ -30,7 +29,6 @@ const ContentEditorWithWidgetFactory = forwardRef(({
 
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
-    const [selectedSlot, setSelectedSlot] = useState(null);
 
     // Get notification context for confirmation dialogs
     const { showConfirm } = useNotificationContext();
@@ -51,8 +49,7 @@ const ContentEditorWithWidgetFactory = forwardRef(({
     // Get page ID from webpageData
     const pageId = webpageData?.id;
 
-    // Ref for tracking widget changes
-    const widgetsRef = useRef(null);
+
 
     // Initialize store when page data is available
     useEffect(() => {
@@ -65,8 +62,6 @@ const ContentEditorWithWidgetFactory = forwardRef(({
     useEffect(() => {
         if (pageVersionData?.widgets) {
             replaceAllWidgets(pageVersionData.widgets);
-            // Reset the ref to force re-render after store sync
-            widgetsRef.current = null;
         }
     }, [pageVersionData?.widgets, replaceAllWidgets]);
 
@@ -99,10 +94,7 @@ const ContentEditorWithWidgetFactory = forwardRef(({
         }
     }, [removeWidget, getAllWidgets, onUpdate, onDirtyChange, showConfirm]);
 
-    // Preview functionality removed from PageEditor
-    const handleWidgetPreview = useCallback(() => {
-        // No preview functionality in PageEditor
-    }, []);
+
 
     // Move widget up in the slot
     const handleWidgetMoveUp = useCallback((slotName, index, widget) => {
@@ -160,31 +152,14 @@ const ContentEditorWithWidgetFactory = forwardRef(({
             rendererRef.current.setWidgetActionHandlers({
                 onEdit: handleWidgetEdit,
                 onDelete: handleWidgetDelete,
-                onPreview: handleWidgetPreview,
                 onMoveUp: handleWidgetMoveUp,
                 onMoveDown: handleWidgetMoveDown
             });
 
-            // Set up confirmation dialog callback for widget removal
-            rendererRef.current.showConfirmDialog = async (title, message, onConfirm) => {
-                const confirmed = await showConfirm({
-                    title: 'Remove Widget',
-                    message: title,
-                    confirmText: 'Remove',
-                    confirmButtonStyle: 'danger'
-                });
-                if (confirmed) {
-                    onConfirm();
-                }
-            };
 
-            // Set up widget editor callback for slide-out panel
-            if (onOpenWidgetEditor) {
-                rendererRef.current.openWidgetEditor = onOpenWidgetEditor;
-            }
         }
         return rendererRef.current;
-    }, [editable, showConfirm, onOpenWidgetEditor, handleWidgetEdit, handleWidgetDelete, handleWidgetPreview, handleWidgetMoveUp, handleWidgetMoveDown]);
+    }, [editable, showConfirm, onOpenWidgetEditor, handleWidgetEdit, handleWidgetDelete, handleWidgetMoveUp, handleWidgetMoveDown]);
 
     // Initialize version management when webpageData is available
     useEffect(() => {
@@ -348,10 +323,7 @@ const ContentEditorWithWidgetFactory = forwardRef(({
             return;
         }
 
-        // Skip if widgets content hasn't actually changed
 
-
-        widgetsRef.current = widgetsJsonString;
 
         // Load widget data and update slots
         const updateSlots = () => {
@@ -483,11 +455,9 @@ const ContentEditorWithWidgetFactory = forwardRef(({
         updateSlot,
         getSlots,
         getSlotConfig,
-        setSelectedSlot,
-        getSelectedSlot: () => selectedSlot,
         saveWidgets,
         layoutRenderer
-    }), [updateSlot, getSlots, getSlotConfig, selectedSlot, saveWidgets, layoutRenderer]);
+    }), [updateSlot, getSlots, getSlotConfig, saveWidgets, layoutRenderer]);
 
     useImperativeHandle(ref, () => api, [api]);
 

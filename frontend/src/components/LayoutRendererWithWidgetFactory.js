@@ -79,7 +79,7 @@ class LayoutRendererWithWidgetFactory extends LayoutRenderer {
 
     /**
      * Set widget action handlers
-     * @param {Object} handlers - Object with onEdit, onDelete, onPreview functions
+     * @param {Object} handlers - Object with onEdit, onDelete functions
      */
     setWidgetActionHandlers(handlers) {
         this.widgetActionHandlers = { ...this.widgetActionHandlers, ...handlers };
