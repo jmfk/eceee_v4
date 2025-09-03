@@ -41,7 +41,7 @@ if len(SECRET_KEY) < 50:
     )
 # Dynamic hostname validation settings
 SKIP_HOST_VALIDATION_IN_DEBUG = config(
-    "SKIP_HOST_VALIDATION_IN_DEBUG", default=False, cast=bool
+    "SKIP_HOST_VALIDATION_IN_DEBUG", default=True, cast=bool
 )
 
 # ALLOWED_HOSTS configuration
@@ -49,7 +49,7 @@ SKIP_HOST_VALIDATION_IN_DEBUG = config(
 # 1. Django's ALLOWED_HOSTS is set to allow all hosts (for performance)
 # 2. DynamicHostValidationMiddleware does the actual validation
 _static_hosts = config(
-    "ALLOWED_HOSTS", default="localhost,127.0.0.1,backend,frontend"
+    "ALLOWED_HOSTS", default="localhost,127.0.0.1,backend,frontend,testserver"
 ).split(",")
 
 # Add common ports for backend and frontend services
@@ -152,7 +152,7 @@ LOCAL_APPS = [
     "webpages",
     "content",
     "core_widgets",  # Core widget types - can be disabled to use only custom widgets
-    "example_custom_widgets",  # Example of custom site-specific widgets
+    # "example_custom_widgets",  # Example of custom site-specific widgets
     "file_manager",  # Comprehensive media file management system
     "object_storage",  # Non-hierarchical object storage system
 ]

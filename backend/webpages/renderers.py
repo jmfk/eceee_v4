@@ -86,11 +86,15 @@ class WebPageRenderer:
             str: Rendered widget HTML
         """
         from django.template.loader import render_to_string
-        from .widget_registry import widget_registry
+        from .widget_registry import widget_type_registry
 
-        # Get widget type from registry
-        widget_type_name = widget_data.get("widget_type")
-        widget_type = widget_registry.get_widget_type(widget_type_name)
+        # Get widget type from registry - support both old and new formats
+        widget_type_name = widget_data.get("widget_type") or widget_data.get("type")
+        widget_type = (
+            widget_type_registry.get_widget_type_flexible(widget_type_name)
+            if widget_type_name
+            else None
+        )
 
         if not widget_type:
             return f'<!-- Widget type "{widget_type_name}" not found -->'
@@ -237,12 +241,18 @@ class WebPageRenderer:
         for slot_name, slot_widgets in widgets_by_slot.items():
             for widget_info in slot_widgets:
                 widget_data = widget_info["widget_data"]
-                widget_type_name = widget_data.get("widget_type")
+                widget_type_name = widget_data.get("widget_type") or widget_data.get(
+                    "type"
+                )
 
                 # Try to get CSS from widget type
-                from .widget_registry import widget_registry
+                from .widget_registry import widget_type_registry
 
-                widget_type = widget_registry.get_widget_type(widget_type_name)
+                widget_type = (
+                    widget_type_registry.get_widget_type_flexible(widget_type_name)
+                    if widget_type_name
+                    else None
+                )
 
                 if (
                     widget_type

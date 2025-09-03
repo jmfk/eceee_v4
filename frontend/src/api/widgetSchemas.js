@@ -13,7 +13,9 @@ import { api } from './client.js'
  */
 export const getWidgetSchema = async (widgetType) => {
     try {
-        const response = await api.get(`/api/v1/webpages/widget-types/${encodeURIComponent(widgetType)}/schema/`)
+        // Properly encode the widget type to handle dots and spaces
+        const encodedWidgetType = encodeURIComponent(widgetType)
+        const response = await api.get(`/api/v1/webpages/widget-types/${encodedWidgetType}/schema/`)
         return response.data
     } catch (error) {
         console.error(`Failed to fetch schema for widget type "${widgetType}":`, error)
@@ -28,7 +30,9 @@ export const getWidgetSchema = async (widgetType) => {
  */
 export const getWidgetTypeDetails = async (widgetType) => {
     try {
-        const response = await api.get(`/api/v1/webpages/widget-types/${encodeURIComponent(widgetType)}/`)
+        // Properly encode the widget type to handle dots and spaces
+        const encodedWidgetType = encodeURIComponent(widgetType)
+        const response = await api.get(`/api/v1/webpages/widget-types/${encodedWidgetType}/`)
         return response.data
     } catch (error) {
         console.error(`Failed to fetch details for widget type "${widgetType}":`, error)
@@ -43,7 +47,9 @@ export const getWidgetTypeDetails = async (widgetType) => {
  */
 export const getWidgetConfigurationDefaults = async (widgetType) => {
     try {
-        const response = await api.get(`/api/v1/webpages/widget-types/${encodeURIComponent(widgetType)}/configuration-defaults/`)
+        // Properly encode the widget type to handle dots and spaces
+        const encodedWidgetType = encodeURIComponent(widgetType)
+        const response = await api.get(`/api/v1/webpages/widget-types/${encodedWidgetType}/configuration-defaults/`)
         return response.data
     } catch (error) {
         console.error(`Failed to fetch configuration defaults for widget type "${widgetType}":`, error)
@@ -59,7 +65,9 @@ export const getWidgetConfigurationDefaults = async (widgetType) => {
  */
 export const validateWidgetConfiguration = async (widgetType, widgetData) => {
     try {
-        const response = await api.post(`/api/v1/webpages/widget-types/${encodeURIComponent(widgetType)}/validate/`, {
+        // Properly encode the widget type to handle dots and spaces
+        const encodedWidgetType = encodeURIComponent(widgetType)
+        const response = await api.post(`/api/v1/webpages/widget-types/${encodedWidgetType}/validate/`, {
             widgetData: widgetData
         })
         return response.data

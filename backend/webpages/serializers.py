@@ -525,10 +525,10 @@ class WidgetUpdateSerializer(serializers.ModelSerializer):
                         f"Widget {i} in slot '{slot_name}' must be a dictionary"
                     )
 
-                # Basic required fields check
-                if "type" not in widget:
+                # Basic required fields check - accept either 'type' or 'widget_type'
+                if "type" not in widget and "widget_type" not in widget:
                     raise serializers.ValidationError(
-                        f"Widget {i} in slot '{slot_name}' missing 'type' field"
+                        f"Widget {i} in slot '{slot_name}' missing 'type' or 'widget_type' field"
                     )
 
         return value

@@ -96,10 +96,8 @@ class WidgetTypeViewSet(viewsets.ViewSet):
 
         from ..widget_registry import widget_type_registry
 
-        # Try to find by slug first, then by name
-        widget_type = widget_type_registry.get_widget_type_by_slug(
-            pk
-        ) or widget_type_registry.get_widget_type(pk)
+        # Try flexible lookup: type, name, or slug
+        widget_type = widget_type_registry.get_widget_type_flexible(pk)
         if not widget_type:
             return Response(
                 {"error": f"Widget type '{pk}' not found"},
@@ -130,10 +128,8 @@ class WidgetTypeViewSet(viewsets.ViewSet):
         """Validate widget configuration using Pydantic models"""
         from ..widget_registry import widget_type_registry
 
-        # Try to find by slug first, then by name
-        widget_type = widget_type_registry.get_widget_type_by_slug(
-            pk
-        ) or widget_type_registry.get_widget_type(pk)
+        # Try flexible lookup: type, name, or slug
+        widget_type = widget_type_registry.get_widget_type_flexible(pk)
         if not widget_type:
             return Response(
                 {"error": f"Widget type '{pk}' not found"},
@@ -173,10 +169,8 @@ class WidgetTypeViewSet(viewsets.ViewSet):
         """Return default configuration values and schema for a widget type"""
         from ..widget_registry import widget_type_registry
 
-        # Try to find by slug first, then by name
-        widget_type = widget_type_registry.get_widget_type_by_slug(
-            pk
-        ) or widget_type_registry.get_widget_type(pk)
+        # Try flexible lookup: type, name, or slug
+        widget_type = widget_type_registry.get_widget_type_flexible(pk)
         if not widget_type:
             return Response(
                 {"error": f"Widget type '{pk}' not found"},
@@ -192,10 +186,8 @@ class WidgetTypeViewSet(viewsets.ViewSet):
         """Return JSON schema for a widget type configuration"""
         from ..widget_registry import widget_type_registry
 
-        # Try to find by slug first, then by name
-        widget_type = widget_type_registry.get_widget_type_by_slug(
-            pk
-        ) or widget_type_registry.get_widget_type(pk)
+        # Try flexible lookup: type, name, or slug
+        widget_type = widget_type_registry.get_widget_type_flexible(pk)
         if not widget_type:
             return Response(
                 {"error": f"Widget type '{pk}' not found"},

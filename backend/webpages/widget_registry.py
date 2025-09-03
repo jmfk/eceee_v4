@@ -139,6 +139,7 @@ class BaseWidget(ABC):
             "name": self.name,
             "slug": self.slug,  # URL-safe slug for API endpoints
             "description": self.description,
+            "template_name": self.template_name,  # Include template name for backward compatibility
             "widget_class": self.__class__.__name__,
             "is_active": self.is_active,
             "configuration_schema": self.configuration_model.model_json_schema(),
@@ -279,6 +280,40 @@ class WidgetTypeRegistry:
             if widget.slug == slug:
                 return widget
         return None
+
+    def get_widget_type_by_type(self, widget_type: str) -> Optional[BaseWidget]:
+        """Get a widget type instance by type identifier (e.g., 'core_widgets.TextBlockWidget')."""
+        for widget in self._instances.values():
+            if widget.type == widget_type:
+                return widget
+        return None
+
+    def get_widget_type_flexible(self, identifier: str) -> Optional[BaseWidget]:
+        """
+        Get a widget type instance by any identifier - tries type, then name, then slug.
+        This provides backward compatibility during the transition to new naming.
+        """
+        if not identifier:
+            return None
+            
+        # Try new format first (core_widgets.WidgetName) - exact match
+        widget = self.get_widget_type_by_type(identifier)
+        if widget:
+            return widget
+        
+        # Try case-insensitive type match for frontend compatibility
+        identifier_lower = identifier.lower()
+        for widget_instance in self._instances.values():
+            if widget_instance.type.lower() == identifier_lower:
+                return widget_instance
+        
+        # Try old format (human name)
+        widget = self.get_widget_type(identifier)
+        if widget:
+            return widget
+        
+        # Try slug format
+        return self.get_widget_type_by_slug(identifier)
 
     def get_widget_class(self, name: str) -> Optional[Type[BaseWidget]]:
         """Get a widget type class by name."""

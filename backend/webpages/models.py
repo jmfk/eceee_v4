@@ -751,11 +751,9 @@ class WebPage(models.Model):
                 has_overrides = False
 
                 if current_version and current_version.widgets:
-                    # Filter widgets for this slot from JSON data
+                    # Get widgets for this slot from JSON data (widgets is a dict with slot_name as key)
                     widgets_data = current_version.widgets
-                    page_widgets = [
-                        w for w in widgets_data if w.get("slot_name") == slot_name
-                    ]
+                    page_widgets = widgets_data.get(slot_name, [])
                     # Sort by sort_order
                     page_widgets = sorted(
                         page_widgets, key=lambda w: w.get("sort_order", 0)

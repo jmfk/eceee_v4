@@ -515,7 +515,8 @@ class HostnamePageView(View):
         # Validate hostname format to prevent host header injection
         import re
 
-        if not re.match(r"^[a-z0-9.-]+$", hostname) or ".." in hostname:
+        # Allow hostname with optional port (e.g., localhost:8000, example.com:443)
+        if not re.match(r"^[a-z0-9.-]+(?::[0-9]+)?$", hostname) or ".." in hostname:
             raise Http404("Invalid hostname format")
 
         # Get the path from the URL

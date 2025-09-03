@@ -87,13 +87,19 @@ const WidgetEditorPanel = forwardRef(({
                     if (resolvedWidgetTypeName) {
                         setWidgetTypeName(resolvedWidgetTypeName)
 
-                        // Get the widget details to find the slug
-                        const allWidgetTypes = await widgetsApi.getTypes()
-                        const widgetWithSlug = allWidgetTypes.find(w => w.name === resolvedWidgetTypeName)
-                        const slugToUse = widgetWithSlug?.slug || resolvedWidgetTypeName.toLowerCase().replace(/\s+/g, '-')
-                        setWidgetTypeSlug(slugToUse)
+                        // Use the widget type (new format) instead of slug for API calls
+                        let widgetTypeToUse = widgetData.type
 
-                        const schemaData = await getWidgetSchema(slugToUse)
+                        // If we don't have the type, find it from the name
+                        if (!widgetTypeToUse) {
+                            const allWidgetTypes = await widgetsApi.getTypes()
+                            const widgetWithType = allWidgetTypes.find(w => w.name === resolvedWidgetTypeName)
+                            widgetTypeToUse = widgetWithType?.type || widgetWithType?.slug || resolvedWidgetTypeName.toLowerCase().replace(/\s+/g, '-')
+                        }
+
+                        setWidgetTypeSlug(widgetTypeToUse)
+
+                        const schemaData = await getWidgetSchema(widgetTypeToUse)
                         setFetchedSchema(schemaData)
                         setIsLoadingSchema(false)
                     } else {

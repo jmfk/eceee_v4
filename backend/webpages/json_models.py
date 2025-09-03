@@ -6,7 +6,7 @@ replacing ad-hoc JSON validation with structured pydantic models.
 """
 
 from typing import Optional, List, Dict, Any, Union, Tuple
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, validator, field_validator, model_validator
 from datetime import datetime
 from enum import Enum
 
@@ -145,12 +145,31 @@ class PaginatedResponse(BaseModel):
 class PageWidgetData(BaseModel):
     """Individual widget configuration within a PageVersion"""
 
-    widget_type: str = Field(..., description="Name of the widget type")
+    widget_type: Optional[str] = Field(
+        None, description="Name of the widget type (legacy)"
+    )
+    type: Optional[str] = Field(
+        None, description="Widget type identifier (new format: core_widgets.WidgetName)"
+    )
     slot_name: str = Field(..., description="Slot where the widget is placed")
     sort_order: int = Field(0, description="Order within the slot")
     configuration: Dict[str, Any] = Field(
         default_factory=dict, description="Widget-specific configuration"
     )
+
+    @field_validator("widget_type", "type")
+    def validate_widget_type(cls, v, info):
+        """Ensure at least one widget type field is provided."""
+        # This will be called for each field, but we need to check if at least one is provided
+        # We'll handle this in model_validator instead
+        return v
+
+    @model_validator(mode="after")
+    def validate_widget_type_present(self):
+        """Ensure at least one widget type field is provided."""
+        if not self.widget_type and not self.type:
+            raise ValueError("Either 'widget_type' or 'type' must be provided")
+        return self
 
     # Optional metadata
     id: Optional[str] = Field(
