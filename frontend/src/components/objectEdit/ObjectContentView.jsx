@@ -266,7 +266,7 @@ const ObjectContentView = ({ objectType, instance, parentId, isNewInstance, onSa
     return (
         <div className="h-full flex relative">
             {/* Main Content Area */}
-            <div className={`flex-1 min-w-0 transition-all duration-300 ${isWidgetEditorOpen ? 'mr-0' : ''}`}>
+            <div className={`flex-1 min-w-0 transition-all duration-300 ${isWidgetEditorOpen ? 'mr-0' : ''} pb-24`}>
                 <div className="space-y-6">
                     <div className="bg-white p-6">
                         <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
@@ -446,118 +446,71 @@ const ObjectContentView = ({ objectType, instance, parentId, isNewInstance, onSa
                             </div>
                         )}
                     </div>
+                </div>
+            </div>
 
-                    {/* Save Options (only for existing instances) */}
-                    {!isNewInstance && (
-                        <div className="bg-white p-6">
-                            <h3 className="text-sm font-medium text-gray-900 mb-3">Save Options</h3>
-                            <div className="space-y-2">
-                                <label className="flex items-center">
-                                    <input
-                                        type="radio"
-                                        name="saveMode"
-                                        value="update_current"
-                                        checked={saveMode === 'update_current'}
-                                        onChange={(e) => setSaveMode(e.target.value)}
-                                        className="mr-2"
-                                    />
-                                    <div>
-                                        <span className="text-sm font-medium text-gray-900">Update Current Version</span>
-                                        <p className="text-xs text-gray-600">
-                                            Save changes to the existing version (v{instance?.version || 1})
-                                        </p>
-                                    </div>
-                                </label>
-                                <label className="flex items-center">
-                                    <input
-                                        type="radio"
-                                        name="saveMode"
-                                        value="create_new"
-                                        checked={saveMode === 'create_new'}
-                                        onChange={(e) => setSaveMode(e.target.value)}
-                                        className="mr-2"
-                                    />
-                                    <div>
-                                        <span className="text-sm font-medium text-gray-900">Create New Version</span>
-                                        <p className="text-xs text-gray-600">
-                                            Save changes as a new version (v{(instance?.version || 1) + 1})
-                                        </p>
-                                    </div>
-                                </label>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Action Buttons */}
-                    <div className="flex justify-between items-center">
-                        <button
-                            type="button"
-                            onClick={onCancel}
-                            className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
-                        >
-                            Cancel
-                        </button>
-
-                        <div className="flex space-x-3">
-                            {!isNewInstance && (
-                                <>
-                                    <button
-                                        onClick={() => handleSave('update_current')}
-                                        disabled={saveMutation.isPending || !hasUnsavedChanges}
-                                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-colors"
-                                    >
-                                        {saveMutation.isPending ? (
-                                            <>
-                                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                                                Saving...
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Save className="h-4 w-4 mr-2" />
-                                                Update Current (v{instance?.version || 1})
-                                            </>
-                                        )}
-                                    </button>
-                                    <button
-                                        onClick={() => handleSave('create_new')}
-                                        disabled={saveMutation.isPending || !hasUnsavedChanges}
-                                        className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-colors"
-                                    >
-                                        {saveMutation.isPending ? (
-                                            <>
-                                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                                                Saving...
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Save className="h-4 w-4 mr-2" />
-                                                New Version (v{(instance?.version || 1) + 1})
-                                            </>
-                                        )}
-                                    </button>
-                                </>
-                            )}
-
-                            {isNewInstance && (
+            {/* Sticky Footer with Save Buttons */}
+            <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-10">
+                <div className="max-w-full mx-auto px-6 py-4">
+                    <div className="flex justify-center space-x-3">
+                        {!isNewInstance && (
+                            <>
                                 <button
-                                    onClick={() => handleSave('create_new')}
+                                    onClick={() => handleSave('update_current')}
                                     disabled={saveMutation.isPending || !hasUnsavedChanges}
                                     className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-colors"
                                 >
                                     {saveMutation.isPending ? (
                                         <>
                                             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                                            Creating...
+                                            Saving...
                                         </>
                                     ) : (
                                         <>
                                             <Save className="h-4 w-4 mr-2" />
-                                            Create
+                                            Update Current (v{instance?.version || 1})
                                         </>
                                     )}
                                 </button>
-                            )}
-                        </div>
+                                <button
+                                    onClick={() => handleSave('create_new')}
+                                    disabled={saveMutation.isPending || !hasUnsavedChanges}
+                                    className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-colors"
+                                >
+                                    {saveMutation.isPending ? (
+                                        <>
+                                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                            Saving...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Save className="h-4 w-4 mr-2" />
+                                            New Version (v{(instance?.version || 1) + 1})
+                                        </>
+                                    )}
+                                </button>
+                            </>
+                        )}
+
+                        {isNewInstance && (
+                            <button
+                                onClick={() => handleSave('create_new')}
+                                disabled={saveMutation.isPending || !hasUnsavedChanges}
+                                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-colors"
+                            >
+                                {saveMutation.isPending ? (
+                                    <>
+                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                        Creating...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Save className="h-4 w-4 mr-2" />
+                                        Create
+                                    </>
+                                )}
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
@@ -574,7 +527,7 @@ const ObjectContentView = ({ objectType, instance, parentId, isNewInstance, onSa
                         setWidgetEditorUI(prev => ({ ...prev, hasUnsavedChanges: hasChanges }))
                     }}
                     widgetData={widgetEditorUI.editingWidget}
-                    title={widgetEditorUI.editingWidget ? `Edit ${widgetEditorUI.editingWidget.name || widgetEditorUI.editingWidget.type}` : 'Edit Widget'}
+                    title={widgetEditorUI.editingWidget ? `Edit ${widgetEditorUI.editingWidget.name}` : 'Edit Widget'}
                 />
             )}
         </div>

@@ -1422,7 +1422,7 @@ const WidgetControlManager = ({ widgetControls = [], availableWidgets = [], load
                     <div key={control.id || index} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
                         <div className="flex justify-between items-start mb-4">
                             <h6 className="font-medium text-gray-900">
-                                Widget Control {index + 1}
+                                {control?.label} ({control?.widgetType})
                                 {selectedWidget && (
                                     <span className="ml-2 text-sm font-normal text-gray-600">
                                         ({selectedWidget.name})
@@ -1439,42 +1439,6 @@ const WidgetControlManager = ({ widgetControls = [], availableWidgets = [], load
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {/* Widget Type Selection */}
-                            <div className="md:col-span-2">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Widget Type <span className="text-red-500">*</span>
-                                </label>
-                                <select
-                                    value={control.widgetType || ''}
-                                    onChange={(e) => updateWidgetControl(index, 'widgetType', e.target.value)}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                >
-                                    <option value="">Select widget type...</option>
-                                    {availableWidgets.map((widget) => (
-                                        <option key={widget.slug} value={widget.slug}>
-                                            {widget.name}
-                                        </option>
-                                    ))}
-                                </select>
-                                {selectedWidget?.description && (
-                                    <p className="text-xs text-gray-600 mt-1">{selectedWidget.description}</p>
-                                )}
-                            </div>
-
-                            {/* Label */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Display Label
-                                </label>
-                                <input
-                                    type="text"
-                                    value={control.label || ''}
-                                    onChange={(e) => updateWidgetControl(index, 'label', e.target.value)}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                    placeholder="Custom label for this widget"
-                                />
-                            </div>
-
                             {/* Max Instances */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1484,7 +1448,7 @@ const WidgetControlManager = ({ widgetControls = [], availableWidgets = [], load
                                     type="number"
                                     value={control.maxInstances || ''}
                                     onChange={(e) => updateWidgetControl(index, 'maxInstances', e.target.value ? parseInt(e.target.value) : null)}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    className="w-20 px-3 py-2 border bg-white border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                     placeholder="∞"
                                     min="1"
                                 />

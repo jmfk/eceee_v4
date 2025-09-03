@@ -223,7 +223,7 @@ export function logChanges(currentState, originalState, context = 'Editor') {
         console.log('Summary:', changes.summary)
         console.log('Changed fields:', changes.changedFields)
         console.log('Detailed changes:', changes.changes)
-        
+
         if (changes.hasPageChanges) {
             console.log('📄 Page changes:', changes.changes.pageFields)
         }
@@ -231,7 +231,7 @@ export function logChanges(currentState, originalState, context = 'Editor') {
         if (changes.hasVersionChanges) {
             console.log('📝 Version changes:', changes.changes.versionFields)
         }
-        
+
         console.groupEnd()
     }
 

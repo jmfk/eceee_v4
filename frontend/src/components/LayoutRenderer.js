@@ -2670,17 +2670,25 @@ class LayoutRenderer {
   }
 
   /**
-   * Render default widget (fallback)
+   * Render default widget (fallback) - show red warning for unavailable widget types
    * @param {string} type - Widget type
    * @param {Object} config - Widget configuration
-   * @returns {HTMLElement} Default widget element
+   * @returns {HTMLElement} Default widget element with warning
    */
   renderDefaultWidget(type, config) {
     const element = document.createElement('div');
-    element.className = 'p-4 border border-gray-300 rounded bg-gray-50';
+    element.className = 'relative p-4 border-2 border-dashed border-red-300 rounded bg-gray-50';
     element.innerHTML = `
-      <div class="text-sm font-medium text-gray-700">${this.templateRenderer.escapeHtml(type)} Widget</div>
-      <div class="text-xs text-gray-500 mt-1">Custom widget type</div>
+      <!-- Fallback widget content -->
+      <div class="text-center">
+        <div class="text-sm font-medium text-red-700">${this.templateRenderer.escapeHtml(type)} Widget</div>
+        <div class="text-xs text-red-500 mt-1 mb-6">Widget content will appear here</div>
+      </div>
+      <!-- Red warning banner at bottom -->
+      <div class="absolute bottom-0 left-0 right-0 bg-red-600 text-white text-xs px-2 py-1 rounded-b flex items-center justify-center">
+        <span class="mr-1">⚠️</span>
+        Widget type not available: ${this.templateRenderer.escapeHtml(type)}
+      </div>
     `;
     return element;
   }
@@ -5250,7 +5258,7 @@ class LayoutRenderer {
     console.error(errorMessage, error);
 
     if (additionalData) {
-      console.debug('Additional error context:', additionalData);
+      // Additional error context available for debugging
     }
 
     // Could be extended to send errors to monitoring service

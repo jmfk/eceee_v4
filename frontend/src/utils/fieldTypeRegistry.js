@@ -296,7 +296,7 @@ class FieldTypeRegistry {
      */
     registerCustomFieldType(fieldTypeConfig) {
         this.registerFieldType(fieldTypeConfig)
-        console.log(`🎨 Registered custom field type: ${fieldTypeConfig.key}`)
+        // Custom field type registered successfully
     }
 }
 

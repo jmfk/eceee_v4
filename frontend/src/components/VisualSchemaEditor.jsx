@@ -629,12 +629,9 @@ function PropertyTypeSelector({ onAddProperty, existingProperties = [] }) {
 export default function VisualSchemaEditor({ schema, onChange }) {
   const [properties, setProperties] = useState(() => {
     // Convert schema properties to internal format
-    console.log("Loading schema in VisualSchemaEditor:", schema)
     const schemaProps = schema?.properties || {}
     const required = schema?.required || []
     const propertyOrder = schema?.propertyOrder || []
-    console.log("Schema props:", schemaProps)
-    console.log("Property order:", propertyOrder)
 
     // If propertyOrder exists, use it to maintain order
     if (propertyOrder.length > 0) {
@@ -683,7 +680,6 @@ export default function VisualSchemaEditor({ schema, onChange }) {
 
   // Update properties when schema prop changes
   useEffect(() => {
-    console.log("Schema prop changed:", schema)
 
     const schemaProps = schema?.properties || {}
     const required = schema?.required || []
@@ -714,8 +710,6 @@ export default function VisualSchemaEditor({ schema, onChange }) {
         _id: `prop-${index}`
       }))
     }
-
-    console.log("Converted properties:", newProperties)
     setProperties(newProperties)
   }, [schema])
 
@@ -794,7 +788,6 @@ export default function VisualSchemaEditor({ schema, onChange }) {
       _id: `prop-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
     }
     const updatedProperties = [...properties, propertyWithId]
-    console.log("updatedProperties", updatedProperties)
     setProperties(updatedProperties)
     updateSchema(updatedProperties)
   }, [properties, updateSchema])

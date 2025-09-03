@@ -612,8 +612,6 @@ const ContentEditor = forwardRef(({
       </div>
     );
   }
-  // console.log('webpageData', webpageData)
-  console.log('widgets', pageVersionData.widgets)
 
   return (
     <div className={`content-editor relative h-full flex flex-col ${className}`}>

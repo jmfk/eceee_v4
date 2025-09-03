@@ -12,7 +12,7 @@ export const WIDGET_COMPONENTS = {
     'core_widgets.ImageWidget': ImageWidget,
     'core_widgets.ButtonWidget': ButtonWidget,
     'core_widgets.SpacerWidget': SpacerWidget,
-    'core_widgets.HtmlBlockWidget': HtmlBlockWidget,
+    'core_widgets.HTMLBlockWidget': HtmlBlockWidget,
     'core_widgets.GalleryWidget': GalleryWidget
 }
 
