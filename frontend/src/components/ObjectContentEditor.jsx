@@ -1,7 +1,8 @@
-import React, { forwardRef, useState, useMemo, useRef, useCallback, useImperativeHandle } from 'react'
+import React, { forwardRef, useState, useMemo, useRef, useCallback, useImperativeHandle, useEffect } from 'react'
 import { Layout, Plus, Settings, Trash2, Eye, Check, X } from 'lucide-react'
 import { WidgetFactory } from './widgets'
 import { useWidgets, getWidgetDisplayName, createDefaultWidgetConfig } from '../hooks/useWidgets'
+import { filterAvailableWidgetTypes } from '../utils/widgetTypeValidation'
 
 import WidgetEditorPanel from './WidgetEditorPanel'
 
@@ -26,8 +27,12 @@ const ObjectContentEditor = forwardRef(({ objectType, widgets = {}, onWidgetChan
         deleteWidget
     } = useWidgets(normalizedWidgets)
 
+    // State for filtered widget types
+    const [filteredWidgetTypes, setFilteredWidgetTypes] = useState([])
+    const [isFilteringTypes, setIsFilteringTypes] = useState(false)
+
     // Get available widget types from the object type's slot configurations
-    const availableWidgetTypes = useMemo(() => {
+    const rawAvailableWidgetTypes = useMemo(() => {
         if (!objectType?.slotConfiguration?.slots) return []
 
         const allWidgetControls = []
@@ -40,7 +45,8 @@ const ObjectContentEditor = forwardRef(({ objectType, widgets = {}, onWidgetChan
                             type: control.widgetType,
                             display_name: control.label || getWidgetDisplayName(control.widgetType),
                             name: control.label || getWidgetDisplayName(control.widgetType),
-                            defaultConfig: control.defaultConfig || {}
+                            defaultConfig: control.defaultConfig || {},
+                            widgetType: control.widgetType // Keep original for filtering
                         })
                     }
                 })
@@ -49,6 +55,33 @@ const ObjectContentEditor = forwardRef(({ objectType, widgets = {}, onWidgetChan
 
         return allWidgetControls
     }, [objectType?.slotConfiguration?.slots])
+
+    // Filter widget types to only include available ones from server
+    useEffect(() => {
+        const filterTypes = async () => {
+            if (rawAvailableWidgetTypes.length === 0) {
+                setFilteredWidgetTypes([])
+                return
+            }
+
+            setIsFilteringTypes(true)
+            try {
+                const filtered = await filterAvailableWidgetTypes(rawAvailableWidgetTypes)
+                setFilteredWidgetTypes(filtered)
+            } catch (error) {
+                console.error('Error filtering widget types:', error)
+                // Fallback to raw types on error
+                setFilteredWidgetTypes(rawAvailableWidgetTypes)
+            } finally {
+                setIsFilteringTypes(false)
+            }
+        }
+
+        filterTypes()
+    }, [rawAvailableWidgetTypes])
+
+    // Use filtered types as the available widget types
+    const availableWidgetTypes = filteredWidgetTypes
 
     if (!objectType?.slotConfiguration?.slots || !Array.isArray(objectType.slotConfiguration.slots)) {
         return (
@@ -361,18 +394,35 @@ const ObjectContentEditor = forwardRef(({ objectType, widgets = {}, onWidgetChan
                                         e.target.value = '' // Reset
                                     }
                                 }}
-                                className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-md transition-colors text-sm border-0 focus:ring-2 focus:ring-blue-500"
+                                className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-md transition-colors text-sm border-0 focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                                 defaultValue=""
                                 onClick={(e) => e.stopPropagation()}
+                                disabled={isFilteringTypes}
                             >
                                 <option value="" disabled>
-                                    {(!slot.widgetControls || slot.widgetControls.length === 0) ? 'No widgets configured' : 'Add Widget...'}
+                                    {isFilteringTypes
+                                        ? 'Loading widget types...'
+                                        : (!slot.widgetControls || slot.widgetControls.length === 0)
+                                            ? 'No widgets configured'
+                                            : availableWidgetTypes.length === 0
+                                                ? 'No available widget types'
+                                                : 'Add Widget...'
+                                    }
                                 </option>
-                                {slot.widgetControls && slot.widgetControls.map((control, index) => (
-                                    <option key={control.id || index} value={control.widgetType} className="text-gray-900">
-                                        {control.label || getWidgetDisplayName(control.widgetType)}
-                                    </option>
-                                ))}
+                                {!isFilteringTypes && slot.widgetControls && slot.widgetControls
+                                    .filter(control => {
+                                        // Only show widget controls that are available on the server
+                                        return availableWidgetTypes.some(available =>
+                                            available.type === control.widgetType ||
+                                            available.widgetType === control.widgetType
+                                        )
+                                    })
+                                    .map((control, index) => (
+                                        <option key={control.id || index} value={control.widgetType} className="text-gray-900">
+                                            {control.label || getWidgetDisplayName(control.widgetType)}
+                                        </option>
+                                    ))
+                                }
                             </select>
                         </div>
                     </div>

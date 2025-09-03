@@ -84,7 +84,7 @@ class LayoutRenderer {
   }
 
   /**
-   * Fetch widget types from the API
+   * Fetch widget types from the API (with server validation)
    * @returns {Promise<Array>} Promise resolving to array of widget definitions
    */
   async fetchWidgetTypes() {
@@ -99,13 +99,19 @@ class LayoutRenderer {
     }
 
     try {
-      // Import widgetsApi at the top of the file or load it dynamically
-      const { widgetsApi } = await import('../api');
+      // Import both widgetsApi and validation utilities
+      const [{ widgetsApi }, { getAvailableWidgetTypes }] = await Promise.all([
+        import('../api'),
+        import('../utils/widgetTypeValidation')
+      ]);
 
-      this.widgetTypesPromise = widgetsApi.getTypes(true) // includeTemplateJson = true
+      this.widgetTypesPromise = getAvailableWidgetTypes() // Use validated widget types
         .then(apiWidgets => {
+          // Filter out inactive widgets
+          const activeWidgets = apiWidgets.filter(widget => widget.isActive !== false);
+
           // Transform API response to widget card format
-          const transformedWidgets = this.transformApiWidgetsToCardFormat(apiWidgets);
+          const transformedWidgets = this.transformApiWidgetsToCardFormat(activeWidgets);
 
           // Cache the transformed widgets
           this.cachedApiWidgets = transformedWidgets;
@@ -2069,6 +2075,15 @@ class LayoutRenderer {
   async forceRefreshWidgets() {
     this.cachedApiWidgets = null;
     this.widgetTypesPromise = null;
+
+    // Also clear the widget validation cache
+    try {
+      const { clearWidgetTypesCache } = await import('../utils/widgetTypeValidation');
+      clearWidgetTypesCache();
+    } catch (error) {
+      console.warn('LayoutRenderer: Could not clear widget validation cache:', error);
+    }
+
     return await this.fetchWidgetTypes();
   }
 

@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react'
-import { X, Save, RotateCcw } from 'lucide-react'
+import { X, Save, RotateCcw, RefreshCw } from 'lucide-react'
 import ValidatedInput from './validation/ValidatedInput.jsx'
 import { getWidgetSchema, validateWidgetConfiguration } from '../api/widgetSchemas.js'
 import { widgetsApi } from '../api'
+import { validateWidgetType, clearWidgetTypesCache } from '../utils/widgetTypeValidation.js'
+import DeletedWidgetWarning from './DeletedWidgetWarning.jsx'
 
 /**
  * WidgetEditorPanel - Slide-out panel for editing widgets
@@ -39,6 +41,8 @@ const WidgetEditorPanel = forwardRef(({
     const [schemaError, setSchemaError] = useState(null)
     const [panelWidth, setPanelWidth] = useState(400) // Default width in pixels
     const [isResizing, setIsResizing] = useState(false)
+    const [widgetTypeValidation, setWidgetTypeValidation] = useState(null)
+    const [isValidatingType, setIsValidatingType] = useState(false)
 
     const panelRef = useRef(null)
     const resizeRef = useRef(null)
@@ -58,9 +62,34 @@ const WidgetEditorPanel = forwardRef(({
         }
     }, [widgetData])
 
-    // Fetch schema from backend when widget type changes
+    // Validate widget type availability when widget data changes
     useEffect(() => {
-        if (widgetData && !schema) {
+        if (widgetData) {
+            setIsValidatingType(true)
+            validateWidgetType(widgetData)
+                .then(validation => {
+                    setWidgetTypeValidation(validation)
+                    setIsValidatingType(false)
+                })
+                .catch(error => {
+                    console.error('Error validating widget type:', error)
+                    setWidgetTypeValidation({
+                        isValid: false,
+                        error: `Failed to validate widget type: ${error.message}`,
+                        canEdit: false,
+                        shouldHide: false
+                    })
+                    setIsValidatingType(false)
+                })
+        } else {
+            setWidgetTypeValidation(null)
+            setIsValidatingType(false)
+        }
+    }, [widgetData])
+
+    // Fetch schema from backend when widget type changes (only if widget type is valid)
+    useEffect(() => {
+        if (widgetData && !schema && widgetTypeValidation?.canEdit !== false) {
             setIsLoadingSchema(true)
             setSchemaError(null)
 
@@ -117,7 +146,7 @@ const WidgetEditorPanel = forwardRef(({
             // Use provided schema if available
             setFetchedSchema(schema)
         }
-    }, [widgetData, schema])
+    }, [widgetData, schema, widgetTypeValidation])
 
     // Simple widget validation function using dedicated API
     const validateWidget = useCallback(async (configToValidate) => {
@@ -301,6 +330,37 @@ const WidgetEditorPanel = forwardRef(({
         }
         onClose()
     }
+
+    // Handle refresh widget types
+    const handleRefreshWidgetTypes = useCallback(async () => {
+        if (!widgetData) return
+
+        // Clear cache and re-validate
+        clearWidgetTypesCache()
+        setIsValidatingType(true)
+
+        try {
+            const validation = await validateWidgetType(widgetData)
+            setWidgetTypeValidation(validation)
+
+            // If the widget type is now available, try to fetch schema
+            if (validation.canEdit && !schema) {
+                setIsLoadingSchema(true)
+                setSchemaError(null)
+                // The schema fetch effect will trigger due to widgetTypeValidation change
+            }
+        } catch (error) {
+            console.error('Error refreshing widget type:', error)
+            setWidgetTypeValidation({
+                isValid: false,
+                error: `Failed to refresh widget type: ${error.message}`,
+                canEdit: false,
+                shouldHide: false
+            })
+        } finally {
+            setIsValidatingType(false)
+        }
+    }, [widgetData, schema])
 
     // Generate form fields from schema using ValidatedInput
     const renderFormField = (fieldName, fieldSchema) => {
@@ -518,7 +578,23 @@ const WidgetEditorPanel = forwardRef(({
 
                     {/* Form content - scrollable */}
                     <div className="flex-1 overflow-y-auto p-4">
-                        {isLoadingSchema ? (
+                        {isValidatingType ? (
+                            <div className="flex items-center justify-center py-8">
+                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-3"></div>
+                                <span className="text-gray-600">Validating widget type...</span>
+                            </div>
+                        ) : widgetTypeValidation && !widgetTypeValidation.canEdit ? (
+                            <div className="space-y-4">
+                                <DeletedWidgetWarning
+                                    widget={widgetData}
+                                    onRefresh={handleRefreshWidgetTypes}
+                                    className="mb-4"
+                                />
+                                <div className="text-center text-gray-500 py-8">
+                                    <p>Widget editing is disabled because the widget type is not available.</p>
+                                </div>
+                            </div>
+                        ) : isLoadingSchema ? (
                             <div className="flex items-center justify-center py-8">
                                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-3"></div>
                                 <span className="text-gray-600">Loading widget configuration...</span>

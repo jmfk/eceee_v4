@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
     Search,
@@ -17,20 +17,42 @@ import {
     ImageIcon
 } from 'lucide-react'
 import { widgetsApi } from '../api'
+import { getAvailableWidgetTypes } from '../utils/widgetTypeValidation'
 
 const WidgetLibrary = ({ onSelectWidget, selectedWidgetTypes = [] }) => {
     const [searchTerm, setSearchTerm] = useState('')
     const [filterCategory, setFilterCategory] = useState('all')
+    const [availableWidgetTypes, setAvailableWidgetTypes] = useState([])
+    const [isLoadingAvailable, setIsLoadingAvailable] = useState(false)
 
-    // Fetch available widget types - now returns direct array instead of paginated results
-    const { data: widgetTypes, isLoading, error } = useQuery({
-        queryKey: ['widget-types'],
-        queryFn: async () => {
-            const response = await widgetsApi.getTypes()
-            // New API returns direct array, filter active ones
-            return response?.filter(widget => widget.isActive) || []
+    // Fetch available widget types from server (validated)
+    useEffect(() => {
+        const fetchAvailableTypes = async () => {
+            setIsLoadingAvailable(true)
+            try {
+                const types = await getAvailableWidgetTypes()
+                // Filter active ones and ensure they have required properties
+                const activeTypes = types.filter(widget =>
+                    widget.isActive !== false && // Include if isActive is undefined or true
+                    widget.name &&
+                    widget.type
+                )
+                setAvailableWidgetTypes(activeTypes)
+            } catch (error) {
+                console.error('Error fetching available widget types:', error)
+                setAvailableWidgetTypes([])
+            } finally {
+                setIsLoadingAvailable(false)
+            }
         }
-    })
+
+        fetchAvailableTypes()
+    }, [])
+
+    // Use the validated available widget types
+    const widgetTypes = availableWidgetTypes
+    const isLoading = isLoadingAvailable
+    const error = null // Handle errors inline above
 
     // Widget type icons mapping
     const getWidgetIcon = (widgetName) => {
@@ -202,7 +224,9 @@ const WidgetLibrary = ({ onSelectWidget, selectedWidgetTypes = [] }) => {
                     <p className="text-gray-400 text-sm mt-1">
                         {searchTerm || filterCategory !== 'all'
                             ? 'Try adjusting your search or filter criteria'
-                            : 'No widget types are available'
+                            : availableWidgetTypes.length === 0
+                                ? 'No widget types are available on the server'
+                                : 'No widget types match your criteria'
                         }
                     </p>
                 </div>
