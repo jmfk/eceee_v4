@@ -66,8 +66,6 @@ export const renderWidgetToHTML = (widget) => {
 
   switch (widget.type) {
     case 'core_widgets.TextBlockWidget':
-    case 'text':
-    case 'text-block':
       return `
         <div class="text-widget">
           ${config.title ? `<h3 class="font-semibold text-gray-900 mb-2">${escapeHtml(config.title)}</h3>` : ''}
@@ -76,7 +74,6 @@ export const renderWidgetToHTML = (widget) => {
       `
 
     case 'core_widgets.ImageWidget':
-    case 'image':
       const imgSrc = config.image_url || config.imageUrl || ''
       const altText = config.alt_text || config.altText || 'Image'
       const caption = config.caption || ''
@@ -91,7 +88,6 @@ export const renderWidgetToHTML = (widget) => {
       `
 
     case 'core_widgets.ButtonWidget':
-    case 'button':
       const buttonText = config.text || 'Button'
       const buttonUrl = config.url || '#'
       const buttonStyle = config.style || 'primary'
@@ -110,7 +106,6 @@ export const renderWidgetToHTML = (widget) => {
       `
 
     case 'core_widgets.SpacerWidget':
-    case 'spacer':
       const height = config.height === 'custom' ? config.custom_height :
         config.height === 'small' ? '16px' :
           config.height === 'large' ? '64px' : '32px'
@@ -123,7 +118,6 @@ export const renderWidgetToHTML = (widget) => {
       `
 
     case 'core_widgets.HtmlBlockWidget':
-    case 'html-block':
       const htmlContent = config.html_content || '<div class="text-gray-500 italic">HTML content will appear here...</div>'
       return `
         <div class="html-widget">
@@ -132,7 +126,6 @@ export const renderWidgetToHTML = (widget) => {
       `
 
     case 'core_widgets.GalleryWidget':
-    case 'gallery':
       const images = config.images || []
       const columns = config.columns || 3
       const gridClasses = {
