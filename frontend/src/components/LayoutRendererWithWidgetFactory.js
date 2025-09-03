@@ -227,6 +227,13 @@ class LayoutRendererWithWidgetFactory extends LayoutRenderer {
                 throw new Error('Widgets must be an array');
             }
 
+            // Preserve slot menu state before cleanup
+            let wasMenuOpen = false;
+            const existingDropdown = container.querySelector('.slot-menu-dropdown');
+            if (existingDropdown) {
+                wasMenuOpen = !existingDropdown.classList.contains('hidden');
+            }
+
             // Clean up existing React roots in this slot SYNCHRONOUSLY
             const existingWidgets = container.querySelectorAll('.widget-factory-container');
             existingWidgets.forEach((widgetContainer, index) => {
@@ -242,7 +249,7 @@ class LayoutRendererWithWidgetFactory extends LayoutRenderer {
                 }
             });
 
-            // Clear all existing content from container (this is the key fix!)
+            // Clear all existing content from container (this removes the slot menu too)
             container.innerHTML = '';
 
 
@@ -281,7 +288,22 @@ class LayoutRendererWithWidgetFactory extends LayoutRenderer {
                 container.appendChild(emptyMessage);
             }
 
+            // Recreate the slot menu with proper event listeners
+            if (this.uiConfig.showIconMenu) {
+                this.addSlotIconMenu(slotName, {
+                    showAddWidget: this.uiConfig.showAddWidget,
+                    showSlotInfo: true,
+                    showClearSlot: true
+                });
 
+                // Restore the menu state if it was open before cleanup
+                if (wasMenuOpen) {
+                    const newDropdown = container.querySelector('.slot-menu-dropdown');
+                    if (newDropdown) {
+                        newDropdown.classList.remove('hidden');
+                    }
+                }
+            }
 
         } catch (error) {
             console.error(`LayoutRendererWithWidgetFactory: Error updating slot ${slotName}`, error);
