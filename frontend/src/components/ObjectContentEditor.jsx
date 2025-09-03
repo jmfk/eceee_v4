@@ -1,10 +1,255 @@
 import React, { forwardRef, useState, useMemo, useRef, useCallback, useImperativeHandle, useEffect } from 'react'
-import { Layout, Plus, Settings, Trash2, Eye, Check, X } from 'lucide-react'
+import { Layout, Plus, Settings, Trash2, Eye, Check, X, MoreHorizontal } from 'lucide-react'
 import { WidgetFactory } from './widgets'
 import { useWidgets, getWidgetDisplayName, createDefaultWidgetConfig } from '../hooks/useWidgets'
 import { filterAvailableWidgetTypes } from '../utils/widgetTypeValidation'
 
 import WidgetEditorPanel from './WidgetEditorPanel'
+
+// WidgetSelectionModal component that replicates the PageEditor widget selection modal
+const WidgetSelectionModal = ({ isOpen, onClose, onSelectWidget, slot, availableWidgetTypes, isFilteringTypes }) => {
+    const [searchTerm, setSearchTerm] = useState('')
+    const modalRef = useRef(null)
+
+    // Close modal when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (modalRef.current && !modalRef.current.contains(event.target)) {
+                onClose()
+            }
+        }
+
+        if (isOpen) {
+            document.addEventListener('mousedown', handleClickOutside)
+            return () => document.removeEventListener('mousedown', handleClickOutside)
+        }
+    }, [isOpen, onClose])
+
+    // Close modal on Escape key
+    useEffect(() => {
+        const handleEscape = (event) => {
+            if (event.key === 'Escape') {
+                onClose()
+            }
+        }
+
+        if (isOpen) {
+            document.addEventListener('keydown', handleEscape)
+            return () => document.removeEventListener('keydown', handleEscape)
+        }
+    }, [isOpen, onClose])
+
+    if (!isOpen) return null
+
+    // Filter available widget types based on slot configuration and search term
+    const filteredWidgets = useMemo(() => {
+        if (!slot?.widgetControls || !availableWidgetTypes) return []
+
+        let widgets = slot.widgetControls
+            .filter(control => {
+                // Only show widget controls that are available on the server
+                return availableWidgetTypes.some(available =>
+                    available.type === control.widgetType ||
+                    available.widgetType === control.widgetType
+                )
+            })
+            .map(control => {
+                const widgetType = availableWidgetTypes.find(available =>
+                    available.type === control.widgetType ||
+                    available.widgetType === control.widgetType
+                )
+                return {
+                    type: control.widgetType,
+                    name: control.label || getWidgetDisplayName(control.widgetType),
+                    description: widgetType?.description || 'No description available',
+                    category: widgetType?.category || 'General',
+                    icon: widgetType?.icon || '🧩'
+                }
+            })
+
+        // Filter by search term
+        if (searchTerm.trim()) {
+            const term = searchTerm.toLowerCase()
+            widgets = widgets.filter(widget =>
+                widget.name.toLowerCase().includes(term) ||
+                widget.description.toLowerCase().includes(term) ||
+                widget.category.toLowerCase().includes(term) ||
+                widget.type.toLowerCase().includes(term)
+            )
+        }
+
+        return widgets
+    }, [slot, availableWidgetTypes, searchTerm])
+
+    const handleWidgetSelect = (widgetType) => {
+        onSelectWidget(widgetType)
+        onClose()
+    }
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div 
+                ref={modalRef}
+                className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-hidden"
+            >
+                <div className="p-6">
+                    {/* Header */}
+                    <div className="flex items-center justify-between mb-4">
+                        <div>
+                            <h3 className="text-lg font-semibold text-gray-900">Add Widget to Slot</h3>
+                            <p className="text-sm text-gray-600">{slot?.label || slot?.name}</p>
+                        </div>
+                        <button
+                            onClick={onClose}
+                            className="text-gray-400 hover:text-gray-600 transition-colors"
+                        >
+                            <X className="h-6 w-6" />
+                        </button>
+                    </div>
+
+                    {/* Search */}
+                    <div className="mb-4">
+                        <input
+                            type="text"
+                            placeholder="Search widgets..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                    </div>
+
+                    {/* Widget Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto">
+                        {isFilteringTypes ? (
+                            <div className="col-span-full flex items-center justify-center py-12">
+                                <div className="text-center">
+                                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                                    <p className="mt-2 text-sm text-gray-600">Loading widgets...</p>
+                                </div>
+                            </div>
+                        ) : filteredWidgets.length === 0 ? (
+                            <div className="col-span-full text-center py-12 text-gray-500">
+                                <div className="text-4xl mb-2">🔍</div>
+                                <p className="text-sm">No widgets found</p>
+                                {searchTerm && (
+                                    <p className="text-xs mt-1">Try adjusting your search terms</p>
+                                )}
+                            </div>
+                        ) : (
+                            filteredWidgets.map((widget, index) => (
+                                <div
+                                    key={widget.type + index}
+                                    onClick={() => handleWidgetSelect(widget.type)}
+                                    className="border border-gray-200 rounded-lg p-4 cursor-pointer hover:border-blue-300 hover:bg-blue-50 transition-all duration-200"
+                                >
+                                    <div className="flex items-start space-x-3">
+                                        <div className="bg-gray-100 rounded-lg w-12 h-12 flex items-center justify-center text-xl font-bold text-gray-600">
+                                            {widget.icon}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <h4 className="text-sm font-semibold text-gray-900 mb-1">{widget.name}</h4>
+                                            <p className="text-xs text-gray-600 leading-relaxed">{widget.description}</p>
+                                            <div className="mt-2">
+                                                <span className="inline-block px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded-full">
+                                                    {widget.category}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+
+                    {/* Footer */}
+                    <div className="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-200">
+                        <button
+                            onClick={onClose}
+                            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+// SlotIconMenu component that replicates the PageEditor three-dot menu
+const SlotIconMenu = ({ slotName, slot, availableWidgetTypes, isFilteringTypes, onAddWidget, onClearSlot, onShowWidgetModal }) => {
+    const [isOpen, setIsOpen] = useState(false)
+    const menuRef = useRef(null)
+
+    // Close menu when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (menuRef.current && !menuRef.current.contains(event.target)) {
+                setIsOpen(false)
+            }
+        }
+
+        if (isOpen) {
+            document.addEventListener('mousedown', handleClickOutside)
+            return () => document.removeEventListener('mousedown', handleClickOutside)
+        }
+    }, [isOpen])
+
+    const handleMenuToggle = () => {
+        setIsOpen(!isOpen)
+    }
+
+    const handleAddWidgetClick = () => {
+        onShowWidgetModal(slot)
+        setIsOpen(false)
+    }
+
+    const handleClearSlotClick = () => {
+        onClearSlot(slotName)
+        setIsOpen(false)
+    }
+
+    return (
+        <div className="absolute top-2 right-2 z-20 opacity-80 hover:opacity-100 transition-opacity" ref={menuRef}>
+            {/* Menu Button (3 dots icon) */}
+            <button
+                onClick={handleMenuToggle}
+                className="bg-gray-700 hover:bg-gray-800 text-white p-2 rounded-md transition-colors"
+                title={`Slot: ${slotName}`}
+            >
+                <MoreHorizontal className="h-4 w-4" />
+            </button>
+
+            {/* Menu Dropdown */}
+            {isOpen && (
+                <div className="absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg min-w-48">
+                    {/* Add Widget */}
+                    {!isFilteringTypes && slot.widgetControls && slot.widgetControls.length > 0 && (
+                        <>
+                            <button
+                                onClick={handleAddWidgetClick}
+                                className="flex items-center w-full px-3 py-2 text-sm text-left hover:bg-gray-100 transition-colors text-green-700 hover:bg-green-50"
+                            >
+                                <Plus className="h-4 w-4 mr-3 text-gray-600" />
+                                <span className="text-gray-900">Add Widget</span>
+                            </button>
+                            <div className="border-t border-gray-200 my-1"></div>
+                        </>
+                    )}
+
+                    {/* Clear Slot */}
+                    <button
+                        onClick={handleClearSlotClick}
+                        className="flex items-center w-full px-3 py-2 text-sm text-left hover:bg-gray-100 transition-colors text-red-700 hover:bg-red-50"
+                    >
+                        <Trash2 className="h-4 w-4 mr-3 text-gray-600" />
+                        <span className="text-gray-900">Clear Slot</span>
+                    </button>
+                </div>
+            )}
+        </div>
+    )
+}
 
 const ObjectContentEditor = forwardRef(({ objectType, widgets = {}, onWidgetChange, mode = 'object' }, ref) => {
     const [selectedWidgets, setSelectedWidgets] = useState({}) // For bulk operations
@@ -15,6 +260,10 @@ const ObjectContentEditor = forwardRef(({ objectType, widgets = {}, onWidgetChan
     const [widgetHasUnsavedChanges, setWidgetHasUnsavedChanges] = useState(false)
     const widgetEditorRef = useRef(null)
 
+    // Widget selection modal state
+    const [widgetModalOpen, setWidgetModalOpen] = useState(false)
+    const [selectedSlotForModal, setSelectedSlotForModal] = useState(null)
+
     // Use widgets directly since migration is complete
     const normalizedWidgets = useMemo(() => {
         return widgets
@@ -22,6 +271,7 @@ const ObjectContentEditor = forwardRef(({ objectType, widgets = {}, onWidgetChan
 
     // Use the shared widget hook (but we'll override widgetTypes with object type's configuration)
     const {
+        widgetTypes,
         addWidget,
         updateWidget,
         deleteWidget
@@ -43,8 +293,8 @@ const ObjectContentEditor = forwardRef(({ objectType, widgets = {}, onWidgetChan
                     if (!allWidgetControls.some(existing => existing.widgetType === control.widgetType)) {
                         allWidgetControls.push({
                             type: control.widgetType,
-                            display_name: control.label || getWidgetDisplayName(control.widgetType),
-                            name: control.label || getWidgetDisplayName(control.widgetType),
+                            display_name: control.label || getWidgetDisplayName(control.widgetType, widgetTypes),
+                            name: control.label || getWidgetDisplayName(control.widgetType, widgetTypes),
                             defaultConfig: control.defaultConfig || {},
                             widgetType: control.widgetType // Keep original for filtering
                         })
@@ -54,7 +304,7 @@ const ObjectContentEditor = forwardRef(({ objectType, widgets = {}, onWidgetChan
         })
 
         return allWidgetControls
-    }, [objectType?.slotConfiguration?.slots])
+    }, [objectType?.slotConfiguration?.slots, widgetTypes])
 
     // Filter widget types to only include available ones from server
     useEffect(() => {
@@ -300,6 +550,23 @@ const ObjectContentEditor = forwardRef(({ objectType, widgets = {}, onWidgetChan
         }
     }
 
+    // Widget modal handlers
+    const handleShowWidgetModal = (slot) => {
+        setSelectedSlotForModal(slot)
+        setWidgetModalOpen(true)
+    }
+
+    const handleCloseWidgetModal = () => {
+        setWidgetModalOpen(false)
+        setSelectedSlotForModal(null)
+    }
+
+    const handleWidgetSelection = (widgetType) => {
+        if (selectedSlotForModal) {
+            handleAddWidget(selectedSlotForModal.name, widgetType)
+        }
+    }
+
     // Clear all widgets in a slot
     const handleClearSlot = (slotName) => {
         const updatedWidgets = {
@@ -356,8 +623,21 @@ const ObjectContentEditor = forwardRef(({ objectType, widgets = {}, onWidgetChan
         return (
             <div
                 key={slot.name}
-                className="border p-4 transition-colors border-gray-200"
+                className="relative border p-4 transition-colors border-gray-200 min-h-[100px]"
+                data-slot-name={slot.name}
+                data-slot-title={slot.label}
             >
+                                {/* Slot Menu - Three Dot Menu */}
+                <SlotIconMenu 
+                    slotName={slot.name}
+                    slot={slot}
+                    availableWidgetTypes={availableWidgetTypes}
+                    isFilteringTypes={isFilteringTypes}
+                    onAddWidget={handleAddWidget}
+                    onClearSlot={handleClearSlot}
+                    onShowWidgetModal={handleShowWidgetModal}
+                />
+
                 {/* Slot Header */}
                 <div className="flex items-center justify-between mb-3">
                     <div className="flex-1">
@@ -382,50 +662,6 @@ const ObjectContentEditor = forwardRef(({ objectType, widgets = {}, onWidgetChan
                             </p>
                         )}
                     </div>
-
-                    {/* Action Buttons */}
-                    <div className="flex items-center space-x-2">
-                        {/* Add Widget Dropdown */}
-                        <div className="relative">
-                            <select
-                                onChange={(e) => {
-                                    if (e.target.value) {
-                                        handleAddWidget(slot.name, e.target.value)
-                                        e.target.value = '' // Reset
-                                    }
-                                }}
-                                className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-md transition-colors text-sm border-0 focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                                defaultValue=""
-                                onClick={(e) => e.stopPropagation()}
-                                disabled={isFilteringTypes}
-                            >
-                                <option value="" disabled>
-                                    {isFilteringTypes
-                                        ? 'Loading widget types...'
-                                        : (!slot.widgetControls || slot.widgetControls.length === 0)
-                                            ? 'No widgets configured'
-                                            : availableWidgetTypes.length === 0
-                                                ? 'No available widget types'
-                                                : 'Add Widget...'
-                                    }
-                                </option>
-                                {!isFilteringTypes && slot.widgetControls && slot.widgetControls
-                                    .filter(control => {
-                                        // Only show widget controls that are available on the server
-                                        return availableWidgetTypes.some(available =>
-                                            available.type === control.widgetType ||
-                                            available.widgetType === control.widgetType
-                                        )
-                                    })
-                                    .map((control, index) => (
-                                        <option key={control.id || index} value={control.widgetType} className="text-gray-900">
-                                            {control.label || getWidgetDisplayName(control.widgetType)}
-                                        </option>
-                                    ))
-                                }
-                            </select>
-                        </div>
-                    </div>
                 </div>
 
                 {/* Widgets List - Always Visible */}
@@ -435,9 +671,12 @@ const ObjectContentEditor = forwardRef(({ objectType, widgets = {}, onWidgetChan
                             {slotWidgets.map((widget, index) => renderWidget(widget, slot.name, index, true))}
                         </div>
                     ) : (
-                        <div className="text-center py-6 text-gray-400 border-2 border-dashed border-gray-200 rounded-lg">
-                            <Layout className="h-6 w-6 mx-auto mb-2" />
-                            <p className="text-sm">No widgets in this slot</p>
+                        <div className="slot-placeholder p-4 border-2 border-dashed border-gray-300 rounded text-center text-gray-500">
+                            <div className="text-sm font-medium">{slot.label}</div>
+                            {slot.description && (
+                                <div className="text-xs mt-1">{slot.description}</div>
+                            )}
+                            <div className="text-xs mt-2 opacity-75">Click ••• to add widgets</div>
                         </div>
                     )}
                 </div>
@@ -484,6 +723,16 @@ const ObjectContentEditor = forwardRef(({ objectType, widgets = {}, onWidgetChan
                     <p>This object type doesn't have any widget slots configured.</p>
                 </div>
             )}
+
+            {/* Widget Selection Modal */}
+            <WidgetSelectionModal
+                isOpen={widgetModalOpen}
+                onClose={handleCloseWidgetModal}
+                onSelectWidget={handleWidgetSelection}
+                slot={selectedSlotForModal}
+                availableWidgetTypes={availableWidgetTypes}
+                isFilteringTypes={isFilteringTypes}
+            />
         </div>
     )
 })

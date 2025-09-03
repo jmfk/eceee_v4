@@ -292,7 +292,6 @@ class LayoutRendererWithWidgetFactory extends LayoutRenderer {
             if (this.uiConfig.showIconMenu) {
                 this.addSlotIconMenu(slotName, {
                     showAddWidget: this.uiConfig.showAddWidget,
-                    showSlotInfo: true,
                     showClearSlot: true
                 });
 

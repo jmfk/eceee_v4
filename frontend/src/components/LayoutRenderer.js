@@ -419,7 +419,6 @@ class LayoutRenderer {
         setTimeout(() => {
           this.addIconMenusToAllSlots({
             showAddWidget: this.uiConfig.showAddWidget,
-            showSlotInfo: true,
             showClearSlot: true
           });
           // Add global click outside listener for all menus
@@ -563,7 +562,6 @@ class LayoutRenderer {
       if (this.uiConfig.showIconMenu && !container.querySelector('[data-slot-menu]')) {
         this.addSlotIconMenu(slotName, {
           showAddWidget: this.uiConfig.showAddWidget,
-          showSlotInfo: true,
           showClearSlot: true
         });
       }
@@ -1323,7 +1321,6 @@ class LayoutRenderer {
     // Add menus to existing slots
     this.addIconMenusToAllSlots({
       showAddWidget: this.uiConfig.showAddWidget,
-      showSlotInfo: true,
       showClearSlot: true,
       ...options
     });
@@ -2974,7 +2971,6 @@ class LayoutRenderer {
         setTimeout(() => {
           this.addSlotIconMenu(slotName, {
             showAddWidget: this.uiConfig.showAddWidget,
-            showSlotInfo: true,
             showClearSlot: true
           });
         }, 100);
