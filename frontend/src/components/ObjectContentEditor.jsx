@@ -153,8 +153,11 @@ const WidgetSelectionModal = ({ isOpen, onClose, onSelectWidget, slot, available
                                                 React.createElement(widget.icon, { className: "h-6 w-6" })
                                             ) : React.isValidElement(widget.icon) ? (
                                                 React.cloneElement(widget.icon, { className: "h-6 w-6" })
+                                            ) : widget.icon && typeof widget.icon === 'object' ? (
+                                                // Handle case where icon is an object (like a React component)
+                                                React.createElement(widget.icon, { className: "h-6 w-6" })
                                             ) : (
-                                                <span className="text-xl font-bold">{widget.icon || '🧩'}</span>
+                                                <span className="text-xl font-bold">{typeof widget.icon === 'string' ? widget.icon : '🧩'}</span>
                                             )}
                                         </div>
                                         <div className="flex-1 min-w-0">
