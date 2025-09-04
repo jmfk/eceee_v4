@@ -88,7 +88,7 @@ const WidgetSelectionModal = ({ isOpen, onClose, onSelectWidget, slot, available
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div 
+            <div
                 ref={modalRef}
                 className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-hidden"
             >
@@ -627,8 +627,8 @@ const ObjectContentEditor = forwardRef(({ objectType, widgets = {}, onWidgetChan
                 data-slot-name={slot.name}
                 data-slot-title={slot.label}
             >
-                                {/* Slot Menu - Three Dot Menu */}
-                <SlotIconMenu 
+                {/* Slot Menu - Three Dot Menu */}
+                <SlotIconMenu
                     slotName={slot.name}
                     slot={slot}
                     availableWidgetTypes={availableWidgetTypes}

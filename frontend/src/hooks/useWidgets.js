@@ -55,7 +55,7 @@ export const useWidgets = (initialWidgets = {}) => {
     const addWidget = useCallback((slotName, widgetType, config = {}) => {
         const newWidget = {
             id: generateWidgetId(),
-            name: getWidgetDisplayName(widgetType),
+            name: getWidgetDisplayName(widgetType, widgetTypes),
             type: widgetType,
             config: config,
             slotName: slotName
@@ -67,7 +67,7 @@ export const useWidgets = (initialWidgets = {}) => {
         }))
 
         return newWidget
-    }, [generateWidgetId])
+    }, [generateWidgetId, widgetTypes])
 
     // Update widget configuration
     const updateWidget = useCallback((slotName, widgetIndex, updates) => {
@@ -187,16 +187,32 @@ export const useWidgets = (initialWidgets = {}) => {
 }
 
 // Helper function to get display name for widget types (NEW FORMAT ONLY)
-export const getWidgetDisplayName = (widgetType) => {
-    const widgetMap = {
-        'core_widgets.TextBlockWidget': 'Text Block',
-        'core_widgets.ImageWidget': 'Image',
-        'core_widgets.ButtonWidget': 'Button',
-        'core_widgets.HtmlBlockWidget': 'HTML Block',
-        'core_widgets.GalleryWidget': 'Gallery',
-        'core_widgets.SpacerWidget': 'Spacer'
+export const getWidgetDisplayName = (widgetTypeOrData, widgetTypes = []) => {
+    // If widgetTypeOrData is an object (widget type data), extract name from it
+    if (typeof widgetTypeOrData === 'object' && widgetTypeOrData !== null) {
+        return widgetTypeOrData.name || widgetTypeOrData.label || widgetTypeOrData.display_name || widgetTypeOrData.type
     }
-    return widgetMap[widgetType] || widgetType
+
+    // If widgetTypeOrData is a string (widget type), look it up in widgetTypes array
+    if (typeof widgetTypeOrData === 'string') {
+        const widgetTypeData = widgetTypes.find(w => w.type === widgetTypeOrData)
+        if (widgetTypeData) {
+            return widgetTypeData.name || widgetTypeData.label || widgetTypeData.display_name || widgetTypeOrData
+        }
+
+        // Fallback to hardcoded mapping for backwards compatibility
+        const widgetMap = {
+            'core_widgets.TextBlockWidget': 'Text Block',
+            'core_widgets.ImageWidget': 'Image',
+            'core_widgets.ButtonWidget': 'Button',
+            'core_widgets.HtmlBlockWidget': 'HTML Block',
+            'core_widgets.GalleryWidget': 'Gallery',
+            'core_widgets.SpacerWidget': 'Spacer'
+        }
+        return widgetMap[widgetTypeOrData] || widgetTypeOrData
+    }
+
+    return widgetTypeOrData || 'Unknown Widget'
 }
 
 // Helper function to create default widget config

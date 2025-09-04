@@ -4,6 +4,8 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { Save, AlertCircle } from 'lucide-react'
 import { objectInstancesApi, objectTypesApi } from '../../api/objectStorage'
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext'
+import { getWidgetDisplayName } from '../../hooks/useWidgets'
+import { widgetsApi } from '../../api'
 import ObjectContentEditor from '../ObjectContentEditor'
 import ObjectSchemaForm from '../ObjectSchemaForm'
 import WidgetEditorPanel from '../WidgetEditorPanel'
@@ -23,6 +25,21 @@ const ObjectContentView = ({ objectType, instance, parentId, isNewInstance, onSa
         hasUnsavedChanges: false
     })
     const [hasWidgetChanges, setHasWidgetChanges] = useState(false)
+
+    // Fetch widget types for display names
+    const { data: widgetTypes = [] } = useQuery({
+        queryKey: ['widget-types'],
+        queryFn: async () => {
+            try {
+                const response = await widgetsApi.getTypes(true)
+                return Array.isArray(response) ? response : response?.data || response?.results || []
+            } catch (error) {
+                console.error('Error fetching widget types:', error)
+                return []
+            }
+        },
+        staleTime: 5 * 60 * 1000, // 5 minutes
+    })
 
     // Update local widgets when instance changes
     useEffect(() => {
@@ -527,7 +544,7 @@ const ObjectContentView = ({ objectType, instance, parentId, isNewInstance, onSa
                         setWidgetEditorUI(prev => ({ ...prev, hasUnsavedChanges: hasChanges }))
                     }}
                     widgetData={widgetEditorUI.editingWidget}
-                    title={widgetEditorUI.editingWidget ? `Edit ${widgetEditorUI.editingWidget.name}` : 'Edit Widget'}
+                    title={widgetEditorUI.editingWidget ? `Edit ${getWidgetDisplayName(widgetEditorUI.editingWidget.type, widgetTypes)}` : 'Edit Widget'}
                 />
             )}
         </div>
