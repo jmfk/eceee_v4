@@ -126,7 +126,7 @@ export const MockDataFactory = {
         ...overrides
     }),
 
-    createButtonWidget: (overrides = {}) => ({
+    createContentWidget: (overrides = {}) => ({
         id: 2,
         widget_type: { id: 2, name: 'Button' },
         slot_name: 'content',

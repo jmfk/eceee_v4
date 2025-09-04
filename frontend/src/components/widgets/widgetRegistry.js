@@ -1,10 +1,13 @@
 // Enhanced Widget Registry - auto-discovers metadata from widget components
-import TextBlockWidget from './TextBlockWidget'
+// Import the new core widgets
+import ContentWidget from './ContentWidget'
 import ImageWidget from './ImageWidget'
-import ButtonWidget from './ButtonWidget'
-import SpacerWidget from './SpacerWidget'
-import HtmlBlockWidget from './HtmlBlockWidget'
-import GalleryWidget from './GalleryWidget'
+import TableWidget from './TableWidget'
+import FooterWidget from './FooterWidget'
+import HeaderWidget from './HeaderWidget'
+import NavigationWidget from './NavigationWidget'
+import SidebarWidget from './SidebarWidget'
+import FormsWidget from './FormsWidget'
 
 // Auto-collect metadata from widget components
 const collectWidgetMetadata = (WidgetComponent) => {
@@ -25,12 +28,14 @@ const collectWidgetMetadata = (WidgetComponent) => {
 
 // Enhanced widget registry with auto-discovered metadata
 export const WIDGET_REGISTRY = {
-    'core_widgets.TextBlockWidget': collectWidgetMetadata(TextBlockWidget),
+    'core_widgets.ContentWidget': collectWidgetMetadata(ContentWidget),
     'core_widgets.ImageWidget': collectWidgetMetadata(ImageWidget),
-    'core_widgets.ButtonWidget': collectWidgetMetadata(ButtonWidget),
-    'core_widgets.SpacerWidget': collectWidgetMetadata(SpacerWidget),
-    'core_widgets.HTMLBlockWidget': collectWidgetMetadata(HtmlBlockWidget),
-    'core_widgets.GalleryWidget': collectWidgetMetadata(GalleryWidget)
+    'core_widgets.TableWidget': collectWidgetMetadata(TableWidget),
+    'core_widgets.FooterWidget': collectWidgetMetadata(FooterWidget),
+    'core_widgets.HeaderWidget': collectWidgetMetadata(HeaderWidget),
+    'core_widgets.NavigationWidget': collectWidgetMetadata(NavigationWidget),
+    'core_widgets.SidebarWidget': collectWidgetMetadata(SidebarWidget),
+    'core_widgets.FormsWidget': collectWidgetMetadata(FormsWidget)
 }
 
 // Legacy export for backward compatibility
@@ -101,7 +106,7 @@ export const getWidgetTags = (widgetType) => {
 export const getAllWidgetMetadata = () => {
     return Object.fromEntries(
         Object.entries(WIDGET_REGISTRY).map(([type, data]) => [
-            type, 
+            type,
             data.metadata
         ])
     )

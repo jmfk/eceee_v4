@@ -1,217 +1,254 @@
 """
 Pydantic models for widget configuration validation.
 
-These models replace the JSON schema validation previously used in the database
-WidgetType model, providing type-safe configuration for all widget types.
+These models define the configuration schemas for the new core widget types.
 """
 
-from typing import Optional, List, Literal
+from typing import Optional, List, Literal, Dict, Any
 from pydantic import BaseModel, Field, HttpUrl
 from datetime import datetime
 import datetime as dt
 
 
-class TextBlockConfig(BaseModel):
-    """Configuration for Text Block widget"""
+class ContentConfig(BaseModel):
+    """Configuration for Content widget"""
 
-    title: Optional[str] = Field(None, description="Optional title for the text block")
-    content: str = Field(..., description="Main text content")
-    alignment: Literal["left", "center", "right", "justify"] = Field(
-        "left", description="Text alignment"
+    content: str = Field(..., description="HTML content to display")
+    allow_scripts: bool = Field(
+        False, description="WARNING: Only enable for trusted content"
     )
-    style: Literal["normal", "bold", "italic"] = Field(
-        "normal", description="Text style"
+    sanitize_html: bool = Field(
+        True, description="Sanitize HTML to prevent XSS attacks"
     )
+
+
+class ImageMediaItem(BaseModel):
+    """Individual media item for Image widget"""
+
+    url: str = Field(..., description="Media URL (image or video)")
+    type: Literal["image", "video"] = Field("image", description="Media type")
+    alt_text: str = Field(
+        ..., min_length=1, description="Alternative text for accessibility"
+    )
+    caption: Optional[str] = Field(None, description="Optional caption")
+    thumbnail: Optional[str] = Field(None, description="Thumbnail URL for videos")
 
 
 class ImageConfig(BaseModel):
     """Configuration for Image widget"""
 
-    image_url: HttpUrl = Field(..., description="URL or path to the image")
-    alt_text: str = Field(
-        ..., min_length=1, description="Alternative text for accessibility"
+    media_items: List[ImageMediaItem] = Field(
+        ..., min_items=1, description="List of images/videos to display"
     )
-    caption: Optional[str] = Field(None, description="Optional caption below the image")
+    display_type: Literal["single", "gallery", "carousel"] = Field(
+        "single", description="How to display multiple items"
+    )
     size: Literal["small", "medium", "large", "full"] = Field(
-        "medium", description="Image size"
+        "medium", description="Media size"
     )
     alignment: Literal["left", "center", "right"] = Field(
         "center", description="Alignment"
     )
-
-
-class ButtonConfig(BaseModel):
-    """Configuration for Button widget"""
-
-    text: str = Field(..., min_length=1, description="Text displayed on the button")
-    url: HttpUrl = Field(..., description="Link destination")
-    style: Literal["primary", "secondary", "outline"] = Field(
-        "primary", description="Button style"
+    gallery_columns: int = Field(
+        3, ge=1, le=6, description="Number of columns for gallery layout"
     )
-    size: Literal["small", "medium", "large"] = Field(
-        "medium", description="Button size"
+    enable_lightbox: bool = Field(
+        True, description="Enable lightbox for full-size viewing"
     )
-    open_in_new_tab: bool = Field(False, description="Open in new tab")
+    auto_play: bool = Field(False, description="Auto-play videos (if applicable)")
+    show_captions: bool = Field(True, description="Display captions")
 
 
-class SpacerConfig(BaseModel):
-    """Configuration for Spacer widget"""
+class TableCell(BaseModel):
+    """Individual table cell configuration"""
 
-    height: Literal["small", "medium", "large", "custom"] = Field(
-        "medium", description="Height"
+    content: str = Field("", description="Cell content")
+    colspan: int = Field(1, ge=1, description="Number of columns to span")
+    rowspan: int = Field(1, ge=1, description="Number of rows to span")
+    alignment: Literal["left", "center", "right"] = Field(
+        "left", description="Text alignment"
     )
-    custom_height: Optional[str] = Field(
-        None,
-        pattern=r"^[0-9]+px$",
-        description="Custom height in pixels (only used if height is 'custom')",
+    background_color: Optional[str] = Field(
+        None, description="Background color (hex or CSS color)"
+    )
+    text_color: Optional[str] = Field(None, description="Text color (hex or CSS color)")
+    font_weight: Literal["normal", "bold"] = Field("normal", description="Font weight")
+    font_style: Literal["normal", "italic"] = Field("normal", description="Font style")
+    padding: Optional[str] = Field(None, description="Cell padding (CSS value)")
+    border: Optional[str] = Field(None, description="Cell border (CSS value)")
+    css_class: Optional[str] = Field(None, description="Additional CSS class")
+
+
+class TableRow(BaseModel):
+    """Table row configuration"""
+
+    cells: List[TableCell] = Field(..., description="List of cells in this row")
+    is_header: bool = Field(False, description="Whether this is a header row")
+    background_color: Optional[str] = Field(None, description="Row background color")
+    css_class: Optional[str] = Field(None, description="Additional CSS class")
+
+
+class TableConfig(BaseModel):
+    """Configuration for Table widget"""
+
+    rows: List[TableRow] = Field(..., min_items=1, description="Table rows")
+    caption: Optional[str] = Field(None, description="Table caption")
+    show_borders: bool = Field(True, description="Show table borders")
+    striped_rows: bool = Field(True, description="Alternate row colors")
+    hover_effect: bool = Field(True, description="Highlight rows on hover")
+    responsive: bool = Field(True, description="Make table responsive on mobile")
+    table_width: Literal["auto", "full"] = Field("full", description="Table width")
+    css_class: Optional[str] = Field(None, description="Additional CSS class for table")
+
+
+class LayoutWidgetConfig(BaseModel):
+    """Base configuration for layout widgets (Footer, Header, Navigation, Sidebar)"""
+
+    content: str = Field(..., description="Widget content (HTML)")
+    background_color: Optional[str] = Field(
+        None, description="Background color (hex or CSS color)"
+    )
+    background_image: Optional[str] = Field(None, description="Background image URL")
+    background_size: Literal["cover", "contain", "auto"] = Field(
+        "cover", description="Background image size"
+    )
+    background_position: Literal["center", "top", "bottom", "left", "right"] = Field(
+        "center", description="Background image position"
+    )
+    text_color: Optional[str] = Field(None, description="Text color (hex or CSS color)")
+    padding: Optional[str] = Field(None, description="Widget padding (CSS value)")
+    margin: Optional[str] = Field(None, description="Widget margin (CSS value)")
+    text_align: Literal["left", "center", "right", "justify"] = Field(
+        "left", description="Text alignment"
+    )
+    css_class: Optional[str] = Field(None, description="Additional CSS class")
+    custom_css: Optional[str] = Field(None, description="Custom CSS for this widget")
+
+
+class FooterConfig(LayoutWidgetConfig):
+    """Configuration for Footer widget"""
+
+    show_copyright: bool = Field(True, description="Show copyright notice")
+    copyright_text: Optional[str] = Field(None, description="Custom copyright text")
+    social_links: List[Dict[str, str]] = Field(
+        default_factory=list,
+        description="Social media links [{'name': 'Facebook', 'url': 'https://...', 'icon': 'fab fa-facebook'}]",
     )
 
 
-class HTMLBlockConfig(BaseModel):
-    """Configuration for HTML Block widget"""
+class HeaderConfig(LayoutWidgetConfig):
+    """Configuration for Header widget"""
 
-    html_content: str = Field(..., min_length=1, description="Raw HTML content")
-    allow_scripts: bool = Field(
-        False, description="WARNING: Only enable for trusted content"
+    show_overlay: bool = Field(False, description="Show overlay on background image")
+    overlay_color: Optional[str] = Field(None, description="Overlay color")
+    overlay_opacity: float = Field(0.5, ge=0, le=1, description="Overlay opacity")
+    hero_style: bool = Field(False, description="Use hero banner styling")
+    min_height: Optional[str] = Field(None, description="Minimum height (CSS value)")
+
+
+class NavigationItem(BaseModel):
+    """Navigation menu item"""
+
+    label: str = Field(..., description="Menu item label")
+    url: str = Field(..., description="Menu item URL")
+    is_active: bool = Field(False, description="Whether this item is active")
+    children: List["NavigationItem"] = Field(
+        default_factory=list, description="Submenu items"
     )
 
 
-class NewsConfig(BaseModel):
-    """Configuration for News widget"""
+# Update forward reference
+NavigationItem.model_rebuild()
 
-    title: str = Field(
-        ..., min_length=1, description="Main headline for the news article"
+
+class NavigationConfig(LayoutWidgetConfig):
+    """Configuration for Navigation widget"""
+
+    brand_name: Optional[str] = Field(None, description="Brand/logo name")
+    brand_url: Optional[str] = Field(None, description="Brand/logo URL")
+    brand_logo: Optional[str] = Field(None, description="Brand logo image URL")
+    menu_items: List[NavigationItem] = Field(
+        default_factory=list, description="Navigation menu items"
     )
-    summary: Optional[str] = Field(None, description="Brief summary or lead paragraph")
-    content: str = Field(..., min_length=1, description="Full article content")
-    author: Optional[str] = Field(None, description="Article author name")
-    publication_date: Optional[dt.date] = Field(
-        None, description="When the article was published"
+    mobile_friendly: bool = Field(True, description="Enable mobile hamburger menu")
+    sticky: bool = Field(False, description="Make navigation sticky on scroll")
+    dropdown_enabled: bool = Field(True, description="Enable dropdown submenus")
+
+
+class SidebarConfig(LayoutWidgetConfig):
+    """Configuration for Sidebar widget"""
+
+    position: Literal["left", "right"] = Field("right", description="Sidebar position")
+    width: Optional[str] = Field(None, description="Sidebar width (CSS value)")
+    collapsible: bool = Field(False, description="Make sidebar collapsible")
+    widgets: List[Dict[str, Any]] = Field(
+        default_factory=list, description="Nested widgets in sidebar sections"
     )
-    featured_image: Optional[HttpUrl] = Field(None, description="URL to featured image")
-    category: Literal[
-        "general", "business", "technology", "sports", "health", "politics"
-    ] = Field("general", description="News category")
-    show_meta: bool = Field(True, description="Display author and publication date")
 
 
-class EventConfig(BaseModel):
-    """Configuration for Events widget"""
-
-    event_title: str = Field(..., min_length=1, description="Name of the event")
-    description: Optional[str] = Field(None, description="Event description")
-    start_date: datetime = Field(..., description="Event start date and time")
-    end_date: Optional[datetime] = Field(None, description="Event end date and time")
-    location: Optional[str] = Field(None, description="Event venue or address")
-    registration_url: Optional[HttpUrl] = Field(
-        None, description="Link for event registration"
-    )
-    price: Optional[str] = Field(
-        None, description="Event cost (e.g., 'Free', '$25', '$10-50')"
-    )
-    capacity: Optional[int] = Field(
-        None, ge=1, description="Maximum number of attendees"
-    )
-    event_type: Literal[
-        "conference", "workshop", "seminar", "meeting", "social", "other"
-    ] = Field("other", description="Event type")
-
-
-class CalendarEventConfig(BaseModel):
-    """Individual event configuration for calendar widget"""
-
-    title: str = Field(..., min_length=1, description="Event title")
-    date: dt.date = Field(..., description="Event date")
-    time: Optional[str] = Field(None, description="Event time")
-    description: Optional[str] = Field(None, description="Event description")
-
-
-class CalendarConfig(BaseModel):
-    """Configuration for Calendar widget"""
-
-    title: Optional[str] = Field(None, description="Optional title for the calendar")
-    view_type: Literal["month", "week", "agenda"] = Field(
-        "month", description="View type"
-    )
-    default_date: Optional[dt.date] = Field(None, description="Initial date to display")
-    event_source: Literal["manual", "api", "external"] = Field(
-        "manual", description="Event source"
-    )
-    events: List[CalendarEventConfig] = Field(
-        default_factory=list, description="Manual events for the calendar"
-    )
-    show_navigation: bool = Field(
-        True, description="Show month/week navigation controls"
-    )
-    highlight_today: bool = Field(True, description="Highlight current date")
-
-
-class FormFieldConfig(BaseModel):
+class FormField(BaseModel):
     """Individual form field configuration"""
 
     name: str = Field(..., min_length=1, description="Field name")
     label: str = Field(..., min_length=1, description="Field label")
     type: Literal[
-        "text", "email", "phone", "textarea", "select", "checkbox", "radio"
+        "text",
+        "email",
+        "phone",
+        "number",
+        "textarea",
+        "select",
+        "checkbox",
+        "radio",
+        "file",
+        "date",
+        "time",
     ] = Field(..., description="Field type")
     required: bool = Field(False, description="Required field")
     placeholder: Optional[str] = Field(None, description="Placeholder text")
+    default_value: Optional[str] = Field(None, description="Default value")
     options: Optional[List[str]] = Field(
         None, description="Options for select/radio fields"
     )
+    validation: Optional[Dict[str, Any]] = Field(
+        None, description="Validation rules (min_length, max_length, pattern, etc.)"
+    )
+    help_text: Optional[str] = Field(None, description="Help text for the field")
+    css_class: Optional[str] = Field(None, description="Additional CSS class")
 
 
 class FormsConfig(BaseModel):
     """Configuration for Forms widget"""
 
-    form_title: str = Field(
-        ..., min_length=1, description="Title displayed above the form"
-    )
-    form_description: Optional[str] = Field(
-        None, description="Optional description text"
-    )
-    submit_url: Optional[HttpUrl] = Field(
-        None, description="Where to submit the form data"
-    )
+    title: str = Field(..., min_length=1, description="Form title")
+    description: Optional[str] = Field(None, description="Form description")
+    fields: List[FormField] = Field(..., min_items=1, description="Form fields")
+    submit_url: Optional[str] = Field(None, description="Form submission URL")
+    submit_method: Literal["POST", "GET"] = Field("POST", description="HTTP method")
     success_message: str = Field(
-        "Thank you for your submission!",
-        description="Message shown after successful submission",
+        "Thank you for your submission!", description="Success message"
     )
-    fields: List[FormFieldConfig] = Field(
-        ..., description="List of form fields to display"
+    error_message: str = Field(
+        "There was an error submitting the form. Please try again.",
+        description="Error message",
     )
     submit_button_text: str = Field("Submit", description="Submit button text")
-
-
-class GalleryImageConfig(BaseModel):
-    """Individual image configuration for gallery widget"""
-
-    url: HttpUrl = Field(..., description="Image URL")
-    thumbnail: Optional[HttpUrl] = Field(None, description="Thumbnail URL")
-    alt_text: str = Field(..., min_length=1, description="Alt text")
-    caption: Optional[str] = Field(None, description="Caption")
-    description: Optional[str] = Field(None, description="Description")
-
-
-class GalleryConfig(BaseModel):
-    """Configuration for Gallery widget"""
-
-    title: Optional[str] = Field(None, description="Optional title for the gallery")
-    layout: Literal["grid", "masonry", "carousel", "lightbox"] = Field(
-        "grid", description="Gallery layout"
+    reset_button: bool = Field(False, description="Show reset button")
+    ajax_submit: bool = Field(True, description="Submit form via AJAX")
+    redirect_url: Optional[str] = Field(
+        None, description="Redirect URL after submission"
     )
-    columns: int = Field(3, ge=1, le=6, description="Number of columns for grid layout")
-    images: List[GalleryImageConfig] = Field(
-        ..., description="List of images in the gallery"
+    email_notifications: bool = Field(False, description="Send email notifications")
+    notification_email: Optional[str] = Field(
+        None, description="Notification email address"
     )
-    show_captions: bool = Field(True, description="Display image captions")
-    enable_lightbox: bool = Field(True, description="Allow full-size viewing")
-    auto_play: bool = Field(False, description="Auto-advance carousel slides")
-
-
-# Default/fallback configuration for widgets without specific schemas
-class DefaultConfig(BaseModel):
-    """Default configuration for widgets without specific configuration"""
-
-    title: Optional[str] = Field(None, description="Optional title")
-    content: Optional[str] = Field(None, description="Optional content")
+    store_submissions: bool = Field(
+        True, description="Store form submissions in database"
+    )
+    honeypot_protection: bool = Field(
+        True, description="Enable honeypot spam protection"
+    )
+    recaptcha_enabled: bool = Field(False, description="Enable reCAPTCHA protection")
+    css_framework: Literal["default", "bootstrap", "tailwind", "custom"] = Field(
+        "default", description="CSS framework for styling"
+    )

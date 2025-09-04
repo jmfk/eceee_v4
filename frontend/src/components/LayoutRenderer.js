@@ -1681,11 +1681,11 @@ class LayoutRenderer {
   }
 
   /**
-   * Extract button widget configuration
+   * Extract content widget configuration
    * @param {HTMLElement} contentElement - Widget content element
-   * @returns {Object} Button widget configuration
+   * @returns {Object} Content widget configuration
    */
-  extractButtonWidgetConfig(contentElement) {
+  extractContentWidgetConfig(contentElement) {
     const config = {};
     const buttonElement = contentElement.querySelector('button');
 
@@ -2425,7 +2425,7 @@ class LayoutRenderer {
         return this.renderImageWidget(config);
 
       case 'button':
-        return this.renderButtonWidget(config);
+        return this.renderGenericWidget(config, 'button');
 
       case 'card':
         return this.renderCardWidget(config);
@@ -2434,7 +2434,7 @@ class LayoutRenderer {
         return this.renderListWidget(config);
 
       case 'spacer':
-        return this.renderSpacerWidget(config);
+        return this.renderGenericWidget(config, 'spacer');
 
       case 'divider':
         return this.renderDividerWidget(config);

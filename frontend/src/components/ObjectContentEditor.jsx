@@ -360,7 +360,7 @@ const ObjectContentEditor = forwardRef(({ objectType, widgets = {}, onWidgetChan
         const slot = objectType.slotConfiguration.slots.find(s => s.name === slotName)
         if (!slot) return
 
-        let widgetType = 'core_widgets.TextBlockWidget'
+        let widgetType = 'core_widgets.ContentWidget'
         let widgetConfig = {}
 
         if (widgetTypeToAdd) {

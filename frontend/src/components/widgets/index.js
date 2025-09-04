@@ -1,23 +1,14 @@
-// Export individual widget components
-export { default as TextBlockWidget } from './TextBlockWidget'
+// Export all new core widgets
+export { default as ContentWidget } from './ContentWidget'
 export { default as ImageWidget } from './ImageWidget'
-export { default as ButtonWidget } from './ButtonWidget'
-export { default as SpacerWidget } from './SpacerWidget'
-export { default as HtmlBlockWidget } from './HtmlBlockWidget'
-export { default as GalleryWidget } from './GalleryWidget'
+export { default as TableWidget } from './TableWidget'
+export { default as FooterWidget } from './FooterWidget'
+export { default as HeaderWidget } from './HeaderWidget'
+export { default as NavigationWidget } from './NavigationWidget'
+export { default as SidebarWidget } from './SidebarWidget'
+export { default as FormsWidget } from './FormsWidget'
 
-// Export main components
-export { default as WidgetRenderer } from './WidgetRenderer'
+// Re-export the widget registry and utilities
+export * from './widgetRegistry'
 export { default as WidgetFactory } from './WidgetFactory'
-
-// Export widget registry utilities
-export {
-    WIDGET_COMPONENTS,
-    getWidgetComponent,
-    getAvailableWidgetTypes,
-    isWidgetTypeSupported,
-    // Legacy aliases for backward compatibility
-    getNewFormatWidgetComponent,
-    getNewFormatWidgetTypes,
-    isNewFormatWidgetTypeSupported
-} from './widgetRegistry'
+export { default as WidgetRenderer } from './WidgetRenderer'

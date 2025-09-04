@@ -93,7 +93,7 @@ import { WidgetRenderer } from './widgets'
 const MyComponent = () => {
   const widget = {
     id: 'test-1',
-    type: 'core_widgets.TextBlockWidget',
+    type: 'core_widgets.ContentWidget',
     config: {
       title: 'Hello World',
       content: 'This is a test widget.'
@@ -127,7 +127,7 @@ Each widget type has its own configuration schema. Default configurations are pr
 {
   id: 'widget-123',
   name: 'My Text Block',
-  type: 'core_widgets.TextBlockWidget',
+  type: 'core_widgets.ContentWidget',
   config: {
     title: 'Widget Title',
     content: 'Widget content here...',

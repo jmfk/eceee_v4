@@ -65,11 +65,11 @@ export const renderWidgetToHTML = (widget) => {
   }
 
   switch (widget.type) {
-    case 'core_widgets.TextBlockWidget':
+    case 'core_widgets.ContentWidget':
+      const content = config.content || '<div class="text-gray-500 italic">Content will appear here...</div>'
       return `
-        <div class="text-widget">
-          ${config.title ? `<h3 class="font-semibold text-gray-900 mb-2">${escapeHtml(config.title)}</h3>` : ''}
-          <div class="text-gray-700">${config.content || 'Text content will appear here...'}</div>
+        <div class="content-widget">
+          ${content}
         </div>
       `
 
@@ -87,71 +87,48 @@ export const renderWidgetToHTML = (widget) => {
         </div>
       `
 
-    case 'core_widgets.ButtonWidget':
-      const buttonText = config.text || 'Button'
-      const buttonUrl = config.url || '#'
-      const buttonStyle = config.style || 'primary'
-      const buttonClasses = buttonStyle === 'secondary'
-        ? 'inline-block bg-gray-600 text-white px-6 py-2 rounded hover:bg-gray-700 transition-colors'
-        : buttonStyle === 'outline'
-          ? 'inline-block border-2 border-blue-600 text-blue-600 px-6 py-2 rounded hover:bg-blue-600 hover:text-white transition-colors'
-          : 'inline-block bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition-colors'
-
+    case 'core_widgets.TableWidget':
       return `
-        <div class="button-widget text-center">
-          <a href="${escapeHtml(buttonUrl)}" class="${buttonClasses}">
-            ${escapeHtml(buttonText)}
-          </a>
-        </div>
-      `
-
-    case 'core_widgets.SpacerWidget':
-      const height = config.height === 'custom' ? config.custom_height :
-        config.height === 'small' ? '16px' :
-          config.height === 'large' ? '64px' : '32px'
-      return `
-        <div class="spacer-widget" style="height: ${height};">
-          <div class="h-full border-l-2 border-r-2 border-dashed border-gray-300 bg-gray-100 opacity-50 flex items-center justify-center">
-            <span class="text-xs text-gray-500">Spacer (${height})</span>
+        <div class="table-widget">
+          <div class="bg-gray-50 border border-gray-200 rounded p-4 text-center">
+            <div class="text-gray-600">Table widget will appear here...</div>
           </div>
         </div>
       `
 
-    case 'core_widgets.HtmlBlockWidget':
-      const htmlContent = config.html_content || '<div class="text-gray-500 italic">HTML content will appear here...</div>'
+    case 'core_widgets.FooterWidget':
       return `
-        <div class="html-widget">
-          ${htmlContent}
-        </div>
+        <footer class="footer-widget bg-gray-800 text-white p-4 text-center rounded">
+          <div class="text-sm">Footer content will appear here...</div>
+        </footer>
       `
 
-    case 'core_widgets.GalleryWidget':
-      const images = config.images || []
-      const columns = config.columns || 3
-      const gridClasses = {
-        1: 'grid-cols-1',
-        2: 'grid-cols-1 md:grid-cols-2',
-        3: 'grid-cols-2 md:grid-cols-3',
-        4: 'grid-cols-2 md:grid-cols-4',
-        5: 'grid-cols-2 md:grid-cols-5',
-        6: 'grid-cols-2 md:grid-cols-6'
-      }
-
+    case 'core_widgets.HeaderWidget':
       return `
-        <div class="gallery-widget">
-          ${config.title ? `<h3 class="font-semibold text-gray-900 mb-3">${escapeHtml(config.title)}</h3>` : ''}
-          <div class="grid ${gridClasses[columns] || gridClasses[3]} gap-2">
-            ${images.length > 0 ?
-          images.map((image, index) => `
-                <img
-                  src="${escapeHtml(image.url || image.src || '')}"
-                  alt="${escapeHtml(image.alt || `Gallery image ${index + 1}`)}"
-                  class="w-full h-24 object-cover rounded"
-                />
-              `).join('') :
-          '<div class="col-span-full bg-gray-200 h-24 rounded flex items-center justify-center text-gray-500">Gallery placeholder</div>'
-        }
-          </div>
+        <header class="header-widget bg-white p-6 text-center border border-gray-200 rounded">
+          <div class="text-lg font-semibold">Header content will appear here...</div>
+        </header>
+      `
+
+    case 'core_widgets.NavigationWidget':
+      return `
+        <nav class="navigation-widget bg-white border border-gray-200 rounded p-4">
+          <div class="text-center text-gray-600">Navigation content will appear here...</div>
+        </nav>
+      `
+
+    case 'core_widgets.SidebarWidget':
+      return `
+        <aside class="sidebar-widget bg-gray-50 border border-gray-200 rounded p-4">
+          <div class="text-gray-600">Sidebar content will appear here...</div>
+        </aside>
+      `
+
+    case 'core_widgets.FormsWidget':
+      return `
+        <div class="forms-widget bg-white border border-gray-200 rounded p-6">
+          <h3 class="text-lg font-semibold mb-4 text-center">Contact Form</h3>
+          <div class="text-center text-gray-600">Form will appear here...</div>
         </div>
       `
 
