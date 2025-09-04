@@ -1,11 +1,16 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Plus, Trash2, Settings, Hash, Type, Calendar, ToggleLeft, Check, Users } from 'lucide-react'
+import { Plus, Trash2, Settings, Hash, Type, Calendar, ToggleLeft, Check, Users, CheckCircle, XCircle } from 'lucide-react'
 import { objectTypesApi } from '../api/objectStorage'
 import VisualSchemaEditor from './VisualSchemaEditor'
 import InlineImageUpload from './InlineImageUpload'
 import { validateFieldName } from '../utils/schemaValidation'
 import { getAllFieldTypes } from '../utils/fieldTypeRegistry'
+import { 
+    getWidgetIcon, 
+    getWidgetCategory, 
+    getWidgetDescription 
+} from './widgets/widgetRegistry'
 
 // Get field types from the registry
 const FIELD_TYPES = getAllFieldTypes().map(fieldType => ({
@@ -1418,27 +1423,85 @@ const WidgetControlManager = ({ widgetControls = [], availableWidgets = [], load
             {widgetControls.map((control, index) => {
                 const selectedWidget = getSelectedWidget(control.widgetType)
 
+                const IconComponent = getWidgetIcon(control.widgetType) || Settings
+                const category = getWidgetCategory(control.widgetType) || 'other'
+                const description = getWidgetDescription(control.widgetType) || selectedWidget?.description || 'No description provided'
+
                 return (
-                    <div key={control.id || index} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                        <div className="flex justify-between items-start mb-4">
-                            <h6 className="font-medium text-gray-900">
-                                {control?.label} ({control?.widgetType})
-                                {selectedWidget && (
-                                    <span className="ml-2 text-sm font-normal text-gray-600">
-                                        ({selectedWidget.name})
-                                    </span>
-                                )}
-                            </h6>
-                            <button
-                                type="button"
-                                onClick={() => removeWidgetControl(index)}
-                                className="text-red-600 hover:text-red-800"
-                            >
-                                <Trash2 className="h-4 w-4" />
-                            </button>
+                    <div key={control.id || index} className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                        <div className="flex items-start justify-between">
+                            <div className="flex items-start space-x-3 flex-1">
+                                {/* Widget Icon */}
+                                <div className="flex-shrink-0">
+                                    <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                                        {IconComponent && typeof IconComponent === 'function' ? (
+                                            React.createElement(IconComponent, { className: "w-5 h-5 text-blue-600" })
+                                        ) : (
+                                            <Settings className="w-5 h-5 text-blue-600" />
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Widget Info */}
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center space-x-2 mb-1">
+                                        <h3 className="text-lg font-medium text-gray-900 truncate">
+                                            {control?.label || selectedWidget?.name || 'Unknown Widget'}
+                                        </h3>
+                                        <div className="flex items-center space-x-1">
+                                            <CheckCircle className="w-4 h-4 text-green-500" />
+                                            <span className="text-xs font-medium text-green-600">
+                                                Active
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <p className="text-gray-600 text-sm mb-2">
+                                        {description}
+                                    </p>
+
+                                    <div className="flex flex-wrap gap-2 text-xs">
+                                        <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded">
+                                            Type: {control.widgetType}
+                                        </span>
+                                        <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded">
+                                            Category: {category}
+                                        </span>
+                                        {control.maxInstances && (
+                                            <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                                                Max: {control.maxInstances}
+                                            </span>
+                                        )}
+                                        {control.required && (
+                                            <span className="bg-red-100 text-red-700 px-2 py-1 rounded">
+                                                Required
+                                            </span>
+                                        )}
+                                        {control.preCreate && (
+                                            <span className="bg-green-100 text-green-700 px-2 py-1 rounded">
+                                                Auto-create
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex-shrink-0 ml-4">
+                                <button
+                                    type="button"
+                                    onClick={() => removeWidgetControl(index)}
+                                    className="text-red-600 hover:text-red-800 p-1"
+                                    title="Remove widget control"
+                                >
+                                    <Trash2 className="h-4 w-4" />
+                                </button>
+                            </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Additional Configuration Details */}
+                        <div className="mt-4 pt-4 border-t border-gray-100">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {/* Max Instances */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1601,6 +1664,7 @@ const WidgetControlManager = ({ widgetControls = [], availableWidgets = [], load
                                     </div>
                                 </div>
                             )}
+                            </div>
                         </div>
                     </div>
                 )
