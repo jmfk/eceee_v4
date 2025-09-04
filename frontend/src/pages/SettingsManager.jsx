@@ -50,12 +50,24 @@ const SettingsManager = () => {
     const location = useLocation()
     const [searchParams, setSearchParams] = useSearchParams()
 
-    // Get tab from URL search params, default to 'layouts'
-    const activeTab = searchParams.get('tab') || 'layouts'
+    // Get tab from URL path, default to 'layouts'
+    const getActiveTabFromPath = () => {
+        const path = location.pathname
+        if (path === '/settings/themes') return 'themes'
+        if (path === '/settings/widgets') return 'widgets'
+        if (path === '/settings/tags') return 'tags'
+        if (path === '/settings/object-types') return 'object-types'
+        if (path === '/settings/versions') return 'versions'
+        if (path === '/settings/publishing') return 'publishing'
+        if (path === '/settings/namespaces') return 'namespaces'
+        return 'layouts' // default for /settings/layouts or fallback
+    }
+
+    const activeTab = getActiveTabFromPath()
     const [selectedPage, setSelectedPage] = useState(null)
     const [searchTerm, setSearchTerm] = useState('')
     const [showVersionManager, setShowVersionManager] = useState(false)
-    // Get publishing sub-tab from URL, default to 'dashboard'
+    // Get publishing sub-tab from URL search params, default to 'dashboard'
     const publishingView = searchParams.get('publishingView') || 'dashboard'
     const [isCreating, setIsCreating] = useState(false)
     const [isEditing, setIsEditing] = useState(false)
@@ -361,12 +373,7 @@ const SettingsManager = () => {
         }
     }
 
-    // Redirect legacy /settings?tab=schemas to dedicated schema page
-    useEffect(() => {
-        if (activeTab === 'schemas') {
-            navigate('/schemas/system', { replace: true })
-        }
-    }, [activeTab, navigate])
+    // Note: Schema management is handled by dedicated routes /schemas/*
 
     return (
         <div className="space-y-6">

@@ -1,31 +1,29 @@
 import React, { useState } from 'react'
-import { Link, useLocation, useSearchParams } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { Grid3X3, Palette, Settings as Cog, Calendar, FolderOpen, Code, ChevronDown, Hash, Database, Package } from 'lucide-react'
 
 const tabs = [
-    { id: 'layouts', label: 'Layouts', icon: Grid3X3, href: '/settings?tab=layouts' },
-    { id: 'themes', label: 'Themes', icon: Palette, href: '/settings?tab=themes' },
-    { id: 'widgets', label: 'Widgets', icon: Package, href: '/settings?tab=widgets' },
-    { id: 'tags', label: 'Tags', icon: Hash, href: '/settings?tab=tags' },
-    { id: 'object-types', label: 'Object Types', icon: Database, href: '/settings?tab=object-types' },
-    { id: 'versions', label: 'Versions', icon: Cog, href: '/settings?tab=versions' },
-    { id: 'publishing', label: 'Publishing Workflow', icon: Calendar, href: '/settings?tab=publishing' },
-    { id: 'namespaces', label: 'Namespaces', icon: FolderOpen, href: '/settings?tab=namespaces' },
+    { id: 'layouts', label: 'Layouts', icon: Grid3X3, href: '/settings/layouts' },
+    { id: 'themes', label: 'Themes', icon: Palette, href: '/settings/themes' },
+    { id: 'widgets', label: 'Widgets', icon: Package, href: '/settings/widgets' },
+    { id: 'tags', label: 'Tags', icon: Hash, href: '/settings/tags' },
+    { id: 'object-types', label: 'Object Types', icon: Database, href: '/settings/object-types' },
+    { id: 'versions', label: 'Versions', icon: Cog, href: '/settings/versions' },
+    { id: 'publishing', label: 'Publishing Workflow', icon: Calendar, href: '/settings/publishing' },
+    { id: 'namespaces', label: 'Namespaces', icon: FolderOpen, href: '/settings/namespaces' },
 ]
 
 export default function SettingsTabs() {
     const location = useLocation()
-    const [searchParams] = useSearchParams()
     const [openDropdown, setOpenDropdown] = useState(false)
 
-    const isSettingsPath = location.pathname === '/settings'
-    const activeSettingsTab = searchParams.get('tab') || 'layouts'
+    const isSettingsPath = location.pathname.startsWith('/settings')
     const isSchemasPath = location.pathname.startsWith('/schemas')
 
     const isActive = (tab) => {
         if (tab.id === 'schemas') return isSchemasPath
         if (!isSettingsPath) return false
-        return activeSettingsTab === tab.id
+        return location.pathname === tab.href
     }
 
     return (

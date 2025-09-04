@@ -1,7 +1,8 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster, toast } from 'react-hot-toast'
 import { X } from 'lucide-react'
+import './utils/startRenderInvestigation' // Initialize render investigation
 import Navbar from '@components/Navbar'
 import HomePage from '@pages/HomePage'
 
@@ -17,6 +18,7 @@ import TreePageManager from '@components/TreePageManager'
 import PageEditor from '@components/PageEditor'
 import VersionTimelinePage from '@pages/VersionTimelinePage'
 import NotFoundPage from '@pages/NotFoundPage'
+import RenderInvestigation from '@pages/RenderInvestigation'
 import { NotificationProvider } from '@components/NotificationManager'
 import { GlobalNotificationProvider } from './contexts/GlobalNotificationContext'
 import { AuthProvider } from './contexts/AuthContext'
@@ -63,6 +65,20 @@ function App() {
                   </PrivateRoute>
                 } />
 
+                <Route path="/render-investigation" element={
+                  <PrivateRoute>
+                    <div className="fixed inset-0 bg-gray-50 flex flex-col">
+                      <Navbar />
+                      <main className="flex-1 overflow-hidden">
+                        <div className="h-full overflow-y-auto">
+                          <RenderInvestigation />
+                        </div>
+                      </main>
+                      <StatusBar customStatusContent={<span>Render Investigation - Active</span>} />
+                    </div>
+                  </PrivateRoute>
+                } />
+
                 <Route path="/pages" element={
                   <PrivateRoute>
                     <div className="fixed inset-0 bg-gray-50 flex flex-col">
@@ -91,7 +107,9 @@ function App() {
                     </div>
                   </PrivateRoute>
                 } />
-                <Route path="/settings" element={
+                {/* Settings routes with distinct paths */}
+                <Route path="/settings" element={<Navigate to="/settings/layouts" replace />} />
+                <Route path="/settings/layouts" element={
                   <PrivateRoute>
                     <div className="fixed inset-0 bg-gray-50 flex flex-col">
                       <Navbar />
@@ -102,7 +120,112 @@ function App() {
                           </div>
                         </div>
                       </main>
-                      <StatusBar customStatusContent={<span>Settings - Ready</span>} />
+                      <StatusBar customStatusContent={<span>Settings - Layouts</span>} />
+                    </div>
+                  </PrivateRoute>
+                } />
+                <Route path="/settings/themes" element={
+                  <PrivateRoute>
+                    <div className="fixed inset-0 bg-gray-50 flex flex-col">
+                      <Navbar />
+                      <main className="flex-1 overflow-hidden">
+                        <div className="h-full overflow-y-auto">
+                          <div className="container mx-auto px-4 py-8">
+                            <SettingsManager />
+                          </div>
+                        </div>
+                      </main>
+                      <StatusBar customStatusContent={<span>Settings - Themes</span>} />
+                    </div>
+                  </PrivateRoute>
+                } />
+                <Route path="/settings/widgets" element={
+                  <PrivateRoute>
+                    <div className="fixed inset-0 bg-gray-50 flex flex-col">
+                      <Navbar />
+                      <main className="flex-1 overflow-hidden">
+                        <div className="h-full overflow-y-auto">
+                          <div className="container mx-auto px-4 py-8">
+                            <SettingsManager />
+                          </div>
+                        </div>
+                      </main>
+                      <StatusBar customStatusContent={<span>Settings - Widgets</span>} />
+                    </div>
+                  </PrivateRoute>
+                } />
+                <Route path="/settings/tags" element={
+                  <PrivateRoute>
+                    <div className="fixed inset-0 bg-gray-50 flex flex-col">
+                      <Navbar />
+                      <main className="flex-1 overflow-hidden">
+                        <div className="h-full overflow-y-auto">
+                          <div className="container mx-auto px-4 py-8">
+                            <SettingsManager />
+                          </div>
+                        </div>
+                      </main>
+                      <StatusBar customStatusContent={<span>Settings - Tags</span>} />
+                    </div>
+                  </PrivateRoute>
+                } />
+                <Route path="/settings/object-types" element={
+                  <PrivateRoute>
+                    <div className="fixed inset-0 bg-gray-50 flex flex-col">
+                      <Navbar />
+                      <main className="flex-1 overflow-hidden">
+                        <div className="h-full overflow-y-auto">
+                          <div className="container mx-auto px-4 py-8">
+                            <SettingsManager />
+                          </div>
+                        </div>
+                      </main>
+                      <StatusBar customStatusContent={<span>Settings - Object Types</span>} />
+                    </div>
+                  </PrivateRoute>
+                } />
+                <Route path="/settings/versions" element={
+                  <PrivateRoute>
+                    <div className="fixed inset-0 bg-gray-50 flex flex-col">
+                      <Navbar />
+                      <main className="flex-1 overflow-hidden">
+                        <div className="h-full overflow-y-auto">
+                          <div className="container mx-auto px-4 py-8">
+                            <SettingsManager />
+                          </div>
+                        </div>
+                      </main>
+                      <StatusBar customStatusContent={<span>Settings - Versions</span>} />
+                    </div>
+                  </PrivateRoute>
+                } />
+                <Route path="/settings/publishing" element={
+                  <PrivateRoute>
+                    <div className="fixed inset-0 bg-gray-50 flex flex-col">
+                      <Navbar />
+                      <main className="flex-1 overflow-hidden">
+                        <div className="h-full overflow-y-auto">
+                          <div className="container mx-auto px-4 py-8">
+                            <SettingsManager />
+                          </div>
+                        </div>
+                      </main>
+                      <StatusBar customStatusContent={<span>Settings - Publishing Workflow</span>} />
+                    </div>
+                  </PrivateRoute>
+                } />
+                <Route path="/settings/namespaces" element={
+                  <PrivateRoute>
+                    <div className="fixed inset-0 bg-gray-50 flex flex-col">
+                      <Navbar />
+                      <main className="flex-1 overflow-hidden">
+                        <div className="h-full overflow-y-auto">
+                          <div className="container mx-auto px-4 py-8">
+                            <SettingsManager />
+                          </div>
+                        </div>
+                      </main>
+                      <StatusBar customStatusContent={<span>Settings - Namespaces</span>} />
                     </div>
                   </PrivateRoute>
                 } />

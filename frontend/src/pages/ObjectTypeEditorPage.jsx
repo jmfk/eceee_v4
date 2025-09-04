@@ -30,12 +30,12 @@ const ObjectTypeEditorPage = () => {
 
     const handleSave = (savedObjectType) => {
         // Navigate back to object types list
-        navigate('/settings?tab=object-types')
+        navigate('/settings/object-types')
     }
 
     const handleCancel = () => {
         // Navigate back to object types list
-        navigate('/settings?tab=object-types')
+        navigate('/settings/object-types')
     }
 
     if (isLoading && !isCreating) {
