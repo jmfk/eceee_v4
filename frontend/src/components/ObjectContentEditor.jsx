@@ -16,36 +16,6 @@ const WidgetSelectionModal = ({ isOpen, onClose, onSelectWidget, slot, available
     const [searchTerm, setSearchTerm] = useState('')
     const modalRef = useRef(null)
 
-    // Close modal when clicking outside
-    useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (modalRef.current && !modalRef.current.contains(event.target)) {
-                onClose()
-            }
-        }
-
-        if (isOpen) {
-            document.addEventListener('mousedown', handleClickOutside)
-            return () => document.removeEventListener('mousedown', handleClickOutside)
-        }
-    }, [isOpen, onClose])
-
-    // Close modal on Escape key
-    useEffect(() => {
-        const handleEscape = (event) => {
-            if (event.key === 'Escape') {
-                onClose()
-            }
-        }
-
-        if (isOpen) {
-            document.addEventListener('keydown', handleEscape)
-            return () => document.removeEventListener('keydown', handleEscape)
-        }
-    }, [isOpen, onClose])
-
-    if (!isOpen) return null
-
     // Filter available widget types based on slot configuration and search term
     const filteredWidgets = useMemo(() => {
         if (!slot?.widgetControls || !availableWidgetTypes) return []
@@ -86,10 +56,40 @@ const WidgetSelectionModal = ({ isOpen, onClose, onSelectWidget, slot, available
         return widgets
     }, [slot, availableWidgetTypes, searchTerm])
 
+    // Close modal when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (modalRef.current && !modalRef.current.contains(event.target)) {
+                onClose()
+            }
+        }
+
+        if (isOpen) {
+            document.addEventListener('mousedown', handleClickOutside)
+            return () => document.removeEventListener('mousedown', handleClickOutside)
+        }
+    }, [isOpen, onClose])
+
+    // Close modal on Escape key
+    useEffect(() => {
+        const handleEscape = (event) => {
+            if (event.key === 'Escape') {
+                onClose()
+            }
+        }
+
+        if (isOpen) {
+            document.addEventListener('keydown', handleEscape)
+            return () => document.removeEventListener('keydown', handleEscape)
+        }
+    }, [isOpen, onClose])
+
     const handleWidgetSelect = (widgetType) => {
         onSelectWidget(widgetType)
         onClose()
     }
+
+    if (!isOpen) return null
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
