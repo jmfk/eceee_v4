@@ -65,18 +65,7 @@ const ContentEditor = forwardRef(({
       rendererRef.current = new LayoutRenderer({ editable });
       rendererRef.current.setWidgetRenderer(createWidgetElement);
 
-      // Set up confirmation dialog callback for widget removal
-      rendererRef.current.showConfirmDialog = async (title, message, onConfirm) => {
-        const confirmed = await showConfirm({
-          title: 'Remove Widget',
-          message: title,
-          confirmText: 'Remove',
-          confirmButtonStyle: 'danger'
-        });
-        if (confirmed) {
-          onConfirm();
-        }
-      };
+      // No confirmation dialog needed for widget removal
 
       // Set up widget editor callback for slide-out panel
       if (onOpenWidgetEditor) {
@@ -84,7 +73,7 @@ const ContentEditor = forwardRef(({
       }
     }
     return rendererRef.current;
-  }, [createWidgetElement, editable, showConfirm, onOpenWidgetEditor]);
+  }, [createWidgetElement, editable, onOpenWidgetEditor]);
 
 
 

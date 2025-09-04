@@ -73,14 +73,8 @@ const ContentEditorWithWidgetFactory = forwardRef(({
     }, [onOpenWidgetEditor]);
 
     const handleWidgetDelete = useCallback(async (slotName, index, widget) => {
-        const confirmed = await showConfirm({
-            title: 'Remove Widget',
-            message: `Are you sure you want to remove this ${widget.type} widget?`,
-            confirmText: 'Remove',
-            confirmButtonStyle: 'danger'
-        });
-
-        if (confirmed && onUpdate) {
+        // Direct removal without confirmation
+        if (onUpdate) {
             // Update store immediately
             removeWidget(slotName, widget.id);
 
@@ -92,7 +86,7 @@ const ContentEditorWithWidgetFactory = forwardRef(({
                 onDirtyChange(true, `removed widget from slot ${slotName}`);
             }
         }
-    }, [removeWidget, getAllWidgets, onUpdate, onDirtyChange, showConfirm]);
+    }, [removeWidget, getAllWidgets, onUpdate, onDirtyChange]);
 
 
 
@@ -159,7 +153,7 @@ const ContentEditorWithWidgetFactory = forwardRef(({
 
         }
         return rendererRef.current;
-    }, [editable, showConfirm, onOpenWidgetEditor, handleWidgetEdit, handleWidgetDelete, handleWidgetMoveUp, handleWidgetMoveDown]);
+    }, [editable, onOpenWidgetEditor, handleWidgetEdit, handleWidgetDelete, handleWidgetMoveUp, handleWidgetMoveDown]);
 
     // Initialize version management when webpageData is available
     useEffect(() => {

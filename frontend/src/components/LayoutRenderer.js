@@ -2351,17 +2351,8 @@ class LayoutRenderer {
 
     // Add remove menu item  
     const removeItem = this.createMenuItem(WIDGET_ICONS.TRASH, 'Remove', () => {
-      // Use React confirmation dialog instead of browser confirm
-      if (this.showConfirmDialog) {
-        this.showConfirmDialog(
-          `Remove ${name} widget?`,
-          'This action cannot be undone.',
-          () => this.removeWidgetFromSlot(id)
-        );
-      } else {
-        // Fallback to direct removal if no confirmation dialog is available
-        this.removeWidgetFromSlot(id);
-      }
+      // Direct removal without confirmation
+      this.removeWidgetFromSlot(id);
       this.hideWidgetMenu(id);
     }, 'text-red-700 hover:bg-red-50');
     menuDropdown.appendChild(removeItem);

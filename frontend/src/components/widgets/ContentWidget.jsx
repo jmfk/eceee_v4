@@ -1,62 +1,74 @@
 import React from 'react'
-import PropTypes from 'prop-types'
+import { FileText } from 'lucide-react'
 
 /**
- * ContentWidget - Displays HTML content with sanitization options
+ * Content Widget Component
+ * Renders HTML content with sanitization options
  */
-const ContentWidget = ({ config = {}, className = '', style = {} }) => {
+const ContentWidget = ({ config = {}, mode = 'preview' }) => {
     const {
-        content = '',
+        content = 'Content will appear here...',
         allow_scripts = false,
-        sanitize_html = true,
-        ...otherConfig
+        sanitize_html = true
     } = config
 
-    // Basic content validation
-    if (!content || typeof content !== 'string') {
+    if (mode === 'editor') {
         return (
-            <div className={`content-widget ${className}`} style={style}>
-                <p className="text-gray-500 italic">No content to display</p>
+            <div className="content-widget-editor p-2 border border-dashed border-gray-300 rounded">
+                <div className="flex items-center mb-2">
+                    <FileText className="h-4 w-4 text-gray-400 mr-2" />
+                    <span className="text-sm font-medium text-gray-600">Content</span>
+                </div>
+                <div className="content-widget">
+                    {content ? (
+                        <div dangerouslySetInnerHTML={{ __html: content }} />
+                    ) : (
+                        <div className="bg-gray-200 h-32 rounded flex items-center justify-center text-gray-500">
+                            <FileText className="h-8 w-8 mr-2" />
+                            Content placeholder
+                        </div>
+                    )}
+                </div>
             </div>
         )
     }
 
-    // For now, we'll always render as safe HTML
-    // In a production environment, you'd want proper HTML sanitization
+    if (!content) {
+        return (
+            <div className="content-widget">
+                <div className="bg-gray-200 h-32 rounded flex items-center justify-center text-gray-500">
+                    <FileText className="h-8 w-8 mr-2" />
+                    No content
+                </div>
+            </div>
+        )
+    }
+
     return (
-        <div
-            className={`content-widget ${className}`}
-            style={style}
-            dangerouslySetInnerHTML={{ __html: content }}
-        />
+        <div className="content-widget">
+            <div dangerouslySetInnerHTML={{ __html: content }} />
+        </div>
     )
 }
 
-ContentWidget.propTypes = {
-    config: PropTypes.shape({
-        content: PropTypes.string,
-        allow_scripts: PropTypes.bool,
-        sanitize_html: PropTypes.bool,
-    }),
-    className: PropTypes.string,
-    style: PropTypes.object,
-}
-
-// Widget metadata for registration
-ContentWidget.displayName = 'Content Widget'
+// === COLOCATED METADATA ===
+ContentWidget.displayName = 'ContentWidget'
 ContentWidget.widgetType = 'core_widgets.ContentWidget'
+
+// Default configuration
 ContentWidget.defaultConfig = {
-    content: '<p>Enter your content here...</p>',
+    content: '<h2>Welcome</h2><p>This is sample content. You can add any HTML here including headings, paragraphs, lists, links, and more.</p>',
     allow_scripts: false,
-    sanitize_html: true,
+    sanitize_html: true
 }
 
+// Display metadata
 ContentWidget.metadata = {
     name: 'Content',
-    description: 'Display HTML content with formatting and styling options',
+    description: 'HTML content with sanitization options for rich text display',
     category: 'content',
-    icon: '📄',
-    tags: ['html', 'content', 'text', 'rich-text']
+    icon: FileText,
+    tags: ['content', 'html', 'text', 'rich', 'editor']
 }
 
 export default ContentWidget
