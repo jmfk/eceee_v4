@@ -219,7 +219,7 @@ const WidgetManager = () => {
                                                     Slug: {widget.slug}
                                                 </span>
                                                 <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded">
-                                                    Category: {getCategoryForWidget(widget.name)}
+                                                    Category: {getWidgetCategory(widget.type) || 'other'}
                                                 </span>
                                                 {widget.templateName && (
                                                     <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded">
