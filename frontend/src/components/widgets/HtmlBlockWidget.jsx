@@ -51,11 +51,23 @@ const HtmlBlockWidget = ({ config = {}, mode = 'preview' }) => {
     )
 }
 
+// === COLOCATED METADATA ===
 HtmlBlockWidget.displayName = 'HtmlBlockWidget'
-HtmlBlockWidget.widgetType = 'core_widgets.HtmlBlockWidget'
+HtmlBlockWidget.widgetType = 'core_widgets.HTMLBlockWidget'
+
+// Default configuration
 HtmlBlockWidget.defaultConfig = {
     html_content: '<p>HTML content goes here...</p>',
     allow_scripts: false
+}
+
+// Display metadata
+HtmlBlockWidget.metadata = {
+    name: 'HTML Block',
+    description: 'Custom HTML content block for advanced users',
+    category: 'content',
+    icon: Code,
+    tags: ['html', 'code', 'custom', 'advanced']
 }
 
 export default HtmlBlockWidget

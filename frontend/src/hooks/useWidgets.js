@@ -1,6 +1,10 @@
 import { useState, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { widgetsApi } from '../api'
+import { 
+    getWidgetDisplayName as getDisplayNameFromRegistry, 
+    getWidgetDefaultConfig 
+} from '../components/widgets/widgetRegistry'
 
 /**
  * Custom hook for widget management
@@ -55,7 +59,7 @@ export const useWidgets = (initialWidgets = {}) => {
     const addWidget = useCallback((slotName, widgetType, config = {}) => {
         const newWidget = {
             id: generateWidgetId(),
-            name: getWidgetDisplayName(widgetType, widgetTypes),
+            name: getDisplayNameFromRegistry(widgetType, widgetTypes),
             type: widgetType,
             config: config,
             slotName: slotName
@@ -186,72 +190,10 @@ export const useWidgets = (initialWidgets = {}) => {
     }
 }
 
-// Helper function to get display name for widget types (NEW FORMAT ONLY)
-export const getWidgetDisplayName = (widgetTypeOrData, widgetTypes = []) => {
-    // If widgetTypeOrData is an object (widget type data), extract name from it
-    if (typeof widgetTypeOrData === 'object' && widgetTypeOrData !== null) {
-        return widgetTypeOrData.name || widgetTypeOrData.label || widgetTypeOrData.display_name || widgetTypeOrData.type
-    }
+// Helper function to get display name for widget types (uses registry)
+export const getWidgetDisplayName = getDisplayNameFromRegistry
 
-    // If widgetTypeOrData is a string (widget type), look it up in widgetTypes array
-    if (typeof widgetTypeOrData === 'string') {
-        const widgetTypeData = widgetTypes.find(w => w.type === widgetTypeOrData)
-        if (widgetTypeData) {
-            return widgetTypeData.name || widgetTypeData.label || widgetTypeData.display_name || widgetTypeOrData
-        }
-
-        // Fallback to hardcoded mapping for backwards compatibility
-        const widgetMap = {
-            'core_widgets.TextBlockWidget': 'Text Block',
-            'core_widgets.ImageWidget': 'Image',
-            'core_widgets.ButtonWidget': 'Button',
-            'core_widgets.HtmlBlockWidget': 'HTML Block',
-            'core_widgets.GalleryWidget': 'Gallery',
-            'core_widgets.SpacerWidget': 'Spacer'
-        }
-        return widgetMap[widgetTypeOrData] || widgetTypeOrData
-    }
-
-    return widgetTypeOrData || 'Unknown Widget'
-}
-
-// Helper function to create default widget config
-export const createDefaultWidgetConfig = (widgetType) => {
-    const defaultConfigs = {
-        'core_widgets.TextBlockWidget': {
-            title: '',
-            content: 'Click to edit this content...',
-            style: 'normal',
-            alignment: 'left'
-        },
-        'core_widgets.ImageWidget': {
-            image_url: '',
-            alt_text: '',
-            caption: '',
-            alignment: 'center'
-        },
-        'core_widgets.ButtonWidget': {
-            text: 'Click me',
-            url: '#',
-            style: 'primary',
-            target: '_self'
-        },
-        'core_widgets.HtmlBlockWidget': {
-            html_content: '<p>HTML content goes here...</p>'
-        },
-        'core_widgets.GalleryWidget': {
-            title: '',
-            images: [],
-            columns: 3,
-            spacing: 'normal'
-        },
-        'core_widgets.SpacerWidget': {
-            height: 'medium',
-            custom_height: '32px'
-        }
-    }
-
-    return defaultConfigs[widgetType] || {}
-}
+// Helper function to create default widget config (uses registry)
+export const createDefaultWidgetConfig = getWidgetDefaultConfig
 
 export default useWidgets

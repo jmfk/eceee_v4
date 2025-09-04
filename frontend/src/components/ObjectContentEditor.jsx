@@ -3,6 +3,11 @@ import { Layout, Plus, Settings, Trash2, Eye, Check, X, MoreHorizontal } from 'l
 import { WidgetFactory } from './widgets'
 import { useWidgets, getWidgetDisplayName, createDefaultWidgetConfig } from '../hooks/useWidgets'
 import { filterAvailableWidgetTypes } from '../utils/widgetTypeValidation'
+import { 
+    getWidgetIcon, 
+    getWidgetCategory, 
+    getWidgetDescription 
+} from './widgets/widgetRegistry'
 
 import WidgetEditorPanel from './WidgetEditorPanel'
 
@@ -61,9 +66,9 @@ const WidgetSelectionModal = ({ isOpen, onClose, onSelectWidget, slot, available
                 return {
                     type: control.widgetType,
                     name: control.label || getWidgetDisplayName(control.widgetType),
-                    description: widgetType?.description || 'No description available',
-                    category: widgetType?.category || 'General',
-                    icon: widgetType?.icon || '🧩'
+                    description: getWidgetDescription(control.widgetType) || widgetType?.description || 'No description available',
+                    category: getWidgetCategory(control.widgetType) || widgetType?.category || 'General',
+                    icon: getWidgetIcon(control.widgetType) || widgetType?.icon || '🧩'
                 }
             })
 
@@ -143,8 +148,14 @@ const WidgetSelectionModal = ({ isOpen, onClose, onSelectWidget, slot, available
                                     className="border border-gray-200 rounded-lg p-4 cursor-pointer hover:border-blue-300 hover:bg-blue-50 transition-all duration-200"
                                 >
                                     <div className="flex items-start space-x-3">
-                                        <div className="bg-gray-100 rounded-lg w-12 h-12 flex items-center justify-center text-xl font-bold text-gray-600">
-                                            {widget.icon}
+                                        <div className="bg-gray-100 rounded-lg w-12 h-12 flex items-center justify-center text-gray-600">
+                                            {widget.icon && React.isValidElement(widget.icon) ? (
+                                                React.cloneElement(widget.icon, { className: "h-6 w-6" })
+                                            ) : widget.icon && typeof widget.icon === 'function' ? (
+                                                <widget.icon className="h-6 w-6" />
+                                            ) : (
+                                                <span className="text-xl font-bold">{widget.icon || '🧩'}</span>
+                                            )}
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <h4 className="text-sm font-semibold text-gray-900 mb-1">{widget.name}</h4>

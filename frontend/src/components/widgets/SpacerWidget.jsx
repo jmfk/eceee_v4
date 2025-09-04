@@ -53,11 +53,23 @@ const SpacerWidget = ({ config = {}, mode = 'preview' }) => {
     )
 }
 
+// === COLOCATED METADATA ===
 SpacerWidget.displayName = 'SpacerWidget'
 SpacerWidget.widgetType = 'core_widgets.SpacerWidget'
+
+// Default configuration
 SpacerWidget.defaultConfig = {
     height: 'medium',
     custom_height: '32px'
+}
+
+// Display metadata
+SpacerWidget.metadata = {
+    name: 'Spacer',
+    description: 'Vertical spacing element for layout control',
+    category: 'layout',
+    icon: Space,
+    tags: ['spacer', 'spacing', 'layout', 'divider']
 }
 
 export default SpacerWidget

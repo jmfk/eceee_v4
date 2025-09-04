@@ -112,14 +112,26 @@ const GalleryWidget = ({ config = {}, mode = 'preview' }) => {
     )
 }
 
+// === COLOCATED METADATA ===
 GalleryWidget.displayName = 'GalleryWidget'
 GalleryWidget.widgetType = 'core_widgets.GalleryWidget'
+
+// Default configuration
 GalleryWidget.defaultConfig = {
     title: '',
     images: [],
     columns: 3,
     spacing: 'normal',
     show_captions: true
+}
+
+// Display metadata
+GalleryWidget.metadata = {
+    name: 'Gallery',
+    description: 'Image gallery widget with multiple display options',
+    category: 'media',
+    icon: ImageIcon,
+    tags: ['gallery', 'images', 'slideshow', 'media']
 }
 
 export default GalleryWidget

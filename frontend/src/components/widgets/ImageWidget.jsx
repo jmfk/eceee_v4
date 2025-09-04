@@ -68,13 +68,25 @@ const ImageWidget = ({ config = {}, mode = 'preview' }) => {
     )
 }
 
+// === COLOCATED METADATA ===
 ImageWidget.displayName = 'ImageWidget'
 ImageWidget.widgetType = 'core_widgets.ImageWidget'
+
+// Default configuration
 ImageWidget.defaultConfig = {
     image_url: '',
     alt_text: '',
     caption: '',
     alignment: 'center'
+}
+
+// Display metadata
+ImageWidget.metadata = {
+    name: 'Image',
+    description: 'Image display with caption and sizing options',
+    category: 'media',
+    icon: Image,
+    tags: ['image', 'picture', 'photo', 'media']
 }
 
 export default ImageWidget

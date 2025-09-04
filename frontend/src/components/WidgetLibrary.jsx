@@ -2,22 +2,20 @@ import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
     Search,
-    Type,
-    Image,
-    MousePointer,
-    Space,
-    Code,
     Plus,
     Grid3X3,
-    Filter,
-    Newspaper,
-    Calendar,
-    Users,
-    FileText,
-    ImageIcon
+    Filter
 } from 'lucide-react'
 import { widgetsApi } from '../api'
 import { getAvailableWidgetTypes } from '../utils/widgetTypeValidation'
+import { 
+    getWidgetIcon, 
+    getWidgetCategory, 
+    getWidgetDescription,
+    searchWidgets,
+    filterWidgetsByCategory,
+    getAvailableCategories
+} from './widgets/widgetRegistry'
 
 const WidgetLibrary = ({ onSelectWidget, selectedWidgetTypes = [] }) => {
     const [searchTerm, setSearchTerm] = useState('')
@@ -54,33 +52,16 @@ const WidgetLibrary = ({ onSelectWidget, selectedWidgetTypes = [] }) => {
     const isLoading = isLoadingAvailable
     const error = null // Handle errors inline above
 
-    // Widget type icons mapping
-    const getWidgetIcon = (widgetName) => {
-        switch (widgetName.toLowerCase()) {
-            case 'text block':
-                return Type
-            case 'image':
-                return Image
-            case 'button':
-                return MousePointer
-            case 'spacer':
-                return Space
-            case 'html block':
-                return Code
-            // Phase 6: Extended Widget Types
-            case 'news':
-                return Newspaper
-            case 'events':
-                return Calendar
-            case 'calendar':
-                return Calendar
-            case 'forms':
-                return FileText
-            case 'gallery':
-                return ImageIcon
-            default:
-                return Grid3X3
+    // Widget type icons mapping (now uses registry)
+    const getWidgetIconComponent = (widget) => {
+        // Try to get icon from registry first
+        const IconComponent = getWidgetIcon(widget.type)
+        if (IconComponent) {
+            return IconComponent
         }
+        
+        // Fallback for widgets not in registry
+        return Grid3X3
     }
 
     // Filter and search logic
@@ -89,24 +70,13 @@ const WidgetLibrary = ({ onSelectWidget, selectedWidgetTypes = [] }) => {
             widget.description.toLowerCase().includes(searchTerm.toLowerCase())
 
         const matchesCategory = filterCategory === 'all' ||
-            getCategoryForWidget(widget.name) === filterCategory
+            getWidgetCategory(widget.type) === filterCategory
 
         return matchesSearch && matchesCategory
     }) || []
 
-    // Get category for widget (for filtering)
-    const getCategoryForWidget = (widgetName) => {
-        const name = widgetName.toLowerCase()
-        if (['text block', 'html block'].includes(name)) return 'content'
-        if (['image', 'gallery'].includes(name)) return 'media'
-        if (['button', 'forms'].includes(name)) return 'interactive'
-        if (['news', 'events', 'calendar'].includes(name)) return 'dynamic'
-        if (['spacer'].includes(name)) return 'layout'
-        return 'other'
-    }
-
-    // Get unique categories for filter
-    const categories = ['all', ...new Set(widgetTypes?.map(w => getCategoryForWidget(w.name)) || [])]
+    // Get unique categories for filter (now uses registry)
+    const categories = ['all', ...getAvailableCategories()]
 
     if (isLoading) {
         return (
@@ -160,7 +130,7 @@ const WidgetLibrary = ({ onSelectWidget, selectedWidgetTypes = [] }) => {
             {/* Widget Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-96 overflow-y-auto">
                 {filteredWidgets.map((widgetType) => {
-                    const IconComponent = getWidgetIcon(widgetType.name)
+                    const IconComponent = getWidgetIconComponent(widgetType)
                     const isSelected = selectedWidgetTypes.some(selected => selected.name === widgetType.name)
 
                     return (
@@ -207,7 +177,7 @@ const WidgetLibrary = ({ onSelectWidget, selectedWidgetTypes = [] }) => {
                                                 : 'bg-gray-100 text-gray-600'
                                             }
                                         `}>
-                                            {getCategoryForWidget(widgetType.name)}
+                                            {getWidgetCategory(widgetType.type) || 'other'}
                                         </span>
                                     </div>
                                 </div>

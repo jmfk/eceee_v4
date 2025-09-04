@@ -2,19 +2,8 @@ import React, { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
     Search,
-    Type,
-    Image,
-    MousePointer,
-    Space,
-    Code,
-    Plus,
     Grid3X3,
     Filter,
-    Newspaper,
-    Calendar,
-    Users,
-    FileText,
-    ImageIcon,
     Package,
     Eye,
     EyeOff,
@@ -23,10 +12,14 @@ import {
     ExternalLink,
     CheckCircle,
     XCircle,
-    AlertCircle,
-    Layers
+    AlertCircle
 } from 'lucide-react'
 import { widgetsApi } from '../api'
+import { 
+    getWidgetIcon, 
+    getWidgetCategory, 
+    getAvailableCategories
+} from './widgets/widgetRegistry'
 
 const WidgetManager = () => {
     const [searchTerm, setSearchTerm] = useState('')
@@ -42,44 +35,10 @@ const WidgetManager = () => {
         }
     })
 
-    // Widget type icons mapping
-    const getWidgetIcon = (widgetName) => {
-        switch (widgetName.toLowerCase()) {
-            case 'text block':
-                return Type
-            case 'image':
-                return Image
-            case 'button':
-                return MousePointer
-            case 'spacer':
-                return Space
-            case 'html block':
-                return Code
-            case 'news':
-                return Newspaper
-            case 'event':
-                return Calendar
-            case 'team':
-                return Users
-            case 'article':
-                return FileText
-            case 'gallery':
-                return ImageIcon
-            case 'layout':
-                return Layers
-            default:
-                return Package
-        }
-    }
-
-    // Simple categorization of widgets
-    const getCategoryForWidget = (widgetName) => {
-        const name = widgetName.toLowerCase()
-        if (['text block', 'html block', 'article'].includes(name)) return 'content'
-        if (['image', 'gallery'].includes(name)) return 'media'
-        if (['button', 'spacer'].includes(name)) return 'layout'
-        if (['news', 'event', 'team'].includes(name)) return 'dynamic'
-        return 'other'
+    // Widget type icons mapping (now uses registry)
+    const getWidgetIconComponent = (widget) => {
+        const IconComponent = getWidgetIcon(widget.type)
+        return IconComponent || Package
     }
 
     // Filter widget types based on search and category
@@ -94,8 +53,8 @@ const WidgetManager = () => {
             widget.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             widget.description.toLowerCase().includes(searchTerm.toLowerCase())
 
-        // Filter by category - for now we'll use a simple categorization
-        const category = getCategoryForWidget(widget.name)
+        // Filter by category - now uses registry
+        const category = getWidgetCategory(widget.type) || 'other'
         const matchesCategory = filterCategory === 'all' || category === filterCategory
 
         return matchesSearch && matchesCategory
@@ -103,11 +62,10 @@ const WidgetManager = () => {
 
     const categories = [
         { id: 'all', label: 'All Widgets' },
-        { id: 'content', label: 'Content' },
-        { id: 'media', label: 'Media' },
-        { id: 'layout', label: 'Layout' },
-        { id: 'dynamic', label: 'Dynamic' },
-        { id: 'other', label: 'Other' }
+        ...getAvailableCategories().map(cat => ({ 
+            id: cat, 
+            label: cat.charAt(0).toUpperCase() + cat.slice(1) 
+        }))
     ]
 
     const getStatusIcon = (isActive) => {
@@ -222,7 +180,7 @@ const WidgetManager = () => {
                     </div>
                 ) : (
                     filteredWidgetTypes.map((widget) => {
-                        const IconComponent = getWidgetIcon(widget.name)
+                        const IconComponent = getWidgetIconComponent(widget)
                         return (
                             <div
                                 key={widget.slug}

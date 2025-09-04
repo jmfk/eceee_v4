@@ -70,14 +70,26 @@ const ButtonWidget = ({ config = {}, mode = 'preview' }) => {
     )
 }
 
+// === COLOCATED METADATA ===
 ButtonWidget.displayName = 'ButtonWidget'
 ButtonWidget.widgetType = 'core_widgets.ButtonWidget'
+
+// Default configuration
 ButtonWidget.defaultConfig = {
     text: 'Click me',
     url: '#',
     style: 'primary',
     target: '_self',
     alignment: 'center'
+}
+
+// Display metadata
+ButtonWidget.metadata = {
+    name: 'Button',
+    description: 'Interactive button with multiple styles and customizable appearance',
+    category: 'interactive',
+    icon: MousePointer,
+    tags: ['button', 'link', 'cta', 'interactive']
 }
 
 export default ButtonWidget

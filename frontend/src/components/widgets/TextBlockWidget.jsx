@@ -62,13 +62,25 @@ const TextBlockWidget = ({ config = {}, mode = 'preview' }) => {
     )
 }
 
+// === COLOCATED METADATA ===
 TextBlockWidget.displayName = 'TextBlockWidget'
 TextBlockWidget.widgetType = 'core_widgets.TextBlockWidget'
+
+// Default configuration
 TextBlockWidget.defaultConfig = {
     title: '',
     content: 'Click to edit this content...',
     style: 'normal',
     alignment: 'left'
+}
+
+// Display metadata
+TextBlockWidget.metadata = {
+    name: 'Text Block',
+    description: 'Rich text content block with title and formatting options',
+    category: 'content',
+    icon: Type,
+    tags: ['text', 'content', 'paragraph', 'rich text']
 }
 
 export default TextBlockWidget
