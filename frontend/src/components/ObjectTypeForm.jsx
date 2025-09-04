@@ -6,10 +6,10 @@ import VisualSchemaEditor from './VisualSchemaEditor'
 import InlineImageUpload from './InlineImageUpload'
 import { validateFieldName } from '../utils/schemaValidation'
 import { getAllFieldTypes } from '../utils/fieldTypeRegistry'
-import { 
-    getWidgetIcon, 
-    getWidgetCategory, 
-    getWidgetDescription 
+import {
+    getWidgetIcon,
+    getWidgetCategory,
+    getWidgetDescription
 } from './widgets/widgetRegistry'
 
 // Get field types from the registry
@@ -1502,168 +1502,168 @@ const WidgetControlManager = ({ widgetControls = [], availableWidgets = [], load
                         {/* Additional Configuration Details */}
                         <div className="mt-4 pt-4 border-t border-gray-100">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {/* Max Instances */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Max Instances
-                                </label>
-                                <input
-                                    type="number"
-                                    value={control.maxInstances || ''}
-                                    onChange={(e) => updateWidgetControl(index, 'maxInstances', e.target.value ? parseInt(e.target.value) : null)}
-                                    className="w-20 px-3 py-2 border bg-white border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                    placeholder="∞"
-                                    min="1"
-                                />
-                            </div>
-
-                            {/* Control Flags */}
-                            <div className="md:col-span-2">
-                                <div className="flex items-center space-x-6">
-                                    <label className="flex items-center">
-                                        <input
-                                            type="checkbox"
-                                            checked={control.required || false}
-                                            onChange={(e) => updateWidgetControl(index, 'required', e.target.checked)}
-                                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                                        />
-                                        <span className="ml-2 text-sm text-gray-700">Required widget</span>
+                                {/* Max Instances */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Max Instances
                                     </label>
-
-                                    <label className="flex items-center">
-                                        <input
-                                            type="checkbox"
-                                            checked={control.preCreate || false}
-                                            onChange={(e) => updateWidgetControl(index, 'preCreate', e.target.checked)}
-                                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                                        />
-                                        <span className="ml-2 text-sm text-gray-700">Auto-create on new objects</span>
-                                    </label>
+                                    <input
+                                        type="number"
+                                        value={control.maxInstances || ''}
+                                        onChange={(e) => updateWidgetControl(index, 'maxInstances', e.target.value ? parseInt(e.target.value) : null)}
+                                        className="w-20 px-3 py-2 border bg-white border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        placeholder="∞"
+                                        min="1"
+                                    />
                                 </div>
-                            </div>
 
-                            {/* Default Configuration */}
-                            {selectedWidget && (
+                                {/* Control Flags */}
                                 <div className="md:col-span-2">
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Default Configuration
-                                    </label>
-                                    <div className="bg-white border border-gray-200 rounded-md p-3 space-y-3">
-                                        {/* Common configuration fields */}
-                                        {selectedWidget.slug === 'text-block' && (
-                                            <>
-                                                <div>
-                                                    <label className="block text-xs font-medium text-gray-600 mb-1">
-                                                        Default Title
-                                                    </label>
-                                                    <input
-                                                        type="text"
-                                                        value={control.defaultConfig?.title || ''}
-                                                        onChange={(e) => updateDefaultConfig(index, 'title', e.target.value)}
-                                                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
-                                                        placeholder="Enter default title..."
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-xs font-medium text-gray-600 mb-1">
-                                                        Default Content
-                                                    </label>
-                                                    <textarea
-                                                        value={control.defaultConfig?.content || ''}
-                                                        onChange={(e) => updateDefaultConfig(index, 'content', e.target.value)}
-                                                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
-                                                        rows={3}
-                                                        placeholder="Enter default content..."
-                                                    />
-                                                </div>
-                                            </>
-                                        )}
+                                    <div className="flex items-center space-x-6">
+                                        <label className="flex items-center">
+                                            <input
+                                                type="checkbox"
+                                                checked={control.required || false}
+                                                onChange={(e) => updateWidgetControl(index, 'required', e.target.checked)}
+                                                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                            />
+                                            <span className="ml-2 text-sm text-gray-700">Required widget</span>
+                                        </label>
 
-                                        {selectedWidget.slug === 'image' && (
-                                            <>
-                                                <div>
-                                                    <label className="block text-xs font-medium text-gray-600 mb-1">
-                                                        Default Alt Text
-                                                    </label>
-                                                    <input
-                                                        type="text"
-                                                        value={control.defaultConfig?.alt || ''}
-                                                        onChange={(e) => updateDefaultConfig(index, 'alt', e.target.value)}
-                                                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
-                                                        placeholder="Enter default alt text..."
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-xs font-medium text-gray-600 mb-1">
-                                                        Default Caption
-                                                    </label>
-                                                    <input
-                                                        type="text"
-                                                        value={control.defaultConfig?.caption || ''}
-                                                        onChange={(e) => updateDefaultConfig(index, 'caption', e.target.value)}
-                                                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
-                                                        placeholder="Enter default caption..."
-                                                    />
-                                                </div>
-                                            </>
-                                        )}
-
-                                        {selectedWidget.slug === 'button' && (
-                                            <>
-                                                <div>
-                                                    <label className="block text-xs font-medium text-gray-600 mb-1">
-                                                        Default Button Text
-                                                    </label>
-                                                    <input
-                                                        type="text"
-                                                        value={control.defaultConfig?.text || ''}
-                                                        onChange={(e) => updateDefaultConfig(index, 'text', e.target.value)}
-                                                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
-                                                        placeholder="Enter default button text..."
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-xs font-medium text-gray-600 mb-1">
-                                                        Default Button Style
-                                                    </label>
-                                                    <select
-                                                        value={control.defaultConfig?.style || 'primary'}
-                                                        onChange={(e) => updateDefaultConfig(index, 'style', e.target.value)}
-                                                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
-                                                    >
-                                                        <option value="primary">Primary</option>
-                                                        <option value="secondary">Secondary</option>
-                                                        <option value="outline">Outline</option>
-                                                    </select>
-                                                </div>
-                                            </>
-                                        )}
-
-                                        {/* Generic JSON editor for other widget types */}
-                                        {!['text-block', 'image', 'button'].includes(selectedWidget.slug) && (
-                                            <div>
-                                                <label className="block text-xs font-medium text-gray-600 mb-1">
-                                                    Default Configuration (JSON)
-                                                </label>
-                                                <textarea
-                                                    value={JSON.stringify(control.defaultConfig || {}, null, 2)}
-                                                    onChange={(e) => {
-                                                        try {
-                                                            const config = JSON.parse(e.target.value)
-                                                            updateWidgetControl(index, 'defaultConfig', config)
-                                                        } catch (err) {
-                                                            // Invalid JSON, ignore for now
-                                                        }
-                                                    }}
-                                                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded font-mono"
-                                                    rows={4}
-                                                    placeholder='{"key": "value"}'
-                                                />
-                                            </div>
-                                        )}
+                                        <label className="flex items-center">
+                                            <input
+                                                type="checkbox"
+                                                checked={control.preCreate || false}
+                                                onChange={(e) => updateWidgetControl(index, 'preCreate', e.target.checked)}
+                                                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                            />
+                                            <span className="ml-2 text-sm text-gray-700">Auto-create on new objects</span>
+                                        </label>
                                     </div>
                                 </div>
-                            )}
+
+                                {/* Default Configuration */}
+                                {selectedWidget && (
+                                    <div className="md:col-span-2">
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            Default Configuration
+                                        </label>
+                                        <div className="bg-white border border-gray-200 rounded-md p-3 space-y-3">
+                                            {/* Common configuration fields */}
+                                            {selectedWidget.slug === 'text-block' && (
+                                                <>
+                                                    <div>
+                                                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                                                            Default Title
+                                                        </label>
+                                                        <input
+                                                            type="text"
+                                                            value={control.defaultConfig?.title || ''}
+                                                            onChange={(e) => updateDefaultConfig(index, 'title', e.target.value)}
+                                                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                                                            placeholder="Enter default title..."
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                                                            Default Content
+                                                        </label>
+                                                        <textarea
+                                                            value={control.defaultConfig?.content || ''}
+                                                            onChange={(e) => updateDefaultConfig(index, 'content', e.target.value)}
+                                                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                                                            rows={3}
+                                                            placeholder="Enter default content..."
+                                                        />
+                                                    </div>
+                                                </>
+                                            )}
+
+                                            {selectedWidget.slug === 'image' && (
+                                                <>
+                                                    <div>
+                                                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                                                            Default Alt Text
+                                                        </label>
+                                                        <input
+                                                            type="text"
+                                                            value={control.defaultConfig?.alt || ''}
+                                                            onChange={(e) => updateDefaultConfig(index, 'alt', e.target.value)}
+                                                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                                                            placeholder="Enter default alt text..."
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                                                            Default Caption
+                                                        </label>
+                                                        <input
+                                                            type="text"
+                                                            value={control.defaultConfig?.caption || ''}
+                                                            onChange={(e) => updateDefaultConfig(index, 'caption', e.target.value)}
+                                                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                                                            placeholder="Enter default caption..."
+                                                        />
+                                                    </div>
+                                                </>
+                                            )}
+
+                                            {selectedWidget.slug === 'button' && (
+                                                <>
+                                                    <div>
+                                                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                                                            Default Button Text
+                                                        </label>
+                                                        <input
+                                                            type="text"
+                                                            value={control.defaultConfig?.text || ''}
+                                                            onChange={(e) => updateDefaultConfig(index, 'text', e.target.value)}
+                                                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                                                            placeholder="Enter default button text..."
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                                                            Default Button Style
+                                                        </label>
+                                                        <select
+                                                            value={control.defaultConfig?.style || 'primary'}
+                                                            onChange={(e) => updateDefaultConfig(index, 'style', e.target.value)}
+                                                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                                                        >
+                                                            <option value="primary">Primary</option>
+                                                            <option value="secondary">Secondary</option>
+                                                            <option value="outline">Outline</option>
+                                                        </select>
+                                                    </div>
+                                                </>
+                                            )}
+
+                                            {/* Generic JSON editor for other widget types */}
+                                            {!['text-block', 'image', 'button'].includes(selectedWidget.slug) && (
+                                                <div>
+                                                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                                                        Default Configuration (JSON)
+                                                    </label>
+                                                    <textarea
+                                                        value={JSON.stringify(control.defaultConfig || {}, null, 2)}
+                                                        onChange={(e) => {
+                                                            try {
+                                                                const config = JSON.parse(e.target.value)
+                                                                updateWidgetControl(index, 'defaultConfig', config)
+                                                            } catch (err) {
+                                                                // Invalid JSON, ignore for now
+                                                            }
+                                                        }}
+                                                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded font-mono"
+                                                        rows={4}
+                                                        placeholder='{"key": "value"}'
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>

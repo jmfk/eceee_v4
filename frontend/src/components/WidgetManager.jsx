@@ -15,9 +15,9 @@ import {
     AlertCircle
 } from 'lucide-react'
 import { widgetsApi } from '../api'
-import { 
-    getWidgetIcon, 
-    getWidgetCategory, 
+import {
+    getWidgetIcon,
+    getWidgetCategory,
     getAvailableCategories
 } from './widgets/widgetRegistry'
 
@@ -62,9 +62,9 @@ const WidgetManager = () => {
 
     const categories = [
         { id: 'all', label: 'All Widgets' },
-        ...getAvailableCategories().map(cat => ({ 
-            id: cat, 
-            label: cat.charAt(0).toUpperCase() + cat.slice(1) 
+        ...getAvailableCategories().map(cat => ({
+            id: cat,
+            label: cat.charAt(0).toUpperCase() + cat.slice(1)
         }))
     ]
 
@@ -150,8 +150,8 @@ const WidgetManager = () => {
                             key={category.id}
                             onClick={() => setFilterCategory(category.id)}
                             className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${filterCategory === category.id
-                                    ? 'bg-blue-100 text-blue-800 border border-blue-200'
-                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200'
+                                ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200'
                                 }`}
                         >
                             {category.label}
