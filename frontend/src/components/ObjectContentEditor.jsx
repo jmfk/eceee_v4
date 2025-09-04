@@ -3,10 +3,10 @@ import { Layout, Plus, Settings, Trash2, Eye, Check, X, MoreHorizontal } from 'l
 import { WidgetFactory } from './widgets'
 import { useWidgets, getWidgetDisplayName, createDefaultWidgetConfig } from '../hooks/useWidgets'
 import { filterAvailableWidgetTypes } from '../utils/widgetTypeValidation'
-import { 
-    getWidgetIcon, 
-    getWidgetCategory, 
-    getWidgetDescription 
+import {
+    getWidgetIcon,
+    getWidgetCategory,
+    getWidgetDescription
 } from './widgets/widgetRegistry'
 
 import WidgetEditorPanel from './WidgetEditorPanel'
@@ -149,10 +149,10 @@ const WidgetSelectionModal = ({ isOpen, onClose, onSelectWidget, slot, available
                                 >
                                     <div className="flex items-start space-x-3">
                                         <div className="bg-gray-100 rounded-lg w-12 h-12 flex items-center justify-center text-gray-600">
-                                            {widget.icon && React.isValidElement(widget.icon) ? (
+                                            {widget.icon && typeof widget.icon === 'function' ? (
+                                                React.createElement(widget.icon, { className: "h-6 w-6" })
+                                            ) : React.isValidElement(widget.icon) ? (
                                                 React.cloneElement(widget.icon, { className: "h-6 w-6" })
-                                            ) : widget.icon && typeof widget.icon === 'function' ? (
-                                                <widget.icon className="h-6 w-6" />
                                             ) : (
                                                 <span className="text-xl font-bold">{widget.icon || '🧩'}</span>
                                             )}
