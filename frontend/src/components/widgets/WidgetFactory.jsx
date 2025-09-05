@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Layout, Settings, Trash2, ChevronUp, ChevronDown, Eye, ChevronLeft, ChevronRight, X } from 'lucide-react'
-import { WIDGET_REGISTRY } from './widgetRegistry'
+import { WIDGET_REGISTRY, getWidgetComponent } from './widgetRegistry'
 import { renderWidgetPreview } from '../../utils/widgetPreview'
 
 /**
@@ -212,21 +212,41 @@ const WidgetFactory = ({
 
 
 
-                {/* Widget Content - Simple representation for editor */}
-                <div className="widget-content bg-gray-50 border border-gray-200 rounded p-4">
-                    <div className="flex items-center space-x-3">
-                        <div className="bg-white rounded-lg w-10 h-10 flex items-center justify-center text-gray-600 border">
-                            <Layout className="h-5 w-5" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <h4 className="text-sm font-medium text-gray-900">
-                                {getWidgetTypeName(widget)}
-                            </h4>
-                            <p className="text-xs text-gray-500 truncate">
-                                {widget.config?.title || widget.config?.content || widget.config?.text || 'Widget content'}
-                            </p>
-                        </div>
-                    </div>
+                {/* Widget Content - Render actual widget component */}
+                <div className="widget-content border border-gray-200 rounded overflow-hidden">
+                    {(() => {
+                        const WidgetComponent = getWidgetComponent(widget.type)
+                        if (WidgetComponent) {
+                            return (
+                                <WidgetComponent
+                                    config={widget.config || {}}
+                                    mode="editor"
+                                    onConfigChange={onConfigChange}
+                                    themeId={widget.config?.themeId}
+                                />
+                            )
+                        } else {
+                            // Fallback to placeholder if component not found
+                            return (
+                                <div className="bg-gray-50 p-4">
+                                    <div className="flex items-center space-x-3">
+                                        <div className="bg-white rounded-lg w-10 h-10 flex items-center justify-center text-gray-600 border">
+                                            <Layout className="h-5 w-5" />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <h4 className="text-sm font-medium text-gray-900">
+                                                {getWidgetTypeName(widget)}
+                                            </h4>
+                                            <p className="text-xs text-gray-500 truncate">
+                                                {widget.config?.title || widget.config?.content || widget.config?.text || 'Widget content'}
+                                            </p>
+                                            <p className="text-xs text-red-500 mt-1">Component not found: {widget.type}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )
+                        }
+                    })()}
                 </div>
 
                 {/* Preview Modal */}
@@ -281,27 +301,40 @@ const WidgetFactory = ({
     }
 
     // Simple widget renderer without controls
+    const WidgetComponent = getWidgetComponent(widget.type)
+    
     return (
         <div
             className={`widget-item ${className}`}
             data-widget-type={widget.type}
             data-widget-id={widget.id}
         >
-            <div className="widget-content bg-gray-50 border border-gray-200 rounded p-4">
-                <div className="flex items-center space-x-3">
-                    <div className="bg-white rounded-lg w-10 h-10 flex items-center justify-center text-gray-600 border">
-                        <Layout className="h-5 w-5" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                        <h4 className="text-sm font-medium text-gray-900">
-                            {getWidgetTypeName(widget)}
-                        </h4>
-                        <p className="text-xs text-gray-500 truncate">
-                            {widget.config?.title || widget.config?.content || widget.config?.text || 'Widget content'}
-                        </p>
+            {WidgetComponent ? (
+                <WidgetComponent
+                    config={widget.config || {}}
+                    mode={mode}
+                    onConfigChange={onConfigChange}
+                    themeId={widget.config?.themeId}
+                />
+            ) : (
+                // Fallback to placeholder if component not found
+                <div className="widget-content bg-gray-50 border border-gray-200 rounded p-4">
+                    <div className="flex items-center space-x-3">
+                        <div className="bg-white rounded-lg w-10 h-10 flex items-center justify-center text-gray-600 border">
+                            <Layout className="h-5 w-5" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <h4 className="text-sm font-medium text-gray-900">
+                                {getWidgetTypeName(widget)}
+                            </h4>
+                            <p className="text-xs text-gray-500 truncate">
+                                {widget.config?.title || widget.config?.content || widget.config?.text || 'Widget content'}
+                            </p>
+                            <p className="text-xs text-red-500 mt-1">Component not found: {widget.type}</p>
+                        </div>
                     </div>
                 </div>
-            </div>
+            )}
         </div>
     )
 }
