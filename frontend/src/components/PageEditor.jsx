@@ -17,7 +17,7 @@ import {
     Trash2,
     Calendar
 } from 'lucide-react'
-import { pagesApi, layoutsApi, versionsApi } from '../api'
+import { pagesApi, layoutsApi, versionsApi, themesApi } from '../api'
 import { api } from '../api/client'
 import { endpoints } from '../api/endpoints'
 import { smartSave, analyzeChanges, determineSaveStrategy, generateChangeSummary, processLoadedVersionData } from '../utils/smartSaveUtils'
@@ -33,6 +33,7 @@ import StatusBar from './StatusBar'
 import SaveOptionsModal from './SaveOptionsModal'
 import WidgetEditorPanel from './WidgetEditorPanel'
 import PageTagWidget from './PageTagWidget'
+import ThemeSelector from './ThemeSelector'
 
 import { logValidationSync } from '../utils/stateVerification'
 
@@ -542,10 +543,46 @@ const PageEditor = () => {
         }
     }, [webpageData?.id, isNewPage, currentVersion, showError]);
 
+    // Define switchToVersion first since updatePageData depends on it
+    const switchToVersion = useCallback(async (versionId) => {
+        if (!versionId || !webpageData?.id) return;
+        try {
+            // Use the raw API endpoint to get the proper data structure
+            const response = await api.get(endpoints.versions.pageVersionDetail(webpageData.id || pageId, versionId));
+            const versionPageData = response.data || response;
+            const versionData = availableVersions.find(version => version.id === versionId);
+            setCurrentVersion(versionData);
 
+            // Set pageVersionData with processed data (meta fields flattened)
+            const processedVersionData = processLoadedVersionData(versionPageData);
+            setPageVersionData(processedVersionData);
+            setOriginalPageVersionData(processedVersionData);
+
+            // Update URL to include version parameter
+            const currentPath = location.pathname;
+            const newUrl = buildUrlWithVersion(currentPath, versionId);
+            navigate(newUrl, { replace: true, state: { previousView } });
+
+            // Handle layout fallback for versions without valid layouts
+            if (!versionPageData.codeLayout) {
+                addNotification({
+                    type: 'warning',
+                    message: `Version ${versionData.versionNumber} has no layout. Using fallback layout for preview.`
+                });
+            }
+
+            addNotification({
+                type: 'info',
+                message: `Switched to version ${versionData.versionNumber}`
+            });
+        } catch (error) {
+            console.error('PageEditor: Error switching to version', error);
+            showError(`Failed to load version: ${error.message}`);
+        }
+    }, [webpageData, availableVersions, showError, addNotification, location.pathname, buildUrlWithVersion, previousView]);
 
     // Handle page data updates - route to appropriate data structure
-    const updatePageData = (updates) => {
+    const updatePageData = useCallback((updates) => {
         // Handle version changes from LayoutRenderer
         if (updates.versionChanged && updates.pageVersionData) {
             // This is a version switch from LayoutRenderer, use switchToVersion
@@ -586,44 +623,7 @@ const PageEditor = () => {
         }
 
         setIsDirty(true)
-    }
-
-    const switchToVersion = useCallback(async (versionId) => {
-        if (!versionId || !webpageData?.id) return;
-        try {
-            // Use the raw API endpoint to get the proper data structure
-            const response = await api.get(endpoints.versions.pageVersionDetail(webpageData.id || pageId, versionId));
-            const versionPageData = response.data || response;
-            const versionData = availableVersions.find(version => version.id === versionId);
-            setCurrentVersion(versionData);
-
-            // Set pageVersionData with processed data (meta fields flattened)
-            const processedVersionData = processLoadedVersionData(versionPageData);
-            setPageVersionData(processedVersionData);
-            setOriginalPageVersionData(processedVersionData);
-
-            // Update URL to include version parameter
-            const currentPath = location.pathname;
-            const newUrl = buildUrlWithVersion(currentPath, versionId);
-            navigate(newUrl, { replace: true, state: { previousView } });
-
-            // Handle layout fallback for versions without valid layouts
-            if (!versionPageData.codeLayout) {
-                addNotification({
-                    type: 'warning',
-                    message: `Version ${versionData.versionNumber} has no layout. Using fallback layout for preview.`
-                });
-            }
-
-            addNotification({
-                type: 'info',
-                message: `Switched to version ${versionData.versionNumber}`
-            });
-        } catch (error) {
-            console.error('PageEditor: Error switching to version', error);
-            showError(`Failed to load version: ${error.message}`);
-        }
-    }, [webpageData, availableVersions, showError, addNotification, location.pathname, buildUrlWithVersion, previousView]);
+    }, [switchToVersion])
 
     // NEW: Validation-driven sync handlers
     const handleValidatedPageDataSync = useCallback((validatedData) => {
@@ -997,11 +997,17 @@ const PageEditor = () => {
         handleCloseWidgetEditor()
     }, [addNotification, handleCloseWidgetEditor])
 
+    // Memoized callback to prevent ContentEditor re-renders
+    const handleDirtyChange = useCallback((isDirty, reason) => {
+        setIsDirty(isDirty);
+    }, [])
+
     // Tab navigation (main tabs)
     const tabs = [
         { id: 'content', label: 'Content', icon: Layout },
         { id: 'data', label: 'Data', icon: FileText },
         { id: 'settings', label: 'Settings & SEO', icon: Settings },
+        { id: 'theme', label: 'Theme', icon: Palette },
         { id: 'publishing', label: 'Publishing', icon: Calendar },
         { id: 'preview', label: 'Preview', icon: Eye },
     ]
@@ -1263,9 +1269,7 @@ const PageEditor = () => {
                                                         isNewPage={isNewPage}
                                                         layoutJson={layoutData}
                                                         editable={true}
-                                                        onDirtyChange={(isDirty, reason) => {
-                                                            setIsDirty(isDirty);
-                                                        }}
+                                                        onDirtyChange={handleDirtyChange}
                                                         onOpenWidgetEditor={handleOpenWidgetEditor}
                                                     />
                                                 ) : (
@@ -1278,9 +1282,7 @@ const PageEditor = () => {
                                                         isNewPage={isNewPage}
                                                         layoutJson={layoutData}
                                                         editable={true}
-                                                        onDirtyChange={(isDirty, reason) => {
-                                                            setIsDirty(isDirty);
-                                                        }}
+                                                        onDirtyChange={handleDirtyChange}
                                                         onOpenWidgetEditor={handleOpenWidgetEditor}
                                                     />
                                                 )}
@@ -1320,6 +1322,14 @@ const PageEditor = () => {
                                 onValidationChange={setSchemaValidationState}
                                 onValidatedDataSync={handleValidatedPageDataSync}
                                 namespace={null} // TODO: Add proper namespace integration
+                            />
+                        )}
+                        {activeTab === 'theme' && (
+                            <ThemeSelector
+                                key={`theme-${pageVersionData?.versionId || 'new'}`}
+                                selectedThemeId={pageVersionData?.theme}
+                                onThemeChange={(themeId) => updatePageData({ theme: themeId })}
+                                onDirtyChange={handleDirtyChange}
                             />
                         )}
                         {activeTab === 'preview' && (

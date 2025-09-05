@@ -32,7 +32,27 @@ const ThemeEditor = () => {
     const { data: themes = [], isLoading } = useQuery({
         queryKey: ['themes'],
         queryFn: async () => {
-            return await themesApi.list()
+            try {
+                const response = await themesApi.list()
+
+                // Check if response has data property or is direct array
+                let themeData = null
+                if (Array.isArray(response)) {
+                    themeData = response
+                } else if (response?.data && Array.isArray(response.data)) {
+                    themeData = response.data
+                } else if (response?.results && Array.isArray(response.results)) {
+                    themeData = response.results
+                } else {
+                    console.warn('Unexpected themes API response structure:', response)
+                    themeData = []
+                }
+
+                return themeData || []
+            } catch (error) {
+                console.error('Error fetching themes:', error)
+                throw error
+            }
         }
     })
 

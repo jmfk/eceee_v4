@@ -9,6 +9,7 @@ import React, { useRef, useEffect, useCallback, useState, useMemo, forwardRef, u
 import LayoutRenderer from './LayoutRenderer';
 import { WIDGET_ACTIONS } from '../utils/widgetConstants';
 import { useNotificationContext } from './NotificationManager';
+import { useRenderTracker, useEffectTracker, useStabilityTracker } from '../utils/debugHooks';
 
 const ContentEditor = forwardRef(({
   layoutJson,
@@ -22,6 +23,14 @@ const ContentEditor = forwardRef(({
   isNewPage,
   onOpenWidgetEditor
 }, ref) => {
+  // Debug tracking
+  const renderCount = useRenderTracker('ContentEditor', {
+    layoutJson, editable, webpageData, pageVersionData, isNewPage
+  })
+  useStabilityTracker(layoutJson, 'ContentEditor.layoutJson')
+  useStabilityTracker(webpageData, 'ContentEditor.webpageData')
+  useStabilityTracker(pageVersionData, 'ContentEditor.pageVersionData')
+
   const containerRef = useRef(null);
   const rendererRef = useRef(null);
   const eventListenersRef = useRef(new Map()); // Track event listeners for cleanup
@@ -129,6 +138,24 @@ const ContentEditor = forwardRef(({
     layoutRenderer.currentVersion = currentVersion;
     layoutRenderer.updateVersionSelector();
   }, [layoutRenderer, pageVersionData?.versionId, pageVersionData?.versionNumber, pageVersionData?.versionTitle, pageVersionData?.publicationStatus]);
+
+  // Apply theme to layout renderer when pageVersionData theme changes
+  useEffect(() => {
+    if (!layoutRenderer || !pageVersionData?.theme) return;
+
+    // Fetch and apply theme
+    const applyTheme = async () => {
+      try {
+        const { themesApi } = await import('../api');
+        const theme = await themesApi.get(pageVersionData.theme);
+        layoutRenderer.applyTheme(theme);
+      } catch (error) {
+        console.error('ContentEditor: Error applying theme', error);
+      }
+    };
+
+    applyTheme();
+  }, [layoutRenderer, pageVersionData?.theme]);
 
   // Set up dirty state communication with LayoutRenderer
   useEffect(() => {
@@ -322,6 +349,7 @@ const ContentEditor = forwardRef(({
   }, [editable, handleFixedPositioning, setupSlotInteractivity]);
 
   // Render layout when layoutJson changes
+  useEffectTracker('ContentEditor.renderLayout', [layoutJson, layoutRenderer, cleanupEventListeners, editable])
   useEffect(() => {
     if (!layoutJson || !containerRef.current) {
       return;
@@ -349,6 +377,7 @@ const ContentEditor = forwardRef(({
   const widgetsRef = useRef(null);
   const widgetsJsonString = JSON.stringify(currentWidgets);
 
+  useEffectTracker('ContentEditor.updateWidgets', [widgetsJsonString, layoutRenderer, currentWidgets])
   useEffect(() => {
     if (!layoutRenderer || !currentWidgets) {
       return;

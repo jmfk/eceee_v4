@@ -16,12 +16,14 @@ const collectWidgetMetadata = (WidgetComponent) => {
         displayName: WidgetComponent.displayName,
         widgetType: WidgetComponent.widgetType,
         defaultConfig: WidgetComponent.defaultConfig || {},
+        actionHandlers: WidgetComponent.actionHandlers || {},
         metadata: WidgetComponent.metadata || {
             name: WidgetComponent.displayName,
             description: '',
             category: 'other',
             icon: null,
-            tags: []
+            tags: [],
+            menuItems: []
         }
     }
 }
@@ -160,6 +162,35 @@ export const isWidgetTypeSupported = (widgetType) => {
 // Get all available widget types
 export const getAvailableWidgetTypes = () => {
     return Object.keys(WIDGET_REGISTRY)
+}
+
+// Get widget menu items
+export const getWidgetMenuItems = (widgetType) => {
+    return WIDGET_REGISTRY[widgetType]?.metadata?.menuItems || []
+}
+
+// Get widget action handlers
+export const getWidgetActionHandlers = (widgetType) => {
+    return WIDGET_REGISTRY[widgetType]?.actionHandlers || {}
+}
+
+// Execute widget action
+export const executeWidgetAction = (widgetType, actionName, widgetInstance, layoutRenderer) => {
+    const handlers = getWidgetActionHandlers(widgetType)
+    const handler = handlers[actionName]
+
+    if (typeof handler === 'function') {
+        try {
+            handler(widgetInstance, layoutRenderer)
+            return true
+        } catch (error) {
+            console.error(`Error executing widget action ${actionName}:`, error)
+            return false
+        }
+    } else {
+        console.warn(`No handler found for widget action: ${actionName}`)
+        return false
+    }
 }
 
 // Legacy aliases for backward compatibility during transition

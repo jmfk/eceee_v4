@@ -9,6 +9,9 @@
 import LayoutRenderer from './LayoutRenderer';
 import React from 'react';
 import { createRoot } from 'react-dom/client';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { NotificationProvider } from './NotificationManager';
+import { GlobalNotificationProvider } from '../contexts/GlobalNotificationContext';
 
 class LayoutRendererWithWidgetFactory extends LayoutRenderer {
     constructor(options = {}) {
@@ -26,6 +29,38 @@ class LayoutRendererWithWidgetFactory extends LayoutRenderer {
 
         // Track slots currently being updated to prevent overlapping updates
         this.slotsBeingUpdated = new Set();
+
+        // Create a QueryClient for isolated React roots
+        this.queryClient = new QueryClient({
+            defaultOptions: {
+                queries: {
+                    retry: 1,
+                    refetchOnWindowFocus: false,
+                    staleTime: 5 * 60 * 1000, // 5 minutes
+                },
+            },
+        });
+    }
+
+    /**
+     * Create a provider wrapper component for isolated React roots
+     * @param {React.Component} children - The component to wrap
+     * @returns {React.Element} Wrapped component with providers
+     */
+    createProviderWrapper(children) {
+        return React.createElement(
+            QueryClientProvider,
+            { client: this.queryClient },
+            React.createElement(
+                GlobalNotificationProvider,
+                {},
+                React.createElement(
+                    NotificationProvider,
+                    {},
+                    children
+                )
+            )
+        );
     }
 
     /**
@@ -83,6 +118,32 @@ class LayoutRendererWithWidgetFactory extends LayoutRenderer {
      */
     setWidgetActionHandlers(handlers) {
         this.widgetActionHandlers = { ...this.widgetActionHandlers, ...handlers };
+    }
+
+    /**
+     * Create a stable config change handler for a widget
+     * @param {Object} widget - Widget instance
+     * @returns {Function} Config change handler
+     */
+    createConfigChangeHandler(widget) {
+        // Use a WeakMap to cache handlers per widget to avoid recreating them
+        if (!this.configChangeHandlers) {
+            this.configChangeHandlers = new WeakMap();
+        }
+
+        if (!this.configChangeHandlers.has(widget)) {
+            const handler = (newConfig) => {
+                // Handle widget configuration changes
+                const updatedWidget = {
+                    ...widget,
+                    config: newConfig
+                };
+                this.executeCallback('widgetDataChanged', 'UPDATE', widget.slotName || 'unknown', updatedWidget);
+            };
+            this.configChangeHandlers.set(widget, handler);
+        }
+
+        return this.configChangeHandlers.get(widget);
     }
 
     /**
@@ -144,8 +205,8 @@ class LayoutRendererWithWidgetFactory extends LayoutRenderer {
             container._reactRoot = root;
             container.setAttribute('data-widget-key', widgetKey);
 
-            // Render React component
-            root.render(
+            // Render React component wrapped with providers
+            const wrappedComponent = this.createProviderWrapper(
                 React.createElement(WidgetFactoryComponent, {
                     key: `${widget.id}-${actualIndex}`, // Force re-render when index changes
                     widget: widget,
@@ -153,15 +214,17 @@ class LayoutRendererWithWidgetFactory extends LayoutRenderer {
                     index: actualIndex,
                     onEdit: this.widgetActionHandlers.onEdit,
                     onDelete: this.widgetActionHandlers.onDelete,
-
                     onMoveUp: this.widgetActionHandlers.onMoveUp,
                     onMoveDown: this.widgetActionHandlers.onMoveDown,
+                    onConfigChange: this.createConfigChangeHandler(widget),
                     canMoveUp: actualIndex > 0,
                     canMoveDown: actualIndex < slotWidgets.length - 1,
                     mode: this.editable ? 'editor' : 'preview',
                     showControls: this.editable
                 })
             );
+
+            root.render(wrappedComponent);
 
             // Wait for React to render (but root is already stored)
             await new Promise((resolve) => {
@@ -317,8 +380,13 @@ class LayoutRendererWithWidgetFactory extends LayoutRenderer {
      * Override cleanup method to handle React roots safely
      */
     cleanup() {
-        // Only cleanup React roots, don't call parent cleanup which has issues
+        // Cleanup React roots
         this.cleanupReactRoots();
+
+        // Clear QueryClient cache to prevent memory leaks
+        if (this.queryClient) {
+            this.queryClient.clear();
+        }
     }
 
     /**
@@ -328,6 +396,11 @@ class LayoutRendererWithWidgetFactory extends LayoutRenderer {
         try {
             // Cleanup React roots
             this.cleanupReactRoots();
+
+            // Clear QueryClient cache to prevent memory leaks
+            if (this.queryClient) {
+                this.queryClient.clear();
+            }
 
             // Call parent destroy only if safe
             if (this.slotContainers && this.slotContainers.size > 0) {

@@ -11,6 +11,7 @@ import { WIDGET_ACTIONS } from '../utils/widgetConstants';
 import { useNotificationContext } from './NotificationManager';
 import WidgetFactory from './widgets/WidgetFactory';
 import useWidgetStore from '../stores/widgetStore';
+import { useRenderTracker, useEffectTracker, useStabilityTracker } from '../utils/debugHooks';
 
 const ContentEditorWithWidgetFactory = forwardRef(({
     layoutJson,
@@ -23,6 +24,14 @@ const ContentEditorWithWidgetFactory = forwardRef(({
     isNewPage,
     onOpenWidgetEditor
 }, ref) => {
+    // Debug tracking
+    const renderCount = useRenderTracker('ContentEditorWithWidgetFactory', {
+        layoutJson, editable, webpageData, pageVersionData, isNewPage
+    })
+    useStabilityTracker(layoutJson, 'ContentEditorWithWidgetFactory.layoutJson')
+    useStabilityTracker(webpageData, 'ContentEditorWithWidgetFactory.webpageData')
+    useStabilityTracker(pageVersionData, 'ContentEditorWithWidgetFactory.pageVersionData')
+
     const containerRef = useRef(null);
     const rendererRef = useRef(null);
     const eventListenersRef = useRef(new Map());
@@ -189,6 +198,24 @@ const ContentEditorWithWidgetFactory = forwardRef(({
 
     }, [layoutRenderer, pageId, isNewPage, onUpdate, webpageData, pageVersionData?.versionId, pageVersionData?.versionNumber, pageVersionData?.versionTitle, pageVersionData?.publicationStatus]);
 
+    // Apply theme to layout renderer when pageVersionData theme changes
+    useEffect(() => {
+        if (!layoutRenderer || !pageVersionData?.theme) return;
+
+        // Fetch and apply theme
+        const applyTheme = async () => {
+            try {
+                const { themesApi } = await import('../api');
+                const theme = await themesApi.get(pageVersionData.theme);
+                layoutRenderer.applyTheme(theme);
+            } catch (error) {
+                console.error('ContentEditorWithWidgetFactory: Error applying theme', error);
+            }
+        };
+
+        applyTheme();
+    }, [layoutRenderer, pageVersionData?.theme]);
+
     // Set up dirty state communication with LayoutRenderer
     useEffect(() => {
         if (!layoutRenderer) return;
@@ -307,6 +334,7 @@ const ContentEditorWithWidgetFactory = forwardRef(({
     // Update widgets when store widgets change
     const widgetsJsonString = JSON.stringify(storeWidgets);
 
+    useEffectTracker('ContentEditorWithWidgetFactory.updateWidgets', [widgetsJsonString, layoutRenderer, storeWidgets])
     useEffect(() => {
         if (!layoutRenderer) {
             return;
@@ -316,8 +344,6 @@ const ContentEditorWithWidgetFactory = forwardRef(({
         if (!storeWidgets || Object.keys(storeWidgets).length === 0) {
             return;
         }
-
-
 
         // Load widget data and update slots
         const updateSlots = () => {

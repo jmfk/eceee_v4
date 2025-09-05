@@ -68,7 +68,7 @@ export const renderWidgetToHTML = (widget) => {
     case 'core_widgets.ContentWidget':
       const content = config.content || '<div class="text-gray-500 italic">Content will appear here...</div>'
       return `
-        <div class="content-widget">
+        <div class="content-widget theme-content widget-content">
           ${content}
         </div>
       `
@@ -78,7 +78,7 @@ export const renderWidgetToHTML = (widget) => {
       const altText = config.alt_text || config.altText || 'Image'
       const caption = config.caption || ''
       return `
-        <div class="image-widget text-center">
+        <div class="image-widget text-center theme-content widget-content">
           ${imgSrc ?
           `<img src="${escapeHtml(imgSrc)}" alt="${escapeHtml(altText)}" class="max-w-full h-auto rounded" />` :
           '<div class="bg-gray-200 h-32 rounded flex items-center justify-center text-gray-500">Image placeholder</div>'
@@ -89,7 +89,7 @@ export const renderWidgetToHTML = (widget) => {
 
     case 'core_widgets.TableWidget':
       return `
-        <div class="table-widget">
+        <div class="table-widget theme-content widget-content">
           <div class="bg-gray-50 border border-gray-200 rounded p-4 text-center">
             <div class="text-gray-600">Table widget will appear here...</div>
           </div>
@@ -98,35 +98,35 @@ export const renderWidgetToHTML = (widget) => {
 
     case 'core_widgets.FooterWidget':
       return `
-        <footer class="footer-widget bg-gray-800 text-white p-4 text-center rounded">
+        <footer class="footer-widget bg-gray-800 text-white p-4 text-center rounded theme-content widget-content">
           <div class="text-sm">Footer content will appear here...</div>
         </footer>
       `
 
     case 'core_widgets.HeaderWidget':
       return `
-        <header class="header-widget bg-white p-6 text-center border border-gray-200 rounded">
+        <header class="header-widget bg-white p-6 text-center border border-gray-200 rounded theme-content widget-content">
           <div class="text-lg font-semibold">Header content will appear here...</div>
         </header>
       `
 
     case 'core_widgets.NavigationWidget':
       return `
-        <nav class="navigation-widget bg-white border border-gray-200 rounded p-4">
+        <nav class="navigation-widget bg-white border border-gray-200 rounded p-4 theme-content widget-content">
           <div class="text-center text-gray-600">Navigation content will appear here...</div>
         </nav>
       `
 
     case 'core_widgets.SidebarWidget':
       return `
-        <aside class="sidebar-widget bg-gray-50 border border-gray-200 rounded p-4">
+        <aside class="sidebar-widget bg-gray-50 border border-gray-200 rounded p-4 theme-content widget-content">
           <div class="text-gray-600">Sidebar content will appear here...</div>
         </aside>
       `
 
     case 'core_widgets.FormsWidget':
       return `
-        <div class="forms-widget bg-white border border-gray-200 rounded p-6">
+        <div class="forms-widget bg-white border border-gray-200 rounded p-6 theme-content widget-content">
           <h3 class="text-lg font-semibold mb-4 text-center">Contact Form</h3>
           <div class="text-center text-gray-600">Form will appear here...</div>
         </div>
@@ -136,7 +136,7 @@ export const renderWidgetToHTML = (widget) => {
       // Generic widget renderer for unknown types
       const widgetTypeName = widget.name || widget.type || 'Unknown Widget'
       return `
-        <div class="generic-widget text-center p-4 bg-gray-50 border-2 border-dashed border-gray-300 rounded">
+        <div class="generic-widget text-center p-4 bg-gray-50 border-2 border-dashed border-gray-300 rounded theme-content widget-content">
           <div class="text-sm font-medium text-gray-700">${escapeHtml(widgetTypeName)}</div>
           <div class="text-xs text-gray-500 mt-1">
             ${config.title || config.content || 'Widget content will appear here 2'}

@@ -265,8 +265,34 @@ const SlotIconMenu = ({ slotName, slot, availableWidgetTypes, isFilteringTypes, 
     )
 }
 
-const ObjectContentEditor = forwardRef(({ objectType, widgets = {}, onWidgetChange, mode = 'object' }, ref) => {
+const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange, mode = 'object' }, ref) => {
     const [selectedWidgets, setSelectedWidgets] = useState({}) // For bulk operations
+
+    // Create a stable reference to onWidgetChange to prevent unnecessary re-renders
+    const stableOnWidgetChange = useRef(onWidgetChange)
+    stableOnWidgetChange.current = onWidgetChange
+
+    const memoizedOnWidgetChange = useCallback((updatedWidgets) => {
+        if (stableOnWidgetChange.current) {
+            stableOnWidgetChange.current(updatedWidgets)
+        }
+    }, [])
+
+    // Debug re-renders by tracking prop changes
+    const prevProps = useRef()
+    useEffect(() => {
+        if (prevProps.current) {
+            const changes = []
+            if (prevProps.current.objectType !== objectType) changes.push('objectType')
+            if (prevProps.current.widgets !== widgets) changes.push('widgets')
+            if (prevProps.current.onWidgetChange !== onWidgetChange) changes.push('onWidgetChange')
+            if (prevProps.current.mode !== mode) changes.push('mode')
+            if (changes.length > 0) {
+                console.log('ObjectContentEditor re-render caused by:', changes)
+            }
+        }
+        prevProps.current = { objectType, widgets, onWidgetChange, mode }
+    })
 
     // Widget editor panel state
     const [widgetEditorOpen, setWidgetEditorOpen] = useState(false)
@@ -392,7 +418,7 @@ const ObjectContentEditor = forwardRef(({ objectType, widgets = {}, onWidgetChan
                 ...normalizedWidgets,
                 [slotName]: [...currentSlotWidgets, newWidget]
             }
-            onWidgetChange(updatedWidgets)
+            memoizedOnWidgetChange(updatedWidgets)
         }
     }
 
@@ -440,10 +466,10 @@ const ObjectContentEditor = forwardRef(({ objectType, widgets = {}, onWidgetChan
             )
         }
 
-        onWidgetChange(updatedWidgets)
+        memoizedOnWidgetChange(updatedWidgets)
         setWidgetHasUnsavedChanges(false)
         handleCloseWidgetEditor()
-    }, [editingWidget, normalizedWidgets, onWidgetChange, handleCloseWidgetEditor])
+    }, [editingWidget, normalizedWidgets, memoizedOnWidgetChange, handleCloseWidgetEditor])
 
     const handleEditWidget = (slotName, widgetIndex, widget) => {
         // Add slotName to widget data for editor
@@ -473,7 +499,7 @@ const ObjectContentEditor = forwardRef(({ objectType, widgets = {}, onWidgetChan
                 ...normalizedWidgets,
                 [slotName]: updatedSlotWidgets
             }
-            onWidgetChange(updatedWidgets)
+            memoizedOnWidgetChange(updatedWidgets)
         }
     }
 
@@ -495,8 +521,8 @@ const ObjectContentEditor = forwardRef(({ objectType, widgets = {}, onWidgetChan
         }
 
         // Notify parent component of the change
-        if (onWidgetChange) {
-            onWidgetChange(updatedWidgets)
+        if (memoizedOnWidgetChange) {
+            memoizedOnWidgetChange(updatedWidgets)
         }
     }
 
@@ -516,8 +542,8 @@ const ObjectContentEditor = forwardRef(({ objectType, widgets = {}, onWidgetChan
         }
 
         // Notify parent component of the change
-        if (onWidgetChange) {
-            onWidgetChange(updatedWidgets)
+        if (memoizedOnWidgetChange) {
+            memoizedOnWidgetChange(updatedWidgets)
         }
     }
 
@@ -559,8 +585,8 @@ const ObjectContentEditor = forwardRef(({ objectType, widgets = {}, onWidgetChan
         setSelectedWidgets({})
 
         // Notify parent component
-        if (onWidgetChange) {
-            onWidgetChange(updatedWidgets)
+        if (memoizedOnWidgetChange) {
+            memoizedOnWidgetChange(updatedWidgets)
         }
     }
 
@@ -599,15 +625,35 @@ const ObjectContentEditor = forwardRef(({ objectType, widgets = {}, onWidgetChan
             return newSelection
         })
 
-        if (onWidgetChange) {
-            onWidgetChange(updatedWidgets)
+        if (memoizedOnWidgetChange) {
+            memoizedOnWidgetChange(updatedWidgets)
         }
     }
+
+    // Stable config change handler that doesn't depend on widget.config
+    const handleConfigChange = useCallback((widgetId, slotName, newConfig) => {
+        console.log('onConfigChange', newConfig);
+        // Get the current widget from the store to avoid stale closure
+        const currentWidgets = normalizedWidgets[slotName] || [];
+        const currentWidget = currentWidgets.find(w => w.id === widgetId);
+        if (currentWidget) {
+            const updatedWidget = {
+                ...currentWidget,
+                config: newConfig
+            };
+            updateWidget(slotName, widgetId, updatedWidget);
+        }
+    }, [normalizedWidgets, updateWidget]);
 
     const renderWidget = (widget, slotName, index) => {
         const widgetKey = `${slotName}-${index}`
         const isSelected = !!selectedWidgets[widgetKey]
         const slotWidgets = normalizedWidgets[slotName] || []
+
+        // Create a stable callback for this specific widget
+        const handleWidgetConfigChange = useCallback((newConfig) => {
+            handleConfigChange(widget.id, slotName, newConfig);
+        }, [handleConfigChange, widget.id, slotName]);
 
         return (
             <div key={widget.id || index} className="relative">
@@ -619,6 +665,7 @@ const ObjectContentEditor = forwardRef(({ objectType, widgets = {}, onWidgetChan
                     onDelete={handleDeleteWidget}
                     onMoveUp={handleMoveWidgetUp}
                     onMoveDown={handleMoveWidgetDown}
+                    onConfigChange={handleWidgetConfigChange}
                     canMoveUp={index > 0}
                     canMoveDown={index < slotWidgets.length - 1}
                     mode="editor"
@@ -723,6 +770,7 @@ const ObjectContentEditor = forwardRef(({ objectType, widgets = {}, onWidgetChan
         handleSaveWidget
     }), [widgetEditorOpen, editingWidget, widgetHasUnsavedChanges, handleOpenWidgetEditor, handleCloseWidgetEditor, handleSaveWidget])
 
+    console.log('render ObjectContentEditor')
     return (
         <div ref={ref} className="space-y-4">
             {/* Slots */}
@@ -749,8 +797,23 @@ const ObjectContentEditor = forwardRef(({ objectType, widgets = {}, onWidgetChan
             />
         </div>
     )
+}
+
+// Create the forwardRef component
+const ObjectContentEditorWithRef = forwardRef(ObjectContentEditorComponent)
+
+// Wrap with memo and custom comparison
+const ObjectContentEditor = React.memo(ObjectContentEditorWithRef, (prevProps, nextProps) => {
+    // Custom comparison function for React.memo
+    // Note: We don't compare onWidgetChange since we handle it internally with a stable reference
+    return (
+        prevProps.objectType === nextProps.objectType &&
+        prevProps.widgets === nextProps.widgets &&
+        prevProps.mode === nextProps.mode
+    )
 })
 
 ObjectContentEditor.displayName = 'ObjectContentEditor'
 
 export default ObjectContentEditor
+

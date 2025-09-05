@@ -7,7 +7,7 @@ import { getNewFormatWidgetComponent } from './widgetRegistry'
  * Renders individual widgets based on their type and configuration
  */
 
-const WidgetRenderer = ({ widget, mode = 'preview', className = '' }) => {
+const WidgetRenderer = ({ widget, mode = 'preview', className = '', onConfigChange }) => {
     // Validate widget
     if (!widget || !widget.type) {
         return (
@@ -31,6 +31,7 @@ const WidgetRenderer = ({ widget, mode = 'preview', className = '' }) => {
                     config={widget.config || {}}
                     mode={mode}
                     widget={widget}
+                    onConfigChange={onConfigChange}
                 />
             </div>
         )

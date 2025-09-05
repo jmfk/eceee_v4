@@ -6,6 +6,7 @@
 // Constants for widget actions to eliminate magic strings
 import { WIDGET_ACTIONS } from '../utils/widgetConstants';
 import DjangoTemplateRenderer from '../utils/DjangoTemplateRenderer.js';
+import { getWidgetMenuItems, executeWidgetAction } from './widgets/widgetRegistry.js';
 
 // Constants for widget menu icons
 const WIDGET_ICONS = {
@@ -74,6 +75,10 @@ class LayoutRenderer {
     this.pageId = null; // Current page ID
     this.versionSelectorElement = null; // Version selector UI element
     this.versionCallbacks = new Map(); // Map of version-related callbacks
+
+    // Theme support properties
+    this.currentTheme = null; // Currently applied theme
+    this.themeStyleId = null; // ID of injected theme style element
 
     // NEW: Widget data change callbacks for single source of truth
     this.widgetDataCallbacks = new Map(); // Map of widget data change callbacks
@@ -624,6 +629,9 @@ class LayoutRenderer {
           cleanup();
         }
       });
+
+      // Clean up theme styles
+      this.removeTheme();
 
       // Clear all maps
       this.slotContainers.clear();
@@ -2342,14 +2350,42 @@ class LayoutRenderer {
     menuDropdown.className = 'widget-menu-dropdown absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg min-w-32 hidden z-30';
     menuDropdown.setAttribute('data-widget-menu', id);
 
-    // Add edit menu item
+    // Get widget-specific menu items from metadata
+    const widgetType = widgetInstance.type;
+    const widgetMenuItems = getWidgetMenuItems(widgetType);
+
+    // Add widget-specific menu items first
+    if (widgetMenuItems.length > 0) {
+      widgetMenuItems.forEach(item => {
+        if (item.type === 'separator') {
+          // Create separator element
+          const separator = document.createElement('div');
+          separator.className = 'border-t border-gray-200 my-1';
+          menuDropdown.appendChild(separator);
+        } else {
+          // Create widget-specific menu item
+          const menuItem = this.createMenuItem(item.icon, item.label, () => {
+            executeWidgetAction(widgetType, item.action, widgetInstance, this);
+            this.hideWidgetMenu(id);
+          }, item.className);
+          menuDropdown.appendChild(menuItem);
+        }
+      });
+
+      // Add separator before standard items if widget items exist
+      const separator = document.createElement('div');
+      separator.className = 'border-t border-gray-200 my-1';
+      menuDropdown.appendChild(separator);
+    }
+
+    // Add standard edit menu item
     const editItem = this.createMenuItem(WIDGET_ICONS.EDIT, 'Edit', () => {
       this.editWidget(id, widgetInstance);
       this.hideWidgetMenu(id);
     }, 'text-blue-700 hover:bg-blue-50');
     menuDropdown.appendChild(editItem);
 
-    // Add remove menu item  
+    // Add standard remove menu item  
     const removeItem = this.createMenuItem(WIDGET_ICONS.TRASH, 'Remove', () => {
       // Direct removal without confirmation
       this.removeWidgetFromSlot(id);
@@ -5231,6 +5267,107 @@ class LayoutRenderer {
    */
   setWidgetDataCallbacks(callbacks = {}) {
     this.widgetDataCallbacks = new Map(Object.entries(callbacks));
+  }
+
+  /**
+   * Apply theme CSS to content areas
+   * @param {Object} theme - Theme data with cssVariables and customCss
+   */
+  applyTheme(theme) {
+    try {
+      if (!theme) {
+        this.removeTheme()
+        return
+      }
+
+      // Remove existing theme styles
+      this.removeTheme()
+
+      // Generate theme CSS
+      const cssContent = this.generateThemeCSS(theme)
+
+      if (!cssContent) {
+        return
+      }
+
+      // Create unique style ID
+      this.themeStyleId = `layout-theme-${theme.id || 'default'}`
+
+      // Inject theme styles
+      this.injectWidgetStyles(cssContent, null, 0) // Use existing injection method
+
+      this.currentTheme = theme
+
+      console.log(`LayoutRenderer: Applied theme "${theme.name}" to content areas`)
+
+    } catch (error) {
+      console.error('LayoutRenderer: Error applying theme', error)
+    }
+  }
+
+  /**
+   * Generate CSS content from theme data
+   * @param {Object} theme - Theme data
+   * @returns {string} Generated CSS content
+   */
+  generateThemeCSS(theme) {
+    if (!theme) return ''
+
+    const { cssVariables = {}, customCss = '' } = theme
+
+    // Generate CSS variables for content areas
+    const variablesCSS = Object.keys(cssVariables).length > 0 ? `
+.theme-content, .widget-content, .content-editor-theme {
+${Object.entries(cssVariables)
+        .map(([key, value]) => `  --${key}: ${value};`)
+        .join('\n')}
+}` : ''
+
+    // Generate scoped custom CSS for content areas
+    const scopedCustomCSS = customCss ?
+      customCss.split('}').map(rule => {
+        if (rule.trim() && !rule.includes('@')) {
+          const selector = rule.split('{')[0].trim()
+          const styles = rule.split('{')[1] || ''
+
+          if (selector && styles) {
+            // Scope to content areas only
+            const scopedSelectors = [
+              `.theme-content ${selector}`,
+              `.widget-content ${selector}`,
+              `.content-editor-theme ${selector}`
+            ].join(', ')
+
+            return `${scopedSelectors} { ${styles} }`
+          }
+        }
+        return rule.includes('@') ? rule + '}' : ''
+      }).filter(Boolean).join('\n') : ''
+
+    return [variablesCSS, scopedCustomCSS].filter(Boolean).join('\n\n')
+  }
+
+  /**
+   * Remove theme CSS from document
+   */
+  removeTheme() {
+    if (this.themeStyleId) {
+      const styleElement = document.getElementById(this.themeStyleId)
+      if (styleElement) {
+        styleElement.remove()
+        this.injectedStyles.delete(this.themeStyleId)
+      }
+      this.themeStyleId = null
+    }
+    this.currentTheme = null
+  }
+
+  /**
+   * Get currently applied theme
+   * @returns {Object|null} Current theme data
+   */
+  getCurrentTheme() {
+    return this.currentTheme
   }
 
   /**
