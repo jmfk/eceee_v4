@@ -206,7 +206,6 @@ const ContentWidget = memo(({ config = {}, mode = 'editor', onConfigChange, them
 
     // Memoize the content change handler to prevent unnecessary re-renders
     const handleContentChange = useCallback((newContent) => {
-        console.log('handleContentChange', newContent)
         if (onConfigChange && newContent !== content) {
             onConfigChange({
                 ...config,
@@ -214,7 +213,6 @@ const ContentWidget = memo(({ config = {}, mode = 'editor', onConfigChange, them
             })
         }
     }, [onConfigChange, config, content])
-    console.log(mode)
     if (mode === 'editor') {
         return (
             <ContentEditor

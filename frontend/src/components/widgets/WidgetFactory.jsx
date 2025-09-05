@@ -1,7 +1,7 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Layout, Settings, Trash2, ChevronUp, ChevronDown, Eye, ChevronLeft, ChevronRight, X } from 'lucide-react'
-import WidgetRenderer from './WidgetRenderer'
 import { WIDGET_REGISTRY } from './widgetRegistry'
+import { renderWidgetPreview } from '../../utils/widgetPreview'
 
 /**
  * Widget Factory component that creates widget elements with controls
@@ -46,6 +46,9 @@ const WidgetFactory = ({
     const [isHovered, setIsHovered] = useState(false)
     const [isMenuExpanded, setIsMenuExpanded] = useState(true)
     const [showPreview, setShowPreview] = useState(false)
+    const [isLoadingPreview, setIsLoadingPreview] = useState(false)
+    const [previewContent, setPreviewContent] = useState(null)
+    const previewContainerRef = useRef(null)
 
     const handleEdit = () => {
         if (onEdit) {
@@ -73,12 +76,34 @@ const WidgetFactory = ({
         }
     }
 
-    const handlePreview = () => {
+    const handlePreview = async () => {
         setShowPreview(true)
+        setIsLoadingPreview(true)
+        setPreviewContent(null)
+
+        try {
+            const result = await renderWidgetPreview(widget)
+            setPreviewContent(result)
+        } catch (error) {
+            console.error('Error loading widget preview:', error)
+            setPreviewContent({
+                html: `<div class="text-red-600 p-4 border border-red-200 rounded bg-red-50">
+                    <strong>Preview Error:</strong> Could not load widget preview
+                    <br><small>${error.message || 'Unknown error'}</small>
+                </div>`,
+                css: '',
+                success: false,
+                error: error.message
+            })
+        } finally {
+            setIsLoadingPreview(false)
+        }
     }
 
     const handleClosePreview = () => {
         setShowPreview(false)
+        setPreviewContent(null)
+        setIsLoadingPreview(false)
     }
 
     const toggleMenuExpansion = () => {
@@ -187,12 +212,22 @@ const WidgetFactory = ({
 
 
 
-                {/* Widget Content */}
-                <WidgetRenderer
-                    widget={widget}
-                    mode={mode}
-                    onConfigChange={onConfigChange}
-                />
+                {/* Widget Content - Simple representation for editor */}
+                <div className="widget-content bg-gray-50 border border-gray-200 rounded p-4">
+                    <div className="flex items-center space-x-3">
+                        <div className="bg-white rounded-lg w-10 h-10 flex items-center justify-center text-gray-600 border">
+                            <Layout className="h-5 w-5" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <h4 className="text-sm font-medium text-gray-900">
+                                {getWidgetTypeName(widget)}
+                            </h4>
+                            <p className="text-xs text-gray-500 truncate">
+                                {widget.config?.title || widget.config?.content || widget.config?.text || 'Widget content'}
+                            </p>
+                        </div>
+                    </div>
+                </div>
 
                 {/* Preview Modal */}
                 {showPreview && (
@@ -215,9 +250,28 @@ const WidgetFactory = ({
                                     <X className="h-4 w-4" />
                                 </button>
                             </div>
-                            <div className="">
-                                <WidgetRenderer widget={widget} mode="preview" />
+                            <div className="p-4">
+                                {isLoadingPreview ? (
+                                    <div className="text-center py-12">
+                                        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                                        <p className="mt-2 text-sm text-gray-600">Rendering preview...</p>
+                                    </div>
+                                ) : previewContent ? (
+                                    <div
+                                        ref={previewContainerRef}
+                                        className="widget-preview-content"
+                                        dangerouslySetInnerHTML={{ __html: previewContent.html }}
+                                    />
+                                ) : (
+                                    <div className="text-center py-12 text-gray-500">
+                                        <p>No preview available</p>
+                                    </div>
+                                )}
                             </div>
+                            {/* Add CSS if available */}
+                            {previewContent?.css && (
+                                <style dangerouslySetInnerHTML={{ __html: previewContent.css }} />
+                            )}
                         </div>
                     </div>
                 )}
@@ -233,11 +287,21 @@ const WidgetFactory = ({
             data-widget-type={widget.type}
             data-widget-id={widget.id}
         >
-            <WidgetRenderer
-                widget={widget}
-                mode={mode}
-                onConfigChange={onConfigChange}
-            />
+            <div className="widget-content bg-gray-50 border border-gray-200 rounded p-4">
+                <div className="flex items-center space-x-3">
+                    <div className="bg-white rounded-lg w-10 h-10 flex items-center justify-center text-gray-600 border">
+                        <Layout className="h-5 w-5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <h4 className="text-sm font-medium text-gray-900">
+                            {getWidgetTypeName(widget)}
+                        </h4>
+                        <p className="text-xs text-gray-500 truncate">
+                            {widget.config?.title || widget.config?.content || widget.config?.text || 'Widget content'}
+                        </p>
+                    </div>
+                </div>
+            </div>
         </div>
     )
 }

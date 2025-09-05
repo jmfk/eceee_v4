@@ -4,13 +4,14 @@ import {
     Search,
     Plus,
     Grid3X3,
-    Filter
+    Filter,
+    Code
 } from 'lucide-react'
 import { widgetsApi } from '../api'
 import { getAvailableWidgetTypes } from '../utils/widgetTypeValidation'
-import { 
-    getWidgetIcon, 
-    getWidgetCategory, 
+import {
+    getWidgetIcon,
+    getWidgetCategory,
     getWidgetDescription,
     searchWidgets,
     filterWidgetsByCategory,
@@ -59,7 +60,7 @@ const WidgetLibrary = ({ onSelectWidget, selectedWidgetTypes = [] }) => {
         if (IconComponent) {
             return IconComponent
         }
-        
+
         // Fallback for widgets not in registry
         return Grid3X3
     }

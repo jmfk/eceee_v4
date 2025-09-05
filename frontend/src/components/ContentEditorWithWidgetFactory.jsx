@@ -102,7 +102,6 @@ const ContentEditorWithWidgetFactory = forwardRef(({
     // Move widget up in the slot
     const handleWidgetMoveUp = useCallback((slotName, index, widget) => {
         if (index <= 0) return; // Can't move the first widget up
-
         // Update store immediately
         moveWidget(slotName, index, index - 1);
 
@@ -119,14 +118,15 @@ const ContentEditorWithWidgetFactory = forwardRef(({
 
     // Move widget down in the slot
     const handleWidgetMoveDown = useCallback((slotName, index, widget) => {
-        const slotWidgets = storeWidgets[slotName] || [];
+        // Get updated widgets and notify parent
+        const updatedWidgets = getAllWidgets();
+        const slotWidgets = updatedWidgets[slotName] || [];
         if (index >= slotWidgets.length - 1) return; // Can't move the last widget down
 
         // Update store immediately
         moveWidget(slotName, index, index + 1);
 
         // Get updated widgets and notify parent
-        const updatedWidgets = getAllWidgets();
         if (onUpdate) {
             onUpdate({ widgets: updatedWidgets });
         }

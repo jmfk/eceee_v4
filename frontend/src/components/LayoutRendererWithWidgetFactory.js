@@ -223,7 +223,7 @@ class LayoutRendererWithWidgetFactory extends LayoutRenderer {
                     showControls: this.editable
                 })
             );
-
+            console.log("createElement(WidgetFactoryComponent", this.widgetActionHandlers)
             root.render(wrappedComponent);
 
             // Wait for React to render (but root is already stored)

@@ -288,7 +288,7 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
             if (prevProps.current.onWidgetChange !== onWidgetChange) changes.push('onWidgetChange')
             if (prevProps.current.mode !== mode) changes.push('mode')
             if (changes.length > 0) {
-                console.log('ObjectContentEditor re-render caused by:', changes)
+                // Re-render caused by: changes
             }
         }
         prevProps.current = { objectType, widgets, onWidgetChange, mode }
@@ -493,14 +493,12 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
 
         // Notify parent component of the change (using normalized widgets)
         if (onWidgetChange) {
-            console.log('handleDeleteWidget', slotName, widgetIndex, widget)
             const currentSlotWidgets = normalizedWidgets[slotName] || []
             const updatedSlotWidgets = currentSlotWidgets.filter((_, index) => index !== widgetIndex)
             const updatedWidgets = {
                 ...normalizedWidgets,
                 [slotName]: updatedSlotWidgets
             }
-            console.log('handleDeleteWidget', slotName, updatedWidgets)
             memoizedOnWidgetChange(updatedWidgets)
         }
     }
@@ -531,7 +529,9 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
     // Move widget down in the slot
     const handleMoveWidgetDown = (slotName, widgetIndex, widget) => {
         const currentSlotWidgets = [...(normalizedWidgets[slotName] || [])]
-        if (widgetIndex >= currentSlotWidgets.length - 1) return // Can't move the last widget down
+        if (widgetIndex >= currentSlotWidgets.length - 1) {
+            return // Can't move the last widget down
+        }
 
         // Swap with next widget
         const temp = currentSlotWidgets[widgetIndex]
@@ -667,10 +667,10 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
         const isSelected = !!selectedWidgets[widgetKey]
         const slotWidgets = normalizedWidgets[slotName] || []
 
-        // Create a stable callback for this specific widget
-        const handleWidgetConfigChange = useCallback((newConfig) => {
+        // Create a stable callback for this specific widget without using useCallback inside render
+        const handleWidgetConfigChange = (newConfig) => {
             handleConfigChange(widget.id, slotName, newConfig);
-        }, [handleConfigChange, widget.id, slotName]);
+        };
 
         return (
             <div key={widget.id || index} className="relative">
@@ -787,7 +787,6 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
         handleSaveWidget
     }), [widgetEditorOpen, editingWidget, widgetHasUnsavedChanges, handleOpenWidgetEditor, handleCloseWidgetEditor, handleSaveWidget])
 
-    console.log('render ObjectContentEditor')
     return (
         <div ref={ref} className="space-y-4">
             {/* Slots */}

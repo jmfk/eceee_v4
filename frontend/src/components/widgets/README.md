@@ -8,17 +8,11 @@ This directory contains a shared widget system that can be used by both ContentE
 
 ### Core Components
 
-1. **WidgetRenderer** (`WidgetRenderer.jsx`)
-   - Main component for rendering individual widgets
-   - Automatically selects the appropriate widget component based on type
-   - Provides fallback rendering for unknown widget types
-   - Supports both preview and editor modes
-
-2. **WidgetFactory** (`WidgetFactory.jsx`)
-   - Higher-level component that wraps widgets with editor controls
-   - Provides edit, delete, and preview buttons
-   - Handles widget metadata display
-   - Can be used in both editor and preview modes
+1. **WidgetFactory** (`WidgetFactory.jsx`)
+   - Main component for rendering widgets with editor controls
+   - Provides edit, delete, and preview buttons with backend rendering for previews
+   - Handles widget metadata display and simple representation in editor mode
+   - Uses backend API for accurate widget previews
 
 3. **Individual Widget Components**
    - `TextBlockWidget.jsx` - Renders text content with optional title
@@ -88,7 +82,7 @@ const createWidgetElement = useCallback((widget) => {
 ### Direct Widget Usage
 
 ```jsx
-import { WidgetRenderer } from './widgets'
+import { WidgetFactory } from './widgets'
 
 const MyComponent = () => {
   const widget = {
@@ -100,7 +94,7 @@ const MyComponent = () => {
     }
   }
   
-  return <WidgetRenderer widget={widget} mode="preview" />
+  return <WidgetFactory widget={widget} mode="preview" showControls={false} />
 }
 ```
 

@@ -11,4 +11,3 @@ export { default as FormsWidget } from './FormsWidget'
 // Re-export the widget registry and utilities
 export * from './widgetRegistry'
 export { default as WidgetFactory } from './WidgetFactory'
-export { default as WidgetRenderer } from './WidgetRenderer'
