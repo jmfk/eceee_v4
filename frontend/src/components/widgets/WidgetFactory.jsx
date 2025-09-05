@@ -108,12 +108,14 @@ const WidgetFactory = ({
                         </button>
 
                         {/* Widget Type Label */}
-                        <span
-                            className="text-xs font-medium text-gray-500 px-2 py-1 bg-gray-100 rounded"
-                            title={`Widget Type: ${getWidgetTypeName(widget)}`}
-                        >
-                            {isMenuExpanded ? getWidgetTypeName(widget) : getWidgetTypeName(widget).charAt(0)}
-                        </span>
+                        {isMenuExpanded && (
+                            <span
+                                className="text-xs font-medium text-gray-500 px-2 py-1 bg-gray-100 rounded"
+                                title={`Widget Type: ${getWidgetTypeName(widget)}`}
+                            >
+                                {getWidgetTypeName(widget)}
+                            </span>
+                        )}
 
                         {/* Menu Container (can be hidden/shown) */}
                         {isMenuExpanded && (

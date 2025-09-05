@@ -493,12 +493,14 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
 
         // Notify parent component of the change (using normalized widgets)
         if (onWidgetChange) {
+            console.log('handleDeleteWidget', slotName, widgetIndex, widget)
             const currentSlotWidgets = normalizedWidgets[slotName] || []
             const updatedSlotWidgets = currentSlotWidgets.filter((_, index) => index !== widgetIndex)
             const updatedWidgets = {
                 ...normalizedWidgets,
                 [slotName]: updatedSlotWidgets
             }
+            console.log('handleDeleteWidget', slotName, updatedWidgets)
             memoizedOnWidgetChange(updatedWidgets)
         }
     }
@@ -632,18 +634,33 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
 
     // Stable config change handler that doesn't depend on widget.config
     const handleConfigChange = useCallback((widgetId, slotName, newConfig) => {
-        console.log('onConfigChange', newConfig);
         // Get the current widget from the store to avoid stale closure
         const currentWidgets = normalizedWidgets[slotName] || [];
-        const currentWidget = currentWidgets.find(w => w.id === widgetId);
-        if (currentWidget) {
+        const widgetIndex = currentWidgets.findIndex(w => w.id === widgetId);
+        if (widgetIndex !== -1) {
+            const currentWidget = currentWidgets[widgetIndex];
             const updatedWidget = {
                 ...currentWidget,
                 config: newConfig
             };
-            updateWidget(slotName, widgetId, updatedWidget);
+            updateWidget(slotName, widgetIndex, updatedWidget);
+
+            // Update editingWidget if this is the widget being edited
+            if (editingWidget && editingWidget.id === widgetId) {
+                setEditingWidget({
+                    ...updatedWidget,
+                    slotName: editingWidget.slotName // Preserve slotName
+                });
+            }
+
+            // Create updated widgets object and notify parent
+            const updatedWidgets = { ...normalizedWidgets };
+            updatedWidgets[slotName] = [...currentWidgets];
+            updatedWidgets[slotName][widgetIndex] = updatedWidget;
+
+            memoizedOnWidgetChange(updatedWidgets);
         }
-    }, [normalizedWidgets, updateWidget]);
+    }, [normalizedWidgets, updateWidget, memoizedOnWidgetChange, editingWidget]);
 
     const renderWidget = (widget, slotName, index) => {
         const widgetKey = `${slotName}-${index}`
