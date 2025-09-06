@@ -10,10 +10,12 @@
         <div class="objects-container">
             {% for object in objects %}
                 <div class="object-item{% if config.show_hierarchy %} level-{{ object.level }}{% endif %}">
-                    {% if config.show_hierarchy and object.level > 0 %}
-                        <div class="hierarchy-indicator" style="margin-left: {{ object.level|mul:20 }}px;">
-                            <span class="hierarchy-line">└─</span>
-                        </div>
+                    {% if config.show_hierarchy %}
+                        {% if object.level > 0 %}
+                            <div class="hierarchy-indicator" style="margin-left: {{ object.level|mul:20 }}px;">
+                                <span class="hierarchy-line">└─</span>
+                            </div>
+                        {% endif %}
                     {% endif %}
                     
                     <div class="object-content">

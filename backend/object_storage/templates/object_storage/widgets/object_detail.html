@@ -22,19 +22,21 @@
                     <span class="object-version"> • Version {{ object.version }}</span>
                 </div>
                 
-                {% if config.show_hierarchy and object.level > 0 %}
-                    <div class="object-hierarchy">
-                        <h4 class="text-sm font-medium text-gray-700 mb-2">Location in hierarchy:</h4>
-                        <div class="breadcrumb">
-                            {% for ancestor in ancestors %}
-                                <a href="{% url 'object_detail' ancestor.object_type.name ancestor.slug %}" class="text-blue-600 hover:text-blue-800">
-                                    {{ ancestor.title }}
-                                </a>
-                                <span class="mx-2 text-gray-400">→</span>
-                            {% endfor %}
-                            <span class="text-gray-900 font-medium">{{ object.title }}</span>
+                {% if config.show_hierarchy %}
+                    {% if object.level > 0 %}
+                        <div class="object-hierarchy">
+                            <h4 class="text-sm font-medium text-gray-700 mb-2">Location in hierarchy:</h4>
+                            <div class="breadcrumb">
+                                {% for ancestor in ancestors %}
+                                    <a href="{% url 'object_detail' ancestor.object_type.name ancestor.slug %}" class="text-blue-600 hover:text-blue-800">
+                                        {{ ancestor.title }}
+                                    </a>
+                                    <span class="mx-2 text-gray-400">→</span>
+                                {% endfor %}
+                                <span class="text-gray-900 font-medium">{{ object.title }}</span>
+                            </div>
                         </div>
-                    </div>
+                    {% endif %}
                 {% endif %}
             </header>
             

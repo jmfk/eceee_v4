@@ -662,15 +662,15 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
         }
     }, [normalizedWidgets, updateWidget, memoizedOnWidgetChange, editingWidget]);
 
+    // Create a stable config change handler at component level
+    const stableConfigChangeHandler = useCallback((widgetId, slotName, newConfig) => {
+        handleConfigChange(widgetId, slotName, newConfig);
+    }, [handleConfigChange]);
+
     const renderWidget = (widget, slotName, index) => {
         const widgetKey = `${slotName}-${index}`
         const isSelected = !!selectedWidgets[widgetKey]
         const slotWidgets = normalizedWidgets[slotName] || []
-
-        // Create a stable callback for this specific widget without using useCallback inside render
-        const handleWidgetConfigChange = (newConfig) => {
-            handleConfigChange(widget.id, slotName, newConfig);
-        };
 
         return (
             <div key={widget.id || index} className="relative">
@@ -682,7 +682,7 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
                     onDelete={handleDeleteWidget}
                     onMoveUp={handleMoveWidgetUp}
                     onMoveDown={handleMoveWidgetDown}
-                    onConfigChange={handleWidgetConfigChange}
+                    onConfigChange={stableConfigChangeHandler}
                     canMoveUp={index > 0}
                     canMoveDown={index < slotWidgets.length - 1}
                     mode="editor"

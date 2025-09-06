@@ -217,11 +217,16 @@ const WidgetFactory = ({
                     {(() => {
                         const WidgetComponent = getWidgetComponent(widget.type)
                         if (WidgetComponent) {
+                            // Create a wrapper function that passes widget ID and slotName
+                            const handleConfigChange = onConfigChange ? (newConfig) => {
+                                onConfigChange(widget.id, slotName, newConfig);
+                            } : undefined;
+                            
                             return (
                                 <WidgetComponent
                                     config={widget.config || {}}
                                     mode="editor"
-                                    onConfigChange={onConfigChange}
+                                    onConfigChange={handleConfigChange}
                                     themeId={widget.config?.themeId}
                                 />
                             )
@@ -310,12 +315,21 @@ const WidgetFactory = ({
             data-widget-id={widget.id}
         >
             {WidgetComponent ? (
-                <WidgetComponent
-                    config={widget.config || {}}
-                    mode={mode}
-                    onConfigChange={onConfigChange}
-                    themeId={widget.config?.themeId}
-                />
+                (() => {
+                    // Create a wrapper function that passes widget ID and slotName
+                    const handleConfigChange = onConfigChange ? (newConfig) => {
+                        onConfigChange(widget.id, slotName, newConfig);
+                    } : undefined;
+                    
+                    return (
+                        <WidgetComponent
+                            config={widget.config || {}}
+                            mode={mode}
+                            onConfigChange={handleConfigChange}
+                            themeId={widget.config?.themeId}
+                        />
+                    );
+                })()
             ) : (
                 // Fallback to placeholder if component not found
                 <div className="widget-content bg-gray-50 border border-gray-200 rounded p-4">

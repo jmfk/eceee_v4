@@ -215,6 +215,30 @@ def render_page_backend(context, page, version=None):
         return mark_safe("")
 
 
+@register.filter
+def mul(value, arg):
+    """
+    Multiply a number by another number.
+    Usage: {{ value|mul:arg }}
+    """
+    try:
+        return int(value) * int(arg)
+    except (ValueError, TypeError):
+        return 0
+
+
+@register.filter
+def sub(value, arg):
+    """
+    Subtract a number from another number.
+    Usage: {{ value|sub:arg }}
+    """
+    try:
+        return int(value) - int(arg)
+    except (ValueError, TypeError):
+        return 0
+
+
 @register.simple_tag(takes_context=True)
 def render_page_with_css(context, page, version=None):
     """
