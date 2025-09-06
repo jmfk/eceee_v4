@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link, Navigate, useLocation } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
     ArrowLeft, Layout, FileText, Settings, Calendar, Users, History,
     Save, Eye
@@ -21,6 +21,49 @@ const ObjectInstanceEditPage = () => {
     const navigate = useNavigate()
     const location = useLocation()
     const { addNotification } = useGlobalNotifications()
+    const queryClient = useQueryClient()
+
+    // Save state management
+    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+
+    // Save mutation
+    const saveMutation = useMutation({
+        mutationFn: (saveData) => {
+            if (isNewInstance) {
+                return objectInstancesApi.create(saveData)
+            } else if (saveData.createNew) {
+                // Create new version
+                return objectInstancesApi.createVersion(instanceId, saveData)
+            } else {
+                // Update current version
+                return objectInstancesApi.update(instanceId, saveData)
+            }
+        },
+        onSuccess: (response, variables) => {
+            queryClient.invalidateQueries(['objectInstances'])
+            queryClient.invalidateQueries(['objectInstance'])
+
+            const message = isNewInstance
+                ? 'Object created successfully'
+                : variables.createNew
+                    ? 'New version created successfully'
+                    : 'Object updated successfully'
+
+            addNotification(message, 'success')
+            setHasUnsavedChanges(false)
+
+            // Navigate back or to the new instance
+            if (isNewInstance && response.data?.id) {
+                navigate(`/objects/${response.data.id}/edit/content`)
+            } else {
+                handleBack()
+            }
+        },
+        onError: (error) => {
+            console.error('Failed to save object:', error)
+            addNotification('Failed to save object', 'error')
+        }
+    })
 
     // Extract parent ID from URL search params for new sub-objects
     const urlParams = new URLSearchParams(location.search)
@@ -87,6 +130,23 @@ const ObjectInstanceEditPage = () => {
         return <Navigate to={redirectPath} replace />
     }
 
+    // Save handlers
+    const handleSave = async (saveType = 'update_current') => {
+        // Collect data from all tabs - this is a simplified version
+        // In a real implementation, you'd want to collect data from each tab component
+        const saveData = {
+            objectTypeId: actualObjectTypeId,
+            title: instance?.title || 'Untitled',
+            data: instance?.data || {},
+            widgets: instance?.widgets || {},
+            status: instance?.status || 'draft',
+            parent: parentIdFromUrl || instance?.parent?.id || instance?.parent,
+            createNew: saveType === 'create_new'
+        }
+
+        saveMutation.mutate(saveData)
+    }
+
     const handleBack = () => {
         // If this object has a parent (either from URL param or instance data), 
         // navigate back to parent's sub-objects view
@@ -117,21 +177,10 @@ const ObjectInstanceEditPage = () => {
             instance,
             parentId: parentIdFromUrl || instance?.parent?.id || instance?.parent,
             isNewInstance,
+            onUnsavedChanges: setHasUnsavedChanges,
             onSave: () => {
-                addNotification('Object saved successfully', 'success')
-                // Navigate back to parent's sub-objects view if this is a sub-object
-                const actualParentId = parentIdFromUrl || instance?.parent?.id || instance?.parent
-                if (actualParentId) {
-                    navigate(`/objects/${actualParentId}/edit/subobjects`)
-                } else {
-                    // If no parent, go to the list view filtered by this object's type
-                    const objectTypeName = objectType?.name
-                    if (objectTypeName) {
-                        navigate(`/objects/${objectTypeName}`)
-                    } else {
-                        navigate('/objects')
-                    }
-                }
+                // This is now handled by the footer buttons
+                // Individual tabs can still trigger saves if needed
             },
             onCancel: handleBack
         }
@@ -180,9 +229,9 @@ const ObjectInstanceEditPage = () => {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50">
-            {/* Header */}
-            <div className="bg-white shadow-sm border-b">
+        <div className="h-screen bg-gray-50 flex flex-col">
+            {/* Header - Fixed */}
+            <div className="flex-shrink-0 bg-white shadow-sm border-b">
                 <div className="max-w-7xl mx-auto px-6 py-4">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center">
@@ -241,19 +290,83 @@ const ObjectInstanceEditPage = () => {
                 </div>
             </div>
 
-            {/* Content */}
-            <div className="mx-auto">
+            {/* Content Area - Scrollable */}
+            <div className="flex-1 min-h-0">
                 {renderTabContent()}
             </div>
 
-            {/* Status Bar */}
-            <StatusBar
-                customStatusContent={
-                    <span>
-                        {isNewInstance ? 'Creating' : 'Editing'} {objectType?.label} - {tabs.find(t => t.id === tab)?.label}
-                    </span>
-                }
-            />
+            {/* Footer - Fixed with Save Buttons */}
+            <div className="flex-shrink-0 bg-white border-t border-gray-200 shadow-lg">
+                <div className="max-w-7xl mx-auto px-6 py-4">
+                    <div className="flex items-center justify-between">
+                        {/* Status Info */}
+                        <div className="text-sm text-gray-600">
+                            {isNewInstance ? 'Creating' : 'Editing'} {objectType?.label} - {tabs.find(t => t.id === tab)?.label}
+                        </div>
+
+                        {/* Save Buttons */}
+                        <div className="flex items-center space-x-3">
+                            {!isNewInstance && (
+                                <>
+                                    <button
+                                        onClick={() => handleSave('update_current')}
+                                        disabled={saveMutation.isPending || !hasUnsavedChanges}
+                                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-colors"
+                                    >
+                                        {saveMutation.isPending ? (
+                                            <>
+                                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                                Saving...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Save className="h-4 w-4 mr-2" />
+                                                Save
+                                            </>
+                                        )}
+                                    </button>
+                                    <button
+                                        onClick={() => handleSave('create_new')}
+                                        disabled={saveMutation.isPending || !hasUnsavedChanges}
+                                        className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-colors"
+                                    >
+                                        {saveMutation.isPending ? (
+                                            <>
+                                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                                Saving...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Save className="h-4 w-4 mr-2" />
+                                                Save as New...
+                                            </>
+                                        )}
+                                    </button>
+                                </>
+                            )}
+                            {isNewInstance && (
+                                <button
+                                    onClick={() => handleSave('create')}
+                                    disabled={saveMutation.isPending || !hasUnsavedChanges}
+                                    className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-colors"
+                                >
+                                    {saveMutation.isPending ? (
+                                        <>
+                                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                            Creating...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Save className="h-4 w-4 mr-2" />
+                                            Save
+                                        </>
+                                    )}
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     )
 }

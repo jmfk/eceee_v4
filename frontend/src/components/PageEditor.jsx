@@ -1231,10 +1231,10 @@ const PageEditor = () => {
                                         </div>
                                     </div>
                                 ) : (
-                                    <>
+                                    <div className="h-full flex flex-col">
                                         {/* Layout fallback warning */}
                                         {!(pageVersionData?.codeLayout) && (
-                                            <div className="bg-amber-50 border-l-4 border-amber-400 p-4 mb-4">
+                                            <div className="flex-shrink-0 bg-amber-50 border-l-4 border-amber-400 p-4 mb-2">
                                                 <div className="flex">
                                                     <div className="flex-shrink-0">
                                                         <svg className="h-5 w-5 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
@@ -1251,14 +1251,14 @@ const PageEditor = () => {
                                         )}
 
                                         {isLoadingLayout ? (
-                                            <div className="h-full flex items-center justify-center bg-gray-50">
+                                            <div className="flex-1 flex items-center justify-center bg-gray-50">
                                                 <div className="text-center">
                                                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
                                                     <p className="text-gray-600">Loading layout data...</p>
                                                 </div>
                                             </div>
                                         ) : (
-                                            <>
+                                            <div className="flex-1 min-h-0">
                                                 {useWidgetFactory ? (
                                                     <ContentEditorWithWidgetFactory
                                                         key={`wf-${webpageData?.id}-${pageVersionData?.versionId || 'current'}`}
@@ -1286,9 +1286,9 @@ const PageEditor = () => {
                                                         onOpenWidgetEditor={handleOpenWidgetEditor}
                                                     />
                                                 )}
-                                            </>
+                                            </div>
                                         )}
-                                    </>
+                                    </div>
                                 )}
                             </>
                         )}

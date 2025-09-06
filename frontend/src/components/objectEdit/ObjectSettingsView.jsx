@@ -5,7 +5,7 @@ import { objectInstancesApi } from '../../api/objectStorage'
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext'
 import ParentObjectSelector from '../ParentObjectSelector'
 
-const ObjectSettingsView = ({ objectType, instance, isNewInstance, parentId, onSave, onCancel }) => {
+const ObjectSettingsView = ({ objectType, instance, isNewInstance, parentId, onSave, onCancel, onUnsavedChanges }) => {
     const [formData, setFormData] = useState({
         parent: instance?.parent?.id || parentId || null,
         metadata: instance?.metadata || {}
@@ -14,6 +14,13 @@ const ObjectSettingsView = ({ objectType, instance, isNewInstance, parentId, onS
 
     const queryClient = useQueryClient()
     const { addNotification } = useGlobalNotifications()
+
+    // Notify parent about unsaved changes
+    useEffect(() => {
+        if (onUnsavedChanges) {
+            onUnsavedChanges(isDirty)
+        }
+    }, [isDirty, onUnsavedChanges])
 
     // Parent object selection is now handled by ParentObjectSelector component
 
@@ -91,15 +98,19 @@ const ObjectSettingsView = ({ objectType, instance, isNewInstance, parentId, onS
     }
 
     return (
-        <div className="h-full flex relative">
-            {/* Main Content Area */}
-            <div className="flex-1 min-w-0">
-                <div className="space-y-6">
-                    <div className="bg-white p-6">
-                        <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
-                            <SettingsIcon className="h-5 w-5 mr-2" />
-                            Object Settings
-                        </h2>
+        <div className="h-full flex flex-col relative">
+            {/* Content Header */}
+            <div className="flex-shrink-0 bg-white border-b border-gray-200 p-6">
+                <h2 className="text-xl font-semibold text-gray-900 flex items-center">
+                    <SettingsIcon className="h-5 w-5 mr-2" />
+                    Object Settings
+                </h2>
+            </div>
+
+            {/* Scrollable Content Area */}
+            <div className="flex-1 min-h-0 overflow-y-auto bg-white">
+                <div className="p-6">
+                    <div className="space-y-6">
 
                         <div className="space-y-6">
                             {/* Parent Object */}
@@ -162,33 +173,7 @@ const ObjectSettingsView = ({ objectType, instance, isNewInstance, parentId, onS
                         </div>
                     </div>
 
-                    {/* Action Buttons */}
-                    <div className="flex justify-end space-x-4">
-                        <button
-                            type="button"
-                            onClick={onCancel}
-                            className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            onClick={handleSave}
-                            disabled={saveMutation.isPending || !isDirty}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-colors"
-                        >
-                            {saveMutation.isPending ? (
-                                <>
-                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                                    Saving...
-                                </>
-                            ) : (
-                                <>
-                                    <Save className="h-4 w-4 mr-2" />
-                                    Save Settings
-                                </>
-                            )}
-                        </button>
-                    </div>
+                    {/* Save buttons are now in the main footer */}
                 </div>
             </div>
         </div>

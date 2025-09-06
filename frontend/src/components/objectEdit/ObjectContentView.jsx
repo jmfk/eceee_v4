@@ -10,7 +10,7 @@ import ObjectContentEditor from '../ObjectContentEditor'
 import ObjectSchemaForm from '../ObjectSchemaForm'
 import WidgetEditorPanel from '../WidgetEditorPanel'
 
-const ObjectContentView = ({ objectType, instance, parentId, isNewInstance, onSave, onCancel }) => {
+const ObjectContentView = ({ objectType, instance, parentId, isNewInstance, onSave, onCancel, onUnsavedChanges }) => {
     const navigate = useNavigate()
     const { instanceId, objectTypeId, tab } = useParams()
 
@@ -25,6 +25,13 @@ const ObjectContentView = ({ objectType, instance, parentId, isNewInstance, onSa
         hasUnsavedChanges: false
     })
     const [hasWidgetChanges, setHasWidgetChanges] = useState(false)
+
+    // Notify parent about unsaved changes
+    useEffect(() => {
+        if (onUnsavedChanges) {
+            onUnsavedChanges(hasWidgetChanges)
+        }
+    }, [hasWidgetChanges, onUnsavedChanges])
 
     // Fetch widget types for display names
     const { data: widgetTypes = [] } = useQuery({
@@ -281,119 +288,42 @@ const ObjectContentView = ({ objectType, instance, parentId, isNewInstance, onSa
     const isWidgetEditorOpen = editorState?.widgetEditorOpen || false
 
     return (
-        <div className="h-full flex relative">
-            {/* Main Content Area */}
-            <div className={`flex-1 min-w-0 transition-all duration-300 ${isWidgetEditorOpen ? 'mr-0' : ''} pb-24`}>
-                <div className="space-y-6">
-                    <div className="bg-white p-6">
-                        <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
-                            Object Content & Data
-                            {objectType && (
-                                <span className="ml-3 text-sm font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                                    {objectType.label}
-                                </span>
-                            )}
-                        </h2>
+        <div className="h-full flex flex-col relative">
+            {/* Content Header */}
+            <div className="flex-shrink-0 bg-white border-b border-gray-200 p-6">
+                <h2 className="text-xl font-semibold text-gray-900 flex items-center">
+                    Object Content & Data
+                    {objectType && (
+                        <span className="ml-3 text-sm font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                            {objectType.label}
+                        </span>
+                    )}
+                </h2>
+            </div>
 
-                        {/* Conditional Layout - Two columns if widget slots exist, single column if not */}
-                        {objectType?.slotConfiguration?.slots && objectType.slotConfiguration.slots.length > 0 ? (
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                {/* Left Column - Widget Slots */}
-                                <div className="space-y-6 border-r pr-6 border-gray-200">
-                                    <div>
-                                        <ObjectContentEditor
-                                            ref={objectContentEditorRef}
-                                            objectType={objectType}
-                                            widgets={localWidgets}
-                                            onWidgetChange={(newWidgets) => {
-                                                setLocalWidgets(newWidgets)
-                                                setHasWidgetChanges(true)
-                                            }}
-                                            mode="object"
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* Right Column - Object Data */}
-                                <div className="space-y-6">
-                                    {/* Object Type Selection (only for new instances) */}
-                                    {isNewInstance && (
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                Object Type <span className="text-red-500">*</span>
-                                            </label>
-                                            <select
-                                                value={formData.objectTypeId}
-                                                onChange={(e) => handleInputChange('objectTypeId', e.target.value)}
-                                                className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.objectTypeId ? 'border-red-300' : 'border-gray-300'
-                                                    }`}
-                                            >
-                                                <option value="">Select object type...</option>
-                                                {availableTypes.map((type) => (
-                                                    <option key={type.id} value={type.id}>
-                                                        {type.label}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                            {errors.objectTypeId && (
-                                                <p className="text-red-600 text-sm mt-1 flex items-center">
-                                                    <AlertCircle className="h-4 w-4 mr-1" />
-                                                    {errors.objectTypeId}
-                                                </p>
-                                            )}
-                                        </div>
-                                    )}
-
-                                    {/* Title - Model Field */}
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            Object Title <span className="text-red-500">*</span>
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={formData.title}
-                                            onChange={(e) => handleInputChange('title', e.target.value)}
-                                            className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.title ? 'border-red-300' : 'border-gray-300'
-                                                }`}
-                                            placeholder="Enter object title..."
-                                        />
-                                        {errors.title && (
-                                            <p className="text-red-600 text-sm mt-1 flex items-center">
-                                                <AlertCircle className="h-4 w-4 mr-1" />
-                                                {errors.title}
-                                            </p>
-                                        )}
-                                        <p className="text-gray-500 text-sm mt-1">
-                                            This is the object's display title (stored on the object, not in schema data)
-                                        </p>
-                                    </div>
-
-                                    {/* Dynamic Schema Fields */}
-                                    {objectType && (
-                                        <div className="border-t pt-4">
-                                            <h4 className="font-medium text-gray-900 mb-4">
-                                                {objectType.label} Fields
-                                            </h4>
-                                            <ObjectSchemaForm
-                                                schema={getSchemaFromObjectType(objectType)}
-                                                data={formData.data}
-                                                onChange={handleDataFieldChange}
-                                                errors={errors}
-                                            />
-                                        </div>
-                                    )}
+            {/* Scrollable Content Area */}
+            <div className={`flex-1 min-h-0 overflow-y-auto bg-white transition-all duration-300 ${isWidgetEditorOpen ? 'mr-0' : ''}`}>
+                <div className="p-6">
+                    {objectType?.slotConfiguration?.slots && objectType.slotConfiguration.slots.length > 0 ? (
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            {/* Left Column - Widget Slots */}
+                            <div className="space-y-6 border-r pr-6 border-gray-200">
+                                <div>
+                                    <ObjectContentEditor
+                                        ref={objectContentEditorRef}
+                                        objectType={objectType}
+                                        widgets={localWidgets}
+                                        onWidgetChange={(newWidgets) => {
+                                            setLocalWidgets(newWidgets)
+                                            setHasWidgetChanges(true)
+                                        }}
+                                        mode="object"
+                                    />
                                 </div>
                             </div>
-                        ) : (
-                            /* Single Column - Object Data Only */
-                            <div className="space-y-6">
-                                <div>
-                                    <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
-                                        <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-                                        Object Data
-                                    </h3>
-                                </div>
 
+                            {/* Right Column - Object Data */}
+                            <div className="space-y-6">
                                 {/* Object Type Selection (only for new instances) */}
                                 {isNewInstance && (
                                     <div>
@@ -461,74 +391,85 @@ const ObjectContentView = ({ objectType, instance, parentId, isNewInstance, onSa
                                     </div>
                                 )}
                             </div>
-                        )}
-                    </div>
-                </div>
-            </div>
+                        </div>
+                    ) : (
+                        /* Single Column - Object Data Only */
+                        <div className="space-y-6">
+                            <div>
+                                <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                                    <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                                    Object Data
+                                </h3>
+                            </div>
 
-            {/* Sticky Footer with Save Buttons */}
-            <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-10">
-                <div className="max-w-full mx-auto px-6 py-4">
-                    <div className="flex justify-center space-x-3">
-                        {!isNewInstance && (
-                            <>
-                                <button
-                                    onClick={() => handleSave('update_current')}
-                                    disabled={saveMutation.isPending || !hasUnsavedChanges}
-                                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-colors"
-                                >
-                                    {saveMutation.isPending ? (
-                                        <>
-                                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                                            Saving...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Save className="h-4 w-4 mr-2" />
-                                            Update Current (v{instance?.version || 1})
-                                        </>
+                            {/* Object Type Selection (only for new instances) */}
+                            {isNewInstance && (
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Object Type <span className="text-red-500">*</span>
+                                    </label>
+                                    <select
+                                        value={formData.objectTypeId}
+                                        onChange={(e) => handleInputChange('objectTypeId', e.target.value)}
+                                        className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.objectTypeId ? 'border-red-300' : 'border-gray-300'
+                                            }`}
+                                    >
+                                        <option value="">Select object type...</option>
+                                        {availableTypes.map((type) => (
+                                            <option key={type.id} value={type.id}>
+                                                {type.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    {errors.objectTypeId && (
+                                        <p className="text-red-600 text-sm mt-1 flex items-center">
+                                            <AlertCircle className="h-4 w-4 mr-1" />
+                                            {errors.objectTypeId}
+                                        </p>
                                     )}
-                                </button>
-                                <button
-                                    onClick={() => handleSave('create_new')}
-                                    disabled={saveMutation.isPending || !hasUnsavedChanges}
-                                    className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-colors"
-                                >
-                                    {saveMutation.isPending ? (
-                                        <>
-                                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                                            Saving...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Save className="h-4 w-4 mr-2" />
-                                            New Version (v{(instance?.version || 1) + 1})
-                                        </>
-                                    )}
-                                </button>
-                            </>
-                        )}
+                                </div>
+                            )}
 
-                        {isNewInstance && (
-                            <button
-                                onClick={() => handleSave('create_new')}
-                                disabled={saveMutation.isPending || !hasUnsavedChanges}
-                                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-colors"
-                            >
-                                {saveMutation.isPending ? (
-                                    <>
-                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                                        Creating...
-                                    </>
-                                ) : (
-                                    <>
-                                        <Save className="h-4 w-4 mr-2" />
-                                        Create
-                                    </>
+                            {/* Title - Model Field */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Object Title <span className="text-red-500">*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    value={formData.title}
+                                    onChange={(e) => handleInputChange('title', e.target.value)}
+                                    className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.title ? 'border-red-300' : 'border-gray-300'
+                                        }`}
+                                    placeholder="Enter object title..."
+                                />
+                                {errors.title && (
+                                    <p className="text-red-600 text-sm mt-1 flex items-center">
+                                        <AlertCircle className="h-4 w-4 mr-1" />
+                                        {errors.title}
+                                    </p>
                                 )}
-                            </button>
-                        )}
-                    </div>
+                                <p className="text-gray-500 text-sm mt-1">
+                                    This is the object's display title (stored on the object, not in schema data)
+                                </p>
+                            </div>
+
+                            {/* Dynamic Schema Fields */}
+                            {objectType && (
+                                <div className="border-t pt-4">
+                                    <h4 className="font-medium text-gray-900 mb-4">
+                                        {objectType.label} Fields
+                                    </h4>
+                                    <ObjectSchemaForm
+                                        schema={getSchemaFromObjectType(objectType)}
+                                        data={formData.data}
+                                        onChange={handleDataFieldChange}
+                                        errors={errors}
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
 
