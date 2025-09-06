@@ -60,11 +60,16 @@ const Modal = ({
             {/* Modal content */}
             <div className="flex min-h-full items-center justify-center p-4">
                 <div className={`
-                    relative bg-white rounded-lg shadow-xl transform transition-all
+                    relative bg-white rounded-lg shadow-xl transform transition-all flex flex-col
                     w-full ${getSizeClasses()}
-                `}>
+                `}
+                style={{
+                    height: '85vh',
+                    maxHeight: '800px',
+                    minHeight: '500px'
+                }}>
                     {/* Header */}
-                    <div className="flex items-center justify-between p-6 border-b border-gray-200">
+                    <div className="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0">
                         <h3 className="text-lg font-semibold text-gray-900">
                             {title}
                         </h3>
@@ -79,8 +84,8 @@ const Modal = ({
                         )}
                     </div>
 
-                    {/* Content */}
-                    <div className="p-6">
+                    {/* Content - scrollable */}
+                    <div className="p-6 flex-1 overflow-y-auto">
                         {children}
                     </div>
                 </div>
