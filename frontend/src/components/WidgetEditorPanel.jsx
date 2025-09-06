@@ -539,12 +539,17 @@ const WidgetEditorPanel = forwardRef(({
                 onClick={handleClose}
             />
 
-            {/* Slide-out panel - positioned relative to content area */}
+            {/* Slide-out panel - positioned relative to content area with fixed height */}
             <div
                 ref={panelRef}
-                className={`absolute top-0 right-0 h-full bg-white shadow-xl transform transition-transform duration-300 ease-in-out z-50 flex ${isOpen ? 'translate-x-0' : 'translate-x-full'
+                className={`absolute top-0 right-0 bg-white shadow-xl transform transition-transform duration-300 ease-in-out z-50 flex ${isOpen ? 'translate-x-0' : 'translate-x-full'
                     }`}
-                style={{ width: `${panelWidth}px` }}
+                style={{ 
+                    width: `${panelWidth}px`,
+                    height: '80vh',
+                    maxHeight: '600px',
+                    minHeight: '400px'
+                }}
             >
                 {/* Resize handle */}
                 <div
