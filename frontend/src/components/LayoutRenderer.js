@@ -5298,7 +5298,6 @@ class LayoutRenderer {
 
       this.currentTheme = theme
 
-      console.log(`LayoutRenderer: Applied theme "${theme.name}" to content areas`)
 
     } catch (error) {
       console.error('LayoutRenderer: Error applying theme', error)

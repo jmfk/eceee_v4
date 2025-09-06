@@ -302,7 +302,7 @@ const WidgetFactory = ({
 
     // Simple widget renderer without controls
     const WidgetComponent = getWidgetComponent(widget.type)
-    console.log("rerender")
+
     return (
         <div
             className={`widget-item ${className}`}
