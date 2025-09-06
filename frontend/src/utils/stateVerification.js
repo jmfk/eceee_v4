@@ -76,12 +76,6 @@ export const logValidationSync = (type, data, source = 'unknown') => {
         stackTrace: new Error().stack
     }
 
-    // console.group(`🔄 Validation Sync: ${type}`)
-    // console.log('Source:', source)
-    // console.log('Data:', data)
-    // console.log('Timestamp:', timestamp)
-    // console.groupEnd()
-
     // Store in sessionStorage for debugging
     try {
         const existing = JSON.parse(sessionStorage.getItem('validationSyncLog') || '[]')

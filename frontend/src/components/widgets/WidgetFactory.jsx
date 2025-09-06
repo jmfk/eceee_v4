@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { Layout, Settings, Trash2, ChevronUp, ChevronDown, Eye, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { WIDGET_REGISTRY, getWidgetComponent } from './widgetRegistry'
 import { renderWidgetPreview } from '../../utils/widgetPreview'
@@ -49,6 +49,13 @@ const WidgetFactory = ({
     const [isLoadingPreview, setIsLoadingPreview] = useState(false)
     const [previewContent, setPreviewContent] = useState(null)
     const previewContainerRef = useRef(null)
+
+    // Create a stable config change handler using useMemo
+    const stableConfigChangeHandler = useMemo(() => {
+        return onConfigChange ? (newConfig) => {
+            onConfigChange(widget.id, slotName, newConfig);
+        } : undefined;
+    }, [onConfigChange, widget.id, slotName])
 
     const handleEdit = () => {
         if (onEdit) {
@@ -217,16 +224,11 @@ const WidgetFactory = ({
                     {(() => {
                         const WidgetComponent = getWidgetComponent(widget.type)
                         if (WidgetComponent) {
-                            // Create a wrapper function that passes widget ID and slotName
-                            const handleConfigChange = onConfigChange ? (newConfig) => {
-                                onConfigChange(widget.id, slotName, newConfig);
-                            } : undefined;
-                            
                             return (
                                 <WidgetComponent
                                     config={widget.config || {}}
                                     mode="editor"
-                                    onConfigChange={handleConfigChange}
+                                    onConfigChange={stableConfigChangeHandler}
                                     themeId={widget.config?.themeId}
                                 />
                             )
@@ -315,21 +317,12 @@ const WidgetFactory = ({
             data-widget-id={widget.id}
         >
             {WidgetComponent ? (
-                (() => {
-                    // Create a wrapper function that passes widget ID and slotName
-                    const handleConfigChange = onConfigChange ? (newConfig) => {
-                        onConfigChange(widget.id, slotName, newConfig);
-                    } : undefined;
-                    
-                    return (
-                        <WidgetComponent
-                            config={widget.config || {}}
-                            mode={mode}
-                            onConfigChange={handleConfigChange}
-                            themeId={widget.config?.themeId}
-                        />
-                    );
-                })()
+                <WidgetComponent
+                    config={widget.config || {}}
+                    mode={mode}
+                    onConfigChange={stableConfigChangeHandler}
+                    themeId={widget.config?.themeId}
+                />
             ) : (
                 // Fallback to placeholder if component not found
                 <div className="widget-content bg-gray-50 border border-gray-200 rounded p-4">
