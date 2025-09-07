@@ -10,6 +10,8 @@ import {
 } from './widgets/widgetRegistry'
 
 import WidgetEditorPanel from './WidgetEditorPanel'
+import { useWidgetEventListener, useWidgetEventEmitter } from '../contexts/WidgetEventContext'
+import { WIDGET_EVENTS, WIDGET_CHANGE_TYPES } from '../types/widgetEvents'
 
 // WidgetSelectionModal component that replicates the PageEditor widget selection modal
 const WidgetSelectionModal = ({ isOpen, onClose, onSelectWidget, slot, availableWidgetTypes, isFilteringTypes }) => {
@@ -268,6 +270,19 @@ const SlotIconMenu = ({ slotName, slot, availableWidgetTypes, isFilteringTypes, 
 const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange, mode = 'object' }, ref) => {
     const [selectedWidgets, setSelectedWidgets] = useState({}) // For bulk operations
 
+    // Event system for widget communication (primary method)
+    // Falls back to callback props if event system unavailable
+    let emitWidgetChanged = null, emitWidgetAdded = null, emitWidgetRemoved = null, emitWidgetMoved = null
+    try {
+        const eventEmitter = useWidgetEventEmitter()
+        emitWidgetChanged = eventEmitter.emitWidgetChanged
+        emitWidgetAdded = eventEmitter.emitWidgetAdded
+        emitWidgetRemoved = eventEmitter.emitWidgetRemoved
+        emitWidgetMoved = eventEmitter.emitWidgetMoved
+    } catch (error) {
+        console.warn('WidgetEventContext not available in ObjectContentEditor, using callback-only mode')
+    }
+
     // Create a stable reference to onWidgetChange to prevent unnecessary re-renders
     const stableOnWidgetChange = useRef(onWidgetChange)
     stableOnWidgetChange.current = onWidgetChange
@@ -411,8 +426,13 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
         // Use the shared addWidget function
         const newWidget = addWidget(slotName, widgetType, widgetConfig)
 
-        // Notify parent component of the change (using normalized widgets)
-        if (onWidgetChange) {
+        // Emit widget added event (no prop drilling!)
+        if (emitWidgetAdded) {
+            emitWidgetAdded(slotName, newWidget)
+        }
+
+        // Fallback for parent components not yet using event system
+        if (onWidgetChange && !emitWidgetAdded) {
             const currentSlotWidgets = normalizedWidgets[slotName] || []
             const updatedWidgets = {
                 ...normalizedWidgets,
@@ -454,22 +474,34 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
     }, [])
 
     const handleSaveWidget = useCallback((updatedWidget) => {
-        if (!editingWidget || !onWidgetChange) return
+        if (!editingWidget) return
 
-        // Update the widget in the widgets object
-        const updatedWidgets = { ...normalizedWidgets }
         const slotName = editingWidget.slotName || 'main'
 
-        if (updatedWidgets[slotName]) {
-            updatedWidgets[slotName] = updatedWidgets[slotName].map(w =>
-                w.id === editingWidget.id ? updatedWidget : w
+        // Emit widget changed event (no prop drilling!)
+        if (emitWidgetChanged) {
+            emitWidgetChanged(
+                updatedWidget.id,
+                slotName,
+                updatedWidget,
+                WIDGET_CHANGE_TYPES.CONFIG
             )
         }
 
-        memoizedOnWidgetChange(updatedWidgets)
+        // Fallback for parent components not yet using event system
+        if (onWidgetChange && !emitWidgetChanged) {
+            const updatedWidgets = { ...normalizedWidgets }
+            if (updatedWidgets[slotName]) {
+                updatedWidgets[slotName] = updatedWidgets[slotName].map(w =>
+                    w.id === editingWidget.id ? updatedWidget : w
+                )
+            }
+            memoizedOnWidgetChange(updatedWidgets)
+        }
+
         setWidgetHasUnsavedChanges(false)
         handleCloseWidgetEditor()
-    }, [editingWidget, normalizedWidgets, memoizedOnWidgetChange, handleCloseWidgetEditor])
+    }, [editingWidget, normalizedWidgets, memoizedOnWidgetChange, handleCloseWidgetEditor, emitWidgetChanged])
 
     const handleEditWidget = (slotName, widgetIndex, widget) => {
         // Add slotName to widget data for editor
@@ -478,6 +510,11 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
     }
 
     const handleDeleteWidget = (slotName, widgetIndex, widget) => {
+        // Emit widget removed event (no prop drilling!)
+        if (emitWidgetRemoved && widget?.id) {
+            emitWidgetRemoved(slotName, widget.id)
+        }
+
         // Use the shared deleteWidget function
         deleteWidget(slotName, widgetIndex)
 
@@ -491,8 +528,8 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
             })
         }
 
-        // Notify parent component of the change (using normalized widgets)
-        if (onWidgetChange) {
+        // Fallback for parent components not yet using event system
+        if (onWidgetChange && !emitWidgetRemoved) {
             const currentSlotWidgets = normalizedWidgets[slotName] || []
             const updatedSlotWidgets = currentSlotWidgets.filter((_, index) => index !== widgetIndex)
             const updatedWidgets = {
@@ -510,6 +547,11 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
         const currentSlotWidgets = [...(normalizedWidgets[slotName] || [])]
         if (currentSlotWidgets.length <= 1) return
 
+        // Emit widget moved event (no prop drilling!)
+        if (emitWidgetMoved && widget?.id) {
+            emitWidgetMoved(slotName, widget.id, widgetIndex, widgetIndex - 1)
+        }
+
         // Swap with previous widget
         const temp = currentSlotWidgets[widgetIndex]
         currentSlotWidgets[widgetIndex] = currentSlotWidgets[widgetIndex - 1]
@@ -520,8 +562,8 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
             [slotName]: currentSlotWidgets
         }
 
-        // Notify parent component of the change
-        if (memoizedOnWidgetChange) {
+        // Fallback for parent components not yet using event system
+        if (memoizedOnWidgetChange && !emitWidgetMoved) {
             memoizedOnWidgetChange(updatedWidgets)
         }
     }
@@ -531,6 +573,11 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
         const currentSlotWidgets = [...(normalizedWidgets[slotName] || [])]
         if (widgetIndex >= currentSlotWidgets.length - 1) {
             return // Can't move the last widget down
+        }
+
+        // Emit widget moved event (no prop drilling!)
+        if (emitWidgetMoved && widget?.id) {
+            emitWidgetMoved(slotName, widget.id, widgetIndex, widgetIndex + 1)
         }
 
         // Swap with next widget
@@ -543,8 +590,8 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
             [slotName]: currentSlotWidgets
         }
 
-        // Notify parent component of the change
-        if (memoizedOnWidgetChange) {
+        // Fallback for parent components not yet using event system
+        if (memoizedOnWidgetChange && !emitWidgetMoved) {
             memoizedOnWidgetChange(updatedWidgets)
         }
     }
@@ -687,6 +734,8 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
                     canMoveDown={index < slotWidgets.length - 1}
                     mode="editor"
                     showControls={true}
+                    // Pass widget identity for event system
+                    widgetId={widget.id}
                     className={`mb-2 ${isSelected ? 'ring-2 ring-blue-500' : ''}`}
                 />
             </div>

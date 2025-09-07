@@ -12,6 +12,7 @@ import { useNotificationContext } from './NotificationManager';
 import WidgetFactory from './widgets/WidgetFactory';
 import useWidgetStore from '../stores/widgetStore';
 import { useRenderTracker, useEffectTracker, useStabilityTracker } from '../utils/debugHooks';
+import { useWidgetEvents } from '../contexts/WidgetEventContext';
 
 const ContentEditorWithWidgetFactory = forwardRef(({
     layoutJson,
@@ -41,6 +42,9 @@ const ContentEditorWithWidgetFactory = forwardRef(({
 
     // Get notification context for confirmation dialogs
     const { showConfirm } = useNotificationContext();
+
+    // Get widget event context to share with LayoutRenderer
+    const widgetEventContext = useWidgetEvents();
 
     // Use Zustand store for centralized widget state management
     const {
@@ -158,6 +162,9 @@ const ContentEditorWithWidgetFactory = forwardRef(({
                 onMoveUp: handleWidgetMoveUp,
                 onMoveDown: handleWidgetMoveDown
             });
+
+            // Share widget event context with LayoutRenderer
+            rendererRef.current.setWidgetEventContext(widgetEventContext);
 
 
         }
