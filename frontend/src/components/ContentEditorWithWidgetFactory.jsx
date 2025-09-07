@@ -389,11 +389,7 @@ const ContentEditorWithWidgetFactory = forwardRef(({
         cursor: pointer;
         transition: all 0.2s ease;
       }
-      
-      .slot-editable:hover {
-        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
-      }
-      
+           
       .widget-factory-container .widget-item:hover .widget-edit-btn {
         opacity: 1;
       }

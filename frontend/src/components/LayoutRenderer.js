@@ -766,24 +766,6 @@ class LayoutRenderer {
       slotElement.style.minHeight = '40px';
     }
 
-    // Add hover effect to make slots more discoverable (only in editable mode)
-    if (this.editable) {
-      slotElement.style.transition = 'background-color 0.2s ease, border-color 0.2s ease';
-      slotElement.addEventListener('mouseenter', () => {
-        if (!slotElement.style.backgroundColor || slotElement.style.backgroundColor === 'transparent') {
-          slotElement.style.backgroundColor = 'rgba(59, 130, 246, 0.05)';
-          slotElement.style.borderColor = 'rgba(59, 130, 246, 0.2)';
-        }
-      });
-
-      slotElement.addEventListener('mouseleave', () => {
-        if (slotElement.style.backgroundColor === 'rgba(59, 130, 246, 0.05)') {
-          slotElement.style.backgroundColor = '';
-          slotElement.style.borderColor = '';
-        }
-      });
-    }
-
     // Add menu to slot
     slotElement.appendChild(menuContainer);
 
