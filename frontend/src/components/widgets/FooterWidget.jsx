@@ -38,11 +38,7 @@ const FooterWidget = ({ config = {}, mode = 'preview' }) => {
 
     if (mode === 'editor') {
         return (
-            <div className="footer-widget-editor p-2 border border-dashed border-gray-300 rounded">
-                <div className="flex items-center mb-2">
-                    <Hash className="h-4 w-4 text-gray-400 mr-2" />
-                    <span className="text-sm font-medium text-gray-600">Footer</span>
-                </div>
+            <div className="footer-widget-editor p-4">
                 <footer
                     className={`footer-widget rounded ${css_class}`}
                     style={footerStyle}

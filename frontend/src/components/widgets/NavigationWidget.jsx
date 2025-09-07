@@ -89,11 +89,7 @@ const NavigationWidget = ({ config = {}, mode = 'preview' }) => {
 
     if (mode === 'editor') {
         return (
-            <div className="navigation-widget-editor p-2 border border-dashed border-gray-300 rounded">
-                <div className="flex items-center mb-2">
-                    <Menu className="h-4 w-4 text-gray-400 mr-2" />
-                    <span className="text-sm font-medium text-gray-600">Navigation</span>
-                </div>
+            <div className="navigation-widget-editor p-4">
                 <nav
                     className={`navigation-widget rounded border border-gray-200 ${sticky ? 'sticky top-0 z-50' : ''} ${css_class}`}
                     style={navStyle}

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { Layout, Settings, Trash2, ChevronUp, ChevronDown, Eye, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { WIDGET_REGISTRY, getWidgetComponent } from './widgetRegistry'
 import { renderWidgetPreview } from '../../utils/widgetPreview'
+import WidgetHeader from './WidgetHeader'
 
 /**
  * Widget Factory component that creates widget elements with controls
@@ -48,8 +49,6 @@ const WidgetFactory = ({
     // Use passed props or extract from widget
     const actualWidgetId = widgetId || widget?.id
     const actualSlotName = passedSlotName || slotName || widget?.slotName
-    const [isHovered, setIsHovered] = useState(false)
-    const [isMenuExpanded, setIsMenuExpanded] = useState(true)
     const [showPreview, setShowPreview] = useState(false)
     const [isLoadingPreview, setIsLoadingPreview] = useState(false)
     const [previewContent, setPreviewContent] = useState(null)
@@ -118,114 +117,30 @@ const WidgetFactory = ({
         setIsLoadingPreview(false)
     }
 
-    const toggleMenuExpansion = () => {
-        setIsMenuExpanded(!isMenuExpanded)
-    }
 
     // Widget wrapper with controls
     if (mode === 'editor' && showControls) {
         return (
             <div
-                className={`widget-item relative hover:shadow-sm transition-colors ${className}`}
+                className={`widget-item ${className}`}
                 data-widget-type={widget.type}
                 data-widget-id={widget.id}
-                onMouseEnter={() => setIsHovered(true)}
-                onMouseLeave={() => setIsHovered(false)}
             >
-                {/* Enhanced Hover Menu - positioned in top-right corner */}
-                {isHovered && (
-                    <div className="absolute top-2 right-2 flex items-center space-x-1 bg-white shadow-lg rounded-md p-1 border z-10">
-                        {/* Expand/Contract Button */}
-                        <button
-                            onClick={toggleMenuExpansion}
-                            className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors rounded"
-                            title={isMenuExpanded ? "Minimize menu" : "Expand menu"}
-                        >
-                            {isMenuExpanded ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-                        </button>
-
-                        {/* Widget Type Label */}
-                        {isMenuExpanded && (
-                            <span
-                                className="text-xs font-medium text-gray-500 px-2 py-1 bg-gray-100 rounded"
-                                title={`Widget Type: ${getWidgetTypeName(widget)}`}
-                            >
-                                {getWidgetTypeName(widget)}
-                            </span>
-                        )}
-
-                        {/* Menu Container (can be hidden/shown) */}
-                        {isMenuExpanded && (
-                            <div className="flex items-center space-x-1">
-                                {/* Preview Button */}
-                                <button
-                                    onClick={handlePreview}
-                                    className="p-1.5 text-blue-500 hover:text-blue-700 hover:bg-blue-50 transition-colors rounded"
-                                    title="Preview widget"
-                                >
-                                    <Eye className="h-4 w-4" />
-                                </button>
-
-                                {/* Move Up Button */}
-                                {onMoveUp && (
-                                    <button
-                                        onClick={handleMoveUp}
-                                        disabled={!canMoveUp}
-                                        className={`p-1.5 transition-colors rounded ${canMoveUp
-                                            ? 'text-gray-400 hover:text-purple-600 hover:bg-purple-50'
-                                            : 'text-gray-300 cursor-not-allowed'
-                                            }`}
-                                        title={canMoveUp ? "Move widget up" : "Cannot move up"}
-                                    >
-                                        <ChevronUp className="h-4 w-4" />
-                                    </button>
-                                )}
-
-                                {/* Move Down Button */}
-                                {onMoveDown && (
-                                    <button
-                                        onClick={handleMoveDown}
-                                        disabled={!canMoveDown}
-                                        className={`p-1.5 transition-colors rounded ${canMoveDown
-                                            ? 'text-gray-400 hover:text-purple-600 hover:bg-purple-50'
-                                            : 'text-gray-300 cursor-not-allowed'
-                                            }`}
-                                        title={canMoveDown ? "Move widget down" : "Cannot move down"}
-                                    >
-                                        <ChevronDown className="h-4 w-4" />
-                                    </button>
-                                )}
-
-                                {/* Edit Button */}
-                                {onEdit && (
-                                    <button
-                                        onClick={handleEdit}
-                                        className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors rounded"
-                                        title="Edit widget"
-                                    >
-                                        <Settings className="h-4 w-4" />
-                                    </button>
-                                )}
-
-                                {/* Delete Button */}
-                                {onDelete && (
-                                    <button
-                                        onClick={handleDelete}
-                                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors rounded"
-                                        title="Delete widget"
-                                    >
-                                        <Trash2 className="h-4 w-4" />
-                                    </button>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                )}
-
-
+                {/* Widget Header */}
+                <WidgetHeader
+                    widgetType={getWidgetTypeName(widget)}
+                    onEdit={onEdit ? handleEdit : undefined}
+                    onDelete={onDelete ? handleDelete : undefined}
+                    onMoveUp={onMoveUp ? handleMoveUp : undefined}
+                    onMoveDown={onMoveDown ? handleMoveDown : undefined}
+                    onPreview={handlePreview}
+                    canMoveUp={canMoveUp}
+                    canMoveDown={canMoveDown}
+                    showControls={true}
+                />
 
                 {/* Widget Content - Render actual widget component */}
-                <div className="widget-content border border-gray-200 rounded overflow-hidden">
+                <div className="widget-content border border-gray-200 border-t-0 rounded-b overflow-hidden">
                     {(() => {
                         const WidgetComponent = getWidgetComponent(widget.type)
                         if (WidgetComponent) {

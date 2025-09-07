@@ -87,11 +87,7 @@ const SidebarWidget = ({ config = {}, mode = 'preview' }) => {
 
     if (mode === 'editor') {
         return (
-            <div className="sidebar-widget-editor p-2 border border-dashed border-gray-300 rounded">
-                <div className="flex items-center mb-2">
-                    <PanelRight className="h-4 w-4 text-gray-400 mr-2" />
-                    <span className="text-sm font-medium text-gray-600">Sidebar</span>
-                </div>
+            <div className="sidebar-widget-editor p-4">
                 <aside
                     className={`sidebar-widget border border-gray-200 rounded-lg relative ${position === 'left' ? 'position-left' : 'position-right'} ${css_class}`}
                     style={sidebarStyle}

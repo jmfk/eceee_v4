@@ -251,11 +251,7 @@ const FormsWidget = ({ config = {}, mode = 'preview' }) => {
 
     if (mode === 'editor') {
         return (
-            <div className="forms-widget-editor p-2 border border-dashed border-gray-300 rounded">
-                <div className="flex items-center mb-2">
-                    <FileText className="h-4 w-4 text-gray-400 mr-2" />
-                    <span className="text-sm font-medium text-gray-600">Forms</span>
-                </div>
+            <div className="forms-widget-editor p-4">
                 <div className="forms-widget bg-white border border-gray-200 rounded-lg p-6 max-w-2xl mx-auto">
                     <div className="form-header mb-6">
                         <h2 className="form-title text-2xl font-semibold text-gray-900 text-center">{title}</h2>

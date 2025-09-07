@@ -62,11 +62,7 @@ const HeaderWidget = ({ config = {}, mode = 'preview' }) => {
 
     if (mode === 'editor') {
         return (
-            <div className="header-widget-editor p-2 border border-dashed border-gray-300 rounded">
-                <div className="flex items-center mb-2">
-                    <Layout className="h-4 w-4 text-gray-400 mr-2" />
-                    <span className="text-sm font-medium text-gray-600">Header</span>
-                </div>
+            <div className="header-widget-editor p-4">
                 <header
                     className={`header-widget rounded ${hero_style ? 'hero-header' : ''} ${css_class}`}
                     style={headerStyle}

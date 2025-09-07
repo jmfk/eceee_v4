@@ -120,11 +120,7 @@ const ImageWidget = ({ config = {}, mode = 'preview' }) => {
 
     if (mode === 'editor') {
         return (
-            <div className="image-widget-editor p-2 border border-dashed border-gray-300 rounded">
-                <div className="flex items-center mb-2">
-                    <Image className="h-4 w-4 text-gray-400 mr-2" />
-                    <span className="text-sm font-medium text-gray-600">Image</span>
-                </div>
+            <div className="image-widget-editor p-4">
                 <div className={`${alignmentClasses[alignment]} ${sizeClasses[size]}`}>
                     {items.length > 0 ? (
                         display_type === 'gallery' ? renderGallery() : (

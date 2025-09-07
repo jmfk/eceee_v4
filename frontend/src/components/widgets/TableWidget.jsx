@@ -19,11 +19,7 @@ const TableWidget = ({ config = {}, mode = 'preview' }) => {
 
     if (mode === 'editor') {
         return (
-            <div className="table-widget-editor p-2 border border-dashed border-gray-300 rounded">
-                <div className="flex items-center mb-2">
-                    <Table className="h-4 w-4 text-gray-400 mr-2" />
-                    <span className="text-sm font-medium text-gray-600">Table</span>
-                </div>
+            <div className="table-widget-editor p-4">
                 {rows.length > 0 ? (
                     <div className="overflow-x-auto">
                         <table className={`border-collapse ${table_width === 'full' ? 'w-full' : 'w-auto'} ${show_borders ? 'border border-gray-300' : ''} ${css_class}`}>
