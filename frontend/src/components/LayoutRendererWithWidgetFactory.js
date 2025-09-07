@@ -12,6 +12,7 @@ import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { NotificationProvider } from './NotificationManager';
 import { GlobalNotificationProvider } from '../contexts/GlobalNotificationContext';
+import { WidgetEventProvider } from '../contexts/WidgetEventContext';
 
 class LayoutRendererWithWidgetFactory extends LayoutRenderer {
     constructor(options = {}) {
@@ -30,6 +31,9 @@ class LayoutRendererWithWidgetFactory extends LayoutRenderer {
         // Track slots currently being updated to prevent overlapping updates
         this.slotsBeingUpdated = new Set();
 
+        // Store the widget event context from parent component
+        this.widgetEventContext = null;
+
         // Create a QueryClient for isolated React roots
         this.queryClient = new QueryClient({
             defaultOptions: {
@@ -43,11 +47,41 @@ class LayoutRendererWithWidgetFactory extends LayoutRenderer {
     }
 
     /**
+     * Set widget event context from parent component
+     * @param {Object} eventContext - The widget event context
+     */
+    setWidgetEventContext(eventContext) {
+        this.widgetEventContext = eventContext;
+    }
+
+    /**
      * Create a provider wrapper component for isolated React roots
      * @param {React.Component} children - The component to wrap
      * @returns {React.Element} Wrapped component with providers
      */
     createProviderWrapper(children) {
+        // If we have widget event context, provide it to isolated roots with shared event bus
+        if (this.widgetEventContext) {
+            return React.createElement(
+                QueryClientProvider,
+                { client: this.queryClient },
+                React.createElement(
+                    GlobalNotificationProvider,
+                    {},
+                    React.createElement(
+                        WidgetEventProvider,
+                        { sharedEventBus: this.widgetEventContext },
+                        React.createElement(
+                            NotificationProvider,
+                            {},
+                            children
+                        )
+                    )
+                )
+            );
+        }
+
+        // Fallback without widget event context - create isolated event bus
         return React.createElement(
             QueryClientProvider,
             { client: this.queryClient },
@@ -55,9 +89,13 @@ class LayoutRendererWithWidgetFactory extends LayoutRenderer {
                 GlobalNotificationProvider,
                 {},
                 React.createElement(
-                    NotificationProvider,
+                    WidgetEventProvider,
                     {},
-                    children
+                    React.createElement(
+                        NotificationProvider,
+                        {},
+                        children
+                    )
                 )
             )
         );
@@ -220,7 +258,10 @@ class LayoutRendererWithWidgetFactory extends LayoutRenderer {
                     canMoveUp: actualIndex > 0,
                     canMoveDown: actualIndex < slotWidgets.length - 1,
                     mode: this.editable ? 'editor' : 'preview',
-                    showControls: this.editable
+                    showControls: this.editable,
+                    // Pass widget ID and slot name for event system
+                    widgetId: widget.id,
+                    slotName: widget.slotName || 'unknown'
                 })
             );
             root.render(wrappedComponent);

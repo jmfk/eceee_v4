@@ -1,9 +1,18 @@
 /**
  * Debug hooks for investigating React re-rendering issues
  * These hooks help identify why components are re-rendering frequently
+ * 
+ * TO TURN OFF DEBUG LOGGING:
+ * Set DEBUG_ENABLED to false below to disable all console output from debug hooks
+ * 
+ * TO TURN ON DEBUG LOGGING:
+ * Set DEBUG_ENABLED to true below to enable all debug console output
  */
 
 import { useEffect, useRef } from 'react'
+
+// Global debug flag - set to false to disable all debug logging
+const DEBUG_ENABLED = false
 
 /**
  * Hook to track component renders and log when they happen
@@ -17,6 +26,8 @@ export const useRenderTracker = (componentName, props = {}) => {
     renderCount.current += 1
 
     useEffect(() => {
+        if (!DEBUG_ENABLED) return
+
         console.log(`🔄 ${componentName} rendered #${renderCount.current}`)
 
         if (prevProps.current) {
@@ -63,26 +74,28 @@ export const useEffectTracker = (effectName, dependencies, callback) => {
     useEffect(() => {
         runCount.current += 1
 
-        if (prevDeps.current) {
-            const changedDeps = dependencies.filter((dep, index) => {
-                const prevDep = prevDeps.current[index]
+        if (DEBUG_ENABLED) {
+            if (prevDeps.current) {
+                const changedDeps = dependencies.filter((dep, index) => {
+                    const prevDep = prevDeps.current[index]
 
-                // Deep comparison for objects/arrays
-                if (typeof dep === 'object' && typeof prevDep === 'object') {
-                    return JSON.stringify(dep) !== JSON.stringify(prevDep)
+                    // Deep comparison for objects/arrays
+                    if (typeof dep === 'object' && typeof prevDep === 'object') {
+                        return JSON.stringify(dep) !== JSON.stringify(prevDep)
+                    }
+
+                    return dep !== prevDep
+                })
+
+                console.log(`⚡ useEffect "${effectName}" triggered #${runCount.current}`)
+                if (changedDeps.length > 0) {
+                    console.log(`  📊 Changed dependencies:`, changedDeps)
+                } else {
+                    console.log(`  ⚠️  No dependencies changed - check dependency array!`)
                 }
-
-                return dep !== prevDep
-            })
-
-            console.log(`⚡ useEffect "${effectName}" triggered #${runCount.current}`)
-            if (changedDeps.length > 0) {
-                console.log(`  📊 Changed dependencies:`, changedDeps)
             } else {
-                console.log(`  ⚠️  No dependencies changed - check dependency array!`)
+                console.log(`🚀 useEffect "${effectName}" initial run`)
             }
-        } else {
-            console.log(`🚀 useEffect "${effectName}" initial run`)
         }
 
         prevDeps.current = [...dependencies]
@@ -108,12 +121,14 @@ export const useStabilityTracker = (value, name) => {
             if (hasChanged) {
                 changeCount.current += 1
 
-                if (!hasDeepChanged) {
-                    console.warn(`🔄 ${name} reference changed but content is the same (change #${changeCount.current})`)
-                    console.log('  Previous:', prevValue.current)
-                    console.log('  Current:', value)
-                } else {
-                    console.log(`✅ ${name} legitimately changed (change #${changeCount.current})`)
+                if (DEBUG_ENABLED) {
+                    if (!hasDeepChanged) {
+                        console.warn(`🔄 ${name} reference changed but content is the same (change #${changeCount.current})`)
+                        console.log('  Previous:', prevValue.current)
+                        console.log('  Current:', value)
+                    } else {
+                        console.log(`✅ ${name} legitimately changed (change #${changeCount.current})`)
+                    }
                 }
             }
         }
@@ -136,6 +151,8 @@ export const usePerformanceTracker = (componentName) => {
     startTime.current = performance.now()
 
     useEffect(() => {
+        if (!DEBUG_ENABLED) return
+
         const endTime = performance.now()
         const renderTime = endTime - startTime.current
 
@@ -167,6 +184,8 @@ export const useMemoryLeakDetector = (componentName) => {
     renderCount.current += 1
 
     useEffect(() => {
+        if (!DEBUG_ENABLED) return
+
         const now = Date.now()
         const timeAlive = now - mountTime.current
         const rendersPerSecond = renderCount.current / (timeAlive / 1000)

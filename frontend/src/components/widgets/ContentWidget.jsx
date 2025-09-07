@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect, useCallback, memo } from 'react'
 import { FileText, Bold, Italic, List, ListOrdered, Undo, Redo, Type, Eraser } from 'lucide-react'
 import { useRenderTracker, useStabilityTracker } from '../../utils/debugHooks'
 import { useContentEditorTheme } from '../../hooks/useTheme'
+import { useWidgetEventEmitter } from '../../contexts/WidgetEventContext'
+import { WIDGET_CHANGE_TYPES } from '../../types/widgetEvents'
 
 /**
  * Clean up HTML content by removing unsupported tags and attributes
@@ -186,11 +188,32 @@ const ContentEditor = memo(({ content, onChange, className }) => {
  * Content Widget Component
  * Renders HTML content with sanitization options
  */
-const ContentWidget = memo(({ config = {}, mode = 'editor', onConfigChange, themeId = null }) => {
+const ContentWidget = memo(({
+    config = {},
+    mode = 'editor',
+    onConfigChange,
+    themeId = null,
+    widgetId = null,
+    slotName = null
+}) => {
+    // Store current content in ref for save collection (without triggering re-renders)
+    const currentContentRef = useRef(config.content || '')
+
     // Debug tracking
     const renderCount = useRenderTracker('ContentWidget', { config, mode, onConfigChange })
     useStabilityTracker(config, 'ContentWidget.config')
     useStabilityTracker(onConfigChange, 'ContentWidget.onConfigChange')
+
+    // Event system for widget communication (with fallback)
+    let emitWidgetChanged = null
+    try {
+        const eventEmitter = useWidgetEventEmitter()
+        emitWidgetChanged = eventEmitter.emitWidgetChanged
+    } catch (error) {
+        // Fallback when context is not available (e.g., in isolated renders)
+        console.warn('WidgetEventContext not available, falling back to callback-only mode')
+        emitWidgetChanged = null
+    }
 
     // Apply theme to content editor
     const { getThemeClassName } = useContentEditorTheme({
@@ -204,15 +227,48 @@ const ContentWidget = memo(({ config = {}, mode = 'editor', onConfigChange, them
         sanitize_html = true
     } = config
 
-    // Memoize the content change handler to prevent unnecessary re-renders
+    // Debounced config update to prevent focus loss during typing
+    const debouncedConfigUpdate = useRef(null)
+
+    // Cleanup timeout on unmount
+    useEffect(() => {
+        return () => {
+            if (debouncedConfigUpdate.current) {
+                clearTimeout(debouncedConfigUpdate.current)
+            }
+        }
+    }, [])
+
+    // Enhanced content change handler with event emission
     const handleContentChange = useCallback((newContent) => {
-        if (onConfigChange && newContent !== content) {
-            onConfigChange({
+        if (newContent !== content) {
+            // Update current content ref immediately (no re-renders)
+            currentContentRef.current = newContent
+
+            const updatedConfig = {
                 ...config,
                 content: newContent
-            })
+            }
+
+            // For real-time typing: Only emit events, don't update store
+            // The save mechanism will collect current content from currentContentRef
+
+            // Emit event immediately for coordination (notifications, dirty state, etc.)
+            if (widgetId && slotName && emitWidgetChanged) {
+                emitWidgetChanged(
+                    widgetId,
+                    slotName,
+                    { ...config, id: widgetId, config: updatedConfig },
+                    WIDGET_CHANGE_TYPES.CONFIG
+                )
+            }
+
+            // Only call onConfigChange for components without event system (fallback)
+            if (!emitWidgetChanged && onConfigChange) {
+                onConfigChange(updatedConfig)
+            }
         }
-    }, [onConfigChange, config, content])
+    }, [config, content, widgetId, slotName, emitWidgetChanged, onConfigChange])
     if (mode === 'editor') {
         return (
             <ContentEditor

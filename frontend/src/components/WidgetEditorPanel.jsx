@@ -5,6 +5,8 @@ import { getWidgetSchema, validateWidgetConfiguration } from '../api/widgetSchem
 import { widgetsApi } from '../api'
 import { validateWidgetType, clearWidgetTypesCache } from '../utils/widgetTypeValidation.js'
 import DeletedWidgetWarning from './DeletedWidgetWarning.jsx'
+import { useWidgetEventEmitter } from '../contexts/WidgetEventContext'
+import { WIDGET_CHANGE_TYPES } from '../types/widgetEvents'
 
 /**
  * WidgetEditorPanel - Slide-out panel for editing widgets
@@ -51,6 +53,18 @@ const WidgetEditorPanel = forwardRef(({
     const rafRef = useRef(null)
     const updateTimeoutRef = useRef(null)
     const validationTimeoutRef = useRef(null)
+
+    // Event system for widget communication (with fallback)
+    let emitWidgetChanged = null, emitWidgetValidated = null, emitWidgetSaved = null
+    try {
+        const eventEmitter = useWidgetEventEmitter()
+        emitWidgetChanged = eventEmitter.emitWidgetChanged
+        emitWidgetValidated = eventEmitter.emitWidgetValidated
+        emitWidgetSaved = eventEmitter.emitWidgetSaved
+    } catch (error) {
+        // Fallback when context is not available
+        console.warn('WidgetEventContext not available in WidgetEditorPanel, using callback-only mode')
+    }
 
     // Initialize config when widget data changes
     useEffect(() => {
@@ -185,7 +199,16 @@ const WidgetEditorPanel = forwardRef(({
                 setIsWidgetValid(isValid)
                 setIsValidating(false)
 
-                // NEW: Sync validated widget data to canonical state when validation passes
+                // Emit validation event (no prop drilling!)
+                if (widgetData && emitWidgetValidated) {
+                    emitWidgetValidated(widgetData.id, widgetData.slotName, {
+                        isValid,
+                        errors: formattedResults,
+                        warnings: result.warnings || {}
+                    })
+                }
+
+                // Keep backward compatibility
                 if (isValid && onValidatedWidgetSync && widgetData) {
                     onValidatedWidgetSync({
                         ...widgetData,
@@ -279,9 +302,9 @@ const WidgetEditorPanel = forwardRef(({
         }
     }, [handleResizeMove, handleResizeEnd])
 
-    // Debounced real-time update function
+    // Enhanced real-time update function with event emission
     const triggerRealTimeUpdate = useCallback((newConfig) => {
-        if (!onRealTimeUpdate || !widgetData) return
+        if (!widgetData) return
 
         // Clear any pending update
         if (updateTimeoutRef.current) {
@@ -290,12 +313,27 @@ const WidgetEditorPanel = forwardRef(({
 
         // Debounce updates to prevent too many calls
         updateTimeoutRef.current = setTimeout(() => {
-            onRealTimeUpdate({
+            const updatedWidget = {
                 ...widgetData,
                 config: newConfig
-            })
+            }
+
+            // Emit event for real-time updates (no prop drilling!)
+            if (emitWidgetChanged) {
+                emitWidgetChanged(
+                    widgetData.id,
+                    widgetData.slotName,
+                    updatedWidget,
+                    WIDGET_CHANGE_TYPES.CONFIG
+                )
+            }
+
+            // Fallback for components not yet using event system
+            if (onRealTimeUpdate && !emitWidgetChanged) {
+                onRealTimeUpdate(updatedWidget)
+            }
         }, 300) // 300ms debounce
-    }, [onRealTimeUpdate, widgetData])
+    }, [widgetData, emitWidgetChanged, onRealTimeUpdate])
 
     // Handle form field changes with real-time updates and validation
     const handleFieldChange = useCallback((fieldName, value) => {

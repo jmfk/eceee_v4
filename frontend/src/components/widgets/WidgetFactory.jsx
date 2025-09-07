@@ -41,8 +41,13 @@ const WidgetFactory = ({
     canMoveDown = false,
     mode = 'editor',
     showControls = true,
-    className = ''
+    className = '',
+    widgetId,
+    slotName: passedSlotName
 }) => {
+    // Use passed props or extract from widget
+    const actualWidgetId = widgetId || widget?.id
+    const actualSlotName = passedSlotName || slotName || widget?.slotName
     const [isHovered, setIsHovered] = useState(false)
     const [isMenuExpanded, setIsMenuExpanded] = useState(true)
     const [showPreview, setShowPreview] = useState(false)
@@ -230,6 +235,8 @@ const WidgetFactory = ({
                                     mode="editor"
                                     onConfigChange={stableConfigChangeHandler}
                                     themeId={widget.config?.themeId}
+                                    widgetId={actualWidgetId}
+                                    slotName={actualSlotName}
                                 />
                             )
                         } else {

@@ -24,6 +24,8 @@ import { smartSave, analyzeChanges, determineSaveStrategy, generateChangeSummary
 import { WIDGET_ACTIONS } from '../utils/widgetConstants'
 import { useNotificationContext } from './NotificationManager'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
+import { useWidgetEventListener } from '../contexts/WidgetEventContext'
+import { WIDGET_EVENTS, WIDGET_CHANGE_TYPES } from '../types/widgetEvents'
 import ContentEditor from './ContentEditor'
 import ContentEditorWithWidgetFactory from './ContentEditorWithWidgetFactory'
 import ErrorTodoSidebar from './ErrorTodoSidebar'
@@ -191,9 +193,6 @@ const PageEditor = () => {
     // Version management state
     const [currentVersion, setCurrentVersion] = useState(null)
     const [availableVersions, setAvailableVersions] = useState([])
-
-    // Editor type selection state
-    const [useWidgetFactory, setUseWidgetFactory] = useState(true)
 
     // Guard: only consider layout/rendering ready once the intended version is resolved
     // Note: API returns 'id' but we need to check against currentVersion.id
@@ -1002,6 +1001,43 @@ const PageEditor = () => {
         setIsDirty(isDirty);
     }, [])
 
+    // Listen to widget events (no prop drilling!)
+    useWidgetEventListener(WIDGET_EVENTS.CHANGED, useCallback((payload) => {
+        // For real-time config changes, do ABSOLUTELY NOTHING
+        // The widget handles its own display updates internally
+        // Data will be collected during save via saveWidgets()
+        if (payload.changeType === WIDGET_CHANGE_TYPES.CONFIG) {
+            // Don't even mark as dirty to prevent any state changes
+            // Dirty state will be set by other mechanisms (auto-save, etc.)
+            return
+        }
+
+        // For structural changes (position, add, remove), trigger full re-render
+        if (contentEditorRef.current && contentEditorRef.current.layoutRenderer) {
+            const renderer = contentEditorRef.current.layoutRenderer
+            renderer.executeWidgetDataCallback(WIDGET_ACTIONS.UPDATE, payload.slotName, payload.widget)
+            renderer.updateSlot(payload.slotName, renderer.getSlotWidgetData(payload.slotName))
+        }
+    }, []), [])
+
+    useWidgetEventListener(WIDGET_EVENTS.VALIDATED, useCallback((payload) => {
+        // Handle validation results
+        if (!payload.isValid && Object.keys(payload.errors).length > 0) {
+            addNotification({
+                type: 'warning',
+                message: `Widget validation failed: ${Object.values(payload.errors).flat().join(', ')}`
+            })
+        }
+    }, [addNotification]), [addNotification])
+
+    useWidgetEventListener(WIDGET_EVENTS.ERROR, useCallback((payload) => {
+        // Handle widget errors
+        addNotification({
+            type: 'error',
+            message: `Widget error: ${payload.error}`
+        })
+    }, [addNotification]), [addNotification])
+
     // Tab navigation (main tabs)
     const tabs = [
         { id: 'content', label: 'Content', icon: Layout },
@@ -1259,33 +1295,18 @@ const PageEditor = () => {
                                             </div>
                                         ) : (
                                             <div className="flex-1 min-h-0">
-                                                {useWidgetFactory ? (
-                                                    <ContentEditorWithWidgetFactory
-                                                        key={`wf-${webpageData?.id}-${pageVersionData?.versionId || 'current'}`}
-                                                        ref={contentEditorRef}
-                                                        webpageData={webpageData}
-                                                        pageVersionData={pageVersionData}
-                                                        onUpdate={updatePageData}
-                                                        isNewPage={isNewPage}
-                                                        layoutJson={layoutData}
-                                                        editable={true}
-                                                        onDirtyChange={handleDirtyChange}
-                                                        onOpenWidgetEditor={handleOpenWidgetEditor}
-                                                    />
-                                                ) : (
-                                                    <ContentEditor
-                                                        key={`legacy-${webpageData?.id}-${pageVersionData?.versionId || 'current'}`}
-                                                        ref={contentEditorRef}
-                                                        webpageData={webpageData}
-                                                        pageVersionData={pageVersionData}
-                                                        onUpdate={updatePageData}
-                                                        isNewPage={isNewPage}
-                                                        layoutJson={layoutData}
-                                                        editable={true}
-                                                        onDirtyChange={handleDirtyChange}
-                                                        onOpenWidgetEditor={handleOpenWidgetEditor}
-                                                    />
-                                                )}
+                                                <ContentEditorWithWidgetFactory
+                                                    key={`wf-${webpageData?.id}-${pageVersionData?.versionId || 'current'}`}
+                                                    ref={contentEditorRef}
+                                                    webpageData={webpageData}
+                                                    pageVersionData={pageVersionData}
+                                                    onUpdate={updatePageData}
+                                                    isNewPage={isNewPage}
+                                                    layoutJson={layoutData}
+                                                    editable={true}
+                                                    onDirtyChange={handleDirtyChange}
+                                                    onOpenWidgetEditor={handleOpenWidgetEditor}
+                                                />
                                             </div>
                                         )}
                                     </div>
@@ -1606,78 +1627,80 @@ const PublishingEditor = ({ webpageData, pageVersionData, pageId, currentVersion
     }
 
     return (
-        <div className="h-full p-6 overflow-y-auto">
-            <div className="max-w-4xl mx-auto space-y-6">
-                {/* Header */}
-                <div className="bg-white rounded-lg shadow p-6">
-                    <h2 className="text-lg font-semibold text-gray-900 mb-2">Version Timeline & Publishing</h2>
-                    <p className="text-gray-600">
-                        Manage page versions, scheduling, and publishing workflow
-                    </p>
-                </div>
+        <>
+            <div className="h-full p-6 overflow-y-auto">
+                <div className="max-w-4xl mx-auto space-y-6">
+                    {/* Header */}
+                    <div className="bg-white rounded-lg shadow p-6">
+                        <h2 className="text-lg font-semibold text-gray-900 mb-2">Version Timeline & Publishing</h2>
+                        <p className="text-gray-600">
+                            Manage page versions, scheduling, and publishing workflow
+                        </p>
+                    </div>
 
-                {/* Version List */}
-                <div className="bg-white rounded-lg shadow">
-                    <div className="p-6">
-                        <h3 className="text-md font-semibold text-gray-900 mb-4">Page Versions</h3>
+                    {/* Version List */}
+                    <div className="bg-white rounded-lg shadow">
+                        <div className="p-6">
+                            <h3 className="text-md font-semibold text-gray-900 mb-4">Page Versions</h3>
 
-                        {versions.length === 0 ? (
-                            <div className="text-center py-8 text-gray-500">
-                                <Calendar className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-                                <p>No versions found for this page</p>
-                            </div>
-                        ) : (
-                            <div className="space-y-4">
-                                {versions.map((version) => {
-                                    const isCurrentVersion = currentVersion?.id === version.id
+                            {versions.length === 0 ? (
+                                <div className="text-center py-8 text-gray-500">
+                                    <Calendar className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+                                    <p>No versions found for this page</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    {versions.map((version) => {
+                                        const isCurrentVersion = currentVersion?.id === version.id
 
-                                    return (
-                                        <div
-                                            key={version.id}
-                                            className={`border rounded-lg p-4 ${isCurrentVersion ? 'border-blue-300 bg-blue-50' : 'border-gray-200'}`}
-                                        >
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex items-center space-x-4">
-                                                    <div>
-                                                        <div className="flex items-center space-x-2">
-                                                            <span className="font-medium text-gray-900">
-                                                                Version {version.versionNumber}
-                                                            </span>
-                                                            {isCurrentVersion && (
-                                                                <span className="px-2 py-1 text-xs rounded-full bg-indigo-100 text-indigo-800">
-                                                                    Current
+                                        return (
+                                            <div
+                                                key={version.id}
+                                                className={`border rounded-lg p-4 ${isCurrentVersion ? 'border-blue-300 bg-blue-50' : 'border-gray-200'}`}
+                                            >
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center space-x-4">
+                                                        <div>
+                                                            <div className="flex items-center space-x-2">
+                                                                <span className="font-medium text-gray-900">
+                                                                    Version {version.versionNumber}
                                                                 </span>
-                                                            )}
+                                                                {isCurrentVersion && (
+                                                                    <span className="px-2 py-1 text-xs rounded-full bg-indigo-100 text-indigo-800">
+                                                                        Current
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <p className="text-sm text-gray-600 mt-1">
+                                                                {version.changeSummary || 'No description'}
+                                                            </p>
+                                                            <p className="text-xs text-gray-500 mt-1">
+                                                                Created {new Date(version.createdAt).toLocaleDateString()}
+                                                            </p>
                                                         </div>
-                                                        <p className="text-sm text-gray-600 mt-1">
-                                                            {version.changeSummary || 'No description'}
-                                                        </p>
-                                                        <p className="text-xs text-gray-500 mt-1">
-                                                            Created {new Date(version.createdAt).toLocaleDateString()}
-                                                        </p>
+                                                    </div>
+
+                                                    <div className="flex items-center space-x-2">
+                                                        {!isCurrentVersion && (
+                                                            <button
+                                                                onClick={() => onVersionChange(version)}
+                                                                className="px-3 py-1 text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
+                                                            >
+                                                                Switch to
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </div>
-
-                                                <div className="flex items-center space-x-2">
-                                                    {!isCurrentVersion && (
-                                                        <button
-                                                            onClick={() => onVersionChange(version)}
-                                                            className="px-3 py-1 text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
-                                                        >
-                                                            Switch to
-                                                        </button>
-                                                    )}
-                                                </div>
                                             </div>
-                                        </div>
-                                    )
-                                })}
-                            </div>
-                        )}
+                                        )
+                                    })}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
+        </>
     )
 }
 
@@ -1851,6 +1874,7 @@ const PagePreview = ({ webpageData, pageVersionData, isLoadingLayout, layoutData
                     </div>
                 )}
             </div>
+
         </div>
     );
 }
