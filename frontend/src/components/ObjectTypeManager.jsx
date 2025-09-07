@@ -248,7 +248,12 @@ const ObjectTypeCard = ({ objectType, onEdit, onDelete }) => {
                     Edit
                 </button>
                 <button
-                    onClick={() => canDelete && onDelete(objectType)}
+                    onClick={(e) => {
+                        e.stopPropagation()
+                        if (canDelete) {
+                            onDelete(objectType)
+                        }
+                    }}
                     disabled={!canDelete}
                     className={`px-3 py-2 rounded-md text-sm flex items-center justify-center transition-colors ${canDelete
                         ? 'bg-red-100 hover:bg-red-200 text-red-700 cursor-pointer'

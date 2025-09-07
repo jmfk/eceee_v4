@@ -7,7 +7,12 @@ including hierarchical relationships and inheritance logic.
 
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import WebPage, PageVersion, PageTheme, PageDataSchema
+from .models import (
+    WebPage,
+    PageVersion,
+    PageTheme,
+    PageDataSchema,
+)
 from django.utils import timezone
 from content.models import Tag
 from content.serializers import TagSerializer
@@ -37,8 +42,10 @@ class PageThemeSerializer(serializers.ModelSerializer):
             "name",
             "description",
             "css_variables",
+            "html_elements",
             "custom_css",
             "is_active",
+            "is_default",
             "created_at",
             "updated_at",
             "created_by",
@@ -49,6 +56,36 @@ class PageThemeSerializer(serializers.ModelSerializer):
         """Validate that css_variables is a valid JSON object"""
         if not isinstance(value, dict):
             raise serializers.ValidationError("CSS variables must be a JSON object")
+        return value
+
+    def validate_html_elements(self, value):
+        """Validate that html_elements is a valid JSON object with proper structure"""
+        if not isinstance(value, dict):
+            raise serializers.ValidationError("HTML elements must be a JSON object")
+
+        # Validate each element's styles
+        for element, styles in value.items():
+            if not isinstance(element, str):
+                raise serializers.ValidationError(
+                    f"Element key must be a string, got {type(element)}"
+                )
+
+            if not isinstance(styles, dict):
+                raise serializers.ValidationError(
+                    f"Styles for element '{element}' must be a JSON object"
+                )
+
+            # Validate CSS property names and values
+            for prop, val in styles.items():
+                if not isinstance(prop, str):
+                    raise serializers.ValidationError(
+                        f"CSS property name must be a string for element '{element}'"
+                    )
+                if not isinstance(val, (str, int, float)):
+                    raise serializers.ValidationError(
+                        f"CSS property value must be a string or number for element '{element}', property '{prop}'"
+                    )
+
         return value
 
 

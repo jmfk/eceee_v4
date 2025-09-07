@@ -4,6 +4,7 @@ import { themesApi } from '../api'
 import { extractErrorMessage } from '../utils/errorHandling.js'
 import { useNotificationContext } from './NotificationManager'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
+import HtmlElementStyleEditor from './HtmlElementStyleEditor'
 import {
     Plus,
     Edit3,
@@ -17,7 +18,8 @@ import {
     Download,
     Upload,
     Settings,
-    Hash
+    Hash,
+    Type
 } from 'lucide-react'
 
 const ThemeEditor = () => {
@@ -228,12 +230,15 @@ const ThemeForm = ({ theme = null, onSave, onCancel }) => {
         name: theme?.name || '',
         description: theme?.description || '',
         cssVariables: theme?.cssVariables || {},
+        htmlElements: theme?.htmlElements || {},
         customCss: theme?.customCss || '',
-        isActive: theme?.isActive ?? true
+        isActive: theme?.isActive ?? true,
+        isDefault: theme?.isDefault ?? false
     })
 
     const [newVariable, setNewVariable] = useState({ key: '', value: '' })
     const [showCssEditor, setShowCssEditor] = useState(false)
+    const [activeTab, setActiveTab] = useState('variables')
 
     const mutation = useMutation({
         mutationFn: async (data) => {
@@ -372,7 +377,7 @@ const ThemeForm = ({ theme = null, onSave, onCancel }) => {
                         />
                     </div>
 
-                    <div className="flex items-center">
+                    <div className="space-y-3">
                         <label className="flex items-center">
                             <input
                                 id="theme-active"
@@ -382,6 +387,18 @@ const ThemeForm = ({ theme = null, onSave, onCancel }) => {
                                 className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
                             />
                             <span className="ml-2 text-sm text-gray-700">Active</span>
+                        </label>
+                        <label className="flex items-center">
+                            <input
+                                id="theme-default"
+                                type="checkbox"
+                                checked={formData.isDefault}
+                                onChange={(e) => setFormData({ ...formData, isDefault: e.target.checked })}
+                                className="rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+                            />
+                            <span className="ml-2 text-sm text-gray-700">
+                                Default theme for object content editors
+                            </span>
                         </label>
                     </div>
                 </div>
@@ -418,123 +435,176 @@ const ThemeForm = ({ theme = null, onSave, onCancel }) => {
                     </div>
                 </div>
 
-                {/* CSS Variables */}
-                <div>
-                    <div className="flex items-center justify-between mb-4">
-                        <label className="block text-sm font-medium text-gray-700">
-                            CSS Variables
-                        </label>
-                        <div className="flex items-center space-x-2">
-                            <button
-                                type="button"
-                                onClick={() => setShowCssEditor(!showCssEditor)}
-                                className="inline-flex items-center px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
-                            >
-                                {showCssEditor ? <EyeOff className="w-3 h-3 mr-1" /> : <Eye className="w-3 h-3 mr-1" />}
-                                {showCssEditor ? 'Hide' : 'Show'} CSS
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Add New Variable */}
-                    <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-                        <div className="flex items-center space-x-2">
-                            <input
-                                type="text"
-                                placeholder="Variable name (e.g., primary-color)"
-                                value={newVariable.key}
-                                onChange={(e) => setNewVariable({ ...newVariable, key: e.target.value })}
-                                className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
-                            />
-                            <input
-                                type="text"
-                                placeholder="Value (e.g., #3b82f6)"
-                                value={newVariable.value}
-                                onChange={(e) => setNewVariable({ ...newVariable, value: e.target.value })}
-                                className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
-                            />
-                            <button
-                                type="button"
-                                onClick={addVariable}
-                                className="px-3 py-1 bg-purple-600 text-white text-sm rounded hover:bg-purple-700"
-                                aria-label="Add variable"
-                                title="Add variable"
-                            >
-                                <Plus className="w-4 h-4" />
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Variables List */}
-                    <div className="space-y-2 max-h-60 overflow-y-auto">
-                        {Object.entries(formData.cssVariables).map(([key, value]) => (
-                            <VariableEditor
-                                key={key}
-                                originalKey={key}
-                                value={value}
-                                onUpdate={(newKey, newValue) => updateVariable(key, newKey, newValue)}
-                                onRemove={() => removeVariable(key)}
-                            />
-                        ))}
-
-                        {Object.keys(formData.cssVariables).length === 0 && (
-                            <div className="text-center py-4 text-gray-500">
-                                <Hash className="w-6 h-6 mx-auto mb-2" />
-                                <p className="text-sm">No CSS variables defined. Add variables to customize your theme.</p>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* CSS Preview */}
-                    {showCssEditor && (
-                        <div className="mt-4 p-3 bg-gray-900 rounded-lg">
-                            <div className="text-xs text-gray-300 mb-2">Generated CSS Variables</div>
-                            <pre className="text-xs text-green-300 overflow-x-auto">
-                                <code>
-                                    {`:root {\n${Object.entries(formData.cssVariables)
-                                        .map(([key, value]) => `  --${key}: ${value};`)
-                                        .join('\n')}\n}`}
-                                </code>
-                            </pre>
-                        </div>
-                    )}
-                </div>
-
-                {/* Custom CSS */}
-                <div>
-                    <div className="flex items-center justify-between mb-2">
-                        <label htmlFor="theme-custom-css" className="block text-sm font-medium text-gray-700">
-                            Custom CSS
-                        </label>
+                {/* Tab Navigation */}
+                <div className="border-b border-gray-200">
+                    <nav className="-mb-px flex space-x-8">
                         <button
                             type="button"
-                            onClick={() => setShowCssEditor(!showCssEditor)}
-                            className="text-xs text-purple-600 hover:text-purple-700"
+                            onClick={() => setActiveTab('variables')}
+                            className={`py-2 px-1 border-b-2 font-medium text-sm ${activeTab === 'variables'
+                                ? 'border-purple-500 text-purple-600'
+                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                }`}
                         >
-                            {showCssEditor ? 'Hide Editor' : 'Show Editor'}
+                            <Hash className="w-4 h-4 inline mr-2" />
+                            CSS Variables
                         </button>
-                    </div>
+                        <button
+                            type="button"
+                            onClick={() => setActiveTab('elements')}
+                            className={`py-2 px-1 border-b-2 font-medium text-sm ${activeTab === 'elements'
+                                ? 'border-purple-500 text-purple-600'
+                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                }`}
+                        >
+                            <Type className="w-4 h-4 inline mr-2" />
+                            HTML Elements
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setActiveTab('custom')}
+                            className={`py-2 px-1 border-b-2 font-medium text-sm ${activeTab === 'custom'
+                                ? 'border-purple-500 text-purple-600'
+                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                }`}
+                        >
+                            <Settings className="w-4 h-4 inline mr-2" />
+                            Custom CSS
+                        </button>
+                    </nav>
+                </div>
 
-                    {showCssEditor && (
-                        <textarea
-                            id="theme-custom-css"
-                            value={formData.customCss}
-                            onChange={(e) => setFormData({ ...formData, customCss: e.target.value })}
-                            rows={8}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono text-sm"
-                            placeholder={`/* Additional custom CSS for this theme */\n.theme-custom {\n  /* Your styles here */\n}\n\nbody {\n  background: var(--background);\n  color: var(--text);\n}`}
+                {/* Tab Content */}
+                <div className="mt-6">
+                    {activeTab === 'variables' && (
+                        <div>
+                            <div className="flex items-center justify-between mb-4">
+                                <label className="block text-sm font-medium text-gray-700">
+                                    CSS Variables
+                                </label>
+                                <div className="flex items-center space-x-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowCssEditor(!showCssEditor)}
+                                        className="inline-flex items-center px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+                                    >
+                                        {showCssEditor ? <EyeOff className="w-3 h-3 mr-1" /> : <Eye className="w-3 h-3 mr-1" />}
+                                        {showCssEditor ? 'Hide' : 'Show'} CSS
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Add New Variable */}
+                            <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                                <div className="flex items-center space-x-2">
+                                    <input
+                                        type="text"
+                                        placeholder="Variable name (e.g., primary-color)"
+                                        value={newVariable.key}
+                                        onChange={(e) => setNewVariable({ ...newVariable, key: e.target.value })}
+                                        className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
+                                    />
+                                    <input
+                                        type="text"
+                                        placeholder="Value (e.g., #3b82f6)"
+                                        value={newVariable.value}
+                                        onChange={(e) => setNewVariable({ ...newVariable, value: e.target.value })}
+                                        className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={addVariable}
+                                        className="px-3 py-1 bg-purple-600 text-white text-sm rounded hover:bg-purple-700"
+                                        aria-label="Add variable"
+                                        title="Add variable"
+                                    >
+                                        <Plus className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Variables List */}
+                            <div className="space-y-2 max-h-60 overflow-y-auto">
+                                {Object.entries(formData.cssVariables).map(([key, value]) => (
+                                    <VariableEditor
+                                        key={key}
+                                        originalKey={key}
+                                        value={value}
+                                        onUpdate={(newKey, newValue) => updateVariable(key, newKey, newValue)}
+                                        onRemove={() => removeVariable(key)}
+                                    />
+                                ))}
+
+                                {Object.keys(formData.cssVariables).length === 0 && (
+                                    <div className="text-center py-4 text-gray-500">
+                                        <Hash className="w-6 h-6 mx-auto mb-2" />
+                                        <p className="text-sm">No CSS variables defined. Add variables to customize your theme.</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* CSS Preview */}
+                            {showCssEditor && (
+                                <div className="mt-4 p-3 bg-gray-900 rounded-lg">
+                                    <div className="text-xs text-gray-300 mb-2">Generated CSS Variables</div>
+                                    <pre className="text-xs text-green-300 overflow-x-auto">
+                                        <code>
+                                            {`:root {\n${Object.entries(formData.cssVariables)
+                                                .map(([key, value]) => `  --${key}: ${value};`)
+                                                .join('\n')}\n}`}
+                                        </code>
+                                    </pre>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {activeTab === 'elements' && (
+                        <HtmlElementStyleEditor
+                            htmlElements={formData.htmlElements}
+                            onChange={(htmlElements) => setFormData({ ...formData, htmlElements })}
+                            showPreview={showCssEditor}
                         />
                     )}
 
-                    {!showCssEditor && formData.custom_css && (
-                        <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded">
-                            {formData.custom_css.split('\n').length} lines of custom CSS defined
+                    {activeTab === 'custom' && (
+                        <div>
+                            <div className="flex items-center justify-between mb-2">
+                                <label htmlFor="theme-custom-css" className="block text-sm font-medium text-gray-700">
+                                    Custom CSS
+                                </label>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowCssEditor(!showCssEditor)}
+                                    className="text-xs text-purple-600 hover:text-purple-700"
+                                >
+                                    {showCssEditor ? 'Hide Editor' : 'Show Editor'}
+                                </button>
+                            </div>
+
+                            {showCssEditor && (
+                                <textarea
+                                    id="theme-custom-css"
+                                    value={formData.customCss}
+                                    onChange={(e) => setFormData({ ...formData, customCss: e.target.value })}
+                                    rows={12}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono text-sm"
+                                    placeholder={`/* Additional custom CSS for this theme */\n.theme-content h1 {\n  /* Your styles here */\n}\n\n.theme-content {\n  background: var(--background);\n  color: var(--text);\n}`}
+                                />
+                            )}
+
+                            {!showCssEditor && formData.customCss && (
+                                <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded">
+                                    {formData.customCss.split('\n').length} lines of custom CSS defined
+                                </div>
+                            )}
+
+                            <p className="text-xs text-gray-500 mt-1">
+                                Additional CSS that will be included with this theme. You can reference CSS variables using var(--variable-name).
+                                CSS will be automatically scoped to .theme-content elements.
+                            </p>
                         </div>
                     )}
-
-                    <p className="text-xs text-gray-500 mt-1">
-                        Additional CSS that will be included with this theme. You can reference CSS variables using var(--variable-name).
-                    </p>
                 </div>
 
                 {/* Actions */}
@@ -702,6 +772,7 @@ const ThemeEditPanel = ({ theme, onUpdate, onCancel, showPreview, onTogglePrevie
                         <Eye className="w-4 h-4 mr-1" />
                         {showPreview ? 'Hide Preview' : 'Show Preview'}
                     </button>
+                    <DefaultThemeButton theme={theme} onUpdate={onUpdate} />
                     <button
                         onClick={exportTheme}
                         className="inline-flex items-center px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm"
@@ -752,10 +823,17 @@ const ThemeEditPanel = ({ theme, onUpdate, onCancel, showPreview, onTogglePrevie
                             <div>
                                 <dt className="text-sm font-medium text-gray-500">Status</dt>
                                 <dd className="text-sm">
-                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${theme.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                                        }`}>
-                                        {theme.isActive ? 'Active' : 'Inactive'}
-                                    </span>
+                                    <div className="flex items-center space-x-2">
+                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${theme.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                                            }`}>
+                                            {theme.isActive ? 'Active' : 'Inactive'}
+                                        </span>
+                                        {theme.isDefault && (
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                                                Default
+                                            </span>
+                                        )}
+                                    </div>
                                 </dd>
                             </div>
                             <div>
@@ -885,6 +963,50 @@ const ThemePreview = ({ theme }) => {
                 </div>
             </div>
         </div>
+    )
+}
+
+// Default Theme Button Component
+const DefaultThemeButton = ({ theme, onUpdate }) => {
+    const { addNotification } = useGlobalNotifications()
+
+    const setDefaultMutation = useMutation({
+        mutationFn: async () => {
+            if (theme.isDefault) {
+                return await themesApi.clearDefault()
+            } else {
+                return await themesApi.setDefault(theme.id)
+            }
+        },
+        onSuccess: () => {
+            const action = theme.isDefault ? 'cleared' : 'set'
+            addNotification(`Default theme ${action} successfully`, 'success', 'theme-default')
+            onUpdate()
+        },
+        onError: (error) => {
+            const message = extractErrorMessage(error, 'Failed to update default theme')
+            addNotification(message, 'error', 'theme-default')
+            console.error(error)
+        }
+    })
+
+    return (
+        <button
+            onClick={() => setDefaultMutation.mutate()}
+            disabled={setDefaultMutation.isPending}
+            className={`inline-flex items-center px-3 py-1 rounded-md text-sm transition-colors ${theme.isDefault
+                    ? 'bg-orange-100 text-orange-700 hover:bg-orange-200'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                } disabled:opacity-50`}
+        >
+            <Settings className="w-4 h-4 mr-1" />
+            {setDefaultMutation.isPending
+                ? 'Updating...'
+                : theme.isDefault
+                    ? 'Clear Default'
+                    : 'Set as Default'
+            }
+        </button>
     )
 }
 

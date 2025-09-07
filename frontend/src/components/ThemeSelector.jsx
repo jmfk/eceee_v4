@@ -191,6 +191,11 @@ const ThemeSelector = ({ selectedThemeId, onThemeChange, onDirtyChange }) => {
                                                 <div className="flex-1">
                                                     <div className="flex items-center space-x-2">
                                                         <h4 className="font-medium text-gray-900">{theme.name}</h4>
+                                                        {theme.isDefault && (
+                                                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800">
+                                                                Default
+                                                            </span>
+                                                        )}
                                                         {selectedThemeId === theme.id && (
                                                             <Check className="w-4 h-4 text-blue-600" />
                                                         )}

@@ -13,7 +13,9 @@ class SingleColumnLayout(BaseLayout):
     """Simple single-column layout suitable for most content pages"""
 
     name = "single_column"
-    description = "Single column layout with header, main content, sidebar, and footer areas"
+    description = (
+        "Single column layout with header, main content, sidebar, and footer areas"
+    )
     template_name = "webpages/layouts/single_column.html"
     css_classes = "layout-single-column"
 
