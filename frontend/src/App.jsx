@@ -2,7 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster, toast } from 'react-hot-toast'
 import { X } from 'lucide-react'
-// import './utils/startRenderInvestigation' // Initialize render investigation
+import './utils/rerenderInvestigation' // Initialize render investigation
 import Navbar from '@components/Navbar'
 import HomePage from '@pages/HomePage'
 

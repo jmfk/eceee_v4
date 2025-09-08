@@ -51,13 +51,6 @@ const ObjectInstanceEditPage = () => {
 
             addNotification(message, 'success')
             setHasUnsavedChanges(false)
-
-            // Navigate back or to the new instance
-            if (isNewInstance && response.data?.id) {
-                navigate(`/objects/${response.data.id}/edit/content`)
-            } else {
-                handleBack()
-            }
         },
         onError: (error) => {
             console.error('Failed to save object:', error)
@@ -134,6 +127,7 @@ const ObjectInstanceEditPage = () => {
     const handleSave = async (saveType = 'update_current') => {
         // Collect data from all tabs - this is a simplified version
         // In a real implementation, you'd want to collect data from each tab component
+        console.log('handleSave', saveType)
         const saveData = {
             objectTypeId: actualObjectTypeId,
             title: instance?.title || 'Untitled',
@@ -321,7 +315,7 @@ const ObjectInstanceEditPage = () => {
                                         ) : (
                                             <>
                                                 <Save className="h-4 w-4 mr-2" />
-                                                Save
+                                                Save 2
                                             </>
                                         )}
                                     </button>

@@ -329,13 +329,16 @@ const PageEditor = () => {
 
     // Fetch layout data when page has a codeLayout, with fallback support
     useEffect(() => {
-        if (!pageVersionData) return;
-        if (!isVersionReady) return;
+        const codeLayout = pageVersionData?.codeLayout;
+        const webpageId = webpageData?.id;
+
+        if (!pageVersionData || !isVersionReady) return;
+
         const fetchLayoutData = async () => {
             setIsLoadingLayout(true)
 
             // Determine which layout to load (support both camelCase and snake_case)
-            let layoutToLoad = pageVersionData?.codeLayout;
+            let layoutToLoad = codeLayout;
             let isUsingFallback = false;
 
             if (!layoutToLoad) {
@@ -375,10 +378,7 @@ const PageEditor = () => {
             }
         }
 
-        // Only fetch if we have pageVersionData (avoid loading on initial mount)
-        if (pageVersionData) {
-            fetchLayoutData()
-        }
+        fetchLayoutData()
     }, [pageVersionData?.codeLayout, webpageData?.id, isVersionReady, addNotification, showError])
 
 
@@ -814,7 +814,7 @@ const PageEditor = () => {
                 }
             }
         }
-    }, [addNotification, showError, webpageData, pageVersionData, originalWebpageData, originalPageVersionData, queryClient, loadVersionsPreserveCurrent, currentVersion]);
+    }, [addNotification, showError, webpageData, pageVersionData, originalWebpageData, originalPageVersionData, queryClient, currentVersion]); // Removed loadVersionsPreserveCurrent to break circular dependency
 
     // Smart save - analyze changes first, then show modal only if needed
     const handleSaveFromStatusBar = useCallback(async () => {

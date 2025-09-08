@@ -62,19 +62,32 @@ const ContentEditorWithWidgetFactory = forwardRef(({
     // Get page ID from webpageData
     const pageId = webpageData?.id;
 
-    // Initialize store when page data is available
-    useEffect(() => {
-        if (pageId && pageVersionData?.widgets) {
-            initializePage(pageId, pageVersionData.widgets);
-        }
-    }, [pageId, pageVersionData?.widgets, initializePage]);
+    // Initialize store when page data is available - with stable comparison
+    const widgetsRef = useRef(null);
 
-    // Sync store with pageVersionData changes
     useEffect(() => {
-        if (pageVersionData?.widgets) {
-            replaceAllWidgets(pageVersionData.widgets);
+        if (!pageId || !pageVersionData?.widgets) return;
+
+        // Use stable reference comparison to avoid unnecessary updates
+        const newWidgetsStr = JSON.stringify(pageVersionData.widgets);
+        if (widgetsRef.current === newWidgetsStr) return;
+
+        widgetsRef.current = newWidgetsStr;
+
+        // Check if store needs initialization
+        const hasStoreData = storeWidgets && Object.keys(storeWidgets).length > 0;
+
+        if (!hasStoreData) {
+            // Initialize store for first time
+            initializePage(pageId, pageVersionData.widgets);
+        } else {
+            // Update existing store only if content differs
+            const currentWidgetsStr = JSON.stringify(storeWidgets);
+            if (currentWidgetsStr !== newWidgetsStr) {
+                replaceAllWidgets(pageVersionData.widgets);
+            }
         }
-    }, [pageVersionData?.widgets, replaceAllWidgets]);
+    }, [pageId, pageVersionData?.widgets, initializePage, replaceAllWidgets]); // Remove storeWidgets from deps to prevent loops
 
     // Handle widget actions - pass widget to PageEditor which handles toggle logic
     const handleWidgetEdit = useCallback((slotName, index, widget) => {

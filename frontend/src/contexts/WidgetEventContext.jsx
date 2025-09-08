@@ -135,7 +135,7 @@ export const useWidgetEventListener = (eventType, callback, dependencies = []) =
     useEffect(() => {
         const unsubscribe = subscribe(eventType, callback)
         return unsubscribe
-    }, [subscribe, eventType, callback, ...dependencies])
+    }, [subscribe, eventType, callback]) // Remove spread dependencies to prevent infinite loops
 }
 
 // Convenience hook for emitting events
