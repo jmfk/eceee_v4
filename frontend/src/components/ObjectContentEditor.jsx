@@ -324,46 +324,62 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
         return widgets
     }, [widgets])
 
-    // Listen to widget events (similar to PageEditor) - MUST be after normalizedWidgets definition
+    // Listen to widget events (similar to PageEditor) - STABLE listeners that register once
+    // Use refs to access current values without causing re-subscriptions
+    const normalizedWidgetsRef = useRef(normalizedWidgets)
+    const onWidgetChangeRef = useRef(onWidgetChange)
+
+    // Update refs when values change (no re-renders)
+    useEffect(() => {
+        normalizedWidgetsRef.current = normalizedWidgets
+    }, [normalizedWidgets])
+
+    useEffect(() => {
+        onWidgetChangeRef.current = onWidgetChange
+    }, [onWidgetChange])
+
     useWidgetEventListener(WIDGET_EVENTS.CHANGED, useCallback((payload) => {
         // For real-time config changes, just update the local state
-        if (payload.changeType === WIDGET_CHANGE_TYPES.CONFIG && onWidgetChange) {
-            const updatedWidgets = { ...normalizedWidgets }
+        if (payload.changeType === WIDGET_CHANGE_TYPES.CONFIG && onWidgetChangeRef.current) {
+            const currentWidgets = normalizedWidgetsRef.current
+            const updatedWidgets = { ...currentWidgets }
             const slotName = payload.slotName
 
             if (updatedWidgets[slotName]) {
                 updatedWidgets[slotName] = updatedWidgets[slotName].map(w =>
                     w.id === payload.widgetId ? payload.widget : w
                 )
-                memoizedOnWidgetChange(updatedWidgets)
+                onWidgetChangeRef.current(updatedWidgets)
             }
         }
-    }, [normalizedWidgets, memoizedOnWidgetChange, onWidgetChange]), [normalizedWidgets, memoizedOnWidgetChange, onWidgetChange])
+    }, []), []) // Empty dependencies - register once only!
 
     useWidgetEventListener(WIDGET_EVENTS.ADDED, useCallback((payload) => {
         // Handle widget added events
-        if (onWidgetChange) {
-            const currentSlotWidgets = normalizedWidgets[payload.slotName] || []
+        if (onWidgetChangeRef.current) {
+            const currentWidgets = normalizedWidgetsRef.current
+            const currentSlotWidgets = currentWidgets[payload.slotName] || []
             const updatedWidgets = {
-                ...normalizedWidgets,
+                ...currentWidgets,
                 [payload.slotName]: [...currentSlotWidgets, payload.widget]
             }
-            memoizedOnWidgetChange(updatedWidgets)
+            onWidgetChangeRef.current(updatedWidgets)
         }
-    }, [normalizedWidgets, memoizedOnWidgetChange, onWidgetChange]), [normalizedWidgets, memoizedOnWidgetChange, onWidgetChange])
+    }, []), []) // Empty dependencies - register once only!
 
     useWidgetEventListener(WIDGET_EVENTS.REMOVED, useCallback((payload) => {
         // Handle widget removed events
-        if (onWidgetChange) {
-            const updatedWidgets = { ...normalizedWidgets }
+        if (onWidgetChangeRef.current) {
+            const currentWidgets = normalizedWidgetsRef.current
+            const updatedWidgets = { ...currentWidgets }
             if (updatedWidgets[payload.slotName]) {
                 updatedWidgets[payload.slotName] = updatedWidgets[payload.slotName].filter(
                     w => w.id !== payload.widgetId
                 )
-                memoizedOnWidgetChange(updatedWidgets)
+                onWidgetChangeRef.current(updatedWidgets)
             }
         }
-    }, [normalizedWidgets, memoizedOnWidgetChange, onWidgetChange]), [normalizedWidgets, memoizedOnWidgetChange, onWidgetChange])
+    }, []), []) // Empty dependencies - register once only!
 
     // Use the shared widget hook (but we'll override widgetTypes with object type's configuration)
     const {

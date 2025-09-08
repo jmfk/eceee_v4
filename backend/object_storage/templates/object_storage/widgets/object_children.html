@@ -37,16 +37,25 @@
                         </div>
                         
                         {% comment %}
-                        Show excerpt if available
+                        Show excerpt if available - check common excerpt fields in order
                         {% endcomment %}
-                        {% for field_name, field_value in child.data.items %}
-                            {% if field_name in "content,description,summary,text" and field_value %}
-                                <div class="child-excerpt text-sm text-gray-600 mt-1">
-                                    {{ field_value|truncatewords:20 }}
-                                </div>
-                                {% break %}
-                            {% endif %}
-                        {% endfor %}
+                        {% if child.data.content %}
+                            <div class="child-excerpt text-sm text-gray-600 mt-1">
+                                {{ child.data.content|truncatewords:20 }}
+                            </div>
+                        {% elif child.data.description %}
+                            <div class="child-excerpt text-sm text-gray-600 mt-1">
+                                {{ child.data.description|truncatewords:20 }}
+                            </div>
+                        {% elif child.data.summary %}
+                            <div class="child-excerpt text-sm text-gray-600 mt-1">
+                                {{ child.data.summary|truncatewords:20 }}
+                            </div>
+                        {% elif child.data.text %}
+                            <div class="child-excerpt text-sm text-gray-600 mt-1">
+                                {{ child.data.text|truncatewords:20 }}
+                            </div>
+                        {% endif %}
                     </div>
                 {% endfor %}
             </div>

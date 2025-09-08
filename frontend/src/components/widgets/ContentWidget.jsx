@@ -194,7 +194,8 @@ const ContentWidget = memo(({
     onConfigChange,
     themeId = null,
     widgetId = null,
-    slotName = null
+    slotName = null,
+    widgetType = null
 }) => {
     // Store current content in ref for save collection (without triggering re-renders)
     const currentContentRef = useRef(config.content || '')
@@ -254,11 +255,16 @@ const ContentWidget = memo(({
             // The save mechanism will collect current content from currentContentRef
 
             // Emit event immediately for coordination (notifications, dirty state, etc.)
-            if (widgetId && slotName && emitWidgetChanged) {
+            if (widgetId && slotName && emitWidgetChanged && widgetType) {
                 emitWidgetChanged(
                     widgetId,
                     slotName,
-                    { ...config, id: widgetId, config: updatedConfig },
+                    {
+                        id: widgetId,
+                        type: widgetType,
+                        config: updatedConfig,
+                        slotName: slotName
+                    },
                     WIDGET_CHANGE_TYPES.CONFIG
                 )
             }
@@ -268,7 +274,7 @@ const ContentWidget = memo(({
                 onConfigChange(updatedConfig)
             }
         }
-    }, [config, content, widgetId, slotName, emitWidgetChanged, onConfigChange])
+    }, [config, content, widgetId, slotName, widgetType, emitWidgetChanged, onConfigChange])
     if (mode === 'editor') {
         return (
             <ContentEditor

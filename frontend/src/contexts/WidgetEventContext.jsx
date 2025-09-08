@@ -23,7 +23,7 @@ import React, { createContext, useContext, useCallback, useRef, useEffect } from
  */
 
 // Global debug flag - set to false to disable all debug logging
-const DEBUG_ENABLED = false
+const DEBUG_ENABLED = true
 
 const WidgetEventContext = createContext()
 

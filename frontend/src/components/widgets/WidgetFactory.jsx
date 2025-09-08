@@ -152,6 +152,7 @@ const WidgetFactory = ({
                                     themeId={widget.config?.themeId}
                                     widgetId={actualWidgetId}
                                     slotName={actualSlotName}
+                                    widgetType={widget.type}
                                 />
                             )
                         } else {
@@ -246,6 +247,7 @@ const WidgetFactory = ({
                     themeId={widget.config?.themeId}
                     widgetId={actualWidgetId}
                     slotName={actualSlotName}
+                    widgetType={widget.type}
                 />
             ) : (
                 // Fallback to placeholder if component not found
