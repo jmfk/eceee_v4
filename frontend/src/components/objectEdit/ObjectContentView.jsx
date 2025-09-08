@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react'
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Save, AlertCircle } from 'lucide-react'
@@ -10,7 +10,7 @@ import ObjectContentEditor from '../ObjectContentEditor'
 import ObjectSchemaForm from '../ObjectSchemaForm'
 import WidgetEditorPanel from '../WidgetEditorPanel'
 
-const ObjectContentView = ({ objectType, instance, parentId, isNewInstance, onSave, onCancel, onUnsavedChanges }) => {
+const ObjectContentView = forwardRef(({ objectType, instance, parentId, isNewInstance, onSave, onCancel, onUnsavedChanges }, ref) => {
     const navigate = useNavigate()
     const { instanceId, objectTypeId, tab } = useParams()
 
@@ -283,6 +283,21 @@ const ObjectContentView = ({ objectType, instance, parentId, isNewInstance, onSa
         saveMutation.mutate({ data: saveData, mode })
     }
 
+    // Expose methods to parent component
+    useImperativeHandle(ref, () => ({
+        handleSave: (mode) => {
+            // Map parent's save types to child's save modes
+            let saveMode = 'update_current'
+            if (mode === 'create_new') {
+                saveMode = 'create_new'
+            } else if (mode === 'create' || mode === 'update_current') {
+                saveMode = 'update_current'
+            }
+
+            handleSave(saveMode)
+        }
+    }), [handleSave])
+
     // Get widget editor state from ObjectContentEditor
     const editorState = objectContentEditorRef.current
     const isWidgetEditorOpen = editorState?.widgetEditorOpen || false
@@ -490,6 +505,7 @@ const ObjectContentView = ({ objectType, instance, parentId, isNewInstance, onSa
             )}
         </div>
     )
-}
+})
 
+ObjectContentView.displayName = 'ObjectContentView'
 export default ObjectContentView

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, Link, Navigate, useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
@@ -25,6 +25,9 @@ const ObjectInstanceEditPage = () => {
 
     // Save state management
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+
+    // Refs for tab components
+    const contentTabRef = useRef(null)
 
     // Save mutation
     const saveMutation = useMutation({
@@ -125,20 +128,24 @@ const ObjectInstanceEditPage = () => {
 
     // Save handlers
     const handleSave = async (saveType = 'update_current') => {
-        // Collect data from all tabs - this is a simplified version
-        // In a real implementation, you'd want to collect data from each tab component
-        console.log('handleSave', saveType)
-        const saveData = {
-            objectTypeId: actualObjectTypeId,
-            title: instance?.title || 'Untitled',
-            data: instance?.data || {},
-            widgets: instance?.widgets || {},
-            status: instance?.status || 'draft',
-            parent: parentIdFromUrl || instance?.parent?.id || instance?.parent,
-            createNew: saveType === 'create_new'
-        }
+        // If we're on the content tab, delegate to the child component's save method
+        // which has access to the current localWidgets and formData state
+        if (tab === 'content' && contentTabRef.current?.handleSave) {
+            contentTabRef.current.handleSave(saveType)
+        } else {
+            // Fallback to original logic for other tabs
+            const saveData = {
+                objectTypeId: actualObjectTypeId,
+                title: instance?.title || 'Untitled',
+                data: instance?.data || {},
+                widgets: instance?.widgets || {},
+                status: instance?.status || 'draft',
+                parent: parentIdFromUrl || instance?.parent?.id || instance?.parent,
+                createNew: saveType === 'create_new'
+            }
 
-        saveMutation.mutate(saveData)
+            saveMutation.mutate(saveData)
+        }
     }
 
     const handleBack = () => {
@@ -181,7 +188,7 @@ const ObjectInstanceEditPage = () => {
 
         switch (tab) {
             case 'content':
-                return <ObjectContentView {...commonProps} />
+                return <ObjectContentView ref={contentTabRef} {...commonProps} />
             case 'settings':
                 return <ObjectSettingsView {...commonProps} />
             case 'publishing':
@@ -315,7 +322,7 @@ const ObjectInstanceEditPage = () => {
                                         ) : (
                                             <>
                                                 <Save className="h-4 w-4 mr-2" />
-                                                Save 2
+                                                Save
                                             </>
                                         )}
                                     </button>
