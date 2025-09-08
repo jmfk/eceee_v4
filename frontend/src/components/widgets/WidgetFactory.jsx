@@ -244,6 +244,8 @@ const WidgetFactory = ({
                     mode={mode}
                     onConfigChange={stableConfigChangeHandler}
                     themeId={widget.config?.themeId}
+                    widgetId={actualWidgetId}
+                    slotName={actualSlotName}
                 />
             ) : (
                 // Fallback to placeholder if component not found

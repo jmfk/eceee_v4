@@ -324,6 +324,47 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
         return widgets
     }, [widgets])
 
+    // Listen to widget events (similar to PageEditor) - MUST be after normalizedWidgets definition
+    useWidgetEventListener(WIDGET_EVENTS.CHANGED, useCallback((payload) => {
+        // For real-time config changes, just update the local state
+        if (payload.changeType === WIDGET_CHANGE_TYPES.CONFIG && onWidgetChange) {
+            const updatedWidgets = { ...normalizedWidgets }
+            const slotName = payload.slotName
+
+            if (updatedWidgets[slotName]) {
+                updatedWidgets[slotName] = updatedWidgets[slotName].map(w =>
+                    w.id === payload.widgetId ? payload.widget : w
+                )
+                memoizedOnWidgetChange(updatedWidgets)
+            }
+        }
+    }, [normalizedWidgets, memoizedOnWidgetChange, onWidgetChange]), [normalizedWidgets, memoizedOnWidgetChange, onWidgetChange])
+
+    useWidgetEventListener(WIDGET_EVENTS.ADDED, useCallback((payload) => {
+        // Handle widget added events
+        if (onWidgetChange) {
+            const currentSlotWidgets = normalizedWidgets[payload.slotName] || []
+            const updatedWidgets = {
+                ...normalizedWidgets,
+                [payload.slotName]: [...currentSlotWidgets, payload.widget]
+            }
+            memoizedOnWidgetChange(updatedWidgets)
+        }
+    }, [normalizedWidgets, memoizedOnWidgetChange, onWidgetChange]), [normalizedWidgets, memoizedOnWidgetChange, onWidgetChange])
+
+    useWidgetEventListener(WIDGET_EVENTS.REMOVED, useCallback((payload) => {
+        // Handle widget removed events
+        if (onWidgetChange) {
+            const updatedWidgets = { ...normalizedWidgets }
+            if (updatedWidgets[payload.slotName]) {
+                updatedWidgets[payload.slotName] = updatedWidgets[payload.slotName].filter(
+                    w => w.id !== payload.widgetId
+                )
+                memoizedOnWidgetChange(updatedWidgets)
+            }
+        }
+    }, [normalizedWidgets, memoizedOnWidgetChange, onWidgetChange]), [normalizedWidgets, memoizedOnWidgetChange, onWidgetChange])
+
     // Use the shared widget hook (but we'll override widgetTypes with object type's configuration)
     const {
         widgetTypes,
