@@ -1,8 +1,36 @@
-# Widget System Documentation
+# DEPRECATED: Legacy Widget System
 
-## Overview
+## ⚠️ **DEPRECATED NOTICE**
 
-This directory contains a shared widget system that can be used by both ContentEditor and ObjectContentEditor. The system provides reusable React components for rendering different widget types with consistent behavior and styling.
+**This directory contains legacy widget implementations and is deprecated.**
+
+**For new development, use the new hybrid widget system:**
+- **Shared widgets**: `/frontend/src/widgets/`
+- **PageEditor framework**: `/frontend/src/editors/page-editor/`
+- **ObjectEditor framework**: `/frontend/src/editors/object-editor/`
+
+## Migration Guide
+
+**Old approach (deprecated):**
+```jsx
+import { WidgetFactory } from './components/widgets'
+```
+
+**New hybrid approach:**
+```jsx
+// For PageEditor
+import { PageWidgetFactory } from './editors/page-editor'
+
+// For ObjectEditor  
+import { ObjectWidgetFactory } from './editors/object-editor'
+
+// For direct widget usage
+import { ContentWidget } from './widgets'
+```
+
+## Legacy Documentation
+
+This directory previously contained a shared widget system that was used by both ContentEditor and ObjectContentEditor. This approach has been replaced by the hybrid system for better stability and separation of concerns.
 
 ## Architecture
 

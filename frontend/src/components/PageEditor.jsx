@@ -27,7 +27,7 @@ import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import { useWidgetEventListener } from '../contexts/WidgetEventContext'
 import { WIDGET_EVENTS, WIDGET_CHANGE_TYPES } from '../types/widgetEvents'
 import ContentEditor from './ContentEditor'
-import ContentEditorWithWidgetFactory from './ContentEditorWithWidgetFactory'
+import PageContentEditor from '../editors/page-editor/PageContentEditor'
 import ErrorTodoSidebar from './ErrorTodoSidebar'
 import SchemaDrivenForm from './SchemaDrivenForm'
 import LayoutSelector from './LayoutSelector'
@@ -1295,8 +1295,8 @@ const PageEditor = () => {
                                             </div>
                                         ) : (
                                             <div className="flex-1 min-h-0">
-                                                <ContentEditorWithWidgetFactory
-                                                    key={`wf-${webpageData?.id}-${pageVersionData?.versionId || 'current'}`}
+                                                <PageContentEditor
+                                                    key={`page-editor-${webpageData?.id}-${pageVersionData?.versionId || 'current'}`}
                                                     ref={contentEditorRef}
                                                     webpageData={webpageData}
                                                     pageVersionData={pageVersionData}
@@ -1306,6 +1306,10 @@ const PageEditor = () => {
                                                     editable={true}
                                                     onDirtyChange={handleDirtyChange}
                                                     onOpenWidgetEditor={handleOpenWidgetEditor}
+                                                    // PageEditor-specific props
+                                                    currentVersion={currentVersion}
+                                                    availableVersions={availableVersions}
+                                                    onVersionChange={switchToVersion}
                                                 />
                                             </div>
                                         )}

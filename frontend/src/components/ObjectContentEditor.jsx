@@ -1,16 +1,16 @@
 import React, { forwardRef, useState, useMemo, useRef, useCallback, useImperativeHandle, useEffect } from 'react'
 import { Layout, Plus, Settings, Trash2, Eye, Check, X, MoreHorizontal } from 'lucide-react'
-import { WidgetFactory } from './widgets'
+import { ObjectWidgetFactory, createObjectEditorEventSystem } from '../editors/object-editor'
 import { useWidgets, getWidgetDisplayName, createDefaultWidgetConfig } from '../hooks/useWidgets'
 import { filterAvailableWidgetTypes } from '../utils/widgetTypeValidation'
 import {
-    getWidgetIcon,
-    getWidgetCategory,
-    getWidgetDescription
-} from './widgets/widgetRegistry'
+    getCoreWidgetIcon as getWidgetIcon,
+    getCoreWidgetCategory as getWidgetCategory,
+    getCoreWidgetDescription as getWidgetDescription
+} from '../widgets'
 
 import WidgetEditorPanel from './WidgetEditorPanel'
-import { useWidgetEventListener, useWidgetEventEmitter } from '../contexts/WidgetEventContext'
+import { useWidgetEvents } from '../contexts/WidgetEventContext'
 import { WIDGET_EVENTS, WIDGET_CHANGE_TYPES } from '../types/widgetEvents'
 
 // WidgetSelectionModal component that replicates the PageEditor widget selection modal
@@ -270,13 +270,12 @@ const SlotIconMenu = ({ slotName, slot, availableWidgetTypes, isFilteringTypes, 
 const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange, mode = 'object' }, ref) => {
     const [selectedWidgets, setSelectedWidgets] = useState({}) // For bulk operations
 
-    // Event system for widget communication
-    const {
-        emitWidgetChanged,
-        emitWidgetAdded,
-        emitWidgetRemoved,
-        emitWidgetMoved
-    } = useWidgetEventEmitter()
+    // Create ObjectEditor-specific event system
+    const baseWidgetEvents = useWidgetEvents();
+    const objectEventSystem = useMemo(() =>
+        createObjectEditorEventSystem(baseWidgetEvents),
+        [baseWidgetEvents]
+    );
 
     // Keep onWidgetChange reference for potential external API compatibility
     const stableOnWidgetChange = useRef(onWidgetChange)
@@ -313,42 +312,61 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
         normalizedWidgetsRef.current = normalizedWidgets
     }, [normalizedWidgets])
 
-    useWidgetEventListener(WIDGET_EVENTS.CHANGED, useCallback((payload) => {
-        // For real-time config changes, update the save state
-        if (payload.changeType === WIDGET_CHANGE_TYPES.CONFIG) {
+    // Listen to ObjectEditor-specific widget events
+    useEffect(() => {
+        const unsubscribeChanged = objectEventSystem.onWidgetChanged((payload) => {
+            // For real-time config changes, update the save state
+            if (payload.changeType === 'config') {
+                const currentWidgets = normalizedWidgetsRef.current
+                const updatedWidgets = { ...currentWidgets }
+                const slotName = payload.slotName
+
+                if (updatedWidgets[slotName]) {
+                    updatedWidgets[slotName] = updatedWidgets[slotName].map(w =>
+                        w.id === payload.widgetId ? payload.widget : w
+                    )
+                    notifyWidgetChange(updatedWidgets)
+                }
+            }
+        });
+
+        const unsubscribeAdded = objectEventSystem.onWidgetAdded((payload) => {
+            const currentWidgets = normalizedWidgetsRef.current
+            const currentSlotWidgets = currentWidgets[payload.slotName] || []
+            const updatedWidgets = {
+                ...currentWidgets,
+                [payload.slotName]: [...currentSlotWidgets, payload.widget]
+            }
+            notifyWidgetChange(updatedWidgets)
+        });
+
+        const unsubscribeRemoved = objectEventSystem.onWidgetRemoved((payload) => {
             const currentWidgets = normalizedWidgetsRef.current
             const updatedWidgets = { ...currentWidgets }
-            const slotName = payload.slotName
-
-            if (updatedWidgets[slotName]) {
-                updatedWidgets[slotName] = updatedWidgets[slotName].map(w =>
-                    w.id === payload.widgetId ? payload.widget : w
+            if (updatedWidgets[payload.slotName]) {
+                updatedWidgets[payload.slotName] = updatedWidgets[payload.slotName].filter(
+                    w => w.id !== payload.widgetId
                 )
                 notifyWidgetChange(updatedWidgets)
             }
-        }
-    }, [notifyWidgetChange]), [])
+        });
 
-    useWidgetEventListener(WIDGET_EVENTS.ADDED, useCallback((payload) => {
-        const currentWidgets = normalizedWidgetsRef.current
-        const currentSlotWidgets = currentWidgets[payload.slotName] || []
-        const updatedWidgets = {
-            ...currentWidgets,
-            [payload.slotName]: [...currentSlotWidgets, payload.widget]
-        }
-        notifyWidgetChange(updatedWidgets)
-    }, [notifyWidgetChange]), [])
-
-    useWidgetEventListener(WIDGET_EVENTS.REMOVED, useCallback((payload) => {
-        const currentWidgets = normalizedWidgetsRef.current
-        const updatedWidgets = { ...currentWidgets }
-        if (updatedWidgets[payload.slotName]) {
-            updatedWidgets[payload.slotName] = updatedWidgets[payload.slotName].filter(
-                w => w.id !== payload.widgetId
-            )
+        const unsubscribeSlotCleared = objectEventSystem.onSlotCleared((payload) => {
+            const currentWidgets = normalizedWidgetsRef.current
+            const updatedWidgets = {
+                ...currentWidgets,
+                [payload.slotName]: []
+            }
             notifyWidgetChange(updatedWidgets)
-        }
-    }, [notifyWidgetChange]), [])
+        });
+
+        return () => {
+            unsubscribeChanged();
+            unsubscribeAdded();
+            unsubscribeRemoved();
+            unsubscribeSlotCleared();
+        };
+    }, [objectEventSystem, notifyWidgetChange])
 
     // Use the shared widget hook (but we'll override widgetTypes with object type's configuration)
     const {
@@ -452,8 +470,12 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
         // Use the shared addWidget function
         const newWidget = addWidget(slotName, widgetType, widgetConfig)
 
-        // Emit widget added event
-        emitWidgetAdded(slotName, newWidget)
+        // Emit ObjectEditor-specific widget added event
+        objectEventSystem.emitWidgetAdded(slotName, newWidget, {
+            objectType: objectType?.name,
+            slotConfig: slot,
+            widgetCount: (normalizedWidgets[slotName] || []).length + 1
+        })
     }
 
 
@@ -491,18 +513,22 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
         if (!editingWidget) return
 
         const slotName = editingWidget.slotName || 'main'
+        const slot = objectType?.slotConfiguration?.slots?.find(s => s.name === slotName)
 
-        // Emit widget changed event
-        emitWidgetChanged(
+        // Emit ObjectEditor-specific widget saved event
+        objectEventSystem.emitWidgetSaved(
             updatedWidget.id,
             slotName,
             updatedWidget,
-            WIDGET_CHANGE_TYPES.CONFIG
+            {
+                objectType: objectType?.name,
+                slotConfig: slot
+            }
         )
 
         setWidgetHasUnsavedChanges(false)
         handleCloseWidgetEditor()
-    }, [editingWidget, handleCloseWidgetEditor, emitWidgetChanged])
+    }, [editingWidget, handleCloseWidgetEditor, objectEventSystem, objectType])
 
     const handleEditWidget = (slotName, widgetIndex, widget) => {
         // Add slotName to widget data for editor
@@ -511,9 +537,15 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
     }
 
     const handleDeleteWidget = (slotName, widgetIndex, widget) => {
-        // Emit widget removed event
+        const slot = objectType?.slotConfiguration?.slots?.find(s => s.name === slotName)
+
+        // Emit ObjectEditor-specific widget removed event
         if (widget?.id) {
-            emitWidgetRemoved(slotName, widget.id)
+            objectEventSystem.emitWidgetRemoved(slotName, widget.id, {
+                objectType: objectType?.name,
+                slotConfig: slot,
+                widgetCount: (normalizedWidgets[slotName] || []).length - 1
+            })
         }
 
         // Use the shared deleteWidget function
@@ -534,9 +566,14 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
     const handleMoveWidgetUp = (slotName, widgetIndex, widget) => {
         if (widgetIndex <= 0) return // Can't move the first widget up
 
-        // Emit widget moved event
+        const slot = objectType?.slotConfiguration?.slots?.find(s => s.name === slotName)
+
+        // Emit ObjectEditor-specific widget moved event
         if (widget?.id) {
-            emitWidgetMoved(slotName, widget.id, widgetIndex, widgetIndex - 1)
+            objectEventSystem.emitWidgetMoved(slotName, widget.id, widgetIndex, widgetIndex - 1, {
+                objectType: objectType?.name,
+                slotConfig: slot
+            })
         }
     }
 
@@ -547,9 +584,14 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
             return // Can't move the last widget down
         }
 
-        // Emit widget moved event
+        const slot = objectType?.slotConfiguration?.slots?.find(s => s.name === slotName)
+
+        // Emit ObjectEditor-specific widget moved event
         if (widget?.id) {
-            emitWidgetMoved(slotName, widget.id, widgetIndex, widgetIndex + 1)
+            objectEventSystem.emitWidgetMoved(slotName, widget.id, widgetIndex, widgetIndex + 1, {
+                objectType: objectType?.name,
+                slotConfig: slot
+            })
         }
     }
 
@@ -613,10 +655,20 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
 
     // Clear all widgets in a slot
     const handleClearSlot = (slotName) => {
+        const slot = objectType?.slotConfiguration?.slots?.find(s => s.name === slotName)
+        const previousWidgetCount = (normalizedWidgets[slotName] || []).length
+
         const updatedWidgets = {
             ...normalizedWidgets,
             [slotName]: []
         }
+
+        // Emit ObjectEditor-specific slot cleared event
+        objectEventSystem.emitSlotCleared(slotName, {
+            objectType: objectType?.name,
+            slotConfig: slot,
+            previousWidgetCount
+        })
 
         // Clear any selections for this slot
         setSelectedWidgets(prev => {
@@ -632,6 +684,40 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
         // Notify parent component via callback
         notifyWidgetChange(updatedWidgets)
     }
+
+    // Handle ObjectEditor-specific slot actions
+    const handleSlotAction = useCallback((action, slotName, widget) => {
+        const slot = objectType?.slotConfiguration?.slots?.find(s => s.name === slotName)
+
+        switch (action) {
+            case 'duplicate':
+                if (widget) {
+                    const duplicatedWidget = {
+                        ...widget,
+                        id: `widget-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                        name: `${widget.name} (Copy)`
+                    }
+
+                    // Add the duplicated widget
+                    const newWidget = addWidget(slotName, widget.type, duplicatedWidget.config)
+
+                    // Emit duplication event
+                    objectEventSystem.emitWidgetDuplicated(slotName, widget.id, newWidget, {
+                        objectType: objectType?.name,
+                        slotConfig: slot
+                    })
+                }
+                break;
+
+            case 'move_to_slot':
+                // This would open a slot selection modal - for now just log
+                console.log('Move to slot action:', widget, 'from slot:', slotName)
+                break;
+
+            default:
+                console.warn('Unknown slot action:', action)
+        }
+    }, [objectType, addWidget, objectEventSystem])
 
     // Stable config change handler that doesn't depend on widget.config
     const stableConfigChangeHandler = useCallback((widgetId, slotName, newConfig) => {
@@ -667,10 +753,11 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
         const widgetKey = `${slotName}-${index}`
         const isSelected = !!selectedWidgets[widgetKey]
         const slotWidgets = normalizedWidgets[slotName] || []
+        const slot = objectType?.slotConfiguration?.slots?.find(s => s.name === slotName)
 
         return (
             <div key={widget.id || index} className="relative">
-                <WidgetFactory
+                <ObjectWidgetFactory
                     widget={widget}
                     slotName={slotName}
                     index={index}
@@ -683,6 +770,12 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
                     canMoveDown={index < slotWidgets.length - 1}
                     mode="editor"
                     showControls={true}
+                    // ObjectEditor-specific props
+                    objectType={objectType}
+                    slotConfig={slot}
+                    onSlotAction={handleSlotAction}
+                    allowedWidgetTypes={availableWidgetTypes?.map(w => w.type) || []}
+                    maxWidgets={slot?.maxWidgets}
                     // Pass widget identity for event system
                     widgetId={widget.id}
                     className={`mb-2 ${isSelected ? 'ring-2 ring-blue-500' : ''}`}

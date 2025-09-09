@@ -6,7 +6,10 @@
 // Constants for widget actions to eliminate magic strings
 import { WIDGET_ACTIONS } from '../utils/widgetConstants';
 import DjangoTemplateRenderer from '../utils/DjangoTemplateRenderer.js';
-import { getWidgetMenuItems, executeWidgetAction } from './widgets/widgetRegistry.js';
+// Note: Widget menu items and actions are now handled by editor-specific frameworks
+// This is a placeholder for backward compatibility
+const getWidgetMenuItems = () => [];
+const executeWidgetAction = () => false;
 
 // Constants for widget menu icons
 const WIDGET_ICONS = {

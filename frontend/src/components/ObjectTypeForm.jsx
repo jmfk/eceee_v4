@@ -7,10 +7,10 @@ import InlineImageUpload from './InlineImageUpload'
 import { validateFieldName } from '../utils/schemaValidation'
 import { getAllFieldTypes } from '../utils/fieldTypeRegistry'
 import {
-    getWidgetIcon,
-    getWidgetCategory,
-    getWidgetDescription
-} from './widgets/widgetRegistry'
+    getCoreWidgetIcon as getWidgetIcon,
+    getCoreWidgetCategory as getWidgetCategory,
+    getCoreWidgetDescription as getWidgetDescription
+} from '../widgets'
 
 // Get field types from the registry
 const FIELD_TYPES = getAllFieldTypes().map(fieldType => ({

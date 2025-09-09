@@ -10,13 +10,13 @@ import {
 import { widgetsApi } from '../api'
 import { getAvailableWidgetTypes } from '../utils/widgetTypeValidation'
 import {
-    getWidgetIcon,
-    getWidgetCategory,
-    getWidgetDescription,
-    searchWidgets,
-    filterWidgetsByCategory,
-    getAvailableCategories
-} from './widgets/widgetRegistry'
+    getCoreWidgetIcon as getWidgetIcon,
+    getCoreWidgetCategory as getWidgetCategory,
+    getCoreWidgetDescription as getWidgetDescription,
+    searchCoreWidgets as searchWidgets,
+    filterCoreWidgetsByCategory as filterWidgetsByCategory,
+    getAvailableCoreCategories as getAvailableCategories
+} from '../widgets'
 
 const WidgetLibrary = ({ onSelectWidget, selectedWidgetTypes = [] }) => {
     const [searchTerm, setSearchTerm] = useState('')

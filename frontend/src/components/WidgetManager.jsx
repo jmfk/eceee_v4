@@ -16,10 +16,10 @@ import {
 } from 'lucide-react'
 import { widgetsApi } from '../api'
 import {
-    getWidgetIcon,
-    getWidgetCategory,
-    getAvailableCategories
-} from './widgets/widgetRegistry'
+    getCoreWidgetIcon as getWidgetIcon,
+    getCoreWidgetCategory as getWidgetCategory,
+    getAvailableCoreCategories as getAvailableCategories
+} from '../widgets'
 
 const WidgetManager = () => {
     const [searchTerm, setSearchTerm] = useState('')

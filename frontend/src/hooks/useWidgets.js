@@ -1,10 +1,10 @@
 import { useState, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { widgetsApi } from '../api'
-import { 
-    getWidgetDisplayName as getDisplayNameFromRegistry, 
-    getWidgetDefaultConfig 
-} from '../components/widgets/widgetRegistry'
+import {
+    getCoreWidgetDisplayName as getDisplayNameFromRegistry,
+    getCoreWidgetDefaultConfig as getWidgetDefaultConfig
+} from '../widgets'
 
 /**
  * Custom hook for widget management
