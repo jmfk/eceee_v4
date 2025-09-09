@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react'
-import { Layout, Settings, Trash2, ChevronUp, ChevronDown, Eye, ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { Layout, Settings, Trash2, ChevronUp, ChevronDown, Eye, ChevronLeft, ChevronRight, X, EyeOff } from 'lucide-react'
 import { WIDGET_REGISTRY, getWidgetComponent } from './widgetRegistry'
 import { renderWidgetPreview } from '../../utils/widgetPreview'
 import WidgetHeader from './WidgetHeader'
@@ -49,6 +49,7 @@ const WidgetFactory = ({
     // Use passed props or extract from widget
     const actualWidgetId = widgetId || widget?.id
     const actualSlotName = passedSlotName || slotName || widget?.slotName
+    const [isPreviewMode, setIsPreviewMode] = useState(false)
     const [showPreview, setShowPreview] = useState(false)
     const [isLoadingPreview, setIsLoadingPreview] = useState(false)
     const [previewContent, setPreviewContent] = useState(null)
@@ -87,7 +88,15 @@ const WidgetFactory = ({
         }
     }
 
-    const handlePreview = async () => {
+    const handlePreview = () => {
+        setIsPreviewMode(true)
+    }
+
+    const handleExitPreview = () => {
+        setIsPreviewMode(false)
+    }
+
+    const handleModalPreview = async () => {
         setShowPreview(true)
         setIsLoadingPreview(true)
         setPreviewContent(null)
@@ -122,33 +131,51 @@ const WidgetFactory = ({
     if (mode === 'editor' && showControls) {
         return (
             <div
-                className={`widget-item ${className}`}
+                className={`widget-item relative ${className} ${isPreviewMode ? 'preview-mode' : ''}`}
                 data-widget-type={widget.type}
                 data-widget-id={widget.id}
             >
-                {/* Widget Header */}
-                <WidgetHeader
-                    widgetType={getWidgetTypeName(widget)}
-                    onEdit={onEdit ? handleEdit : undefined}
-                    onDelete={onDelete ? handleDelete : undefined}
-                    onMoveUp={onMoveUp ? handleMoveUp : undefined}
-                    onMoveDown={onMoveDown ? handleMoveDown : undefined}
-                    onPreview={handlePreview}
-                    canMoveUp={canMoveUp}
-                    canMoveDown={canMoveDown}
-                    showControls={true}
-                />
+                {/* Widget Header - Hidden in preview mode */}
+                {!isPreviewMode && (
+                    <WidgetHeader
+                        widgetType={getWidgetTypeName(widget)}
+                        onEdit={onEdit ? handleEdit : undefined}
+                        onDelete={onDelete ? handleDelete : undefined}
+                        onMoveUp={onMoveUp ? handleMoveUp : undefined}
+                        onMoveDown={onMoveDown ? handleMoveDown : undefined}
+                        onPreview={handlePreview}
+                        canMoveUp={canMoveUp}
+                        canMoveDown={canMoveDown}
+                        showControls={true}
+                    />
+                )}
+
+                {/* Preview Mode Exit Button - Semi-transparent overlay */}
+                {isPreviewMode && (
+                    <div className="absolute top-2 right-2 z-10 opacity-30 hover:opacity-100 transition-opacity duration-200">
+                        <button
+                            onClick={handleExitPreview}
+                            className="bg-black bg-opacity-50 text-white p-2 rounded-full hover:bg-opacity-70 transition-colors"
+                            title="Exit preview mode"
+                        >
+                            <EyeOff className="h-4 w-4" />
+                        </button>
+                    </div>
+                )}
 
                 {/* Widget Content - Render actual widget component */}
-                <div className="widget-content border border-gray-200 border-t-0 rounded-b overflow-hidden">
+                <div className={`widget-content overflow-hidden ${isPreviewMode
+                        ? 'border-0 rounded'
+                        : 'border border-gray-200 border-t-0 rounded-b'
+                    }`}>
                     {(() => {
                         const WidgetComponent = getWidgetComponent(widget.type)
                         if (WidgetComponent) {
                             return (
                                 <WidgetComponent
                                     config={widget.config || {}}
-                                    mode="editor"
-                                    onConfigChange={stableConfigChangeHandler}
+                                    mode={isPreviewMode ? "display" : "editor"}
+                                    onConfigChange={isPreviewMode ? undefined : stableConfigChangeHandler}
                                     themeId={widget.config?.themeId}
                                     widgetId={actualWidgetId}
                                     slotName={actualSlotName}
