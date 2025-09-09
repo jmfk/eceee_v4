@@ -228,6 +228,7 @@ const ContentWidget = memo(({
         sanitize_html = true
     } = config
 
+
     // Debounced config update to prevent focus loss during typing
     const debouncedConfigUpdate = useRef(null)
 

@@ -1003,12 +1003,12 @@ const PageEditor = () => {
 
     // Listen to widget events (no prop drilling!)
     useWidgetEventListener(WIDGET_EVENTS.CHANGED, useCallback((payload) => {
-        // For real-time config changes, do ABSOLUTELY NOTHING
+        // For real-time config changes, mark as dirty but don't trigger re-renders
         // The widget handles its own display updates internally
         // Data will be collected during save via saveWidgets()
         if (payload.changeType === WIDGET_CHANGE_TYPES.CONFIG) {
-            // Don't even mark as dirty to prevent any state changes
-            // Dirty state will be set by other mechanisms (auto-save, etc.)
+            // Mark page as dirty so user knows there are unsaved changes
+            setIsDirty(true)
             return
         }
 

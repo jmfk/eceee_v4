@@ -9,8 +9,11 @@ import { widgetsApi } from '../../api'
 import ObjectContentEditor from '../ObjectContentEditor'
 import ObjectSchemaForm from '../ObjectSchemaForm'
 import WidgetEditorPanel from '../WidgetEditorPanel'
+import { WidgetEventProvider, useWidgetEventListener } from '../../contexts/WidgetEventContext'
+import { WIDGET_EVENTS, WIDGET_CHANGE_TYPES } from '../../types/widgetEvents'
 
-const ObjectContentView = forwardRef(({ objectType, instance, parentId, isNewInstance, onSave, onCancel, onUnsavedChanges }, ref) => {
+// Internal component that uses widget event hooks
+const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, isNewInstance, onSave, onCancel, onUnsavedChanges }, ref) => {
     const navigate = useNavigate()
     const { instanceId, objectTypeId, tab } = useParams()
 
@@ -53,6 +56,28 @@ const ObjectContentView = forwardRef(({ objectType, instance, parentId, isNewIns
         setLocalWidgets(instance?.widgets || {})
         setHasWidgetChanges(false)
     }, [instance])
+
+    // Listen to widget events for real-time updates and dirty state management
+    useWidgetEventListener(WIDGET_EVENTS.CHANGED, useCallback((payload) => {
+        if (payload.changeType === WIDGET_CHANGE_TYPES.CONFIG) {
+            // Handle real-time config changes - mark as dirty but don't auto-save
+            setHasWidgetChanges(true)
+
+            // Update local widgets for live preview
+            setLocalWidgets(prevWidgets => {
+                const newWidgets = { ...prevWidgets }
+                const slotName = payload.slotName
+
+                if (newWidgets[slotName]) {
+                    newWidgets[slotName] = newWidgets[slotName].map(widget =>
+                        widget.id === payload.widgetId ? payload.widget : widget
+                    )
+                }
+
+                return newWidgets
+            })
+        }
+    }, []), [])
 
     // Handle real-time widget updates from WidgetEditorPanel
     const handleRealTimeWidgetUpdate = useCallback((updatedWidget) => {
@@ -504,6 +529,17 @@ const ObjectContentView = forwardRef(({ objectType, instance, parentId, isNewIns
                 />
             )}
         </div>
+    )
+})
+
+ObjectContentViewInternal.displayName = 'ObjectContentViewInternal'
+
+// Main component that provides the WidgetEventContext
+const ObjectContentView = forwardRef((props, ref) => {
+    return (
+        <WidgetEventProvider>
+            <ObjectContentViewInternal {...props} ref={ref} />
+        </WidgetEventProvider>
     )
 })
 
