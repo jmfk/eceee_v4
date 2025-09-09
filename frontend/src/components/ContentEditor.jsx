@@ -539,7 +539,7 @@ const ContentEditor = forwardRef(({
     };
   }, [cleanupEventListeners]);
 
-  // NEW: Return current widget data from currentWidgets (single source of truth)
+  // NEW: Return current widget data from currentWidgets with live content collection
   const saveWidgets = useCallback((options = {}) => {
 
     if (!currentWidgets) {
@@ -548,8 +548,50 @@ const ContentEditor = forwardRef(({
     }
 
     try {
-      // Simply return the current widgets - no DOM collection needed
-      return currentWidgets;
+      // Create a deep copy of currentWidgets to avoid mutations
+      const widgetsToSave = JSON.parse(JSON.stringify(currentWidgets));
+
+      // Collect live content from ContentWidgets in the DOM
+      Object.keys(widgetsToSave).forEach(slotName => {
+        const slotWidgets = widgetsToSave[slotName] || [];
+
+        slotWidgets.forEach((widget, index) => {
+          // Only collect content for ContentWidgets
+          if (widget.type === 'core_widgets.ContentWidget') {
+            try {
+              // Find the widget element in DOM
+              const widgetElement = document.querySelector(`[data-widget-id="${widget.id}"]`);
+              if (widgetElement) {
+                // Look for contentEditable element within the widget (ContentWidget editor)
+                const contentEditableElement = widgetElement.querySelector('[contenteditable="true"]');
+                if (contentEditableElement && contentEditableElement.innerHTML) {
+                  // Update the widget config with current content from DOM
+                  widgetsToSave[slotName][index] = {
+                    ...widget,
+                    config: {
+                      ...widget.config,
+                      content: contentEditableElement.innerHTML
+                    }
+                  };
+
+                  if (options.debug) {
+                    console.log(`✅ SAVE SIGNAL: Collected content for ContentWidget ${widget.id}`, {
+                      slotName,
+                      widgetId: widget.id,
+                      contentLength: contentEditableElement.innerHTML.length
+                    });
+                  }
+                }
+              }
+            } catch (error) {
+              console.warn(`⚠️ SAVE SIGNAL: Failed to collect content for widget ${widget.id}:`, error);
+              // Continue with original widget data if collection fails
+            }
+          }
+        });
+      });
+
+      return widgetsToSave;
     } catch (error) {
       console.error("❌ SAVE SIGNAL: ContentEditor save failed", error);
       throw error;
