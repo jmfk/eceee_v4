@@ -11,7 +11,7 @@
  * Ported from ContentWidget.jsx cleanHTML function
  */
 const cleanHTML = (html) => {
-    const tempDiv = document.createElement('div')
+    const tempDiv = document.createElement('p')
     tempDiv.innerHTML = html
 
     // Remove unsupported tags

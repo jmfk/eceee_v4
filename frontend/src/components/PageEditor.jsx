@@ -1256,7 +1256,7 @@ const PageEditor = () => {
             {/* Main Content Area with right error To-Do sidebar and widget editor panel */}
             <div className="flex-1 overflow-hidden">
                 <div className="h-full flex relative">
-                    <div className={`flex-1 min-w-0 transition-all duration-300 ${widgetEditorOpen ? 'mr-0' : ''}`}>
+                    <div className={`flex-1 min-w-0 overflow-y-auto transition-all duration-300 ${widgetEditorOpen ? 'mr-0' : ''}`}>
                         {activeTab === 'content' && (
                             <>
                                 {!isVersionReady ? (
@@ -1294,7 +1294,7 @@ const PageEditor = () => {
                                                 </div>
                                             </div>
                                         ) : (
-                                            <div className="flex-1 min-h-0">
+                                            <div className="flex-1 h-full">
                                                 <PageContentEditor
                                                     key={`page-editor-${webpageData?.id}-${pageVersionData?.versionId || 'current'}`}
                                                     ref={contentEditorRef}

@@ -19,6 +19,12 @@ from .views import (
     render_page_backend,
     render_page_preview,
 )
+from .views.simplified_layout_views import (
+    simplified_layout_json,
+    simplified_layouts_list,
+    simplified_layout_schema,
+    validate_simplified_layout,
+)
 
 # Create router and register viewsets
 router = DefaultRouter()
@@ -69,7 +75,27 @@ widget_type_patterns = [
 
 # API URLs without app_name to avoid namespace conflicts when included in main API
 urlpatterns = [
+    # Legacy layout JSON (Django template-based)
     path("layouts/<str:layout_name>/json/", layout_json, name="layout-json"),
+    # New simplified layout JSON (React-optimized)
+    path(
+        "layouts/simplified/", simplified_layouts_list, name="simplified-layouts-list"
+    ),
+    path(
+        "layouts/simplified/<str:layout_name>/",
+        simplified_layout_json,
+        name="simplified-layout-json",
+    ),
+    path(
+        "layouts/simplified/schema/",
+        simplified_layout_schema,
+        name="simplified-layout-schema",
+    ),
+    path(
+        "layouts/simplified/validate/",
+        validate_simplified_layout,
+        name="simplified-layout-validate",
+    ),
     # Nested page-version endpoints (consistent path-based routing)
     path(
         "pages/<int:page_id>/versions/",

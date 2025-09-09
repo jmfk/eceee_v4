@@ -1,8 +1,8 @@
 /**
- * PageEditorCore - PageEditor-specific widget rendering system
+ * PageEditorCore - Hybrid layout renderer with React widgets
  * 
- * This component renders widgets using the shared React widgets (not Django templates)
- * but with PageEditor-specific implementation that's separate from ObjectContentEditor.
+ * This uses the existing LayoutRenderer for layout structure but overrides
+ * widget rendering to use PageWidgetFactory with shared React widgets.
  */
 
 import React, { useState, useEffect, useRef, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react'
@@ -16,6 +16,9 @@ import {
     getCoreWidgetCategory as getWidgetCategory,
     getCoreWidgetDescription as getWidgetDescription
 } from '../../widgets'
+import SimplifiedLayoutRenderer from './SimplifiedLayoutRenderer'
+import { simplifiedLayoutsApi, layoutFormatUtils } from '../../api/simplifiedLayouts'
+import { useNotificationContext } from '../../components/NotificationManager'
 
 const PageEditorCore = forwardRef(({
     layoutJson,
@@ -31,6 +34,15 @@ const PageEditorCore = forwardRef(({
     availableVersions,
     onVersionChange
 }, ref) => {
+    const containerRef = useRef(null);
+    const rendererRef = useRef(null);
+
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState(null);
+
+    // Get notification context
+    const { showConfirm } = useNotificationContext();
+
     // Create PageEditor-specific event system
     const baseWidgetEvents = useWidgetEvents();
     const pageEventSystem = useMemo(() =>
@@ -56,97 +68,7 @@ const PageEditorCore = forwardRef(({
         deleteWidget
     } = useWidgets(currentWidgets);
 
-    // State for filtered widget types
-    const [filteredWidgetTypes, setFilteredWidgetTypes] = useState([]);
-    const [isFilteringTypes, setIsFilteringTypes] = useState(false);
-
-    // Widget editor panel state
-    const [widgetEditorOpen, setWidgetEditorOpen] = useState(false);
-    const [editingWidget, setEditingWidget] = useState(null);
-
-    // Get available widget types from the layout's slot configurations
-    const rawAvailableWidgetTypes = useMemo(() => {
-        if (!layoutJson?.slots) return [];
-
-        const allWidgetControls = [];
-        layoutJson.slots.forEach(slot => {
-            if (slot.allowedWidgetTypes && Array.isArray(slot.allowedWidgetTypes)) {
-                slot.allowedWidgetTypes.forEach(widgetType => {
-                    // Avoid duplicates
-                    if (!allWidgetControls.some(existing => existing.type === widgetType)) {
-                        allWidgetControls.push({
-                            type: widgetType,
-                            display_name: getWidgetDisplayName(widgetType, widgetTypes),
-                            name: getWidgetDisplayName(widgetType, widgetTypes),
-                            defaultConfig: createDefaultWidgetConfig(widgetType)
-                        });
-                    }
-                });
-            }
-        });
-
-        return allWidgetControls;
-    }, [layoutJson?.slots, widgetTypes]);
-
-    // Filter widget types to only include available ones from server
-    useEffect(() => {
-        const filterTypes = async () => {
-            if (rawAvailableWidgetTypes.length === 0) {
-                setFilteredWidgetTypes([]);
-                return;
-            }
-
-            setIsFilteringTypes(true);
-            try {
-                const filtered = await filterAvailableWidgetTypes(rawAvailableWidgetTypes);
-                setFilteredWidgetTypes(filtered);
-            } catch (error) {
-                console.error('Error filtering widget types:', error);
-                // Fallback to raw types on error
-                setFilteredWidgetTypes(rawAvailableWidgetTypes);
-            } finally {
-                setIsFilteringTypes(false);
-            }
-        };
-
-        filterTypes();
-    }, [rawAvailableWidgetTypes]);
-
-    // PageEditor-specific widget handlers
-    const handleAddWidget = useCallback((slotName, widgetType) => {
-        // Check if adding to a published version
-        if (isPublished && onVersionChange) {
-            const shouldCreateVersion = window.confirm(
-                'This page is published. Do you want to create a new version for your changes?'
-            );
-            if (shouldCreateVersion) {
-                onVersionChange('create_new');
-                return;
-            }
-        }
-
-        const widgetConfig = createDefaultWidgetConfig(widgetType);
-        const newWidget = addWidget(slotName, widgetType, widgetConfig);
-
-        // Emit PageEditor-specific widget added event
-        pageEventSystem.emitWidgetAdded(slotName, newWidget, {
-            versionId,
-            isPublished,
-            pageId,
-            layoutRenderer: null // We're not using LayoutRenderer anymore
-        });
-
-        // Notify parent of changes
-        const updatedWidgets = { ...currentWidgets };
-        if (!updatedWidgets[slotName]) updatedWidgets[slotName] = [];
-        updatedWidgets[slotName].push(newWidget);
-        onUpdate({ widgets: updatedWidgets });
-
-        if (onDirtyChange) {
-            onDirtyChange(true, `added widget to slot ${slotName}`);
-        }
-    }, [isPublished, onVersionChange, addWidget, pageEventSystem, versionId, pageId, currentWidgets, onUpdate, onDirtyChange]);
-
+    // PageEditor-specific widget handlers (defined before layoutRenderer)
     const handleEditWidget = useCallback((slotName, index, widget) => {
         // Check if editing a published version
         if (isPublished && onVersionChange) {
@@ -240,7 +162,6 @@ const PageEditorCore = forwardRef(({
         }
     }, [currentWidgets, pageEventSystem, versionId, isPublished, pageId, onUpdate, onDirtyChange]);
 
-    // Handle publishing actions
     const handlePublishingAction = useCallback((action, actionVersionId) => {
         if (onVersionChange) {
             switch (action) {
@@ -259,111 +180,88 @@ const PageEditorCore = forwardRef(({
         }
     }, [onVersionChange]);
 
-    // Render a single widget using PageWidgetFactory
-    const renderWidget = useCallback((widget, slotName, index, slotWidgets) => {
-        return (
-            <div key={widget.id || index} className="mb-4">
-                <PageWidgetFactory
-                    widget={widget}
-                    slotName={slotName}
-                    index={index}
-                    onEdit={handleEditWidget}
-                    onDelete={handleDeleteWidget}
-                    onMoveUp={(slot, idx, w) => handleMoveWidget(slot, idx, idx - 1, w)}
-                    onMoveDown={(slot, idx, w) => handleMoveWidget(slot, idx, idx + 1, w)}
-                    onConfigChange={handleConfigChange}
-                    canMoveUp={index > 0}
-                    canMoveDown={index < slotWidgets.length - 1}
-                    mode="editor"
-                    showControls={editable}
-                    // PageEditor-specific props
-                    layoutRenderer={null} // Not using LayoutRenderer
-                    versionId={versionId}
-                    isPublished={isPublished}
-                    onVersionChange={onVersionChange}
-                    onPublishingAction={handlePublishingAction}
-                />
-            </div>
-        );
-    }, [handleEditWidget, handleDeleteWidget, handleMoveWidget, handleConfigChange, handlePublishingAction, editable, versionId, isPublished, onVersionChange]);
+    // Create and configure the hybrid layout renderer
+    const layoutRenderer = useMemo(() => {
+        if (!rendererRef.current || rendererRef.current.editable !== editable) {
+            // Clean up existing renderer if it exists
+            if (rendererRef.current) {
+                rendererRef.current.cleanup();
+            }
 
-    // Render a slot with its widgets
-    const renderSlot = useCallback((slot) => {
-        const slotWidgets = currentWidgets[slot.name] || [];
+            // Create simplified layout renderer
+            rendererRef.current = new SimplifiedLayoutRenderer({ editable });
 
-        return (
-            <div
-                key={slot.name}
-                className="page-editor-slot border border-gray-200 rounded-lg p-6 mb-6"
-                data-slot-name={slot.name}
-            >
-                {/* Slot Header */}
-                <div className="flex items-center justify-between mb-4">
-                    <div>
-                        <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                            <Layout className="h-5 w-5 mr-2 text-gray-600" />
-                            {slot.label || slot.name}
-                            <span className="ml-3 text-sm text-gray-500 font-normal">
-                                ({slotWidgets.length} widgets)
-                            </span>
-                            {isPublished && (
-                                <span className="ml-3 inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
-                                    Published
-                                </span>
-                            )}
-                        </h3>
-                        {slot.description && (
-                            <p className="text-sm text-gray-600 mt-1">{slot.description}</p>
-                        )}
-                    </div>
+            // Set PageEditor context
+            rendererRef.current.setPageContext({
+                versionId,
+                isPublished,
+                pageId,
+                currentVersion,
+                availableVersions
+            });
 
-                    {editable && (
-                        <button
-                            onClick={() => handleAddWidget(slot.name, 'core_widgets.ContentWidget')}
-                            className="flex items-center px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                        >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add Widget
-                        </button>
-                    )}
-                </div>
+            // Set PageEditor event system
+            rendererRef.current.setPageEventSystem(pageEventSystem);
 
-                {/* Widgets */}
-                <div className="space-y-4">
-                    {slotWidgets.length > 0 ? (
-                        slotWidgets.map((widget, index) =>
-                            renderWidget(widget, slot.name, index, slotWidgets)
-                        )
-                    ) : (
-                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center text-gray-500">
-                            <Layout className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-                            <p className="text-sm">No widgets in this slot</p>
-                            {editable && (
-                                <p className="text-xs mt-1">Click "Add Widget" to get started</p>
-                            )}
-                        </div>
-                    )}
-                </div>
-            </div>
-        );
-    }, [currentWidgets, renderWidget, editable, handleAddWidget, isPublished]);
+            // Set PageWidgetFactory component
+            rendererRef.current.setPageWidgetFactory(PageWidgetFactory);
 
-    // Parse layout JSON to extract slots
-    const layoutSlots = useMemo(() => {
-        if (!layoutJson) return [];
+            // Set widget data accessor
+            rendererRef.current.setWidgetDataAccessor((slotName) => {
+                return currentWidgets[slotName] || [];
+            });
 
-        // Handle different layout JSON formats
-        if (layoutJson.slots && Array.isArray(layoutJson.slots)) {
-            return layoutJson.slots;
+            // Set widget action handlers
+            rendererRef.current.setWidgetActionHandlers({
+                onEdit: handleEditWidget,
+                onDelete: handleDeleteWidget,
+                onMoveUp: (slotName, index, widget) => handleMoveWidget(slotName, index, index - 1, widget),
+                onMoveDown: (slotName, index, widget) => handleMoveWidget(slotName, index, index + 1, widget),
+                onConfigChange: handleConfigChange,
+                onVersionChange: onVersionChange,
+                onPublishingAction: handlePublishingAction
+            });
+        }
+        return rendererRef.current;
+    }, [editable, versionId, isPublished, pageId, currentVersion, availableVersions, pageEventSystem, currentWidgets, handleEditWidget, handleDeleteWidget, handleMoveWidget, handleConfigChange, onVersionChange, handlePublishingAction]);
+
+    // Additional widget handler for adding widgets
+    const handleAddWidget = useCallback((slotName, widgetType) => {
+        // Check if adding to a published version
+        if (isPublished && onVersionChange) {
+            const shouldCreateVersion = window.confirm(
+                'This page is published. Do you want to create a new version for your changes?'
+            );
+            if (shouldCreateVersion) {
+                onVersionChange('create_new');
+                return;
+            }
         }
 
-        // Fallback: create slots based on current widgets
-        return Object.keys(currentWidgets).map(slotName => ({
-            name: slotName,
-            label: slotName.charAt(0).toUpperCase() + slotName.slice(1),
-            description: `Content area for ${slotName}`
-        }));
-    }, [layoutJson, currentWidgets]);
+        const widgetConfig = createDefaultWidgetConfig(widgetType);
+        const newWidget = addWidget(slotName, widgetType, widgetConfig);
+
+        // Emit PageEditor-specific widget added event
+        pageEventSystem.emitWidgetAdded(slotName, newWidget, {
+            versionId,
+            isPublished,
+            pageId,
+            layoutRenderer: layoutRenderer
+        });
+
+        // Notify parent of changes
+        const updatedWidgets = { ...currentWidgets };
+        if (!updatedWidgets[slotName]) updatedWidgets[slotName] = [];
+        updatedWidgets[slotName].push(newWidget);
+        onUpdate({ widgets: updatedWidgets });
+
+        if (onDirtyChange) {
+            onDirtyChange(true, `added widget to slot ${slotName}`);
+        }
+    }, [isPublished, onVersionChange, addWidget, pageEventSystem, versionId, pageId, layoutRenderer, currentWidgets, onUpdate, onDirtyChange]);
+
+    // Note: Widget rendering is now handled by PageLayoutRendererWithReact
+    // The LayoutRenderer will call renderWidget() which uses PageWidgetFactory
 
     // Listen to PageEditor-specific events
     useEffect(() => {
@@ -383,22 +281,97 @@ const PageEditorCore = forwardRef(({
         };
     }, [pageEventSystem, versionId]);
 
+    // Render layout when layoutJson or widgets change
+    useEffect(() => {
+        if (!layoutRenderer || !layoutJson || !containerRef.current) return;
+
+        const renderLayout = async () => {
+            setIsLoading(true);
+            setError(null);
+
+            try {
+                // Load widget data into renderer
+                layoutRenderer.loadWidgetData(currentWidgets);
+
+                // Detect layout format and handle accordingly
+                let layoutToRender = layoutJson;
+
+                if (layoutFormatUtils.isLegacyFormat(layoutJson)) {
+                    console.warn('PageEditorCore: Legacy layout format detected, attempting to get simplified version');
+
+                    try {
+                        // Try to get simplified version
+                        const layoutName = layoutJson.layout?.name;
+                        if (layoutName) {
+                            const simplifiedResponse = await simplifiedLayoutsApi.get(layoutName);
+                            if (simplifiedResponse.success && simplifiedResponse.layout) {
+                                layoutToRender = simplifiedResponse.layout;
+                                console.log('PageEditorCore: Using simplified layout format');
+                            }
+                        }
+                    } catch (simplifiedError) {
+                        console.warn('PageEditorCore: Failed to get simplified layout, converting legacy:', simplifiedError);
+                        layoutToRender = layoutFormatUtils.convertLegacyToSimplified(layoutJson);
+                    }
+                }
+
+                // Render the layout with React widgets (no Django templates)
+                await layoutRenderer.render(layoutToRender, containerRef);
+
+                // Emit layout rendered event
+                pageEventSystem.emitLayoutRendered(layoutRenderer, {
+                    versionId,
+                    isPublished,
+                    pageId,
+                    format: layoutFormatUtils.getFormatVersion(layoutToRender)
+                });
+
+            } catch (error) {
+                console.error('PageEditorCore: Layout rendering failed', error);
+                setError(error.message);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        renderLayout();
+    }, [layoutRenderer, layoutJson, currentWidgets, pageEventSystem, versionId, isPublished, pageId]);
+
+    // Update widgets when they change
+    useEffect(() => {
+        if (!layoutRenderer || !currentWidgets) return;
+
+        // Update all slots with current widgets
+        Object.entries(currentWidgets).forEach(([slotName, slotWidgets]) => {
+            try {
+                layoutRenderer.updateSlot(slotName, slotWidgets);
+            } catch (error) {
+                console.error(`PageEditorCore: Error updating slot ${slotName}`, error);
+            }
+        });
+    }, [layoutRenderer, currentWidgets]);
+
     // Expose methods to parent component
     useImperativeHandle(ref, () => ({
         saveWidgets: async () => {
             try {
+                // Mark layout renderer as clean after successful save
+                if (layoutRenderer) {
+                    layoutRenderer.markAsClean();
+                }
+
                 // Emit PageEditor-specific save event
                 pageEventSystem.emitPageSaved({ widgets: currentWidgets }, {
                     versionId,
                     isPublished,
                     pageId,
-                    saveStrategy: 'page-editor-core'
+                    saveStrategy: 'page-editor-hybrid'
                 });
 
                 return {
                     success: true,
                     data: currentWidgets,
-                    module: 'page-editor-core',
+                    module: 'page-editor-hybrid',
                     timestamp: new Date().toISOString()
                 };
             } catch (error) {
@@ -411,12 +384,15 @@ const PageEditorCore = forwardRef(({
             console.log('PageEditorCore: Auto-save', enabled ? 'enabled' : 'disabled', `interval: ${interval}ms`);
         },
 
+        // Expose layout renderer for compatibility
+        layoutRenderer: layoutRenderer,
+
         // PageEditor-specific methods
         getCurrentVersion: () => currentVersion,
         getVersionId: () => versionId,
         isPublishedVersion: () => isPublished,
         pageEventSystem
-    }), [currentWidgets, pageEventSystem, versionId, isPublished, pageId, currentVersion]);
+    }), [currentWidgets, layoutRenderer, pageEventSystem, versionId, isPublished, pageId, currentVersion]);
 
     if (!layoutJson) {
         return (
@@ -430,17 +406,39 @@ const PageEditorCore = forwardRef(({
         );
     }
 
+    if (error) {
+        return (
+            <div className="flex items-center justify-center h-full bg-red-50">
+                <div className="text-center">
+                    <div className="text-red-600 text-lg font-medium mb-2">Layout Rendering Error</div>
+                    <div className="text-red-500 text-sm">{error}</div>
+                </div>
+            </div>
+        );
+    }
+
+    if (isLoading) {
+        return (
+            <div className="flex items-center justify-center h-full bg-gray-50">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                    <p className="text-gray-600">Rendering page layout with React widgets...</p>
+                </div>
+            </div>
+        );
+    }
+
     return (
-        <div className="page-editor-core">
+        <div className="page-editor-core h-full">
             {/* Page Editor Header */}
             <div className="bg-white border-b border-gray-200 p-4 mb-6">
                 <div className="flex items-center justify-between">
                     <div>
                         <h2 className="text-xl font-semibold text-gray-900">
-                            Page Content Editor
+                            Page Layout Editor
                         </h2>
                         <p className="text-sm text-gray-600 mt-1">
-                            Using shared React widgets • Version: {versionId || 'new'}
+                            Layout rendering with shared React widgets • Version: {versionId || 'new'}
                             {isPublished && <span className="text-green-600"> • Published</span>}
                         </p>
                     </div>
@@ -462,18 +460,11 @@ const PageEditorCore = forwardRef(({
                 </div>
             </div>
 
-            {/* Layout Slots */}
-            <div className="page-editor-slots space-y-6 p-4">
-                {layoutSlots.length > 0 ? (
-                    layoutSlots.map(renderSlot)
-                ) : (
-                    <div className="text-center py-12 text-gray-500">
-                        <Layout className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                        <h3 className="text-lg font-medium text-gray-900 mb-2">No Slots Configured</h3>
-                        <p>This layout doesn't have any widget slots configured.</p>
-                    </div>
-                )}
-            </div>
+            {/* Layout Container - Rendered by LayoutRenderer */}
+            <div
+                ref={containerRef}
+                className="page-layout-container flex-1 overflow-auto p-4"
+            />
         </div>
     );
 });
