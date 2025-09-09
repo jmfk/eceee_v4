@@ -6,9 +6,8 @@
  */
 
 import React from 'react';
-import { Layout, Plus } from 'lucide-react';
+import { Layout, Plus, MoreHorizontal } from 'lucide-react';
 import PageWidgetFactory from '../PageWidgetFactory';
-
 const WidgetSlot = ({
     name,
     label,
@@ -65,36 +64,32 @@ const WidgetSlot = ({
         <div className={`widget-slot ${className}`} data-slot-name={name}>
             {/* Slot Header */}
             {editable && (
-                <div className="slot-header bg-gray-100 border border-gray-300 rounded-t-lg px-4 py-3 flex items-center justify-between">
-                    <div>
-                        <div className="flex items-center space-x-2">
-                            <Layout className="h-4 w-4 text-gray-600" />
-                            <span className="font-medium text-gray-900">{label}</span>
-                            {required && (
-                                <span className="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded">
-                                    Required
-                                </span>
-                            )}
-                            {pageContext.isPublished && (
-                                <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
-                                    Published
-                                </span>
-                            )}
+                <div
+                    key={name}
+                    className="relative border p-4 transition-colors border-gray-200 "
+                    data-slot-name={name}
+                    data-slot-title={label}
+                >
+                    <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                            <div className="flex items-center">
+                                <Layout className="h-4 w-4 mr-2 text-gray-400" />
+                                <h4 className="text-sm font-medium text-gray-900">
+                                    {label}
+                                </h4>
+                            </div>
                         </div>
-                        <div className="text-sm text-gray-600 mt-1">
-                            {description} • {widgets.length}/{maxWidgets === Infinity ? '∞' : maxWidgets} widgets
+                        <div>
+                            <button className="bg-gray-300 hover:bg-gray-500 text-black hover:text-white p-1 rounded-lg transition-colors" title="Add Widget"
+                                onClick={handleAddWidget}
+                                disabled={widgets.length >= maxWidgets}
+                            >
+                                <MoreHorizontal className="h-4 w-4" />
+                            </button>
                         </div>
                     </div>
-
-                    <button
-                        onClick={handleAddWidget}
-                        disabled={widgets.length >= maxWidgets}
-                        className="flex items-center px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors text-sm"
-                    >
-                        <Plus className="h-4 w-4 mr-1" />
-                        Add Widget
-                    </button>
                 </div>
+
             )}
 
             {/* Slot Content */}

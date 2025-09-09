@@ -230,7 +230,7 @@ const SlotIconMenu = ({ slotName, slot, availableWidgetTypes, isFilteringTypes, 
             {/* Menu Button (3 dots icon) */}
             <button
                 onClick={handleMenuToggle}
-                className="bg-gray-700 hover:bg-gray-800 text-white p-2 rounded-md transition-colors"
+                className="bg-gray-300 hover:bg-gray-500 text-black hover:text-white p-1 rounded-lg transition-colors"
                 title={`Slot: ${slotName}`}
             >
                 <MoreHorizontal className="h-4 w-4" />
@@ -360,11 +360,34 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
             notifyWidgetChange(updatedWidgets)
         });
 
+        const unsubscribeWidgetMoved = objectEventSystem.onWidgetMoved((payload) => {
+            const currentWidgets = normalizedWidgetsRef.current
+            const { slotName, widgetId, fromIndex, toIndex } = payload
+
+            // Use moveWidget function to actually reorder the widgets
+            const slotWidgets = [...(currentWidgets[slotName] || [])]
+            if (fromIndex >= 0 && fromIndex < slotWidgets.length &&
+                toIndex >= 0 && toIndex < slotWidgets.length) {
+
+                // Remove widget from source position
+                const [movedWidget] = slotWidgets.splice(fromIndex, 1)
+                // Insert widget at target position
+                slotWidgets.splice(toIndex, 0, movedWidget)
+
+                const updatedWidgets = {
+                    ...currentWidgets,
+                    [slotName]: slotWidgets
+                }
+                notifyWidgetChange(updatedWidgets)
+            }
+        });
+
         return () => {
             unsubscribeChanged();
             unsubscribeAdded();
             unsubscribeRemoved();
             unsubscribeSlotCleared();
+            unsubscribeWidgetMoved();
         };
     }, [objectEventSystem, notifyWidgetChange])
 
@@ -568,12 +591,20 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
 
         const slot = objectType?.slotConfiguration?.slots?.find(s => s.name === slotName)
 
-        // Emit ObjectEditor-specific widget moved event
-        if (widget?.id) {
-            objectEventSystem.emitWidgetMoved(slotName, widget.id, widgetIndex, widgetIndex - 1, {
-                objectType: objectType?.name,
-                slotConfig: slot
-            })
+        // Directly perform the widget move operation
+        const currentWidgets = normalizedWidgets
+        const slotWidgets = [...(currentWidgets[slotName] || [])]
+
+        if (widgetIndex < slotWidgets.length) {
+            // Swap widgets
+            const [movedWidget] = slotWidgets.splice(widgetIndex, 1)
+            slotWidgets.splice(widgetIndex - 1, 0, movedWidget)
+
+            const updatedWidgets = {
+                ...currentWidgets,
+                [slotName]: slotWidgets
+            }
+            notifyWidgetChange(updatedWidgets)
         }
     }
 
@@ -586,12 +617,20 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
 
         const slot = objectType?.slotConfiguration?.slots?.find(s => s.name === slotName)
 
-        // Emit ObjectEditor-specific widget moved event
-        if (widget?.id) {
-            objectEventSystem.emitWidgetMoved(slotName, widget.id, widgetIndex, widgetIndex + 1, {
-                objectType: objectType?.name,
-                slotConfig: slot
-            })
+        // Directly perform the widget move operation
+        const currentWidgets = normalizedWidgets
+        const currentSlotWidgets = [...(currentWidgets[slotName] || [])]
+
+        if (widgetIndex >= 0 && widgetIndex < currentSlotWidgets.length - 1) {
+            // Swap widgets
+            const [movedWidget] = currentSlotWidgets.splice(widgetIndex, 1)
+            currentSlotWidgets.splice(widgetIndex + 1, 0, movedWidget)
+
+            const updatedWidgets = {
+                ...currentWidgets,
+                [slotName]: currentSlotWidgets
+            }
+            notifyWidgetChange(updatedWidgets)
         }
     }
 
@@ -711,7 +750,7 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
 
             case 'move_to_slot':
                 // This would open a slot selection modal - for now just log
-                console.log('Move to slot action:', widget, 'from slot:', slotName)
+                // TODO: Implement slot selection modal
                 break;
 
             default:

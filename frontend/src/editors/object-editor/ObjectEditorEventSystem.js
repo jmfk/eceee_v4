@@ -327,6 +327,15 @@ export class ObjectEditorEventListener {
         })
     }
 
+    onWidgetMoved(callback, slotFilter = null) {
+        return this.subscribe(OBJECT_EDITOR_EVENTS.WIDGET_MOVED, (payload) => {
+            if (slotFilter && payload.slotName !== slotFilter) {
+                return
+            }
+            callback(payload)
+        })
+    }
+
     onWidgetDuplicated(callback, slotFilter = null) {
         return this.subscribe(OBJECT_EDITOR_EVENTS.WIDGET_DUPLICATED, (payload) => {
             if (slotFilter && payload.slotName !== slotFilter) {
@@ -431,6 +440,7 @@ export const createObjectEditorEventSystem = (baseEventSystem) => {
         onWidgetSaved: listener.onWidgetSaved.bind(listener),
         onWidgetAdded: listener.onWidgetAdded.bind(listener),
         onWidgetRemoved: listener.onWidgetRemoved.bind(listener),
+        onWidgetMoved: listener.onWidgetMoved.bind(listener),
         onWidgetDuplicated: listener.onWidgetDuplicated.bind(listener),
         onSlotCleared: listener.onSlotCleared.bind(listener),
         onSlotValidated: listener.onSlotValidated.bind(listener),
