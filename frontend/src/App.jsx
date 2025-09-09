@@ -2,7 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster, toast } from 'react-hot-toast'
 import { X } from 'lucide-react'
-import './utils/rerenderInvestigation' // Initialize render investigation
+// import './utils/rerenderInvestigation' // Initialize render investigation - DISABLED
 import Navbar from '@components/Navbar'
 import HomePage from '@pages/HomePage'
 
@@ -18,7 +18,7 @@ import TreePageManager from '@components/TreePageManager'
 import PageEditor from '@components/PageEditor'
 import VersionTimelinePage from '@pages/VersionTimelinePage'
 import NotFoundPage from '@pages/NotFoundPage'
-import RenderInvestigation from '@pages/RenderInvestigation'
+// import RenderInvestigation from '@pages/RenderInvestigation' // DISABLED
 import { NotificationProvider } from '@components/NotificationManager'
 import { GlobalNotificationProvider } from './contexts/GlobalNotificationContext'
 import { AuthProvider } from './contexts/AuthContext'
@@ -67,6 +67,7 @@ function App() {
                     </PrivateRoute>
                   } />
 
+                  {/* RENDER INVESTIGATION ROUTE - DISABLED
                   <Route path="/render-investigation" element={
                     <PrivateRoute>
                       <div className="fixed inset-0 bg-gray-50 flex flex-col">
@@ -80,6 +81,7 @@ function App() {
                       </div>
                     </PrivateRoute>
                   } />
+                  */}
 
                   <Route path="/pages" element={
                     <PrivateRoute>
