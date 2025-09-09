@@ -1,15 +1,16 @@
-import React, { useState, useRef, useEffect, useCallback, memo } from 'react'
-import { FileText, Bold, Italic, List, ListOrdered, Undo, Redo, Type, Eraser } from 'lucide-react'
+import React, { useRef, useEffect, useCallback, memo } from 'react'
+import { FileText, Type, Eraser } from 'lucide-react'
 import { useRenderTracker, useStabilityTracker } from '../../utils/debugHooks'
 import { useContentEditorTheme } from '../../hooks/useTheme'
 import { useWidgetEventEmitter } from '../../contexts/WidgetEventContext'
 import { WIDGET_CHANGE_TYPES } from '../../types/widgetEvents'
+import ContentWidgetEditorRenderer from './ContentWidgetEditorRenderer.js'
 
 /**
  * Clean up HTML content by removing unsupported tags and attributes
  */
 const cleanHTML = (html) => {
-    const tempDiv = document.createElement('div')
+    const tempDiv = document.createElement('p')
     tempDiv.innerHTML = html
 
     // Remove unsupported tags
@@ -41,147 +42,45 @@ const cleanHTML = (html) => {
 }
 
 /**
- * Content Editor Component
+ * Vanilla JS Editor Wrapper Component
+ * Wraps the vanilla JS ContentWidgetEditorRenderer for React integration
  */
-const ContentEditor = memo(({ content, onChange, className }) => {
-    const editorRef = useRef(null)
+const ContentWidgetEditor = memo(({ content, onChange, className }) => {
+    const containerRef = useRef(null)
+    const rendererRef = useRef(null)
 
     useEffect(() => {
-        if (editorRef.current && content !== editorRef.current.innerHTML) {
-            editorRef.current.innerHTML = content
+        if (containerRef.current && !rendererRef.current) {
+            // Initialize vanilla JS renderer
+            rendererRef.current = new ContentWidgetEditorRenderer(containerRef.current, {
+                content,
+                onChange,
+                className
+            })
+            rendererRef.current.render()
         }
-    }, [content])
+    }, [])
 
-    const handleContentChange = useCallback(() => {
-        if (editorRef.current && onChange) {
-            const cleanedContent = cleanHTML(editorRef.current.innerHTML)
-            // Only call onChange if content actually changed
-            if (cleanedContent !== content) {
-                onChange(cleanedContent)
+    useEffect(() => {
+        if (rendererRef.current) {
+            rendererRef.current.updateConfig({
+                content,
+                onChange,
+                className
+            })
+        }
+    }, [content, onChange, className])
+
+    useEffect(() => {
+        return () => {
+            if (rendererRef.current) {
+                rendererRef.current.destroy()
+                rendererRef.current = null
             }
         }
-    }, [onChange, content])
+    }, [])
 
-    const execCommand = useCallback((command, value = null) => {
-        document.execCommand(command, false, value)
-        handleContentChange()
-    }, [handleContentChange])
-
-    const handlePaste = useCallback((e) => {
-        e.preventDefault()
-        const paste = (e.clipboardData || window.clipboardData).getData('text/html') ||
-            (e.clipboardData || window.clipboardData).getData('text/plain')
-        const cleanedPaste = cleanHTML(paste)
-        document.execCommand('insertHTML', false, cleanedPaste)
-        handleContentChange()
-    }, [handleContentChange])
-
-    const handleKeyDown = useCallback((e) => {
-        // Tab handling for indentation
-        if (e.key === 'Tab') {
-            e.preventDefault()
-            if (e.shiftKey) {
-                execCommand('outdent')
-            } else {
-                execCommand('indent')
-            }
-        }
-        // Enter key handling for lists
-        else if (e.key === 'Enter') {
-            setTimeout(handleContentChange, 0)
-        }
-    }, [execCommand, handleContentChange])
-
-    return (
-        <div className="content-editor">
-            {/* Toolbar */}
-            <div className="toolbar flex items-center gap-1 p-2 border-b border-gray-200 bg-gray-50">
-                <button
-                    type="button"
-                    onClick={() => execCommand('bold')}
-                    className="p-1 hover:bg-gray-200 rounded"
-                    title="Bold"
-                >
-                    <Bold className="h-4 w-4" />
-                </button>
-                <button
-                    type="button"
-                    onClick={() => execCommand('italic')}
-                    className="p-1 hover:bg-gray-200 rounded"
-                    title="Italic"
-                >
-                    <Italic className="h-4 w-4" />
-                </button>
-
-                <div className="w-px h-6 bg-gray-300 mx-1"></div>
-
-                <select
-                    onChange={(e) => execCommand('formatBlock', e.target.value)}
-                    className="text-sm border border-gray-300 rounded px-2 py-1"
-                    defaultValue=""
-                >
-                    <option value="">Format</option>
-                    <option value="<h1>">Heading 1</option>
-                    <option value="<h2>">Heading 2</option>
-                    <option value="<h3>">Heading 3</option>
-                    <option value="<h4>">Heading 4</option>
-                    <option value="<h5>">Heading 5</option>
-                    <option value="<h6>">Heading 6</option>
-                    <option value="<p>">Paragraph</option>
-                </select>
-
-                <div className="w-px h-6 bg-gray-300 mx-1"></div>
-
-                <button
-                    type="button"
-                    onClick={() => execCommand('insertUnorderedList')}
-                    className="p-1 hover:bg-gray-200 rounded"
-                    title="Bullet List"
-                >
-                    <List className="h-4 w-4" />
-                </button>
-                <button
-                    type="button"
-                    onClick={() => execCommand('insertOrderedList')}
-                    className="p-1 hover:bg-gray-200 rounded"
-                    title="Numbered List"
-                >
-                    <ListOrdered className="h-4 w-4" />
-                </button>
-
-                <div className="w-px h-6 bg-gray-300 mx-1"></div>
-
-                <button
-                    type="button"
-                    onClick={() => execCommand('undo')}
-                    className="p-1 hover:bg-gray-200 rounded"
-                    title="Undo"
-                >
-                    <Undo className="h-4 w-4" />
-                </button>
-                <button
-                    type="button"
-                    onClick={() => execCommand('redo')}
-                    className="p-1 hover:bg-gray-200 rounded"
-                    title="Redo"
-                >
-                    <Redo className="h-4 w-4" />
-                </button>
-            </div>
-
-            {/* Editor */}
-            <div
-                ref={editorRef}
-                contentEditable
-                className="p-3 min-h-32 outline-none"
-                onInput={handleContentChange}
-                onPaste={handlePaste}
-                onKeyDown={handleKeyDown}
-                style={{ lineHeight: '1.6' }}
-                suppressContentEditableWarning={true}
-            />
-        </div>
-    )
+    return <div ref={containerRef} />
 })
 
 /**
@@ -278,7 +177,7 @@ const ContentWidget = memo(({
     }, [config, content, widgetId, slotName, widgetType, emitWidgetChanged, onConfigChange])
     if (mode === 'editor') {
         return (
-            <ContentEditor
+            <ContentWidgetEditor
                 content={content}
                 onChange={handleContentChange}
                 className={`${getThemeClassName()}`}
