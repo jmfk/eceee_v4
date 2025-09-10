@@ -76,22 +76,6 @@ const PageWidgetHeader = ({
                     <span className="text-xs font-medium text-gray-700">
                         {widgetType}
                     </span>
-
-                    {/* Publishing status indicator */}
-                    {isPublished && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-green-100 text-green-800">
-                            <Globe className="h-3 w-3 mr-1" />
-                            Live
-                        </span>
-                    )}
-
-                    {/* Version indicator */}
-                    {versionId && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-blue-100 text-blue-800">
-                            <GitBranch className="h-3 w-3 mr-1" />
-                            v{versionId}
-                        </span>
-                    )}
                 </div>
             </div>
 
@@ -104,8 +88,8 @@ const PageWidgetHeader = ({
                             onClick={onMoveUp}
                             disabled={!canMoveUp}
                             className={`p-1 rounded transition-colors ${canMoveUp
-                                    ? 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
-                                    : 'text-gray-400 cursor-not-allowed'
+                                ? 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
+                                : 'text-gray-400 cursor-not-allowed'
                                 }`}
                             title="Move up"
                         >
@@ -115,8 +99,8 @@ const PageWidgetHeader = ({
                             onClick={onMoveDown}
                             disabled={!canMoveDown}
                             className={`p-1 rounded transition-colors ${canMoveDown
-                                    ? 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
-                                    : 'text-gray-400 cursor-not-allowed'
+                                ? 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
+                                : 'text-gray-400 cursor-not-allowed'
                                 }`}
                             title="Move down"
                         >

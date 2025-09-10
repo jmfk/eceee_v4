@@ -88,7 +88,7 @@ class ContentWidget(BaseWidget):
         "content-font": "inherit",
         "content-line-height": "1.6",
         "content-color": "inherit",
-        "heading-margin-top": "1.5rem",
+        "heading-margin-top": "0",
         "heading-margin-bottom": "0.5rem",
         "heading-font-weight": "600",
         "paragraph-margin": "1rem",
@@ -402,9 +402,9 @@ class FooterWidget(BaseWidget):
     }
     
     .footer-widget ul {
-        list-style: none;
-        padding: 0;
-        margin: 0;
+        list-style: var(--footer-list-style, none);
+        padding: var(--footer-list-padding, 0);
+        margin: var(--footer-list-margin, 0);
     }
     
     .footer-widget ul li {
@@ -428,6 +428,9 @@ class FooterWidget(BaseWidget):
         "footer-line-height": "1.6",
         "footer-link-color": "#60a5fa",
         "footer-link-hover-color": "#93c5fd",
+        "footer-list-style": "none",
+        "footer-list-padding": "0",
+        "footer-list-margin": "0",
         "footer-list-item-margin": "0.5rem",
     }
 
@@ -591,9 +594,9 @@ class NavigationWidget(BaseWidget):
     
     .navigation-widget .nav-menu {
         display: flex;
-        list-style: none;
-        margin: 0;
-        padding: 0;
+        list-style: var(--nav-menu-list-style, none);
+        margin: var(--nav-menu-margin, 0);
+        padding: var(--nav-menu-padding, 0);
         gap: var(--nav-menu-gap, 2rem);
     }
     
@@ -658,6 +661,9 @@ class NavigationWidget(BaseWidget):
         "nav-brand-size": "1.5rem",
         "nav-brand-weight": "700",
         "nav-brand-color": "inherit",
+        "nav-menu-list-style": "none",
+        "nav-menu-margin": "0",
+        "nav-menu-padding": "0",
         "nav-menu-gap": "2rem",
         "nav-link-color": "inherit",
         "nav-link-weight": "500",
@@ -726,9 +732,9 @@ class SidebarWidget(BaseWidget):
     }
     
     .sidebar-widget ul {
-        list-style: none;
-        padding: 0;
-        margin: 0;
+        list-style: var(--sidebar-list-style, none);
+        padding: var(--sidebar-list-padding, 0);
+        margin: var(--sidebar-list-margin, 0);
     }
     
     .sidebar-widget ul li {
@@ -742,6 +748,7 @@ class SidebarWidget(BaseWidget):
         color: var(--sidebar-list-bullet-color, #6b7280);
         position: absolute;
         left: 0;
+        display: var(--sidebar-list-bullet-display, block);
     }
     
     .sidebar-widget a {
@@ -791,10 +798,14 @@ class SidebarWidget(BaseWidget):
         "sidebar-paragraph-margin": "1rem",
         "sidebar-line-height": "1.6",
         "sidebar-font-size": "0.875rem",
+        "sidebar-list-style": "none",
+        "sidebar-list-padding": "0",
+        "sidebar-list-margin": "0",
         "sidebar-list-item-margin": "0.75rem",
         "sidebar-list-item-padding": "1rem",
         "sidebar-list-bullet": '"•"',
         "sidebar-list-bullet-color": "#6b7280",
+        "sidebar-list-bullet-display": "block",
         "sidebar-link-color": "#3b82f6",
         "sidebar-link-hover-color": "#2563eb",
         "sidebar-widget-list-bg": "#ffffff",

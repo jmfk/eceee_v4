@@ -105,18 +105,6 @@ const ReactLayoutRenderer = forwardRef(({
 
             case 'edit':
                 const widgetIndex = args[0];
-
-                // Check if editing published version
-                if (isPublished && onVersionChange) {
-                    const shouldCreateVersion = window.confirm(
-                        'This page is published. Do you want to create a new version for your changes?'
-                    );
-                    if (shouldCreateVersion) {
-                        onVersionChange('create_new');
-                        return;
-                    }
-                }
-
                 if (onOpenWidgetEditor) {
                     onOpenWidgetEditor({ ...widget, slotName });
                 }

@@ -65,20 +65,6 @@ const PageWidgetFactory = ({
     // PageEditor-specific edit handler with version awareness
     const handleEdit = () => {
         if (onEdit) {
-            // Check if we're editing a published version
-            if (isPublished) {
-                // Prompt for new version creation or warn about editing published content
-                if (onVersionChange) {
-                    const shouldCreateVersion = window.confirm(
-                        'This page is published. Do you want to create a new version for your changes?'
-                    )
-                    if (shouldCreateVersion) {
-                        onVersionChange('create_new')
-                        return
-                    }
-                }
-            }
-
             onEdit(slotName, index, widget)
         }
     }
@@ -230,15 +216,6 @@ const PageWidgetFactory = ({
                         >
                             <EyeOff className="h-4 w-4" />
                         </button>
-                    </div>
-                )}
-
-                {/* Published indicator */}
-                {isPublished && (
-                    <div className="absolute top-2 left-2 z-10">
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
-                            Published
-                        </span>
                     </div>
                 )}
 

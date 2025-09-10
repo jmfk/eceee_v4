@@ -1,11 +1,6 @@
-/**
- * ContentWidget - Core shared widget implementation
- * 
- * This is the shared implementation that can be used by both PageEditor and ObjectEditor.
- * Framework-specific behaviors are handled by the editor frameworks, not here.
- */
-import React, { useState, useEffect, useRef } from 'react'
-import { FileText, Type, AlignLeft } from 'lucide-react'
+import React, { useRef, useEffect, useCallback, memo } from 'react'
+import { FileText, Type, Eraser } from 'lucide-react'
+import ContentWidgetEditorRenderer from './ContentWidgetEditorRenderer.js'
 
 /**
  * Clean up HTML content by removing unsupported tags and attributes
@@ -43,232 +38,224 @@ const cleanHTML = (html) => {
 }
 
 /**
- * ContentWidget Component - Shared Implementation
- * 
- * This component provides the core functionality for text content widgets.
- * It's designed to be framework-agnostic and reusable across different editors.
+ * Vanilla JS Editor Wrapper Component
+ * Wraps the vanilla JS ContentWidgetEditorRenderer for React integration
  */
-const ContentWidget = ({
-    config = {},
-    mode = 'preview',
-    onConfigChange,
-    themeId,
-    widgetId,
-    slotName,
-    widgetType
-}) => {
-    // Extract configuration with defaults
-    const {
-        title = '',
-        content = 'Click to edit content...',
-        titleTag = 'h3',
-        showTitle = true,
-        alignment = 'left',
-        style = 'normal',
-        customCss = '',
-        template = 'default'
-    } = config
+const ContentWidgetEditor = memo(({ content, onChange, className }) => {
+    const containerRef = useRef(null)
+    const rendererRef = useRef(null)
 
-    // State for editor mode
-    const [isEditing, setIsEditing] = useState(false)
-    const [editTitle, setEditTitle] = useState(title)
-    const [editContent, setEditContent] = useState(content)
-    const editorRef = useRef(null)
-
-    // Handle configuration changes
-    const handleConfigChange = (newConfig) => {
-        if (onConfigChange && typeof onConfigChange === 'function') {
-            onConfigChange(newConfig)
+    useEffect(() => {
+        if (containerRef.current && !rendererRef.current) {
+            // Initialize vanilla JS renderer
+            rendererRef.current = new ContentWidgetEditorRenderer(containerRef.current, {
+                content,
+                onChange,
+                className
+            })
+            rendererRef.current.render()
         }
-    }
+    }, [])
 
-    // Handle edit mode toggle
-    const handleEditToggle = () => {
-        if (mode === 'editor') {
-            setIsEditing(!isEditing)
-            if (!isEditing) {
-                setEditTitle(title)
-                setEditContent(content)
+    useEffect(() => {
+        if (rendererRef.current) {
+            rendererRef.current.updateConfig({
+                content,
+                onChange,
+                className
+            })
+        }
+    }, [content, onChange, className])
+
+    useEffect(() => {
+        return () => {
+            if (rendererRef.current) {
+                rendererRef.current.destroy()
+                rendererRef.current = null
             }
         }
-    }
+    }, [])
 
-    // Handle save changes
-    const handleSave = () => {
-        handleConfigChange({
-            ...config,
-            title: editTitle,
-            content: editContent
-        })
-        setIsEditing(false)
-    }
+    return <div ref={containerRef} />
+})
 
-    // Handle cancel changes
-    const handleCancel = () => {
-        setEditTitle(title)
-        setEditContent(content)
-        setIsEditing(false)
-    }
+/**
+ * Content Widget Component
+ * Renders HTML content with WYSIWYG editing capabilities
+ */
+const ContentWidget = memo(({
+    config = {},
+    mode = 'editor',
+    onConfigChange,
+    themeId = null,
+    widgetId = null,
+    slotName = null,
+    widgetType = null
+}) => {
+    // Store current content in ref for save collection (without triggering re-renders)
+    const currentContentRef = useRef(config.content || '')
 
-    // Handle click to edit in editor mode
-    const handleClick = () => {
-        if (mode === 'editor' && !isEditing) {
-            handleEditToggle()
+    const {
+        content = 'Content will appear here...',
+        allow_scripts = false,
+        sanitize_html = true
+    } = config
+
+    // Debounced config update to prevent focus loss during typing
+    const debouncedConfigUpdate = useRef(null)
+
+    // Cleanup timeout on unmount
+    useEffect(() => {
+        return () => {
+            if (debouncedConfigUpdate.current) {
+                clearTimeout(debouncedConfigUpdate.current)
+            }
         }
-    }
+    }, [])
 
-    // Render title element
-    const renderTitle = () => {
-        if (!showTitle || !title) return null
+    // Enhanced content change handler
+    const handleContentChange = useCallback((newContent) => {
+        if (newContent !== content) {
+            // Update current content ref immediately (no re-renders)
+            currentContentRef.current = newContent
 
-        const TitleTag = titleTag
+            const updatedConfig = {
+                ...config,
+                content: newContent
+            }
+
+            // Call onConfigChange if provided
+            if (onConfigChange) {
+                onConfigChange(updatedConfig)
+            }
+        }
+    }, [config, content, onConfigChange])
+
+    if (mode === 'editor') {
         return (
-            <TitleTag className={`widget-title ${alignment === 'center' ? 'text-center' : alignment === 'right' ? 'text-right' : 'text-left'}`}>
-                {title}
-            </TitleTag>
-        )
-    }
-
-    // Render content with proper sanitization
-    const renderContent = () => {
-        if (!content) return null
-
-        const sanitizedContent = cleanHTML(content)
-        return (
-            <div
-                className={`widget-content ${alignment === 'center' ? 'text-center' : alignment === 'right' ? 'text-right' : 'text-left'}`}
-                dangerouslySetInnerHTML={{ __html: sanitizedContent }}
+            <ContentWidgetEditor
+                content={content}
+                onChange={handleContentChange}
+                className=""
             />
         )
     }
 
-    // Editor mode rendering
-    if (mode === 'editor' && isEditing) {
-        return (
-            <div className="content-widget-editor p-4 border border-blue-300 rounded bg-blue-50">
-                <div className="mb-3">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Title
-                    </label>
-                    <input
-                        type="text"
-                        value={editTitle}
-                        onChange={(e) => setEditTitle(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="Enter widget title..."
-                    />
-                </div>
-
-                <div className="mb-3">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Content
-                    </label>
-                    <textarea
-                        ref={editorRef}
-                        value={editContent}
-                        onChange={(e) => setEditContent(e.target.value)}
-                        rows={6}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="Enter widget content..."
-                    />
-                </div>
-
-                <div className="flex justify-end space-x-2">
-                    <button
-                        onClick={handleCancel}
-                        className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded hover:bg-gray-50"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        onClick={handleSave}
-                        className="px-3 py-1 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded"
-                    >
-                        Save
-                    </button>
-                </div>
-            </div>
-        )
-    }
-
-    // Preview/Display mode rendering
-    const containerClasses = [
-        'content-widget',
-        style === 'card' ? 'p-4 border border-gray-200 rounded-lg bg-white shadow-sm' : '',
-        style === 'highlight' ? 'p-4 bg-blue-50 border-l-4 border-blue-500' : '',
-        mode === 'editor' ? 'cursor-pointer hover:bg-gray-50 min-h-[60px] p-3 border border-dashed border-gray-300 rounded' : '',
-        customCss
-    ].filter(Boolean).join(' ')
-
     return (
-        <div
-            className={containerClasses}
-            onClick={handleClick}
-            style={customCss ? { cssText: customCss } : undefined}
-        >
-            {mode === 'editor' && (!title && !content) && (
-                <div className="flex items-center justify-center text-gray-400 min-h-[40px]">
-                    <FileText className="h-5 w-5 mr-2" />
-                    <span>Click to add content</span>
-                </div>
-            )}
-
-            {renderTitle()}
-            {renderContent()}
-
-            {mode === 'editor' && (title || content) && (
-                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Type className="h-4 w-4 text-gray-400" />
-                </div>
-            )}
+        <div className="content-widget min-h-32 theme-content widget-content">
+            {content && <div dangerouslySetInnerHTML={{ __html: content }} />}
         </div>
     )
-}
+})
 
-// === WIDGET METADATA ===
+// === COLOCATED METADATA ===
 ContentWidget.displayName = 'ContentWidget'
 ContentWidget.widgetType = 'core_widgets.ContentWidget'
 
 // Default configuration
 ContentWidget.defaultConfig = {
-    title: '',
-    content: 'Click to edit content...',
-    titleTag: 'h3',
-    showTitle: true,
-    alignment: 'left',
-    style: 'normal',
-    customCss: '',
-    template: 'default'
+    content: '<h2>Welcome</h2><p>This is sample content. You can add any HTML here including headings, paragraphs, lists, links, and more.</p>',
+    allow_scripts: false,
+    sanitize_html: true
 }
 
-// Widget metadata for registry
+// Action handlers for widget menu items
+ContentWidget.actionHandlers = {
+    'format-content': (widgetInstance, layoutRenderer) => {
+        // Get the widget element
+        const widgetElement = document.querySelector(`[data-widget-id="${widgetInstance.id}"]`)
+        if (!widgetElement) return
+
+        // Find the content editor within this widget
+        const editorElement = widgetElement.querySelector('[contenteditable="true"]')
+        if (editorElement) {
+            // Apply basic formatting cleanup
+            const currentContent = editorElement.innerHTML
+            const cleanedContent = cleanHTML(currentContent)
+            editorElement.innerHTML = cleanedContent
+
+            // Trigger change event to save the cleaned content
+            const event = new Event('input', { bubbles: true })
+            editorElement.dispatchEvent(event)
+        }
+    },
+
+    'clear-formatting': (widgetInstance, layoutRenderer) => {
+        // Get the widget element
+        const widgetElement = document.querySelector(`[data-widget-id="${widgetInstance.id}"]`)
+        if (!widgetElement) return
+
+        // Find the content editor within this widget
+        const editorElement = widgetElement.querySelector('[contenteditable="true"]')
+        if (editorElement) {
+            // Strip all formatting, keep only text content
+            const textOnly = editorElement.textContent || editorElement.innerText
+            editorElement.innerHTML = `<p>${textOnly}</p>`
+
+            // Trigger change event to save the plain content
+            const event = new Event('input', { bubbles: true })
+            editorElement.dispatchEvent(event)
+        }
+    },
+
+    'insert-template': (widgetInstance, layoutRenderer) => {
+        // Get the widget element
+        const widgetElement = document.querySelector(`[data-widget-id="${widgetInstance.id}"]`)
+        if (!widgetElement) return
+
+        // Find the content editor within this widget
+        const editorElement = widgetElement.querySelector('[contenteditable="true"]')
+        if (editorElement) {
+            // Insert a basic content template
+            const template = `
+                <h2>Welcome</h2>
+                <p>This is a sample content template with:</p>
+                <ul>
+                    <li>A heading</li>
+                    <li>Some text</li>
+                    <li>A bullet list</li>
+                </ul>
+                <p>You can edit this content using the toolbar above.</p>
+            `
+            editorElement.innerHTML = cleanHTML(template)
+
+            // Trigger change event to save the template
+            const event = new Event('input', { bubbles: true })
+            editorElement.dispatchEvent(event)
+        }
+    }
+}
+
+// Display metadata
 ContentWidget.metadata = {
-    name: 'Content Block',
-    description: 'Rich text content with optional title and styling options',
+    name: 'Content',
+    description: 'HTML content with WYSIWYG editing capabilities',
     category: 'content',
     icon: FileText,
-    tags: ['text', 'content', 'rich-text', 'title'],
+    tags: ['content', 'html', 'text', 'rich', 'editor', 'wysiwyg'],
     menuItems: [
-        { action: 'edit', label: 'Edit Content', icon: 'edit' },
-        { action: 'style', label: 'Change Style', icon: 'palette' },
-        { action: 'alignment', label: 'Text Alignment', icon: 'align-left' }
+        {
+            icon: 'svg:type',
+            label: 'Clean Formatting',
+            action: 'format-content',
+            className: 'text-blue-700 hover:bg-blue-50'
+        },
+        {
+            icon: 'svg:eraser',
+            label: 'Remove All Formatting',
+            action: 'clear-formatting',
+            className: 'text-orange-700 hover:bg-orange-50'
+        },
+        {
+            type: 'separator'
+        },
+        {
+            icon: 'svg:file-text',
+            label: 'Insert Template',
+            action: 'insert-template',
+            className: 'text-green-700 hover:bg-green-50'
+        }
     ]
-}
-
-// Action handlers (framework-specific implementations will override these)
-ContentWidget.actionHandlers = {
-    edit: (widgetInstance, layoutRenderer) => {
-        // Default edit handler - can be overridden by framework
-        console.log('ContentWidget edit action', widgetInstance)
-    },
-    style: (widgetInstance, layoutRenderer) => {
-        // Default style handler - can be overridden by framework
-        console.log('ContentWidget style action', widgetInstance)
-    },
-    alignment: (widgetInstance, layoutRenderer) => {
-        // Default alignment handler - can be overridden by framework
-        console.log('ContentWidget alignment action', widgetInstance)
-    }
 }
 
 export default ContentWidget

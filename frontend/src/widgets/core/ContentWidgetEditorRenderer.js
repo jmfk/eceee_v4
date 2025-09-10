@@ -232,7 +232,7 @@ class ContentWidgetEditorRenderer {
     createEditor() {
         this.editorElement = document.createElement('div')
         this.editorElement.contentEditable = true
-        this.editorElement.className = 'p-3 min-h-32 outline-none'
+        this.editorElement.className = 'p-3 min-h-32 outline-none theme-content widget-content content-editor-theme'
         this.editorElement.style.lineHeight = '1.6'
 
         // Add event listeners

@@ -37,6 +37,19 @@
   body {
     @apply antialiased;
   }
+  
+  /* Restore default list styles that Tailwind's preflight removes */
+  ul, ol {
+    list-style: revert;
+  }
+  
+  ul {
+    list-style-type: disc;
+  }
+  
+  ol {
+    list-style-type: decimal;
+  }
 }
 
 @layer components {
@@ -293,7 +306,7 @@ div[style*="z-index"] {
 .theme-content h6 {
   color: var(--heading-color, var(--primary, #1f2937));
   font-weight: var(--heading-weight, 600);
-  margin-top: var(--heading-margin-top, 1.5em);
+  margin-top: var(--heading-margin-top, 0);
   margin-bottom: var(--heading-margin-bottom, 0.5em);
   line-height: var(--heading-line-height, 1.2);
 }
@@ -320,11 +333,21 @@ div[style*="z-index"] {
   color: var(--link-hover-color, var(--primary-dark, #1d4ed8));
 }
 
+/* List styling with theme-overridable defaults */
 .theme-content ul,
 .theme-content ol {
   color: var(--text, #1f2937);
   margin: var(--list-margin, 1em 0);
   padding-left: var(--list-indent, 1.5em);
+  list-style: var(--list-style, revert);
+}
+
+.theme-content ul {
+  list-style-type: var(--ul-list-style-type, disc);
+}
+
+.theme-content ol {
+  list-style-type: var(--ol-list-style-type, decimal);
 }
 
 .theme-content li {
@@ -367,6 +390,26 @@ div[style*="z-index"] {
   /* Inherit theme content styles */
   color: var(--text, #1f2937);
   background-color: var(--surface, var(--background, transparent));
+}
+
+.widget-content ul,
+.widget-content ol {
+  color: var(--text, #1f2937);
+  margin: var(--list-margin, 1em 0);
+  padding-left: var(--list-indent, 1.5em);
+  list-style: var(--list-style, revert);
+}
+
+.widget-content ul {
+  list-style-type: var(--ul-list-style-type, disc);
+}
+
+.widget-content ol {
+  list-style-type: var(--ol-list-style-type, decimal);
+}
+
+.widget-content li {
+  margin-bottom: var(--list-item-spacing, 0.5em);
 }
 
 /* Content Editor Theme Styles */
