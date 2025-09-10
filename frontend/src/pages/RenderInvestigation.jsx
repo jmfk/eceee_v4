@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import PerformanceProfiler from '../components/PerformanceProfiler'
-import ContentWidget from '../components/widgets/ContentWidget'
+import ContentWidget from '../widgets/core/ContentWidget'
 
 /**
  * Render Investigation Page

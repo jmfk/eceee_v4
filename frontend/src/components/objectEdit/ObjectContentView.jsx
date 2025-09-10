@@ -526,6 +526,7 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
                     }}
                     widgetData={widgetEditorUI.editingWidget}
                     title={widgetEditorUI.editingWidget ? `Edit ${getWidgetDisplayName(widgetEditorUI.editingWidget.type, widgetTypes)}` : 'Edit Widget'}
+                    autoOpenSpecialEditor={widgetEditorUI.editingWidget?.type === 'core_widgets.ImageWidget'}
                 />
             )}
         </div>

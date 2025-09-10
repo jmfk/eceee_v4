@@ -7,6 +7,7 @@ import { validateWidgetType, clearWidgetTypesCache } from '../utils/widgetTypeVa
 import DeletedWidgetWarning from './DeletedWidgetWarning.jsx'
 import { useWidgetEventEmitter } from '../contexts/WidgetEventContext'
 import { WIDGET_CHANGE_TYPES } from '../types/widgetEvents'
+import { SpecialEditorRenderer, hasSpecialEditor } from './special-editors'
 
 /**
  * WidgetEditorPanel - Slide-out panel for editing widgets
@@ -27,7 +28,8 @@ const WidgetEditorPanel = forwardRef(({
     onValidatedWidgetSync,
     widgetData,
     schema,
-    title = "Edit Widget"
+    title = "Edit Widget",
+    autoOpenSpecialEditor = false
 }, ref) => {
     const [config, setConfig] = useState({})
     const [originalConfig, setOriginalConfig] = useState({})
@@ -45,6 +47,10 @@ const WidgetEditorPanel = forwardRef(({
     const [isResizing, setIsResizing] = useState(false)
     const [widgetTypeValidation, setWidgetTypeValidation] = useState(null)
     const [isValidatingType, setIsValidatingType] = useState(false)
+    const [showSpecialEditor, setShowSpecialEditor] = useState(false) // For special editor mode
+    const [specialEditorWidth, setSpecialEditorWidth] = useState(60) // Percentage of total width
+    const [isAnimatingSpecialEditor, setIsAnimatingSpecialEditor] = useState(false) // Animation state
+    const [isClosingSpecialEditor, setIsClosingSpecialEditor] = useState(false) // Closing animation state
 
     const panelRef = useRef(null)
     const resizeRef = useRef(null)
@@ -66,6 +72,25 @@ const WidgetEditorPanel = forwardRef(({
         console.warn('WidgetEventContext not available in WidgetEditorPanel, using callback-only mode')
     }
 
+    // Check if widget supports special editor mode
+    const supportsSpecialEditor = useCallback(() => {
+        return hasSpecialEditor(widgetData?.type)
+    }, [widgetData?.type])
+
+    // Close special editor with animation
+    const closeSpecialEditor = useCallback(() => {
+        if (showSpecialEditor) {
+            setIsClosingSpecialEditor(true)
+            // Wait for exit animation to complete before hiding
+            setTimeout(() => {
+                setShowSpecialEditor(false)
+                setIsClosingSpecialEditor(false)
+                setIsAnimatingSpecialEditor(false)
+            }, 500) // 500ms for exit animation
+        }
+    }, [showSpecialEditor])
+
+
     // Initialize config when widget data changes
     useEffect(() => {
         if (widgetData?.config) {
@@ -74,7 +99,27 @@ const WidgetEditorPanel = forwardRef(({
             setOriginalConfig(initialConfig)
             setHasChanges(false)
         }
-    }, [widgetData])
+        // Reset special editor state when switching to a different widget
+        if (widgetData && showSpecialEditor && !supportsSpecialEditor()) {
+            closeSpecialEditor()
+        }
+    }, [widgetData, showSpecialEditor, supportsSpecialEditor, closeSpecialEditor])
+
+    // Auto-open special editor when panel opens for supported widgets
+    useEffect(() => {
+        if (isOpen && autoOpenSpecialEditor && supportsSpecialEditor() && !showSpecialEditor) {
+            setShowSpecialEditor(true)
+            setIsAnimatingSpecialEditor(true)
+            setTimeout(() => setIsAnimatingSpecialEditor(false), 800)
+        }
+    }, [isOpen, autoOpenSpecialEditor, supportsSpecialEditor, showSpecialEditor])
+
+    // Reset special editor state when panel closes
+    useEffect(() => {
+        if (!isOpen && showSpecialEditor) {
+            closeSpecialEditor()
+        }
+    }, [isOpen, showSpecialEditor, closeSpecialEditor])
 
     // Validate widget type availability when widget data changes
     useEffect(() => {
@@ -360,13 +405,44 @@ const WidgetEditorPanel = forwardRef(({
         triggerRealTimeUpdate(newConfig)
     }, [config, originalConfig, triggerRealTimeUpdate, validateWidget])
 
+    // Handle config changes from special editor
+    const handleSpecialEditorConfigChange = useCallback((newConfig) => {
+        setConfig(newConfig)
+
+        // Check if we have changes compared to original
+        const hasActualChanges = JSON.stringify(newConfig) !== JSON.stringify(originalConfig)
+        setHasChanges(hasActualChanges)
+
+        // Notify parent about unsaved changes state
+        if (onUnsavedChanges) {
+            onUnsavedChanges(hasActualChanges)
+        }
+
+        // Trigger real-time preview update
+        triggerRealTimeUpdate(newConfig)
+    }, [originalConfig, triggerRealTimeUpdate, onUnsavedChanges])
+
     // Handle close - revert changes if not saved
     const handleClose = () => {
         // Clear any pending real-time update
         if (updateTimeoutRef.current) {
             clearTimeout(updateTimeoutRef.current)
         }
-        onClose()
+
+        // If special editor is open, animate it closed first, then close panel
+        if (showSpecialEditor) {
+            setIsClosingSpecialEditor(true)
+            // Wait for exit animation, then close the panel
+            setTimeout(() => {
+                setShowSpecialEditor(false)
+                setIsClosingSpecialEditor(false)
+                setIsAnimatingSpecialEditor(false)
+                onClose()
+            }, 500)
+        } else {
+            // Close immediately if special editor is not open
+            onClose()
+        }
     }
 
     // Handle refresh widget types
@@ -580,45 +656,66 @@ const WidgetEditorPanel = forwardRef(({
             {/* Slide-out panel - positioned to extend from header to footer */}
             <div
                 ref={panelRef}
-                className={`absolute top-0 right-0 bottom-0 bg-white transform transition-transform duration-300 ease-in-out z-50 flex ${isOpen ? 'translate-x-0' : 'translate-x-full'
+                className={`absolute top-0 right-0 bottom-0 bg-white transform transition-all duration-300 ease-in-out z-50 flex ${isOpen ? 'translate-x-0' : 'translate-x-full'
+                    } ${showSpecialEditor ? 'left-0' : ''
                     }`}
                 style={{
-                    width: `${panelWidth}px`,
+                    width: showSpecialEditor ? '100vw' : `${panelWidth}px`,
                     boxShadow: '-4px 0 6px -1px rgba(0, 0, 0, 0.1), -2px 0 4px -1px rgba(0, 0, 0, 0.06)'
                 }}
             >
-                {/* Resize handle */}
-                <div
-                    ref={resizeRef}
-                    onMouseDown={handleResizeStart}
-                    className={`w-2 bg-gray-300 hover:bg-blue-400 cursor-col-resize flex-shrink-0 relative group transition-colors duration-150 ${isResizing ? 'bg-blue-500' : ''
-                        }`}
-                >
-                    {/* Visual indicator dots for resize handle */}
-                    <div className="absolute inset-y-0 left-0 w-full flex flex-col justify-center items-center space-y-1 opacity-60 group-hover:opacity-100 transition-opacity">
-                        <div className="w-0.5 h-1 bg-gray-600 rounded-full"></div>
-                        <div className="w-0.5 h-1 bg-gray-600 rounded-full"></div>
-                        <div className="w-0.5 h-1 bg-gray-600 rounded-full"></div>
-                        <div className="w-0.5 h-1 bg-gray-600 rounded-full"></div>
-                        <div className="w-0.5 h-1 bg-gray-600 rounded-full"></div>
+                {/* Resize handle - hidden in special editor mode */}
+                {!showSpecialEditor && (
+                    <div
+                        ref={resizeRef}
+                        onMouseDown={handleResizeStart}
+                        className={`w-2 bg-gray-300 hover:bg-blue-400 cursor-col-resize flex-shrink-0 relative group transition-colors duration-150 ${isResizing ? 'bg-blue-500' : ''
+                            }`}
+                    >
+                        {/* Visual indicator dots for resize handle */}
+                        <div className="absolute inset-y-0 left-0 w-full flex flex-col justify-center items-center space-y-1 opacity-60 group-hover:opacity-100 transition-opacity">
+                            <div className="w-0.5 h-1 bg-gray-600 rounded-full"></div>
+                            <div className="w-0.5 h-1 bg-gray-600 rounded-full"></div>
+                            <div className="w-0.5 h-1 bg-gray-600 rounded-full"></div>
+                            <div className="w-0.5 h-1 bg-gray-600 rounded-full"></div>
+                            <div className="w-0.5 h-1 bg-gray-600 rounded-full"></div>
+                        </div>
                     </div>
-                </div>
+                )}
+
+                {/* Special Editor Area - Left Side */}
+                {showSpecialEditor && (
+                    <SpecialEditorRenderer
+                        widgetData={widgetData}
+                        specialEditorWidth={specialEditorWidth}
+                        isAnimating={isAnimatingSpecialEditor}
+                        isClosing={isClosingSpecialEditor}
+                        onConfigChange={handleSpecialEditorConfigChange}
+                    />
+                )}
 
                 {/* Panel content */}
-                <div className="flex-1 flex flex-col">
+                <div className={`flex-1 flex flex-col ${showSpecialEditor ? 'border-l border-gray-200' : ''}`}>
                     {/* Header */}
-                    <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50">
-                        <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+                    <div className={`flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50 transition-all duration-300 ${showSpecialEditor && isAnimatingSpecialEditor ? 'animate-fade-in-up delay-100' : ''
+                        } ${showSpecialEditor && isClosingSpecialEditor ? 'animate-fade-out-down' : ''
+                        }`}>
+                        <div className="flex items-center space-x-3">
+                            <h3 className="text-md font-medium text-gray-900">{title}</h3>
+                        </div>
                         <button
                             onClick={handleClose}
                             className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
                         >
-                            <X className="w-5 h-5" />
+                            <X className={`w-4 h-4 transition-all duration-300 ${showSpecialEditor && isAnimatingSpecialEditor ? 'animate-bounce-in delay-200' : ''
+                                }`} />
                         </button>
                     </div>
 
                     {/* Form content - scrollable */}
-                    <div className="flex-1 overflow-y-auto p-4">
+                    <div className={`flex-1 overflow-y-auto p-4 transition-all duration-500 ${showSpecialEditor && isAnimatingSpecialEditor ? 'animate-fade-in-up delay-300' : ''
+                        } ${showSpecialEditor && isClosingSpecialEditor ? 'animate-fade-out-down' : ''
+                        }`}>
                         {isValidatingType ? (
                             <div className="flex items-center justify-center py-8">
                                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-3"></div>

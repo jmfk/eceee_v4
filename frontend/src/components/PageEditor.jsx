@@ -1398,6 +1398,7 @@ const PageEditor = () => {
                         onValidatedWidgetSync={handleValidatedWidgetSync}
                         widgetData={editingWidget}
                         title={editingWidget ? `Edit ${editingWidget.name}` : 'Edit Widget'}
+                        autoOpenSpecialEditor={editingWidget?.type === 'core_widgets.ImageWidget'}
                     />
                 </div>
             </div>
