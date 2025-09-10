@@ -296,6 +296,9 @@ div[style*="z-index"] {
   background-color: var(--background, transparent);
   font-family: var(--font-family, inherit);
   line-height: var(--line-height, 1.6);
+  
+  /* Editor configuration - can be overridden by themes */
+  --editor-max-header-level: var(--max-header-level, 3);
 }
 
 .theme-content h1,
