@@ -3,9 +3,9 @@ import { useParams, useNavigate, Link, Navigate, useLocation } from 'react-route
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
     ArrowLeft, Layout, FileText, Settings, Calendar, Users, History,
-    Save, Eye
+    Eye
 } from 'lucide-react'
-import { objectInstancesApi, objectTypesApi } from '../api/objectStorage'
+import { objectInstancesApi, objectTypesApi, objectVersionsApi } from '../api/objectStorage'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import StatusBar from '../components/StatusBar'
 
@@ -25,6 +25,10 @@ const ObjectInstanceEditPage = () => {
 
     // Save state management
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+
+    // Version management state
+    const [currentVersion, setCurrentVersion] = useState(null)
+    const [availableVersions, setAvailableVersions] = useState([])
 
     // Refs for tab components
     const contentTabRef = useRef(null)
@@ -92,6 +96,60 @@ const ObjectInstanceEditPage = () => {
 
     const objectType = objectTypeResponse?.data
     const instance = instanceResponse?.data
+
+    // Load versions for existing instances
+    const { data: versionsResponse } = useQuery({
+        queryKey: ['objectInstance', instanceId, 'versions'],
+        queryFn: () => objectInstancesApi.getVersions(instanceId),
+        enabled: !!instanceId && !isNewInstance
+    })
+
+    // Update available versions when data loads
+    useEffect(() => {
+        if (versionsResponse?.data) {
+            setAvailableVersions(versionsResponse.data)
+            // Set current version if not already set
+            if (!currentVersion && instance) {
+                // Find the version that matches the instance's current version number
+                const current = versionsResponse.data.find(v => v.versionNumber === instance.version)
+                    || versionsResponse.data[0] // Fallback to first (latest) version
+                setCurrentVersion(current)
+            }
+        }
+    }, [versionsResponse, instance, currentVersion])
+
+    // Switch to a different version
+    const switchToVersion = async (versionId) => {
+        if (!versionId || versionId === instance?.id) return
+
+        try {
+            const response = await objectVersionsApi.get(versionId)
+            const versionData = response.data
+
+            // Update current version
+            const version = availableVersions.find(v => v.id === versionId)
+            setCurrentVersion(version)
+
+            // Reconstruct instance object with version data
+            const reconstructedInstance = {
+                ...instance, // Keep original instance structure (id, objectType, etc.)
+                data: versionData.data, // Use version's data
+                widgets: versionData.widgets, // Use version's widgets
+                version: versionData.versionNumber, // Update version number
+                updatedAt: versionData.createdAt, // Use version's creation time
+                // Explicitly preserve objectType for UI components
+                objectType: instance.objectType
+            }
+
+            // Update instance data with reconstructed object
+            queryClient.setQueryData(['objectInstance', instanceId], { data: reconstructedInstance })
+
+            addNotification(`Switched to version ${version?.versionNumber || 'Unknown'}`, 'info')
+        } catch (error) {
+            console.error('Failed to switch version:', error)
+            addNotification('Failed to switch version', 'error')
+        }
+    }
 
     // Generate sub-objects tab label with allowed child types
     const getSubObjectsLabel = () => {
@@ -301,78 +359,22 @@ const ObjectInstanceEditPage = () => {
                 {renderTabContent()}
             </div>
 
-            {/* Footer - Fixed with Save Buttons */}
-            <div className="flex-shrink-0 bg-white border-t border-gray-200 shadow-lg">
-                <div className="max-w-7xl mx-auto px-6 py-4">
-                    <div className="flex items-center justify-between">
-                        {/* Status Info */}
-                        <div className="text-sm text-gray-600">
-                            {isNewInstance ? 'Creating' : 'Editing'} {objectType?.label} - {tabs.find(t => t.id === tab)?.label}
-                        </div>
-
-                        {/* Save Buttons */}
-                        <div className="flex items-center space-x-3">
-                            {!isNewInstance && (
-                                <>
-                                    <button
-                                        onClick={() => handleSave('update_current')}
-                                        disabled={saveMutation.isPending || !hasUnsavedChanges}
-                                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-colors"
-                                    >
-                                        {saveMutation.isPending ? (
-                                            <>
-                                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                                                Saving...
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Save className="h-4 w-4 mr-2" />
-                                                Save
-                                            </>
-                                        )}
-                                    </button>
-                                    <button
-                                        onClick={() => handleSave('create_new')}
-                                        disabled={saveMutation.isPending || !hasUnsavedChanges}
-                                        className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-colors"
-                                    >
-                                        {saveMutation.isPending ? (
-                                            <>
-                                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                                                Saving...
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Save className="h-4 w-4 mr-2" />
-                                                Save as New...
-                                            </>
-                                        )}
-                                    </button>
-                                </>
-                            )}
-                            {isNewInstance && (
-                                <button
-                                    onClick={() => handleSave('create')}
-                                    disabled={saveMutation.isPending || !hasUnsavedChanges}
-                                    className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-colors"
-                                >
-                                    {saveMutation.isPending ? (
-                                        <>
-                                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                                            Creating...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Save className="h-4 w-4 mr-2" />
-                                            Save
-                                        </>
-                                    )}
-                                </button>
-                            )}
-                        </div>
+            {/* Status bar with notifications and save buttons */}
+            <StatusBar
+                isDirty={hasUnsavedChanges}
+                currentVersion={currentVersion}
+                availableVersions={availableVersions}
+                onVersionChange={switchToVersion}
+                onSaveClick={() => handleSave('update_current')}
+                onSaveNewClick={() => handleSave('create_new')}
+                isSaving={saveMutation.isPending}
+                isNewPage={isNewInstance}
+                customStatusContent={
+                    <div className="text-sm text-gray-600">
+                        {isNewInstance ? 'Creating' : 'Editing'} {objectType?.label} - {tabs.find(t => t.id === tab)?.label}
                     </div>
-                </div>
-            </div>
+                }
+            />
         </div>
     )
 }

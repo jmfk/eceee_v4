@@ -9,6 +9,7 @@ import { Layout, Settings, Trash2, ChevronUp, ChevronDown, Eye, ChevronLeft, Che
 import { getCoreWidgetComponent, getCoreWidgetDisplayName } from '../../widgets'
 import { renderWidgetPreview } from '../../utils/widgetPreview'
 import WidgetHeader from './PageWidgetHeader'
+import DeleteConfirmationModal from '../../components/DeleteConfirmationModal'
 
 /**
  * PageEditor Widget Factory - Layout-based widget rendering
@@ -47,6 +48,8 @@ const PageWidgetFactory = ({
     const [showPreview, setShowPreview] = useState(false)
     const [isLoadingPreview, setIsLoadingPreview] = useState(false)
     const [previewContent, setPreviewContent] = useState(null)
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+    const [isDeleting, setIsDeleting] = useState(false)
     const previewContainerRef = useRef(null)
 
     // Create a stable config change handler that integrates with LayoutRenderer
@@ -69,19 +72,30 @@ const PageWidgetFactory = ({
         }
     }
 
-    // PageEditor-specific delete handler with publishing integration
+    // PageEditor-specific delete handler
     const handleDelete = () => {
-        if (onDelete) {
-            // Additional confirmation for published pages
-            if (isPublished) {
-                const confirmMessage = 'This will delete the widget from a published page. Are you sure?'
-                if (!window.confirm(confirmMessage)) {
-                    return
-                }
-            }
+        setShowDeleteConfirm(true)
+    }
 
-            onDelete(slotName, index, widget)
+    // Handle confirmed deletion
+    const handleConfirmDelete = async () => {
+        if (onDelete) {
+            setIsDeleting(true)
+            try {
+                await onDelete(slotName, index, widget)
+                setShowDeleteConfirm(false)
+            } catch (error) {
+                console.error('Failed to delete widget:', error)
+                // Keep modal open on error
+            } finally {
+                setIsDeleting(false)
+            }
         }
+    }
+
+    // Handle delete cancellation
+    const handleCancelDelete = () => {
+        setShowDeleteConfirm(false)
     }
 
     const handleMoveUp = () => {
@@ -196,13 +210,9 @@ const PageWidgetFactory = ({
                         onMoveUp={onMoveUp ? handleMoveUp : undefined}
                         onMoveDown={onMoveDown ? handleMoveDown : undefined}
                         onPreview={handlePreview}
-                        onModalPreview={handleModalPreview}
                         canMoveUp={canMoveUp}
                         canMoveDown={canMoveDown}
                         showControls={true}
-                        isPublished={isPublished}
-                        versionId={versionId}
-                        onPublishingAction={onPublishingAction}
                     />
                 )}
 
@@ -290,6 +300,18 @@ const PageWidgetFactory = ({
                         </div>
                     </div>
                 )}
+
+                {/* Delete Confirmation Modal */}
+                <DeleteConfirmationModal
+                    isOpen={showDeleteConfirm}
+                    onClose={handleCancelDelete}
+                    onConfirm={handleConfirmDelete}
+                    title="Delete Widget"
+                    message={`Are you sure you want to delete this ${getCoreWidgetDisplayName(widget.type)} widget? This action cannot be undone.`}
+                    itemName={getCoreWidgetDisplayName(widget.type)}
+                    isDeleting={isDeleting}
+                    deleteButtonText="Delete Widget"
+                />
             </div>
         )
     }

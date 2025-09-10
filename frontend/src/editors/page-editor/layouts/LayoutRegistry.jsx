@@ -11,7 +11,7 @@ import WidgetSlot from './WidgetSlot';
 /**
  * Single Column Layout - Simple single column for articles
  */
-export const SingleColumnLayout = ({ widgets, onWidgetAction, editable = true, pageContext = {} }) => {
+export const SingleColumnLayout = ({ widgets, onWidgetAction, editable = true, pageContext = {}, onShowWidgetModal, onClearSlot }) => {
     return (
         <div className="single-column-layout w-full h-full overflow-y-auto">
             <div className="max-w-4xl mx-auto p-6 pb-20">
@@ -27,6 +27,8 @@ export const SingleColumnLayout = ({ widgets, onWidgetAction, editable = true, p
                     allowedWidgetTypes={['*']}
                     maxWidgets={20}
                     required={true}
+                    onShowWidgetModal={onShowWidgetModal}
+                    onClearSlot={onClearSlot}
                 />
             </div>
         </div>
@@ -36,7 +38,7 @@ export const SingleColumnLayout = ({ widgets, onWidgetAction, editable = true, p
 /**
  * Sidebar Layout - Main content with sidebar
  */
-export const SidebarLayout = ({ widgets, onWidgetAction, editable = true, pageContext = {} }) => {
+export const SidebarLayout = ({ widgets, onWidgetAction, editable = true, pageContext = {}, onShowWidgetModal, onClearSlot }) => {
     return (
         <div className="sidebar-layout w-full h-full overflow-y-auto bg-gray-50">
             <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6 max-w-7xl mx-auto p-6 pb-20">
@@ -54,6 +56,8 @@ export const SidebarLayout = ({ widgets, onWidgetAction, editable = true, pageCo
                         allowedWidgetTypes={['core_widgets.HeaderWidget', 'core_widgets.NavigationWidget']}
                         maxWidgets={3}
                         required={false}
+                        onShowWidgetModal={onShowWidgetModal}
+                        onClearSlot={onClearSlot}
                     />
                 </div>
 
@@ -71,6 +75,8 @@ export const SidebarLayout = ({ widgets, onWidgetAction, editable = true, pageCo
                         allowedWidgetTypes={['core_widgets.ContentWidget', 'core_widgets.ImageWidget', 'core_widgets.TableWidget']}
                         maxWidgets={10}
                         required={true}
+                        onShowWidgetModal={onShowWidgetModal}
+                        onClearSlot={onClearSlot}
                     />
                 </div>
 
@@ -88,6 +94,8 @@ export const SidebarLayout = ({ widgets, onWidgetAction, editable = true, pageCo
                         allowedWidgetTypes={['core_widgets.NavigationWidget', 'core_widgets.ContentWidget']}
                         maxWidgets={5}
                         required={false}
+                        onShowWidgetModal={onShowWidgetModal}
+                        onClearSlot={onClearSlot}
                     />
                 </div>
 
@@ -105,6 +113,8 @@ export const SidebarLayout = ({ widgets, onWidgetAction, editable = true, pageCo
                         allowedWidgetTypes={['core_widgets.FooterWidget', 'core_widgets.NavigationWidget']}
                         maxWidgets={2}
                         required={false}
+                        onShowWidgetModal={onShowWidgetModal}
+                        onClearSlot={onClearSlot}
                     />
                 </div>
             </div>
@@ -115,7 +125,7 @@ export const SidebarLayout = ({ widgets, onWidgetAction, editable = true, pageCo
 /**
  * Two Column Layout - Equal columns
  */
-export const TwoColumnLayout = ({ widgets, onWidgetAction, editable = true, pageContext = {} }) => {
+export const TwoColumnLayout = ({ widgets, onWidgetAction, editable = true, pageContext = {}, onShowWidgetModal, onClearSlot }) => {
     return (
         <div className="two-column-layout w-full h-full overflow-y-auto bg-gray-50">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-6xl mx-auto p-6 pb-20">
@@ -133,6 +143,8 @@ export const TwoColumnLayout = ({ widgets, onWidgetAction, editable = true, page
                         allowedWidgetTypes={['core_widgets.HeaderWidget']}
                         maxWidgets={2}
                         required={false}
+                        onShowWidgetModal={onShowWidgetModal}
+                        onClearSlot={onClearSlot}
                     />
                 </div>
 
@@ -150,6 +162,8 @@ export const TwoColumnLayout = ({ widgets, onWidgetAction, editable = true, page
                         allowedWidgetTypes={['*']}
                         maxWidgets={8}
                         required={true}
+                        onShowWidgetModal={onShowWidgetModal}
+                        onClearSlot={onClearSlot}
                     />
                 </div>
 
@@ -167,6 +181,8 @@ export const TwoColumnLayout = ({ widgets, onWidgetAction, editable = true, page
                         allowedWidgetTypes={['*']}
                         maxWidgets={8}
                         required={true}
+                        onShowWidgetModal={onShowWidgetModal}
+                        onClearSlot={onClearSlot}
                     />
                 </div>
 
@@ -184,6 +200,8 @@ export const TwoColumnLayout = ({ widgets, onWidgetAction, editable = true, page
                         allowedWidgetTypes={['core_widgets.FooterWidget']}
                         maxWidgets={1}
                         required={false}
+                        onShowWidgetModal={onShowWidgetModal}
+                        onClearSlot={onClearSlot}
                     />
                 </div>
             </div>
@@ -194,7 +212,7 @@ export const TwoColumnLayout = ({ widgets, onWidgetAction, editable = true, page
 /**
  * Three Column Layout - Header, three columns, footer
  */
-export const ThreeColumnLayout = ({ widgets, onWidgetAction, editable = true, pageContext = {} }) => {
+export const ThreeColumnLayout = ({ widgets, onWidgetAction, editable = true, pageContext = {}, onShowWidgetModal, onClearSlot }) => {
     return (
         <div className="three-column-layout w-full h-full overflow-y-auto bg-gray-50">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 max-w-7xl mx-auto p-6 pb-20">
@@ -212,6 +230,8 @@ export const ThreeColumnLayout = ({ widgets, onWidgetAction, editable = true, pa
                         allowedWidgetTypes={['core_widgets.HeaderWidget']}
                         maxWidgets={2}
                         required={false}
+                        onShowWidgetModal={onShowWidgetModal}
+                        onClearSlot={onClearSlot}
                     />
                 </div>
 
@@ -229,6 +249,8 @@ export const ThreeColumnLayout = ({ widgets, onWidgetAction, editable = true, pa
                         allowedWidgetTypes={['*']}
                         maxWidgets={6}
                         required={false}
+                        onShowWidgetModal={onShowWidgetModal}
+                        onClearSlot={onClearSlot}
                     />
                 </div>
 
@@ -246,6 +268,8 @@ export const ThreeColumnLayout = ({ widgets, onWidgetAction, editable = true, pa
                         allowedWidgetTypes={['*']}
                         maxWidgets={6}
                         required={true}
+                        onShowWidgetModal={onShowWidgetModal}
+                        onClearSlot={onClearSlot}
                     />
                 </div>
 
@@ -263,6 +287,8 @@ export const ThreeColumnLayout = ({ widgets, onWidgetAction, editable = true, pa
                         allowedWidgetTypes={['*']}
                         maxWidgets={6}
                         required={false}
+                        onShowWidgetModal={onShowWidgetModal}
+                        onClearSlot={onClearSlot}
                     />
                 </div>
 
@@ -280,6 +306,8 @@ export const ThreeColumnLayout = ({ widgets, onWidgetAction, editable = true, pa
                         allowedWidgetTypes={['core_widgets.FooterWidget']}
                         maxWidgets={1}
                         required={false}
+                        onShowWidgetModal={onShowWidgetModal}
+                        onClearSlot={onClearSlot}
                     />
                 </div>
             </div>

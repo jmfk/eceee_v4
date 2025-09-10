@@ -598,34 +598,7 @@ const ContentEditor = forwardRef(({
     }
   }, [currentWidgets]);
 
-  // Enable auto-save functionality
-  const enableAutoSave = useCallback((enabled = false, delay = 5000) => {
-    if (!layoutRenderer) return;
 
-    layoutRenderer.autoSaveEnabled = enabled;
-    layoutRenderer.autoSaveDelay = delay;
-  }, [layoutRenderer]);
-
-  // Manually trigger auto-save check
-  const triggerAutoSave = useCallback(() => {
-    if (!layoutRenderer) return;
-    layoutRenderer.scheduleAutoSave('manual_trigger');
-  }, [layoutRenderer]);
-
-  // Set up auto-save when editing is enabled AND widgets are loaded
-  useEffect(() => {
-    if (editable && layoutRenderer && currentWidgets) {
-      // Delay auto-save activation to ensure widgets are loaded first
-      const autoSaveTimeoutId = setTimeout(() => {
-        enableAutoSave(true, 10000);
-      }, 100); // Small delay to ensure widget loading is complete
-
-      return () => clearTimeout(autoSaveTimeoutId);
-    } else if (layoutRenderer) {
-      // Disable auto-save for non-editable mode or when no widgets
-      enableAutoSave(false);
-    }
-  }, [editable, layoutRenderer, currentWidgets, enableAutoSave]);
 
   // Expose methods for external use
   const api = useMemo(() => ({
@@ -635,10 +608,8 @@ const ContentEditor = forwardRef(({
     setSelectedSlot,
     getSelectedSlot: () => selectedSlot,
     saveWidgets,
-    enableAutoSave,
-    triggerAutoSave,
     layoutRenderer  // Expose layoutRenderer for unified save system
-  }), [updateSlot, getSlots, getSlotConfig, selectedSlot, saveWidgets, enableAutoSave, triggerAutoSave, layoutRenderer]);
+  }), [updateSlot, getSlots, getSlotConfig, selectedSlot, saveWidgets, layoutRenderer]);
 
   // Expose API methods to parent components via ref
   useImperativeHandle(ref, () => api, [api]);

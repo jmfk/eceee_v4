@@ -15,7 +15,8 @@ import {
     ChevronLeft,
     ChevronRight,
     Trash2,
-    Calendar
+    Calendar,
+    Save
 } from 'lucide-react'
 import { pagesApi, layoutsApi, versionsApi, themesApi } from '../api'
 import { api } from '../api/client'
@@ -32,7 +33,6 @@ import ErrorTodoSidebar from './ErrorTodoSidebar'
 import SchemaDrivenForm from './SchemaDrivenForm'
 import LayoutSelector from './LayoutSelector'
 import StatusBar from './StatusBar'
-import SaveOptionsModal from './SaveOptionsModal'
 import WidgetEditorPanel from './WidgetEditorPanel'
 import PageTagWidget from './PageTagWidget'
 import ThemeSelector from './ThemeSelector'
@@ -200,11 +200,10 @@ const PageEditor = () => {
         Boolean(currentVersion?.id) && Boolean(pageVersionData?.id) && currentVersion.id === pageVersionData.id
     )
 
-    // Auto-save management state
-    const [autoSaveEnabled, setAutoSaveEnabled] = useState(true)
 
-    // Save options modal state
-    const [showSaveOptionsModal, setShowSaveOptionsModal] = useState(false)
+
+    // Save mutation state
+    const [isSaving, setIsSaving] = useState(false)
 
     // Widget editor panel state
     const [widgetEditorOpen, setWidgetEditorOpen] = useState(false)
@@ -669,13 +668,6 @@ const PageEditor = () => {
         loadVersions();
     }, [loadVersions]);
 
-    // Sync auto-save state with all editors when they're available
-    useEffect(() => {
-        // Sync with ContentEditor
-        if (contentEditorRef.current && contentEditorRef.current.enableAutoSave) {
-            contentEditorRef.current.enableAutoSave(autoSaveEnabled, autoSaveEnabled ? 10000 : 0);
-        }
-    }, [autoSaveEnabled, layoutData]); // layoutData dependency ensures this runs after ContentEditor is mounted
 
     // SMART SAVE: Intelligent save logic that only saves what changed
     const handleActualSave = useCallback(async (saveOptions = {}) => {
@@ -685,6 +677,7 @@ const PageEditor = () => {
 
             // Collect current widget data (from pageVersionData) and any unsaved changes from ContentEditor
             collectedData.widgets = pageVersionData?.widgets || {};
+
             if (contentEditorRef.current && contentEditorRef.current.saveWidgets) {
                 try {
                     const widgetResult = await contentEditorRef.current.saveWidgets({
@@ -882,15 +875,15 @@ const PageEditor = () => {
             };
 
             // Analyze what changed using separated data
+
             const changes = analyzeChanges(
                 originalWebpageData || {},
                 currentWebpageDataForSave,
                 originalPageVersionData || {},
                 currentVersionDataForSave
             );
+
             const strategy = determineSaveStrategy(changes);
-
-
 
             // Decision logic: Show modal only if version changes detected
             if (strategy.strategy === 'page-only') {
@@ -904,9 +897,8 @@ const PageEditor = () => {
                     message: 'No changes detected'
                 });
             } else {
-                // Version changes detected - show modal for user to choose options
-
-                setShowSaveOptionsModal(true);
+                // Version changes detected - save as new version directly
+                await handleActualSave({ description: 'Version changes detected', option: 'new' });
             }
 
         } catch (error) {
@@ -928,20 +920,29 @@ const PageEditor = () => {
         }
     }, [handleActualSave]);
 
-    // Auto-save toggle handler
-    const handleAutoSaveToggle = useCallback((enabled) => {
-        setAutoSaveEnabled(enabled);
-
-        // Pass auto-save setting to ContentEditor
-        if (contentEditorRef.current && contentEditorRef.current.enableAutoSave) {
-            contentEditorRef.current.enableAutoSave(enabled, enabled ? 10000 : 0);
+    // Simple save handlers - no modal confirmation
+    const handleSave = useCallback(async () => {
+        setIsSaving(true);
+        try {
+            await handleActualSave({ description: 'Page updated', option: 'update' });
+        } catch (error) {
+            console.error('Save failed:', error);
+        } finally {
+            setIsSaving(false);
         }
+    }, [handleActualSave]);
 
-        addNotification({
-            type: 'info',
-            message: `Auto-save ${enabled ? 'enabled' : 'disabled'} - Settings & metadata save in real-time`
-        });
-    }, [addNotification]);
+    const handleSaveNew = useCallback(async () => {
+        setIsSaving(true);
+        try {
+            await handleActualSave({ description: 'New version created', option: 'new' });
+        } catch (error) {
+            console.error('Save New failed:', error);
+        } finally {
+            setIsSaving(false);
+        }
+    }, [handleActualSave]);
+
 
     // Widget editor handlers
     const handleOpenWidgetEditor = useCallback((widgetData) => {
@@ -1403,15 +1404,14 @@ const PageEditor = () => {
 
             {/* Status bar with notifications */}
             <StatusBar
-                showAutoSave={true}
                 isDirty={isDirty}
                 currentVersion={currentVersion}
                 availableVersions={availableVersions}
                 onVersionChange={switchToVersion}
-                onRefreshVersions={loadVersions}
-                onSaveClick={handleSaveFromStatusBar}
-                onAutoSaveToggle={handleAutoSaveToggle}
-                autoSaveEnabled={autoSaveEnabled}
+                onSaveClick={handleSave}
+                onSaveNewClick={handleSaveNew}
+                isSaving={isSaving}
+                isNewPage={isNewPage}
                 webpageData={webpageData}
                 pageVersionData={pageVersionData}
                 validationState={schemaValidationState}
@@ -1443,15 +1443,6 @@ const PageEditor = () => {
                         )}
                     </div>
                 }
-            />
-
-            {/* Save Options Modal */}
-            <SaveOptionsModal
-                isOpen={showSaveOptionsModal}
-                onClose={() => setShowSaveOptionsModal(false)}
-                onSave={handleSaveOptions}
-                currentVersion={currentVersion}
-                isNewPage={isNewPage}
             />
         </div>
     )

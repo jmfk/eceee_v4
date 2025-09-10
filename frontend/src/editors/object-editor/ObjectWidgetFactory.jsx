@@ -9,6 +9,7 @@ import { Layout, Settings, Trash2, ChevronUp, ChevronDown, Eye, ChevronLeft, Che
 import { getCoreWidgetComponent, getCoreWidgetDisplayName } from '../../widgets'
 import { renderWidgetPreview } from '../../utils/widgetPreview'
 import ObjectWidgetHeader from './ObjectWidgetHeader'
+import DeleteConfirmationModal from '../../components/DeleteConfirmationModal'
 
 /**
  * ObjectEditor Widget Factory - Slot-based widget rendering
@@ -47,6 +48,8 @@ const ObjectWidgetFactory = ({
     const [showPreview, setShowPreview] = useState(false)
     const [isLoadingPreview, setIsLoadingPreview] = useState(false)
     const [previewContent, setPreviewContent] = useState(null)
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+    const [isDeleting, setIsDeleting] = useState(false)
     const previewContainerRef = useRef(null)
 
     // Create a stable config change handler for ObjectEditor
@@ -66,17 +69,28 @@ const ObjectWidgetFactory = ({
 
     // ObjectEditor-specific delete handler with slot validation
     const handleDelete = () => {
-        if (onDelete) {
-            // Check if this would violate slot requirements
-            if (slotConfig?.required && index === 0) {
-                const confirmMessage = 'This is a required slot. Deleting this widget may cause validation errors. Continue?'
-                if (!window.confirm(confirmMessage)) {
-                    return
-                }
-            }
+        setShowDeleteConfirm(true)
+    }
 
-            onDelete(slotName, index, widget)
+    // Handle confirmed deletion
+    const handleConfirmDelete = async () => {
+        if (onDelete) {
+            setIsDeleting(true)
+            try {
+                await onDelete(slotName, index, widget)
+                setShowDeleteConfirm(false)
+            } catch (error) {
+                console.error('Failed to delete widget:', error)
+                // Keep modal open on error
+            } finally {
+                setIsDeleting(false)
+            }
         }
+    }
+
+    // Handle delete cancellation
+    const handleCancelDelete = () => {
+        setShowDeleteConfirm(false)
     }
 
     const handleMoveUp = () => {
@@ -301,6 +315,19 @@ const ObjectWidgetFactory = ({
                         </div>
                     </div>
                 )}
+
+                {/* Delete Confirmation Modal */}
+                <DeleteConfirmationModal
+                    isOpen={showDeleteConfirm}
+                    onClose={handleCancelDelete}
+                    onConfirm={handleConfirmDelete}
+                    title="Delete Widget"
+                    message={`Are you sure you want to delete this ${getCoreWidgetDisplayName(widget.type)} widget?${slotConfig?.required ? ' This is a required slot and deleting this widget may cause validation errors.' : ' This action cannot be undone.'}`}
+                    itemName={getCoreWidgetDisplayName(widget.type)}
+                    isDeleting={isDeleting}
+                    deleteButtonText="Delete Widget"
+                    warningText={slotConfig?.required ? "This widget is in a required slot" : null}
+                />
             </div>
         )
     }

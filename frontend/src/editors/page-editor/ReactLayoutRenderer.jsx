@@ -11,6 +11,7 @@ import { getLayoutComponent, getLayoutMetadata, layoutExists, LAYOUT_REGISTRY } 
 import { createPageEditorEventSystem } from './PageEditorEventSystem';
 import { useWidgetEvents } from '../../contexts/WidgetEventContext';
 import { useWidgets, createDefaultWidgetConfig } from '../../hooks/useWidgets';
+import PageWidgetSelectionModal from './PageWidgetSelectionModal';
 
 const ReactLayoutRenderer = forwardRef(({
     layoutName = 'single_column',
@@ -43,6 +44,10 @@ const ReactLayoutRenderer = forwardRef(({
         deleteWidget
     } = useWidgets(widgets);
 
+    // Widget modal state
+    const [widgetModalOpen, setWidgetModalOpen] = useState(false);
+    const [selectedSlotForModal, setSelectedSlotForModal] = useState(null);
+
     // Page context for widgets
     const pageContext = useMemo(() => ({
         versionId,
@@ -72,16 +77,6 @@ const ReactLayoutRenderer = forwardRef(({
             case 'add':
                 const widgetType = args[0] || 'core_widgets.ContentWidget';
 
-                // Check if adding to published version
-                if (isPublished && onVersionChange) {
-                    const shouldCreateVersion = window.confirm(
-                        'This page is published. Do you want to create a new version for your changes?'
-                    );
-                    if (shouldCreateVersion) {
-                        onVersionChange('create_new');
-                        return;
-                    }
-                }
 
                 const widgetConfig = createDefaultWidgetConfig(widgetType);
                 const newWidget = addWidget(slotName, widgetType, widgetConfig);
@@ -112,14 +107,6 @@ const ReactLayoutRenderer = forwardRef(({
 
             case 'delete':
                 const deleteIndex = args[0];
-
-                // Confirmation for published pages
-                if (isPublished) {
-                    const confirmMessage = 'This will delete the widget from a published page. Are you sure?';
-                    if (!window.confirm(confirmMessage)) {
-                        return;
-                    }
-                }
 
                 const updatedWidgetsDelete = { ...widgets };
                 if (updatedWidgetsDelete[slotName]) {
@@ -213,6 +200,41 @@ const ReactLayoutRenderer = forwardRef(({
         }
     }, [widgets, onWidgetChange, onDirtyChange, onOpenWidgetEditor, addWidget, pageEventSystem, versionId, isPublished, onVersionChange]);
 
+    // Widget modal handlers
+    const handleShowWidgetModal = useCallback((slotName) => {
+        setSelectedSlotForModal(slotName);
+        setWidgetModalOpen(true);
+    }, []);
+
+    const handleCloseWidgetModal = useCallback(() => {
+        setWidgetModalOpen(false);
+        setSelectedSlotForModal(null);
+    }, []);
+
+    const handleWidgetSelection = useCallback((widgetType) => {
+        if (selectedSlotForModal) {
+            handleWidgetAction('add', selectedSlotForModal, null, widgetType);
+        }
+        handleCloseWidgetModal();
+    }, [selectedSlotForModal, handleWidgetAction, handleCloseWidgetModal]);
+
+    // Clear slot handler
+    const handleClearSlot = useCallback((slotName) => {
+        const updatedWidgets = { ...widgets };
+        updatedWidgets[slotName] = [];
+
+        if (onWidgetChange) {
+            onWidgetChange(updatedWidgets);
+        }
+
+        if (onDirtyChange) {
+            onDirtyChange(true, `cleared slot ${slotName}`);
+        }
+
+        // Emit event
+        pageEventSystem.emitSlotCleared(slotName, { versionId, isPublished });
+    }, [widgets, onWidgetChange, onDirtyChange, pageEventSystem, versionId, isPublished]);
+
     // Get layout component
     const LayoutComponent = getLayoutComponent(layoutName);
 
@@ -267,6 +289,17 @@ const ReactLayoutRenderer = forwardRef(({
                 onWidgetAction={handleWidgetAction}
                 editable={editable}
                 pageContext={pageContext}
+                onShowWidgetModal={handleShowWidgetModal}
+                onClearSlot={handleClearSlot}
+            />
+
+            {/* Widget Selection Modal */}
+            <PageWidgetSelectionModal
+                isOpen={widgetModalOpen}
+                onClose={handleCloseWidgetModal}
+                onWidgetSelect={handleWidgetSelection}
+                slotName={selectedSlotForModal}
+                slotLabel={selectedSlotForModal}
             />
         </div>
     );

@@ -22,6 +22,7 @@ export const PAGE_EDITOR_EVENTS = {
     LAYOUT_CHANGED: 'page-editor:layout:changed',
     LAYOUT_RENDERED: 'page-editor:layout:rendered',
     SLOT_UPDATED: 'page-editor:slot:updated',
+    SLOT_CLEARED: 'page-editor:slot:cleared',
 
     // Version events
     VERSION_CREATED: 'page-editor:version:created',
@@ -175,6 +176,15 @@ export class PageEditorEventEmitter {
             slotData,
             versionId: context.versionId,
             layoutRenderer: context.layoutRenderer,
+            timestamp: Date.now(),
+            ...context
+        })
+    }
+
+    emitSlotCleared(slotName, context = {}) {
+        this.emit(PAGE_EDITOR_EVENTS.SLOT_CLEARED, {
+            slotName,
+            versionId: context.versionId,
             timestamp: Date.now(),
             ...context
         })

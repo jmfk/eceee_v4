@@ -13,9 +13,7 @@ import {
     Eye,
     MoreHorizontal,
     AlertTriangle,
-    Info,
-    Copy,
-    Move
+    Info
 } from 'lucide-react'
 
 const ObjectWidgetHeader = ({
@@ -25,14 +23,11 @@ const ObjectWidgetHeader = ({
     onMoveUp,
     onMoveDown,
     onPreview,
-    onModalPreview,
     canMoveUp = false,
     canMoveDown = false,
     showControls = true,
     // ObjectEditor-specific props
-    objectType,
     slotConfig,
-    onSlotAction,
     isRequired = false,
     maxWidgets = null,
     currentIndex = 0,
@@ -54,14 +49,6 @@ const ObjectWidgetHeader = ({
             return () => document.removeEventListener('mousedown', handleClickOutside)
         }
     }, [showMenu])
-
-    // Handle slot-specific actions
-    const handleSlotAction = (action) => {
-        if (onSlotAction) {
-            onSlotAction(action)
-        }
-        setShowMenu(false)
-    }
 
     const handleMenuToggle = () => {
         setShowMenu(!showMenu)
@@ -114,8 +101,8 @@ const ObjectWidgetHeader = ({
                             onClick={onMoveUp}
                             disabled={!canMoveUp}
                             className={`p-1 rounded transition-colors ${canMoveUp
-                                    ? 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
-                                    : 'text-gray-400 cursor-not-allowed'
+                                ? 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
+                                : 'text-gray-400 cursor-not-allowed'
                                 }`}
                             title="Move up in slot"
                         >
@@ -125,8 +112,8 @@ const ObjectWidgetHeader = ({
                             onClick={onMoveDown}
                             disabled={!canMoveDown}
                             className={`p-1 rounded transition-colors ${canMoveDown
-                                    ? 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
-                                    : 'text-gray-400 cursor-not-allowed'
+                                ? 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
+                                : 'text-gray-400 cursor-not-allowed'
                                 }`}
                             title="Move down in slot"
                         >
@@ -171,87 +158,19 @@ const ObjectWidgetHeader = ({
                     {showMenu && (
                         <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
                             <div className="py-1">
-                                {/* Preview in modal */}
-                                {onModalPreview && (
-                                    <button
-                                        onClick={() => {
-                                            onModalPreview()
-                                            setShowMenu(false)
-                                        }}
-                                        className="w-full flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
-                                    >
-                                        <Eye className="h-4 w-4 mr-3" />
-                                        Preview in Modal
-                                    </button>
-                                )}
-
-                                {/* Widget actions */}
-                                {onSlotAction && (
-                                    <>
-                                        <div className="border-t border-gray-200 my-1"></div>
-                                        <div className="px-3 py-2">
-                                            <div className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                Widget Actions
-                                            </div>
-                                        </div>
-
-                                        <button
-                                            onClick={() => handleSlotAction('duplicate')}
-                                            className="w-full flex items-center px-3 py-2 text-sm text-blue-700 hover:bg-blue-50 transition-colors"
-                                        >
-                                            <Copy className="h-4 w-4 mr-3" />
-                                            Duplicate Widget
-                                        </button>
-
-                                        <button
-                                            onClick={() => handleSlotAction('move_to_slot')}
-                                            className="w-full flex items-center px-3 py-2 text-sm text-purple-700 hover:bg-purple-50 transition-colors"
-                                        >
-                                            <Move className="h-4 w-4 mr-3" />
-                                            Move to Another Slot
-                                        </button>
-                                    </>
-                                )}
-
-                                {/* Slot information */}
-                                {slotConfig && (
-                                    <>
-                                        <div className="border-t border-gray-200 my-1"></div>
-                                        <div className="px-3 py-2">
-                                            <div className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                Slot Info
-                                            </div>
-                                            <div className="mt-1 text-xs text-gray-600">
-                                                <div>Name: {slotConfig.name}</div>
-                                                {slotConfig.description && (
-                                                    <div>Description: {slotConfig.description}</div>
-                                                )}
-                                                {slotConfig.maxWidgets && (
-                                                    <div>Max widgets: {slotConfig.maxWidgets}</div>
-                                                )}
-                                                {slotConfig.required && (
-                                                    <div className="text-orange-600">Required slot</div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </>
-                                )}
 
                                 {/* Destructive actions */}
                                 {onDelete && (
-                                    <>
-                                        <div className="border-t border-gray-200 my-1"></div>
-                                        <button
-                                            onClick={() => {
-                                                onDelete()
-                                                setShowMenu(false)
-                                            }}
-                                            className="w-full flex items-center px-3 py-2 text-sm text-red-700 hover:bg-red-50 transition-colors"
-                                        >
-                                            <Trash2 className="h-4 w-4 mr-3" />
-                                            {isRequired ? 'Delete (required slot)' : 'Delete Widget'}
-                                        </button>
-                                    </>
+                                    <button
+                                        onClick={() => {
+                                            onDelete()
+                                            setShowMenu(false)
+                                        }}
+                                        className="w-full flex items-center px-3 py-2 text-sm text-red-700 hover:bg-red-50 transition-colors"
+                                    >
+                                        <Trash2 className="h-4 w-4 mr-3" />
+                                        Delete Widget
+                                    </button>
                                 )}
                             </div>
                         </div>

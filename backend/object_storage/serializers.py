@@ -563,14 +563,14 @@ class ObjectInstanceListSerializer(serializers.ModelSerializer):
 class ObjectVersionSerializer(serializers.ModelSerializer):
     """Serializer for Object Versions"""
 
-    object = ObjectInstanceListSerializer(read_only=True)
+    object_instance = ObjectInstanceListSerializer(read_only=True)
     created_by = UserSerializer(read_only=True)
 
     class Meta:
         model = ObjectVersion
         fields = [
             "id",
-            "object",
+            "object_instance",
             "version_number",
             "data",
             "widgets",
@@ -580,7 +580,7 @@ class ObjectVersionSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             "id",
-            "object",
+            "object_instance",
             "version_number",
             "data",
             "widgets",
@@ -592,7 +592,7 @@ class ObjectVersionSerializer(serializers.ModelSerializer):
 class ObjectVersionListSerializer(serializers.ModelSerializer):
     """Simplified serializer for object version lists"""
 
-    object_title = serializers.CharField(source="object.title", read_only=True)
+    object_title = serializers.CharField(source="object_instance.title", read_only=True)
     created_by_name = serializers.CharField(
         source="created_by.username", read_only=True
     )
@@ -601,7 +601,7 @@ class ObjectVersionListSerializer(serializers.ModelSerializer):
         model = ObjectVersion
         fields = [
             "id",
-            "object",
+            "object_instance",
             "object_title",
             "version_number",
             "created_by_name",
@@ -610,7 +610,7 @@ class ObjectVersionListSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             "id",
-            "object",
+            "object_instance",
             "version_number",
             "created_by_name",
             "created_at",

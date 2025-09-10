@@ -1004,14 +1004,14 @@ class ObjectVersionViewSet(viewsets.ReadOnlyModelViewSet):
     """ViewSet for viewing Object Versions (read-only)"""
 
     queryset = ObjectVersion.objects.select_related(
-        "object", "object__object_type", "created_by"
+        "object_instance", "object_instance__object_type", "created_by"
     )
     serializer_class = ObjectVersionSerializer
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     ordering_fields = ["version_number", "created_at"]
     ordering = ["-version_number"]
-    filterset_fields = ["object", "object__object_type"]
+    filterset_fields = ["object_instance", "object_instance__object_type"]
 
     def get_serializer_class(self):
         """Return appropriate serializer based on action"""

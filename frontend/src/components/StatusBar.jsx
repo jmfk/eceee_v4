@@ -1,9 +1,8 @@
-import { ChevronLeft, ChevronRight, Trash2, Clock } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Trash2, Save } from 'lucide-react'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import VersionSelector from './VersionSelector'
 
 const StatusBar = ({
-    showAutoSave = false,
     isDirty = false,
     customStatusContent = null,
     className = "",
@@ -14,8 +13,9 @@ const StatusBar = ({
     onRefreshVersions = null,
     // Save functionality props
     onSaveClick = null,
-    onAutoSaveToggle = null,
-    autoSaveEnabled = true,
+    onSaveNewClick = null,
+    isSaving = false,
+    isNewPage = false,
     // Validation state props
     validationState = { isValid: true, hasErrors: false }
 }) => {
@@ -95,57 +95,82 @@ const StatusBar = ({
                     )}
                 </div>
 
-                {/* Right side - Auto-save status and other info */}
-                <div className="flex items-center space-x-2 text-gray-600 flex-shrink-0 ml-4">
-                    {isDirty && (
-                        <button
-                            onClick={() => onSaveClick && onSaveClick()}
-                            className="font-medium px-2 py-1 text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded transition-colors flex items-center space-x-2"
-                            title={validationState.hasErrors ? "Save changes (validation errors will be handled)" : "Click to save changes"}
-                        ><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-save w-4 h-4" aria-hidden="true"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"></path><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"></path><path d="M7 3v4a1 1 0 0 0 1 1h7"></path></svg><span>Save</span>
-
-                        </button>
-                    )}
-                    {showAutoSave && (
-                        <>
-                            <div className="w-px h-4 bg-gray-300 mx-2" />
-                            <button
-                                onClick={() => onAutoSaveToggle && onAutoSaveToggle(!autoSaveEnabled)}
-                                className={`flex items-center space-x-1 px-2 py-1 rounded transition-colors ${autoSaveEnabled
-                                    ? 'text-green-600 hover:bg-green-50'
-                                    : 'text-gray-500 hover:bg-gray-50'
-                                    }`}
-                                title={`Auto-save is ${autoSaveEnabled ? 'enabled' : 'disabled'} - Click to toggle`}
-                            >
-                                <Clock className="w-4 h-4" />
-                                <span className="text-xs">
-                                    Auto-save {autoSaveEnabled ? 'ON' : 'OFF'}
-                                </span>
-                            </button>
-                        </>
-                    )}
-
-                    {/* Version selector */}
+                {/* Right side - Save buttons and version selector */}
+                <div className="flex items-center space-x-3 text-gray-600 flex-shrink-0 ml-4">
+                    {/* Version selector - always show if versions available */}
                     {availableVersions.length > 0 && (
-                        <>
-                            <div className="w-px h-4 bg-gray-300 mx-2" />
-                            <VersionSelector
-                                currentVersion={currentVersion}
-                                availableVersions={availableVersions}
-                                onVersionChange={onVersionChange}
-                                className="min-w-0 w-32"
-                            />
+                        <VersionSelector
+                            currentVersion={currentVersion}
+                            availableVersions={availableVersions}
+                            onVersionChange={onVersionChange}
+                            className="min-w-0 w-32"
+                        />
+                    )}
 
-                            {onRefreshVersions && (
+                    {/* Save buttons */}
+                    {isDirty && (
+                        <div className="flex items-center space-x-2">
+                            {!isNewPage && (
+                                <>
+                                    <button
+                                        onClick={() => onSaveClick && onSaveClick()}
+                                        disabled={isSaving}
+                                        className="font-medium px-3 py-1 text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 rounded transition-colors flex items-center space-x-1"
+                                        title={validationState.hasErrors ? "Save changes (validation errors will be handled)" : "Update current version"}
+                                    >
+                                        {isSaving ? (
+                                            <>
+                                                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                                                <span className="text-xs">Saving...</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Save className="w-3 h-3" />
+                                                <span className="text-xs">Save</span>
+                                            </>
+                                        )}
+                                    </button>
+                                    <button
+                                        onClick={() => onSaveNewClick && onSaveNewClick()}
+                                        disabled={isSaving}
+                                        className="font-medium px-3 py-1 text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-green-500 rounded transition-colors flex items-center space-x-1"
+                                        title="Create new version"
+                                    >
+                                        {isSaving ? (
+                                            <>
+                                                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                                                <span className="text-xs">Saving...</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Save className="w-3 h-3" />
+                                                <span className="text-xs">Save New</span>
+                                            </>
+                                        )}
+                                    </button>
+                                </>
+                            )}
+                            {isNewPage && (
                                 <button
-                                    onClick={onRefreshVersions}
-                                    className="text-xs text-gray-500 hover:text-gray-700 p-1 rounded hover:bg-gray-100 ml-2"
-                                    title="Refresh versions"
+                                    onClick={() => onSaveClick && onSaveClick()}
+                                    disabled={isSaving}
+                                    className="font-medium px-3 py-1 text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-green-500 rounded transition-colors flex items-center space-x-1"
+                                    title="Create new page"
                                 >
-                                    ↻
+                                    {isSaving ? (
+                                        <>
+                                            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                                            <span className="text-xs">Creating...</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Save className="w-3 h-3" />
+                                            <span className="text-xs">Save</span>
+                                        </>
+                                    )}
                                 </button>
                             )}
-                        </>
+                        </div>
                     )}
                 </div>
             </div>

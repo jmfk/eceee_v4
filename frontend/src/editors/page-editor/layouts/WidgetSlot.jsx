@@ -6,8 +6,9 @@
  */
 
 import React from 'react';
-import { Layout, Plus, MoreHorizontal } from 'lucide-react';
+import { Layout, Plus } from 'lucide-react';
 import PageWidgetFactory from '../PageWidgetFactory';
+import PageSlotIconMenu from '../PageSlotIconMenu';
 const WidgetSlot = ({
     name,
     label,
@@ -19,7 +20,9 @@ const WidgetSlot = ({
     className = '',
     allowedWidgetTypes = ['*'],
     maxWidgets = 10,
-    required = false
+    required = false,
+    onShowWidgetModal,
+    onClearSlot
 }) => {
     // Handle widget actions
     const handleWidgetAction = (action, widget, ...args) => {
@@ -80,12 +83,15 @@ const WidgetSlot = ({
                             </div>
                         </div>
                         <div>
-                            <button className="bg-gray-300 hover:bg-gray-500 text-black hover:text-white p-1 rounded-lg transition-colors" title="Add Widget"
-                                onClick={handleAddWidget}
-                                disabled={widgets.length >= maxWidgets}
-                            >
-                                <MoreHorizontal className="h-4 w-4" />
-                            </button>
+                            <PageSlotIconMenu
+                                slotName={name}
+                                slotLabel={label}
+                                widgets={widgets}
+                                maxWidgets={maxWidgets}
+                                onAddWidget={handleWidgetAction}
+                                onClearSlot={onClearSlot}
+                                onShowWidgetModal={onShowWidgetModal}
+                            />
                         </div>
                     </div>
                 </div>
