@@ -468,20 +468,52 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"])
     def publish(self, request, pk=None):
-        """Publish an object instance"""
+        """Publish the latest version of an object instance"""
         instance = self.get_object()
 
-        publish_date = request.data.get("publish_date")
-        if publish_date:
-            instance.publish_date = publish_date
+        # Get or create latest version
+        latest_version = instance.get_latest_version()
+        if not latest_version:
+            # Create a version if none exists
+            latest_version = instance.create_version(
+                request.user, change_description="Published via API"
+            )
 
-        instance.status = "published"
-        instance.save()
+        # Set effective_date to now to publish immediately
+        effective_date = request.data.get("effective_date", timezone.now())
+        expiry_date = request.data.get("expiry_date")
 
-        # Create version for publishing (no data/widgets change, just status)
-        instance.create_version(request.user, change_description="Published via API")
+        latest_version.effective_date = effective_date
+        latest_version.expiry_date = expiry_date
+        latest_version.save(update_fields=["effective_date", "expiry_date"])
+
+        # Update current_version pointer
+        instance.current_version = latest_version
+        instance.save(update_fields=["current_version"])
 
         serializer = self.get_serializer(instance)
+        return Response(
+            {
+                "message": "Object published successfully",
+                "object": serializer.data,
+            }
+        )
+
+    @action(detail=True, methods=["get"])
+    def current_published_version(self, request, pk=None):
+        """Get the current published version of this object"""
+        instance = self.get_object()
+        current_version = instance.get_current_published_version()
+
+        if not current_version:
+            return Response(
+                {"message": "No published version found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        from .serializers import ObjectVersionSerializer
+
+        serializer = ObjectVersionSerializer(current_version)
         return Response(serializer.data)
 
     @action(detail=True, methods=["put", "patch"])
@@ -876,13 +908,20 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["get"])
     def published(self, request):
-        """Get only published objects"""
+        """Get only published objects using version-based logic"""
         now = timezone.now()
-        published_instances = self.get_queryset().filter(
-            Q(status="published")
-            & (Q(publish_date__isnull=True) | Q(publish_date__lte=now))
-            & (Q(unpublish_date__isnull=True) | Q(unpublish_date__gt=now))
+
+        # Get objects that have at least one published version
+        from .models import ObjectVersion
+
+        published_object_ids = (
+            ObjectVersion.objects.filter(effective_date__lte=now)
+            .filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
+            .values_list("object_instance_id", flat=True)
+            .distinct()
         )
+
+        published_instances = self.get_queryset().filter(id__in=published_object_ids)
 
         serializer = self.get_serializer(published_instances, many=True)
         return Response(serializer.data)
@@ -1018,6 +1057,87 @@ class ObjectVersionViewSet(viewsets.ReadOnlyModelViewSet):
         if self.action == "list":
             return ObjectVersionListSerializer
         return ObjectVersionSerializer
+
+    @action(detail=True, methods=["post"])
+    def publish(self, request, pk=None):
+        """Publish this version immediately"""
+        version = self.get_object()
+
+        # Set effective_date to now to publish immediately
+        version.effective_date = timezone.now()
+        # Don't change expiry_date - let it remain as is
+        version.save(update_fields=["effective_date"])
+
+        # Update the object's current_version pointer to this version if it's the latest published
+        current_published = version.object_instance.get_current_published_version()
+        if current_published and current_published.id == version.id:
+            version.object_instance.current_version = version
+            version.object_instance.save(update_fields=["current_version"])
+
+        serializer = self.get_serializer(version)
+        return Response(
+            {
+                "message": "Version published successfully",
+                "version": serializer.data,
+            }
+        )
+
+    @action(detail=True, methods=["post"])
+    def schedule(self, request, pk=None):
+        """Schedule this version for future publication"""
+        version = self.get_object()
+
+        effective_date = request.data.get("effective_date")
+        expiry_date = request.data.get("expiry_date")
+
+        if not effective_date:
+            return Response(
+                {"error": "effective_date is required for scheduling"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            from dateutil.parser import parse
+
+            version.effective_date = parse(effective_date)
+            if expiry_date:
+                version.expiry_date = parse(expiry_date)
+            version.save(update_fields=["effective_date", "expiry_date"])
+        except (ValueError, TypeError) as e:
+            return Response(
+                {"error": f"Invalid date format: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer = self.get_serializer(version)
+        return Response(
+            {
+                "message": "Version scheduled successfully",
+                "version": serializer.data,
+            }
+        )
+
+    @action(detail=True, methods=["post"])
+    def unpublish(self, request, pk=None):
+        """Unpublish this version by removing its effective_date"""
+        version = self.get_object()
+
+        version.effective_date = None
+        version.expiry_date = None
+        version.save(update_fields=["effective_date", "expiry_date"])
+
+        # Update the object's current_version pointer if needed
+        current_published = version.object_instance.get_current_published_version()
+        version.object_instance.current_version = current_published
+        version.object_instance.save(update_fields=["current_version"])
+
+        serializer = self.get_serializer(version)
+        return Response(
+            {
+                "message": "Version unpublished successfully",
+                "version": serializer.data,
+            }
+        )
 
 
 @api_view(["POST"])

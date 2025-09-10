@@ -1,19 +1,35 @@
 import React, { useState, useEffect } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Save, Calendar, Eye, EyeOff, Archive } from 'lucide-react'
-import { objectInstancesApi } from '../../api/objectStorage'
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
+import { Save, Calendar, Eye, EyeOff, Archive, Clock, CheckCircle } from 'lucide-react'
+import { objectInstancesApi, objectVersionsApi } from '../../api/objectStorage'
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext'
 
 const ObjectPublishingView = ({ objectType, instance, isNewInstance, onSave, onCancel, onUnsavedChanges }) => {
     const [formData, setFormData] = useState({
-        status: instance?.status || 'draft',
-        publishDate: instance?.publishDate || '',
-        unpublishDate: instance?.unpublishDate || ''
+        effectiveDate: '',
+        expiryDate: ''
     })
     const [isDirty, setIsDirty] = useState(false)
 
     const queryClient = useQueryClient()
     const { addNotification } = useGlobalNotifications()
+
+    // Fetch current published version for the object
+    const { data: currentPublishedVersion, isLoading: currentVersionLoading } = useQuery({
+        queryKey: ['objectInstance', instance?.id, 'currentPublishedVersion'],
+        queryFn: () => objectInstancesApi.getCurrentPublishedVersion(instance.id),
+        enabled: Boolean(instance?.id && !isNewInstance),
+        retry: false
+    })
+
+    // Fetch all versions for this object
+    const { data: versionsResponse, isLoading: versionsLoading } = useQuery({
+        queryKey: ['objectVersions', instance?.id],
+        queryFn: () => objectVersionsApi.getByObject(instance.id),
+        enabled: Boolean(instance?.id && !isNewInstance)
+    })
+
+    const versions = versionsResponse?.data || []
 
     // Notify parent about unsaved changes
     useEffect(() => {
@@ -23,53 +39,83 @@ const ObjectPublishingView = ({ objectType, instance, isNewInstance, onSave, onC
     }, [isDirty, onUnsavedChanges])
 
     useEffect(() => {
-        if (instance) {
+        if (currentPublishedVersion?.data) {
+            const version = currentPublishedVersion.data
             setFormData({
-                status: instance.status || 'draft',
-                publishDate: instance.publishDate || '',
-                unpublishDate: instance.unpublishDate || ''
+                effectiveDate: version.effectiveDate ? new Date(version.effectiveDate).toISOString().slice(0, 16) : '',
+                expiryDate: version.expiryDate ? new Date(version.expiryDate).toISOString().slice(0, 16) : ''
             })
         }
-    }, [instance])
+    }, [currentPublishedVersion])
 
-    // Save mutation
-    const saveMutation = useMutation({
+    // Schedule version publication
+    const scheduleMutation = useMutation({
         mutationFn: (data) => {
-            if (isNewInstance) {
-                return objectInstancesApi.create({
-                    objectTypeId: objectType?.id,
-                    title: instance?.title || 'New Object',
-                    data: instance?.data || {},
-                    ...data
-                })
-            } else {
-                return objectInstancesApi.update(instance.id, data)
+            const latestVersion = versions[0] // Versions are ordered by version_number desc
+            if (!latestVersion) {
+                throw new Error('No version found to schedule')
             }
+            return objectVersionsApi.schedule(latestVersion.id, {
+                effectiveDate: data.effectiveDate,
+                expiryDate: data.expiryDate || null
+            })
         },
         onSuccess: () => {
             queryClient.invalidateQueries(['objectInstances'])
             queryClient.invalidateQueries(['objectInstance', instance?.id])
+            queryClient.invalidateQueries(['objectVersions', instance?.id])
+            queryClient.invalidateQueries(['objectInstance', instance?.id, 'currentPublishedVersion'])
             setIsDirty(false)
-            addNotification('Publishing settings saved successfully', 'success')
+            addNotification('Publication scheduled successfully', 'success')
         },
         onError: (error) => {
-            console.error('Save failed:', error)
-            const errorMessage = error.response?.data?.error || 'Failed to save publishing settings'
+            console.error('Schedule failed:', error)
+            const errorMessage = error.response?.data?.error || 'Failed to schedule publication'
             addNotification(errorMessage, 'error')
         }
     })
 
-    // Publish/Unpublish actions
+    // Publish immediately
     const publishMutation = useMutation({
-        mutationFn: () => objectInstancesApi.publish(instance.id),
+        mutationFn: () => {
+            const latestVersion = versions[0] // Versions are ordered by version_number desc
+            if (!latestVersion) {
+                throw new Error('No version found to publish')
+            }
+            return objectVersionsApi.publish(latestVersion.id)
+        },
         onSuccess: () => {
             queryClient.invalidateQueries(['objectInstances'])
             queryClient.invalidateQueries(['objectInstance', instance?.id])
-            addNotification('Object published successfully', 'success')
+            queryClient.invalidateQueries(['objectVersions', instance?.id])
+            queryClient.invalidateQueries(['objectInstance', instance?.id, 'currentPublishedVersion'])
+            addNotification('Version published successfully', 'success')
         },
         onError: (error) => {
             console.error('Publish failed:', error)
-            const errorMessage = error.response?.data?.error || 'Failed to publish object'
+            const errorMessage = error.response?.data?.error || 'Failed to publish version'
+            addNotification(errorMessage, 'error')
+        }
+    })
+
+    // Unpublish current version
+    const unpublishMutation = useMutation({
+        mutationFn: () => {
+            if (!currentPublishedVersion?.data) {
+                throw new Error('No published version to unpublish')
+            }
+            return objectVersionsApi.unpublish(currentPublishedVersion.data.id)
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries(['objectInstances'])
+            queryClient.invalidateQueries(['objectInstance', instance?.id])
+            queryClient.invalidateQueries(['objectVersions', instance?.id])
+            queryClient.invalidateQueries(['objectInstance', instance?.id, 'currentPublishedVersion'])
+            addNotification('Version unpublished successfully', 'success')
+        },
+        onError: (error) => {
+            console.error('Unpublish failed:', error)
+            const errorMessage = error.response?.data?.error || 'Failed to unpublish version'
             addNotification(errorMessage, 'error')
         }
     })
@@ -79,8 +125,16 @@ const ObjectPublishingView = ({ objectType, instance, isNewInstance, onSave, onC
         setIsDirty(true)
     }
 
-    const handleSave = () => {
-        saveMutation.mutate(formData)
+    const handleSchedule = () => {
+        if (isNewInstance) {
+            addNotification('Please save the object first before scheduling', 'warning')
+            return
+        }
+        if (!formData.effectiveDate) {
+            addNotification('Please set an effective date', 'warning')
+            return
+        }
+        scheduleMutation.mutate(formData)
     }
 
     const handleQuickPublish = () => {
@@ -96,7 +150,7 @@ const ObjectPublishingView = ({ objectType, instance, isNewInstance, onSave, onC
             addNotification('Please save the object first', 'warning')
             return
         }
-        saveMutation.mutate({ status: 'draft' })
+        unpublishMutation.mutate()
     }
 
     const getStatusColor = (status) => {
@@ -118,7 +172,6 @@ const ObjectPublishingView = ({ objectType, instance, isNewInstance, onSave, onC
     }
 
     const isPublished = instance?.isPublished || false
-    const StatusIcon = getStatusIcon(formData.status)
 
     return (
         <div className="h-full flex flex-col relative">
@@ -141,9 +194,13 @@ const ObjectPublishingView = ({ objectType, instance, isNewInstance, onSave, onC
                                 <div className="bg-gray-50 rounded-lg p-4">
                                     <h3 className="text-sm font-medium text-gray-900 mb-2">Current Status</h3>
                                     <div className="flex items-center space-x-4">
-                                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(instance?.status)}`}>
-                                            <StatusIcon className="h-4 w-4 mr-1" />
-                                            {instance?.status?.charAt(0).toUpperCase() + instance?.status?.slice(1)}
+                                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${isPublished ? 'text-green-700 bg-green-100' : 'text-gray-700 bg-gray-100'}`}>
+                                            {isPublished ? (
+                                                <Eye className="h-4 w-4 mr-1" />
+                                            ) : (
+                                                <EyeOff className="h-4 w-4 mr-1" />
+                                            )}
+                                            {isPublished ? 'Published' : 'Not Published'}
                                         </span>
                                         {isPublished && (
                                             <span className="text-green-600 text-sm font-medium">
@@ -154,90 +211,94 @@ const ObjectPublishingView = ({ objectType, instance, isNewInstance, onSave, onC
                                 </div>
                             )}
 
-                            {/* Status Selection */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Publication Status
-                                </label>
-                                <select
-                                    value={formData.status}
-                                    onChange={(e) => handleInputChange('status', e.target.value)}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                >
-                                    <option value="draft">Draft - Not visible to public</option>
-                                    <option value="published">Published - Visible to public</option>
-                                    <option value="archived">Archived - Hidden from listings</option>
-                                </select>
-                                <p className="text-gray-500 text-sm mt-1">
-                                    {formData.status === 'draft' && 'Object is saved but not visible to the public'}
-                                    {formData.status === 'published' && 'Object is live and visible to the public'}
-                                    {formData.status === 'archived' && 'Object is hidden from public listings but still accessible via direct link'}
-                                </p>
-                            </div>
+                            {/* Current Published Version Info */}
+                            {!isNewInstance && currentPublishedVersion && (
+                                <div className="bg-blue-50 rounded-lg p-4">
+                                    <h3 className="text-sm font-medium text-blue-900 mb-2">Currently Published Version</h3>
+                                    <div className="space-y-1 text-sm text-blue-800">
+                                        <div>Version {currentPublishedVersion.data.versionNumber}</div>
+                                        <div>Effective: {currentPublishedVersion.data.effectiveDate ? new Date(currentPublishedVersion.data.effectiveDate).toLocaleString() : 'Immediately'}</div>
+                                        <div>Expires: {currentPublishedVersion.data.expiryDate ? new Date(currentPublishedVersion.data.expiryDate).toLocaleString() : 'Never'}</div>
+                                    </div>
+                                </div>
+                            )}
 
-                            {/* Publishing Schedule */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Publish Date (Optional)
-                                    </label>
-                                    <input
-                                        type="datetime-local"
-                                        value={formData.publishDate}
-                                        onChange={(e) => handleInputChange('publishDate', e.target.value)}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                    />
-                                    <p className="text-gray-500 text-sm mt-1">
-                                        When to automatically publish this object
-                                    </p>
+                            {/* Version Publishing Schedule */}
+                            <div className="space-y-4">
+                                <h3 className="text-lg font-medium text-gray-900">Schedule Latest Version</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            Effective Date <span className="text-red-500">*</span>
+                                        </label>
+                                        <input
+                                            type="datetime-local"
+                                            value={formData.effectiveDate}
+                                            onChange={(e) => handleInputChange('effectiveDate', e.target.value)}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        />
+                                        <p className="text-gray-500 text-sm mt-1">
+                                            When this version becomes active/published
+                                        </p>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            Expiry Date (Optional)
+                                        </label>
+                                        <input
+                                            type="datetime-local"
+                                            value={formData.expiryDate}
+                                            onChange={(e) => handleInputChange('expiryDate', e.target.value)}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        />
+                                        <p className="text-gray-500 text-sm mt-1">
+                                            When this version expires (leave blank for no expiry)
+                                        </p>
+                                    </div>
                                 </div>
 
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Unpublish Date (Optional)
-                                    </label>
-                                    <input
-                                        type="datetime-local"
-                                        value={formData.unpublishDate}
-                                        onChange={(e) => handleInputChange('unpublishDate', e.target.value)}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                    />
-                                    <p className="text-gray-500 text-sm mt-1">
-                                        When to automatically unpublish this object
-                                    </p>
+                                <div className="flex justify-end">
+                                    <button
+                                        onClick={handleSchedule}
+                                        disabled={scheduleMutation.isPending || !formData.effectiveDate || isNewInstance}
+                                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-colors"
+                                    >
+                                        <Clock className="h-4 w-4 mr-2" />
+                                        {scheduleMutation.isPending ? 'Scheduling...' : 'Schedule Version'}
+                                    </button>
                                 </div>
                             </div>
 
-                            {/* Publishing Info */}
-                            {!isNewInstance && instance && (
+                            {/* Version Information */}
+                            {!isNewInstance && versions.length > 0 && (
                                 <div className="border-t pt-6">
-                                    <h3 className="text-lg font-medium text-gray-900 mb-4">Publishing Information</h3>
-                                    <div className="bg-gray-50 rounded-md p-4 space-y-2">
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                                            <div>
-                                                <span className="font-medium text-gray-700">Version:</span>
-                                                <span className="ml-2 text-gray-600">{instance.version || 1}</span>
-                                            </div>
-                                            <div>
-                                                <span className="font-medium text-gray-700">Created By:</span>
-                                                <span className="ml-2 text-gray-600">
-                                                    {instance.createdBy?.username || instance.createdBy?.firstName || 'Unknown'}
-                                                </span>
-                                            </div>
-                                            {instance.publishDate && (
-                                                <div>
-                                                    <span className="font-medium text-gray-700">Scheduled Publish:</span>
-                                                    <span className="ml-2 text-gray-600">
-                                                        {new Date(instance.publishDate).toLocaleString()}
-                                                    </span>
+                                    <h3 className="text-lg font-medium text-gray-900 mb-4">Version History</h3>
+                                    <div className="bg-gray-50 rounded-md p-4">
+                                        <div className="space-y-3">
+                                            {versions.slice(0, 3).map((version) => (
+                                                <div key={version.id} className="flex justify-between items-center text-sm">
+                                                    <div>
+                                                        <span className="font-medium text-gray-700">Version {version.versionNumber}</span>
+                                                        {version.changeDescription && (
+                                                            <span className="ml-2 text-gray-600">- {version.changeDescription}</span>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <div className="text-gray-600">
+                                                            {new Date(version.createdAt).toLocaleDateString()}
+                                                        </div>
+                                                        {version.effectiveDate && (
+                                                            <div className="text-xs text-blue-600">
+                                                                Effective: {new Date(version.effectiveDate).toLocaleDateString()}
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
-                                            )}
-                                            {instance.unpublishDate && (
-                                                <div>
-                                                    <span className="font-medium text-gray-700">Scheduled Unpublish:</span>
-                                                    <span className="ml-2 text-gray-600">
-                                                        {new Date(instance.unpublishDate).toLocaleString()}
-                                                    </span>
+                                            ))}
+                                            {versions.length > 3 && (
+                                                <div className="text-sm text-gray-500 text-center pt-2">
+                                                    ... and {versions.length - 3} more versions
                                                 </div>
                                             )}
                                         </div>
@@ -254,19 +315,19 @@ const ObjectPublishingView = ({ objectType, instance, isNewInstance, onSave, onC
                             <div className="flex space-x-4">
                                 <button
                                     onClick={handleQuickPublish}
-                                    disabled={publishMutation.isPending || instance?.status === 'published'}
+                                    disabled={publishMutation.isPending || isPublished}
                                     className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-colors"
                                 >
                                     <Eye className="h-4 w-4 mr-2" />
-                                    Publish Now
+                                    {publishMutation.isPending ? 'Publishing...' : 'Publish Now'}
                                 </button>
                                 <button
                                     onClick={handleQuickUnpublish}
-                                    disabled={saveMutation.isPending || instance?.status === 'draft'}
+                                    disabled={unpublishMutation.isPending || !isPublished}
                                     className="px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-colors"
                                 >
                                     <EyeOff className="h-4 w-4 mr-2" />
-                                    Unpublish
+                                    {unpublishMutation.isPending ? 'Unpublishing...' : 'Unpublish'}
                                 </button>
                             </div>
                         </div>

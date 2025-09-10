@@ -645,20 +645,56 @@ class ObjectInstance(MPTTModel):
         # This allows for flexibility and prevents data loss when object type
         # definitions change
 
-    def is_published(self):
-        """Check if the object is currently published."""
-        if self.status != "published":
-            return False
+    def is_published(self, now=None):
+        """
+        Check if this object should be visible to the public.
 
-        now = timezone.now()
+        NEW: Object is published if it has a currently published version (date-based).
+        """
+        current_version = self.get_current_published_version(now)
+        return current_version is not None
 
-        if self.publish_date and self.publish_date > now:
-            return False
+    def get_current_published_version(self, now=None):
+        """
+        Get the currently published version of this object using date-based logic.
 
-        if self.unpublish_date and self.unpublish_date <= now:
-            return False
+        Returns the latest version by version_number that:
+        - Has effective_date <= now
+        - Has no expiry_date OR expiry_date > now
+        """
+        if now is None:
+            now = timezone.now()
 
-        return True
+        return (
+            self.versions.filter(effective_date__lte=now)
+            .filter(models.Q(expiry_date__isnull=True) | models.Q(expiry_date__gt=now))
+            .order_by("-version_number")
+            .first()
+        )
+
+    def get_latest_published_version(self, now=None):
+        """Get the latest published version by version number"""
+        if now is None:
+            now = timezone.now()
+
+        return (
+            self.versions.filter(effective_date__lte=now)
+            .filter(models.Q(expiry_date__isnull=True) | models.Q(expiry_date__gt=now))
+            .order_by("-version_number")
+            .first()
+        )
+
+    def get_latest_version(self):
+        """Get the latest version of this object (regardless of publication status)"""
+        return self.versions.order_by("-version_number").first()
+
+    def has_newer_versions(self):
+        """Check if there are versions newer than the current published version"""
+        current = self.get_current_published_version()
+        if not current:
+            return self.versions.exists()
+
+        return self.versions.filter(version_number__gt=current.version_number).exists()
 
     def get_root_objects(self):
         """Get all root objects (objects without parents) of the same type."""
@@ -810,6 +846,16 @@ class ObjectVersion(models.Model):
         blank=True, help_text="Description of changes made in this version"
     )
 
+    # Publication date fields - similar to PageVersion
+    effective_date = models.DateTimeField(
+        blank=True, null=True, help_text="When this version becomes active/published"
+    )
+    expiry_date = models.DateTimeField(
+        blank=True,
+        null=True,
+        help_text="When this version expires (null means never expires)",
+    )
+
     class Meta:
         ordering = ["-version_number"]
         indexes = [
@@ -826,6 +872,73 @@ class ObjectVersion(models.Model):
     def __str__(self):
         return f"{self.object_instance.title} v{self.version_number}"
 
+    def clean(self):
+        """Validate the version data"""
+        super().clean()
+
+        # Validate that effective_date is before expiry_date
+        if (
+            self.effective_date
+            and self.expiry_date
+            and self.effective_date >= self.expiry_date
+        ):
+            from django.core.exceptions import ValidationError
+
+            raise ValidationError("Effective date must be before expiry date.")
+
+    def is_published(self, now=None):
+        """
+        Check if this version is currently published based on dates.
+
+        A version is published if:
+        - It has an effective_date that has passed
+        - It either has no expiry_date or the expiry_date hasn't passed
+        """
+        if now is None:
+            now = timezone.now()
+
+        # Must have an effective date that has passed
+        if not self.effective_date or self.effective_date > now:
+            return False
+
+        # Must not be expired
+        if self.expiry_date and self.expiry_date <= now:
+            return False
+
+        return True
+
+    def is_current_published(self, now=None):
+        """
+        Check if this is the current published version for its object.
+
+        The current published version is the latest published version by version_number.
+        """
+        if not self.is_published(now):
+            return False
+
+        current_version = self.object_instance.get_current_published_version(now)
+        return current_version == self
+
+    def get_publication_status(self, now=None):
+        """
+        Get a human-readable publication status based on dates.
+
+        Returns: 'draft', 'scheduled', 'published', 'expired'
+        """
+        if now is None:
+            now = timezone.now()
+
+        if not self.effective_date:
+            return "draft"
+
+        if self.effective_date > now:
+            return "scheduled"
+
+        if self.expiry_date and self.expiry_date <= now:
+            return "expired"
+
+        return "published"
+
     def to_dict(self):
         """Convert to dictionary for API serialization."""
         return {
@@ -837,4 +950,8 @@ class ObjectVersion(models.Model):
             "created_by": self.created_by.username,
             "created_at": self.created_at,
             "change_description": self.change_description,
+            "effective_date": self.effective_date,
+            "expiry_date": self.expiry_date,
+            "is_published": self.is_published(),
+            "publication_status": self.get_publication_status(),
         }

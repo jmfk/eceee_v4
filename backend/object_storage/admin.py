@@ -147,11 +147,20 @@ class ObjectVersionInline(admin.TabularInline):
 
     model = ObjectVersion
     extra = 0
-    readonly_fields = ["version_number", "created_by", "created_at", "version_link"]
+    readonly_fields = [
+        "version_number",
+        "created_by",
+        "created_at",
+        "version_link",
+        "publication_status_display",
+    ]
     fields = [
         "version_number",
         "version_link",
         "change_description",
+        "effective_date",
+        "expiry_date",
+        "publication_status_display",
         "created_by",
         "created_at",
     ]
@@ -169,6 +178,27 @@ class ObjectVersionInline(admin.TabularInline):
         return "Not saved yet"
 
     version_link.short_description = "View"
+
+    def publication_status_display(self, obj):
+        """Display publication status with color coding."""
+        if not obj.pk:
+            return "-"
+
+        status = obj.get_publication_status()
+        colors = {
+            "draft": "gray",
+            "scheduled": "orange",
+            "published": "green",
+            "expired": "red",
+        }
+        color = colors.get(status, "black")
+        return format_html(
+            '<span style="color: {}; font-weight: bold;">{}</span>',
+            color,
+            status.title(),
+        )
+
+    publication_status_display.short_description = "Status"
 
 
 class SubObjectInline(admin.TabularInline):
@@ -234,7 +264,6 @@ class ObjectInstanceAdmin(admin.ModelAdmin):
         "level",
         "created_at",
         "updated_at",
-        "publish_date",
     ]
     search_fields = ["title", "slug"]
     readonly_fields = [
@@ -248,6 +277,7 @@ class ObjectInstanceAdmin(admin.ModelAdmin):
         "data_preview",
         "widgets_preview",
         "is_published_display",
+        "current_published_version_info",
         "children_count",
     ]
     inlines = [ObjectVersionInline, SubObjectInline]
@@ -264,8 +294,8 @@ class ObjectInstanceAdmin(admin.ModelAdmin):
         (
             "Publishing",
             {
-                "fields": ("publish_date", "unpublish_date", "is_published_display"),
-                "description": "Control when this object is published",
+                "fields": ("is_published_display", "current_published_version_info"),
+                "description": "Publication status is now controlled at the version level",
             },
         ),
         (
@@ -308,6 +338,29 @@ class ObjectInstanceAdmin(admin.ModelAdmin):
             return format_html('<span style="color: red;">✗ Not Published</span>')
 
     is_published_display.short_description = "Published"
+
+    def current_published_version_info(self, obj):
+        """Display information about the current published version."""
+        current_pub_version = obj.get_current_published_version()
+        if current_pub_version:
+            return format_html(
+                "Version {} (effective: {}, expires: {})",
+                current_pub_version.version_number,
+                (
+                    current_pub_version.effective_date.strftime("%Y-%m-%d %H:%M")
+                    if current_pub_version.effective_date
+                    else "N/A"
+                ),
+                (
+                    current_pub_version.expiry_date.strftime("%Y-%m-%d %H:%M")
+                    if current_pub_version.expiry_date
+                    else "Never"
+                ),
+            )
+        else:
+            return format_html('<span style="color: gray;">No published version</span>')
+
+    current_published_version_info.short_description = "Current Published Version"
 
     def data_preview(self, obj):
         """Display a formatted preview of the object data."""
@@ -416,11 +469,19 @@ class ObjectVersionAdmin(admin.ModelAdmin):
     list_display = [
         "object_instance",
         "version_number",
+        "publication_status_display",
+        "effective_date",
+        "expiry_date",
         "created_by",
         "created_at",
         "change_description_short",
     ]
-    list_filter = ["created_at", "object_instance__object_type"]
+    list_filter = [
+        "created_at",
+        "effective_date",
+        "expiry_date",
+        "object_instance__object_type",
+    ]
     search_fields = ["object_instance__title", "change_description"]
     readonly_fields = [
         "object_instance",
@@ -430,12 +491,26 @@ class ObjectVersionAdmin(admin.ModelAdmin):
         "created_by",
         "created_at",
         "data_preview",
+        "publication_status_display",
+        "is_published_display",
     ]
 
     fieldsets = (
         (
             "Version Information",
             {"fields": ("object_instance", "version_number", "change_description")},
+        ),
+        (
+            "Publication Schedule",
+            {
+                "fields": (
+                    "effective_date",
+                    "expiry_date",
+                    "publication_status_display",
+                    "is_published_display",
+                ),
+                "description": "Control when this version is published and expires",
+            },
         ),
         (
             "Snapshot Data",
@@ -469,6 +544,35 @@ class ObjectVersionAdmin(admin.ModelAdmin):
         )
 
     change_description_short.short_description = "Description"
+
+    def publication_status_display(self, obj):
+        """Display publication status with color coding."""
+        status = obj.get_publication_status()
+        colors = {
+            "draft": "gray",
+            "scheduled": "orange",
+            "published": "green",
+            "expired": "red",
+        }
+        color = colors.get(status, "black")
+        return format_html(
+            '<span style="color: {}; font-weight: bold;">{}</span>',
+            color,
+            status.title(),
+        )
+
+    publication_status_display.short_description = "Publication Status"
+
+    def is_published_display(self, obj):
+        """Display current publication state."""
+        if obj.is_published():
+            return format_html(
+                '<span style="color: green; font-weight: bold;">✓ Currently Published</span>'
+            )
+        else:
+            return format_html('<span style="color: red;">✗ Not Published</span>')
+
+    is_published_display.short_description = "Currently Published"
 
     def data_preview(self, obj):
         """Display a formatted preview of the version data."""

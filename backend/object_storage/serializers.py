@@ -561,10 +561,13 @@ class ObjectInstanceListSerializer(serializers.ModelSerializer):
 
 
 class ObjectVersionSerializer(serializers.ModelSerializer):
-    """Serializer for Object Versions"""
+    """Serializer for Object Versions with enhanced publication support"""
 
     object_instance = ObjectInstanceListSerializer(read_only=True)
     created_by = UserSerializer(read_only=True)
+    is_published = serializers.SerializerMethodField()
+    is_current_published = serializers.SerializerMethodField()
+    publication_status = serializers.SerializerMethodField()
 
     class Meta:
         model = ObjectVersion
@@ -577,6 +580,12 @@ class ObjectVersionSerializer(serializers.ModelSerializer):
             "created_by",
             "created_at",
             "change_description",
+            # New publication fields
+            "effective_date",
+            "expiry_date",
+            "is_published",
+            "is_current_published",
+            "publication_status",
         ]
         read_only_fields = [
             "id",
@@ -586,7 +595,22 @@ class ObjectVersionSerializer(serializers.ModelSerializer):
             "widgets",
             "created_by",
             "created_at",
+            "is_published",
+            "is_current_published",
+            "publication_status",
         ]
+
+    def get_is_published(self, obj):
+        """Check if this version is currently published based on dates"""
+        return obj.is_published()
+
+    def get_is_current_published(self, obj):
+        """Check if this is the current published version for its object"""
+        return obj.is_current_published()
+
+    def get_publication_status(self, obj):
+        """Get human-readable publication status based on dates"""
+        return obj.get_publication_status()
 
 
 class ObjectVersionListSerializer(serializers.ModelSerializer):
@@ -596,6 +620,8 @@ class ObjectVersionListSerializer(serializers.ModelSerializer):
     created_by_name = serializers.CharField(
         source="created_by.username", read_only=True
     )
+    publication_status = serializers.SerializerMethodField()
+    is_current_published = serializers.SerializerMethodField()
 
     class Meta:
         model = ObjectVersion
@@ -607,6 +633,10 @@ class ObjectVersionListSerializer(serializers.ModelSerializer):
             "created_by_name",
             "created_at",
             "change_description",
+            "effective_date",
+            "expiry_date",
+            "publication_status",
+            "is_current_published",
         ]
         read_only_fields = [
             "id",
@@ -614,4 +644,14 @@ class ObjectVersionListSerializer(serializers.ModelSerializer):
             "version_number",
             "created_by_name",
             "created_at",
+            "publication_status",
+            "is_current_published",
         ]
+
+    def get_publication_status(self, obj):
+        """Get human-readable publication status based on dates"""
+        return obj.get_publication_status()
+
+    def get_is_current_published(self, obj):
+        """Check if this is the current published version for its object"""
+        return obj.is_current_published()

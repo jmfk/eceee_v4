@@ -249,16 +249,6 @@ const ObjectVersionsView = ({ objectType, instance, isNewInstance, onSave, onCan
                         </Modal>
                     )}
 
-                    {/* Action Buttons */}
-                    <div className="flex justify-end space-x-4">
-                        <button
-                            type="button"
-                            onClick={onCancel}
-                            className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
-                        >
-                            Back to Objects
-                        </button>
-                    </div>
                 </div>
             </div>
         </div>
