@@ -7,25 +7,24 @@ import { Image } from 'lucide-react'
  */
 const ImageWidget = ({ config = {}, mode = 'preview' }) => {
     const {
-        media_items = [],
-        display_type = 'single',
-        size = 'medium',
+        mediaItems = [],
+        displayType = 'single',
         alignment = 'center',
-        gallery_columns = 3,
-        enable_lightbox = true,
-        auto_play = false,
-        show_captions = true,
+        galleryColumns = 3,
+        enableLightbox = true,
+        autoPlay = false,
+        showCaptions = true,
         // Backward compatibility
-        image_url = '',
-        alt_text = 'Image',
+        imageUrl = '',
+        altText = 'Image',
         caption = ''
     } = config
 
     // Handle backward compatibility
-    const items = media_items.length > 0 ? media_items : (image_url ? [{
-        url: image_url,
+    const items = mediaItems.length > 0 ? mediaItems : (imageUrl ? [{
+        url: imageUrl,
         type: 'image',
-        alt_text: alt_text,
+        altText: altText,
         caption: caption
     }] : [])
 
@@ -35,12 +34,6 @@ const ImageWidget = ({ config = {}, mode = 'preview' }) => {
         right: 'text-right'
     }
 
-    const sizeClasses = {
-        small: 'max-w-sm',
-        medium: 'max-w-2xl',
-        large: 'max-w-4xl',
-        full: 'w-full'
-    }
 
     const renderMediaItem = (item, index = 0) => {
         if (item.type === 'video') {
@@ -48,7 +41,7 @@ const ImageWidget = ({ config = {}, mode = 'preview' }) => {
                 <video
                     key={index}
                     controls
-                    autoPlay={auto_play}
+                    autoPlay={autoPlay}
                     className="max-w-full h-auto rounded shadow-sm"
                     poster={item.thumbnail}
                 >
@@ -62,9 +55,9 @@ const ImageWidget = ({ config = {}, mode = 'preview' }) => {
             <img
                 key={index}
                 src={item.url}
-                alt={item.alt_text || 'Image'}
+                alt={item.altText || 'Image'}
                 className="max-w-full h-auto rounded shadow-sm cursor-pointer hover:opacity-90 transition-opacity"
-                onClick={enable_lightbox ? () => {
+                onClick={enableLightbox ? () => {
                     // Lightbox functionality would be implemented here
                     // TODO: Implement lightbox modal
                 } : undefined}
@@ -83,7 +76,7 @@ const ImageWidget = ({ config = {}, mode = 'preview' }) => {
         }
 
         return (
-            <div className={`grid ${gridClasses[gallery_columns] || 'grid-cols-2 md:grid-cols-3'} gap-4`}>
+            <div className={`grid ${gridClasses[galleryColumns] || 'grid-cols-2 md:grid-cols-3'} gap-4`}>
                 {items.map((item, index) => (
                     <div key={index} className="gallery-item">
                         {item.type === 'video' ? (
@@ -102,14 +95,14 @@ const ImageWidget = ({ config = {}, mode = 'preview' }) => {
                         ) : (
                             <img
                                 src={item.url}
-                                alt={item.alt_text || `Gallery image ${index + 1}`}
+                                alt={item.altText || `Gallery image ${index + 1}`}
                                 className="w-full h-48 object-cover rounded cursor-pointer hover:opacity-90 transition-opacity"
-                                onClick={enable_lightbox ? () => {
+                                onClick={enableLightbox ? () => {
                                     // TODO: Implement lightbox modal
                                 } : undefined}
                             />
                         )}
-                        {show_captions && item.caption && (
+                        {showCaptions && item.caption && (
                             <p className="text-sm text-gray-600 mt-1">{item.caption}</p>
                         )}
                     </div>
@@ -118,19 +111,75 @@ const ImageWidget = ({ config = {}, mode = 'preview' }) => {
         )
     }
 
+    const renderCarousel = () => {
+        // Simple carousel implementation with navigation
+        const [currentIndex, setCurrentIndex] = React.useState(0)
+
+        if (items.length === 0) return null
+
+        return (
+            <div className="relative">
+                <div className="overflow-hidden rounded-lg">
+                    <div
+                        className="flex transition-transform duration-300 ease-in-out"
+                        style={{ transform: `translateX(-${currentIndex * 100}%)` }}
+                    >
+                        {items.map((item, index) => (
+                            <div key={index} className="w-full flex-shrink-0">
+                                {renderMediaItem(item, index)}
+                                {showCaptions && item.caption && (
+                                    <p className="text-sm text-gray-600 mt-2 text-center">{item.caption}</p>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {items.length > 1 && (
+                    <>
+                        <button
+                            onClick={() => setCurrentIndex(prev => prev > 0 ? prev - 1 : items.length - 1)}
+                            className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-white bg-opacity-80 hover:bg-opacity-100 rounded-full p-2 shadow-md transition-all"
+                        >
+                            ←
+                        </button>
+                        <button
+                            onClick={() => setCurrentIndex(prev => prev < items.length - 1 ? prev + 1 : 0)}
+                            className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-white bg-opacity-80 hover:bg-opacity-100 rounded-full p-2 shadow-md transition-all"
+                        >
+                            →
+                        </button>
+
+                        <div className="flex justify-center mt-4 gap-2">
+                            {items.map((_, index) => (
+                                <button
+                                    key={index}
+                                    onClick={() => setCurrentIndex(index)}
+                                    className={`w-2 h-2 rounded-full transition-colors ${index === currentIndex ? 'bg-blue-600' : 'bg-gray-300'
+                                        }`}
+                                />
+                            ))}
+                        </div>
+                    </>
+                )}
+            </div>
+        )
+    }
+
     if (mode === 'editor') {
         return (
             <div className="image-widget-editor p-4">
-                <div className={`${alignmentClasses[alignment]} ${sizeClasses[size]}`}>
+                <div className={`${alignmentClasses[alignment]}`}>
                     {items.length > 0 ? (
-                        display_type === 'gallery' ? renderGallery() : (
-                            <div>
-                                {renderMediaItem(items[0])}
-                                {show_captions && items[0].caption && (
-                                    <p className="text-sm text-gray-600 mt-2 italic">{items[0].caption}</p>
-                                )}
-                            </div>
-                        )
+                        displayType === 'gallery' ? renderGallery() :
+                            displayType === 'carousel' ? renderCarousel() : (
+                                <div>
+                                    {renderMediaItem(items[0])}
+                                    {showCaptions && items[0].caption && (
+                                        <p className="text-sm text-gray-600 mt-2 italic">{items[0].caption}</p>
+                                    )}
+                                </div>
+                            )
                     ) : (
                         <div className="bg-gray-200 h-32 rounded flex items-center justify-center text-gray-500">
                             <Image className="h-8 w-8 mr-2" />
@@ -154,15 +203,16 @@ const ImageWidget = ({ config = {}, mode = 'preview' }) => {
     }
 
     return (
-        <div className={`image-widget ${alignmentClasses[alignment]} ${sizeClasses[size]} mx-auto`}>
-            {display_type === 'gallery' ? renderGallery() : (
-                <div>
-                    {renderMediaItem(items[0])}
-                    {show_captions && items[0].caption && (
-                        <p className="text-sm text-gray-600 mt-2">{items[0].caption}</p>
-                    )}
-                </div>
-            )}
+        <div className={`image-widget ${alignmentClasses[alignment]} mx-auto`}>
+            {displayType === 'gallery' ? renderGallery() :
+                displayType === 'carousel' ? renderCarousel() : (
+                    <div>
+                        {renderMediaItem(items[0])}
+                        {showCaptions && items[0].caption && (
+                            <p className="text-sm text-gray-600 mt-2">{items[0].caption}</p>
+                        )}
+                    </div>
+                )}
         </div>
     )
 }
@@ -173,17 +223,16 @@ ImageWidget.widgetType = 'core_widgets.ImageWidget'
 
 // Default configuration
 ImageWidget.defaultConfig = {
-    media_items: [],
-    display_type: 'single',
-    size: 'medium',
+    mediaItems: [],
+    displayType: 'single',
     alignment: 'center',
-    gallery_columns: 3,
-    enable_lightbox: true,
-    auto_play: false,
-    show_captions: true,
+    galleryColumns: 3,
+    enableLightbox: true,
+    autoPlay: false,
+    showCaptions: true,
     // Backward compatibility
-    image_url: '',
-    alt_text: '',
+    imageUrl: '',
+    altText: '',
     caption: ''
 }
 

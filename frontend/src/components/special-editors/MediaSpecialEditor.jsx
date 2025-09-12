@@ -1,11 +1,17 @@
 /**
  * MediaSpecialEditor Component
  * 
- * Special editor for Image Widgets that provides media management capabilities.
- * This is a demo implementation showing the structure for special editors.
+ * Simplified, focused media management interface specifically for ImageWidget.
+ * Provides distinct workflows for individual images vs collections with proper metadata handling.
  */
-import React from 'react'
-import { Image } from 'lucide-react'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import {
+    Image, Upload, Search, Grid3X3, List, Eye, Download, Edit3, Trash2, Plus,
+    FolderOpen, Settings, Check, X, ArrowLeft, Tag, FileText, User, Calendar,
+    Shuffle, Hash, AlertCircle, Loader2
+} from 'lucide-react'
+import { namespacesApi, mediaApi, mediaCollectionsApi, mediaTagsApi } from '../../api'
+import ImageWidget from '../../widgets/core/ImageWidget'
 
 const MediaSpecialEditor = ({
     widgetData,
@@ -13,96 +19,1572 @@ const MediaSpecialEditor = ({
     isClosing = false,
     onConfigChange
 }) => {
-    return (
-        <div className="h-full flex flex-col">
-            {/* Special Editor Header */}
-            <div className={`flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-white transition-all duration-300 ${isAnimating ? 'animate-fade-in-up delay-100' : ''
-                } ${isClosing ? 'animate-fade-out-down' : ''
-                }`}>
-                <h4 className="text-md font-medium text-gray-900 flex items-center">
-                    <Image className={`w-4 h-4 mr-2 transition-all duration-300 delay-200 ${isAnimating ? 'animate-bounce-in' : ''
-                        }`} />
-                    Media Editor
-                </h4>
+    // Core state
+    const [namespace, setNamespace] = useState(null)
+    const [loadingNamespace, setLoadingNamespace] = useState(true)
+    const [currentView, setCurrentView] = useState('overview') // 'overview', 'browse', 'collections', 'upload', 'verify'
+
+    // Data state
+    const [searchResults, setSearchResults] = useState([])
+    const [collections, setCollections] = useState([])
+    const [availableTags, setAvailableTags] = useState([])
+    const [pendingUploads, setPendingUploads] = useState([])
+    const [collectionImages, setCollectionImages] = useState([])
+
+    // UI state
+    const [loading, setLoading] = useState(false)
+    const [searchTerm, setSearchTerm] = useState('')
+    const [selectedImage, setSelectedImage] = useState(null)
+    const [selectedCollection, setSelectedCollection] = useState(null)
+    const [editingItem, setEditingItem] = useState(null)
+    const [showCloneForm, setShowCloneForm] = useState(false)
+    const [cloneCollectionName, setCloneCollectionName] = useState('')
+    const [tempSelectedImages, setTempSelectedImages] = useState([])
+    const [localConfig, setLocalConfig] = useState({})
+
+    // Use local config that updates immediately, fallback to widgetData config
+    const currentConfig = useMemo(() => {
+        const baseConfig = widgetData?.config || {}
+        const mergedConfig = { ...baseConfig, ...localConfig }
+        return mergedConfig
+    }, [widgetData?.config, localConfig])
+
+    const currentImages = useMemo(() => currentConfig.mediaItems || [], [currentConfig.mediaItems])
+    const currentCollectionId = useMemo(() => currentConfig.collectionId || null, [currentConfig.collectionId])
+
+    // Reset local config when widgetData changes
+    useEffect(() => {
+        setLocalConfig({})
+    }, [widgetData])
+
+    // Load default namespace and initial data
+    useEffect(() => {
+        const loadInitialData = async () => {
+            try {
+                const defaultNamespace = await namespacesApi.getDefault()
+                setNamespace(defaultNamespace?.slug || null)
+
+                if (defaultNamespace?.slug) {
+                    // Load collections and tags
+                    const [collectionsResult, tagsResult] = await Promise.all([
+                        mediaCollectionsApi.list({ namespace: defaultNamespace.slug })(),
+                        mediaTagsApi.list({ namespace: defaultNamespace.slug })()
+                    ])
+
+                    const collectionsData = collectionsResult.results || collectionsResult || []
+                    const tagsData = tagsResult.results || tagsResult || []
+
+                    setCollections(collectionsData)
+                    setAvailableTags(tagsData)
+                }
+            } catch (error) {
+                console.error('Failed to load initial data:', error)
+                setNamespace(null)
+            } finally {
+                setLoadingNamespace(false)
+            }
+        }
+
+        loadInitialData()
+    }, [])
+
+    // Load all images or search for specific images
+    const loadImages = useCallback(async (term = '') => {
+        if (!namespace) return
+
+        setLoading(true)
+        try {
+            let result
+            if (term.trim()) {
+                // Use search API for text search
+                result = await mediaApi.search.search({
+                    namespace,
+                    q: term,
+                    fileType: 'image',
+                    page: 1,
+                    pageSize: 20
+                })()
+            } else {
+                // Use files list API for browsing all images
+                result = await mediaApi.files.list({
+                    namespace,
+                    fileType: 'image',
+                    page: 1,
+                    pageSize: 20,
+                    ordering: '-created_at'
+                })()
+            }
+            const imagesData = result.results || result || []
+            setSearchResults(imagesData)
+        } catch (error) {
+            console.error('Failed to load images:', error)
+            setSearchResults([])
+        } finally {
+            setLoading(false)
+        }
+    }, [namespace])
+
+    // Handle search
+    const handleSearch = async (term = searchTerm) => {
+        await loadImages(term)
+    }
+
+    // Load collection images
+    const loadCollectionImages = useCallback(async (collectionId) => {
+        if (!namespace || !collectionId) return
+
+        try {
+            const result = await mediaCollectionsApi.getFiles(collectionId, {
+                namespace,
+                pageSize: 100
+            })()
+            const images = result.results || result || []
+            setCollectionImages(images)
+        } catch (error) {
+            console.error('Failed to load collection images:', error)
+            setCollectionImages([])
+        }
+    }, [namespace])
+
+    // Load images when entering browse view
+    useEffect(() => {
+        if (currentView === 'browse' && namespace) {
+            loadImages('')
+        }
+    }, [currentView, namespace, loadImages])
+
+    // Load collection images when collection is selected
+    useEffect(() => {
+        if (currentCollectionId) {
+            loadCollectionImages(currentCollectionId)
+        } else {
+            setCollectionImages([])
+        }
+    }, [currentCollectionId, loadCollectionImages])
+
+    // Handle image selection for temporary selection
+    const handleImageSelect = useCallback((image) => {
+        setTempSelectedImages(prev => {
+            const isAlreadySelected = prev.some(img => img.id === image.id)
+            if (isAlreadySelected) {
+                // Remove if already selected
+                return prev.filter(img => img.id !== image.id)
+            } else {
+                // Add to temporary selection
+                return [...prev, image]
+            }
+        })
+    }, [])
+
+    // Add temporarily selected images to widget
+    const handleAddSelectedImages = useCallback(() => {
+        if (tempSelectedImages.length === 0) return
+
+        const newMediaItems = tempSelectedImages.map(image => ({
+            id: image.id,
+            url: image.imgproxyBaseUrl || image.fileUrl,
+            type: 'image',
+            title: image.title || '',
+            altText: image.altText || image.title || '',
+            caption: image.description || '',
+            photographer: image.photographer || '',
+            source: image.source || '',
+            width: image.width,
+            height: image.height,
+            thumbnailUrl: image.imgproxyBaseUrl || image.fileUrl
+        }))
+        const updatedConfig = {
+            ...currentConfig,
+            mediaItems: [...currentImages, ...newMediaItems],
+            collectionId: null, // Clear collection when adding individual images
+            displayType: (currentImages.length + newMediaItems.length) > 1 ? 'gallery' : 'single'
+        }
+
+        // Update local config immediately for UI feedback
+        setLocalConfig(updatedConfig)
+
+        if (onConfigChange) {
+            onConfigChange(updatedConfig)
+        } else {
+            console.warn('onConfigChange not available for adding images')
+        }
+
+        // Clear temporary selection and return to overview
+        setTempSelectedImages([])
+        setCurrentView('overview')
+    }, [tempSelectedImages, currentConfig, currentImages, onConfigChange])
+
+    // Clear temporary selection
+    const handleClearTempSelection = useCallback(() => {
+        setTempSelectedImages([])
+    }, [])
+
+    // Handle collection selection - immediate save without modal
+    const handleCollectionSelect = useCallback((collection) => {
+        setSelectedCollection(collection)
+
+        // Immediately save collection to widget with default config
+        const updatedConfig = {
+            ...currentConfig,
+            collectionId: collection.id,
+            collectionConfig: {
+                randomize: false,
+                maxItems: 0, // 0 = all
+                displayType: 'gallery',
+                galleryColumns: 3
+            },
+            mediaItems: [], // Clear individual images when using collection
+            displayType: 'gallery',
+            galleryColumns: 3
+        }
+
+        // Update local config immediately for UI feedback
+        setLocalConfig(updatedConfig)
+
+        if (onConfigChange) {
+            onConfigChange(updatedConfig)
+        } else {
+            console.warn('onConfigChange not available')
+        }
+
+        setCurrentView('overview')
+    }, [currentConfig, onConfigChange])
+
+
+
+    // Remove image
+    const handleRemoveImage = (imageId) => {
+        const updatedConfig = {
+            ...currentConfig,
+            mediaItems: currentImages.filter(img => img.id !== imageId)
+        }
+
+        if (onConfigChange) {
+            onConfigChange(updatedConfig)
+        }
+        setLocalConfig(updatedConfig)
+    }
+
+    // Remove collection
+    const handleRemoveCollection = () => {
+        const updatedConfig = {
+            ...currentConfig,
+            collectionId: null,
+            collectionConfig: null
+        }
+
+        if (onConfigChange) {
+            onConfigChange(updatedConfig)
+        } else {
+            console.warn('onConfigChange not available')
+        }
+        setLocalConfig(updatedConfig)
+    }
+
+    // Handle file upload
+    const handleFileUpload = (files) => {
+        const newUploads = Array.from(files).map(file => ({
+            id: Date.now() + Math.random(),
+            file,
+            preview: URL.createObjectURL(file),
+            metadata: {
+                title: file.name.replace(/\.[^/.]+$/, ''),
+                altText: '',
+                caption: '',
+                photographer: '',
+                source: '',
+                tags: []
+            },
+            status: 'pending'
+        }))
+
+        setPendingUploads(prev => [...prev, ...newUploads])
+        setCurrentView('verify')
+    }
+
+    // Handle actual upload to media manager with auto-approval
+    const handleActualUpload = async () => {
+        if (!namespace || pendingUploads.length === 0) return
+
+        setLoading(true)
+        try {
+            // Step 1: Upload files to pending
+            const uploadData = {
+                files: pendingUploads.map(upload => upload.file),
+                namespace: namespace
+            }
+
+            const uploadResult = await mediaApi.upload.upload(uploadData)
+            const uploadedFiles = uploadResult.uploadedFiles || []
+            const rejectedFiles = uploadResult.rejectedFiles || []
+
+            console.log('Upload result:', uploadResult)
+            console.log('Uploaded files:', uploadedFiles)
+            console.log('Rejected files:', rejectedFiles)
+
+            // Step 2: Handle both new uploads and existing pending files
+            const approvalPromises = []
+            const filesToAddToWidget = []
+
+            // Handle newly uploaded files
+            for (let i = 0; i < uploadedFiles.length; i++) {
+                const uploadedFile = uploadedFiles[i]
+                const originalUpload = pendingUploads[i]
+
+                if (originalUpload.metadata.tags.length > 0) {
+                    // Auto-approve files with tags
+                    const approvalData = {
+                        title: originalUpload.metadata.title,
+                        description: originalUpload.metadata.caption,
+                        tag_ids: originalUpload.metadata.tags,
+                        access_level: 'public',
+                        slug: ''
+                    }
+
+                    console.log('Auto-approving new file:', uploadedFile.id, 'with data:', approvalData)
+                    approvalPromises.push(
+                        mediaApi.pendingFiles.approve(uploadedFile.id, approvalData)()
+                    )
+                }
+            }
+
+            // Handle rejected files (duplicates) - check if they're pending and can be approved
+            for (let i = 0; i < rejectedFiles.length; i++) {
+                const rejectedFile = rejectedFiles[i]
+                const originalUpload = pendingUploads[i]
+
+                if (rejectedFile.reason === 'duplicate_pending' && originalUpload.metadata.tags.length > 0) {
+                    // Find and approve the existing pending file
+                    const approvalData = {
+                        title: originalUpload.metadata.title,
+                        description: originalUpload.metadata.caption,
+                        tag_ids: originalUpload.metadata.tags,
+                        access_level: 'public',
+                        slug: ''
+                    }
+
+                    console.log('Auto-approving existing pending file:', rejectedFile.existingFileId, 'with data:', approvalData)
+                    approvalPromises.push(
+                        mediaApi.pendingFiles.approve(rejectedFile.existingFileId, approvalData)()
+                    )
+                }
+            }
+
+            // Execute all approvals and collect approved media files
+            const approvedMediaFiles = []
+            if (approvalPromises.length > 0) {
+                const approvalResults = await Promise.allSettled(approvalPromises)
+                const successfulApprovals = approvalResults.filter(r => r.status === 'fulfilled')
+                const failedApprovals = approvalResults.filter(r => r.status === 'rejected')
+
+                console.log(`${successfulApprovals.length} files auto-approved`)
+
+                // Extract the approved media files from successful approvals
+                successfulApprovals.forEach((result, index) => {
+                    const mediaFile = result.value?.media_file || result.value?.mediaFile
+                    if (mediaFile) {
+                        approvedMediaFiles.push(mediaFile)
+                    }
+                })
+
+                if (failedApprovals.length > 0) {
+                    console.error('Failed approvals:', failedApprovals.map(f => f.reason))
+                }
+            }
+
+            // Step 3: Add approved images to widget
+            if (approvedMediaFiles.length > 0) {
+                const newMediaItems = approvedMediaFiles.map(mediaFile => ({
+                    id: mediaFile.id,
+                    url: mediaFile.imgproxyBaseUrl || mediaFile.fileUrl || mediaFile.file_url,
+                    type: 'image',
+                    title: mediaFile.title || '',
+                    altText: mediaFile.altText || mediaFile.alt_text || mediaFile.title || '',
+                    caption: mediaFile.description || '',
+                    photographer: mediaFile.photographer || '',
+                    source: mediaFile.source || '',
+                    width: mediaFile.width,
+                    height: mediaFile.height,
+                    thumbnailUrl: mediaFile.imgproxyBaseUrl || mediaFile.fileUrl || mediaFile.file_url
+                }))
+
+                // Update widget config with new images
+                const updatedConfig = {
+                    ...currentConfig,
+                    mediaItems: [...currentImages, ...newMediaItems],
+                    collectionId: null, // Clear collection when adding individual images
+                    displayType: (currentImages.length + newMediaItems.length) > 1 ? 'gallery' : 'single'
+                }
+
+                // Update local config immediately for UI feedback
+                setLocalConfig(updatedConfig)
+
+                if (onConfigChange) {
+                    onConfigChange(updatedConfig)
+                }
+
+                console.log(`${newMediaItems.length} approved images added to widget`)
+            }
+
+            // Handle results
+            const totalUploaded = uploadedFiles.length
+            const autoApproved = approvalPromises.length
+            const stillPending = totalUploaded - autoApproved
+
+            if (totalUploaded > 0) {
+                console.log(`${totalUploaded} files uploaded successfully`)
+                if (autoApproved > 0) {
+                    console.log(`${autoApproved} files auto-approved (had tags)`)
+                }
+                if (stillPending > 0) {
+                    console.log(`${stillPending} files pending approval (no tags)`)
+                }
+
+                // Clear pending uploads
+                setPendingUploads([])
+                setCurrentView('overview')
+
+                // Refresh the browse results to show new images
+                loadImages('')
+            }
+
+        } catch (error) {
+            console.error('Upload failed:', error)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    // Render different views based on current state
+    const renderView = () => {
+        if (loadingNamespace) {
+            return (
+                <div className="flex items-center justify-center h-full">
+                    <div className="text-center">
+                        <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-600" />
+                        <p className="text-sm text-gray-600">Loading media editor...</p>
+                    </div>
+                </div>
+            )
+        }
+
+        if (!namespace) {
+            return (
+                <div className="flex items-center justify-center h-full">
+                    <div className="text-center">
+                        <AlertCircle className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                        <p className="text-sm text-gray-600">No namespace available</p>
+                    </div>
+                </div>
+            )
+        }
+
+        switch (currentView) {
+            case 'browse':
+                return renderBrowseView()
+            case 'collections':
+                return renderCollectionsView()
+            case 'upload':
+                return renderUploadView()
+            case 'verify':
+                return renderVerifyView()
+            case 'collectionImages':
+                return renderCollectionImagesView()
+            default:
+                return renderOverviewView()
+        }
+    }
+
+    // Overview view - shows current selection and main actions
+    const renderOverviewView = () => (
+        <div className="p-4 space-y-4 min-h-full">
+            {/* Current Selection Summary */}
+            <div className="bg-white rounded-lg border border-gray-200 p-4">
+                {/* Current Configuration */}
+
+                {currentCollectionId ? (
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
+                            <FolderOpen className="w-6 h-6 text-blue-600" />
+                            <div className="flex-1">
+                                <p className="font-medium text-blue-900">Collection Selected</p>
+                                <p className="text-sm text-blue-700">
+                                    {collections.find(c => c.id === currentCollectionId)?.title || 'Unknown Collection'}
+                                </p>
+                            </div>
+                            <div className="flex gap-1">
+                                <button
+                                    onClick={handleRemoveCollection}
+                                    className="p-1 text-blue-600 hover:text-red-600 transition-colors"
+                                    title="Remove collection"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Collection Images with Edit/Delete */}
+                        <div className="grid grid-cols-4 gap-2">
+                            {collectionImages.map((image, index) => (
+                                <div key={image.id || index} className="relative aspect-square bg-gray-100 rounded overflow-hidden border">
+                                    {image.imgproxyBaseUrl || image.fileUrl ? (
+                                        <img
+                                            src={image.imgproxyBaseUrl || image.fileUrl}
+                                            alt={image.title}
+                                            className="w-full h-full object-cover"
+                                        />
+                                    ) : (
+                                        <div className="w-full h-full flex items-center justify-center">
+                                            <Image className="w-4 h-4 text-gray-400" />
+                                        </div>
+                                    )}
+                                    <div className="absolute top-1 right-1 flex gap-1">
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                // TODO: Edit collection image
+                                                console.log('Edit collection image:', image.id)
+                                            }}
+                                            className="p-1 bg-white rounded shadow-sm border border-gray-200 text-gray-700 hover:text-blue-600 hover:border-blue-300 transition-colors"
+                                            title="Edit image"
+                                        >
+                                            <Edit3 className="w-3 h-3" />
+                                        </button>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                // TODO: Remove from collection
+                                                console.log('Remove from collection:', image.id)
+                                            }}
+                                            className="p-1 bg-white rounded shadow-sm border border-gray-200 text-gray-700 hover:text-red-600 hover:border-red-300 transition-colors"
+                                            title="Remove from collection"
+                                        >
+                                            <Trash2 className="w-3 h-3" />
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                            {collectionImages.length === 0 && (
+                                <div className="col-span-4 text-center py-4 text-gray-500 text-sm">
+                                    No images in collection
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Collection Management Actions */}
+                        <div className="pt-2">
+                            {showCloneForm ? (
+                                <div className="space-y-3 p-3 border border-gray-200 rounded-lg bg-white">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">New Collection Name</label>
+                                        <input
+                                            type="text"
+                                            value={cloneCollectionName}
+                                            onChange={(e) => setCloneCollectionName(e.target.value)}
+                                            placeholder="Enter collection name..."
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            autoFocus
+                                        />
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => {
+                                                setShowCloneForm(false)
+                                                setCloneCollectionName('')
+                                            }}
+                                            className="flex-1 px-3 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors text-sm"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                if (cloneCollectionName.trim()) {
+                                                    // TODO: Implement actual collection cloning
+                                                    console.log('Clone collection:', currentCollectionId, 'as:', cloneCollectionName)
+                                                    setShowCloneForm(false)
+                                                    setCloneCollectionName('')
+                                                }
+                                            }}
+                                            disabled={!cloneCollectionName.trim()}
+                                            className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+                                        >
+                                            Clone
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <button
+                                    onClick={() => {
+                                        const currentCollection = collections.find(c => c.id === currentCollectionId)
+                                        setCloneCollectionName(currentCollection ? `${currentCollection.title} (Copy)` : '')
+                                        setShowCloneForm(true)
+                                    }}
+                                    className="w-full px-3 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors text-sm"
+                                >
+                                    Clone Collection
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                ) : currentImages.length > 0 ? (
+                    <div>
+                        <div className="grid grid-cols-3 gap-2 mb-3">
+                            {currentImages.map((image, index) => (
+                                <div key={image.id || index} className="relative aspect-square bg-gray-100 rounded overflow-hidden border">
+                                    <img
+                                        src={image.thumbnailUrl || image.url}
+                                        alt={image.altText || 'Image'}
+                                        className="w-full h-full object-cover"
+                                    />
+                                    <div className="absolute top-1 right-1 flex gap-1">
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                setEditingItem({
+                                                    type: 'editImage',
+                                                    data: image,
+                                                    index: index,
+                                                    metadata: {
+                                                        title: image.title || '',
+                                                        altText: image.altText || '',
+                                                        caption: image.caption || '',
+                                                        photographer: image.photographer || '',
+                                                        source: image.source || ''
+                                                    }
+                                                })
+                                            }}
+                                            className="p-1 bg-white rounded shadow-sm border border-gray-200 text-gray-700 hover:text-blue-600 hover:border-blue-300 transition-colors"
+                                            title="Edit image"
+                                        >
+                                            <Edit3 className="w-3 h-3" />
+                                        </button>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                handleRemoveImage(image.id)
+                                            }}
+                                            className="p-1 bg-white rounded shadow-sm border border-gray-200 text-gray-700 hover:text-red-600 hover:border-red-300 transition-colors"
+                                            title="Remove image"
+                                        >
+                                            <Trash2 className="w-3 h-3" />
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                ) : (
+                    <div className="text-center py-8 text-gray-500">
+                        <Image className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+                        <p>No media selected</p>
+                    </div>
+                )}
             </div>
 
-            {/* Special Editor Content */}
-            <div className={`flex-1 p-4 overflow-y-auto transition-all duration-500 delay-300 ${isAnimating ? 'animate-fade-in-up' : ''
-                }`}>
-                <div className="space-y-4">
-                    {/* Demo Media Editor Content */}
-                    <div className={`bg-white rounded-lg border border-gray-200 p-6 transition-all duration-500 delay-400 ${isAnimating ? 'animate-scale-in' : ''
-                        }`}>
-                        <div className="text-center">
-                            <div className={`w-16 h-16 mx-auto bg-blue-100 rounded-lg flex items-center justify-center mb-4 transition-all duration-300 delay-500 ${isAnimating ? 'animate-bounce-in' : ''
-                                }`}>
-                                <Image className="w-8 h-8 text-blue-600" />
-                            </div>
-                            <h5 className={`text-lg font-medium text-gray-900 mb-2 transition-all duration-300 delay-600 ${isAnimating ? 'animate-fade-in-up' : ''
-                                }`}>Media Library</h5>
-                            <p className={`text-sm text-gray-600 mb-4 transition-all duration-300 delay-700 ${isAnimating ? 'animate-fade-in-up' : ''
-                                }`}>
-                                This is a demo of the special media editor area.
-                                Here you would see media browsing, upload, and management tools.
-                            </p>
-                            <div className="grid grid-cols-2 gap-3 mb-4">
-                                {[1, 2, 3, 4].map((num, index) => (
-                                    <div
-                                        key={num}
-                                        className={`aspect-square bg-gray-200 rounded border-2 border-dashed border-gray-300 flex items-center justify-center transition-all duration-300 ${isAnimating ? 'animate-scale-in' : ''
-                                            }`}
-                                        style={{
-                                            animationDelay: isAnimating ? `${500 + (index * 100)}ms` : '0ms'
-                                        }}
-                                    >
-                                        <span className="text-xs text-gray-500">Image {num}</span>
-                                    </div>
-                                ))}
-                            </div>
-                            <button className={`w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-all duration-300 text-sm ${isAnimating ? 'animate-fade-in-up delay-[900ms]' : ''
-                                }`}>
-                                Upload New Media
+            {/* Widget Preview */}
+            {(currentImages.length > 0 || currentCollectionId) && (
+                <div className="bg-white rounded-lg border border-gray-200 p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                        <Eye className="w-5 h-5 text-gray-600" />
+                        <h5 className="font-medium text-gray-900">Preview</h5>
+                    </div>
+                    <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                        <ImageWidget
+                            config={currentConfig}
+                            mode="preview"
+                        />
+                    </div>
+                </div>
+            )}
+
+            {/* Additional Actions */}
+            {pendingUploads.length > 0 && (
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                        <AlertCircle className="w-5 h-5 text-orange-600" />
+                        <p className="font-medium text-orange-900">Pending Uploads</p>
+                    </div>
+                    <p className="text-sm text-orange-700 mb-3">{pendingUploads.length} files waiting for verification</p>
+                    <button
+                        onClick={() => setCurrentView('verify')}
+                        className="w-full px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 transition-colors"
+                    >
+                        Review & Verify
+                    </button>
+                </div>
+            )}
+        </div>
+    )
+
+    // Browse view - search and select individual images
+    const renderBrowseView = () => (
+        <div className="h-full flex flex-col">
+            <div className="p-4 border-b border-gray-200">
+                <div className="flex items-center gap-2 mb-3">
+                    <button
+                        onClick={() => {
+                            setCurrentView('overview')
+                            setTempSelectedImages([]) // Clear temp selection when leaving
+                        }}
+                        className="p-1 text-gray-600 hover:text-gray-800"
+                    >
+                        <ArrowLeft className="w-4 h-4" />
+                    </button>
+                    <h6 className="font-medium text-gray-900">Browse Images</h6>
+                </div>
+
+                <div className="flex gap-2">
+                    <div className="flex-1 relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <input
+                            type="text"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                            placeholder="Search images..."
+                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                    </div>
+                    <button
+                        onClick={() => handleSearch()}
+                        disabled={loading}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                    >
+                        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Search'}
+                    </button>
+                </div>
+            </div>
+
+            {/* Temporary Selection Area */}
+            {tempSelectedImages.length > 0 && (
+                <div className="p-4 bg-blue-50 border-b border-blue-200">
+                    <div className="flex items-center justify-between mb-2">
+                        <h6 className="font-medium text-blue-900">Selected Images ({tempSelectedImages.length})</h6>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={handleClearTempSelection}
+                                className="px-2 py-1 text-blue-600 hover:text-blue-800 text-sm"
+                            >
+                                Clear
+                            </button>
+                            <button
+                                onClick={handleAddSelectedImages}
+                                className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
+                            >
+                                Add {tempSelectedImages.length} Image{tempSelectedImages.length !== 1 ? 's' : ''}
                             </button>
                         </div>
                     </div>
-
-                    <div className={`bg-white rounded-lg border border-gray-200 p-4 transition-all duration-500 delay-[1000ms] ${isAnimating ? 'animate-scale-in' : ''
-                        }`}>
-                        <h6 className={`font-medium text-gray-900 mb-3 transition-all duration-300 delay-[1100ms] ${isAnimating ? 'animate-fade-in-up' : ''
-                            }`}>Media Properties</h6>
-                        <div className="space-y-3">
-                            <div className={`transition-all duration-300 delay-[1200ms] ${isAnimating ? 'animate-fade-in-up' : ''
-                                }`}>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Alt Text</label>
-                                <input
-                                    type="text"
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                                    placeholder="Describe this image..."
-                                    defaultValue={widgetData?.config?.alt_text || ''}
-                                    onChange={(e) => onConfigChange && onConfigChange({
-                                        ...widgetData?.config,
-                                        alt_text: e.target.value
-                                    })}
-                                />
+                    <div className="flex gap-2 overflow-x-auto">
+                        {tempSelectedImages.map((image, index) => (
+                            <div key={image.id} className="relative flex-shrink-0">
+                                <div className="w-16 h-16 bg-gray-100 rounded overflow-hidden border-2 border-blue-300">
+                                    <img
+                                        src={image.imgproxyBaseUrl || image.fileUrl}
+                                        alt={image.title}
+                                        className="w-full h-full object-cover"
+                                    />
+                                </div>
+                                <button
+                                    onClick={() => setTempSelectedImages(prev => prev.filter(img => img.id !== image.id))}
+                                    className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full flex items-center justify-center text-xs"
+                                >
+                                    ×
+                                </button>
                             </div>
-                            <div className={`transition-all duration-300 delay-[1300ms] ${isAnimating ? 'animate-fade-in-up' : ''
-                                }`}>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Caption</label>
-                                <textarea
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                                    rows="2"
-                                    placeholder="Image caption..."
-                                    defaultValue={widgetData?.config?.caption || ''}
-                                    onChange={(e) => onConfigChange && onConfigChange({
-                                        ...widgetData?.config,
-                                        caption: e.target.value
-                                    })}
-                                ></textarea>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            <div className="flex-1 overflow-y-auto p-4">
+                {searchResults.length > 0 ? (
+                    <div className="grid grid-cols-3 gap-2">
+                        {searchResults.map(image => {
+                            const isSelected = tempSelectedImages.some(img => img.id === image.id)
+                            return (
+                                <div
+                                    key={image.id}
+                                    onClick={() => handleImageSelect(image)}
+                                    className={`relative cursor-pointer bg-gray-100 rounded overflow-hidden aspect-square hover:shadow-md transition-shadow border-2 ${isSelected ? 'border-blue-500' : 'border-gray-200'
+                                        }`}
+                                >
+                                    {image.imgproxyBaseUrl || image.fileUrl ? (
+                                        <img
+                                            src={image.imgproxyBaseUrl || image.fileUrl}
+                                            alt={image.title}
+                                            className="w-full h-full object-cover"
+                                            onError={(e) => {
+                                                e.target.style.display = 'none'
+                                                e.target.nextSibling.style.display = 'flex'
+                                            }}
+                                        />
+                                    ) : null}
+                                    <div className="w-full h-full flex items-center justify-center" style={{ display: 'none' }}>
+                                        <Image className="w-8 h-8 text-gray-400" />
+                                    </div>
+                                    <div className="absolute top-1 right-1">
+                                        <div className={`rounded-full p-1.5 shadow-sm border ${isSelected
+                                            ? 'bg-blue-600 border-blue-600'
+                                            : 'bg-white border-gray-200'
+                                            }`}>
+                                            {isSelected ? (
+                                                <Check className="w-3 h-3 text-white" />
+                                            ) : (
+                                                <Plus className="w-3 h-3 text-gray-700" />
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/60 to-transparent">
+                                        <p className="text-white text-xs font-medium truncate">{image.title}</p>
+                                    </div>
+                                </div>
+                            )
+                        })}
+                    </div>
+                ) : searchTerm && !loading ? (
+                    <div className="text-center py-8 text-gray-500">
+                        <Search className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+                        <p>No images found for "{searchTerm}"</p>
+                    </div>
+                ) : !searchTerm ? (
+                    <div className="text-center py-8 text-gray-500">
+                        <Search className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+                        <p className="mb-4">Browse all images or search for specific ones</p>
+                        <button
+                            onClick={() => loadImages('')}
+                            disabled={loading}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                        >
+                            {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2 inline" /> : null}
+                            Load All Images
+                        </button>
+                    </div>
+                ) : (
+                    <div className="text-center py-8 text-gray-500">
+                        <Search className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+                        <p>No images found for "{searchTerm}"</p>
+                    </div>
+                )}
+            </div>
+        </div>
+    )
+
+    // Collections view - select from available collections
+    const renderCollectionsView = () => (
+        <div className="h-full flex flex-col">
+            <div className="p-4 border-b border-gray-200">
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={() => setCurrentView('overview')}
+                        className="p-1 text-gray-600 hover:text-gray-800"
+                    >
+                        <ArrowLeft className="w-4 h-4" />
+                    </button>
+                    <h6 className="font-medium text-gray-900">Select Collection</h6>
+                </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4">
+                {collections.length > 0 ? (
+                    <div className="space-y-3">
+                        {collections.map(collection => (
+                            <div
+                                key={collection.id}
+                                onClick={() => handleCollectionSelect(collection)}
+                                className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
+                            >
+                                <FolderOpen className="w-8 h-8 text-blue-600 flex-shrink-0" />
+                                <div className="flex-1">
+                                    <p className="font-medium text-gray-900">{collection.title}</p>
+                                    <p className="text-sm text-gray-600">{collection.description || 'No description'}</p>
+                                    <p className="text-xs text-gray-500 mt-1">
+                                        {collection.fileCount || 0} images
+                                    </p>
+                                </div>
+                                <Plus className="w-5 h-5 text-gray-400" />
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="text-center py-8 text-gray-500">
+                        <FolderOpen className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+                        <p>No collections available</p>
+                    </div>
+                )}
+            </div>
+        </div>
+    )
+
+    // Upload view - drag & drop file upload
+    const renderUploadView = () => (
+        <div className="h-full flex flex-col">
+            <div className="p-4 border-b border-gray-200">
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={() => setCurrentView('overview')}
+                        className="p-1 text-gray-600 hover:text-gray-800"
+                    >
+                        <ArrowLeft className="w-4 h-4" />
+                    </button>
+                    <h6 className="font-medium text-gray-900">Upload Images</h6>
+                </div>
+            </div>
+
+            <div className="flex-1 p-4">
+                <div
+                    className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 hover:bg-blue-50 transition-colors cursor-pointer"
+                    onDrop={(e) => {
+                        e.preventDefault()
+                        handleFileUpload(e.dataTransfer.files)
+                    }}
+                    onDragOver={(e) => e.preventDefault()}
+                    onClick={() => document.getElementById('file-upload').click()}
+                >
+                    <Upload className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+                    <p className="text-lg font-medium text-gray-900 mb-2">Upload Images</p>
+                    <p className="text-sm text-gray-600 mb-4">Drag and drop images here, or click to browse</p>
+                    <p className="text-xs text-gray-500">Supported formats: JPG, PNG, GIF, WebP</p>
+
+                    <input
+                        id="file-upload"
+                        type="file"
+                        multiple
+                        accept="image/*"
+                        onChange={(e) => handleFileUpload(e.target.files)}
+                        className="hidden"
+                    />
+                </div>
+            </div>
+        </div>
+    )
+
+    // Verify view - review uploaded files before adding to library
+    const renderVerifyView = () => (
+        <div className="h-full flex flex-col">
+            <div className="p-4 border-b border-gray-200">
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={() => setCurrentView('overview')}
+                        className="p-1 text-gray-600 hover:text-gray-800"
+                    >
+                        <ArrowLeft className="w-4 h-4" />
+                    </button>
+                    <h6 className="font-medium text-gray-900">Verify Uploads</h6>
+                    <span className="text-sm text-gray-500">({pendingUploads.length} files)</span>
+                </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4">
+                <div className="space-y-4">
+                    {pendingUploads.map((upload, index) => (
+                        <div key={upload.id} className="bg-white border border-gray-200 rounded-lg p-4">
+                            <div className="flex gap-4">
+                                <img
+                                    src={upload.preview}
+                                    alt="Upload preview"
+                                    className="w-20 h-20 object-cover rounded"
+                                />
+                                <div className="flex-1 space-y-3">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                                        <input
+                                            type="text"
+                                            value={upload.metadata.title}
+                                            onChange={(e) => {
+                                                const updated = [...pendingUploads]
+                                                updated[index].metadata.title = e.target.value
+                                                setPendingUploads(updated)
+                                            }}
+                                            className="w-full px-3 py-1 border border-gray-300 rounded text-sm"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Tags <span className="text-red-500">*</span>
+                                        </label>
+                                        <div className="flex flex-wrap gap-1 mb-2">
+                                            {upload.metadata.tags.map((tag, tagIndex) => (
+                                                <span
+                                                    key={tagIndex}
+                                                    className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded"
+                                                >
+                                                    {tag}
+                                                    <button
+                                                        onClick={() => {
+                                                            const updated = [...pendingUploads]
+                                                            updated[index].metadata.tags.splice(tagIndex, 1)
+                                                            setPendingUploads(updated)
+                                                        }}
+                                                        className="hover:text-red-600"
+                                                    >
+                                                        <X className="w-3 h-3" />
+                                                    </button>
+                                                </span>
+                                            ))}
+                                        </div>
+                                        <input
+                                            type="text"
+                                            placeholder="Add tag and press Enter"
+                                            onKeyPress={(e) => {
+                                                if (e.key === 'Enter' && e.target.value.trim()) {
+                                                    const updated = [...pendingUploads]
+                                                    updated[index].metadata.tags.push(e.target.value.trim())
+                                                    setPendingUploads(updated)
+                                                    e.target.value = ''
+                                                }
+                                            }}
+                                            className="w-full px-3 py-1 border border-gray-300 rounded text-sm"
+                                        />
+                                        {upload.metadata.tags.length === 0 && (
+                                            <p className="text-xs text-red-500 mt-1">At least one tag is required</p>
+                                        )}
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        URL.revokeObjectURL(upload.preview)
+                                        setPendingUploads(prev => prev.filter(u => u.id !== upload.id))
+                                    }}
+                                    className="p-1 text-gray-400 hover:text-red-600"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
                             </div>
                         </div>
+                    ))}
+                </div>
+            </div>
+
+            {pendingUploads.length > 0 && (
+                <div className="p-4 border-t border-gray-200 bg-gray-50">
+                    <button
+                        onClick={handleActualUpload}
+                        disabled={pendingUploads.some(u => u.metadata.tags.length === 0) || loading}
+                        className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                        {loading ? (
+                            <>
+                                <Loader2 className="w-4 h-4 animate-spin mr-2 inline" />
+                                Uploading...
+                            </>
+                        ) : (
+                            `Upload ${pendingUploads.length} Files`
+                        )}
+                    </button>
+                </div>
+            )}
+        </div>
+    )
+
+    // Collection Images Management view
+    const renderCollectionImagesView = () => (
+        <div className="h-full flex flex-col">
+            <div className="p-4 border-b border-gray-200">
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={() => setCurrentView('overview')}
+                        className="p-1 text-gray-600 hover:text-gray-800"
+                    >
+                        <ArrowLeft className="w-4 h-4" />
+                    </button>
+                    <h6 className="font-medium text-gray-900">Manage Collection Images</h6>
+                </div>
+                <p className="text-sm text-gray-600 mt-1">
+                    {collections.find(c => c.id === currentCollectionId)?.title || 'Collection'}
+                </p>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4">
+                {collectionImages.length > 0 ? (
+                    <div className="grid grid-cols-3 gap-2">
+                        {collectionImages.map((image, index) => (
+                            <div
+                                key={image.id || index}
+                                className="relative bg-gray-100 rounded overflow-hidden aspect-square border"
+                            >
+                                {image.imgproxyBaseUrl || image.fileUrl ? (
+                                    <img
+                                        src={image.imgproxyBaseUrl || image.fileUrl}
+                                        alt={image.title}
+                                        className="w-full h-full object-cover"
+                                    />
+                                ) : (
+                                    <div className="w-full h-full flex items-center justify-center">
+                                        <Image className="w-8 h-8 text-gray-400" />
+                                    </div>
+                                )}
+                                <div className="absolute top-1 right-1 flex gap-1">
+                                    <button
+                                        className="p-1 bg-white rounded shadow-sm border border-gray-200 text-gray-700 hover:text-blue-600 hover:border-blue-300 transition-colors"
+                                        title="View"
+                                        onClick={(e) => {
+                                            e.stopPropagation()
+                                            // TODO: Implement image preview
+                                        }}
+                                    >
+                                        <Eye className="w-3 h-3" />
+                                    </button>
+                                    <button
+                                        className="p-1 bg-white rounded shadow-sm border border-gray-200 text-gray-700 hover:text-red-600 hover:border-red-300 transition-colors"
+                                        title="Remove from collection"
+                                        onClick={(e) => {
+                                            e.stopPropagation()
+                                            // TODO: Implement remove from collection
+                                            console.log('Remove image from collection:', image.id)
+                                        }}
+                                    >
+                                        <Trash2 className="w-3 h-3" />
+                                    </button>
+                                </div>
+                                <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/60 to-transparent">
+                                    <p className="text-white text-xs font-medium truncate">{image.title}</p>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="text-center py-8 text-gray-500">
+                        <FolderOpen className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+                        <p>No images in this collection</p>
+                    </div>
+                )}
+            </div>
+
+        </div>
+    )
+
+    return (
+        <div className="h-full flex flex-col">
+            {/* Header */}
+            <div className={`px-4 py-3 border-b border-gray-200 bg-white transition-all duration-300 ${isAnimating ? 'animate-fade-in-up delay-100' : ''
+                } ${isClosing ? 'animate-fade-out-down' : ''
+                }`}>
+                <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-md font-medium text-gray-900 flex items-center">
+                        <Image className={`w-4 h-4 mr-2 transition-all duration-300 delay-200 ${isAnimating ? 'animate-bounce-in' : ''
+                            }`} />
+                        Media Manager
+                    </h4>
+                    {pendingUploads.length > 0 && currentView !== 'verify' && (
+                        <button
+                            onClick={() => setCurrentView('verify')}
+                            className="flex items-center gap-1 px-2 py-1 bg-orange-100 text-orange-700 rounded-md text-xs"
+                        >
+                            <AlertCircle className="w-3 h-3" />
+                            {pendingUploads.length} pending
+                        </button>
+                    )}
+                </div>
+
+                {/* Main Actions - Always visible at top */}
+                <div className="grid grid-cols-3 gap-2">
+                    <button
+                        onClick={() => setCurrentView('browse')}
+                        className={`flex flex-col items-center gap-1 p-3 border rounded-lg transition-colors text-sm ${currentView === 'browse' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 hover:bg-gray-50'
+                            }`}
+                    >
+                        <Plus className="w-4 h-4" />
+                        <span>Add Images</span>
+                    </button>
+
+                    <button
+                        onClick={() => setCurrentView('collections')}
+                        className={`flex flex-col items-center gap-1 p-3 border rounded-lg transition-colors text-sm ${currentView === 'collections' ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-200 hover:bg-gray-50'
+                            }`}
+                    >
+                        <FolderOpen className="w-4 h-4" />
+                        <span>Select Collection</span>
+                    </button>
+
+                    <div
+                        className={`flex flex-col items-center gap-1 p-3 border-2 border-dashed rounded-lg transition-colors text-sm cursor-pointer ${currentView === 'upload' ? 'border-purple-500 bg-purple-50 text-purple-700' : 'border-gray-300 hover:border-purple-400 hover:bg-purple-50'
+                            }`}
+                        onClick={() => document.getElementById('header-file-upload').click()}
+                        onDrop={(e) => {
+                            e.preventDefault()
+                            handleFileUpload(e.dataTransfer.files)
+                        }}
+                        onDragOver={(e) => {
+                            e.preventDefault()
+                            e.currentTarget.classList.add('border-purple-500', 'bg-purple-100')
+                        }}
+                        onDragLeave={(e) => {
+                            e.preventDefault()
+                            e.currentTarget.classList.remove('border-purple-500', 'bg-purple-100')
+                        }}
+                    >
+                        <Upload className="w-4 h-4" />
+                        <span>Drop Files</span>
+                        <input
+                            id="header-file-upload"
+                            type="file"
+                            multiple
+                            accept="image/*"
+                            onChange={(e) => handleFileUpload(e.target.files)}
+                            className="hidden"
+                        />
                     </div>
                 </div>
             </div>
+
+            {/* Content */}
+            <div className={`flex-1 overflow-y-auto transition-all duration-500 delay-300 ${isAnimating ? 'animate-fade-in-up' : ''
+                }`}>
+                {renderView()}
+            </div>
+
+            {/* Image/Collection Configuration Modal */}
+            {editingItem && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 max-h-[80vh] overflow-y-auto">
+                        <div className="flex items-center justify-between mb-4">
+                            <h5 className="font-medium text-gray-900">
+                                Edit Image Details
+                            </h5>
+                            <button
+                                onClick={() => setEditingItem(null)}
+                                className="p-1 text-gray-400 hover:text-gray-600"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+
+                        {editingItem.type === 'editImage' ? (
+                            <div className="space-y-4">
+                                <div className="aspect-video bg-gray-100 rounded overflow-hidden">
+                                    <img
+                                        src={editingItem.data.imgproxyBaseUrl || editingItem.data.fileUrl}
+                                        alt="Preview"
+                                        className="w-full h-full object-cover"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                                    <input
+                                        type="text"
+                                        value={editingItem.metadata.title}
+                                        onChange={(e) => setEditingItem(prev => ({
+                                            ...prev,
+                                            metadata: { ...prev.metadata, title: e.target.value }
+                                        }))}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Alt Text</label>
+                                    <input
+                                        type="text"
+                                        value={editingItem.metadata.altText}
+                                        onChange={(e) => setEditingItem(prev => ({
+                                            ...prev,
+                                            metadata: { ...prev.metadata, altText: e.target.value }
+                                        }))}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Caption</label>
+                                    <textarea
+                                        value={editingItem.metadata.caption}
+                                        onChange={(e) => setEditingItem(prev => ({
+                                            ...prev,
+                                            metadata: { ...prev.metadata, caption: e.target.value }
+                                        }))}
+                                        rows={3}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                                    />
+                                </div>
+
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => setEditingItem(null)}
+                                        className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={handleSaveImage}
+                                        className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                                    >
+                                        Add Image
+                                    </button>
+                                </div>
+                            </div>
+                        ) : editingItem.type === 'editImage' ? (
+                            <div className="space-y-4">
+                                <div className="aspect-video bg-gray-100 rounded overflow-hidden">
+                                    <img
+                                        src={editingItem.data.thumbnailUrl || editingItem.data.url}
+                                        alt="Preview"
+                                        className="w-full h-full object-cover"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                                    <input
+                                        type="text"
+                                        value={editingItem.metadata.title}
+                                        onChange={(e) => setEditingItem(prev => ({
+                                            ...prev,
+                                            metadata: { ...prev.metadata, title: e.target.value }
+                                        }))}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Alt Text</label>
+                                    <input
+                                        type="text"
+                                        value={editingItem.metadata.altText}
+                                        onChange={(e) => setEditingItem(prev => ({
+                                            ...prev,
+                                            metadata: { ...prev.metadata, altText: e.target.value }
+                                        }))}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Caption</label>
+                                    <textarea
+                                        value={editingItem.metadata.caption}
+                                        onChange={(e) => setEditingItem(prev => ({
+                                            ...prev,
+                                            metadata: { ...prev.metadata, caption: e.target.value }
+                                        }))}
+                                        rows={3}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                                    />
+                                </div>
+
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => setEditingItem(null)}
+                                        className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            // Update the existing image in the widget config
+                                            const updatedImages = [...currentImages]
+                                            updatedImages[editingItem.index] = {
+                                                ...editingItem.data,
+                                                title: editingItem.metadata.title,
+                                                altText: editingItem.metadata.altText,
+                                                caption: editingItem.metadata.caption,
+                                                photographer: editingItem.metadata.photographer,
+                                                source: editingItem.metadata.source
+                                            }
+
+                                            const updatedConfig = {
+                                                ...currentConfig,
+                                                mediaItems: updatedImages
+                                            }
+
+                                            console.log('Updating image:', updatedImages[editingItem.index])
+                                            console.log('Updated config:', updatedConfig)
+
+                                            if (onConfigChange) {
+                                                onConfigChange(updatedConfig)
+                                            }
+                                            setEditingItem(null)
+                                        }}
+                                        className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                                    >
+                                        Update Image
+                                    </button>
+                                </div>
+                            </div>
+                        ) : editingItem.type === 'editCollection' ? (
+                            <div className="space-y-4">
+                                <div className="p-3 bg-gray-50 rounded">
+                                    <p className="font-medium text-gray-900">{editingItem.data.title}</p>
+                                    <p className="text-sm text-gray-600">{editingItem.data.description}</p>
+                                    <p className="text-xs text-gray-500 mt-1">
+                                        {editingItem.data.fileCount || 0} images
+                                    </p>
+                                </div>
+
+                                <div>
+                                    <label className="flex items-center gap-2">
+                                        <input
+                                            type="checkbox"
+                                            checked={editingItem.config.randomize}
+                                            onChange={(e) => setEditingItem(prev => ({
+                                                ...prev,
+                                                config: { ...prev.config, randomize: e.target.checked }
+                                            }))}
+                                        />
+                                        <span className="text-sm">Randomize order</span>
+                                    </label>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Display Type</label>
+                                    <div className="flex gap-2">
+                                        {['single', 'gallery'].map((type) => (
+                                            <button
+                                                key={type}
+                                                onClick={() => setEditingItem(prev => ({
+                                                    ...prev,
+                                                    config: { ...prev.config, displayType: type }
+                                                }))}
+                                                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${editingItem.config.displayType === type
+                                                    ? 'bg-blue-600 text-white'
+                                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                                    }`}
+                                            >
+                                                {type === 'single' ? 'Single' : 'Gallery'}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {editingItem.config.displayType === 'gallery' && (
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Gallery Columns</label>
+                                        <div className="flex gap-2">
+                                            {[1, 2, 3, 4, 5, 6].map((num) => (
+                                                <button
+                                                    key={num}
+                                                    onClick={() => setEditingItem(prev => ({
+                                                        ...prev,
+                                                        config: { ...prev.config, galleryColumns: num }
+                                                    }))}
+                                                    className={`w-8 h-8 rounded-full text-sm font-medium transition-colors ${editingItem.config.galleryColumns === num
+                                                        ? 'bg-blue-600 text-white'
+                                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                                        }`}
+                                                >
+                                                    {num}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => setEditingItem(null)}
+                                        className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            // Update existing collection config
+                                            const updatedConfig = {
+                                                ...currentConfig,
+                                                collectionConfig: editingItem.config,
+                                                displayType: editingItem.config.displayType,
+                                                galleryColumns: editingItem.config.galleryColumns
+                                            }
+                                            console.log('Updating collection config:', updatedConfig)
+                                            if (onConfigChange) {
+                                                onConfigChange(updatedConfig)
+                                            }
+                                            setEditingItem(null)
+                                        }}
+                                        className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                                    >
+                                        Update Settings
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                <div className="p-3 bg-gray-50 rounded">
+                                    <p className="font-medium text-gray-900">{editingItem.data.title}</p>
+                                    <p className="text-sm text-gray-600">{editingItem.data.description}</p>
+                                    <p className="text-xs text-gray-500 mt-1">
+                                        {editingItem.data.fileCount || 0} images
+                                    </p>
+                                </div>
+
+                                <div>
+                                    <label className="flex items-center gap-2">
+                                        <input
+                                            type="checkbox"
+                                            checked={editingItem.config.randomize}
+                                            onChange={(e) => setEditingItem(prev => ({
+                                                ...prev,
+                                                config: { ...prev.config, randomize: e.target.checked }
+                                            }))}
+                                        />
+                                        <span className="text-sm">Randomize order</span>
+                                    </label>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Display Type</label>
+                                    <div className="flex gap-2">
+                                        {['single', 'gallery'].map((type) => (
+                                            <button
+                                                key={type}
+                                                onClick={() => setEditingItem(prev => ({
+                                                    ...prev,
+                                                    config: { ...prev.config, displayType: type }
+                                                }))}
+                                                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${editingItem.config.displayType === type
+                                                    ? 'bg-blue-600 text-white'
+                                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                                    }`}
+                                            >
+                                                {type === 'single' ? 'Single' : 'Gallery'}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {editingItem.config.displayType === 'gallery' && (
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Gallery Columns</label>
+                                        <div className="flex gap-2">
+                                            {[1, 2, 3, 4, 5, 6].map((num) => (
+                                                <button
+                                                    key={num}
+                                                    onClick={() => setEditingItem(prev => ({
+                                                        ...prev,
+                                                        config: { ...prev.config, galleryColumns: num }
+                                                    }))}
+                                                    className={`w-8 h-8 rounded-full text-sm font-medium transition-colors ${editingItem.config.galleryColumns === num
+                                                        ? 'bg-blue-600 text-white'
+                                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                                        }`}
+                                                >
+                                                    {num}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => setEditingItem(null)}
+                                        className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={handleSaveCollection}
+                                        className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                                    >
+                                        Use Collection
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

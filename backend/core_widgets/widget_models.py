@@ -25,38 +25,49 @@ class ContentConfig(BaseModel):
 class ImageMediaItem(BaseModel):
     """Individual media item for Image widget"""
 
+    id: Optional[str] = Field(None, description="Media file ID")
     url: str = Field(..., description="Media URL (image or video)")
     type: Literal["image", "video"] = Field("image", description="Media type")
-    alt_text: str = Field(
+    altText: str = Field(
         ..., min_length=1, description="Alternative text for accessibility"
     )
     caption: Optional[str] = Field(None, description="Optional caption")
-    thumbnail: Optional[str] = Field(None, description="Thumbnail URL for videos")
+    title: Optional[str] = Field(None, description="Image title")
+    photographer: Optional[str] = Field(None, description="Photographer or source")
+    source: Optional[str] = Field(None, description="Image source")
+    thumbnailUrl: Optional[str] = Field(None, description="Thumbnail URL for videos")
+    width: Optional[int] = Field(None, description="Image width")
+    height: Optional[int] = Field(None, description="Image height")
 
 
 class ImageConfig(BaseModel):
     """Configuration for Image widget"""
 
-    media_items: List[ImageMediaItem] = Field(
-        ..., min_items=1, description="List of images/videos to display"
+    mediaItems: List[ImageMediaItem] = Field(
+        default_factory=list, description="List of images/videos to display"
     )
-    display_type: Literal["single", "gallery", "carousel"] = Field(
+    displayType: Literal["single", "gallery", "carousel"] = Field(
         "single", description="How to display multiple items"
-    )
-    size: Literal["small", "medium", "large", "full"] = Field(
-        "medium", description="Media size"
     )
     alignment: Literal["left", "center", "right"] = Field(
         "center", description="Alignment"
     )
-    gallery_columns: int = Field(
+    galleryColumns: int = Field(
         3, ge=1, le=6, description="Number of columns for gallery layout"
     )
-    enable_lightbox: bool = Field(
+    enableLightbox: bool = Field(
         True, description="Enable lightbox for full-size viewing"
     )
-    auto_play: bool = Field(False, description="Auto-play videos (if applicable)")
-    show_captions: bool = Field(True, description="Display captions")
+    autoPlay: bool = Field(False, description="Auto-play videos (if applicable)")
+    showCaptions: bool = Field(True, description="Display captions")
+
+    # Collection support
+    collectionId: Optional[str] = Field(
+        None, description="ID of selected media collection"
+    )
+    collectionConfig: Optional[dict] = Field(
+        None, description="Collection display configuration"
+    )
 
 
 class TableCell(BaseModel):

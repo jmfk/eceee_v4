@@ -476,13 +476,29 @@ const WidgetEditorPanel = forwardRef(({
         }
     }, [widgetData, schema])
 
-    // Generate form fields from schema using ValidatedInput
+    // Generate form fields from schema using enhanced UI components
     const renderFormField = (fieldName, fieldSchema) => {
         const activeSchema = fetchedSchema || schema
         const value = config[fieldName] || ''
         const fieldType = fieldSchema.type || 'string'
         const fieldTitle = fieldSchema.title || fieldName
         const fieldDescription = fieldSchema.description
+
+        // Hide fields that are managed by special editors
+        const hiddenFields = {
+            'core_widgets.ImageWidget': ['collectionId', 'collectionConfig', 'mediaItems']
+        }
+
+        const widgetType = widgetData?.type || ''
+        if (hiddenFields[widgetType]?.includes(fieldName)) {
+            return null // Don't render these fields
+        }
+
+        // Special handling for common widget fields
+        const isColorField = fieldName.toLowerCase().includes('color') || fieldSchema.format === 'color'
+        const isUrlField = fieldName.toLowerCase().includes('url') || fieldSchema.format === 'uri'
+        const isPercentageField = fieldName.toLowerCase().includes('percent') || fieldSchema.format === 'percentage'
+        const isPixelField = fieldName.toLowerCase().includes('pixel') || fieldName.toLowerCase().includes('px') || fieldSchema.format === 'pixel'
         // Determine if field should show as required in UI
         // Don't show as required if it's a string field that allows empty values (no min_length constraint)
         const isSchemaRequired = activeSchema?.required?.includes(fieldName) || false
@@ -499,23 +515,113 @@ const WidgetEditorPanel = forwardRef(({
 
         switch (fieldType) {
             case 'string':
+                // Enhanced textarea with character count
                 if (fieldSchema.format === 'textarea') {
+                    const maxLength = fieldSchema.maxLength || fieldSchema.max_length
                     return (
-                        <ValidatedInput
-                            key={fieldName}
-                            type="textarea"
-                            value={value}
-                            onChange={handleChange}
-                            label={fieldTitle}
-                            description={fieldDescription}
-                            placeholder={fieldSchema.placeholder || ''}
-                            required={isRequired}
-                            validation={validation}
-                            isValidating={fieldIsValidating}
-                            rows={3}
-                        />
+                        <div key={fieldName} className="space-y-2">
+                            <label className="block text-sm font-medium text-gray-700">
+                                {fieldTitle}
+                                {isRequired && <span className="text-red-500 ml-1">*</span>}
+                            </label>
+                            {fieldDescription && (
+                                <p className="text-xs text-gray-500">{fieldDescription}</p>
+                            )}
+                            <div className="relative">
+                                <textarea
+                                    value={value}
+                                    onChange={handleChange}
+                                    placeholder={fieldSchema.placeholder || ''}
+                                    rows={fieldSchema.rows || 3}
+                                    maxLength={maxLength}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                                />
+                                {maxLength && (
+                                    <div className="absolute bottom-2 right-2 text-xs text-gray-400 bg-white px-1">
+                                        {value?.length || 0}/{maxLength}
+                                    </div>
+                                )}
+                            </div>
+                            {validation && !validation.isValid && (
+                                <div className="text-red-600 text-xs mt-1">
+                                    {validation.errors?.join(', ')}
+                                </div>
+                            )}
+                        </div>
                     )
                 }
+
+                // Color picker for color fields
+                if (isColorField) {
+                    return (
+                        <div key={fieldName} className="space-y-2">
+                            <label className="block text-sm font-medium text-gray-700">
+                                {fieldTitle}
+                                {isRequired && <span className="text-red-500 ml-1">*</span>}
+                            </label>
+                            {fieldDescription && (
+                                <p className="text-xs text-gray-500">{fieldDescription}</p>
+                            )}
+                            <div className="flex items-center gap-3">
+                                <input
+                                    type="color"
+                                    value={value || '#000000'}
+                                    onChange={handleChange}
+                                    className="w-12 h-8 border border-gray-300 rounded cursor-pointer"
+                                />
+                                <input
+                                    type="text"
+                                    value={value}
+                                    onChange={handleChange}
+                                    placeholder="#000000"
+                                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                />
+                            </div>
+                            {validation && !validation.isValid && (
+                                <div className="text-red-600 text-xs mt-1">
+                                    {validation.errors?.join(', ')}
+                                </div>
+                            )}
+                        </div>
+                    )
+                }
+
+                // URL input with validation indicator
+                if (isUrlField) {
+                    const isValidUrl = value && (value.startsWith('http://') || value.startsWith('https://') || value.startsWith('/'))
+                    return (
+                        <div key={fieldName} className="space-y-2">
+                            <label className="block text-sm font-medium text-gray-700">
+                                {fieldTitle}
+                                {isRequired && <span className="text-red-500 ml-1">*</span>}
+                            </label>
+                            {fieldDescription && (
+                                <p className="text-xs text-gray-500">{fieldDescription}</p>
+                            )}
+                            <div className="relative">
+                                <input
+                                    type="url"
+                                    value={value}
+                                    onChange={handleChange}
+                                    placeholder={fieldSchema.placeholder || 'https://example.com/image.jpg'}
+                                    className={`w-full px-3 py-2 pr-10 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${value && !isValidUrl ? 'border-red-300 focus:border-red-500' : 'border-gray-300 focus:border-blue-500'
+                                        }`}
+                                />
+                                {value && (
+                                    <div className={`absolute right-3 top-1/2 transform -translate-y-1/2 w-2 h-2 rounded-full ${isValidUrl ? 'bg-green-500' : 'bg-red-500'
+                                        }`} />
+                                )}
+                            </div>
+                            {validation && !validation.isValid && (
+                                <div className="text-red-600 text-xs mt-1">
+                                    {validation.errors?.join(', ')}
+                                </div>
+                            )}
+                        </div>
+                    )
+                }
+
+                // Enhanced text input with better styling
                 return (
                     <ValidatedInput
                         key={fieldName}
@@ -534,16 +640,8 @@ const WidgetEditorPanel = forwardRef(({
             case 'boolean':
                 return (
                     <div key={fieldName} className="space-y-2">
-                        <div className="flex items-start">
-                            <div className="flex items-center h-5">
-                                <input
-                                    type="checkbox"
-                                    checked={Boolean(value)}
-                                    onChange={(e) => handleFieldChange(fieldName, e.target.checked)}
-                                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                                />
-                            </div>
-                            <div className="ml-3">
+                        <div className="flex items-center justify-between">
+                            <div>
                                 <label className="text-sm font-medium text-gray-700">
                                     {fieldTitle}
                                 </label>
@@ -551,11 +649,106 @@ const WidgetEditorPanel = forwardRef(({
                                     <p className="text-xs text-gray-500 mt-1">{fieldDescription}</p>
                                 )}
                             </div>
+                            <div className="relative">
+                                <input
+                                    type="checkbox"
+                                    checked={Boolean(value)}
+                                    onChange={(e) => handleFieldChange(fieldName, e.target.checked)}
+                                    className="sr-only"
+                                    id={`toggle-${fieldName}`}
+                                />
+                                <label
+                                    htmlFor={`toggle-${fieldName}`}
+                                    className={`block w-12 h-6 rounded-full cursor-pointer transition-colors ${Boolean(value) ? 'bg-blue-600' : 'bg-gray-300'
+                                        }`}
+                                >
+                                    <div
+                                        className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${Boolean(value) ? 'translate-x-6' : 'translate-x-0'
+                                            }`}
+                                    />
+                                </label>
+                            </div>
                         </div>
                     </div>
                 )
 
             case 'number':
+                // Use choice chips for small ranges (like gallery columns)
+                if (fieldSchema.minimum >= 1 && fieldSchema.maximum <= 10 && (fieldSchema.maximum - fieldSchema.minimum) <= 8) {
+                    const options = []
+                    for (let i = fieldSchema.minimum || 1; i <= (fieldSchema.maximum || 6); i++) {
+                        options.push(i)
+                    }
+
+                    return (
+                        <div key={fieldName} className="space-y-2">
+                            <label className="block text-sm font-medium text-gray-700">
+                                {fieldTitle}
+                                {isRequired && <span className="text-red-500 ml-1">*</span>}
+                            </label>
+                            {fieldDescription && (
+                                <p className="text-xs text-gray-500">{fieldDescription}</p>
+                            )}
+                            <div className="flex gap-2">
+                                {options.map(option => (
+                                    <button
+                                        key={option}
+                                        type="button"
+                                        onClick={() => handleFieldChange(fieldName, option)}
+                                        className={`w-8 h-8 rounded-full text-sm font-medium transition-colors ${value === option
+                                            ? 'bg-blue-600 text-white'
+                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                            }`}
+                                    >
+                                        {option}
+                                    </button>
+                                ))}
+                            </div>
+                            {validation && !validation.isValid && (
+                                <div className="text-red-600 text-xs mt-1">
+                                    {validation.errors?.join(', ')}
+                                </div>
+                            )}
+                        </div>
+                    )
+                }
+
+                // Enhanced number input with unit indicators
+                if (isPercentageField || isPixelField) {
+                    const unit = isPercentageField ? '%' : 'px'
+                    return (
+                        <div key={fieldName} className="space-y-2">
+                            <label className="block text-sm font-medium text-gray-700">
+                                {fieldTitle}
+                                {isRequired && <span className="text-red-500 ml-1">*</span>}
+                            </label>
+                            {fieldDescription && (
+                                <p className="text-xs text-gray-500">{fieldDescription}</p>
+                            )}
+                            <div className="relative">
+                                <input
+                                    type="number"
+                                    value={value}
+                                    onChange={(e) => handleFieldChange(fieldName, parseFloat(e.target.value) || 0)}
+                                    placeholder={fieldSchema.placeholder || '0'}
+                                    min={fieldSchema.minimum}
+                                    max={fieldSchema.maximum}
+                                    className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                />
+                                <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-sm text-gray-500">
+                                    {unit}
+                                </div>
+                            </div>
+                            {validation && !validation.isValid && (
+                                <div className="text-red-600 text-xs mt-1">
+                                    {validation.errors?.join(', ')}
+                                </div>
+                            )}
+                        </div>
+                    )
+                }
+
+                // Regular number input for larger ranges
                 return (
                     <ValidatedInput
                         key={fieldName}
@@ -575,29 +768,49 @@ const WidgetEditorPanel = forwardRef(({
 
             case 'array':
                 if (fieldSchema.items?.enum) {
-                    // Multi-select dropdown
+                    // Multi-select chips
+                    const arrayValue = Array.isArray(value) ? value : []
+
                     return (
                         <div key={fieldName} className="space-y-2">
                             <label className="block text-sm font-medium text-gray-700">
                                 {fieldTitle}
+                                {isRequired && <span className="text-red-500 ml-1">*</span>}
                             </label>
                             {fieldDescription && (
                                 <p className="text-xs text-gray-500">{fieldDescription}</p>
                             )}
-                            <select
-                                multiple
-                                value={Array.isArray(value) ? value : []}
-                                onChange={(e) => {
-                                    const selectedValues = Array.from(e.target.selectedOptions, option => option.value)
-                                    handleFieldChange(fieldName, selectedValues)
-                                }}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                size={Math.min(5, fieldSchema.items.enum.length)}
-                            >
-                                {fieldSchema.items.enum.map(option => (
-                                    <option key={option} value={option}>{option}</option>
-                                ))}
-                            </select>
+                            <div className="flex flex-wrap gap-2">
+                                {fieldSchema.items.enum.map(option => {
+                                    const isSelected = arrayValue.includes(option)
+                                    return (
+                                        <button
+                                            key={option}
+                                            type="button"
+                                            onClick={() => {
+                                                const newValue = isSelected
+                                                    ? arrayValue.filter(v => v !== option)
+                                                    : [...arrayValue, option]
+                                                handleFieldChange(fieldName, newValue)
+                                            }}
+                                            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors capitalize ${isSelected
+                                                ? 'bg-blue-600 text-white'
+                                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                                }`}
+                                        >
+                                            {option.replace(/_/g, ' ')}
+                                            {isSelected && (
+                                                <span className="ml-1 text-xs">✓</span>
+                                            )}
+                                        </button>
+                                    )
+                                })}
+                            </div>
+                            {validation && !validation.isValid && (
+                                <div className="text-red-600 text-xs mt-1">
+                                    {validation.errors?.join(', ')}
+                                </div>
+                            )}
                         </div>
                     )
                 }
@@ -605,24 +818,37 @@ const WidgetEditorPanel = forwardRef(({
 
             default:
                 if (fieldSchema.enum) {
-                    // Dropdown select
+                    // Choice chips for enum fields
                     return (
-                        <ValidatedInput
-                            key={fieldName}
-                            type="select"
-                            value={value}
-                            onChange={handleChange}
-                            label={fieldTitle}
-                            description={fieldDescription}
-                            required={isRequired}
-                            validation={validation}
-                            isValidating={fieldIsValidating}
-                        >
-                            <option value="">Select an option</option>
-                            {fieldSchema.enum.map(option => (
-                                <option key={option} value={option}>{option}</option>
-                            ))}
-                        </ValidatedInput>
+                        <div key={fieldName} className="space-y-2">
+                            <label className="block text-sm font-medium text-gray-700">
+                                {fieldTitle}
+                                {isRequired && <span className="text-red-500 ml-1">*</span>}
+                            </label>
+                            {fieldDescription && (
+                                <p className="text-xs text-gray-500">{fieldDescription}</p>
+                            )}
+                            <div className="flex flex-wrap gap-2">
+                                {fieldSchema.enum.map(option => (
+                                    <button
+                                        key={option}
+                                        type="button"
+                                        onClick={() => handleFieldChange(fieldName, option)}
+                                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors capitalize ${value === option
+                                            ? 'bg-blue-600 text-white'
+                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                            }`}
+                                    >
+                                        {option.replace(/_/g, ' ')}
+                                    </button>
+                                ))}
+                            </div>
+                            {validation && !validation.isValid && (
+                                <div className="text-red-600 text-xs mt-1">
+                                    {validation.errors?.join(', ')}
+                                </div>
+                            )}
+                        </div>
                     )
                 }
                 return (
