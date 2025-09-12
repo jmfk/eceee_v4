@@ -1004,10 +1004,35 @@ const PageEditor = () => {
 
     // Listen to widget events (no prop drilling!)
     useWidgetEventListener(WIDGET_EVENTS.CHANGED, useCallback((payload) => {
-        // For real-time config changes, mark as dirty but don't trigger re-renders
-        // The widget handles its own display updates internally
-        // Data will be collected during save via saveWidgets()
         if (payload.changeType === WIDGET_CHANGE_TYPES.CONFIG) {
+            // CRITICAL FIX: Config changes must update persistent data, not just mark as dirty
+            // This fixes the split-brain issue where config changes were only preview-only
+
+            // Update the persistent widget data in pageVersionData
+            setPageVersionData(prev => {
+                const widgets = prev?.widgets || {}
+                const slotWidgets = widgets[payload.slotName] || []
+
+                const updatedSlotWidgets = slotWidgets.map(widget =>
+                    widget.id === payload.widgetId ? payload.widget : widget
+                )
+
+                return {
+                    ...prev,
+                    widgets: {
+                        ...widgets,
+                        [payload.slotName]: updatedSlotWidgets
+                    }
+                }
+            })
+
+            // Also update the visual representation for real-time preview
+            if (contentEditorRef.current && contentEditorRef.current.layoutRenderer) {
+                const renderer = contentEditorRef.current.layoutRenderer
+                renderer.executeWidgetDataCallback(WIDGET_ACTIONS.UPDATE, payload.slotName, payload.widget)
+                renderer.updateSlot(payload.slotName, renderer.getSlotWidgetData(payload.slotName))
+            }
+
             // Mark page as dirty so user knows there are unsaved changes
             setIsDirty(true)
             return
