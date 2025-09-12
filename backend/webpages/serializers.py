@@ -458,6 +458,65 @@ class PageVersionSerializer(serializers.ModelSerializer):
         # Strip forbidden keys from page_data on write
         return super().validate(attrs)
 
+    def to_representation(self, instance):
+        """Convert widget configuration fields from snake_case to camelCase for frontend"""
+        data = super().to_representation(instance)
+
+        # Convert widget configurations from snake_case to camelCase
+        if "widgets" in data and isinstance(data["widgets"], dict):
+            data["widgets"] = self._convert_widgets_to_camel_case(data["widgets"])
+
+        return data
+
+    def _convert_widgets_to_camel_case(self, widgets_data):
+        """Convert widget configurations from snake_case to camelCase"""
+        if not isinstance(widgets_data, dict):
+            return widgets_data
+
+        converted_widgets = {}
+
+        for slot_name, widgets in widgets_data.items():
+            if not isinstance(widgets, list):
+                converted_widgets[slot_name] = widgets
+                continue
+
+            converted_widgets[slot_name] = []
+
+            for widget in widgets:
+                if not isinstance(widget, dict):
+                    converted_widgets[slot_name].append(widget)
+                    continue
+
+                converted_widget = widget.copy()
+                if "config" in widget:
+                    converted_widget["config"] = self._convert_snake_to_camel(
+                        widget["config"]
+                    )
+
+                converted_widgets[slot_name].append(converted_widget)
+
+        return converted_widgets
+
+    def _convert_snake_to_camel(self, obj):
+        """Convert snake_case keys to camelCase recursively"""
+        if isinstance(obj, dict):
+            converted = {}
+            for key, value in obj.items():
+                # Convert snake_case key to camelCase
+                camel_key = self._snake_to_camel_case(key)
+                # Recursively convert nested objects
+                converted[camel_key] = self._convert_snake_to_camel(value)
+            return converted
+        elif isinstance(obj, list):
+            return [self._convert_snake_to_camel(item) for item in obj]
+        else:
+            return obj
+
+    def _snake_to_camel_case(self, name):
+        """Convert snake_case to camelCase"""
+        components = name.split("_")
+        return components[0] + "".join(word.capitalize() for word in components[1:])
+
 
 class PageDataSchemaSerializer(serializers.ModelSerializer):
     """Serializer for page data JSON Schemas (system and layout scopes)."""
@@ -545,16 +604,20 @@ class WidgetUpdateSerializer(serializers.ModelSerializer):
         fields = ["widgets"]
 
     def validate_widgets(self, value):
-        """Basic widget data validation without page_data schema validation"""
+        """Basic widget data validation with camelCase to snake_case conversion"""
         if not isinstance(value, dict):
             raise serializers.ValidationError("Widgets must be a dictionary")
 
-        # Validate widget structure but don't enforce page_data schema
+        # Convert camelCase to snake_case for widget configurations
+        converted_widgets = {}
+
         for slot_name, widgets in value.items():
             if not isinstance(widgets, list):
                 raise serializers.ValidationError(
                     f"Widgets in slot '{slot_name}' must be a list"
                 )
+
+            converted_widgets[slot_name] = []
 
             for i, widget in enumerate(widgets):
                 if not isinstance(widget, dict):
@@ -568,7 +631,40 @@ class WidgetUpdateSerializer(serializers.ModelSerializer):
                         f"Widget {i} in slot '{slot_name}' missing 'type' or 'widget_type' field"
                     )
 
-        return value
+                # Convert widget configuration from camelCase to snake_case
+                converted_widget = widget.copy()
+                if "config" in widget:
+                    converted_widget["config"] = self._convert_camel_to_snake(
+                        widget["config"]
+                    )
+
+                converted_widgets[slot_name].append(converted_widget)
+
+        return converted_widgets
+
+    def _convert_camel_to_snake(self, obj):
+        """Convert camelCase keys to snake_case recursively"""
+        if isinstance(obj, dict):
+            converted = {}
+            for key, value in obj.items():
+                # Convert camelCase key to snake_case
+                snake_key = self._camel_to_snake_case(key)
+                # Recursively convert nested objects
+                converted[snake_key] = self._convert_camel_to_snake(value)
+            return converted
+        elif isinstance(obj, list):
+            return [self._convert_camel_to_snake(item) for item in obj]
+        else:
+            return obj
+
+    def _camel_to_snake_case(self, name):
+        """Convert camelCase to snake_case"""
+        import re
+
+        # Insert underscore before uppercase letters (except first character)
+        s1 = re.sub("(.)([A-Z][a-z]+)", r"\1_\2", name)
+        # Insert underscore before uppercase letters preceded by lowercase
+        return re.sub("([a-z0-9])([A-Z])", r"\1_\2", s1).lower()
 
 
 class PageDataUpdateSerializer(serializers.ModelSerializer):

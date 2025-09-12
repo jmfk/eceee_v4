@@ -208,7 +208,15 @@ class TemplateParser:
 
         except Exception as e:
             logger.error(f"Error parsing template {template_name}: {e}")
-            raise Exception(f"Template parsing failed")  # Generic error message
+            # In development, show the actual error for debugging
+            from django.conf import settings
+
+            if settings.DEBUG:
+                raise Exception(
+                    f"Template parsing failed for {template_name}: {str(e)}"
+                )
+            else:
+                raise Exception(f"Template parsing failed")  # Generic error message
 
     def _parse_element(self, element, template_source: str) -> Dict[str, Any]:
         """Parse a BeautifulSoup element into JSON node"""
@@ -938,7 +946,13 @@ class LayoutSerializer:
         except Exception as e:
             # Re-raise with generic message to prevent information disclosure
             logger.error(f"Error serializing layout {layout.name}: {e}")
-            raise Exception("Template parsing failed")  # Generic error message
+            # In development, show the actual error for debugging
+            from django.conf import settings
+
+            if settings.DEBUG:
+                raise Exception(f"Template parsing failed: {str(e)}")
+            else:
+                raise Exception("Template parsing failed")  # Generic error message
 
 
 class WidgetSerializer:
