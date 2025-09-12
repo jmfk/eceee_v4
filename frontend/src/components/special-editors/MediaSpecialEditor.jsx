@@ -39,6 +39,8 @@ const MediaSpecialEditor = ({
     const [editingItem, setEditingItem] = useState(null)
     const [showCloneForm, setShowCloneForm] = useState(false)
     const [cloneCollectionName, setCloneCollectionName] = useState('')
+    const [showCreateCollectionForm, setShowCreateCollectionForm] = useState(false)
+    const [createCollectionName, setCreateCollectionName] = useState('')
     const [tempSelectedImages, setTempSelectedImages] = useState([])
     const [localConfig, setLocalConfig] = useState({})
 
@@ -51,6 +53,39 @@ const MediaSpecialEditor = ({
 
     const currentImages = useMemo(() => currentConfig.mediaItems || [], [currentConfig.mediaItems])
     const currentCollectionId = useMemo(() => currentConfig.collectionId || null, [currentConfig.collectionId])
+
+    // Mode detection - defined after currentCollectionId and currentImages
+    const isCollectionMode = currentCollectionId !== null
+    const isFreeImagesMode = !isCollectionMode && currentImages.length > 0
+    const isEmpty = !isCollectionMode && currentImages.length === 0
+
+    // Enhanced config for preview - includes collection images when in collection mode
+    const previewConfig = useMemo(() => {
+        if (isCollectionMode && collectionImages.length > 0) {
+            // In collection mode: use collection images for preview
+            const collectionMediaItems = collectionImages.map(image => ({
+                id: image.id,
+                url: image.imgproxyBaseUrl || image.fileUrl,
+                type: 'image',
+                title: image.title || '',
+                altText: image.altText || image.title || '',
+                caption: image.description || '',
+                photographer: image.photographer || '',
+                source: image.source || '',
+                width: image.width,
+                height: image.height,
+                thumbnailUrl: image.imgproxyBaseUrl || image.fileUrl
+            }))
+
+            return {
+                ...currentConfig,
+                mediaItems: collectionMediaItems
+            }
+        } else {
+            // In free images mode or empty: use current config as-is
+            return currentConfig
+        }
+    }, [currentConfig, isCollectionMode, collectionImages])
 
     // Reset local config when widgetData changes
     useEffect(() => {
@@ -177,42 +212,70 @@ const MediaSpecialEditor = ({
     }, [])
 
     // Add temporarily selected images to widget
-    const handleAddSelectedImages = useCallback(() => {
+    const handleAddSelectedImages = useCallback(async () => {
         if (tempSelectedImages.length === 0) return
 
-        const newMediaItems = tempSelectedImages.map(image => ({
-            id: image.id,
-            url: image.imgproxyBaseUrl || image.fileUrl,
-            type: 'image',
-            title: image.title || '',
-            altText: image.altText || image.title || '',
-            caption: image.description || '',
-            photographer: image.photographer || '',
-            source: image.source || '',
-            width: image.width,
-            height: image.height,
-            thumbnailUrl: image.imgproxyBaseUrl || image.fileUrl
-        }))
-        const updatedConfig = {
-            ...currentConfig,
-            mediaItems: [...currentImages, ...newMediaItems],
-            collectionId: null, // Clear collection when adding individual images
-            displayType: (currentImages.length + newMediaItems.length) > 1 ? 'gallery' : 'single'
-        }
+        // Check if we're in collection mode
+        if (isCollectionMode && currentCollectionId) {
+            // Collection Mode: Add images to the existing collection
+            try {
+                setLoading(true)
 
-        // Update local config immediately for UI feedback
-        setLocalConfig(updatedConfig)
+                // Add images to the collection via API
+                const imageIds = tempSelectedImages.map(image => image.id)
+                await mediaCollectionsApi.addFiles(currentCollectionId, imageIds)()
 
-        if (onConfigChange) {
-            onConfigChange(updatedConfig)
+                // Refresh collection images to show the new additions
+                await loadCollectionImages(currentCollectionId)
+
+                console.log(`Added ${imageIds.length} images to collection ${currentCollectionId}`)
+
+                // Clear temporary selection and return to overview
+                setTempSelectedImages([])
+                setCurrentView('overview')
+
+            } catch (error) {
+                console.error('Failed to add images to collection:', error)
+            } finally {
+                setLoading(false)
+            }
         } else {
-            console.warn('onConfigChange not available for adding images')
-        }
+            // Free Images Mode: Add images as individual media items
+            const newMediaItems = tempSelectedImages.map(image => ({
+                id: image.id,
+                url: image.imgproxyBaseUrl || image.fileUrl,
+                type: 'image',
+                title: image.title || '',
+                altText: image.altText || image.title || '',
+                caption: image.description || '',
+                photographer: image.photographer || '',
+                source: image.source || '',
+                width: image.width,
+                height: image.height,
+                thumbnailUrl: image.imgproxyBaseUrl || image.fileUrl
+            }))
 
-        // Clear temporary selection and return to overview
-        setTempSelectedImages([])
-        setCurrentView('overview')
-    }, [tempSelectedImages, currentConfig, currentImages, onConfigChange])
+            const updatedConfig = {
+                ...currentConfig,
+                mediaItems: [...currentImages, ...newMediaItems],
+                collectionId: null, // Ensure we stay in free images mode
+                displayType: (currentImages.length + newMediaItems.length) > 1 ? 'gallery' : 'single'
+            }
+
+            // Update local config immediately for UI feedback
+            setLocalConfig(updatedConfig)
+
+            if (onConfigChange) {
+                onConfigChange(updatedConfig)
+            } else {
+                console.warn('onConfigChange not available for adding images')
+            }
+
+            // Clear temporary selection and return to overview
+            setTempSelectedImages([])
+            setCurrentView('overview')
+        }
+    }, [tempSelectedImages, currentConfig, currentImages, onConfigChange, isCollectionMode, currentCollectionId, loadCollectionImages])
 
     // Clear temporary selection
     const handleClearTempSelection = useCallback(() => {
@@ -279,6 +342,145 @@ const MediaSpecialEditor = ({
             console.warn('onConfigChange not available')
         }
         setLocalConfig(updatedConfig)
+
+        // Clear the selected collection from UI state
+        setSelectedCollection(null)
+    }
+
+    // Convert collection to free images (disconnect from global collection)
+    const handleConvertToFreeImages = () => {
+        const updatedConfig = {
+            ...currentConfig,
+            collectionId: null,
+            collectionConfig: null,
+            mediaItems: collectionImages.map(image => ({
+                id: image.id,
+                url: image.imgproxyBaseUrl || image.fileUrl,
+                type: 'image',
+                title: image.title || '',
+                altText: image.altText || image.title || '',
+                caption: image.description || '',
+                photographer: image.photographer || '',
+                source: image.source || '',
+                width: image.width,
+                height: image.height,
+                thumbnailUrl: image.imgproxyBaseUrl || image.fileUrl
+            })),
+            displayType: collectionImages.length > 1 ? 'gallery' : 'single'
+        }
+
+        if (onConfigChange) {
+            onConfigChange(updatedConfig)
+        }
+        setLocalConfig(updatedConfig)
+
+        // Clear the selected collection from UI state since we're no longer using it
+        setSelectedCollection(null)
+    }
+
+    // Create new collection from current free images
+    const handleCreateCollectionFromImages = async () => {
+        if (!namespace || !createCollectionName.trim() || currentImages.length === 0) return
+
+        setLoading(true)
+        try {
+            // Create new collection
+            const newCollection = await mediaCollectionsApi.create({
+                namespace,
+                title: createCollectionName.trim(),
+                description: `Collection created from ${currentImages.length} images`,
+                tags: []
+            })()
+
+            // Add all current images to the new collection
+            const imageIds = currentImages.map(image => image.id)
+            await mediaCollectionsApi.addFiles(newCollection.id, imageIds)()
+
+            // Switch to collection mode with the new collection
+            const updatedConfig = {
+                ...currentConfig,
+                collectionId: newCollection.id,
+                collectionConfig: {
+                    randomize: false,
+                    maxItems: 0,
+                    displayType: currentImages.length > 1 ? 'gallery' : 'single',
+                    galleryColumns: 3
+                },
+                mediaItems: [], // Clear individual images since we're now using collection
+                displayType: currentImages.length > 1 ? 'gallery' : 'single'
+            }
+
+            if (onConfigChange) {
+                onConfigChange(updatedConfig)
+            }
+            setLocalConfig(updatedConfig)
+
+            // Refresh collections list
+            const collectionsResult = await mediaCollectionsApi.list({ namespace })()
+            setCollections(collectionsResult.results || collectionsResult || [])
+
+            // Update UI state to show the new collection as selected
+            setSelectedCollection(newCollection)
+
+            setShowCreateCollectionForm(false)
+            setCreateCollectionName('')
+
+        } catch (error) {
+            console.error('Failed to create collection:', error)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    // Clone collection with new name
+    const handleCloneCollection = async () => {
+        if (!namespace || !cloneCollectionName.trim() || !currentCollectionId) return
+
+        setLoading(true)
+        try {
+            // Create new collection with cloned data
+            const originalCollection = collections.find(c => c.id === currentCollectionId)
+            const newCollection = await mediaCollectionsApi.create({
+                namespace,
+                title: cloneCollectionName.trim(),
+                description: originalCollection?.description || '',
+                tags: originalCollection?.tags || []
+            })()
+
+            // Add all images from original collection to new collection
+            const imageIds = collectionImages.map(image => image.id)
+            await mediaCollectionsApi.addFiles(newCollection.id, imageIds)()
+
+            // Switch to the new cloned collection
+            const updatedConfig = {
+                ...currentConfig,
+                collectionId: newCollection.id,
+                collectionConfig: {
+                    ...currentConfig.collectionConfig,
+                    // Preserve all collection settings
+                }
+            }
+
+            if (onConfigChange) {
+                onConfigChange(updatedConfig)
+            }
+            setLocalConfig(updatedConfig)
+
+            // Refresh collections list
+            const collectionsResult = await mediaCollectionsApi.list({ namespace })()
+            setCollections(collectionsResult.results || collectionsResult || [])
+
+            // Update UI state to show the cloned collection as selected
+            setSelectedCollection(newCollection)
+
+            setShowCloneForm(false)
+            setCloneCollectionName('')
+
+        } catch (error) {
+            console.error('Failed to clone collection:', error)
+        } finally {
+            setLoading(false)
+        }
     }
 
     // Handle file upload
@@ -498,30 +700,53 @@ const MediaSpecialEditor = ({
     // Overview view - shows current selection and main actions
     const renderOverviewView = () => (
         <div className="p-4 space-y-4 min-h-full">
+            {/* Mode Indicator */}
+            <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-3 border border-blue-200">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        {isCollectionMode ? (
+                            <>
+                                <FolderOpen className="w-5 h-5 text-blue-600" />
+                                <div className="flex flex-col">
+                                    <span className="font-medium text-blue-900">
+                                        {collections.find(c => c.id === currentCollectionId)?.title || 'Unknown Collection'}
+                                    </span>
+                                    <span className="text-xs text-blue-600">Global Collection</span>
+                                </div>
+                            </>
+                        ) : isFreeImagesMode ? (
+                            <>
+                                <Image className="w-5 h-5 text-purple-600" />
+                                <div className="flex flex-col">
+                                    <span className="font-medium text-purple-900">Free Images</span>
+                                    <span className="text-xs text-purple-600">Independent Images</span>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <Plus className="w-5 h-5 text-gray-600" />
+                                <span className="font-medium text-gray-700">Add Images or Select Collection</span>
+                            </>
+                        )}
+                    </div>
+                    {isCollectionMode && (
+                        <button
+                            onClick={handleRemoveCollection}
+                            className="p-1 text-blue-600 hover:text-red-600 transition-colors"
+                            title="Remove collection"
+                        >
+                            <Trash2 className="w-4 h-4" />
+                        </button>
+                    )}
+                </div>
+            </div>
+
             {/* Current Selection Summary */}
             <div className="bg-white rounded-lg border border-gray-200 p-4">
                 {/* Current Configuration */}
 
-                {currentCollectionId ? (
+                {isCollectionMode ? (
                     <div className="space-y-4">
-                        <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
-                            <FolderOpen className="w-6 h-6 text-blue-600" />
-                            <div className="flex-1">
-                                <p className="font-medium text-blue-900">Collection Selected</p>
-                                <p className="text-sm text-blue-700">
-                                    {collections.find(c => c.id === currentCollectionId)?.title || 'Unknown Collection'}
-                                </p>
-                            </div>
-                            <div className="flex gap-1">
-                                <button
-                                    onClick={handleRemoveCollection}
-                                    className="p-1 text-blue-600 hover:text-red-600 transition-colors"
-                                    title="Remove collection"
-                                >
-                                    <Trash2 className="w-4 h-4" />
-                                </button>
-                            </div>
-                        </div>
 
                         {/* Collection Images with Edit/Delete */}
                         <div className="grid grid-cols-4 gap-2">
@@ -572,7 +797,19 @@ const MediaSpecialEditor = ({
                         </div>
 
                         {/* Collection Management Actions */}
-                        <div className="pt-2">
+                        <div className="pt-2 space-y-3">
+                            {/* Warning about global collection modifications */}
+                            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                                <div className="flex items-start gap-2">
+                                    <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                                    <div className="text-xs text-amber-800">
+                                        <p className="font-medium mb-1">Global Collection</p>
+                                        <p>Changes to this collection affect all instances using it.</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Clone Collection Form */}
                             {showCloneForm ? (
                                 <div className="space-y-3 p-3 border border-gray-200 rounded-lg bg-white">
                                     <div>
@@ -597,37 +834,38 @@ const MediaSpecialEditor = ({
                                             Cancel
                                         </button>
                                         <button
-                                            onClick={() => {
-                                                if (cloneCollectionName.trim()) {
-                                                    // TODO: Implement actual collection cloning
-                                                    console.log('Clone collection:', currentCollectionId, 'as:', cloneCollectionName)
-                                                    setShowCloneForm(false)
-                                                    setCloneCollectionName('')
-                                                }
-                                            }}
-                                            disabled={!cloneCollectionName.trim()}
+                                            onClick={handleCloneCollection}
+                                            disabled={!cloneCollectionName.trim() || loading}
                                             className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
                                         >
-                                            Clone
+                                            {loading ? 'Cloning...' : 'Clone'}
                                         </button>
                                     </div>
                                 </div>
                             ) : (
-                                <button
-                                    onClick={() => {
-                                        const currentCollection = collections.find(c => c.id === currentCollectionId)
-                                        setCloneCollectionName(currentCollection ? `${currentCollection.title} (Copy)` : '')
-                                        setShowCloneForm(true)
-                                    }}
-                                    className="w-full px-3 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors text-sm"
-                                >
-                                    Clone Collection
-                                </button>
+                                <div className="grid grid-cols-1 gap-2">
+                                    <button
+                                        onClick={() => {
+                                            const currentCollection = collections.find(c => c.id === currentCollectionId)
+                                            setCloneCollectionName(currentCollection ? `${currentCollection.title} (Copy)` : '')
+                                            setShowCloneForm(true)
+                                        }}
+                                        className="w-full px-3 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors text-sm"
+                                    >
+                                        Clone Collection
+                                    </button>
+                                    <button
+                                        onClick={handleConvertToFreeImages}
+                                        className="w-full px-3 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors text-sm"
+                                    >
+                                        Convert to Free Images
+                                    </button>
+                                </div>
                             )}
                         </div>
                     </div>
-                ) : currentImages.length > 0 ? (
-                    <div>
+                ) : isFreeImagesMode ? (
+                    <div className="space-y-4">
                         <div className="grid grid-cols-3 gap-2 mb-3">
                             {currentImages.map((image, index) => (
                                 <div key={image.id || index} className="relative aspect-square bg-gray-100 rounded overflow-hidden border">
@@ -672,6 +910,56 @@ const MediaSpecialEditor = ({
                                 </div>
                             ))}
                         </div>
+
+                        {/* Free Images Actions */}
+                        <div className="pt-2">
+                            {showCreateCollectionForm ? (
+                                <div className="space-y-3 p-3 border border-gray-200 rounded-lg bg-white">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Collection Name</label>
+                                        <input
+                                            type="text"
+                                            value={createCollectionName}
+                                            onChange={(e) => setCreateCollectionName(e.target.value)}
+                                            placeholder="Enter collection name..."
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                            autoFocus
+                                        />
+                                    </div>
+                                    <div className="text-xs text-gray-600">
+                                        This will create a new collection with all {currentImages.length} images and switch to collection mode.
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => {
+                                                setShowCreateCollectionForm(false)
+                                                setCreateCollectionName('')
+                                            }}
+                                            className="flex-1 px-3 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors text-sm"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={handleCreateCollectionFromImages}
+                                            disabled={!createCollectionName.trim() || loading}
+                                            className="flex-1 px-3 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+                                        >
+                                            {loading ? 'Creating...' : 'Create Collection'}
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <button
+                                    onClick={() => {
+                                        setCreateCollectionName(`Collection from ${currentImages.length} images`)
+                                        setShowCreateCollectionForm(true)
+                                    }}
+                                    className="w-full px-3 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors text-sm"
+                                >
+                                    Create Collection from Images
+                                </button>
+                            )}
+                        </div>
                     </div>
                 ) : (
                     <div className="text-center py-8 text-gray-500">
@@ -690,7 +978,7 @@ const MediaSpecialEditor = ({
                     </div>
                     <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
                         <ImageWidget
-                            config={currentConfig}
+                            config={previewConfig}
                             mode="preview"
                         />
                     </div>
@@ -758,6 +1046,16 @@ const MediaSpecialEditor = ({
             {/* Temporary Selection Area */}
             {tempSelectedImages.length > 0 && (
                 <div className="p-4 bg-blue-50 border-b border-blue-200">
+                    {/* Collection Mode Warning */}
+                    {isCollectionMode && (
+                        <div className="mb-3 p-2 bg-amber-50 border border-amber-200 rounded text-xs text-amber-800">
+                            <div className="flex items-center gap-1">
+                                <AlertCircle className="w-3 h-3" />
+                                <span className="font-medium">Adding to Global Collection</span>
+                            </div>
+                            <p className="mt-1">These images will be added to the collection and visible in all instances using it.</p>
+                        </div>
+                    )}
                     <div className="flex items-center justify-between mb-2">
                         <h6 className="font-medium text-blue-900">Selected Images ({tempSelectedImages.length})</h6>
                         <div className="flex gap-2">
@@ -769,9 +1067,14 @@ const MediaSpecialEditor = ({
                             </button>
                             <button
                                 onClick={handleAddSelectedImages}
-                                className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
+                                disabled={loading}
+                                className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors text-sm"
                             >
-                                Add {tempSelectedImages.length} Image{tempSelectedImages.length !== 1 ? 's' : ''}
+                                {loading ? 'Adding...' :
+                                    isCollectionMode ?
+                                        `Add ${tempSelectedImages.length} to Collection` :
+                                        `Add ${tempSelectedImages.length} Image${tempSelectedImages.length !== 1 ? 's' : ''}`
+                                }
                             </button>
                         </div>
                     </div>

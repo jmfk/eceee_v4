@@ -1,5 +1,6 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { Image } from 'lucide-react'
+import { mediaCollectionsApi, namespacesApi } from '../../api'
 
 /**
  * Image Widget Component
@@ -8,6 +9,8 @@ import { Image } from 'lucide-react'
 const ImageWidget = ({ config = {}, mode = 'preview' }) => {
     const {
         mediaItems = [],
+        collectionId = null,
+        collectionConfig = {},
         displayType = 'single',
         alignment = 'center',
         galleryColumns = 3,
@@ -20,13 +23,101 @@ const ImageWidget = ({ config = {}, mode = 'preview' }) => {
         caption = ''
     } = config
 
+    // State for collection images
+    const [collectionImages, setCollectionImages] = useState([])
+    const [loadingCollection, setLoadingCollection] = useState(false)
+
+    // Load collection images when collectionId is present
+    useEffect(() => {
+        const loadCollectionImages = async () => {
+            if (!collectionId) {
+                setCollectionImages([])
+                return
+            }
+
+            setLoadingCollection(true)
+            try {
+                // Get default namespace
+                const defaultNamespace = await namespacesApi.getDefault()
+                const namespace = defaultNamespace?.slug
+
+                if (namespace) {
+                    // Fetch collection images
+                    const result = await mediaCollectionsApi.getFiles(collectionId, {
+                        namespace,
+                        pageSize: 100
+                    })()
+
+                    const images = result.results || result || []
+
+                    // Convert to mediaItems format
+                    const collectionMediaItems = images.map(image => ({
+                        id: image.id,
+                        url: image.imgproxyBaseUrl || image.fileUrl,
+                        type: 'image',
+                        title: image.title || '',
+                        altText: image.altText || image.title || '',
+                        caption: image.description || '',
+                        photographer: image.photographer || '',
+                        source: image.source || '',
+                        width: image.width,
+                        height: image.height,
+                        thumbnailUrl: image.imgproxyBaseUrl || image.fileUrl
+                    }))
+
+                    // Apply collection configuration
+                    let finalImages = collectionMediaItems
+
+                    // Apply randomization if requested
+                    if (collectionConfig.randomize) {
+                        finalImages = [...finalImages].sort(() => Math.random() - 0.5)
+                    }
+
+                    // Apply max items limit
+                    if (collectionConfig.maxItems > 0) {
+                        finalImages = finalImages.slice(0, collectionConfig.maxItems)
+                    }
+
+                    setCollectionImages(finalImages)
+                }
+            } catch (error) {
+                console.error('Failed to load collection images:', error)
+                setCollectionImages([])
+            } finally {
+                setLoadingCollection(false)
+            }
+        }
+
+        loadCollectionImages()
+    }, [collectionId, collectionConfig])
+
+    console.log("mode", mode)
+    console.log("mediaItems", mediaItems)
+    console.log("collectionId", collectionId)
+    console.log("collectionImages", collectionImages)
+
+    // Determine which images to use: collection images or individual media items
+    const effectiveMediaItems = collectionId ? collectionImages : mediaItems
+
     // Handle backward compatibility
-    const items = mediaItems.length > 0 ? mediaItems : (imageUrl ? [{
+    const items = effectiveMediaItems.length > 0 ? effectiveMediaItems : (imageUrl ? [{
         url: imageUrl,
         type: 'image',
         altText: altText,
         caption: caption
     }] : [])
+
+    // Show loading state when collection is being loaded
+    if (collectionId && loadingCollection) {
+        return (
+            <div className={`image-widget ${mode === 'editor' ? 'p-4' : ''}`}>
+                <div className="bg-gray-100 h-32 rounded flex items-center justify-center text-gray-500">
+                    <Image className="h-6 w-6 mr-2 animate-pulse" />
+                    Loading collection...
+                </div>
+            </div>
+        )
+    }
 
     const alignmentClasses = {
         left: 'text-left',
@@ -165,7 +256,7 @@ const ImageWidget = ({ config = {}, mode = 'preview' }) => {
             </div>
         )
     }
-
+    console.log("items", items)
     if (mode === 'editor') {
         return (
             <div className="image-widget-editor p-4">

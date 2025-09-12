@@ -99,6 +99,25 @@ class WebPageRenderer:
         if not widget_type:
             return f'<!-- Widget type "{widget_type_name}" not found -->'
 
+        # Get base configuration
+        base_config = widget_data.get("configuration", {})
+
+        # Prepare template context with widget-specific logic (e.g., collection resolution)
+        template_config = base_config
+        if hasattr(widget_type, "prepare_template_context"):
+            try:
+                template_config = widget_type.prepare_template_context(
+                    base_config, context
+                )
+            except Exception as e:
+                # Log error but continue with base config to prevent crashes
+                import logging
+
+                logger = logging.getLogger(__name__)
+                logger.error(
+                    f"Error preparing template context for {widget_type.name}: {e}"
+                )
+
         # Create a mock widget object for template rendering
         class MockWidget:
             def __init__(self, widget_type, configuration):
@@ -106,7 +125,7 @@ class WebPageRenderer:
                 self.configuration = configuration
                 self.id = widget_data.get("id", "unknown")
 
-        mock_widget = MockWidget(widget_type, widget_data.get("configuration", {}))
+        mock_widget = MockWidget(widget_type, template_config)
 
         # Render using the widget's template
         try:
@@ -114,7 +133,7 @@ class WebPageRenderer:
                 widget_type.template_name,
                 {
                     "widget": mock_widget,
-                    "config": widget_data.get("configuration", {}),
+                    "config": template_config,
                     **(context or {}),
                 },
                 request=self.request,
