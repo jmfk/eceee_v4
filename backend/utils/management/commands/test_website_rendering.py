@@ -58,9 +58,7 @@ class Command(BaseCommand):
         url = options["url"]
         save_file = options.get("save_file")
 
-        self.stdout.write(
-            self.style.SUCCESS("Website Rendering Test")
-        )
+        self.stdout.write(self.style.SUCCESS("Website Rendering Test"))
         self.stdout.write("=" * 50)
 
         # Test URL validation
@@ -68,13 +66,9 @@ class Command(BaseCommand):
         try:
             renderer = WebsiteRenderer()
             renderer._validate_url(url)
-            self.stdout.write(
-                self.style.SUCCESS(f"✓ URL validation passed: {url}")
-            )
+            self.stdout.write(self.style.SUCCESS(f"✓ URL validation passed: {url}"))
         except WebsiteRenderingError as e:
-            self.stdout.write(
-                self.style.ERROR(f"✗ URL validation failed: {e}")
-            )
+            self.stdout.write(self.style.ERROR(f"✗ URL validation failed: {e}"))
             return
 
         # Test rendering configuration
@@ -92,9 +86,9 @@ class Command(BaseCommand):
         try:
             renderer = WebsiteRenderer(config)
             self.stdout.write(f"Rendering {url}...")
-            
+
             png_bytes = renderer.render_website(url)
-            
+
             self.stdout.write(
                 self.style.SUCCESS(
                     f"✓ Successfully rendered website! "
@@ -111,19 +105,13 @@ class Command(BaseCommand):
                         self.style.SUCCESS(f"✓ Screenshot saved to: {save_file}")
                     )
                 except Exception as e:
-                    self.stdout.write(
-                        self.style.ERROR(f"✗ Failed to save file: {e}")
-                    )
+                    self.stdout.write(self.style.ERROR(f"✗ Failed to save file: {e}"))
 
         except WebsiteRenderingError as e:
-            self.stdout.write(
-                self.style.ERROR(f"✗ Website rendering failed: {e}")
-            )
+            self.stdout.write(self.style.ERROR(f"✗ Website rendering failed: {e}"))
             return
         except Exception as e:
-            self.stdout.write(
-                self.style.ERROR(f"✗ Unexpected error: {e}")
-            )
+            self.stdout.write(self.style.ERROR(f"✗ Unexpected error: {e}"))
             return
 
         # Test summary

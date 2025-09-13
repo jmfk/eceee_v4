@@ -1,6 +1,6 @@
 # Makefile for eceee_v4_test_1
 
-.PHONY: help install backend frontend migrate createsuperuser sample-content sample-pages sample-data sample-clean migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only test lint docker-up docker-down restart clean
+.PHONY: help install backend frontend playwright-service migrate createsuperuser sample-content sample-pages sample-data sample-clean migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only test lint docker-up docker-down restart clean playwright-test playwright-down playwright-logs
 
 # Default target - show help
 .DEFAULT_GOAL := help
@@ -13,6 +13,7 @@ help: ## Show this help message
 	@echo "  servers           Start database, Redis, MinIO, and ImgProxy services"
 	@echo "  backend           Start Django backend server"
 	@echo "  frontend          Start React frontend dev server"
+	@echo "  playwright-service Start Playwright website rendering service"
 	@echo "  shell             Open bash shell in backend container"
 	@echo ""
 	@echo "Database Management:"
@@ -39,12 +40,15 @@ help: ## Show this help message
 	@echo ""
 	@echo "Testing & Quality:"
 	@echo "  backend-test      Run backend tests"
+	@echo "  playwright-test   Test Playwright service endpoints"
 	@echo "  lint              Lint frontend code"
 	@echo ""
 	@echo "Docker Management:"
 	@echo "  docker-up         Start all services with Docker Compose"
 	@echo "  docker-down       Stop all Docker Compose services"
 	@echo "  restart           Restart all Docker Compose services"
+	@echo "  playwright-down   Stop Playwright service"
+	@echo "  playwright-logs   View Playwright service logs"
 	@echo "  clean             Clean Python, Node, and Docker artifacts"
 	@echo ""
 	@echo "Usage: make <target>"
@@ -64,6 +68,10 @@ backend:
 # Run React frontend dev server
 frontend:
 	docker-compose up frontend
+
+# Run Playwright website rendering service
+playwright-service:
+	cd playwright-service && docker-compose up -d
 
 # Run Django migrations
 migrations:
@@ -119,6 +127,10 @@ shell:
 backend-test:
 	docker-compose exec backend python manage.py test
 
+# Test Playwright service endpoints
+playwright-test:
+	cd playwright-service && python test_service.py
+
 # Lint frontend code
 lint:
 	cd frontend && npm run lint
@@ -135,9 +147,18 @@ docker-down:
 restart:
 	docker-compose restart
 
+# Stop Playwright service
+playwright-down:
+	cd playwright-service && docker-compose down
+
+# View Playwright service logs
+playwright-logs:
+	cd playwright-service && docker-compose logs -f
+
 # Clean Python, Node, and Docker artifacts
 clean:
 	find backend -type d -name '__pycache__' -exec rm -rf {} +
 	rm -rf backend/*.pyc backend/*.pyo backend/.pytest_cache
 	rm -rf frontend/node_modules frontend/dist
 	docker-compose down -v
+	cd playwright-service && docker-compose down -v
