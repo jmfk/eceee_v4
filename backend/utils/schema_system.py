@@ -33,110 +33,161 @@ class FieldTypeRegistry:
                 "key": "text",
                 "label": "Text",
                 "json_schema_type": "string",
-                "ui_component": "TextInput",
+                "component": "TextInput",  # Renamed from ui_component
+                "category": "input",
                 "description": "Single line text input",
                 "validation_rules": {
                     "min_length": {"type": "integer", "minimum": 0},
                     "max_length": {"type": "integer", "minimum": 1},
                     "pattern": {"type": "string"},
                 },
+                "ui_props": {
+                    "placeholder": "Enter text...",
+                },
             },
             {
                 "key": "rich_text",
                 "label": "Rich Text",
                 "json_schema_type": "string",
-                "ui_component": "RichTextEditor",
+                "component": "RichTextInput",  # Renamed from ui_component
+                "config_component": "RichTextConfig",
+                "category": "input",
                 "description": "Rich text editor with formatting",
                 "validation_rules": {
                     "min_length": {"type": "integer", "minimum": 0},
                     "max_length": {"type": "integer", "minimum": 1},
+                },
+                "ui_props": {
+                    "toolbar": "basic",
                 },
             },
             {
                 "key": "number",
                 "label": "Number",
                 "json_schema_type": "number",
-                "ui_component": "NumberInput",
+                "component": "NumberInput",  # Renamed from ui_component
+                "category": "input",
                 "description": "Numeric input",
                 "validation_rules": {
                     "minimum": {"type": "number"},
                     "maximum": {"type": "number"},
                     "multipleOf": {"type": "number"},
                 },
+                "ui_props": {
+                    "step": "any",
+                },
             },
             {
                 "key": "date",
                 "label": "Date",
                 "json_schema_type": "string",
-                "ui_component": "DatePicker",
+                "component": "DateInput",  # Renamed from ui_component
+                "category": "input",
                 "description": "Date picker",
                 "validation_rules": {"format": {"type": "string", "enum": ["date"]}},
+                "ui_props": {
+                    "format": "YYYY-MM-DD",
+                },
             },
             {
                 "key": "datetime",
                 "label": "Date & Time",
                 "json_schema_type": "string",
-                "ui_component": "DateTimePicker",
+                "component": "DateTimeInput",  # Renamed from ui_component
+                "category": "input",
                 "description": "Date and time picker",
                 "validation_rules": {
                     "format": {"type": "string", "enum": ["date-time"]}
+                },
+                "ui_props": {
+                    "format": "YYYY-MM-DD HH:mm:ss",
                 },
             },
             {
                 "key": "boolean",
                 "label": "Boolean",
                 "json_schema_type": "boolean",
-                "ui_component": "ToggleInput",
+                "component": "BooleanInput",  # Renamed from ui_component
+                "category": "input",
                 "description": "True/false toggle",
                 "validation_rules": {},
+                "ui_props": {
+                    "variant": "toggle",
+                },
             },
             {
                 "key": "image",
                 "label": "Image",
                 "json_schema_type": "string",
-                "ui_component": "ImageUpload",
+                "component": "ImageInput",  # Renamed from ui_component
+                "config_component": "ImageConfig",
+                "category": "media",
                 "description": "Image upload and selection",
                 "validation_rules": {"format": {"type": "string", "enum": ["uri"]}},
+                "ui_props": {
+                    "accept": "image/*",
+                    "multiple": False,
+                },
             },
             {
                 "key": "file",
                 "label": "File",
                 "json_schema_type": "string",
-                "ui_component": "FileUpload",
+                "component": "FileInput",  # Renamed from ui_component
+                "category": "media",
                 "description": "File upload",
                 "validation_rules": {"format": {"type": "string", "enum": ["uri"]}},
+                "ui_props": {
+                    "accept": "*/*",
+                    "multiple": False,
+                },
             },
             {
                 "key": "url",
                 "label": "URL",
                 "json_schema_type": "string",
-                "ui_component": "URLInput",
+                "component": "URLInput",  # Renamed from ui_component
+                "category": "input",
                 "description": "URL input with validation",
                 "validation_rules": {"format": {"type": "string", "enum": ["uri"]}},
+                "ui_props": {
+                    "placeholder": "https://example.com",
+                },
             },
             {
                 "key": "email",
                 "label": "Email",
                 "json_schema_type": "string",
-                "ui_component": "EmailInput",
+                "component": "EmailInput",  # Renamed from ui_component
+                "category": "input",
                 "description": "Email input with validation",
                 "validation_rules": {"format": {"type": "string", "enum": ["email"]}},
+                "ui_props": {
+                    "placeholder": "user@example.com",
+                },
             },
             {
                 "key": "choice",
                 "label": "Choice",
                 "json_schema_type": "string",
-                "ui_component": "SelectInput",
+                "component": "SelectInput",  # Renamed from ui_component
+                "config_component": "SelectConfig",
+                "category": "selection",
                 "description": "Single choice from predefined options",
                 "validation_rules": {
                     "enum": {"type": "array", "items": {"type": "string"}}
+                },
+                "ui_props": {
+                    "placeholder": "Select an option...",
                 },
             },
             {
                 "key": "multi_choice",
                 "label": "Multiple Choice",
                 "json_schema_type": "array",
-                "ui_component": "MultiSelectInput",
+                "component": "MultiSelectInput",  # Renamed from ui_component
+                "config_component": "MultiSelectConfig",
+                "category": "selection",
                 "description": "Multiple choices from predefined options",
                 "validation_rules": {
                     "items": {
@@ -145,22 +196,35 @@ class FieldTypeRegistry:
                     },
                     "uniqueItems": {"type": "boolean"},
                 },
+                "ui_props": {
+                    "placeholder": "Select options...",
+                },
             },
             {
                 "key": "user_reference",
                 "label": "User Reference",
                 "json_schema_type": "integer",
-                "ui_component": "UserSelector",
+                "component": "UserSelectorInput",  # Renamed from ui_component
+                "config_component": "UserSelectorConfig",
+                "category": "reference",
                 "description": "Reference to a user",
                 "validation_rules": {},
+                "ui_props": {
+                    "searchable": True,
+                },
             },
             {
                 "key": "object_reference",
                 "label": "Object Reference",
                 "json_schema_type": "integer",
-                "ui_component": "ObjectSelector",
+                "component": "ObjectSelectorInput",  # Renamed from ui_component
+                "config_component": "ObjectSelectorConfig",
+                "category": "reference",
                 "description": "Reference to another object",
                 "validation_rules": {"objectType": {"type": "string"}},
+                "ui_props": {
+                    "searchable": True,
+                },
             },
         ]
 
@@ -172,9 +236,12 @@ class FieldTypeRegistry:
         key: str,
         label: str,
         json_schema_type: str,
-        ui_component: str,
+        component: str,
         description: str = "",
         validation_rules: Dict = None,
+        category: str = "input",
+        config_component: Optional[str] = None,
+        ui_props: Dict = None,
         **kwargs,
     ):
         """Register a new field type"""
@@ -182,9 +249,12 @@ class FieldTypeRegistry:
             "key": key,
             "label": label,
             "json_schema_type": json_schema_type,
-            "ui_component": ui_component,
+            "component": component,  # Renamed from ui_component
+            "category": category,
+            "config_component": config_component,
             "description": description,
             "validation_rules": validation_rules or {},
+            "ui_props": ui_props or {},
             **kwargs,
         }
 
@@ -332,16 +402,19 @@ def validate_schema(schema: Dict[str, Any], schema_type: str = "general") -> Non
 def get_ui_component_for_field_type(field_type: str) -> str:
     """Get the UI component name for a field type"""
     field_info = field_registry.get_field_type(field_type)
-    return field_info["ui_component"] if field_info else "TextInput"
+    return field_info["component"] if field_info else "TextInput"
 
 
 def register_custom_field_type(
     key: str,
     label: str,
     json_schema_type: str,
-    ui_component: str,
+    component: str,
     description: str = "",
     validation_rules: Dict = None,
+    category: str = "input",
+    config_component: Optional[str] = None,
+    ui_props: Dict = None,
     **kwargs,
 ) -> None:
     """
@@ -352,18 +425,23 @@ def register_custom_field_type(
             key='color',
             label='Color Picker',
             json_schema_type='string',
-            ui_component='ColorPicker',
+            component='ColorPicker',
+            category='input',
             description='Color selection with picker',
-            validation_rules={'pattern': '^#[0-9A-Fa-f]{6}$'}
+            validation_rules={'pattern': '^#[0-9A-Fa-f]{6}$'},
+            ui_props={'format': 'hex'}
         )
     """
     field_registry.register_field_type(
         key=key,
         label=label,
         json_schema_type=json_schema_type,
-        ui_component=ui_component,
+        component=component,
+        category=category,
+        config_component=config_component,
         description=description,
         validation_rules=validation_rules or {},
+        ui_props=ui_props or {},
         **kwargs,
     )
 

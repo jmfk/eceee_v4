@@ -1,0 +1,48 @@
+/**
+ * Form Field Components Export Index
+ * 
+ * Centralized exports for all form field components.
+ * These components are used by the dynamic form renderer based on field type definitions.
+ */
+
+// Basic Input Components
+export { default as TextInput } from './TextInput'
+export { default as NumberInput } from './NumberInput'
+export { default as BooleanInput } from './BooleanInput'
+
+// Selection Components
+export { default as SelectInput } from './SelectInput'
+
+// TODO: Add more components as they are implemented
+// export { default as DateInput } from './DateInput'
+// export { default as RichTextInput } from './RichTextInput'
+// export { default as EmailInput } from './EmailInput'
+// export { default as URLInput } from './URLInput'
+// export { default as ImageInput } from './ImageInput'
+// export { default as FileInput } from './FileInput'
+
+// Component registry for dynamic loading
+export const FIELD_COMPONENTS = {
+    TextInput: () => import('./TextInput'),
+    NumberInput: () => import('./NumberInput'),
+    BooleanInput: () => import('./BooleanInput'),
+    SelectInput: () => import('./SelectInput'),
+    // TODO: Add more components
+}
+
+/**
+ * Get a field component by name
+ * @param {string} componentName - Name of the component
+ * @returns {Promise<React.Component>} The component
+ */
+export const getFieldComponent = async (componentName) => {
+    if (FIELD_COMPONENTS[componentName]) {
+        const module = await FIELD_COMPONENTS[componentName]()
+        return module.default
+    }
+
+    // Fallback to TextInput if component not found
+    console.warn(`Field component '${componentName}' not found, falling back to TextInput`)
+    const module = await FIELD_COMPONENTS.TextInput()
+    return module.default
+}

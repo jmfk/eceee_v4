@@ -1,239 +1,170 @@
 /**
  * Frontend Field Type Registry
  * 
- * Manages field types and their UI component mappings.
- * Provides extensible system for adding new field types.
+ * Manages field types by consuming definitions from backend API.
+ * Provides dynamic loading of field type definitions and component mappings.
  */
 
 import { Type, Hash, Calendar, ToggleLeft, Image, FileText, Link, Mail, List, Users, Database } from 'lucide-react'
 
+// Icon mapping for field categories and types
+const FIELD_ICONS = {
+    // Category icons
+    input: Type,
+    selection: List,
+    media: Image,
+    reference: Database,
+
+    // Specific field type icons
+    text: Type,
+    rich_text: FileText,
+    number: Hash,
+    date: Calendar,
+    datetime: Calendar,
+    boolean: ToggleLeft,
+    image: Image,
+    file: FileText,
+    url: Link,
+    email: Mail,
+    choice: List,
+    multi_choice: List,
+    user_reference: Users,
+    object_reference: Database,
+}
+
 class FieldTypeRegistry {
     constructor() {
         this.fieldTypes = new Map()
-        this.registerCoreTypes()
+        this.loading = false
+        this.loaded = false
+        this.loadPromise = null
     }
 
-    registerCoreTypes() {
-        const coreTypes = [
-            {
-                key: 'text',
-                label: 'Text',
-                icon: Type,
-                jsonSchemaType: 'string',
-                uiComponent: 'TextInput',
-                description: 'Single line text input',
-                defaultProps: {
-                    type: 'string',
-                    title: '',
-                    description: '',
-                    default: ''
-                }
-            },
-            {
-                key: 'rich_text',
-                label: 'Rich Text',
-                icon: FileText,
-                jsonSchemaType: 'string',
-                uiComponent: 'RichTextEditor',
-                description: 'Rich text editor with formatting',
-                defaultProps: {
-                    type: 'string',
-                    title: '',
-                    description: '',
-                    default: '',
-                    format: 'textarea'
-                }
-            },
-            {
-                key: 'number',
-                label: 'Number',
-                icon: Hash,
-                jsonSchemaType: 'number',
-                uiComponent: 'NumberInput',
-                description: 'Numeric input',
-                defaultProps: {
-                    type: 'number',
-                    title: '',
-                    description: '',
-                    default: 0
-                }
-            },
-            {
-                key: 'date',
-                label: 'Date',
-                icon: Calendar,
-                jsonSchemaType: 'string',
-                uiComponent: 'DatePicker',
-                description: 'Date picker',
-                defaultProps: {
-                    type: 'string',
-                    title: '',
-                    description: '',
-                    format: 'date',
-                    default: ''
-                }
-            },
-            {
-                key: 'datetime',
-                label: 'Date & Time',
-                icon: Calendar,
-                jsonSchemaType: 'string',
-                uiComponent: 'DateTimePicker',
-                description: 'Date and time picker',
-                defaultProps: {
-                    type: 'string',
-                    title: '',
-                    description: '',
-                    format: 'date-time',
-                    default: ''
-                }
-            },
-            {
-                key: 'boolean',
-                label: 'Boolean',
-                icon: ToggleLeft,
-                jsonSchemaType: 'boolean',
-                uiComponent: 'ToggleInput',
-                description: 'True/false toggle',
-                defaultProps: {
-                    type: 'boolean',
-                    title: '',
-                    description: '',
-                    default: false
-                }
-            },
-            {
-                key: 'image',
-                label: 'Image',
-                icon: Image,
-                jsonSchemaType: 'string',
-                uiComponent: 'ImageUpload',
-                description: 'Image upload and selection',
-                defaultProps: {
-                    type: 'string',
-                    title: '',
-                    description: '',
-                    format: 'uri',
-                    default: ''
-                }
-            },
-            {
-                key: 'file',
-                label: 'File',
-                icon: FileText,
-                jsonSchemaType: 'string',
-                uiComponent: 'FileUpload',
-                description: 'File upload',
-                defaultProps: {
-                    type: 'string',
-                    title: '',
-                    description: '',
-                    format: 'uri',
-                    default: ''
-                }
-            },
-            {
-                key: 'url',
-                label: 'URL',
-                icon: Link,
-                jsonSchemaType: 'string',
-                uiComponent: 'URLInput',
-                description: 'URL input with validation',
-                defaultProps: {
-                    type: 'string',
-                    title: '',
-                    description: '',
-                    format: 'uri',
-                    default: ''
-                }
-            },
-            {
-                key: 'email',
-                label: 'Email',
-                icon: Mail,
-                jsonSchemaType: 'string',
-                uiComponent: 'EmailInput',
-                description: 'Email input with validation',
-                defaultProps: {
-                    type: 'string',
-                    title: '',
-                    description: '',
-                    format: 'email',
-                    default: ''
-                }
-            },
-            {
-                key: 'choice',
-                label: 'Choice',
-                icon: List,
-                jsonSchemaType: 'string',
-                uiComponent: 'SelectInput',
-                description: 'Single choice from predefined options',
-                defaultProps: {
-                    type: 'string',
-                    title: '',
-                    description: '',
-                    enum: [],
-                    default: ''
-                }
-            },
-            {
-                key: 'multi_choice',
-                label: 'Multiple Choice',
-                icon: List,
-                jsonSchemaType: 'array',
-                uiComponent: 'MultiSelectInput',
-                description: 'Multiple choices from predefined options',
-                defaultProps: {
-                    type: 'array',
-                    title: '',
-                    description: '',
-                    items: { enum: [] },
-                    default: []
-                }
-            },
-            {
-                key: 'user_reference',
-                label: 'User Reference',
-                icon: Users,
-                jsonSchemaType: 'integer',
-                uiComponent: 'UserSelector',
-                description: 'Reference to a user',
-                defaultProps: {
-                    type: 'integer',
-                    title: '',
-                    description: '',
-                    default: null
-                }
-            },
-            {
-                key: 'object_reference',
-                label: 'Object Reference',
-                icon: Database,
-                jsonSchemaType: 'integer',
-                uiComponent: 'ObjectSelector',
-                description: 'Reference to another object',
-                defaultProps: {
-                    type: 'integer',
-                    title: '',
-                    description: '',
-                    default: null
-                }
+    /**
+     * Load field types from backend API
+     */
+    async loadFromBackend() {
+        if (this.loaded || this.loading) {
+            return this.loadPromise
+        }
+
+        this.loading = true
+        this.loadPromise = this._fetchFieldTypes()
+
+        try {
+            await this.loadPromise
+            this.loaded = true
+        } catch (error) {
+            console.error('Failed to load field types from backend:', error)
+            // Fall back to empty registry - components can handle missing types
+        } finally {
+            this.loading = false
+        }
+
+        return this.loadPromise
+    }
+
+    /**
+     * Fetch field types from backend API
+     */
+    async _fetchFieldTypes() {
+        try {
+            const response = await fetch('/api/v1/utils/field-types/', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    // Add authentication headers if needed
+                    // 'Authorization': `Bearer ${getToken()}`,
+                },
+            })
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`)
             }
-        ]
 
-        coreTypes.forEach(type => this.registerFieldType(type))
+            const data = await response.json()
+
+            // Process and register field types from backend
+            if (data.fieldTypes && Array.isArray(data.fieldTypes)) {
+                data.fieldTypes.forEach(fieldType => {
+                    this.registerFieldType({
+                        key: fieldType.key,
+                        label: fieldType.label,
+                        component: fieldType.component,
+                        configComponent: fieldType.configComponent,
+                        category: fieldType.category,
+                        jsonSchemaType: fieldType.jsonSchemaType,
+                        description: fieldType.description,
+                        validationRules: fieldType.validationRules,
+                        uiProps: fieldType.uiProps,
+                        // Add icon based on field type or category
+                        icon: FIELD_ICONS[fieldType.key] || FIELD_ICONS[fieldType.category] || Type,
+                        // Generate default props for schema creation
+                        defaultProps: this._generateDefaultProps(fieldType)
+                    })
+                })
+            }
+
+            console.log(`Loaded ${data.fieldTypes?.length || 0} field types from backend`)
+        } catch (error) {
+            console.error('Error fetching field types:', error)
+            throw error
+        }
     }
 
-    registerFieldType({ key, label, icon, jsonSchemaType, uiComponent, description, defaultProps, ...extra }) {
+    /**
+     * Generate default props for schema creation based on field type
+     */
+    _generateDefaultProps(fieldType) {
+        const baseProps = {
+            type: fieldType.jsonSchemaType,
+            title: '',
+            description: '',
+        }
+
+        // Add default value based on JSON schema type
+        switch (fieldType.jsonSchemaType) {
+            case 'string':
+                baseProps.default = ''
+                break
+            case 'number':
+            case 'integer':
+                baseProps.default = 0
+                break
+            case 'boolean':
+                baseProps.default = false
+                break
+            case 'array':
+                baseProps.default = []
+                break
+            case 'object':
+                baseProps.default = {}
+                break
+            default:
+                baseProps.default = null
+        }
+
+        // Add field type specific props
+        if (fieldType.uiProps) {
+            Object.assign(baseProps, fieldType.uiProps)
+        }
+
+        return baseProps
+    }
+
+    registerFieldType({ key, label, icon, jsonSchemaType, component, configComponent, category, description, validationRules, uiProps, defaultProps, ...extra }) {
         // Register a new field type
         this.fieldTypes.set(key, {
             key,
             label,
             icon,
             jsonSchemaType,
-            uiComponent,
+            component,  // Updated from uiComponent
+            configComponent,
+            category,
             description,
+            validationRules,
+            uiProps,
             defaultProps,
             ...extra
         })
@@ -263,16 +194,33 @@ class FieldTypeRegistry {
         return this.fieldTypes.has(key)
     }
 
-    getUIComponent(fieldType) {
-        // Get UI component name for field type
+    getComponent(fieldType) {
+        // Get component name for field type
         const field = this.getFieldType(fieldType)
-        return field ? field.uiComponent : 'TextInput'
+        return field ? field.component : 'TextInput'
+    }
+
+    getConfigComponent(fieldType) {
+        // Get config component name for field type
+        const field = this.getFieldType(fieldType)
+        return field ? field.configComponent : null
     }
 
     getDefaultProps(fieldType) {
         // Get default properties for creating new field of this type
         const field = this.getFieldType(fieldType)
         return field ? { ...field.defaultProps } : { type: 'string', fieldType: 'text' }
+    }
+
+    /**
+     * Ensure field types are loaded before use
+     */
+    async ensureLoaded() {
+        if (!this.loaded && !this.loading) {
+            await this.loadFromBackend()
+        } else if (this.loading) {
+            await this.loadPromise
+        }
     }
 
     /**
@@ -285,7 +233,7 @@ class FieldTypeRegistry {
      *   label: 'Color Picker',
      *   icon: Palette,
      *   jsonSchemaType: 'string',
-     *   uiComponent: 'ColorPicker',
+     *   component: 'ColorPicker',
      *   description: 'Color selection with picker',
      *   defaultProps: {
      *     type: 'string',
@@ -306,11 +254,19 @@ export const fieldTypeRegistry = new FieldTypeRegistry()
 // Convenience functions
 export const getFieldType = (key) => fieldTypeRegistry.getFieldType(key)
 export const getAllFieldTypes = () => fieldTypeRegistry.getAllFieldTypes()
-export const getUIComponent = (fieldType) => fieldTypeRegistry.getUIComponent(fieldType)
+export const getComponent = (fieldType) => fieldTypeRegistry.getComponent(fieldType)
+export const getConfigComponent = (fieldType) => fieldTypeRegistry.getConfigComponent(fieldType)
 export const getDefaultProps = (fieldType) => fieldTypeRegistry.getDefaultProps(fieldType)
 export const registerCustomFieldType = (config) => fieldTypeRegistry.registerCustomFieldType(config)
+export const ensureFieldTypesLoaded = () => fieldTypeRegistry.ensureLoaded()
 
-// For backward compatibility with existing FIELD_TYPES usage
-export const FIELD_TYPES = fieldTypeRegistry.getAllFieldTypes()
+// For backward compatibility with existing usage
+export const getUIComponent = (fieldType) => fieldTypeRegistry.getComponent(fieldType)
+
+// Dynamic FIELD_TYPES that loads from backend
+export const getFieldTypes = async () => {
+    await fieldTypeRegistry.ensureLoaded()
+    return fieldTypeRegistry.getAllFieldTypes()
+}
 
 export default fieldTypeRegistry
