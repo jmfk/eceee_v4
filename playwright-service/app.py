@@ -31,6 +31,7 @@ DEFAULT_CONFIG = {
     "wait_for_load_state": "networkidle",
     "full_page": False,
     "quality": 90,
+    "remove_cookie_warnings": True,  # Automatically handle cookie consent dialogs
 }
 
 # Security: List of blocked domains/patterns
@@ -92,6 +93,156 @@ def validate_url(url: str) -> bool:
         if isinstance(e, WebsiteRenderingError):
             raise
         raise WebsiteRenderingError(f"Invalid URL format: {str(e)}")
+
+
+async def handle_cookie_consent(page: Page) -> bool:
+    """
+    Automatically handle cookie consent dialogs and banners.
+    
+    This function looks for common cookie consent patterns and attempts
+    to accept or dismiss them to get a clean screenshot.
+    
+    Args:
+        page: The Playwright page object
+        
+    Returns:
+        bool: True if any cookie dialogs were handled, False otherwise
+    """
+    handled = False
+    
+    # Common cookie consent button selectors (in order of preference)
+    accept_selectors = [
+        # Generic "Accept" buttons
+        'button:has-text("Accept")',
+        'button:has-text("Accept All")',
+        'button:has-text("Accept all cookies")',
+        'button:has-text("Accept Cookies")',
+        'button:has-text("I Accept")',
+        'button:has-text("Agree")',
+        'button:has-text("Got it")',
+        'button:has-text("OK")',
+        'button:has-text("Agree and continue")',
+        
+        # Common class names and IDs
+        'button[class*="accept"]',
+        'button[class*="consent"]',
+        'button[class*="cookie"]',
+        'button[id*="accept"]',
+        'button[id*="consent"]',
+        'button[id*="cookie"]',
+        
+        # Specific popular cookie consent solutions
+        '[data-testid="uc-accept-all-button"]',  # Usercentrics
+        '#onetrust-accept-btn-handler',  # OneTrust
+        '.ot-sdk-show-settings, .optanon-allow-all',  # OneTrust variants
+        '[data-cy="consent-banner-accept"]',  # Custom implementations
+        '.cookie-consent-accept',
+        '.gdpr-accept',
+        '.privacy-accept',
+        
+        # Language-specific variants
+        'button:has-text("Accepter")',  # French
+        'button:has-text("Akzeptieren")',  # German
+        'button:has-text("Aceptar")',  # Spanish
+        'button:has-text("Accetta")',  # Italian
+        'button:has-text("Aceitar")',  # Portuguese
+        'button:has-text("Godkänn")',  # Swedish
+        'button:has-text("Accepteren")',  # Dutch
+    ]
+    
+    # Try to find and click accept buttons
+    for selector in accept_selectors:
+        try:
+            # Wait briefly for the element to appear
+            await page.wait_for_selector(selector, timeout=1000)
+            element = await page.query_selector(selector)
+            if element:
+                # Check if element is visible and clickable
+                if await element.is_visible():
+                    await element.click()
+                    handled = True
+                    logger.info(f"Clicked cookie consent button: {selector}")
+                    # Wait for any animations or page changes
+                    await page.wait_for_timeout(1000)
+                    break
+        except Exception:
+            # Continue to next selector if this one fails
+            continue
+    
+    # If no accept button found, try to dismiss/close the dialog
+    if not handled:
+        dismiss_selectors = [
+            'button:has-text("×")',  # Close button
+            'button:has-text("Close")',
+            'button:has-text("Dismiss")',
+            'button[aria-label="Close"]',
+            'button[aria-label="Dismiss"]',
+            '.close-button',
+            '.dismiss-button',
+            '[data-dismiss="modal"]',
+        ]
+        
+        for selector in dismiss_selectors:
+            try:
+                await page.wait_for_selector(selector, timeout=1000)
+                element = await page.query_selector(selector)
+                if element and await element.is_visible():
+                    await element.click()
+                    handled = True
+                    logger.info(f"Dismissed cookie dialog: {selector}")
+                    await page.wait_for_timeout(1000)
+                    break
+            except Exception:
+                continue
+    
+    # Try to hide cookie banners with CSS if buttons don't work
+    if not handled:
+        try:
+            # Hide common cookie banner containers
+            await page.add_style_tag(content="""
+                /* Hide common cookie consent banners */
+                [class*="cookie" i][class*="banner" i],
+                [class*="cookie" i][class*="consent" i],
+                [class*="cookie" i][class*="notice" i],
+                [class*="gdpr" i],
+                [class*="privacy" i][class*="banner" i],
+                [id*="cookie" i][id*="banner" i],
+                [id*="cookie" i][id*="consent" i],
+                [id*="cookie" i][id*="notice" i],
+                [data-testid*="cookie" i],
+                [data-cy*="cookie" i],
+                .onetrust-banner-sdk,
+                #onetrust-consent-sdk,
+                .uc-banner,
+                .cookielaw-banner,
+                .cookie-policy-banner,
+                .gdpr-banner,
+                .privacy-banner {
+                    display: none !important;
+                    visibility: hidden !important;
+                    opacity: 0 !important;
+                    height: 0 !important;
+                    overflow: hidden !important;
+                }
+                
+                /* Remove backdrop/overlay */
+                [class*="cookie" i][class*="overlay" i],
+                [class*="cookie" i][class*="backdrop" i],
+                .modal-backdrop.show {
+                    display: none !important;
+                }
+                
+                /* Restore body scroll if it was disabled */
+                body {
+                    overflow: auto !important;
+                }
+            """)
+            handled = True
+            logger.info("Applied CSS to hide cookie banners")
+        except Exception as e:
+            logger.debug(f"Failed to apply CSS cookie banner hiding: {e}")
+    
+    return handled
 
 
 async def render_website_async(
@@ -162,6 +313,16 @@ async def render_website_async(
 
         # Wait a bit more for any dynamic content
         await page.wait_for_timeout(2000)
+
+        # Handle cookie consent dialogs if enabled
+        if render_config.get("remove_cookie_warnings", True):
+            try:
+                handled = await handle_cookie_consent(page)
+                if handled:
+                    # Wait a bit more after handling cookie dialogs
+                    await page.wait_for_timeout(1000)
+            except Exception as e:
+                logger.warning(f"Failed to handle cookie consent: {e}")
 
         # Take screenshot
         screenshot_options = {
@@ -247,7 +408,8 @@ def render_website_endpoint():
         "viewport_width": 1920,  // optional
         "viewport_height": 1080,  // optional
         "full_page": false,      // optional
-        "timeout": 30000         // optional, in milliseconds
+        "timeout": 30000,        // optional, in milliseconds
+        "remove_cookie_warnings": true  // optional, auto-handle cookie consent
     }
 
     Returns:
@@ -274,6 +436,8 @@ def render_website_endpoint():
             custom_config["full_page"] = bool(data["full_page"])
         if "timeout" in data:
             custom_config["timeout"] = int(data["timeout"])
+        if "remove_cookie_warnings" in data:
+            custom_config["remove_cookie_warnings"] = bool(data["remove_cookie_warnings"])
 
         logger.info(f"Rendering website to PNG: {url}")
 
@@ -354,12 +518,13 @@ def validate_website_endpoint():
                     "url": url,
                     "message": "URL is valid and can be rendered",
                     "default_config": DEFAULT_CONFIG,
-                    "available_options": {
-                        "viewport_width": "Width of the browser viewport (default: 1920)",
-                        "viewport_height": "Height of the browser viewport (default: 1080)",
-                        "full_page": "Capture full page or just viewport (default: false)",
-                        "timeout": "Maximum time to wait for page load in milliseconds (default: 30000)",
-                    },
+                     "available_options": {
+                         "viewport_width": "Width of the browser viewport (default: 1920)",
+                         "viewport_height": "Height of the browser viewport (default: 1080)",
+                         "full_page": "Capture full page or just viewport (default: false)",
+                         "timeout": "Maximum time to wait for page load in milliseconds (default: 30000)",
+                         "remove_cookie_warnings": "Automatically handle cookie consent dialogs (default: true)",
+                     },
                 }
             )
 
@@ -387,13 +552,14 @@ def index():
                 "POST /render": "Render website to PNG",
                 "POST /validate": "Validate URL without rendering",
             },
-            "example_render_request": {
-                "url": "https://example.com",
-                "viewport_width": 1920,
-                "viewport_height": 1080,
-                "full_page": False,
-                "timeout": 30000,
-            },
+             "example_render_request": {
+                 "url": "https://example.com",
+                 "viewport_width": 1920,
+                 "viewport_height": 1080,
+                 "full_page": False,
+                 "timeout": 30000,
+                 "remove_cookie_warnings": True,
+             },
             "example_validate_request": {"url": "https://example.com"},
         }
     )

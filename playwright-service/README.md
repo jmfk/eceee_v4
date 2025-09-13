@@ -8,6 +8,7 @@ A lightweight Flask microservice for rendering websites to PNG images using Play
 - **Docker-based**: Uses official Microsoft Playwright Docker image
 - **Security-first**: URL validation and blocked domains protection
 - **Configurable**: Viewport sizes, timeouts, full-page capture
+- **Cookie Consent Handling**: Automatically removes cookie banners and consent dialogs
 - **Production-ready**: Gunicorn WSGI server with health checks
 
 ## Quick Start
@@ -71,7 +72,8 @@ Content-Type: application/json
   "viewport_width": 1920,
   "viewport_height": 1080,
   "full_page": false,
-  "timeout": 30000
+  "timeout": 30000,
+  "remove_cookie_warnings": true
 }
 ```
 
@@ -131,12 +133,13 @@ curl http://localhost:5000/health
 import requests
 
 # Render website
-response = requests.post('http://localhost:5000/render', json={
-    'url': 'https://www.github.com',
-    'viewport_width': 1280,
-    'viewport_height': 720,
-    'full_page': True
-})
+response = requests.post('http://localhost:5000/render',     json={
+        'url': 'https://www.github.com',
+        'viewport_width': 1280,
+        'viewport_height': 720,
+        'full_page': True,
+        'remove_cookie_warnings': True
+    })
 
 if response.status_code == 200:
     with open('screenshot.png', 'wb') as f:
@@ -158,6 +161,7 @@ const renderWebsite = async (url, options = {}) => {
       },
       body: JSON.stringify({
         url: url,
+        remove_cookie_warnings: true,
         ...options
       })
     });
@@ -195,6 +199,49 @@ renderWebsite('https://www.example.com', {
 | `viewport_height` | integer | 1080 | Height of the browser viewport in pixels |
 | `full_page` | boolean | false | Whether to capture the full page or just the viewport |
 | `timeout` | integer | 30000 | Maximum time to wait for page load (milliseconds) |
+| `remove_cookie_warnings` | boolean | true | Automatically handle cookie consent dialogs and banners |
+
+## Cookie Consent Handling
+
+The service includes intelligent cookie consent handling that automatically:
+
+### 🍪 **What It Does:**
+- **Detects** cookie consent dialogs and banners automatically
+- **Clicks** "Accept", "OK", "Got it" buttons in multiple languages
+- **Handles** popular consent solutions (OneTrust, Usercentrics, etc.)
+- **Hides** remaining banners with CSS if buttons don't work
+- **Restores** page scroll if disabled by modals
+
+### 🌍 **Multi-Language Support:**
+- English: "Accept", "Accept All", "Got it", "OK"
+- French: "Accepter"
+- German: "Akzeptieren" 
+- Spanish: "Aceptar"
+- Italian: "Accetta"
+- Portuguese: "Aceitar"
+- Swedish: "Godkänn"
+- Dutch: "Accepteren"
+
+### 🔧 **Supported Consent Solutions:**
+- OneTrust
+- Usercentrics
+- Custom implementations
+- Generic GDPR banners
+- Cookie Law banners
+
+### 📝 **Usage Examples:**
+
+```bash
+# Clean screenshots (default behavior)
+curl -X POST http://localhost:5001/render \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://example.com", "remove_cookie_warnings": true}'
+
+# Keep cookie banners visible
+curl -X POST http://localhost:5001/render \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://example.com", "remove_cookie_warnings": false}'
+```
 
 ## Security Features
 
