@@ -46,6 +46,22 @@ class FieldTypeRegistry:
                 },
             },
             {
+                "key": "textarea",
+                "label": "Textarea",
+                "json_schema_type": "string",
+                "component": "TextareaInput",
+                "category": "input",
+                "description": "Multi-line text input",
+                "validation_rules": {
+                    "min_length": {"type": "integer", "minimum": 0},
+                    "max_length": {"type": "integer", "minimum": 1},
+                },
+                "ui_props": {
+                    "rows": 3,
+                    "autoResize": False,
+                },
+            },
+            {
                 "key": "rich_text",
                 "label": "Rich Text",
                 "json_schema_type": "string",
@@ -59,6 +75,34 @@ class FieldTypeRegistry:
                 },
                 "ui_props": {
                     "toolbar": "basic",
+                },
+            },
+            {
+                "key": "password",
+                "label": "Password",
+                "json_schema_type": "string",
+                "component": "PasswordInput",
+                "category": "input",
+                "description": "Password input with strength indicator",
+                "validation_rules": {
+                    "min_length": {"type": "integer", "minimum": 8},
+                    "pattern": {"type": "string"},
+                },
+                "ui_props": {
+                    "showStrengthIndicator": True,
+                    "minLength": 8,
+                },
+            },
+            {
+                "key": "time",
+                "label": "Time",
+                "json_schema_type": "string",
+                "component": "TimeInput",
+                "category": "input",
+                "description": "Time picker",
+                "validation_rules": {"format": {"type": "string", "enum": ["time"]}},
+                "ui_props": {
+                    "step": 60,
                 },
             },
             {

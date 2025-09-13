@@ -43,25 +43,72 @@ const FieldTypeTest = () => {
                 title: 'Full Name',
                 description: 'Enter your full name'
             },
+            email: {
+                fieldType: 'email',
+                title: 'Email Address',
+                description: 'Enter your email address'
+            },
+            website: {
+                fieldType: 'url',
+                title: 'Website',
+                description: 'Enter your website URL'
+            },
+            password: {
+                fieldType: 'password',
+                title: 'Password',
+                description: 'Create a secure password'
+            },
             age: {
                 fieldType: 'number',
                 title: 'Age',
                 description: 'Enter your age in years'
             },
-            isActive: {
-                fieldType: 'boolean',
-                title: 'Active Status',
-                description: 'Are you currently active?'
+            birthDate: {
+                fieldType: 'date',
+                title: 'Birth Date',
+                description: 'Select your birth date'
+            },
+            appointmentTime: {
+                fieldType: 'datetime',
+                title: 'Appointment',
+                description: 'Select appointment date and time'
+            },
+            preferredTime: {
+                fieldType: 'time',
+                title: 'Preferred Time',
+                description: 'Select your preferred time'
+            },
+            bio: {
+                fieldType: 'textarea',
+                title: 'Biography',
+                description: 'Tell us about yourself'
             },
             country: {
                 fieldType: 'choice',
                 title: 'Country',
                 description: 'Select your country',
                 enum: ['USA', 'Canada', 'UK', 'Germany', 'France']
+            },
+            interests: {
+                fieldType: 'multi_choice',
+                title: 'Interests',
+                description: 'Select your interests (multiple)',
+                items: { enum: ['Technology', 'Sports', 'Music', 'Art', 'Travel', 'Food'] }
+            },
+            preferredContact: {
+                fieldType: 'choice',
+                title: 'Preferred Contact Method',
+                description: 'How would you like to be contacted?',
+                enum: ['Email', 'Phone', 'SMS', 'Mail']
+            },
+            isActive: {
+                fieldType: 'boolean',
+                title: 'Active Status',
+                description: 'Are you currently active?'
             }
         },
-        required: ['name', 'age'],
-        propertyOrder: ['name', 'age', 'country', 'isActive']
+        required: ['name', 'email', 'age'],
+        propertyOrder: ['name', 'email', 'website', 'password', 'age', 'birthDate', 'appointmentTime', 'preferredTime', 'bio', 'country', 'interests', 'preferredContact', 'isActive']
     }
 
     const handleFormChange = (fieldName, value) => {

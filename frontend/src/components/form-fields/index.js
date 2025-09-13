@@ -7,26 +7,45 @@
 
 // Basic Input Components
 export { default as TextInput } from './TextInput'
+export { default as TextareaInput } from './TextareaInput'
 export { default as NumberInput } from './NumberInput'
 export { default as BooleanInput } from './BooleanInput'
+export { default as PasswordInput } from './PasswordInput'
+export { default as EmailInput } from './EmailInput'
+export { default as URLInput } from './URLInput'
+
+// Date/Time Components
+export { default as DateInput } from './DateInput'
+export { default as DateTimeInput } from './DateTimeInput'
+export { default as TimeInput } from './TimeInput'
 
 // Selection Components
 export { default as SelectInput } from './SelectInput'
+export { default as MultiSelectInput } from './MultiSelectInput'
+export { default as RadioInput } from './RadioInput'
+export { default as CheckboxInput } from './CheckboxInput'
 
 // TODO: Add more components as they are implemented
-// export { default as DateInput } from './DateInput'
 // export { default as RichTextInput } from './RichTextInput'
-// export { default as EmailInput } from './EmailInput'
-// export { default as URLInput } from './URLInput'
 // export { default as ImageInput } from './ImageInput'
 // export { default as FileInput } from './FileInput'
 
 // Component registry for dynamic loading
 export const FIELD_COMPONENTS = {
     TextInput: () => import('./TextInput'),
+    TextareaInput: () => import('./TextareaInput'),
     NumberInput: () => import('./NumberInput'),
     BooleanInput: () => import('./BooleanInput'),
+    PasswordInput: () => import('./PasswordInput'),
+    EmailInput: () => import('./EmailInput'),
+    URLInput: () => import('./URLInput'),
+    DateInput: () => import('./DateInput'),
+    DateTimeInput: () => import('./DateTimeInput'),
+    TimeInput: () => import('./TimeInput'),
     SelectInput: () => import('./SelectInput'),
+    MultiSelectInput: () => import('./MultiSelectInput'),
+    RadioInput: () => import('./RadioInput'),
+    CheckboxInput: () => import('./CheckboxInput'),
     // TODO: Add more components
 }
 
