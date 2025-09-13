@@ -32,7 +32,7 @@ from .serializers import (
     TaskConfigValidationSerializer,
 )
 
-# from .website_renderer import WebsiteRenderer, WebsiteRenderingError
+from .website_renderer import WebsiteRenderer, WebsiteRenderingError
 
 logger = logging.getLogger(__name__)
 
@@ -648,5 +648,138 @@ def task_sse_stream(request, task_id):
         logger.error(f"SSE stream error for task {task_id}: {e}")
         return Response(
             {"error": "Failed to establish SSE stream"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def render_website_to_png(request):
+    """
+    Render an external website to PNG image.
+
+    POST /api/v1/utils/render-website/
+
+    Request body:
+    {
+        "url": "https://example.com",
+        "viewport_width": 1920,  # optional
+        "viewport_height": 1080,  # optional
+        "full_page": false,      # optional
+        "timeout": 30000         # optional, in milliseconds
+    }
+
+    Returns:
+        - PNG image data as binary response with appropriate headers
+        - Or JSON error response if rendering fails
+    """
+    try:
+        # Get URL from request
+        url = request.data.get("url")
+        if not url:
+            return Response(
+                {"error": "URL is required"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Get optional configuration parameters
+        custom_config = {}
+        if "viewport_width" in request.data:
+            custom_config["viewport_width"] = int(request.data["viewport_width"])
+        if "viewport_height" in request.data:
+            custom_config["viewport_height"] = int(request.data["viewport_height"])
+        if "full_page" in request.data:
+            custom_config["full_page"] = bool(request.data["full_page"])
+        if "timeout" in request.data:
+            custom_config["timeout"] = int(request.data["timeout"])
+
+        logger.info(f"Rendering website to PNG: {url}")
+
+        # Create renderer and render website
+        renderer = WebsiteRenderer()
+        try:
+            png_bytes = renderer.render_website(url, custom_config)
+
+            # Return PNG as binary response
+            response = HttpResponse(png_bytes, content_type="image/png")
+            response["Content-Disposition"] = (
+                f'attachment; filename="website_screenshot.png"'
+            )
+            response["Content-Length"] = len(png_bytes)
+
+            logger.info(f"Successfully rendered website: {url}")
+            return response
+
+        except WebsiteRenderingError as e:
+            logger.warning(f"Website rendering failed for {url}: {str(e)}")
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    except ValueError as e:
+        return Response(
+            {"error": f"Invalid parameter value: {str(e)}"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error rendering website {url}: {str(e)}")
+        return Response(
+            {"error": "An unexpected error occurred during website rendering"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def render_website_info(request):
+    """
+    Get information about rendering a website without actually rendering it.
+    This endpoint validates the URL and returns configuration options.
+
+    POST /api/v1/utils/render-website-info/
+
+    Request body:
+    {
+        "url": "https://example.com"
+    }
+
+    Returns JSON with validation result and available options.
+    """
+    try:
+        url = request.data.get("url")
+        if not url:
+            return Response(
+                {"error": "URL is required"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Create renderer to validate URL
+        renderer = WebsiteRenderer()
+
+        try:
+            # This will raise WebsiteRenderingError if URL is invalid
+            renderer._validate_url(url)
+
+            return Response(
+                {
+                    "valid": True,
+                    "url": url,
+                    "message": "URL is valid and can be rendered",
+                    "default_config": renderer.DEFAULT_CONFIG,
+                    "available_options": {
+                        "viewport_width": "Width of the browser viewport (default: 1920)",
+                        "viewport_height": "Height of the browser viewport (default: 1080)",
+                        "full_page": "Capture full page or just viewport (default: false)",
+                        "timeout": "Maximum time to wait for page load in milliseconds (default: 30000)",
+                    },
+                }
+            )
+
+        except WebsiteRenderingError as e:
+            return Response(
+                {"valid": False, "url": url, "error": str(e)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+    except Exception as e:
+        logger.error(f"Unexpected error validating website URL: {str(e)}")
+        return Response(
+            {"error": "An unexpected error occurred during URL validation"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )

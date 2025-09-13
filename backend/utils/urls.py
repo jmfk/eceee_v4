@@ -28,17 +28,17 @@ urlpatterns = [
         views.get_value_lists_for_field,
         name="get_value_lists_for_field",
     ),
-    # Website Rendering (temporarily disabled)
-    # path(
-    #     "render-website/",
-    #     views.render_website_to_png,
-    #     name="render_website_to_png",
-    # ),
-    # path(
-    #     "render-website-info/",
-    #     views.render_website_info,
-    #     name="render_website_info",
-    # ),
+    # Website Rendering
+    path(
+        "render-website/",
+        views.render_website_to_png,
+        name="render_website_to_png",
+    ),
+    path(
+        "render-website-info/",
+        views.render_website_info,
+        name="render_website_info",
+    ),
     # AI Agent Task utilities
     path(
         "validate-task-config/",
