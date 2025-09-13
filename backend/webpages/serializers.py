@@ -45,6 +45,7 @@ class PageThemeSerializer(serializers.ModelSerializer):
             "html_elements",
             "image_styles",
             "custom_css",
+            "image",
             "is_active",
             "is_default",
             "created_at",

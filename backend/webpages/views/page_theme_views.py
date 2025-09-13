@@ -8,6 +8,7 @@ from rest_framework.response import Response
 from rest_framework.filters import SearchFilter, OrderingFilter
 from django_filters.rest_framework import DjangoFilterBackend
 from django.http import HttpResponse
+import json
 
 from ..models import PageTheme
 from ..serializers import PageThemeSerializer
@@ -24,7 +25,59 @@ class PageThemeViewSet(viewsets.ModelViewSet):
     filterset_fields = ["is_active", "created_by"]
     search_fields = ["name", "description"]
     ordering_fields = ["name", "created_at", "updated_at"]
-    ordering = ["name"]
+    ordering = ["created_at"]  # Oldest first
+
+    def create(self, request, *args, **kwargs):
+        """Handle theme creation with image upload and JSON field parsing"""
+        data = request.data.copy()
+
+        # Parse JSON fields that might be sent as strings in FormData
+        json_fields = ["css_variables", "html_elements", "image_styles"]
+        for field in json_fields:
+            if field in data and isinstance(data[field], str):
+                try:
+                    data[field] = json.loads(data[field])
+                except (json.JSONDecodeError, TypeError):
+                    # If parsing fails, let the serializer handle the validation error
+                    pass
+
+        # Create serializer with processed data
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+
+        headers = self.get_success_headers(serializer.data)
+        return Response(
+            serializer.data, status=status.HTTP_201_CREATED, headers=headers
+        )
+
+    def update(self, request, *args, **kwargs):
+        """Handle theme update with image upload and JSON field parsing"""
+        data = request.data.copy()
+
+        # Parse JSON fields that might be sent as strings in FormData
+        json_fields = ["css_variables", "html_elements", "image_styles"]
+        for field in json_fields:
+            if field in data and isinstance(data[field], str):
+                try:
+                    data[field] = json.loads(data[field])
+                except (json.JSONDecodeError, TypeError):
+                    # If parsing fails, let the serializer handle the validation error
+                    pass
+
+        # Get the instance and update with processed data
+        partial = kwargs.pop("partial", False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        if getattr(instance, "_prefetched_objects_cache", None):
+            # If 'prefetch_related' has been applied to a queryset, we need to
+            # forcibly invalidate the prefetch cache on the instance.
+            instance._prefetched_objects_cache = {}
+
+        return Response(serializer.data)
 
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
@@ -239,16 +292,18 @@ class PageThemeViewSet(viewsets.ModelViewSet):
     def ensure_default(self, request):
         """Ensure a default theme exists, create one if necessary"""
         default_theme = PageTheme.get_default_theme()
-        
+
         if default_theme:
             serializer = PageThemeSerializer(default_theme)
-            return Response({
-                "message": f"Default theme ensured: '{default_theme.name}'",
-                "theme": serializer.data,
-                "created": False
-            })
+            return Response(
+                {
+                    "message": f"Default theme ensured: '{default_theme.name}'",
+                    "theme": serializer.data,
+                    "created": False,
+                }
+            )
         else:
             return Response(
-                {"error": "Failed to create default theme"}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {"error": "Failed to create default theme"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )

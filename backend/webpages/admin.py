@@ -73,8 +73,21 @@ class PageThemeAdmin(admin.ModelAdmin):
     readonly_fields = ["created_at", "updated_at"]
 
     fieldsets = (
-        ("Basic Information", {"fields": ("name", "description", "is_active")}),
-        ("Theme Configuration", {"fields": ("css_variables", "custom_css")}),
+        (
+            "Basic Information",
+            {"fields": ("name", "description", "image", "is_active", "is_default")},
+        ),
+        (
+            "Theme Configuration",
+            {
+                "fields": (
+                    "css_variables",
+                    "html_elements",
+                    "image_styles",
+                    "custom_css",
+                )
+            },
+        ),
         (
             "Metadata",
             {

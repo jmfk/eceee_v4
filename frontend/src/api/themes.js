@@ -41,6 +41,19 @@ export const themesApi = {
     }, 'themes.create'),
 
     /**
+     * Create a new theme with image upload
+     * @param {FormData} formData - Theme creation data with image
+     * @returns {Promise<Object>} Created theme
+     */
+    createWithImage: wrapApiCall(async (formData) => {
+        return api.post(endpoints.themes.list, formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            }
+        })
+    }, 'themes.createWithImage'),
+
+    /**
      * Update an existing theme
      * @param {number} themeId - Theme ID
      * @param {Object} themeData - Updated theme data
@@ -49,6 +62,37 @@ export const themesApi = {
     update: wrapApiCall(async (themeId, themeData) => {
         return api.put(endpoints.themes.detail(themeId), themeData)
     }, 'themes.update'),
+
+    /**
+     * Update an existing theme with image upload
+     * @param {number} themeId - Theme ID
+     * @param {FormData} formData - Updated theme data with image
+     * @returns {Promise<Object>} Updated theme
+     */
+    updateWithImage: wrapApiCall(async (themeId, formData) => {
+        return api.put(endpoints.themes.detail(themeId), formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            }
+        })
+    }, 'themes.updateWithImage'),
+
+    /**
+     * Update only the image field of a theme
+     * @param {number} themeId - Theme ID
+     * @param {File} imageFile - Image file to upload
+     * @returns {Promise<Object>} Updated theme
+     */
+    updateImage: wrapApiCall(async (themeId, imageFile) => {
+        const formData = new FormData()
+        formData.append('image', imageFile)
+
+        return api.patch(endpoints.themes.detail(themeId), formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            }
+        })
+    }, 'themes.updateImage'),
 
     /**
      * Delete a theme

@@ -47,6 +47,12 @@ class PageTheme(models.Model):
     custom_css = models.TextField(
         blank=True, help_text="Additional custom CSS for this theme"
     )
+    image = models.ImageField(
+        upload_to="theme_images/",
+        blank=True,
+        null=True,
+        help_text="Theme preview image for listings and selection",
+    )
     is_active = models.BooleanField(default=True)
     is_default = models.BooleanField(
         default=False,
@@ -57,7 +63,7 @@ class PageTheme(models.Model):
     created_by = models.ForeignKey(User, on_delete=models.PROTECT)
 
     class Meta:
-        ordering = ["name"]
+        ordering = ["created_at"]  # Oldest first
 
     def __str__(self):
         return self.name
@@ -72,6 +78,7 @@ class PageTheme(models.Model):
             "html_elements": self.html_elements,
             "image_styles": self.image_styles,
             "custom_css": self.custom_css,
+            "image": self.image.url if self.image else None,
             "is_active": self.is_active,
             "is_default": self.is_default,
             "created_at": self.created_at.isoformat() if self.created_at else None,
