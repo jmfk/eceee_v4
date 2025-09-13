@@ -42,6 +42,7 @@ import NamespaceManager from '../components/NamespaceManager'
 import TagManager from '../components/TagManager'
 import ObjectTypeManager from '../components/ObjectTypeManager'
 import WidgetManager from '../components/WidgetManager'
+import ValueListEditor from '../components/ValueListEditor'
 import { extractErrorMessage } from '../utils/errorHandling.js'
 // Schema managers are no longer embedded in Settings; use dedicated pages under /schemas
 
@@ -56,6 +57,7 @@ const SettingsManager = () => {
         if (path === '/settings/themes') return 'themes'
         if (path === '/settings/widgets') return 'widgets'
         if (path === '/settings/tags') return 'tags'
+        if (path === '/settings/value-lists') return 'value-lists'
         if (path === '/settings/object-types') return 'object-types'
         if (path === '/settings/versions') return 'versions'
         if (path === '/settings/publishing') return 'publishing'
@@ -358,6 +360,8 @@ const SettingsManager = () => {
                 return <WidgetManager />
             case 'tags':
                 return <TagManager />
+            case 'value-lists':
+                return <ValueListEditor />
             case 'object-types':
                 return <ObjectTypeManager />
 

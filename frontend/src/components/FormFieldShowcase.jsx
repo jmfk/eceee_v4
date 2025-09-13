@@ -13,6 +13,7 @@ import FieldTypeTest from './FieldTypeTest'
 import AdvancedFieldDemo from './AdvancedFieldDemo'
 import SpecialFieldsDemo from './SpecialFieldsDemo'
 import AdvancedUIDemo from './AdvancedUIDemo'
+import ValueListsDemo from './ValueListsDemo'
 import { DynamicFormRenderer, EnhancedSchemaDrivenForm } from './forms'
 
 /**
@@ -60,6 +61,12 @@ const FormFieldShowcase = () => {
             title: 'UI Patterns',
             icon: Users,
             description: 'Advanced UI patterns and interactions'
+        },
+        {
+            id: 'value-lists',
+            title: 'Value Lists',
+            icon: List,
+            description: 'Centralized dropdown option management'
         },
         {
             id: 'integration',
@@ -220,6 +227,7 @@ const FormFieldShowcase = () => {
                 {activeDemo === 'advanced' && <AdvancedFieldDemo />}
                 {activeDemo === 'special' && <SpecialFieldsDemo />}
                 {activeDemo === 'ui-patterns' && <AdvancedUIDemo />}
+                {activeDemo === 'value-lists' && <ValueListsDemo />}
                 {activeDemo === 'dynamic-forms' && (
                     <div className="space-y-6">
                         <h2 className="text-2xl font-bold text-gray-900">Dynamic Form Examples</h2>

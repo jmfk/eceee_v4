@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Grid3X3, Palette, Settings as Cog, Calendar, FolderOpen, Code, ChevronDown, Hash, Database, Package, Menu } from 'lucide-react'
+import { Grid3X3, Palette, Settings as Cog, Calendar, FolderOpen, Code, ChevronDown, Hash, Database, Package, Menu, List } from 'lucide-react'
 import { themesApi } from '../api'
 import { objectTypesApi } from '../api/objectStorage'
 import { layoutsApi } from '../api/layouts'
+import { valueListsApi } from '../api/valueLists'
 
 const tabs = [
     { id: 'layouts', label: 'Layouts', icon: Grid3X3, href: '/settings/layouts' },
     { id: 'themes', label: 'Themes', icon: Palette, href: '/settings/themes' },
     { id: 'widgets', label: 'Widgets', icon: Package, href: '/settings/widgets' },
     { id: 'tags', label: 'Tags', icon: Hash, href: '/settings/tags' },
+    { id: 'value-lists', label: 'Value Lists', icon: List, href: '/settings/value-lists' },
     { id: 'object-types', label: 'Object Types', icon: Database, href: '/settings/object-types' },
     { id: 'versions', label: 'Versions', icon: Cog, href: '/settings/versions' },
     { id: 'publishing', label: 'Publishing Workflow', icon: Calendar, href: '/settings/publishing' },
@@ -96,6 +98,21 @@ export default function SettingsTabs() {
         staleTime: 5 * 60 * 1000, // 5 minutes
     })
 
+    // Fetch value lists for the value lists submenu
+    const { data: valueLists = [] } = useQuery({
+        queryKey: ['value-lists'],
+        queryFn: async () => {
+            try {
+                const response = await valueListsApi.list()
+                return response.results || response.data || []
+            } catch (error) {
+                console.error('Error fetching value lists:', error)
+                return []
+            }
+        },
+        staleTime: 5 * 60 * 1000, // 5 minutes
+    })
+
     // For widgets, we'll use a static list since they're code-based
     const coreWidgets = [
         { id: 'content-widget', label: 'Content Widget', description: 'Rich text and HTML content' },
@@ -111,7 +128,7 @@ export default function SettingsTabs() {
     // Organized navigation structure with submenus
     const navigationStructure = {
         core: [
-            { id: 'tags', label: 'Tags', icon: Hash, href: '/settings/tags' },
+            { id: 'tags', label: 'Tags', icon: Hash, href: '/settings/tags', description: 'Manage content tags' },
         ],
         layouts: {
             id: 'layouts',
@@ -144,6 +161,23 @@ export default function SettingsTabs() {
                     description: theme.description || 'Edit this theme',
                     isTheme: true,
                     themeData: theme
+                })) : [])
+            ]
+        },
+        valueLists: {
+            id: 'valueLists',
+            label: 'Value Lists',
+            icon: List,
+            items: [
+                { id: 'value-lists-overview', label: 'Value List Manager', icon: List, href: '/settings/value-lists', description: 'Manage all value lists' },
+                ...(Array.isArray(valueLists) ? valueLists.map(valueList => ({
+                    id: `value-list-${valueList.id}`,
+                    label: valueList.name,
+                    icon: List,
+                    href: `/settings/value-lists?edit=${valueList.id}`,
+                    description: valueList.description || `Edit ${valueList.name}`,
+                    isValueList: true,
+                    valueListData: valueList
                 })) : [])
             ]
         },
@@ -206,6 +240,7 @@ export default function SettingsTabs() {
         ...navigationStructure.core,
         ...navigationStructure.layouts.items,
         ...navigationStructure.themes.items,
+        ...navigationStructure.valueLists.items,
         ...navigationStructure.widgets.items,
         ...navigationStructure.objectTypes.items,
         ...navigationStructure.system.items,
@@ -420,6 +455,63 @@ export default function SettingsTabs() {
                                                                                 Default
                                                                             </span>
                                                                         )}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </Link>
+                                                )
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Value Lists Submenu */}
+                                <div className="border-t border-gray-100">
+                                    <button
+                                        onClick={() => toggleSubmenu('valueLists')}
+                                        className="w-full flex items-center justify-between px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                    >
+                                        <div className="flex items-center">
+                                            <List className="w-5 h-5 mr-3 flex-shrink-0 text-gray-400" />
+                                            <span className="font-medium">Value Lists</span>
+                                        </div>
+                                        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${expandedMenus.has('valueLists') ? 'rotate-180' : ''}`} />
+                                    </button>
+
+                                    {expandedMenus.has('valueLists') && (
+                                        <div className="bg-gray-50">
+                                            {navigationStructure.valueLists.items.map((item) => {
+                                                const Icon = item.icon
+                                                const active = isActive(item)
+                                                return (
+                                                    <Link
+                                                        key={item.id}
+                                                        to={item.href}
+                                                        onClick={() => setShowDropdown(false)}
+                                                        className={`flex items-center px-8 py-2 text-sm transition-colors ${active
+                                                            ? 'text-blue-600 bg-blue-50 border-r-2 border-blue-600'
+                                                            : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
+                                                            }`}
+                                                    >
+                                                        <Icon className={`w-4 h-4 mr-3 flex-shrink-0 ${active ? 'text-blue-600' : 'text-gray-400'}`} />
+                                                        <div className="min-w-0 flex-1">
+                                                            <div className="flex items-center justify-between">
+                                                                <div className="min-w-0">
+                                                                    <p className="font-medium truncate">{item.label}</p>
+                                                                    <p className="text-xs text-gray-500 truncate">{item.description}</p>
+                                                                </div>
+                                                                {item.isValueList && (
+                                                                    <div className="flex items-center space-x-1 ml-2">
+                                                                        <span className={`px-1.5 py-0.5 text-xs rounded ${item.valueListData?.is_active
+                                                                            ? 'bg-green-100 text-green-700'
+                                                                            : 'bg-gray-100 text-gray-700'
+                                                                            }`}>
+                                                                            {item.valueListData?.value_type}
+                                                                        </span>
+                                                                        <span className="px-1.5 py-0.5 text-xs bg-blue-100 text-blue-700 rounded">
+                                                                            {item.valueListData?.item_count || 0}
+                                                                        </span>
                                                                     </div>
                                                                 )}
                                                             </div>

@@ -1,5 +1,6 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import ValidatedInput from '../validation/ValidatedInput'
+import { valueListsApi } from '../../api/valueLists'
 
 /**
  * SelectInput Component
@@ -18,8 +19,39 @@ const SelectInput = ({
     disabled,
     placeholder = 'Select an option...',
     options = [],
+    valueListName = null, // Name of value list to load options from
     ...props
 }) => {
+    const [valueListOptions, setValueListOptions] = useState([])
+    const [loadingValueList, setLoadingValueList] = useState(false)
+
+    // Load value list options if valueListName is provided
+    useEffect(() => {
+        if (valueListName) {
+            loadValueListOptions()
+        }
+    }, [valueListName])
+
+    const loadValueListOptions = async () => {
+        try {
+            setLoadingValueList(true)
+            const response = await valueListsApi.getForFields()
+            const valueList = response.value_lists?.find(vl => vl.slug === valueListName)
+
+            if (valueList) {
+                setValueListOptions(valueList.items || [])
+            } else {
+                console.warn(`Value list '${valueListName}' not found`)
+                setValueListOptions([])
+            }
+        } catch (error) {
+            console.error('Failed to load value list options:', error)
+            setValueListOptions([])
+        } finally {
+            setLoadingValueList(false)
+        }
+    }
+
     // Handle both array of strings and array of objects
     const normalizeOptions = (opts) => {
         if (!Array.isArray(opts)) return []
@@ -35,7 +67,9 @@ const SelectInput = ({
         })
     }
 
-    const normalizedOptions = normalizeOptions(options)
+    // Use value list options if available, otherwise use provided options
+    const effectiveOptions = valueListName && valueListOptions.length > 0 ? valueListOptions : options
+    const normalizedOptions = normalizeOptions(effectiveOptions)
 
     return (
         <ValidatedInput
@@ -51,13 +85,17 @@ const SelectInput = ({
             {...props}
         >
             {!required && (
-                <option value="">{placeholder}</option>
+                <option value="">{loadingValueList ? 'Loading...' : placeholder}</option>
             )}
-            {normalizedOptions.map((option, index) => (
-                <option key={`${option.value}-${index}`} value={option.value}>
-                    {option.label}
-                </option>
-            ))}
+            {loadingValueList ? (
+                <option disabled>Loading options...</option>
+            ) : (
+                normalizedOptions.map((option, index) => (
+                    <option key={`${option.value}-${index}`} value={option.value}>
+                        {option.label}
+                    </option>
+                ))
+            )}
         </ValidatedInput>
     )
 }

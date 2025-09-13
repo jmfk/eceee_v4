@@ -155,6 +155,7 @@ LOCAL_APPS = [
     # "example_custom_widgets",  # Example of custom site-specific widgets
     "file_manager",  # Comprehensive media file management system
     "object_storage",  # Non-hierarchical object storage system
+    "utils",  # Utility features like value lists and schema system
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS

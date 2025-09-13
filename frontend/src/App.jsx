@@ -173,6 +173,21 @@ function App() {
                       </div>
                     </PrivateRoute>
                   } />
+                  <Route path="/settings/value-lists" element={
+                    <PrivateRoute>
+                      <div className="fixed inset-0 bg-gray-50 flex flex-col">
+                        <Navbar />
+                        <main className="flex-1 overflow-hidden">
+                          <div className="h-full overflow-y-auto">
+                            <div className="container mx-auto px-4 py-8">
+                              <SettingsManager />
+                            </div>
+                          </div>
+                        </main>
+                        <StatusBar customStatusContent={<span>Settings - Value Lists</span>} />
+                      </div>
+                    </PrivateRoute>
+                  } />
                   <Route path="/settings/object-types" element={
                     <PrivateRoute>
                       <div className="fixed inset-0 bg-gray-50 flex flex-col">

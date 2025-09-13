@@ -6,6 +6,7 @@
  */
 
 import { Type, Hash, Calendar, ToggleLeft, Image, FileText, Link, Mail, List, Users, Database, Palette, Sliders, Tag, CalendarRange, Command, Search, AtSign, TreePine, ArrowLeftRight, Filter, GripVertical, Star, ToggleRight, Calculator } from 'lucide-react'
+import apiClient from '../api/client'
 
 // Icon mapping for field categories and types
 const FIELD_ICONS = {
@@ -87,20 +88,8 @@ class FieldTypeRegistry {
      */
     async _fetchFieldTypes() {
         try {
-            const response = await fetch('/api/v1/utils/field-types/', {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json',
-                    // Add authentication headers if needed
-                    // 'Authorization': `Bearer ${getToken()}`,
-                },
-            })
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`)
-            }
-
-            const data = await response.json()
+            const response = await apiClient.get('/api/v1/utils/field-types/')
+            const data = response.data
 
             // Process and register field types from backend
             if (data.fieldTypes && Array.isArray(data.fieldTypes)) {
