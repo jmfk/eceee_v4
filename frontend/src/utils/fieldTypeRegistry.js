@@ -5,7 +5,7 @@
  * Provides dynamic loading of field type definitions and component mappings.
  */
 
-import { Type, Hash, Calendar, ToggleLeft, Image, FileText, Link, Mail, List, Users, Database } from 'lucide-react'
+import { Type, Hash, Calendar, ToggleLeft, Image, FileText, Link, Mail, List, Users, Database, Palette, Sliders, Tag, CalendarRange } from 'lucide-react'
 
 // Icon mapping for field categories and types
 const FIELD_ICONS = {
@@ -30,6 +30,11 @@ const FIELD_ICONS = {
     multi_choice: List,
     user_reference: Users,
     object_reference: Database,
+    // Advanced field types
+    color: Palette,
+    slider: Sliders,
+    tags: Tag,
+    date_range: CalendarRange,
 }
 
 class FieldTypeRegistry {

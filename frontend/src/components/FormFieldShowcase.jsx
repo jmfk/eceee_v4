@@ -10,6 +10,7 @@ import {
     Users
 } from 'lucide-react'
 import FieldTypeTest from './FieldTypeTest'
+import AdvancedFieldDemo from './AdvancedFieldDemo'
 import { DynamicFormRenderer, EnhancedSchemaDrivenForm } from './forms'
 
 /**
@@ -41,6 +42,12 @@ const FormFieldShowcase = () => {
             description: 'Schema-driven dynamic form rendering'
         },
         {
+            id: 'advanced',
+            title: 'Advanced Fields',
+            icon: Palette,
+            description: 'Advanced field types and capabilities'
+        },
+        {
             id: 'integration',
             title: 'System Integration',
             icon: Settings,
@@ -49,13 +56,16 @@ const FormFieldShowcase = () => {
     ]
 
     const systemStats = {
-        fieldTypes: 17,
-        components: 12,
-        integrations: 3,
+        fieldTypes: 21,
+        components: 15,
+        integrations: 4,
         features: [
             'Backend-driven field type definitions',
             'Dynamic component loading',
             'Real-time validation integration',
+            'Advanced field types (color, slider, tags, date range)',
+            'Password strength indicators',
+            'Multi-select with search and tagging',
             'Accessibility compliance',
             'Mobile responsive design',
             'Extensible architecture'
@@ -193,6 +203,7 @@ const FormFieldShowcase = () => {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 {activeDemo === 'overview' && renderOverview()}
                 {activeDemo === 'field-types' && <FieldTypeTest />}
+                {activeDemo === 'advanced' && <AdvancedFieldDemo />}
                 {activeDemo === 'dynamic-forms' && (
                     <div className="space-y-6">
                         <h2 className="text-2xl font-bold text-gray-900">Dynamic Form Examples</h2>

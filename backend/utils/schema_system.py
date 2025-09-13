@@ -270,6 +270,84 @@ class FieldTypeRegistry:
                     "searchable": True,
                 },
             },
+            # Advanced field types
+            {
+                "key": "color",
+                "label": "Color Picker",
+                "json_schema_type": "string",
+                "component": "ColorInput",
+                "config_component": "ColorConfig",
+                "category": "input",
+                "description": "Color picker with presets and eyedropper",
+                "validation_rules": {
+                    "pattern": {"type": "string"},
+                    "format": {"type": "string", "enum": ["color"]},
+                },
+                "ui_props": {
+                    "format": "hex",
+                    "showPresets": True,
+                    "showEyeDropper": True,
+                },
+            },
+            {
+                "key": "slider",
+                "label": "Slider",
+                "json_schema_type": "number",
+                "component": "SliderInput",
+                "config_component": "SliderConfig",
+                "category": "input",
+                "description": "Range slider with visual feedback",
+                "validation_rules": {
+                    "minimum": {"type": "number"},
+                    "maximum": {"type": "number"},
+                    "multipleOf": {"type": "number"},
+                },
+                "ui_props": {
+                    "min": 0,
+                    "max": 100,
+                    "step": 1,
+                    "showValue": True,
+                },
+            },
+            {
+                "key": "tags",
+                "label": "Tags",
+                "json_schema_type": "array",
+                "component": "TagInput",
+                "config_component": "TagConfig",
+                "category": "selection",
+                "description": "Tag input with autocomplete and creation",
+                "validation_rules": {
+                    "items": {"type": "string"},
+                    "uniqueItems": {"type": "boolean"},
+                    "maxItems": {"type": "integer"},
+                },
+                "ui_props": {
+                    "allowCreate": True,
+                    "tagColors": True,
+                    "maxTags": 10,
+                },
+            },
+            {
+                "key": "date_range",
+                "label": "Date Range",
+                "json_schema_type": "object",
+                "component": "DateRangeInput",
+                "config_component": "DateRangeConfig",
+                "category": "input",
+                "description": "Date range picker with presets",
+                "validation_rules": {
+                    "properties": {
+                        "start": {"type": "string", "format": "date"},
+                        "end": {"type": "string", "format": "date"},
+                    },
+                    "required": ["start", "end"],
+                },
+                "ui_props": {
+                    "allowSameDate": True,
+                    "showPresets": True,
+                },
+            },
         ]
 
         for field_type in core_types:

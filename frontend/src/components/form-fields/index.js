@@ -24,9 +24,16 @@ export { default as SelectInput } from './SelectInput'
 export { default as MultiSelectInput } from './MultiSelectInput'
 export { default as RadioInput } from './RadioInput'
 export { default as CheckboxInput } from './CheckboxInput'
+export { default as TagInput } from './TagInput'
+
+// Advanced Components
+export { default as ColorInput } from './ColorInput'
+export { default as SliderInput } from './SliderInput'
+export { default as DateRangeInput } from './DateRangeInput'
 
 // TODO: Add more components as they are implemented
 // export { default as RichTextInput } from './RichTextInput'
+// export { default as AddressInput } from './AddressInput'
 // export { default as ImageInput } from './ImageInput'
 // export { default as FileInput } from './FileInput'
 
@@ -46,6 +53,10 @@ export const FIELD_COMPONENTS = {
     MultiSelectInput: () => import('./MultiSelectInput'),
     RadioInput: () => import('./RadioInput'),
     CheckboxInput: () => import('./CheckboxInput'),
+    TagInput: () => import('./TagInput'),
+    ColorInput: () => import('./ColorInput'),
+    SliderInput: () => import('./SliderInput'),
+    DateRangeInput: () => import('./DateRangeInput'),
     // TODO: Add more components
 }
 

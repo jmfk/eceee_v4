@@ -108,10 +108,32 @@ const FieldTypeTest = () => {
                 fieldType: 'boolean',
                 title: 'Active Status',
                 description: 'Are you currently active?'
+            },
+            favoriteColor: {
+                fieldType: 'color',
+                title: 'Favorite Color',
+                description: 'Pick your favorite color'
+            },
+            priority: {
+                fieldType: 'slider',
+                title: 'Priority Level',
+                description: 'Set your priority level (1-10)',
+                minimum: 1,
+                maximum: 10
+            },
+            skills: {
+                fieldType: 'tags',
+                title: 'Skills',
+                description: 'Add your skills as tags'
+            },
+            projectDuration: {
+                fieldType: 'date_range',
+                title: 'Project Duration',
+                description: 'Select project start and end dates'
             }
         },
         required: ['name', 'email', 'age'],
-        propertyOrder: ['name', 'email', 'website', 'password', 'age', 'birthDate', 'appointmentTime', 'preferredTime', 'bio', 'country', 'interests', 'preferredContact', 'isActive']
+        propertyOrder: ['name', 'email', 'website', 'password', 'age', 'birthDate', 'appointmentTime', 'preferredTime', 'bio', 'country', 'interests', 'preferredContact', 'isActive', 'favoriteColor', 'priority', 'skills', 'projectDuration']
     }
 
     const handleFormChange = (fieldName, value) => {
