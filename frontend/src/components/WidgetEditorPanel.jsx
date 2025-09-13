@@ -494,6 +494,31 @@ const WidgetEditorPanel = forwardRef(({
             return null // Don't render these fields
         }
 
+        // Check if field specifies a custom component (from Pydantic json_schema_extra)
+        if (fieldSchema.component) {
+            // Use SchemaFieldRenderer for fields with custom components
+            const SchemaFieldRenderer = React.lazy(() => import('./forms/SchemaFieldRenderer.jsx'))
+            const validation = validationResults[fieldName]
+
+            return (
+                <React.Suspense
+                    key={fieldName}
+                    fallback={<div className="animate-pulse h-16 bg-gray-100 rounded"></div>}
+                >
+                    <SchemaFieldRenderer
+                        fieldName={fieldName}
+                        fieldSchema={fieldSchema}
+                        value={value}
+                        onChange={(newValue) => handleFieldChange(fieldName, newValue)}
+                        validation={validation}
+                        isValidating={isValidating}
+                        required={activeSchema?.required?.includes(fieldName) || false}
+                        disabled={false}
+                    />
+                </React.Suspense>
+            )
+        }
+
         // Special handling for common widget fields
         const isColorField = fieldName.toLowerCase().includes('color') || fieldSchema.format === 'color'
         const isUrlField = fieldName.toLowerCase().includes('url') || fieldSchema.format === 'uri'

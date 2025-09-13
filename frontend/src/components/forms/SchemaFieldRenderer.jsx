@@ -1,6 +1,6 @@
 import React, { Suspense } from 'react'
 import { fieldTypeRegistry } from '../../utils/fieldTypeRegistry'
-import { getFieldComponent } from '../form-fields'
+import { getFieldComponent, FIELD_COMPONENTS } from '../form-fields'
 import { Loader2 } from 'lucide-react'
 
 /**
@@ -22,7 +22,12 @@ const SchemaFieldRenderer = ({
 }) => {
     // Map JSON Schema type/format to our field type system
     const mapSchemaToFieldType = (schema) => {
-        const { type, format, enum: enumValues } = schema
+        const { type, format, enum: enumValues, controlType } = schema
+
+        // First check for explicit controlType from json_schema_extra
+        if (controlType) {
+            return controlType
+        }
 
         // Handle enum fields
         if (enumValues && Array.isArray(enumValues)) {
@@ -67,10 +72,50 @@ const SchemaFieldRenderer = ({
         }
     }
 
-    // Get the appropriate field type
-    const fieldType = mapSchemaToFieldType(fieldSchema)
+    // Check if schema specifies a direct component (from Pydantic json_schema_extra)
+    const componentName = fieldSchema.component
 
-    // Get field type definition from registry
+    if (componentName) {
+        // Use the component directly from schema
+        const FieldComponent = React.lazy(() => {
+            if (FIELD_COMPONENTS[componentName]) {
+                return FIELD_COMPONENTS[componentName]()
+            }
+            // Fallback to TextInput if component not found
+            console.warn(`Field component '${componentName}' not found, falling back to TextInput`)
+            return FIELD_COMPONENTS.TextInput()
+        })
+
+        // Prepare props for the field component
+        const fieldProps = {
+            value,
+            onChange,
+            validation,
+            isValidating,
+            label: fieldSchema.title || fieldName,
+            description: fieldSchema.description,
+            required,
+            disabled,
+            placeholder: fieldSchema.placeholder,
+            // Pass all schema properties as props (for options, min, max, etc.)
+            ...fieldSchema,
+            ...props
+        }
+
+        return (
+            <Suspense fallback={
+                <div className="flex items-center space-x-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span className="text-sm text-gray-500">Loading...</span>
+                </div>
+            }>
+                <FieldComponent {...fieldProps} />
+            </Suspense>
+        )
+    }
+
+    // Fallback: Use field type registry for non-Pydantic fields
+    const fieldType = mapSchemaToFieldType(fieldSchema)
     const fieldTypeDef = fieldTypeRegistry.getFieldType(fieldType)
 
     if (!fieldTypeDef) {
@@ -96,8 +141,15 @@ const SchemaFieldRenderer = ({
         )
     }
 
-    // Dynamically load the field component
-    const FieldComponent = React.lazy(() => getFieldComponent(fieldTypeDef.component))
+    // Dynamically load the field component from registry
+    const FieldComponent = React.lazy(() => {
+        if (FIELD_COMPONENTS[fieldTypeDef.component]) {
+            return FIELD_COMPONENTS[fieldTypeDef.component]()
+        }
+        // Fallback to TextInput if component not found
+        console.warn(`Field component '${fieldTypeDef.component}' not found, falling back to TextInput`)
+        return FIELD_COMPONENTS.TextInput()
+    })
 
     // Prepare props for the field component
     const fieldProps = {

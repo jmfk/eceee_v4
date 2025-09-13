@@ -1,5 +1,6 @@
 import React from 'react'
-import { Check } from 'lucide-react'
+import { Check, Grid, Play } from 'lucide-react'
+import * as LucideIcons from 'lucide-react'
 
 /**
  * SegmentedControlInput Component
@@ -22,6 +23,7 @@ const SegmentedControlInput = ({
     variant = 'default', // 'default', 'pills', 'buttons'
     fullWidth = false,
     allowDeselect = false, // Allow deselecting in single mode
+    showValue = false, // Show selected value below the control
     ...props
 }) => {
     // Normalize options to consistent format
@@ -172,7 +174,6 @@ const SegmentedControlInput = ({
                     const isSelected = selectedValues.includes(option.value)
                     const isOptionDisabled = option.disabled || false
                     const IconComponent = option.icon
-
                     return (
                         <button
                             key={option.value}
@@ -191,9 +192,22 @@ const SegmentedControlInput = ({
                             title={option.title || option.label}
                             {...props}
                         >
-                            {IconComponent && (
-                                <IconComponent className="w-4 h-4" />
-                            )}
+                            {IconComponent && (() => {
+                                // Handle different icon types
+                                if (typeof IconComponent === 'function') {
+                                    // React component (direct import)
+                                    return <IconComponent className="w-4 h-4" />
+                                } else if (typeof IconComponent === 'string') {
+                                    // String reference to Lucide icon
+                                    const LucideIcon = LucideIcons[IconComponent]
+                                    if (LucideIcon) {
+                                        return <LucideIcon className="w-4 h-4" />
+                                    }
+                                    // Fallback for URLs or other strings
+                                    return <img src={IconComponent} className="w-4 h-4" alt="" />
+                                }
+                                return null
+                            })()}
                             <span>{option.label}</span>
                             {multiple && isSelected && (
                                 <Check className="w-3 h-3 ml-1" />
@@ -223,14 +237,13 @@ const SegmentedControlInput = ({
                     )}
                 </div>
             )}
-
             {/* Labels */}
-            {showLabels && labels.length > 0 && (
+            {options.length > 0 && (
                 <div className="text-xs text-gray-500">
                     <div className="flex justify-between">
-                        {labels.map((labelText, index) => (
+                        {normalizedOptions.map((option, index) => (
                             <span key={index} className="text-center">
-                                {labelText}
+                                {option.label}
                             </span>
                         ))}
                     </div>

@@ -13,12 +13,32 @@ import datetime as dt
 class ContentConfig(BaseModel):
     """Configuration for Content widget"""
 
-    content: str = Field(..., description="HTML content to display")
+    content: str = Field(
+        ...,
+        description="HTML content to display",
+        # Control specifications
+        json_schema_extra={
+            "component": "RichTextInput",
+            "rows": 6,
+            "toolbar": "full",
+        },
+    )
     allow_scripts: bool = Field(
-        False, description="WARNING: Only enable for trusted content"
+        False,
+        description="WARNING: Only enable for trusted content",
+        json_schema_extra={
+            "component": "BooleanInput",
+            "variant": "toggle",
+            "warning": True,
+        },
     )
     sanitize_html: bool = Field(
-        True, description="Sanitize HTML to prevent XSS attacks"
+        True,
+        description="Sanitize HTML to prevent XSS attacks",
+        json_schema_extra={
+            "component": "BooleanInput",
+            "variant": "toggle",
+        },
     )
 
 
@@ -49,19 +69,62 @@ class ImageConfig(BaseModel):
     displayType: Literal["gallery", "carousel"] = Field(
         "gallery",
         description="How to display multiple items (single image display is automatic)",
+        json_schema_extra={
+            "component": "SegmentedControlInput",
+            "variant": "default",
+            "options": [
+                {"value": "gallery", "label": "Gallery", "icon": "Grid"},
+                {"value": "carousel", "label": "Carousel", "icon": "Play"},
+            ],
+        },
     )
     imageStyle: Optional[str] = Field(
         None,
         description="Named image style from the current theme (falls back to default if not found)",
+        json_schema_extra={
+            "component": "SelectInput",
+            "valueListName": "image-styles",  # References a value list
+            "placeholder": "Select image style...",
+        },
     )
     enableLightbox: bool = Field(
-        True, description="Enable lightbox for full-size viewing"
+        True,
+        description="Enable lightbox for full-size viewing",
+        json_schema_extra={
+            "component": "BooleanInput",
+            "variant": "toggle",
+        },
     )
-    autoPlay: bool = Field(False, description="Auto-play videos (if applicable)")
+    autoPlay: bool = Field(
+        False,
+        description="Auto-play videos (if applicable)",
+        json_schema_extra={
+            "component": "BooleanInput",
+            "variant": "toggle",
+        },
+    )
     autoPlayInterval: int = Field(
-        3, ge=1, le=30, description="Auto-play interval in seconds for carousel"
+        3,
+        ge=1,
+        le=30,
+        description="Auto-play interval in seconds for carousel",
+        json_schema_extra={
+            "component": "SliderInput",
+            "min": 1,
+            "max": 30,
+            "step": 1,
+            "unit": "seconds",
+            "showValue": True,
+        },
     )
-    showCaptions: bool = Field(True, description="Display captions")
+    showCaptions: bool = Field(
+        True,
+        description="Display captions",
+        json_schema_extra={
+            "component": "BooleanInput",
+            "variant": "toggle",
+        },
+    )
 
     # Collection support
     collectionId: Optional[str] = Field(
@@ -233,23 +296,103 @@ class FormField(BaseModel):
 class FormsConfig(BaseModel):
     """Configuration for Forms widget"""
 
-    title: str = Field(..., min_length=1, description="Form title")
-    description: Optional[str] = Field(None, description="Form description")
-    fields: List[FormField] = Field(..., min_items=1, description="Form fields")
-    submit_url: Optional[str] = Field(None, description="Form submission URL")
-    submit_method: Literal["POST", "GET"] = Field("POST", description="HTTP method")
+    title: str = Field(
+        ...,
+        min_length=1,
+        description="Form title",
+        json_schema_extra={
+            "component": "TextInput",
+            "placeholder": "Contact Form",
+        },
+    )
+    description: Optional[str] = Field(
+        None,
+        description="Form description",
+        json_schema_extra={
+            "component": "TextareaInput",
+            "rows": 3,
+            "placeholder": "Optional form description...",
+        },
+    )
+    fields: List[FormField] = Field(
+        ...,
+        min_items=1,
+        description="Form fields",
+        json_schema_extra={
+            "component": "ReorderableInput",
+            "allowAdd": True,
+            "allowRemove": True,
+            "allowReorder": True,
+            "itemTemplate": {"name": "", "label": "", "type": "text"},
+        },
+    )
+    submit_url: Optional[str] = Field(
+        None,
+        description="Form submission URL",
+        json_schema_extra={
+            "component": "URLInput",
+            "placeholder": "https://example.com/submit",
+        },
+    )
+    submit_method: Literal["POST", "GET"] = Field(
+        "POST",
+        description="HTTP method",
+        json_schema_extra={
+            "component": "SegmentedControlInput",
+            "variant": "default",
+            "options": [
+                {"value": "POST", "label": "POST"},
+                {"value": "GET", "label": "GET"},
+            ],
+        },
+    )
     success_message: str = Field(
-        "Thank you for your submission!", description="Success message"
+        "Thank you for your submission!",
+        description="Success message",
+        json_schema_extra={
+            "component": "TextareaInput",
+            "rows": 2,
+        },
     )
     error_message: str = Field(
         "There was an error submitting the form. Please try again.",
         description="Error message",
+        json_schema_extra={
+            "component": "TextareaInput",
+            "rows": 2,
+        },
     )
-    submit_button_text: str = Field("Submit", description="Submit button text")
-    reset_button: bool = Field(False, description="Show reset button")
-    ajax_submit: bool = Field(True, description="Submit form via AJAX")
+    submit_button_text: str = Field(
+        "Submit",
+        description="Submit button text",
+        json_schema_extra={
+            "component": "TextInput",
+            "placeholder": "Submit",
+        },
+    )
+    reset_button: bool = Field(
+        False,
+        description="Show reset button",
+        json_schema_extra={
+            "component": "BooleanInput",
+            "variant": "toggle",
+        },
+    )
+    ajax_submit: bool = Field(
+        True,
+        description="Submit form via AJAX",
+        json_schema_extra={
+            "component": "BooleanInput",
+            "variant": "toggle",
+        },
+    )
     redirect_url: Optional[str] = Field(
-        None, description="Redirect URL after submission"
+        None,
+        description="Redirect URL after submission",
+        json_schema_extra={
+            "component": "URLInput",
+            "placeholder": "https://example.com/success",
+        },
     )
     email_notifications: bool = Field(False, description="Send email notifications")
     notification_email: Optional[str] = Field(
