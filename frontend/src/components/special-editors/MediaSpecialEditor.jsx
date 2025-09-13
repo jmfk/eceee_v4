@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { namespacesApi, mediaApi, mediaCollectionsApi, mediaTagsApi } from '../../api'
 import ImageWidget from '../../widgets/core/ImageWidget'
+import { useTheme } from '../../hooks/useTheme'
 
 const MediaSpecialEditor = ({
     widgetData,
@@ -19,6 +20,9 @@ const MediaSpecialEditor = ({
     isClosing = false,
     onConfigChange
 }) => {
+    // Get current theme for image styles
+    const { currentTheme } = useTheme()
+
     // Core state
     const [namespace, setNamespace] = useState(null)
     const [loadingNamespace, setLoadingNamespace] = useState(true)
@@ -58,6 +62,15 @@ const MediaSpecialEditor = ({
     const isCollectionMode = currentCollectionId !== null
     const isFreeImagesMode = !isCollectionMode && currentImages.length > 0
     const isEmpty = !isCollectionMode && currentImages.length === 0
+
+    // Get available image styles from current theme
+    const availableImageStyles = useMemo(() => {
+        if (!currentTheme?.image_styles) return []
+        return Object.keys(currentTheme.image_styles).map(styleName => ({
+            name: styleName,
+            config: currentTheme.image_styles[styleName]
+        }))
+    }, [currentTheme])
 
     // Enhanced config for preview - includes collection images when in collection mode
     const previewConfig = useMemo(() => {
@@ -228,7 +241,6 @@ const MediaSpecialEditor = ({
                 // Refresh collection images to show the new additions
                 await loadCollectionImages(currentCollectionId)
 
-                console.log(`Added ${imageIds.length} images to collection ${currentCollectionId}`)
 
                 // Clear temporary selection and return to overview
                 setTempSelectedImages([])
@@ -259,7 +271,7 @@ const MediaSpecialEditor = ({
                 ...currentConfig,
                 mediaItems: [...currentImages, ...newMediaItems],
                 collectionId: null, // Ensure we stay in free images mode
-                displayType: (currentImages.length + newMediaItems.length) > 1 ? 'gallery' : 'single'
+                displayType: 'gallery' // Default to gallery, widget will handle single image display
             }
 
             // Update local config immediately for UI feedback
@@ -294,11 +306,11 @@ const MediaSpecialEditor = ({
                 randomize: false,
                 maxItems: 0, // 0 = all
                 displayType: 'gallery',
-                galleryColumns: 3
+                imageStyle: null
             },
             mediaItems: [], // Clear individual images when using collection
             displayType: 'gallery',
-            galleryColumns: 3
+            imageStyle: null
         }
 
         // Update local config immediately for UI feedback
@@ -366,7 +378,7 @@ const MediaSpecialEditor = ({
                 height: image.height,
                 thumbnailUrl: image.imgproxyBaseUrl || image.fileUrl
             })),
-            displayType: collectionImages.length > 1 ? 'gallery' : 'single'
+            displayType: 'gallery' // Default to gallery, widget will handle single image display
         }
 
         if (onConfigChange) {
@@ -403,11 +415,11 @@ const MediaSpecialEditor = ({
                 collectionConfig: {
                     randomize: false,
                     maxItems: 0,
-                    displayType: currentImages.length > 1 ? 'gallery' : 'single',
-                    galleryColumns: 3
+                    displayType: 'gallery',
+                    imageStyle: null
                 },
                 mediaItems: [], // Clear individual images since we're now using collection
-                displayType: currentImages.length > 1 ? 'gallery' : 'single'
+                displayType: 'gallery' // Default to gallery, widget will handle single image display
             }
 
             if (onConfigChange) {
@@ -520,9 +532,6 @@ const MediaSpecialEditor = ({
             const uploadedFiles = uploadResult.uploadedFiles || []
             const rejectedFiles = uploadResult.rejectedFiles || []
 
-            console.log('Upload result:', uploadResult)
-            console.log('Uploaded files:', uploadedFiles)
-            console.log('Rejected files:', rejectedFiles)
 
             // Step 2: Handle both new uploads and existing pending files
             const approvalPromises = []
@@ -543,7 +552,6 @@ const MediaSpecialEditor = ({
                         slug: ''
                     }
 
-                    console.log('Auto-approving new file:', uploadedFile.id, 'with data:', approvalData)
                     approvalPromises.push(
                         mediaApi.pendingFiles.approve(uploadedFile.id, approvalData)()
                     )
@@ -565,7 +573,6 @@ const MediaSpecialEditor = ({
                         slug: ''
                     }
 
-                    console.log('Auto-approving existing pending file:', rejectedFile.existingFileId, 'with data:', approvalData)
                     approvalPromises.push(
                         mediaApi.pendingFiles.approve(rejectedFile.existingFileId, approvalData)()
                     )
@@ -579,7 +586,6 @@ const MediaSpecialEditor = ({
                 const successfulApprovals = approvalResults.filter(r => r.status === 'fulfilled')
                 const failedApprovals = approvalResults.filter(r => r.status === 'rejected')
 
-                console.log(`${successfulApprovals.length} files auto-approved`)
 
                 // Extract the approved media files from successful approvals
                 successfulApprovals.forEach((result, index) => {
@@ -615,7 +621,7 @@ const MediaSpecialEditor = ({
                     ...currentConfig,
                     mediaItems: [...currentImages, ...newMediaItems],
                     collectionId: null, // Clear collection when adding individual images
-                    displayType: (currentImages.length + newMediaItems.length) > 1 ? 'gallery' : 'single'
+                    displayType: 'gallery' // Default to gallery, widget will handle single image display
                 }
 
                 // Update local config immediately for UI feedback
@@ -625,7 +631,6 @@ const MediaSpecialEditor = ({
                     onConfigChange(updatedConfig)
                 }
 
-                console.log(`${newMediaItems.length} approved images added to widget`)
             }
 
             // Handle results
@@ -634,12 +639,9 @@ const MediaSpecialEditor = ({
             const stillPending = totalUploaded - autoApproved
 
             if (totalUploaded > 0) {
-                console.log(`${totalUploaded} files uploaded successfully`)
                 if (autoApproved > 0) {
-                    console.log(`${autoApproved} files auto-approved (had tags)`)
                 }
                 if (stillPending > 0) {
-                    console.log(`${stillPending} files pending approval (no tags)`)
                 }
 
                 // Clear pending uploads
@@ -768,7 +770,6 @@ const MediaSpecialEditor = ({
                                             onClick={(e) => {
                                                 e.stopPropagation()
                                                 // TODO: Edit collection image
-                                                console.log('Edit collection image:', image.id)
                                             }}
                                             className="p-1 bg-white rounded shadow-sm border border-gray-200 text-gray-700 hover:text-blue-600 hover:border-blue-300 transition-colors"
                                             title="Edit image"
@@ -779,7 +780,6 @@ const MediaSpecialEditor = ({
                                             onClick={(e) => {
                                                 e.stopPropagation()
                                                 // TODO: Remove from collection
-                                                console.log('Remove from collection:', image.id)
                                             }}
                                             className="p-1 bg-white rounded shadow-sm border border-gray-200 text-gray-700 hover:text-red-600 hover:border-red-300 transition-colors"
                                             title="Remove from collection"
@@ -1434,7 +1434,6 @@ const MediaSpecialEditor = ({
                                         onClick={(e) => {
                                             e.stopPropagation()
                                             // TODO: Implement remove from collection
-                                            console.log('Remove image from collection:', image.id)
                                         }}
                                     >
                                         <Trash2 className="w-3 h-3" />
@@ -1691,8 +1690,6 @@ const MediaSpecialEditor = ({
                                                 mediaItems: updatedImages
                                             }
 
-                                            console.log('Updating image:', updatedImages[editingItem.index])
-                                            console.log('Updated config:', updatedConfig)
 
                                             if (onConfigChange) {
                                                 onConfigChange(updatedConfig)
@@ -1732,7 +1729,7 @@ const MediaSpecialEditor = ({
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">Display Type</label>
                                     <div className="flex gap-2">
-                                        {['single', 'gallery'].map((type) => (
+                                        {['gallery', 'carousel'].map((type) => (
                                             <button
                                                 key={type}
                                                 onClick={() => setEditingItem(prev => ({
@@ -1744,32 +1741,57 @@ const MediaSpecialEditor = ({
                                                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                                                     }`}
                                             >
-                                                {type === 'single' ? 'Single' : 'Gallery'}
+                                                {type === 'gallery' ? 'Gallery' : 'Carousel'}
                                             </button>
                                         ))}
                                     </div>
                                 </div>
 
-                                {editingItem.config.displayType === 'gallery' && (
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Image Style</label>
+                                    <select
+                                        value={editingItem.config.imageStyle || ''}
+                                        onChange={(e) => setEditingItem(prev => ({
+                                            ...prev,
+                                            config: { ...prev.config, imageStyle: e.target.value || null }
+                                        }))}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    >
+                                        <option value="">Default Style</option>
+                                        {availableImageStyles.map((style) => (
+                                            <option key={style.name} value={style.name}>
+                                                {style.name} ({style.config.alignment || 'center'}, {style.config.galleryColumns || 3} cols)
+                                            </option>
+                                        ))}
+                                    </select>
+                                    {availableImageStyles.length === 0 && (
+                                        <p className="text-sm text-gray-500 mt-1">
+                                            No image styles defined in current theme. Go to Theme Manager to create image styles.
+                                        </p>
+                                    )}
+                                </div>
+
+                                {editingItem.config.displayType === 'carousel' && (
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">Gallery Columns</label>
-                                        <div className="flex gap-2">
-                                            {[1, 2, 3, 4, 5, 6].map((num) => (
-                                                <button
-                                                    key={num}
-                                                    onClick={() => setEditingItem(prev => ({
-                                                        ...prev,
-                                                        config: { ...prev.config, galleryColumns: num }
-                                                    }))}
-                                                    className={`w-8 h-8 rounded-full text-sm font-medium transition-colors ${editingItem.config.galleryColumns === num
-                                                        ? 'bg-blue-600 text-white'
-                                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                                        }`}
-                                                >
-                                                    {num}
-                                                </button>
-                                            ))}
-                                        </div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Auto-play Interval</label>
+                                        <select
+                                            value={editingItem.config.autoPlayInterval || 3}
+                                            onChange={(e) => setEditingItem(prev => ({
+                                                ...prev,
+                                                config: { ...prev.config, autoPlayInterval: parseInt(e.target.value) }
+                                            }))}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        >
+                                            <option value={1}>1 second</option>
+                                            <option value={2}>2 seconds</option>
+                                            <option value={3}>3 seconds</option>
+                                            <option value={4}>4 seconds</option>
+                                            <option value={5}>5 seconds</option>
+                                            <option value={7}>7 seconds</option>
+                                            <option value={10}>10 seconds</option>
+                                            <option value={15}>15 seconds</option>
+                                            <option value={30}>30 seconds</option>
+                                        </select>
                                     </div>
                                 )}
 
@@ -1787,9 +1809,8 @@ const MediaSpecialEditor = ({
                                                 ...currentConfig,
                                                 collectionConfig: editingItem.config,
                                                 displayType: editingItem.config.displayType,
-                                                galleryColumns: editingItem.config.galleryColumns
+                                                imageStyle: editingItem.config.imageStyle
                                             }
-                                            console.log('Updating collection config:', updatedConfig)
                                             if (onConfigChange) {
                                                 onConfigChange(updatedConfig)
                                             }
@@ -1828,7 +1849,7 @@ const MediaSpecialEditor = ({
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">Display Type</label>
                                     <div className="flex gap-2">
-                                        {['single', 'gallery'].map((type) => (
+                                        {['gallery', 'carousel'].map((type) => (
                                             <button
                                                 key={type}
                                                 onClick={() => setEditingItem(prev => ({
@@ -1840,32 +1861,57 @@ const MediaSpecialEditor = ({
                                                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                                                     }`}
                                             >
-                                                {type === 'single' ? 'Single' : 'Gallery'}
+                                                {type === 'gallery' ? 'Gallery' : 'Carousel'}
                                             </button>
                                         ))}
                                     </div>
                                 </div>
 
-                                {editingItem.config.displayType === 'gallery' && (
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Image Style</label>
+                                    <select
+                                        value={editingItem.config.imageStyle || ''}
+                                        onChange={(e) => setEditingItem(prev => ({
+                                            ...prev,
+                                            config: { ...prev.config, imageStyle: e.target.value || null }
+                                        }))}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    >
+                                        <option value="">Default Style</option>
+                                        {availableImageStyles.map((style) => (
+                                            <option key={style.name} value={style.name}>
+                                                {style.name} ({style.config.alignment || 'center'}, {style.config.galleryColumns || 3} cols)
+                                            </option>
+                                        ))}
+                                    </select>
+                                    {availableImageStyles.length === 0 && (
+                                        <p className="text-sm text-gray-500 mt-1">
+                                            No image styles defined in current theme. Go to Theme Manager to create image styles.
+                                        </p>
+                                    )}
+                                </div>
+
+                                {editingItem.config.displayType === 'carousel' && (
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">Gallery Columns</label>
-                                        <div className="flex gap-2">
-                                            {[1, 2, 3, 4, 5, 6].map((num) => (
-                                                <button
-                                                    key={num}
-                                                    onClick={() => setEditingItem(prev => ({
-                                                        ...prev,
-                                                        config: { ...prev.config, galleryColumns: num }
-                                                    }))}
-                                                    className={`w-8 h-8 rounded-full text-sm font-medium transition-colors ${editingItem.config.galleryColumns === num
-                                                        ? 'bg-blue-600 text-white'
-                                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                                        }`}
-                                                >
-                                                    {num}
-                                                </button>
-                                            ))}
-                                        </div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Auto-play Interval</label>
+                                        <select
+                                            value={editingItem.config.autoPlayInterval || 3}
+                                            onChange={(e) => setEditingItem(prev => ({
+                                                ...prev,
+                                                config: { ...prev.config, autoPlayInterval: parseInt(e.target.value) }
+                                            }))}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        >
+                                            <option value={1}>1 second</option>
+                                            <option value={2}>2 seconds</option>
+                                            <option value={3}>3 seconds</option>
+                                            <option value={4}>4 seconds</option>
+                                            <option value={5}>5 seconds</option>
+                                            <option value={7}>7 seconds</option>
+                                            <option value={10}>10 seconds</option>
+                                            <option value={15}>15 seconds</option>
+                                            <option value={30}>30 seconds</option>
+                                        </select>
                                     </div>
                                 )}
 

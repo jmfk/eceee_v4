@@ -1119,7 +1119,6 @@ const SlotEditor = ({ slots = [], onChange, errors }) => {
                 const { widgetsApi } = await import('../api')
                 // Use the correct endpoint with authentication
                 const data = await widgetsApi.getTypes(true) // Include template JSON
-                // console.log('Fetched widget types for object type form:', data)
                 setAvailableWidgets(data || [])
             } catch (error) {
                 console.error('Failed to fetch available widgets:', error)
@@ -1714,7 +1713,6 @@ const WidgetControlManager = ({ widgetControls = [], availableWidgets = [], load
                                 .map((widget, index) => {
                                     const widgetType = widget.type || widget.slug || widget.widget_type
                                     const widgetName = widget.display_name || widget.name || widget.label || widgetType
-                                    // console.log(`Widget ${index}:`, { widgetType, widgetName, widget })
                                     return (
                                         <option key={widgetType || index} value={widgetType}>
                                             {widgetName}

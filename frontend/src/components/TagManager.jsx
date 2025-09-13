@@ -155,16 +155,10 @@ const TagManager = () => {
 
     return (
         <div className="p-6 space-y-6">
-            {/* Header */}
+            {/* Simplified Header */}
             <div className="flex items-center justify-between">
-                <div>
-                    <h2 className="text-2xl font-bold text-gray-900 flex items-center">
-                        <Hash className="w-8 h-8 mr-3 text-blue-600" />
-                        Tag Manager
-                    </h2>
-                    <p className="text-gray-600 mt-1">
-                        Organize your content with tags. Total: {tags.length} tags
-                    </p>
+                <div className="flex items-center">
+                    <span className="text-sm text-gray-500">{tags.length} tags</span>
                 </div>
                 <button
                     onClick={() => setShowTagForm(true)}

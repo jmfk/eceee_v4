@@ -40,6 +40,10 @@ class PageTheme(models.Model):
         default=dict,
         help_text="JSON object defining styles for HTML elements (h1-h6, p, ul, ol, li, a, blockquote, code, pre, etc.)",
     )
+    image_styles = models.JSONField(
+        default=dict,
+        help_text="JSON object defining named image styles for widgets (alignment, columns, spacing, etc.)",
+    )
     custom_css = models.TextField(
         blank=True, help_text="Additional custom CSS for this theme"
     )
@@ -66,6 +70,7 @@ class PageTheme(models.Model):
             "description": self.description,
             "css_variables": self.css_variables,
             "html_elements": self.html_elements,
+            "image_styles": self.image_styles,
             "custom_css": self.custom_css,
             "is_active": self.is_active,
             "is_default": self.is_default,

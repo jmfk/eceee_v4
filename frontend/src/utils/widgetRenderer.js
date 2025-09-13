@@ -74,9 +74,11 @@ export const renderWidgetToHTML = (widget) => {
       `
 
     case 'core_widgets.ImageWidget':
-      const imgSrc = config.image_url || config.imageUrl || ''
-      const altText = config.alt_text || config.altText || 'Image'
-      const caption = config.caption || ''
+      // Note: This HTML fallback renderer only shows the first image in a simplified format
+      // Full gallery/carousel functionality requires the React component
+      const imgSrc = config.image_url || config.imageUrl || (config.mediaItems && config.mediaItems[0] ? config.mediaItems[0].url : '')
+      const altText = config.alt_text || config.altText || (config.mediaItems && config.mediaItems[0] ? config.mediaItems[0].altText : 'Image')
+      const caption = config.caption || (config.mediaItems && config.mediaItems[0] ? config.mediaItems[0].caption : '')
       return `
         <div class="image-widget text-center theme-content widget-content">
           ${imgSrc ?

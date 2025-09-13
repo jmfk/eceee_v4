@@ -46,19 +46,21 @@ class ImageConfig(BaseModel):
     mediaItems: List[ImageMediaItem] = Field(
         default_factory=list, description="List of images/videos to display"
     )
-    displayType: Literal["single", "gallery", "carousel"] = Field(
-        "single", description="How to display multiple items"
+    displayType: Literal["gallery", "carousel"] = Field(
+        "gallery",
+        description="How to display multiple items (single image display is automatic)",
     )
-    alignment: Literal["left", "center", "right"] = Field(
-        "center", description="Alignment"
-    )
-    galleryColumns: int = Field(
-        3, ge=1, le=6, description="Number of columns for gallery layout"
+    imageStyle: Optional[str] = Field(
+        None,
+        description="Named image style from the current theme (falls back to default if not found)",
     )
     enableLightbox: bool = Field(
         True, description="Enable lightbox for full-size viewing"
     )
     autoPlay: bool = Field(False, description="Auto-play videos (if applicable)")
+    autoPlayInterval: int = Field(
+        3, ge=1, le=30, description="Auto-play interval in seconds for carousel"
+    )
     showCaptions: bool = Field(True, description="Display captions")
 
     # Collection support

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Image } from 'lucide-react'
 import { mediaCollectionsApi, namespacesApi } from '../../api'
+import { useTheme } from '../../hooks/useTheme'
 
 /**
  * Image Widget Component
@@ -11,21 +12,56 @@ const ImageWidget = ({ config = {}, mode = 'preview' }) => {
         mediaItems = [],
         collectionId = null,
         collectionConfig = {},
-        displayType = 'single',
-        alignment = 'center',
-        galleryColumns = 3,
+        displayType = 'gallery',
+        imageStyle = null,
         enableLightbox = true,
         autoPlay = false,
+        autoPlayInterval = 3,
         showCaptions = true,
         // Backward compatibility
         imageUrl = '',
         altText = 'Image',
-        caption = ''
+        caption = '',
+        alignment = 'center', // Legacy support
+        galleryColumns = 3 // Legacy support
     } = config
+
+    // Get current theme for image styles
+    const { currentTheme } = useTheme()
 
     // State for collection images
     const [collectionImages, setCollectionImages] = useState([])
     const [loadingCollection, setLoadingCollection] = useState(false)
+
+    // Resolve image style from theme
+    const resolvedImageStyle = React.useMemo(() => {
+        if (!imageStyle || !currentTheme?.image_styles) {
+            // Fallback to legacy values or defaults
+            return {
+                alignment: alignment || 'center',
+                galleryColumns: galleryColumns || 3,
+                spacing: 'normal'
+            }
+        }
+
+        const themeStyle = currentTheme.image_styles[imageStyle]
+        if (!themeStyle) {
+            // Style not found in theme, use default
+            return {
+                alignment: 'center',
+                galleryColumns: 3,
+                spacing: 'normal'
+            }
+        }
+
+        return {
+            alignment: themeStyle.alignment || 'center',
+            galleryColumns: themeStyle.galleryColumns || 3,
+            spacing: themeStyle.spacing || 'normal',
+            borderRadius: themeStyle.borderRadius || 'normal',
+            shadow: themeStyle.shadow || 'sm'
+        }
+    }, [imageStyle, currentTheme, alignment, galleryColumns])
 
     // Load collection images when collectionId is present
     useEffect(() => {
@@ -91,11 +127,6 @@ const ImageWidget = ({ config = {}, mode = 'preview' }) => {
         loadCollectionImages()
     }, [collectionId, collectionConfig])
 
-    console.log("mode", mode)
-    console.log("mediaItems", mediaItems)
-    console.log("collectionId", collectionId)
-    console.log("collectionImages", collectionImages)
-
     // Determine which images to use: collection images or individual media items
     const effectiveMediaItems = collectionId ? collectionImages : mediaItems
 
@@ -125,6 +156,41 @@ const ImageWidget = ({ config = {}, mode = 'preview' }) => {
         right: 'text-right'
     }
 
+    // Generate CSS classes based on resolved image style
+    const getStyleClasses = () => {
+        const classes = []
+
+        // Spacing classes
+        if (resolvedImageStyle.spacing === 'tight') {
+            classes.push('gap-2')
+        } else if (resolvedImageStyle.spacing === 'loose') {
+            classes.push('gap-6')
+        } else {
+            classes.push('gap-4') // normal
+        }
+
+        // Shadow classes
+        if (resolvedImageStyle.shadow === 'none') {
+            // No shadow
+        } else if (resolvedImageStyle.shadow === 'lg') {
+            classes.push('shadow-lg')
+        } else {
+            classes.push('shadow-sm') // default
+        }
+
+        // Border radius classes
+        if (resolvedImageStyle.borderRadius === 'none') {
+            // No border radius
+        } else if (resolvedImageStyle.borderRadius === 'large') {
+            classes.push('rounded-lg')
+        } else if (resolvedImageStyle.borderRadius === 'full') {
+            classes.push('rounded-full')
+        } else {
+            classes.push('rounded') // normal
+        }
+
+        return classes.join(' ')
+    }
 
     const renderMediaItem = (item, index = 0) => {
         if (item.type === 'video') {
@@ -166,8 +232,11 @@ const ImageWidget = ({ config = {}, mode = 'preview' }) => {
             6: 'grid-cols-2 md:grid-cols-6'
         }
 
+        const styleClasses = getStyleClasses()
+        const columns = resolvedImageStyle.galleryColumns
+
         return (
-            <div className={`grid ${gridClasses[galleryColumns] || 'grid-cols-2 md:grid-cols-3'} gap-4`}>
+            <div className={`grid ${gridClasses[columns] || 'grid-cols-2 md:grid-cols-3'} ${styleClasses}`}>
                 {items.map((item, index) => (
                     <div key={index} className="gallery-item">
                         {item.type === 'video' ? (
@@ -203,8 +272,20 @@ const ImageWidget = ({ config = {}, mode = 'preview' }) => {
     }
 
     const renderCarousel = () => {
-        // Simple carousel implementation with navigation
+        // Simple carousel implementation with navigation and autoplay
         const [currentIndex, setCurrentIndex] = React.useState(0)
+        const [isPlaying, setIsPlaying] = React.useState(autoPlay)
+
+        // Auto-play functionality
+        React.useEffect(() => {
+            if (!isPlaying || items.length <= 1) return
+
+            const interval = setInterval(() => {
+                setCurrentIndex(prev => prev < items.length - 1 ? prev + 1 : 0)
+            }, (autoPlayInterval || 3) * 1000)
+
+            return () => clearInterval(interval)
+        }, [isPlaying, items.length, autoPlayInterval])
 
         if (items.length === 0) return null
 
@@ -229,23 +310,41 @@ const ImageWidget = ({ config = {}, mode = 'preview' }) => {
                 {items.length > 1 && (
                     <>
                         <button
-                            onClick={() => setCurrentIndex(prev => prev > 0 ? prev - 1 : items.length - 1)}
+                            onClick={() => {
+                                setCurrentIndex(prev => prev > 0 ? prev - 1 : items.length - 1)
+                                setIsPlaying(false) // Pause autoplay when manually navigating
+                            }}
                             className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-white bg-opacity-80 hover:bg-opacity-100 rounded-full p-2 shadow-md transition-all"
                         >
                             ←
                         </button>
                         <button
-                            onClick={() => setCurrentIndex(prev => prev < items.length - 1 ? prev + 1 : 0)}
+                            onClick={() => {
+                                setCurrentIndex(prev => prev < items.length - 1 ? prev + 1 : 0)
+                                setIsPlaying(false) // Pause autoplay when manually navigating
+                            }}
                             className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-white bg-opacity-80 hover:bg-opacity-100 rounded-full p-2 shadow-md transition-all"
                         >
                             →
+                        </button>
+
+                        {/* Play/Pause button */}
+                        <button
+                            onClick={() => setIsPlaying(prev => !prev)}
+                            className="absolute top-2 right-2 bg-white bg-opacity-80 hover:bg-opacity-100 rounded-full p-2 shadow-md transition-all"
+                            title={isPlaying ? 'Pause slideshow' : 'Play slideshow'}
+                        >
+                            {isPlaying ? '⏸️' : '▶️'}
                         </button>
 
                         <div className="flex justify-center mt-4 gap-2">
                             {items.map((_, index) => (
                                 <button
                                     key={index}
-                                    onClick={() => setCurrentIndex(index)}
+                                    onClick={() => {
+                                        setCurrentIndex(index)
+                                        setIsPlaying(false) // Pause autoplay when manually selecting
+                                    }}
                                     className={`w-2 h-2 rounded-full transition-colors ${index === currentIndex ? 'bg-blue-600' : 'bg-gray-300'
                                         }`}
                                 />
@@ -256,21 +355,24 @@ const ImageWidget = ({ config = {}, mode = 'preview' }) => {
             </div>
         )
     }
-    console.log("items", items)
+
     if (mode === 'editor') {
         return (
             <div className="image-widget-editor p-4">
-                <div className={`${alignmentClasses[alignment]}`}>
+                <div className={`${alignmentClasses[resolvedImageStyle.alignment]}`}>
                     {items.length > 0 ? (
-                        displayType === 'gallery' ? renderGallery() :
-                            displayType === 'carousel' ? renderCarousel() : (
-                                <div>
-                                    {renderMediaItem(items[0])}
-                                    {showCaptions && items[0].caption && (
-                                        <p className="text-sm text-gray-600 mt-2 italic">{items[0].caption}</p>
-                                    )}
-                                </div>
-                            )
+                        items.length === 1 ? (
+                            // Single image display regardless of displayType setting
+                            <div>
+                                {renderMediaItem(items[0])}
+                                {showCaptions && items[0].caption && (
+                                    <p className="text-sm text-gray-600 mt-2 italic">{items[0].caption}</p>
+                                )}
+                            </div>
+                        ) : (
+                            // Multiple images: use displayType setting
+                            displayType === 'carousel' ? renderCarousel() : renderGallery()
+                        )
                     ) : (
                         <div className="bg-gray-200 h-32 rounded flex items-center justify-center text-gray-500">
                             <Image className="h-8 w-8 mr-2" />
@@ -284,7 +386,7 @@ const ImageWidget = ({ config = {}, mode = 'preview' }) => {
 
     if (items.length === 0) {
         return (
-            <div className={`image-widget ${alignmentClasses[alignment]}`}>
+            <div className={`image-widget ${alignmentClasses[resolvedImageStyle.alignment]}`}>
                 <div className="bg-gray-200 h-32 rounded flex items-center justify-center text-gray-500">
                     <Image className="h-8 w-8 mr-2" />
                     No media
@@ -294,16 +396,19 @@ const ImageWidget = ({ config = {}, mode = 'preview' }) => {
     }
 
     return (
-        <div className={`image-widget ${alignmentClasses[alignment]} mx-auto`}>
-            {displayType === 'gallery' ? renderGallery() :
-                displayType === 'carousel' ? renderCarousel() : (
-                    <div>
-                        {renderMediaItem(items[0])}
-                        {showCaptions && items[0].caption && (
-                            <p className="text-sm text-gray-600 mt-2">{items[0].caption}</p>
-                        )}
-                    </div>
-                )}
+        <div className={`image-widget ${alignmentClasses[resolvedImageStyle.alignment]} mx-auto`}>
+            {items.length === 1 ? (
+                // Single image display regardless of displayType setting
+                <div>
+                    {renderMediaItem(items[0])}
+                    {showCaptions && items[0].caption && (
+                        <p className="text-sm text-gray-600 mt-2">{items[0].caption}</p>
+                    )}
+                </div>
+            ) : (
+                // Multiple images: use displayType setting
+                displayType === 'carousel' ? renderCarousel() : renderGallery()
+            )}
         </div>
     )
 }
@@ -315,16 +420,18 @@ ImageWidget.widgetType = 'core_widgets.ImageWidget'
 // Default configuration
 ImageWidget.defaultConfig = {
     mediaItems: [],
-    displayType: 'single',
-    alignment: 'center',
-    galleryColumns: 3,
+    displayType: 'gallery',
+    imageStyle: null, // Will use theme default or fallback to legacy values
     enableLightbox: true,
     autoPlay: false,
+    autoPlayInterval: 3,
     showCaptions: true,
     // Backward compatibility
     imageUrl: '',
     altText: '',
-    caption: ''
+    caption: '',
+    alignment: 'center', // Legacy fallback
+    galleryColumns: 3 // Legacy fallback
 }
 
 // Display metadata
