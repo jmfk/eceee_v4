@@ -98,18 +98,18 @@ def validate_url(url: str) -> bool:
 async def handle_cookie_consent(page: Page) -> bool:
     """
     Automatically handle cookie consent dialogs and banners.
-    
+
     This function looks for common cookie consent patterns and attempts
     to accept or dismiss them to get a clean screenshot.
-    
+
     Args:
         page: The Playwright page object
-        
+
     Returns:
         bool: True if any cookie dialogs were handled, False otherwise
     """
     handled = False
-    
+
     # Common cookie consent button selectors (in order of preference)
     accept_selectors = [
         # Generic "Accept" buttons
@@ -122,7 +122,6 @@ async def handle_cookie_consent(page: Page) -> bool:
         'button:has-text("Got it")',
         'button:has-text("OK")',
         'button:has-text("Agree and continue")',
-        
         # Common class names and IDs
         'button[class*="accept"]',
         'button[class*="consent"]',
@@ -130,16 +129,14 @@ async def handle_cookie_consent(page: Page) -> bool:
         'button[id*="accept"]',
         'button[id*="consent"]',
         'button[id*="cookie"]',
-        
         # Specific popular cookie consent solutions
         '[data-testid="uc-accept-all-button"]',  # Usercentrics
-        '#onetrust-accept-btn-handler',  # OneTrust
-        '.ot-sdk-show-settings, .optanon-allow-all',  # OneTrust variants
+        "#onetrust-accept-btn-handler",  # OneTrust
+        ".ot-sdk-show-settings, .optanon-allow-all",  # OneTrust variants
         '[data-cy="consent-banner-accept"]',  # Custom implementations
-        '.cookie-consent-accept',
-        '.gdpr-accept',
-        '.privacy-accept',
-        
+        ".cookie-consent-accept",
+        ".gdpr-accept",
+        ".privacy-accept",
         # Language-specific variants
         'button:has-text("Accepter")',  # French
         'button:has-text("Akzeptieren")',  # German
@@ -149,7 +146,7 @@ async def handle_cookie_consent(page: Page) -> bool:
         'button:has-text("Godkänn")',  # Swedish
         'button:has-text("Accepteren")',  # Dutch
     ]
-    
+
     # Try to find and click accept buttons
     for selector in accept_selectors:
         try:
@@ -168,7 +165,7 @@ async def handle_cookie_consent(page: Page) -> bool:
         except Exception:
             # Continue to next selector if this one fails
             continue
-    
+
     # If no accept button found, try to dismiss/close the dialog
     if not handled:
         dismiss_selectors = [
@@ -177,11 +174,11 @@ async def handle_cookie_consent(page: Page) -> bool:
             'button:has-text("Dismiss")',
             'button[aria-label="Close"]',
             'button[aria-label="Dismiss"]',
-            '.close-button',
-            '.dismiss-button',
+            ".close-button",
+            ".dismiss-button",
             '[data-dismiss="modal"]',
         ]
-        
+
         for selector in dismiss_selectors:
             try:
                 await page.wait_for_selector(selector, timeout=1000)
@@ -194,12 +191,13 @@ async def handle_cookie_consent(page: Page) -> bool:
                     break
             except Exception:
                 continue
-    
+
     # Try to hide cookie banners with CSS if buttons don't work
     if not handled:
         try:
             # Hide common cookie banner containers
-            await page.add_style_tag(content="""
+            await page.add_style_tag(
+                content="""
                 /* Hide common cookie consent banners */
                 [class*="cookie" i][class*="banner" i],
                 [class*="cookie" i][class*="consent" i],
@@ -236,12 +234,13 @@ async def handle_cookie_consent(page: Page) -> bool:
                 body {
                     overflow: auto !important;
                 }
-            """)
+            """
+            )
             handled = True
             logger.info("Applied CSS to hide cookie banners")
         except Exception as e:
             logger.debug(f"Failed to apply CSS cookie banner hiding: {e}")
-    
+
     return handled
 
 
@@ -369,18 +368,35 @@ def render_website(url: str, config: Optional[Dict[str, Any]] = None) -> bytes:
     Raises:
         WebsiteRenderingError: If rendering fails
     """
-    try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+    # Always create a new event loop for each request to avoid conflicts
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
 
     try:
         return loop.run_until_complete(render_website_async(url, config))
     finally:
-        # Clean up the loop if we created it
-        if not loop.is_running():
+        # Always close the loop we created
+        try:
+            # Cancel all pending tasks
+            pending = asyncio.all_tasks(loop)
+            for task in pending:
+                task.cancel()
+
+            # Wait for all tasks to complete cancellation
+            if pending:
+                loop.run_until_complete(
+                    asyncio.gather(*pending, return_exceptions=True)
+                )
+
+            # Close the loop
             loop.close()
+        except Exception as e:
+            logger.debug(f"Error cleaning up event loop: {e}")
+            # Force close if normal close fails
+            try:
+                loop.close()
+            except Exception:
+                pass
 
 
 @app.route("/health", methods=["GET"])
@@ -437,7 +453,9 @@ def render_website_endpoint():
         if "timeout" in data:
             custom_config["timeout"] = int(data["timeout"])
         if "remove_cookie_warnings" in data:
-            custom_config["remove_cookie_warnings"] = bool(data["remove_cookie_warnings"])
+            custom_config["remove_cookie_warnings"] = bool(
+                data["remove_cookie_warnings"]
+            )
 
         logger.info(f"Rendering website to PNG: {url}")
 
@@ -518,13 +536,13 @@ def validate_website_endpoint():
                     "url": url,
                     "message": "URL is valid and can be rendered",
                     "default_config": DEFAULT_CONFIG,
-                     "available_options": {
-                         "viewport_width": "Width of the browser viewport (default: 1920)",
-                         "viewport_height": "Height of the browser viewport (default: 1080)",
-                         "full_page": "Capture full page or just viewport (default: false)",
-                         "timeout": "Maximum time to wait for page load in milliseconds (default: 30000)",
-                         "remove_cookie_warnings": "Automatically handle cookie consent dialogs (default: true)",
-                     },
+                    "available_options": {
+                        "viewport_width": "Width of the browser viewport (default: 1920)",
+                        "viewport_height": "Height of the browser viewport (default: 1080)",
+                        "full_page": "Capture full page or just viewport (default: false)",
+                        "timeout": "Maximum time to wait for page load in milliseconds (default: 30000)",
+                        "remove_cookie_warnings": "Automatically handle cookie consent dialogs (default: true)",
+                    },
                 }
             )
 
@@ -552,14 +570,14 @@ def index():
                 "POST /render": "Render website to PNG",
                 "POST /validate": "Validate URL without rendering",
             },
-             "example_render_request": {
-                 "url": "https://example.com",
-                 "viewport_width": 1920,
-                 "viewport_height": 1080,
-                 "full_page": False,
-                 "timeout": 30000,
-                 "remove_cookie_warnings": True,
-             },
+            "example_render_request": {
+                "url": "https://example.com",
+                "viewport_width": 1920,
+                "viewport_height": 1080,
+                "full_page": False,
+                "timeout": 30000,
+                "remove_cookie_warnings": True,
+            },
             "example_validate_request": {"url": "https://example.com"},
         }
     )
