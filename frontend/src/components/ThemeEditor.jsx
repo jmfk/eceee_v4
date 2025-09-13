@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useSearchParams } from 'react-router-dom'
 import { themesApi } from '../api'
 import { extractErrorMessage } from '../utils/errorHandling.js'
 import { useNotificationContext } from './NotificationManager'
@@ -19,13 +20,20 @@ import {
     Upload,
     Settings,
     Hash,
-    Type
+    Type,
+    Image as ImageIcon,
+    ChevronDown,
+    Menu,
+    Search,
+    ArrowLeft
 } from 'lucide-react'
 
 const ThemeEditor = () => {
     const [selectedTheme, setSelectedTheme] = useState(null)
     const [isCreating, setIsCreating] = useState(false)
-    const [showPreview, setShowPreview] = useState(false)
+    const [currentView, setCurrentView] = useState('list') // 'list' or 'edit'
+    const [searchTerm, setSearchTerm] = useState('')
+    const [searchParams, setSearchParams] = useSearchParams()
     const queryClient = useQueryClient()
     const { showConfirm } = useNotificationContext()
     const { addNotification } = useGlobalNotifications()
@@ -58,179 +66,485 @@ const ThemeEditor = () => {
         }
     })
 
-    return (
-        <div className="space-y-6">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <h2 className="text-2xl font-bold text-gray-900">Theme Editor</h2>
-                    <p className="text-gray-600 mt-1">
-                        Create and manage page themes with color schemes and styling
-                    </p>
-                </div>
-                <button
-                    onClick={() => setIsCreating(true)}
-                    className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-                >
-                    <Plus className="w-4 h-4 mr-2" />
-                    New Theme
-                </button>
-            </div>
+    // Handle URL parameters for direct theme editing
+    useEffect(() => {
+        const editThemeId = searchParams.get('edit')
+        if (editThemeId && themes.length > 0) {
+            const themeToEdit = themes.find(theme => theme.id.toString() === editThemeId)
+            if (themeToEdit) {
+                setSelectedTheme(themeToEdit)
+                setCurrentView('edit')
+                setIsCreating(false)
+            }
+        }
+    }, [searchParams, themes])
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Themes List */}
-                <div className="lg:col-span-1">
-                    <ThemesList
-                        themes={themes}
-                        selectedTheme={selectedTheme}
-                        onSelectTheme={setSelectedTheme}
-                        isLoading={isLoading}
+    // Filter themes based on search term
+    const filteredThemes = themes.filter(theme =>
+        theme.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        theme.description?.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+
+    const handleCreateNew = () => {
+        setIsCreating(true)
+        setCurrentView('edit')
+    }
+
+    const handleEditTheme = (theme) => {
+        setSelectedTheme(theme)
+        setIsCreating(false)
+        setCurrentView('edit')
+    }
+
+    const handleBackToList = () => {
+        setCurrentView('list')
+        setSelectedTheme(null)
+        setIsCreating(false)
+        // Clear URL parameters
+        setSearchParams({})
+    }
+
+    const handleCreateComplete = () => {
+        queryClient.invalidateQueries(['themes'])
+        handleBackToList()
+    }
+
+    const handleUpdateComplete = (updatedTheme) => {
+        queryClient.invalidateQueries(['themes'])
+        // Update the selected theme with the latest data if provided
+        if (updatedTheme) {
+            setSelectedTheme(updatedTheme)
+        }
+        // Stay on edit view, don't navigate away
+    }
+
+    // List View
+    const ListView = () => (
+        <div className="p-6 max-w-7xl mx-auto">
+            <div className="mb-6">
+                <div className="flex justify-between items-center mb-4">
+                    <div className="flex items-center">
+                        <span className="text-sm text-gray-500">{filteredThemes.length} themes</span>
+                    </div>
+                    <button
+                        onClick={handleCreateNew}
+                        className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md flex items-center transition-colors"
+                    >
+                        <Plus className="h-4 w-4 mr-2" />
+                        New Theme
+                    </button>
+                </div>
+
+                {/* Search */}
+                <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <input
+                        type="text"
+                        placeholder="Search themes..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-10 pr-4 py-2 border border-gray-300 rounded-md w-full max-w-md focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                     />
                 </div>
+            </div>
 
-                {/* Theme Editor Panel */}
-                <div className="lg:col-span-2">
-                    {isCreating && (
-                        <ThemeForm
-                            onSave={() => {
-                                setIsCreating(false)
-                                queryClient.invalidateQueries(['themes'])
+            {/* Loading State */}
+            {isLoading && (
+                <div className="flex justify-center py-12">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+                </div>
+            )}
+
+            {/* Themes Grid */}
+            {!isLoading && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {filteredThemes.map((theme) => (
+                        <ThemeCard
+                            key={theme.id}
+                            theme={theme}
+                            onEdit={handleEditTheme}
+                            onDelete={() => {
+                                // Delete is now handled directly in ThemeCard component
                             }}
-                            onCancel={() => setIsCreating(false)}
                         />
-                    )}
+                    ))}
+                </div>
+            )}
 
-                    {selectedTheme && !isCreating && (
-                        <ThemeEditPanel
-                            theme={selectedTheme}
-                            onUpdate={() => {
-                                queryClient.invalidateQueries(['themes'])
-                                setSelectedTheme(null)
-                            }}
-                            onCancel={() => setSelectedTheme(null)}
-                            showPreview={showPreview}
-                            onTogglePreview={() => setShowPreview(!showPreview)}
-                        />
-                    )}
-
-                    {!selectedTheme && !isCreating && (
-                        <div className="bg-white rounded-lg border-2 border-dashed border-gray-300 p-12 text-center">
-                            <Palette className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                            <h3 className="text-lg font-medium text-gray-900 mb-2">
-                                Select a Theme to Edit
-                            </h3>
-                            <p className="text-gray-500">
-                                Choose a theme from the list or create a new one to get started
-                            </p>
-                        </div>
+            {/* Empty State */}
+            {!isLoading && filteredThemes.length === 0 && (
+                <div className="text-center py-12">
+                    <Palette className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">
+                        {searchTerm ? 'No matching themes' : 'No themes yet'}
+                    </h3>
+                    <p className="text-gray-600 mb-6">
+                        {searchTerm
+                            ? 'Try adjusting your search terms'
+                            : 'Create your first theme to get started'
+                        }
+                    </p>
+                    {!searchTerm && (
+                        <button
+                            onClick={handleCreateNew}
+                            className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md flex items-center mx-auto transition-colors"
+                        >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Create Theme
+                        </button>
                     )}
                 </div>
+            )}
+        </div>
+    )
+
+    // Edit View
+    const EditView = () => (
+        <div className="p-6 max-w-7xl mx-auto">
+            <div className="mb-6">
+                <div className="flex items-center mb-4">
+                    <button
+                        onClick={handleBackToList}
+                        className="mr-3 p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+                        title="Back to themes"
+                    >
+                        <ArrowLeft className="h-5 w-5" />
+                    </button>
+                    <div>
+                        <h1 className="text-lg font-semibold text-gray-900">
+                            {isCreating ? 'Create Theme' : selectedTheme?.name}
+                        </h1>
+                    </div>
+                </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-sm border">
+                {isCreating ? (
+                    <ThemeForm
+                        onSave={handleCreateComplete}
+                        onCancel={handleBackToList}
+                    />
+                ) : selectedTheme ? (
+                    <ThemeEditPanel
+                        theme={selectedTheme}
+                        onUpdate={handleUpdateComplete}
+                        onCancel={handleBackToList}
+                    />
+                ) : null}
             </div>
         </div>
     )
+
+    // Main render
+    if (currentView === 'edit') {
+        return <EditView />
+    }
+
+    return <ListView />
 }
 
-// Themes List Component
-const ThemesList = ({ themes, selectedTheme, onSelectTheme, isLoading }) => {
-    if (isLoading) {
+// Theme Card Component
+const ThemeCard = ({ theme, onEdit, onDelete }) => {
+    const { addNotification } = useGlobalNotifications()
+    const queryClient = useQueryClient()
+    const [showPreview, setShowPreview] = useState(false)
+    const [previewData, setPreviewData] = useState(null)
+
+    // Delete mutation for better error handling
+    const deleteMutation = useMutation({
+        mutationFn: async () => {
+            return await themesApi.delete(theme.id)
+        },
+        onSuccess: () => {
+            addNotification('Theme deleted successfully', 'success')
+            queryClient.invalidateQueries(['themes'])
+        },
+        onError: (error) => {
+            console.error('Delete error:', error)
+            const message = extractErrorMessage(error, 'Failed to delete theme')
+            addNotification(message, 'error')
+        }
+    })
+
+    // Preview mutation
+    const previewMutation = useMutation({
+        mutationFn: async () => {
+            return await themesApi.getPreview(theme.id)
+        },
+        onSuccess: (data) => {
+            setPreviewData(data)
+            setShowPreview(true)
+        },
+        onError: (error) => {
+            console.error('Preview error:', error)
+            const message = extractErrorMessage(error, 'Failed to load theme preview')
+            addNotification(message, 'error')
+        }
+    })
+
+    const handleDelete = async (e) => {
+        e.stopPropagation()
+
+        // Simple confirmation using window.confirm for now
+        const confirmed = window.confirm(`Are you sure you want to delete "${theme.name}"?`)
+        if (confirmed) {
+            try {
+                await deleteMutation.mutateAsync()
+            } catch (error) {
+                // Error is already handled in the mutation
+            }
+        }
+    }
+
+    const handlePreview = (e) => {
+        e.stopPropagation()
+        previewMutation.mutate()
+    }
+
+    // Close preview on escape key
+    useEffect(() => {
+        const handleKeyDown = (event) => {
+            if (event.key === 'Escape' && showPreview) {
+                setShowPreview(false)
+            }
+        }
+
+        document.addEventListener('keydown', handleKeyDown)
+        return () => document.removeEventListener('keydown', handleKeyDown)
+    }, [showPreview])
+
+    const generateThemeThumbnail = (theme) => {
+        // Generate a simple color preview based on theme variables
+        const colors = Object.entries(theme.css_variables || {})
+            .filter(([key, value]) => value.startsWith('#') || value.startsWith('rgb'))
+            .slice(0, 4)
+
         return (
-            <div className="bg-white rounded-lg shadow p-6">
-                <div className="animate-pulse space-y-4">
-                    {[...Array(3)].map((_, i) => (
-                        <div key={i} className="h-20 bg-gray-200 rounded"></div>
-                    ))}
-                </div>
+            <div className="w-full h-24 bg-gradient-to-br from-gray-100 to-gray-200 rounded-t-lg flex items-center justify-center overflow-hidden">
+                {colors.length > 0 ? (
+                    <div className="flex w-full h-full">
+                        {colors.map(([key, color], index) => (
+                            <div
+                                key={key}
+                                className="flex-1 h-full"
+                                style={{ backgroundColor: color }}
+                                title={`${key}: ${color}`}
+                            />
+                        ))}
+                    </div>
+                ) : (
+                    <div className="text-center">
+                        <Palette className="w-8 h-8 text-gray-400 mx-auto mb-1" />
+                        <span className="text-xs text-gray-500">No colors</span>
+                    </div>
+                )}
             </div>
         )
     }
 
     return (
-        <div className="bg-white rounded-lg shadow">
-            <div className="p-4 border-b border-gray-200">
-                <h3 className="text-lg font-medium text-gray-900">Available Themes</h3>
-            </div>
-            <div className="divide-y divide-gray-200">
-                {themes?.map((theme) => (
-                    <div
-                        key={theme.id}
-                        onClick={() => onSelectTheme(theme)}
-                        className={`p-4 cursor-pointer hover:bg-gray-50 transition-colors ${selectedTheme?.id === theme.id ? 'bg-purple-50 border-r-4 border-purple-500' : ''
-                            }`}
-                    >
-                        <div className="flex items-center justify-between">
-                            <div className="flex-1">
-                                <h4 className="font-medium text-gray-900">{theme.name}</h4>
-                                <p className="text-sm text-gray-500 mt-1">
-                                    {Object.keys(theme.cssVariables || {}).length} variables
-                                </p>
-                                {theme.description && (
-                                    <p className="text-sm text-gray-600 mt-1">{theme.description}</p>
-                                )}
+        <div className="bg-white border border-gray-200 rounded-lg hover:border-purple-300 hover:shadow-md transition-all cursor-pointer group">
+            {/* Theme Preview */}
+            <div onClick={() => onEdit(theme)}>
+                {generateThemeThumbnail(theme)}
 
-                                {/* Color Preview */}
-                                <div className="flex items-center space-x-1 mt-2">
-                                    {getColorVariables(theme.cssVariables).slice(0, 5).map((color, i) => (
-                                        <div
-                                            key={i}
-                                            className="w-4 h-4 rounded-full border border-gray-300"
-                                            style={{ backgroundColor: color }}
-                                            title={color}
-                                        />
-                                    ))}
-                                    {getColorVariables(theme.cssVariables).length > 5 && (
-                                        <span className="text-xs text-gray-400">
-                                            +{getColorVariables(theme.cssVariables).length - 5}
-                                        </span>
-                                    )}
+                {/* Theme Info */}
+                <div className="p-4">
+                    <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-lg font-medium text-gray-900 truncate">
+                            {theme.name}
+                        </h3>
+                        <div className="flex items-center space-x-1">
+                            {theme.is_default && (
+                                <span className="px-2 py-1 text-xs bg-orange-100 text-orange-700 rounded-full">
+                                    Default
+                                </span>
+                            )}
+                            {(theme.isActive ?? theme.is_active) ? (
+                                <span className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded-full">
+                                    Active
+                                </span>
+                            ) : (
+                                <span className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded-full">
+                                    Inactive
+                                </span>
+                            )}
+                        </div>
+                    </div>
+
+                    <p className="text-sm text-gray-500 mb-3 line-clamp-2">
+                        {theme.description || 'No description provided'}
+                    </p>
+
+                    <div className="flex items-center justify-between text-xs text-gray-400">
+                        <span>
+                            {Object.keys(theme.css_variables || {}).length} variables
+                        </span>
+                        <span>
+                            {Object.keys(theme.image_styles || {}).length} image styles
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            {/* Actions */}
+            <div className="px-4 pb-4">
+                <div className="flex items-center justify-between">
+                    <button
+                        onClick={() => onEdit(theme)}
+                        className="flex items-center px-3 py-1 text-sm text-purple-600 hover:text-purple-700 hover:bg-purple-50 rounded-md transition-colors"
+                    >
+                        <Edit3 className="w-3 h-3 mr-1" />
+                        Edit
+                    </button>
+
+                    <div className="flex items-center space-x-2">
+                        <button
+                            onClick={handlePreview}
+                            disabled={previewMutation.isPending}
+                            className="p-1 text-gray-400 hover:text-blue-600 rounded disabled:opacity-50"
+                            title={previewMutation.isPending ? "Loading preview..." : "Preview theme"}
+                        >
+                            <Eye className="w-4 h-4" />
+                        </button>
+
+                        <button
+                            onClick={handleDelete}
+                            disabled={deleteMutation.isPending}
+                            className="p-1 text-gray-400 hover:text-red-600 rounded disabled:opacity-50"
+                            title={deleteMutation.isPending ? "Deleting..." : "Delete"}
+                        >
+                            <Trash2 className="w-4 h-4" />
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* Preview Modal */}
+            {showPreview && previewData && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+                        <div className="flex items-center justify-between p-4 border-b border-gray-200">
+                            <h3 className="text-lg font-medium text-gray-900">
+                                Preview: {theme.name}
+                            </h3>
+                            <button
+                                onClick={() => setShowPreview(false)}
+                                className="text-gray-400 hover:text-gray-500"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+                            {/* Theme Info */}
+                            <div className="mb-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                    <div>
+                                        <h4 className="font-medium text-gray-900 mb-2">Theme Information</h4>
+                                        <p className="text-sm text-gray-600">{theme.description || 'No description'}</p>
+                                    </div>
+                                    <div>
+                                        <h4 className="font-medium text-gray-900 mb-2">Statistics</h4>
+                                        <div className="text-sm text-gray-600 space-y-1">
+                                            <p>{Object.keys(theme.css_variables || {}).length} CSS variables</p>
+                                            <p>{Object.keys(theme.html_elements || {}).length} HTML element styles</p>
+                                            <p>{Object.keys(theme.image_styles || {}).length} image styles</p>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
-                            <div className="flex items-center space-x-2">
-                                {theme.isActive ? (
-                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                        Active
-                                    </span>
-                                ) : (
-                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                        Inactive
-                                    </span>
-                                )}
+                            {/* Sample Content with Theme Applied */}
+                            <div className="border border-gray-200 rounded-lg overflow-hidden">
+                                <div className="bg-gray-50 px-4 py-2 border-b border-gray-200">
+                                    <h4 className="font-medium text-gray-900">Theme Preview</h4>
+                                </div>
+                                <div className="p-6">
+                                    <style>
+                                        {previewData.css || ''}
+                                    </style>
+                                    <div
+                                        className="theme-content"
+                                        dangerouslySetInnerHTML={{
+                                            __html: previewData.sample_html || `
+                                                <h1>Sample Heading 1</h1>
+                                                <h2>Sample Heading 2</h2>
+                                                <h3>Sample Heading 3</h3>
+                                                <p>This is a sample paragraph to demonstrate how text looks with this theme. It includes <a href="#">a sample link</a> to show link styling.</p>
+                                                <ul>
+                                                    <li>Sample list item one</li>
+                                                    <li>Sample list item two</li>
+                                                    <li>Sample list item three</li>
+                                                </ul>
+                                                <blockquote>
+                                                    This is a sample blockquote to demonstrate quote styling in this theme.
+                                                </blockquote>
+                                            `
+                                        }}
+                                    />
+                                </div>
                             </div>
+
+                            {/* CSS Variables Display */}
+                            {Object.keys(theme.css_variables || {}).length > 0 && (
+                                <div className="mt-6">
+                                    <h4 className="font-medium text-gray-900 mb-3">CSS Variables</h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        {Object.entries(theme.css_variables || {}).map(([key, value]) => (
+                                            <div key={key} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                                                <span className="text-sm font-mono text-gray-700">--{key}</span>
+                                                <div className="flex items-center space-x-2">
+                                                    {value.startsWith('#') && (
+                                                        <div
+                                                            className="w-4 h-4 rounded border border-gray-300"
+                                                            style={{ backgroundColor: value }}
+                                                        />
+                                                    )}
+                                                    <span className="text-sm font-mono text-gray-600">{value}</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Image Styles Display */}
+                            {Object.keys(theme.image_styles || {}).length > 0 && (
+                                <div className="mt-6">
+                                    <h4 className="font-medium text-gray-900 mb-3">Image Styles</h4>
+                                    <div className="space-y-3">
+                                        {Object.entries(theme.image_styles || {}).map(([styleName, styleConfig]) => (
+                                            <div key={styleName} className="p-3 bg-gray-50 rounded">
+                                                <h5 className="font-medium text-gray-800 mb-2">{styleName}</h5>
+                                                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs text-gray-600">
+                                                    <span>Align: {styleConfig.alignment || 'center'}</span>
+                                                    <span>Cols: {styleConfig.galleryColumns || 3}</span>
+                                                    <span>Space: {styleConfig.spacing || 'normal'}</span>
+                                                    <span>Shadow: {styleConfig.shadow || 'sm'}</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
-                ))}
-                {themes?.length === 0 && (
-                    <div className="p-8 text-center text-gray-500">
-                        <Palette className="w-8 h-8 mx-auto mb-2" />
-                        <p>No themes found</p>
-                    </div>
-                )}
-            </div>
+                </div>
+            )}
         </div>
     )
 }
 
-// Helper function to extract color variables
-const getColorVariables = (cssVariables = {}) => {
-    return Object.entries(cssVariables)
-        .filter(([key, value]) =>
-            typeof value === 'string' && (
-                value.startsWith('#') ||
-                value.startsWith('rgb') ||
-                value.startsWith('hsl') ||
-                /^[a-zA-Z]+$/.test(value) // Named colors
-            )
-        )
-        .map(([, value]) => value)
-}
-
-// Theme Form Component
+// Theme Form Component - Full featured version with tabs
 const ThemeForm = ({ theme = null, onSave, onCancel }) => {
+    const { addNotification } = useGlobalNotifications()
     const [formData, setFormData] = useState({
         name: theme?.name || '',
         description: theme?.description || '',
         cssVariables: theme?.cssVariables || {},
         htmlElements: theme?.htmlElements || {},
+        imageStyles: theme?.imageStyles || {},
         customCss: theme?.customCss || '',
         isActive: theme?.isActive ?? true,
         isDefault: theme?.isDefault ?? false
@@ -239,6 +553,29 @@ const ThemeForm = ({ theme = null, onSave, onCancel }) => {
     const [newVariable, setNewVariable] = useState({ key: '', value: '' })
     const [showCssEditor, setShowCssEditor] = useState(false)
     const [activeTab, setActiveTab] = useState('variables')
+    const [showTabDropdown, setShowTabDropdown] = useState(false)
+
+    // Define tabs configuration
+    const tabs = [
+        { id: 'variables', label: 'CSS Variables', icon: Hash },
+        { id: 'elements', label: 'HTML Elements', icon: Type },
+        { id: 'imageStyles', label: 'Image Styles', icon: ImageIcon },
+        { id: 'custom', label: 'Custom CSS', icon: Settings }
+    ]
+
+    const activeTabData = tabs.find(tab => tab.id === activeTab)
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (showTabDropdown && !event.target.closest('.tab-dropdown')) {
+                setShowTabDropdown(false)
+            }
+        }
+
+        document.addEventListener('mousedown', handleClickOutside)
+        return () => document.removeEventListener('mousedown', handleClickOutside)
+    }, [showTabDropdown])
 
     const mutation = useMutation({
         mutationFn: async (data) => {
@@ -248,9 +585,14 @@ const ThemeForm = ({ theme = null, onSave, onCancel }) => {
                 return await themesApi.create(data)
             }
         },
-        onSuccess: () => {
+        onSuccess: (data) => {
             addNotification(`Theme ${theme ? 'updated' : 'created'} successfully`, 'success', 'theme-save')
-            onSave()
+            // Pass the updated theme data back for updates, or just call onSave for creates
+            if (theme) {
+                onSave(data) // For updates, pass the updated data
+            } else {
+                onSave() // For creates, just signal completion
+            }
         },
         onError: (error) => {
             const message = extractErrorMessage(error, `Failed to ${theme ? 'update' : 'create'} theme`)
@@ -261,6 +603,10 @@ const ThemeForm = ({ theme = null, onSave, onCancel }) => {
 
     const handleSubmit = (e) => {
         e.preventDefault()
+        if (!formData.name.trim()) {
+            addNotification('Theme name is required', 'error')
+            return
+        }
         mutation.mutate(formData)
     }
 
@@ -435,43 +781,109 @@ const ThemeForm = ({ theme = null, onSave, onCancel }) => {
                     </div>
                 </div>
 
-                {/* Tab Navigation */}
+                {/* Responsive Tab Navigation */}
                 <div className="border-b border-gray-200">
-                    <nav className="-mb-px flex space-x-8">
-                        <button
-                            type="button"
-                            onClick={() => setActiveTab('variables')}
-                            className={`py-2 px-1 border-b-2 font-medium text-sm ${activeTab === 'variables'
-                                ? 'border-purple-500 text-purple-600'
-                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                }`}
-                        >
-                            <Hash className="w-4 h-4 inline mr-2" />
-                            CSS Variables
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setActiveTab('elements')}
-                            className={`py-2 px-1 border-b-2 font-medium text-sm ${activeTab === 'elements'
-                                ? 'border-purple-500 text-purple-600'
-                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                }`}
-                        >
-                            <Type className="w-4 h-4 inline mr-2" />
-                            HTML Elements
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setActiveTab('custom')}
-                            className={`py-2 px-1 border-b-2 font-medium text-sm ${activeTab === 'custom'
-                                ? 'border-purple-500 text-purple-600'
-                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                }`}
-                        >
-                            <Settings className="w-4 h-4 inline mr-2" />
-                            Custom CSS
-                        </button>
-                    </nav>
+                    <div className="flex items-center justify-between">
+                        {/* Desktop: Horizontal tabs (hidden on small screens) */}
+                        <nav className="hidden md:flex -mb-px space-x-8 flex-1">
+                            {tabs.map((tab) => {
+                                const IconComponent = tab.icon
+                                return (
+                                    <button
+                                        key={tab.id}
+                                        type="button"
+                                        onClick={() => setActiveTab(tab.id)}
+                                        className={`py-2 px-1 border-b-2 font-medium text-sm whitespace-nowrap flex items-center ${activeTab === tab.id
+                                            ? 'border-purple-500 text-purple-600'
+                                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                            }`}
+                                    >
+                                        <IconComponent className="w-4 h-4 mr-2 flex-shrink-0" />
+                                        <span className="truncate">{tab.label}</span>
+                                    </button>
+                                )
+                            })}
+                        </nav>
+
+                        {/* Mobile/Compact: Dropdown menu */}
+                        <div className="md:hidden flex-1">
+                            <div className="relative tab-dropdown">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowTabDropdown(!showTabDropdown)}
+                                    className="w-full flex items-center justify-between py-2 px-3 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                >
+                                    <div className="flex items-center">
+                                        {activeTabData && (
+                                            <>
+                                                <activeTabData.icon className="w-4 h-4 mr-2 flex-shrink-0" />
+                                                <span className="truncate">{activeTabData.label}</span>
+                                            </>
+                                        )}
+                                    </div>
+                                    <ChevronDown className={`w-4 h-4 transition-transform ${showTabDropdown ? 'rotate-180' : ''}`} />
+                                </button>
+
+                                {showTabDropdown && (
+                                    <div className="absolute right-0 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg z-10">
+                                        {tabs.map((tab) => {
+                                            const IconComponent = tab.icon
+                                            return (
+                                                <button
+                                                    key={tab.id}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setActiveTab(tab.id)
+                                                        setShowTabDropdown(false)
+                                                    }}
+                                                    className={`w-full flex items-center px-3 py-2 text-sm text-left hover:bg-gray-50 ${activeTab === tab.id ? 'bg-purple-50 text-purple-600' : 'text-gray-700'
+                                                        }`}
+                                                >
+                                                    <IconComponent className="w-4 h-4 mr-2 flex-shrink-0" />
+                                                    <span className="truncate">{tab.label}</span>
+                                                </button>
+                                            )
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Desktop: When tabs overflow, show dropdown on the right */}
+                        <div className="hidden xl:block relative ml-4 tab-dropdown">
+                            <button
+                                type="button"
+                                onClick={() => setShowTabDropdown(!showTabDropdown)}
+                                className="flex items-center px-3 py-1 text-sm text-gray-500 hover:text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
+                                title="More options"
+                            >
+                                <Menu className="w-4 h-4" />
+                            </button>
+
+                            {showTabDropdown && (
+                                <div className="absolute right-0 mt-1 w-48 bg-white border border-gray-300 rounded-md shadow-lg z-10">
+                                    {tabs.map((tab) => {
+                                        const IconComponent = tab.icon
+                                        return (
+                                            <button
+                                                key={tab.id}
+                                                type="button"
+                                                onClick={() => {
+                                                    setActiveTab(tab.id)
+                                                    setShowTabDropdown(false)
+                                                }}
+                                                className={`w-full flex items-center px-3 py-2 text-sm text-left hover:bg-gray-50 ${activeTab === tab.id ? 'bg-purple-50 text-purple-600' : 'text-gray-700'
+                                                    }`}
+                                            >
+                                                <IconComponent className="w-4 h-4 mr-2 flex-shrink-0" />
+                                                <span className="truncate">{tab.label}</span>
+                                            </button>
+                                        )
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 </div>
 
                 {/* Tab Content */}
@@ -491,6 +903,25 @@ const ThemeForm = ({ theme = null, onSave, onCancel }) => {
                                         {showCssEditor ? <EyeOff className="w-3 h-3 mr-1" /> : <Eye className="w-3 h-3 mr-1" />}
                                         {showCssEditor ? 'Hide' : 'Show'} CSS
                                     </button>
+                                </div>
+                            </div>
+
+                            {/* Color Scheme Templates */}
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Quick Start Templates
+                                </label>
+                                <div className="flex flex-wrap gap-2">
+                                    {Object.keys(colorSchemeTemplates).map((template) => (
+                                        <button
+                                            key={template}
+                                            type="button"
+                                            onClick={() => applyTemplate(template)}
+                                            className="px-3 py-1 text-sm bg-purple-100 text-purple-700 rounded hover:bg-purple-200 transition-colors"
+                                        >
+                                            {template}
+                                        </button>
+                                    ))}
                                 </div>
                             </div>
 
@@ -567,6 +998,13 @@ const ThemeForm = ({ theme = null, onSave, onCancel }) => {
                         />
                     )}
 
+                    {activeTab === 'imageStyles' && (
+                        <ImageStylesEditor
+                            imageStyles={formData.imageStyles}
+                            onChange={(imageStyles) => setFormData({ ...formData, imageStyles })}
+                        />
+                    )}
+
                     {activeTab === 'custom' && (
                         <div>
                             <div className="flex items-center justify-between mb-2">
@@ -630,6 +1068,15 @@ const ThemeForm = ({ theme = null, onSave, onCancel }) => {
     )
 }
 
+const ThemeEditPanel = ({ theme, onUpdate, onCancel }) => {
+    const handleSave = (updatedThemeData) => {
+        // For updates, pass the data; for creates, just signal completion
+        onUpdate(updatedThemeData)
+    }
+
+    return <ThemeForm theme={theme} onSave={handleSave} onCancel={onCancel} />
+}
+
 // Variable Editor Component
 const VariableEditor = ({ originalKey, value, onUpdate, onRemove }) => {
     const [key, setKey] = useState(originalKey)
@@ -690,324 +1137,195 @@ const VariableEditor = ({ originalKey, value, onUpdate, onRemove }) => {
     )
 }
 
-// Theme Edit Panel Component  
-const ThemeEditPanel = ({ theme, onUpdate, onCancel, showPreview, onTogglePreview }) => {
-    const [isEditing, setIsEditing] = useState(false)
+// Image Styles Editor Component
+const ImageStylesEditor = ({ imageStyles, onChange }) => {
+    const [newStyleName, setNewStyleName] = useState('')
+    const [editingStyle, setEditingStyle] = useState(null)
 
-    const deleteMutation = useMutation({
-        mutationFn: async () => {
-            return await themesApi.delete(theme.id)
-        },
-        onSuccess: () => {
-            addNotification('Theme deleted successfully', 'success', 'theme-delete')
-            onCancel()
-        },
-        onError: () => {
-            addNotification('Failed to delete theme', 'error', 'theme-delete')
+    const addImageStyle = () => {
+        if (!newStyleName.trim()) return
+
+        const newStyle = {
+            alignment: 'center',
+            galleryColumns: 3,
+            spacing: 'normal',
+            borderRadius: 'normal',
+            shadow: 'sm'
         }
-    })
 
-    const handleDelete = async () => {
-        const confirmed = await showConfirm({
-            title: 'Delete Theme',
-            message: 'Are you sure you want to delete this theme? This action cannot be undone.',
-            confirmText: 'Delete',
-            confirmButtonStyle: 'danger'
+        onChange({
+            ...imageStyles,
+            [newStyleName]: newStyle
         })
-
-        if (confirmed) {
-            deleteMutation.mutate()
-        }
+        setNewStyleName('')
     }
 
-    const exportTheme = () => {
-        const themeData = {
-            name: theme.name,
-            description: theme.description,
-            cssVariables: theme.cssVariables,
-            custom_css: theme.custom_css
-        }
-
-        const dataStr = JSON.stringify(themeData, null, 2)
-        const dataBlob = new Blob([dataStr], { type: 'application/json' })
-        const url = URL.createObjectURL(dataBlob)
-        const link = document.createElement('a')
-        link.href = url
-        link.download = `${theme.name.replace(/\s+/g, '-').toLowerCase()}-theme.json`
-        link.click()
-        URL.revokeObjectURL(url)
-        addNotification('Theme exported successfully', 'success', 'theme-export')
+    const updateImageStyle = (styleName, updates) => {
+        onChange({
+            ...imageStyles,
+            [styleName]: {
+                ...imageStyles[styleName],
+                ...updates
+            }
+        })
     }
 
-    if (isEditing) {
-        return (
-            <ThemeForm
-                theme={theme}
-                onSave={() => {
-                    setIsEditing(false)
-                    onUpdate()
-                }}
-                onCancel={() => setIsEditing(false)}
-            />
-        )
+    const deleteImageStyle = (styleName) => {
+        const newStyles = { ...imageStyles }
+        delete newStyles[styleName]
+        onChange(newStyles)
+    }
+
+    const startEditing = (styleName) => {
+        setEditingStyle(styleName)
+    }
+
+    const stopEditing = () => {
+        setEditingStyle(null)
     }
 
     return (
-        <div className="bg-white rounded-lg shadow">
-            <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-                <div>
-                    <h3 className="text-lg font-medium text-gray-900">{theme.name}</h3>
-                    <p className="text-sm text-gray-500 mt-1">
-                        {Object.keys(theme.cssVariables || {}).length} CSS variables defined
-                    </p>
-                </div>
+        <div>
+            <div className="flex items-center justify-between mb-4">
+                <label className="block text-sm font-medium text-gray-700">
+                    Image Styles
+                </label>
                 <div className="flex items-center space-x-2">
+                    <input
+                        type="text"
+                        value={newStyleName}
+                        onChange={(e) => setNewStyleName(e.target.value)}
+                        placeholder="Style name (e.g., 'Hero Banner')"
+                        className="px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
+                        onKeyPress={(e) => e.key === 'Enter' && addImageStyle()}
+                    />
                     <button
-                        onClick={onTogglePreview}
-                        className={`inline-flex items-center px-3 py-1 rounded-md text-sm transition-colors ${showPreview
-                            ? 'bg-purple-100 text-purple-700 hover:bg-purple-200'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                            }`}
+                        type="button"
+                        onClick={addImageStyle}
+                        className="inline-flex items-center px-2 py-1 text-xs bg-purple-600 text-white rounded hover:bg-purple-700"
                     >
-                        <Eye className="w-4 h-4 mr-1" />
-                        {showPreview ? 'Hide Preview' : 'Show Preview'}
-                    </button>
-                    <DefaultThemeButton theme={theme} onUpdate={onUpdate} />
-                    <button
-                        onClick={exportTheme}
-                        className="inline-flex items-center px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm"
-                    >
-                        <Download className="w-4 h-4 mr-1" />
-                        Export
-                    </button>
-                    <button
-                        onClick={() => setIsEditing(true)}
-                        className="inline-flex items-center px-3 py-1 bg-purple-600 text-white rounded-md hover:bg-purple-700 text-sm"
-                    >
-                        <Edit3 className="w-4 h-4 mr-1" />
-                        Edit
-                    </button>
-                    <button
-                        onClick={handleDelete}
-                        className="inline-flex items-center px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm"
-                    >
-                        <Trash2 className="w-4 h-4 mr-1" />
-                        Delete
+                        <Plus className="w-3 h-3 mr-1" />
+                        Add Style
                     </button>
                 </div>
             </div>
 
-            <div className="p-6">
-                {showPreview && (
-                    <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-                        <h4 className="font-medium text-gray-900 mb-3">Theme Preview</h4>
-                        <ThemePreview theme={theme} />
+            <div className="space-y-4">
+                {Object.keys(imageStyles).length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                        <ImageIcon className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                        <p>No image styles defined</p>
+                        <p className="text-sm">Add your first image style above</p>
                     </div>
-                )}
-
-                <div className="space-y-6">
-                    {/* Basic Information */}
-                    <div>
-                        <h4 className="font-medium text-gray-900 mb-3">Theme Information</h4>
-                        <dl className="space-y-2">
-                            <div>
-                                <dt className="text-sm font-medium text-gray-500">Name</dt>
-                                <dd className="text-sm text-gray-900">{theme.name}</dd>
+                ) : (
+                    Object.entries(imageStyles).map(([styleName, styleConfig]) => (
+                        <div key={styleName} className="border border-gray-200 rounded-lg p-4">
+                            <div className="flex items-center justify-between mb-3">
+                                <h4 className="font-medium text-gray-900">{styleName}</h4>
+                                <div className="flex items-center space-x-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => editingStyle === styleName ? stopEditing() : startEditing(styleName)}
+                                        className="text-gray-500 hover:text-purple-600"
+                                    >
+                                        <Edit3 className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => deleteImageStyle(styleName)}
+                                        className="text-gray-500 hover:text-red-600"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
+                                </div>
                             </div>
-                            {theme.description && (
-                                <div>
-                                    <dt className="text-sm font-medium text-gray-500">Description</dt>
-                                    <dd className="text-sm text-gray-900">{theme.description}</dd>
+
+                            {editingStyle === styleName ? (
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Alignment</label>
+                                        <select
+                                            value={styleConfig.alignment || 'center'}
+                                            onChange={(e) => updateImageStyle(styleName, { alignment: e.target.value })}
+                                            className="w-full px-3 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
+                                        >
+                                            <option value="left">Left</option>
+                                            <option value="center">Center</option>
+                                            <option value="right">Right</option>
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Gallery Columns</label>
+                                        <select
+                                            value={styleConfig.galleryColumns || 3}
+                                            onChange={(e) => updateImageStyle(styleName, { galleryColumns: parseInt(e.target.value) })}
+                                            className="w-full px-3 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
+                                        >
+                                            <option value={1}>1 Column</option>
+                                            <option value={2}>2 Columns</option>
+                                            <option value={3}>3 Columns</option>
+                                            <option value={4}>4 Columns</option>
+                                            <option value={5}>5 Columns</option>
+                                            <option value={6}>6 Columns</option>
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Spacing</label>
+                                        <select
+                                            value={styleConfig.spacing || 'normal'}
+                                            onChange={(e) => updateImageStyle(styleName, { spacing: e.target.value })}
+                                            className="w-full px-3 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
+                                        >
+                                            <option value="tight">Tight</option>
+                                            <option value="normal">Normal</option>
+                                            <option value="loose">Loose</option>
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Border Radius</label>
+                                        <select
+                                            value={styleConfig.borderRadius || 'normal'}
+                                            onChange={(e) => updateImageStyle(styleName, { borderRadius: e.target.value })}
+                                            className="w-full px-3 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
+                                        >
+                                            <option value="none">None</option>
+                                            <option value="normal">Normal</option>
+                                            <option value="large">Large</option>
+                                            <option value="full">Full (Circular)</option>
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Shadow</label>
+                                        <select
+                                            value={styleConfig.shadow || 'sm'}
+                                            onChange={(e) => updateImageStyle(styleName, { shadow: e.target.value })}
+                                            className="w-full px-3 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
+                                        >
+                                            <option value="none">None</option>
+                                            <option value="sm">Small</option>
+                                            <option value="lg">Large</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="text-sm text-gray-600 space-y-1">
+                                    <p><span className="font-medium">Alignment:</span> {styleConfig.alignment || 'center'}</p>
+                                    <p><span className="font-medium">Columns:</span> {styleConfig.galleryColumns || 3}</p>
+                                    <p><span className="font-medium">Spacing:</span> {styleConfig.spacing || 'normal'}</p>
+                                    <p><span className="font-medium">Border Radius:</span> {styleConfig.borderRadius || 'normal'}</p>
+                                    <p><span className="font-medium">Shadow:</span> {styleConfig.shadow || 'sm'}</p>
                                 </div>
                             )}
-                            <div>
-                                <dt className="text-sm font-medium text-gray-500">Status</dt>
-                                <dd className="text-sm">
-                                    <div className="flex items-center space-x-2">
-                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${theme.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                                            }`}>
-                                            {theme.isActive ? 'Active' : 'Inactive'}
-                                        </span>
-                                        {theme.isDefault && (
-                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
-                                                Default
-                                            </span>
-                                        )}
-                                    </div>
-                                </dd>
-                            </div>
-                            <div>
-                                <dt className="text-sm font-medium text-gray-500">Created</dt>
-                                <dd className="text-sm text-gray-900">
-                                    {new Date(theme.createdAt).toLocaleDateString()} by {theme.createdBy?.username}
-                                </dd>
-                            </div>
-                        </dl>
-                    </div>
-
-                    {/* CSS Variables */}
-                    <div>
-                        <h4 className="font-medium text-gray-900 mb-3">CSS Variables</h4>
-                        {Object.keys(theme.cssVariables || {}).length > 0 ? (
-                            <div className="space-y-2">
-                                {Object.entries(theme.cssVariables).map(([key, value]) => (
-                                    <div key={key} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                                        <div className="flex items-center space-x-3">
-                                            <code className="text-sm font-mono text-gray-700">--{key}</code>
-                                            {getColorVariables({ [key]: value }).length > 0 && (
-                                                <div
-                                                    className="w-6 h-6 rounded border border-gray-300"
-                                                    style={{ backgroundColor: value }}
-                                                />
-                                            )}
-                                        </div>
-                                        <code className="text-sm font-mono text-gray-600">{value}</code>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <p className="text-gray-500 text-sm">No CSS variables defined for this theme.</p>
-                        )}
-                    </div>
-
-                    {/* Custom CSS */}
-                    {theme.custom_css && (
-                        <div>
-                            <h4 className="font-medium text-gray-900 mb-3">Custom CSS</h4>
-                            <pre className="text-xs bg-gray-100 p-3 rounded-lg overflow-x-auto">
-                                <code>{theme.custom_css}</code>
-                            </pre>
                         </div>
-                    )}
-                </div>
+                    ))
+                )}
             </div>
         </div>
     )
 }
 
-// Theme Preview Component
-const ThemePreview = ({ theme }) => {
-    const variables = theme.cssVariables || {}
-
-    // Create style object from CSS variables
-    const previewStyle = Object.entries(variables).reduce((acc, [key, value]) => {
-        acc[`--${key}`] = value
-        return acc
-    }, {})
-
-    return (
-        <div className="border rounded-lg p-4 bg-white" style={previewStyle}>
-            <div className="space-y-4">
-                {/* Header */}
-                <div
-                    className="p-4 rounded"
-                    style={{
-                        backgroundColor: variables.primary || '#3b82f6',
-                        color: variables['text-on-primary'] || variables.background || '#ffffff'
-                    }}
-                >
-                    <h3 className="text-lg font-bold">Sample Header</h3>
-                    <p className="text-sm opacity-90">Preview of your theme</p>
-                </div>
-
-                {/* Content */}
-                <div
-                    className="p-4 rounded"
-                    style={{
-                        backgroundColor: variables.surface || variables.background || '#f8fafc',
-                        color: variables.text || '#1f2937'
-                    }}
-                >
-                    <h4 className="font-medium mb-2">Sample Content</h4>
-                    <p className="text-sm" style={{ color: variables['text-muted'] || variables.secondary || '#6b7280' }}>
-                        This is how your content will look with the current theme. The colors and styling will be applied consistently across your pages.
-                    </p>
-
-                    {/* Buttons */}
-                    <div className="flex space-x-2 mt-3">
-                        <button
-                            className="px-3 py-1 rounded text-sm"
-                            style={{
-                                backgroundColor: variables.primary || '#3b82f6',
-                                color: variables['text-on-primary'] || '#ffffff'
-                            }}
-                        >
-                            Primary Button
-                        </button>
-                        <button
-                            className="px-3 py-1 rounded text-sm border"
-                            style={{
-                                borderColor: variables.primary || '#3b82f6',
-                                color: variables.primary || '#3b82f6'
-                            }}
-                        >
-                            Secondary Button
-                        </button>
-                    </div>
-                </div>
-
-                {/* Color Palette */}
-                <div>
-                    <h5 className="text-sm font-medium mb-2">Color Palette</h5>
-                    <div className="flex flex-wrap gap-2">
-                        {getColorVariables(variables).map((color, i) => (
-                            <div key={i} className="flex flex-col items-center">
-                                <div
-                                    className="w-8 h-8 rounded border border-gray-300"
-                                    style={{ backgroundColor: color }}
-                                />
-                                <span className="text-xs mt-1 text-gray-500">{color}</span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </div>
-        </div>
-    )
-}
-
-// Default Theme Button Component
-const DefaultThemeButton = ({ theme, onUpdate }) => {
-    const { addNotification } = useGlobalNotifications()
-
-    const setDefaultMutation = useMutation({
-        mutationFn: async () => {
-            if (theme.isDefault) {
-                return await themesApi.clearDefault()
-            } else {
-                return await themesApi.setDefault(theme.id)
-            }
-        },
-        onSuccess: () => {
-            const action = theme.isDefault ? 'cleared' : 'set'
-            addNotification(`Default theme ${action} successfully`, 'success', 'theme-default')
-            onUpdate()
-        },
-        onError: (error) => {
-            const message = extractErrorMessage(error, 'Failed to update default theme')
-            addNotification(message, 'error', 'theme-default')
-            console.error(error)
-        }
-    })
-
-    return (
-        <button
-            onClick={() => setDefaultMutation.mutate()}
-            disabled={setDefaultMutation.isPending}
-            className={`inline-flex items-center px-3 py-1 rounded-md text-sm transition-colors ${theme.isDefault
-                    ? 'bg-orange-100 text-orange-700 hover:bg-orange-200'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                } disabled:opacity-50`}
-        >
-            <Settings className="w-4 h-4 mr-1" />
-            {setDefaultMutation.isPending
-                ? 'Updating...'
-                : theme.isDefault
-                    ? 'Clear Default'
-                    : 'Set as Default'
-            }
-        </button>
-    )
-}
-
-export default ThemeEditor 
+export default ThemeEditor

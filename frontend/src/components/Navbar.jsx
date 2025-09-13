@@ -19,7 +19,41 @@ const Navbar = () => {
   const isSchemasActive = false
 
   const isActive = (path) => {
-    return location.pathname === path
+    if (path === '/settings') {
+      return location.pathname.startsWith('/settings') || location.pathname.startsWith('/schemas')
+    }
+    return location.pathname === path || location.pathname.startsWith(path + '/')
+  }
+
+  const getCurrentContext = () => {
+    const path = location.pathname
+    if (path.startsWith('/settings/')) {
+      const section = path.split('/')[2]
+      const sectionNames = {
+        'layouts': 'Layouts',
+        'themes': 'Themes',
+        'widgets': 'Widgets',
+        'tags': 'Tags',
+        'object-types': 'Object Types',
+        'versions': 'Versions',
+        'publishing': 'Publishing',
+        'namespaces': 'Namespaces'
+      }
+      return sectionNames[section] || 'Settings'
+    }
+    if (path.startsWith('/schemas/')) {
+      const section = path.split('/')[2]
+      const sectionNames = {
+        'system': 'System Schema',
+        'layout': 'Layout Schemas'
+      }
+      return sectionNames[section] || 'Schemas'
+    }
+    if (path.startsWith('/pages')) return 'Pages'
+    if (path.startsWith('/objects')) return 'Objects'
+    if (path.startsWith('/media')) return 'Media'
+    if (path === '/') return 'Home'
+    return ''
   }
 
   return (
@@ -36,6 +70,14 @@ const Navbar = () => {
                 ECEEE v4
               </span>
             </Link>
+
+            {/* Context Indicator */}
+            {getCurrentContext() && (
+              <div className="ml-4 flex items-center text-sm text-gray-500">
+                <span className="mx-2">›</span>
+                <span className="font-medium">{getCurrentContext()}</span>
+              </div>
+            )}
           </div>
 
           {/* Desktop navigation */}

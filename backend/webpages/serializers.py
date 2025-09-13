@@ -43,6 +43,7 @@ class PageThemeSerializer(serializers.ModelSerializer):
             "description",
             "css_variables",
             "html_elements",
+            "image_styles",
             "custom_css",
             "is_active",
             "is_default",
@@ -56,6 +57,67 @@ class PageThemeSerializer(serializers.ModelSerializer):
         """Validate that css_variables is a valid JSON object"""
         if not isinstance(value, dict):
             raise serializers.ValidationError("CSS variables must be a JSON object")
+        return value
+
+    def validate_image_styles(self, value):
+        """Validate that image_styles is a valid JSON object with proper structure"""
+        if not isinstance(value, dict):
+            raise serializers.ValidationError("Image styles must be a JSON object")
+
+        # Validate each style's configuration
+        for style_name, style_config in value.items():
+            if not isinstance(style_name, str):
+                raise serializers.ValidationError(
+                    f"Style name must be a string, got {type(style_name)}"
+                )
+
+            if not isinstance(style_config, dict):
+                raise serializers.ValidationError(
+                    f"Configuration for style '{style_name}' must be a JSON object"
+                )
+
+            # Validate style configuration properties
+            valid_alignments = ["left", "center", "right"]
+            valid_spacings = ["tight", "normal", "loose"]
+            valid_border_radius = ["none", "normal", "large", "full"]
+            valid_shadows = ["none", "sm", "lg"]
+
+            if (
+                "alignment" in style_config
+                and style_config["alignment"] not in valid_alignments
+            ):
+                raise serializers.ValidationError(
+                    f"Invalid alignment '{style_config['alignment']}' in style '{style_name}'"
+                )
+
+            if "galleryColumns" in style_config:
+                columns = style_config["galleryColumns"]
+                if not isinstance(columns, int) or not (1 <= columns <= 6):
+                    raise serializers.ValidationError(
+                        f"Gallery columns must be an integer between 1 and 6 in style '{style_name}'"
+                    )
+
+            if (
+                "spacing" in style_config
+                and style_config["spacing"] not in valid_spacings
+            ):
+                raise serializers.ValidationError(
+                    f"Invalid spacing '{style_config['spacing']}' in style '{style_name}'"
+                )
+
+            if (
+                "borderRadius" in style_config
+                and style_config["borderRadius"] not in valid_border_radius
+            ):
+                raise serializers.ValidationError(
+                    f"Invalid border radius '{style_config['borderRadius']}' in style '{style_name}'"
+                )
+
+            if "shadow" in style_config and style_config["shadow"] not in valid_shadows:
+                raise serializers.ValidationError(
+                    f"Invalid shadow '{style_config['shadow']}' in style '{style_name}'"
+                )
+
         return value
 
     def validate_html_elements(self, value):

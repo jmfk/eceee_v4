@@ -93,14 +93,8 @@ const ObjectTypeManager = () => {
             <div className="p-6 max-w-7xl mx-auto">
                 <div className="mb-6">
                     <div className="flex justify-between items-center mb-4">
-                        <div>
-                            <h1 className="text-2xl font-bold text-gray-900 flex items-center">
-                                <Database className="h-6 w-6 mr-2" />
-                                Object Types
-                            </h1>
-                            <p className="text-gray-600 mt-1">
-                                Manage dynamic content types with configurable schemas
-                            </p>
+                        <div className="flex items-center">
+                            <span className="text-sm text-gray-500">{filteredTypes.length} object types</span>
                         </div>
                         <button
                             onClick={handleCreateNew}

@@ -377,15 +377,7 @@ const SettingsManager = () => {
 
     return (
         <div className="space-y-6">
-            {/* Header */}
-            <div className="bg-white rounded-lg shadow p-6">
-                <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-                <p className="text-gray-600 mt-2">
-                    Manage your website pages, layouts, themes, widgets, and system settings
-                </p>
-            </div>
-
-            {/* Navigation Tabs - shared between Settings and Schema pages */}
+            {/* Navigation Dropdown */}
             <SettingsTabs />
 
             {/* Tab Content */}

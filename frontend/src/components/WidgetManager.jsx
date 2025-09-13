@@ -110,12 +110,11 @@ const WidgetManager = () => {
 
     return (
         <div className="p-6">
-            {/* Header */}
+            {/* Simplified Header */}
             <div className="mb-6">
-                <h2 className="text-xl font-semibold text-gray-900">Widget Types</h2>
-                <p className="text-gray-600 mt-1">
-                    Manage and view all registered widget types in the system
-                </p>
+                <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-500">{filteredWidgets.length} widget types</span>
+                </div>
             </div>
 
             {/* Controls */}
