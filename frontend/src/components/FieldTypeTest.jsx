@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { fieldTypeRegistry } from '../utils/fieldTypeRegistry'
 import DynamicFormRenderer from './forms/DynamicFormRenderer'
+import EnhancedWidgetEditorDemo from './EnhancedWidgetEditorDemo'
+import { Settings } from 'lucide-react'
 
 /**
  * FieldTypeTest Component
@@ -13,6 +15,7 @@ const FieldTypeTest = () => {
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
     const [formData, setFormData] = useState({})
+    const [showWidgetEditor, setShowWidgetEditor] = useState(false)
 
     // Load field types on mount
     useEffect(() => {
@@ -165,9 +168,20 @@ const FieldTypeTest = () => {
                 </div>
             </div>
 
-            {/* Test Form */}
+            {/* Integration Demos */}
             <div className="border-t pt-8">
-                <h3 className="text-xl font-semibold mb-4">Test Form</h3>
+                <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-xl font-semibold">Integration Demonstrations</h3>
+                    <button
+                        onClick={() => setShowWidgetEditor(true)}
+                        className="flex items-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors"
+                    >
+                        <Settings className="w-4 h-4" />
+                        <span>Widget Editor Demo</span>
+                    </button>
+                </div>
+
+                <h4 className="text-lg font-medium mb-4">Dynamic Form Test</h4>
                 <div className="bg-white border border-gray-200 rounded-lg p-6">
                     <DynamicFormRenderer
                         schema={testSchema}
@@ -186,6 +200,14 @@ const FieldTypeTest = () => {
                     </pre>
                 </div>
             </div>
+
+            {/* Enhanced Widget Editor Demo */}
+            {showWidgetEditor && (
+                <EnhancedWidgetEditorDemo
+                    isOpen={showWidgetEditor}
+                    onClose={() => setShowWidgetEditor(false)}
+                />
+            )}
         </div>
     )
 }
