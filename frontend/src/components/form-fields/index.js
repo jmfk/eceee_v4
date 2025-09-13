@@ -31,6 +31,20 @@ export { default as ColorInput } from './ColorInput'
 export { default as SliderInput } from './SliderInput'
 export { default as DateRangeInput } from './DateRangeInput'
 
+// Special Interactive Components
+export { default as CommandPaletteInput } from './CommandPaletteInput'
+export { default as ComboboxInput } from './ComboboxInput'
+export { default as MentionsInput } from './MentionsInput'
+export { default as CascaderInput } from './CascaderInput'
+export { default as TransferInput } from './TransferInput'
+
+// Advanced UI Pattern Components
+export { default as RuleBuilderInput } from './RuleBuilderInput'
+export { default as ReorderableInput } from './ReorderableInput'
+export { default as RatingInput } from './RatingInput'
+export { default as SegmentedControlInput } from './SegmentedControlInput'
+export { default as NumericStepperInput } from './NumericStepperInput'
+
 // TODO: Add more components as they are implemented
 // export { default as RichTextInput } from './RichTextInput'
 // export { default as AddressInput } from './AddressInput'
@@ -57,6 +71,16 @@ export const FIELD_COMPONENTS = {
     ColorInput: () => import('./ColorInput'),
     SliderInput: () => import('./SliderInput'),
     DateRangeInput: () => import('./DateRangeInput'),
+    CommandPaletteInput: () => import('./CommandPaletteInput'),
+    ComboboxInput: () => import('./ComboboxInput'),
+    MentionsInput: () => import('./MentionsInput'),
+    CascaderInput: () => import('./CascaderInput'),
+    TransferInput: () => import('./TransferInput'),
+    RuleBuilderInput: () => import('./RuleBuilderInput'),
+    ReorderableInput: () => import('./ReorderableInput'),
+    RatingInput: () => import('./RatingInput'),
+    SegmentedControlInput: () => import('./SegmentedControlInput'),
+    NumericStepperInput: () => import('./NumericStepperInput'),
     // TODO: Add more components
 }
 
