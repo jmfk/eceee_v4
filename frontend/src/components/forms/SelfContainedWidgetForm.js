@@ -244,7 +244,6 @@ class SelfContainedWidgetForm {
             // Try to load real schema first
             const { getWidgetSchema } = await import('../../api/widgetSchemas.js')
             this.schema = await getWidgetSchema(this.widgetType)
-            console.log('Loaded real schema for', this.widgetType)
         } catch (error) {
             console.warn('Failed to load real schema, using mock:', error.message)
 

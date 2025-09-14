@@ -1,334 +1,18 @@
 import React, { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react'
 import { X, RefreshCw } from 'lucide-react'
-import { getWidgetSchema, validateWidgetConfiguration } from '../api/widgetSchemas.js'
+import { getWidgetSchema } from '../api/widgetSchemas.js'
 import { validateWidgetType, clearWidgetTypesCache } from '../utils/widgetTypeValidation.js'
 import DeletedWidgetWarning from './DeletedWidgetWarning.jsx'
 import { useWidgetEventEmitter } from '../contexts/WidgetEventContext'
-import { WIDGET_CHANGE_TYPES } from '../types/widgetEvents'
 import { SpecialEditorRenderer, hasSpecialEditor } from './special-editors'
-import SchemaFieldRenderer from './forms/SchemaFieldRenderer.jsx'
-import ValidatedInput from './validation/ValidatedInput.jsx'
-
-/**
- * OptimizedFormRenderer - React form with optimized state management to prevent excessive rerenders
- */
-const OptimizedFormRenderer = React.memo(({
-    widgetData,
-    schema,
-    onRealTimeUpdate,
-    onUnsavedChanges,
-    onValidatedWidgetSync,
-    emitWidgetChanged,
-    emitWidgetValidated
-}) => {
-    // Minimal React state - only what's absolutely necessary for UI
-    const [validationResults, setValidationResults] = useState({})
-    const [isValidating, setIsValidating] = useState(false)
-    const [hasChanges, setHasChanges] = useState(false)
-
-    // Use refs for form state to prevent rerenders
-    const originalConfigRef = useRef({})
-    const currentConfigRef = useRef({})
-    const schemaRef = useRef(null)
-    const validationTimeoutRef = useRef(null)
-    const updateTimeoutRef = useRef(null)
-
-    // Initialize form data when widget changes
-    useEffect(() => {
-        if (widgetData?.config) {
-            originalConfigRef.current = { ...widgetData.config }
-            currentConfigRef.current = { ...widgetData.config }
-            setHasChanges(false)
-        }
-    }, [widgetData])
-
-    // Fetch schema when needed
-    useEffect(() => {
-        if (widgetData && !schema) {
-            const fetchSchema = async () => {
-                try {
-                    const schemaData = await getWidgetSchema(widgetData.type)
-                    schemaRef.current = schemaData
-                } catch (error) {
-                    console.error('Failed to fetch widget schema:', error)
-                }
-            }
-            fetchSchema()
-        } else if (schema) {
-            schemaRef.current = schema
-        }
-    }, [widgetData, schema])
-
-    // Debounced validation function
-    const validateWidget = useCallback(async (configToValidate) => {
-        if (!widgetData?.type) return
-
-        if (validationTimeoutRef.current) {
-            clearTimeout(validationTimeoutRef.current)
-        }
-
-        validationTimeoutRef.current = setTimeout(async () => {
-            setIsValidating(true)
-            try {
-                const result = await validateWidgetConfiguration(widgetData.type, configToValidate)
-
-                const formattedResults = {}
-                let hasValidationErrors = false
-
-                if (result.errors) {
-                    Object.entries(result.errors).forEach(([field, messages]) => {
-                        formattedResults[field] = {
-                            isValid: false,
-                            errors: Array.isArray(messages) ? messages : [messages],
-                            warnings: result.warnings?.[field] || []
-                        }
-                        hasValidationErrors = true
-                    })
-                }
-
-                setValidationResults(formattedResults)
-                const isValid = (result.is_valid || result.isValid) && !hasValidationErrors
-                setIsValidating(false)
-
-                // Emit validation event
-                if (emitWidgetValidated) {
-                    emitWidgetValidated(widgetData.id, widgetData.slotName, {
-                        isValid,
-                        errors: formattedResults,
-                        warnings: result.warnings || {}
-                    })
-                }
-
-                // Keep backward compatibility
-                if (isValid && onValidatedWidgetSync) {
-                    onValidatedWidgetSync({
-                        ...widgetData,
-                        config: configToValidate
-                    })
-                }
-            } catch (error) {
-                console.error('Widget validation failed:', error)
-                setIsValidating(false)
-            }
-        }, 300)
-    }, [widgetData, emitWidgetValidated, onValidatedWidgetSync])
-
-    // Debounced real-time update function
-    const triggerRealTimeUpdate = useCallback((newConfig) => {
-        if (!widgetData) return
-
-        if (updateTimeoutRef.current) {
-            clearTimeout(updateTimeoutRef.current)
-        }
-
-        updateTimeoutRef.current = setTimeout(() => {
-            const updatedWidget = { ...widgetData, config: newConfig }
-
-            // Emit event for real-time updates
-            if (emitWidgetChanged) {
-                emitWidgetChanged(
-                    widgetData.id,
-                    widgetData.slotName,
-                    updatedWidget,
-                    WIDGET_CHANGE_TYPES.CONFIG
-                )
-            }
-
-            // Fallback for components not using event system
-            if (onRealTimeUpdate && !emitWidgetChanged) {
-                onRealTimeUpdate(updatedWidget)
-            }
-        }, 200)
-    }, [widgetData, emitWidgetChanged, onRealTimeUpdate])
-
-    // Handle field changes without causing rerenders
-    const handleFieldChange = useCallback((fieldName, value) => {
-        // Update config in ref (no rerenders)
-        currentConfigRef.current = {
-            ...currentConfigRef.current,
-            [fieldName]: value
-        }
-
-        // Check if we have changes
-        const hasActualChanges = JSON.stringify(currentConfigRef.current) !== JSON.stringify(originalConfigRef.current)
-        setHasChanges(hasActualChanges)
-
-        if (onUnsavedChanges) {
-            onUnsavedChanges(hasActualChanges)
-        }
-
-        // Trigger validation and real-time updates
-        validateWidget(currentConfigRef.current)
-        triggerRealTimeUpdate(currentConfigRef.current)
-    }, [validateWidget, triggerRealTimeUpdate, onUnsavedChanges])
-
-    // Get current field value from ref
-    const getFieldValue = useCallback((fieldName) => {
-        return currentConfigRef.current[fieldName] ?? originalConfigRef.current[fieldName] ?? ''
-    }, [])
-
-    // Cleanup timeouts
-    useEffect(() => {
-        return () => {
-            if (validationTimeoutRef.current) {
-                clearTimeout(validationTimeoutRef.current)
-            }
-            if (updateTimeoutRef.current) {
-                clearTimeout(updateTimeoutRef.current)
-            }
-        }
-    }, [])
-
-    const activeSchema = schemaRef.current || schema
-
-    if (!activeSchema?.properties) {
-        return (
-            <div className="text-center text-gray-500 py-8 p-4">
-                <p>No configuration options available for this widget.</p>
-            </div>
-        )
-    }
-
-    // Render form fields using React components but with optimized state management
-    return (
-        <div className="space-y-4 p-4">
-            {Object.entries(activeSchema.properties).map(([fieldName, fieldSchema]) => {
-                // Hide fields that are managed by special editors
-                const hiddenFields = {
-                    'core_widgets.ImageWidget': ['collectionId', 'collectionConfig', 'mediaItems']
-                }
-
-                const widgetType = widgetData?.type || ''
-                if (hiddenFields[widgetType]?.includes(fieldName)) {
-                    return null
-                }
-
-                const validation = validationResults[fieldName]
-                const fieldValue = getFieldValue(fieldName)
-                const isRequired = activeSchema?.required?.includes(fieldName) || false
-
-                // Use SchemaFieldRenderer for custom components
-                if (fieldSchema.component) {
-                    return (
-                        <SchemaFieldRenderer
-                            key={fieldName}
-                            fieldName={fieldName}
-                            fieldSchema={fieldSchema}
-                            value={fieldValue}
-                            onChange={(newValue) => handleFieldChange(fieldName, newValue)}
-                            validation={validation}
-                            isValidating={isValidating}
-                            required={isRequired}
-                            disabled={false}
-                        />
-                    )
-                }
-
-                // Enhanced form fields for common types
-                const fieldType = fieldSchema.type || 'string'
-                const fieldTitle = fieldSchema.title || fieldName
-                const fieldDescription = fieldSchema.description
-
-                // Handle different field types with enhanced UI
-                if (fieldType === 'boolean') {
-                    return (
-                        <div key={fieldName} className="space-y-2">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <label className="text-sm font-medium text-gray-700">
-                                        {fieldTitle}
-                                    </label>
-                                    {fieldDescription && (
-                                        <p className="text-xs text-gray-500 mt-1">{fieldDescription}</p>
-                                    )}
-                                </div>
-                                <div className="relative">
-                                    <input
-                                        type="checkbox"
-                                        checked={Boolean(fieldValue)}
-                                        onChange={(e) => handleFieldChange(fieldName, e.target.checked)}
-                                        className="sr-only"
-                                        id={`toggle-${fieldName}`}
-                                    />
-                                    <label
-                                        htmlFor={`toggle-${fieldName}`}
-                                        className={`block w-12 h-6 rounded-full cursor-pointer transition-colors ${Boolean(fieldValue) ? 'bg-blue-600' : 'bg-gray-300'
-                                            }`}
-                                    >
-                                        <div
-                                            className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${Boolean(fieldValue) ? 'translate-x-6' : 'translate-x-0'
-                                                }`}
-                                        />
-                                    </label>
-                                </div>
-                            </div>
-                        </div>
-                    )
-                }
-
-                // Handle enum fields with choice chips
-                if (fieldSchema.enum) {
-                    return (
-                        <div key={fieldName} className="space-y-2">
-                            <label className="block text-sm font-medium text-gray-700">
-                                {fieldTitle}
-                                {isRequired && <span className="text-red-500 ml-1">*</span>}
-                            </label>
-                            {fieldDescription && (
-                                <p className="text-xs text-gray-500">{fieldDescription}</p>
-                            )}
-                            <div className="flex flex-wrap gap-2">
-                                {fieldSchema.enum.map(option => (
-                                    <button
-                                        key={option}
-                                        type="button"
-                                        onClick={() => handleFieldChange(fieldName, option)}
-                                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors capitalize ${fieldValue === option
-                                            ? 'bg-blue-600 text-white'
-                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                            }`}
-                                    >
-                                        {option.replace(/_/g, ' ')}
-                                    </button>
-                                ))}
-                            </div>
-                            {validation && !validation.isValid && (
-                                <div className="text-red-600 text-xs mt-1">
-                                    {validation.errors?.join(', ')}
-                                </div>
-                            )}
-                        </div>
-                    )
-                }
-
-                // Use ValidatedInput for other field types
-                return (
-                    <ValidatedInput
-                        key={fieldName}
-                        type={fieldType === 'number' ? 'number' : 'text'}
-                        value={fieldValue}
-                        onChange={(e) => handleFieldChange(fieldName, e.target.value)}
-                        label={fieldTitle}
-                        description={fieldDescription}
-                        placeholder={fieldSchema.placeholder || ''}
-                        required={isRequired}
-                        validation={validation}
-                        isValidating={isValidating}
-                        min={fieldSchema.minimum}
-                        max={fieldSchema.maximum}
-                    />
-                )
-            })}
-        </div>
-    )
-})
+import IsolatedFormRenderer from './IsolatedFormRenderer.jsx'
 
 /**
  * WidgetEditorPanel - Slide-out panel for editing widgets
  * 
  * Features:
  * - Slides out from the right side with animation
- * - Contains widget editing form
+ * - Contains isolated form fields to prevent excessive rerenders
  * - Scrollable content area
  * - Resizable with drag handle
  * - Save/Cancel actions
@@ -396,7 +80,6 @@ const WidgetEditorPanel = forwardRef(({
             }, 500) // 500ms for exit animation
         }
     }, [showSpecialEditor])
-
 
     // Reset special editor state when switching to a different widget
     useEffect(() => {
@@ -502,7 +185,7 @@ const WidgetEditorPanel = forwardRef(({
         }
     }, [widgetData, schema, widgetTypeValidation])
 
-    // Handle unsaved changes from self-contained form
+    // Handle unsaved changes from isolated form
     const handleUnsavedChanges = useCallback((hasUnsavedChanges) => {
         setHasChanges(hasUnsavedChanges)
         if (onUnsavedChanges) {
@@ -588,7 +271,7 @@ const WidgetEditorPanel = forwardRef(({
     // Expose methods to parent component
     useImperativeHandle(ref, () => ({
         getCurrentConfig: () => {
-            // This will be handled by the self-contained form
+            // This will be handled by the isolated form
             return widgetData?.config || {}
         },
         hasUnsavedChanges: () => hasChanges,
@@ -659,7 +342,6 @@ const WidgetEditorPanel = forwardRef(({
             setIsValidatingType(false)
         }
     }, [widgetData, schema])
-
 
     if (!isOpen) return null
 
@@ -764,7 +446,7 @@ const WidgetEditorPanel = forwardRef(({
                                 </div>
                             </div>
                         ) : widgetData ? (
-                            <OptimizedFormRenderer
+                            <IsolatedFormRenderer
                                 widgetData={widgetData}
                                 schema={fetchedSchema || schema}
                                 onRealTimeUpdate={onRealTimeUpdate}
@@ -779,7 +461,6 @@ const WidgetEditorPanel = forwardRef(({
                             </div>
                         )}
                     </div>
-
                 </div>
             </div>
         </>
