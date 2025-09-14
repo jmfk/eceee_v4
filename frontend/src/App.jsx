@@ -18,6 +18,8 @@ import TreePageManager from '@components/TreePageManager'
 import PageEditor from '@components/PageEditor'
 import VersionTimelinePage from '@pages/VersionTimelinePage'
 import NotFoundPage from '@pages/NotFoundPage'
+import SelfContainedFormDemo from '@components/demos/SelfContainedFormDemo'
+import SimpleFormDemo from '@components/demos/SimpleFormDemo'
 // import RenderInvestigation from '@pages/RenderInvestigation' // DISABLED
 import { NotificationProvider } from '@components/NotificationManager'
 import { GlobalNotificationProvider } from './contexts/GlobalNotificationContext'
@@ -82,6 +84,35 @@ function App() {
                     </PrivateRoute>
                   } />
                   */}
+
+                  {/* Self-Contained Form Demo Routes */}
+                  <Route path="/demo/self-contained-form" element={
+                    <PrivateRoute>
+                      <div className="fixed inset-0 bg-gray-50 flex flex-col">
+                        <Navbar />
+                        <main className="flex-1 overflow-hidden">
+                          <div className="h-full overflow-y-auto">
+                            <SelfContainedFormDemo />
+                          </div>
+                        </main>
+                        <StatusBar customStatusContent={<span>Self-Contained Form Demo - Active</span>} />
+                      </div>
+                    </PrivateRoute>
+                  } />
+
+                  <Route path="/demo/simple-form" element={
+                    <PrivateRoute>
+                      <div className="fixed inset-0 bg-gray-50 flex flex-col">
+                        <Navbar />
+                        <main className="flex-1 overflow-hidden">
+                          <div className="h-full overflow-y-auto">
+                            <SimpleFormDemo />
+                          </div>
+                        </main>
+                        <StatusBar customStatusContent={<span>Simple Form Demo - Active</span>} />
+                      </div>
+                    </PrivateRoute>
+                  } />
 
                   <Route path="/pages" element={
                     <PrivateRoute>

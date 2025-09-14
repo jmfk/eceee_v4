@@ -87,7 +87,6 @@ const StableFormRenderer = React.memo(({ activeSchema, widgetType, renderFormFie
             </div>
         )
     })
-    console.log("render")
     return <div className="space-y-4">{renderElements}</div>
 })
 
@@ -330,7 +329,6 @@ const WidgetEditorPanel = forwardRef(({
 
                 // Emit validation event (no prop drilling!)
                 if (widgetData && emitWidgetValidated) {
-                    console.log("emitWidgetValidated")
                     emitWidgetValidated(widgetData.id, widgetData.slotName, {
                         isValid,
                         errors: formattedResults,
@@ -340,7 +338,6 @@ const WidgetEditorPanel = forwardRef(({
 
                 // Keep backward compatibility
                 if (isValid && onValidatedWidgetSync && widgetData) {
-                    console.log("onValidatedWidgetSync")
                     onValidatedWidgetSync({
                         ...widgetData,
                         config: configToValidate
@@ -451,7 +448,6 @@ const WidgetEditorPanel = forwardRef(({
 
             // Emit event for real-time updates (no prop drilling!)
             if (emitWidgetChanged) {
-                console.log("emitWidgetChanged 2")
                 emitWidgetChanged(
                     widgetData.id,
                     widgetData.slotName,
@@ -462,7 +458,6 @@ const WidgetEditorPanel = forwardRef(({
 
             // Fallback for components not yet using event system
             if (onRealTimeUpdate && !emitWidgetChanged) {
-                console.log("onRealTimeUpdate 2")
                 onRealTimeUpdate(updatedWidget)
             }
         }, 300) // 300ms debounce
@@ -483,7 +478,6 @@ const WidgetEditorPanel = forwardRef(({
 
         // Notify parent about unsaved changes state
         if (onUnsavedChanges) {
-            console.log("onUnsavedChanges 3")
             onUnsavedChanges(hasActualChanges)
         }
 
@@ -491,7 +485,6 @@ const WidgetEditorPanel = forwardRef(({
         validateWidget(currentValues.current)
 
         // Trigger real-time preview update (async)
-        console.log("triggerRealTimeUpdate 3")
         triggerRealTimeUpdate(currentValues.current)
     }, [originalConfig, triggerRealTimeUpdate, validateWidget, onUnsavedChanges])
 
@@ -535,12 +528,10 @@ const WidgetEditorPanel = forwardRef(({
 
         // Notify parent about unsaved changes state
         if (onUnsavedChanges) {
-            console.log("onUnsavedChanges 4")
             onUnsavedChanges(hasActualChanges)
         }
 
         // Trigger real-time preview update
-        console.log("triggerRealTimeUpdate 4")
         triggerRealTimeUpdate(newConfig)
     }, [originalConfig, triggerRealTimeUpdate, onUnsavedChanges])
 
@@ -570,7 +561,6 @@ const WidgetEditorPanel = forwardRef(({
     // Handle refresh widget types
     const handleRefreshWidgetTypes = useCallback(async () => {
         if (!widgetData) return
-        console.log("handleRefreshWidgetTypes 5")
         // Clear cache and re-validate
         clearWidgetTypesCache()
         setIsValidatingType(true)

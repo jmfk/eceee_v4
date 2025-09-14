@@ -9,6 +9,7 @@ import { widgetsApi } from '../../api'
 import ObjectContentEditor from '../ObjectContentEditor'
 import ObjectSchemaForm from '../ObjectSchemaForm'
 import WidgetEditorPanel from '../WidgetEditorPanel'
+import SelfContainedWidgetEditor from '../forms/SelfContainedWidgetEditor.jsx'
 import { WidgetEventProvider, useWidgetEventListener } from '../../contexts/WidgetEventContext'
 import { WIDGET_EVENTS, WIDGET_CHANGE_TYPES } from '../../types/widgetEvents'
 
@@ -19,6 +20,9 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
 
     // Track widget changes locally (don't auto-save)
     const [localWidgets, setLocalWidgets] = useState(instance?.widgets || {})
+
+    // Feature flag for new self-contained widget editor
+    const [useSelfContainedEditor, setUseSelfContainedEditor] = useState(false)
 
     // Widget editor ref and state
     const objectContentEditorRef = useRef(null)
@@ -515,19 +519,57 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
 
             {/* Widget Editor Panel - positioned at top level for full-screen slide-out */}
             {widgetEditorUI && (
-                <WidgetEditorPanel
-                    ref={widgetEditorUI.widgetEditorRef}
-                    isOpen={widgetEditorUI.isOpen}
-                    onClose={widgetEditorUI.handleCloseWidgetEditor}
-                    onSave={widgetEditorUI.handleSaveWidget}
-                    onRealTimeUpdate={handleRealTimeWidgetUpdate}
-                    onUnsavedChanges={(hasChanges) => {
-                        setWidgetEditorUI(prev => ({ ...prev, hasUnsavedChanges: hasChanges }))
-                    }}
-                    widgetData={widgetEditorUI.editingWidget}
-                    title={widgetEditorUI.editingWidget ? `Edit ${getWidgetDisplayName(widgetEditorUI.editingWidget.type, widgetTypes)}` : 'Edit Widget'}
-                    autoOpenSpecialEditor={widgetEditorUI.editingWidget?.type === 'core_widgets.ImageWidget'}
-                />
+                <>
+                    {/* Development Toggle for Widget Editor */}
+                    {widgetEditorUI.isOpen && (
+                        <div className="fixed top-4 left-4 z-50 bg-white border border-gray-200 rounded-lg p-3 shadow-lg">
+                            <div className="flex items-center space-x-3">
+                                <span className="text-sm font-medium text-gray-700">Editor Mode:</span>
+                                <button
+                                    onClick={() => setUseSelfContainedEditor(!useSelfContainedEditor)}
+                                    className={`px-3 py-1 text-xs rounded-full transition-colors ${useSelfContainedEditor
+                                            ? 'bg-blue-600 text-white'
+                                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                        }`}
+                                >
+                                    {useSelfContainedEditor ? 'Self-Contained' : 'Switch to Self-Contained'}
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {useSelfContainedEditor ? (
+                        <SelfContainedWidgetEditor
+                            ref={widgetEditorUI.widgetEditorRef}
+                            isOpen={widgetEditorUI.isOpen}
+                            onClose={widgetEditorUI.handleCloseWidgetEditor}
+                            onSave={widgetEditorUI.handleSaveWidget}
+                            onRealTimeUpdate={handleRealTimeWidgetUpdate}
+                            onUnsavedChanges={(hasChanges) => {
+                                setWidgetEditorUI(prev => ({ ...prev, hasUnsavedChanges: hasChanges }))
+                            }}
+                            widgetData={widgetEditorUI.editingWidget}
+                            title={widgetEditorUI.editingWidget ? `Edit ${getWidgetDisplayName(widgetEditorUI.editingWidget.type, widgetTypes)} (Self-Contained)` : 'Edit Widget (Self-Contained)'}
+                            autoSave={true}
+                            showValidationInline={true}
+                            showSaveStatus={true}
+                        />
+                    ) : (
+                        <WidgetEditorPanel
+                            ref={widgetEditorUI.widgetEditorRef}
+                            isOpen={widgetEditorUI.isOpen}
+                            onClose={widgetEditorUI.handleCloseWidgetEditor}
+                            onSave={widgetEditorUI.handleSaveWidget}
+                            onRealTimeUpdate={handleRealTimeWidgetUpdate}
+                            onUnsavedChanges={(hasChanges) => {
+                                setWidgetEditorUI(prev => ({ ...prev, hasUnsavedChanges: hasChanges }))
+                            }}
+                            widgetData={widgetEditorUI.editingWidget}
+                            title={widgetEditorUI.editingWidget ? `Edit ${getWidgetDisplayName(widgetEditorUI.editingWidget.type, widgetTypes)}` : 'Edit Widget'}
+                            autoOpenSpecialEditor={widgetEditorUI.editingWidget?.type === 'core_widgets.ImageWidget'}
+                        />
+                    )}
+                </>
             )}
         </div>
     )

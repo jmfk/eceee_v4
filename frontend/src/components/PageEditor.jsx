@@ -34,6 +34,7 @@ import SchemaDrivenForm from './SchemaDrivenForm'
 import LayoutSelector from './LayoutSelector'
 import StatusBar from './StatusBar'
 import WidgetEditorPanel from './WidgetEditorPanel'
+import SelfContainedWidgetEditor from './forms/SelfContainedWidgetEditor.jsx'
 import PageTagWidget from './PageTagWidget'
 import ThemeSelector from './ThemeSelector'
 
@@ -185,6 +186,9 @@ const PageEditor = () => {
     const [isDirty, setIsDirty] = useState(false)
     const [layoutData, setLayoutData] = useState(null)
     const [isLoadingLayout, setIsLoadingLayout] = useState(false)
+
+    // Feature flag for new self-contained widget editor
+    const [useSelfContainedEditor, setUseSelfContainedEditor] = useState(false)
     const contentEditorRef = useRef(null)
     const settingsEditorRef = useRef(null)
 
@@ -1294,6 +1298,40 @@ const PageEditor = () => {
                                     </div>
                                 ) : (
                                     <div className="h-full flex flex-col">
+                                        {/* Development Toggle for Widget Editor */}
+                                        <div className="flex-shrink-0 bg-blue-50 border-l-4 border-blue-400 p-3 mb-2">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center">
+                                                    <div className="flex-shrink-0">
+                                                        <Settings className="h-4 w-4 text-blue-400" />
+                                                    </div>
+                                                    <div className="ml-3">
+                                                        <p className="text-sm text-blue-700 font-medium">
+                                                            Widget Editor Mode
+                                                        </p>
+                                                        <p className="text-xs text-blue-600">
+                                                            Switch between React-based and self-contained widget editors
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center space-x-2">
+                                                    <span className="text-xs text-blue-600">
+                                                        {useSelfContainedEditor ? 'Self-Contained' : 'React-based'}
+                                                    </span>
+                                                    <button
+                                                        onClick={() => setUseSelfContainedEditor(!useSelfContainedEditor)}
+                                                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${useSelfContainedEditor ? 'bg-blue-600' : 'bg-gray-300'
+                                                            }`}
+                                                    >
+                                                        <span
+                                                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${useSelfContainedEditor ? 'translate-x-6' : 'translate-x-1'
+                                                                }`}
+                                                        />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+
                                         {/* Layout fallback warning */}
                                         {!(pageVersionData?.codeLayout) && (
                                             <div className="flex-shrink-0 bg-amber-50 border-l-4 border-amber-400 p-4 mb-2">
@@ -1413,18 +1451,35 @@ const PageEditor = () => {
                     )}
 
                     {/* Widget Editor Panel - positioned within content area */}
-                    <WidgetEditorPanel
-                        ref={widgetEditorRef}
-                        isOpen={widgetEditorOpen}
-                        onClose={handleCloseWidgetEditor}
-                        onSave={handleSaveWidget}
-                        onRealTimeUpdate={handleRealTimeWidgetUpdate}
-                        onUnsavedChanges={setWidgetHasUnsavedChanges}
-                        onValidatedWidgetSync={handleValidatedWidgetSync}
-                        widgetData={editingWidget}
-                        title={editingWidget ? `Edit ${editingWidget.name}` : 'Edit Widget'}
-                        autoOpenSpecialEditor={editingWidget?.type === 'core_widgets.ImageWidget'}
-                    />
+                    {useSelfContainedEditor ? (
+                        <SelfContainedWidgetEditor
+                            ref={widgetEditorRef}
+                            isOpen={widgetEditorOpen}
+                            onClose={handleCloseWidgetEditor}
+                            onSave={handleSaveWidget}
+                            onRealTimeUpdate={handleRealTimeWidgetUpdate}
+                            onUnsavedChanges={setWidgetHasUnsavedChanges}
+                            widgetData={editingWidget}
+                            title={editingWidget ? `Edit ${editingWidget.name} (Self-Contained)` : 'Edit Widget (Self-Contained)'}
+                            autoSave={true}
+                            showValidationInline={true}
+                            showSaveStatus={true}
+                            panelWidth={400}
+                        />
+                    ) : (
+                        <WidgetEditorPanel
+                            ref={widgetEditorRef}
+                            isOpen={widgetEditorOpen}
+                            onClose={handleCloseWidgetEditor}
+                            onSave={handleSaveWidget}
+                            onRealTimeUpdate={handleRealTimeWidgetUpdate}
+                            onUnsavedChanges={setWidgetHasUnsavedChanges}
+                            onValidatedWidgetSync={handleValidatedWidgetSync}
+                            widgetData={editingWidget}
+                            title={editingWidget ? `Edit ${editingWidget.name}` : 'Edit Widget'}
+                            autoOpenSpecialEditor={editingWidget?.type === 'core_widgets.ImageWidget'}
+                        />
+                    )}
                 </div>
             </div>
 

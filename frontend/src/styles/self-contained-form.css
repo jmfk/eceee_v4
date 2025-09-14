@@ -1,0 +1,275 @@
+/**
+ * Self-Contained Widget Form Styles
+ * 
+ * CSS styles for the vanilla JS widget form components.
+ * These styles are applied directly to DOM elements created by the form.
+ */
+
+/* Form container */
+.self-contained-widget-form {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+    line-height: 1.5;
+}
+
+/* Field containers */
+.field-container {
+    margin-bottom: 1rem;
+}
+
+.field-container:last-child {
+    margin-bottom: 0;
+}
+
+/* Labels */
+.field-label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #374151;
+    margin-bottom: 0.5rem;
+}
+
+.field-label .required {
+    color: #ef4444;
+    margin-left: 0.25rem;
+}
+
+.field-description {
+    font-size: 0.75rem;
+    color: #6b7280;
+    margin-top: 0.25rem;
+}
+
+/* Input elements */
+.self-contained-widget-form input[type="text"],
+.self-contained-widget-form input[type="email"],
+.self-contained-widget-form input[type="url"],
+.self-contained-widget-form input[type="number"],
+.self-contained-widget-form input[type="color"],
+.self-contained-widget-form input[type="date"],
+.self-contained-widget-form input[type="datetime-local"],
+.self-contained-widget-form input[type="time"],
+.self-contained-widget-form textarea,
+.self-contained-widget-form select {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+.self-contained-widget-form input:focus,
+.self-contained-widget-form textarea:focus,
+.self-contained-widget-form select:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.self-contained-widget-form input:invalid,
+.self-contained-widget-form textarea:invalid {
+    border-color: #ef4444;
+}
+
+/* Checkbox styling */
+.self-contained-widget-form input[type="checkbox"] {
+    width: 1rem;
+    height: 1rem;
+    color: #3b82f6;
+    border: 1px solid #d1d5db;
+    border-radius: 0.25rem;
+    cursor: pointer;
+}
+
+.self-contained-widget-form input[type="checkbox"]:focus {
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Textarea specific */
+.self-contained-widget-form textarea {
+    resize: vertical;
+    min-height: 3rem;
+}
+
+/* Select styling */
+.self-contained-widget-form select {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+    background-position: right 0.5rem center;
+    background-repeat: no-repeat;
+    background-size: 1.5em 1.5em;
+    padding-right: 2.5rem;
+    cursor: pointer;
+}
+
+/* Validation styles */
+.field-validation {
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
+    display: none; /* Hidden by default */
+}
+
+.field-validation.error {
+    color: #dc2626;
+    display: block;
+}
+
+.field-validation.warning {
+    color: #d97706;
+    display: block;
+}
+
+.field-validation.success {
+    color: #059669;
+    display: block;
+}
+
+/* Form status */
+.form-status {
+    font-size: 0.75rem;
+    padding: 0.5rem;
+    border-radius: 0.375rem;
+    margin-top: 1rem;
+    display: none; /* Hidden by default */
+}
+
+.form-status.success {
+    color: #065f46;
+    background-color: #ecfdf5;
+    border: 1px solid #a7f3d0;
+}
+
+.form-status.error {
+    color: #991b1b;
+    background-color: #fef2f2;
+    border: 1px solid #fecaca;
+}
+
+.form-status.warning {
+    color: #92400e;
+    background-color: #fffbeb;
+    border: 1px solid #fed7aa;
+}
+
+.form-status.info {
+    color: #1e40af;
+    background-color: #eff6ff;
+    border: 1px solid #bfdbfe;
+}
+
+/* Loading states */
+.field-container.loading {
+    opacity: 0.7;
+    pointer-events: none;
+}
+
+.field-container.loading input,
+.field-container.loading textarea,
+.field-container.loading select {
+    background-color: #f9fafb;
+}
+
+/* Disabled states */
+.field-container.disabled {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+/* Field groups */
+.field-group {
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.field-group-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+/* Responsive design */
+@media (max-width: 640px) {
+    .self-contained-widget-form {
+        padding: 0.75rem;
+    }
+    
+    .field-container {
+        margin-bottom: 0.75rem;
+    }
+    
+    .self-contained-widget-form input,
+    .self-contained-widget-form textarea,
+    .self-contained-widget-form select {
+        font-size: 1rem; /* Prevent zoom on iOS */
+    }
+}
+
+/* Animation classes */
+.fade-in {
+    animation: fadeIn 0.2s ease-in-out;
+}
+
+.fade-out {
+    animation: fadeOut 0.2s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-0.5rem);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes fadeOut {
+    from {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(-0.5rem);
+    }
+}
+
+/* Focus indicators for accessibility */
+.self-contained-widget-form *:focus-visible {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .self-contained-widget-form input,
+    .self-contained-widget-form textarea,
+    .self-contained-widget-form select {
+        border-width: 2px;
+    }
+    
+    .field-validation.error {
+        font-weight: 600;
+    }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+    .fade-in,
+    .fade-out {
+        animation: none;
+    }
+    
+    .self-contained-widget-form input,
+    .self-contained-widget-form textarea,
+    .self-contained-widget-form select {
+        transition: none;
+    }
+}
