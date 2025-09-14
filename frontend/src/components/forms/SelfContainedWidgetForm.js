@@ -12,7 +12,6 @@
  * - Self-contained lifecycle management
  */
 
-import { widgetsApi } from '../../api/widgets.js'
 import { validateWidgetConfiguration } from '../../api/widgetSchemas.js'
 
 /**
@@ -875,66 +874,40 @@ class SelfContainedWidgetForm {
 
     /**
      * Sync current config to server
+     * 
+     * NOTE: In the eceee_v4 system, widgets are not saved individually.
+     * Instead, widget changes are saved as part of the page version data.
+     * This method simulates a save for UI feedback but doesn't make API calls.
      */
     async syncToServer() {
         if (!this.isDirty || this.isDestroyed) return
 
         if (this.isInitialized && this.statusElement) {
-            this.displaySaveStatus('saving', 'Saving...')
+            this.displaySaveStatus('saving', 'Syncing...')
         }
 
-        try {
-            // Try real API call first
-            const response = await widgetsApi.update(this.widgetId, {
-                config: this.currentConfig
-            })
+        // Simulate save delay for better UX
+        await new Promise(resolve => setTimeout(resolve, 200))
 
-            // Update original config to new saved state
-            this.originalConfig = { ...this.currentConfig }
-            this.isDirty = false
-            this.hasUnsavedChanges = false
+        // Update original config to new saved state
+        this.originalConfig = { ...this.currentConfig }
+        this.isDirty = false
+        this.hasUnsavedChanges = false
 
-            // Notify registry of successful save
-            this.notifyRegistry({
-                type: 'SAVED_TO_SERVER',
-                widgetId: this.widgetId,
-                slotName: this.slotName,
-                config: { ...this.currentConfig }
-            })
+        // Notify registry of successful sync (not actual server save)
+        this.notifyRegistry({
+            type: 'SAVED_TO_SERVER',
+            widgetId: this.widgetId,
+            slotName: this.slotName,
+            config: { ...this.currentConfig }
+        })
 
-            // Show success status
-            if (this.isInitialized && this.statusElement) {
-                this.displaySaveStatus('saved', 'Saved successfully')
-            }
-
-            return response
-
-        } catch (error) {
-            console.warn('Failed to save to server, using demo mode:', error.message)
-
-            // Fallback to mock save for demo
-            await new Promise(resolve => setTimeout(resolve, 300))
-
-            // Update original config to new saved state
-            this.originalConfig = { ...this.currentConfig }
-            this.isDirty = false
-            this.hasUnsavedChanges = false
-
-            // Notify registry of successful save
-            this.notifyRegistry({
-                type: 'SAVED_TO_SERVER',
-                widgetId: this.widgetId,
-                slotName: this.slotName,
-                config: { ...this.currentConfig }
-            })
-
-            // Show success status
-            if (this.isInitialized && this.statusElement) {
-                this.displaySaveStatus('saved', 'Saved successfully (demo mode)')
-            }
-
-            return { success: true, demo: true }
+        // Show success status
+        if (this.isInitialized && this.statusElement) {
+            this.displaySaveStatus('saved', 'Changes synced')
         }
+
+        return { success: true, synced: true }
     }
 
     /**

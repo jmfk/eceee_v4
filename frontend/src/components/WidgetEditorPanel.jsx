@@ -1,93 +1,326 @@
 import React, { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react'
-import { X, Save, RotateCcw, RefreshCw } from 'lucide-react'
-import ValidatedInput from './validation/ValidatedInput.jsx'
+import { X, RefreshCw } from 'lucide-react'
 import { getWidgetSchema, validateWidgetConfiguration } from '../api/widgetSchemas.js'
-import { widgetsApi } from '../api'
 import { validateWidgetType, clearWidgetTypesCache } from '../utils/widgetTypeValidation.js'
 import DeletedWidgetWarning from './DeletedWidgetWarning.jsx'
 import { useWidgetEventEmitter } from '../contexts/WidgetEventContext'
 import { WIDGET_CHANGE_TYPES } from '../types/widgetEvents'
 import { SpecialEditorRenderer, hasSpecialEditor } from './special-editors'
 import SchemaFieldRenderer from './forms/SchemaFieldRenderer.jsx'
+import ValidatedInput from './validation/ValidatedInput.jsx'
 
 /**
- * StableFormRenderer - Renders form fields without re-rendering on config changes
+ * OptimizedFormRenderer - React form with optimized state management to prevent excessive rerenders
  */
-const StableFormRenderer = React.memo(({ activeSchema, widgetType, renderFormField }) => {
+const OptimizedFormRenderer = React.memo(({
+    widgetData,
+    schema,
+    onRealTimeUpdate,
+    onUnsavedChanges,
+    onValidatedWidgetSync,
+    emitWidgetChanged,
+    emitWidgetValidated
+}) => {
+    // Minimal React state - only what's absolutely necessary for UI
+    const [validationResults, setValidationResults] = useState({})
+    const [isValidating, setIsValidating] = useState(false)
+    const [hasChanges, setHasChanges] = useState(false)
+
+    // Use refs for form state to prevent rerenders
+    const originalConfigRef = useRef({})
+    const currentConfigRef = useRef({})
+    const schemaRef = useRef(null)
+    const validationTimeoutRef = useRef(null)
+    const updateTimeoutRef = useRef(null)
+
+    // Initialize form data when widget changes
+    useEffect(() => {
+        if (widgetData?.config) {
+            originalConfigRef.current = { ...widgetData.config }
+            currentConfigRef.current = { ...widgetData.config }
+            setHasChanges(false)
+        }
+    }, [widgetData])
+
+    // Fetch schema when needed
+    useEffect(() => {
+        if (widgetData && !schema) {
+            const fetchSchema = async () => {
+                try {
+                    const schemaData = await getWidgetSchema(widgetData.type)
+                    schemaRef.current = schemaData
+                } catch (error) {
+                    console.error('Failed to fetch widget schema:', error)
+                }
+            }
+            fetchSchema()
+        } else if (schema) {
+            schemaRef.current = schema
+        }
+    }, [widgetData, schema])
+
+    // Debounced validation function
+    const validateWidget = useCallback(async (configToValidate) => {
+        if (!widgetData?.type) return
+
+        if (validationTimeoutRef.current) {
+            clearTimeout(validationTimeoutRef.current)
+        }
+
+        validationTimeoutRef.current = setTimeout(async () => {
+            setIsValidating(true)
+            try {
+                const result = await validateWidgetConfiguration(widgetData.type, configToValidate)
+
+                const formattedResults = {}
+                let hasValidationErrors = false
+
+                if (result.errors) {
+                    Object.entries(result.errors).forEach(([field, messages]) => {
+                        formattedResults[field] = {
+                            isValid: false,
+                            errors: Array.isArray(messages) ? messages : [messages],
+                            warnings: result.warnings?.[field] || []
+                        }
+                        hasValidationErrors = true
+                    })
+                }
+
+                setValidationResults(formattedResults)
+                const isValid = (result.is_valid || result.isValid) && !hasValidationErrors
+                setIsValidating(false)
+
+                // Emit validation event
+                if (emitWidgetValidated) {
+                    emitWidgetValidated(widgetData.id, widgetData.slotName, {
+                        isValid,
+                        errors: formattedResults,
+                        warnings: result.warnings || {}
+                    })
+                }
+
+                // Keep backward compatibility
+                if (isValid && onValidatedWidgetSync) {
+                    onValidatedWidgetSync({
+                        ...widgetData,
+                        config: configToValidate
+                    })
+                }
+            } catch (error) {
+                console.error('Widget validation failed:', error)
+                setIsValidating(false)
+            }
+        }, 300)
+    }, [widgetData, emitWidgetValidated, onValidatedWidgetSync])
+
+    // Debounced real-time update function
+    const triggerRealTimeUpdate = useCallback((newConfig) => {
+        if (!widgetData) return
+
+        if (updateTimeoutRef.current) {
+            clearTimeout(updateTimeoutRef.current)
+        }
+
+        updateTimeoutRef.current = setTimeout(() => {
+            const updatedWidget = { ...widgetData, config: newConfig }
+
+            // Emit event for real-time updates
+            if (emitWidgetChanged) {
+                emitWidgetChanged(
+                    widgetData.id,
+                    widgetData.slotName,
+                    updatedWidget,
+                    WIDGET_CHANGE_TYPES.CONFIG
+                )
+            }
+
+            // Fallback for components not using event system
+            if (onRealTimeUpdate && !emitWidgetChanged) {
+                onRealTimeUpdate(updatedWidget)
+            }
+        }, 200)
+    }, [widgetData, emitWidgetChanged, onRealTimeUpdate])
+
+    // Handle field changes without causing rerenders
+    const handleFieldChange = useCallback((fieldName, value) => {
+        // Update config in ref (no rerenders)
+        currentConfigRef.current = {
+            ...currentConfigRef.current,
+            [fieldName]: value
+        }
+
+        // Check if we have changes
+        const hasActualChanges = JSON.stringify(currentConfigRef.current) !== JSON.stringify(originalConfigRef.current)
+        setHasChanges(hasActualChanges)
+
+        if (onUnsavedChanges) {
+            onUnsavedChanges(hasActualChanges)
+        }
+
+        // Trigger validation and real-time updates
+        validateWidget(currentConfigRef.current)
+        triggerRealTimeUpdate(currentConfigRef.current)
+    }, [validateWidget, triggerRealTimeUpdate, onUnsavedChanges])
+
+    // Get current field value from ref
+    const getFieldValue = useCallback((fieldName) => {
+        return currentConfigRef.current[fieldName] ?? originalConfigRef.current[fieldName] ?? ''
+    }, [])
+
+    // Cleanup timeouts
+    useEffect(() => {
+        return () => {
+            if (validationTimeoutRef.current) {
+                clearTimeout(validationTimeoutRef.current)
+            }
+            if (updateTimeoutRef.current) {
+                clearTimeout(updateTimeoutRef.current)
+            }
+        }
+    }, [])
+
+    const activeSchema = schemaRef.current || schema
+
     if (!activeSchema?.properties) {
         return (
-            <div className="text-center text-gray-500 py-8">
+            <div className="text-center text-gray-500 py-8 p-4">
                 <p>No configuration options available for this widget.</p>
             </div>
         )
     }
 
-    // Prepare fields with order and group info
-    const allFields = Object.entries(activeSchema.properties)
-        .map(([fieldName, fieldSchema]) => ({
-            name: fieldName,
-            schema: fieldSchema,
-            order: fieldSchema.order || 999,
-            group: fieldSchema.group || null
-        }))
-        .sort((a, b) => a.order - b.order) // Sort by global order
+    // Render form fields using React components but with optimized state management
+    return (
+        <div className="space-y-4 p-4">
+            {Object.entries(activeSchema.properties).map(([fieldName, fieldSchema]) => {
+                // Hide fields that are managed by special editors
+                const hiddenFields = {
+                    'core_widgets.ImageWidget': ['collectionId', 'collectionConfig', 'mediaItems']
+                }
 
-    // Separate grouped and non-grouped fields
-    const nonGroupedFields = allFields.filter(f => !f.group)
-    const groupedFields = allFields.filter(f => f.group)
+                const widgetType = widgetData?.type || ''
+                if (hiddenFields[widgetType]?.includes(fieldName)) {
+                    return null
+                }
 
-    // Group the grouped fields by group name
-    const fieldsByGroup = groupedFields.reduce((acc, field) => {
-        if (!acc[field.group]) acc[field.group] = []
-        acc[field.group].push(field)
-        return acc
-    }, {})
+                const validation = validationResults[fieldName]
+                const fieldValue = getFieldValue(fieldName)
+                const isRequired = activeSchema?.required?.includes(fieldName) || false
 
-    // Find group order by lowest order number in each group
-    const groupOrder = Object.keys(fieldsByGroup)
-        .map(groupName => ({
-            name: groupName,
-            minOrder: Math.min(...fieldsByGroup[groupName].map(f => f.order))
-        }))
-        .sort((a, b) => a.minOrder - b.minOrder)
-        .map(g => g.name)
+                // Use SchemaFieldRenderer for custom components
+                if (fieldSchema.component) {
+                    return (
+                        <SchemaFieldRenderer
+                            key={fieldName}
+                            fieldName={fieldName}
+                            fieldSchema={fieldSchema}
+                            value={fieldValue}
+                            onChange={(newValue) => handleFieldChange(fieldName, newValue)}
+                            validation={validation}
+                            isValidating={isValidating}
+                            required={isRequired}
+                            disabled={false}
+                        />
+                    )
+                }
 
-    const renderElements = []
+                // Enhanced form fields for common types
+                const fieldType = fieldSchema.type || 'string'
+                const fieldTitle = fieldSchema.title || fieldName
+                const fieldDescription = fieldSchema.description
 
-    // 1. Render non-grouped fields first
-    nonGroupedFields.forEach(({ name, schema }) => {
-        renderElements.push(renderFormField(name, schema))
-    })
+                // Handle different field types with enhanced UI
+                if (fieldType === 'boolean') {
+                    return (
+                        <div key={fieldName} className="space-y-2">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <label className="text-sm font-medium text-gray-700">
+                                        {fieldTitle}
+                                    </label>
+                                    {fieldDescription && (
+                                        <p className="text-xs text-gray-500 mt-1">{fieldDescription}</p>
+                                    )}
+                                </div>
+                                <div className="relative">
+                                    <input
+                                        type="checkbox"
+                                        checked={Boolean(fieldValue)}
+                                        onChange={(e) => handleFieldChange(fieldName, e.target.checked)}
+                                        className="sr-only"
+                                        id={`toggle-${fieldName}`}
+                                    />
+                                    <label
+                                        htmlFor={`toggle-${fieldName}`}
+                                        className={`block w-12 h-6 rounded-full cursor-pointer transition-colors ${Boolean(fieldValue) ? 'bg-blue-600' : 'bg-gray-300'
+                                            }`}
+                                    >
+                                        <div
+                                            className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${Boolean(fieldValue) ? 'translate-x-6' : 'translate-x-0'
+                                                }`}
+                                        />
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    )
+                }
 
-    // 2. Render groups in order
-    groupOrder.forEach((groupName, groupIndex) => {
-        const groupFields = fieldsByGroup[groupName]
-        if (groupFields.length === 0) return
+                // Handle enum fields with choice chips
+                if (fieldSchema.enum) {
+                    return (
+                        <div key={fieldName} className="space-y-2">
+                            <label className="block text-sm font-medium text-gray-700">
+                                {fieldTitle}
+                                {isRequired && <span className="text-red-500 ml-1">*</span>}
+                            </label>
+                            {fieldDescription && (
+                                <p className="text-xs text-gray-500">{fieldDescription}</p>
+                            )}
+                            <div className="flex flex-wrap gap-2">
+                                {fieldSchema.enum.map(option => (
+                                    <button
+                                        key={option}
+                                        type="button"
+                                        onClick={() => handleFieldChange(fieldName, option)}
+                                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors capitalize ${fieldValue === option
+                                            ? 'bg-blue-600 text-white'
+                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                            }`}
+                                    >
+                                        {option.replace(/_/g, ' ')}
+                                    </button>
+                                ))}
+                            </div>
+                            {validation && !validation.isValid && (
+                                <div className="text-red-600 text-xs mt-1">
+                                    {validation.errors?.join(', ')}
+                                </div>
+                            )}
+                        </div>
+                    )
+                }
 
-        // Check if this is the first group and there are no non-grouped fields
-        const isFirstGroup = groupIndex === 0
-        const hasNonGroupedFields = nonGroupedFields.length > 0
-        const shouldHaveTopBorder = !isFirstGroup || hasNonGroupedFields
-
-        renderElements.push(
-            <div key={`group-${groupName}`} className="space-y-4">
-                {/* Group Header */}
-                <div className={shouldHaveTopBorder ? "border-t pt-4" : "pt-0"}>
-                    <h4 className="text-sm font-medium text-gray-900 mb-3">
-                        {groupName}
-                    </h4>
-                </div>
-
-                {/* Group Fields */}
-                <div className="space-y-4">
-                    {groupFields.map(({ name, schema }) =>
-                        renderFormField(name, schema)
-                    )}
-                </div>
-            </div>
-        )
-    })
-    return <div className="space-y-4">{renderElements}</div>
+                // Use ValidatedInput for other field types
+                return (
+                    <ValidatedInput
+                        key={fieldName}
+                        type={fieldType === 'number' ? 'number' : 'text'}
+                        value={fieldValue}
+                        onChange={(e) => handleFieldChange(fieldName, e.target.value)}
+                        label={fieldTitle}
+                        description={fieldDescription}
+                        placeholder={fieldSchema.placeholder || ''}
+                        required={isRequired}
+                        validation={validation}
+                        isValidating={isValidating}
+                        min={fieldSchema.minimum}
+                        max={fieldSchema.maximum}
+                    />
+                )
+            })}
+        </div>
+    )
 })
 
 /**
@@ -112,12 +345,7 @@ const WidgetEditorPanel = forwardRef(({
     title = "Edit Widget",
     autoOpenSpecialEditor = false
 }, ref) => {
-    const [originalConfig, setOriginalConfig] = useState({})
     const [hasChanges, setHasChanges] = useState(false)
-    const [validationResults, setValidationResults] = useState({})
-    const [isValidating, setIsValidating] = useState(false)
-    const [isWidgetValid, setIsWidgetValid] = useState(true)
-    const [showValidationWarning, setShowValidationWarning] = useState(false)
     const [widgetTypeName, setWidgetTypeName] = useState(null)
     const [widgetTypeSlug, setWidgetTypeSlug] = useState(null)
     const [fetchedSchema, setFetchedSchema] = useState(null)
@@ -138,11 +366,6 @@ const WidgetEditorPanel = forwardRef(({
     const startWidthRef = useRef(0)
     const rafRef = useRef(null)
     const updateTimeoutRef = useRef(null)
-    const validationTimeoutRef = useRef(null)
-
-    // Form state refs (no re-renders)
-    const initialValues = useRef({})
-    const currentValues = useRef({})
 
     // Event system for widget communication (with fallback)
     let emitWidgetChanged = null, emitWidgetValidated = null, emitWidgetSaved = null
@@ -175,14 +398,8 @@ const WidgetEditorPanel = forwardRef(({
     }, [showSpecialEditor])
 
 
-    // Initialize config when widget data changes
+    // Reset special editor state when switching to a different widget
     useEffect(() => {
-        if (widgetData?.config) {
-            const initialConfig = { ...widgetData.config }
-            setOriginalConfig(initialConfig)
-            setHasChanges(false)
-        }
-        // Reset special editor state when switching to a different widget
         if (widgetData && showSpecialEditor && !supportsSpecialEditor()) {
             closeSpecialEditor()
         }
@@ -229,6 +446,19 @@ const WidgetEditorPanel = forwardRef(({
         }
     }, [widgetData])
 
+    // Set widget type name and slug for display purposes
+    useEffect(() => {
+        if (widgetData) {
+            const resolvedWidgetTypeName = widgetData.name ||
+                widgetData.widgetType?.name ||
+                widgetData.widget_type?.name ||
+                widgetData.type
+
+            setWidgetTypeName(resolvedWidgetTypeName)
+            setWidgetTypeSlug(widgetData.type)
+        }
+    }, [widgetData])
+
     // Fetch schema from backend when widget type changes (only if widget type is valid)
     useEffect(() => {
         if (widgetData && !schema && widgetTypeValidation?.canEdit !== false) {
@@ -237,36 +467,18 @@ const WidgetEditorPanel = forwardRef(({
 
             const fetchSchemaForWidget = async () => {
                 try {
-                    // First, try to use the widget name directly if available
                     let resolvedWidgetTypeName = widgetData.name ||
                         widgetData.widgetType?.name ||
                         widgetData.widget_type?.name
 
-                    // If we don't have a name, we need to look it up from the widget type registry
                     if (!resolvedWidgetTypeName && widgetData.type) {
-                        // Fetch all widget types to find the name for this type
-                        const allWidgetTypes = await widgetsApi.getTypes()
-                        const matchingWidget = allWidgetTypes.find(w => w.type === widgetData.type)
-
-                        if (matchingWidget) {
-                            resolvedWidgetTypeName = matchingWidget.name
-                        } else {
-                            throw new Error(`Widget type "${widgetData.type}" not found in registry`)
-                        }
+                        // Use the widget type directly
+                        resolvedWidgetTypeName = widgetData.type
                     }
 
                     if (resolvedWidgetTypeName) {
                         setWidgetTypeName(resolvedWidgetTypeName)
-
-                        // Use the widget type (new format) instead of slug for API calls
-                        let widgetTypeToUse = widgetData.type
-
-                        // If we don't have the type, find it from the name
-                        if (!widgetTypeToUse) {
-                            const allWidgetTypes = await widgetsApi.getTypes()
-                            const widgetWithType = allWidgetTypes.find(w => w.name === resolvedWidgetTypeName)
-                            widgetTypeToUse = widgetWithType?.type || widgetWithType?.slug || resolvedWidgetTypeName.toLowerCase().replace(/\s+/g, '-')
-                        }
+                        const widgetTypeToUse = widgetData.type
 
                         setWidgetTypeSlug(widgetTypeToUse)
 
@@ -290,65 +502,13 @@ const WidgetEditorPanel = forwardRef(({
         }
     }, [widgetData, schema, widgetTypeValidation])
 
-    // Simple widget validation function using dedicated API
-    const validateWidget = useCallback(async (configToValidate) => {
-        if (!widgetTypeSlug) return
-
-        // Clear any pending validation
-        if (validationTimeoutRef.current) {
-            clearTimeout(validationTimeoutRef.current)
+    // Handle unsaved changes from self-contained form
+    const handleUnsavedChanges = useCallback((hasUnsavedChanges) => {
+        setHasChanges(hasUnsavedChanges)
+        if (onUnsavedChanges) {
+            onUnsavedChanges(hasUnsavedChanges)
         }
-
-        // Debounce validation calls
-        validationTimeoutRef.current = setTimeout(async () => {
-            setIsValidating(true)
-
-
-            try {
-                const result = await validateWidgetConfiguration(widgetTypeSlug, configToValidate)
-
-                // Convert API response to format expected by ValidatedInput
-                const formattedResults = {}
-                let hasValidationErrors = false
-
-                if (result.errors) {
-                    Object.entries(result.errors).forEach(([field, messages]) => {
-                        formattedResults[field] = {
-                            isValid: false,
-                            errors: Array.isArray(messages) ? messages : [messages],
-                            warnings: result.warnings?.[field] || []
-                        }
-                        hasValidationErrors = true
-                    })
-                }
-
-                setValidationResults(formattedResults)
-                const isValid = (result.is_valid || result.isValid) && !hasValidationErrors
-                setIsWidgetValid(isValid)
-                setIsValidating(false)
-
-                // Emit validation event (no prop drilling!)
-                if (widgetData && emitWidgetValidated) {
-                    emitWidgetValidated(widgetData.id, widgetData.slotName, {
-                        isValid,
-                        errors: formattedResults,
-                        warnings: result.warnings || {}
-                    })
-                }
-
-                // Keep backward compatibility
-                if (isValid && onValidatedWidgetSync && widgetData) {
-                    onValidatedWidgetSync({
-                        ...widgetData,
-                        config: configToValidate
-                    })
-                }
-            } catch (error) {
-                console.error('Widget validation failed:', error)
-                setIsValidating(false)
-            }
-        }, 300) // 300ms debounce
-    }, [widgetTypeSlug, onValidatedWidgetSync, widgetData])
+    }, [onUnsavedChanges])
 
     // Handle resize drag with useCallback and RAF for smooth performance
     const handleResizeMove = useCallback((e) => {
@@ -416,11 +576,6 @@ const WidgetEditorPanel = forwardRef(({
                 clearTimeout(updateTimeoutRef.current)
             }
 
-            // Cancel any pending validation
-            if (validationTimeoutRef.current) {
-                clearTimeout(validationTimeoutRef.current)
-            }
-
             document.removeEventListener('mousemove', handleResizeMove)
             document.removeEventListener('mouseup', handleResizeEnd)
 
@@ -430,110 +585,27 @@ const WidgetEditorPanel = forwardRef(({
         }
     }, [handleResizeMove, handleResizeEnd])
 
-    // Enhanced real-time update function with event emission
-    const triggerRealTimeUpdate = useCallback((newConfig) => {
-        if (!widgetData) return
-
-        // Clear any pending update
-        if (updateTimeoutRef.current) {
-            clearTimeout(updateTimeoutRef.current)
-        }
-
-        // Debounce updates to prevent too many calls
-        updateTimeoutRef.current = setTimeout(() => {
-            const updatedWidget = {
-                ...widgetData,
-                config: newConfig
-            }
-
-            // Emit event for real-time updates (no prop drilling!)
-            if (emitWidgetChanged) {
-                emitWidgetChanged(
-                    widgetData.id,
-                    widgetData.slotName,
-                    updatedWidget,
-                    WIDGET_CHANGE_TYPES.CONFIG
-                )
-            }
-
-            // Fallback for components not yet using event system
-            if (onRealTimeUpdate && !emitWidgetChanged) {
-                onRealTimeUpdate(updatedWidget)
-            }
-        }, 300) // 300ms debounce
-    }, [widgetData, emitWidgetChanged, onRealTimeUpdate])
-
-
-    // Handle form field changes with pure event-driven updates (no state updates)
-    const handleFieldChange = useCallback((fieldName, value) => {
-        // Update values in ref (no re-renders)
-        currentValues.current = {
-            ...currentValues.current,
-            [fieldName]: value
-        }
-
-        // Check if we have changes compared to original
-        const hasActualChanges = JSON.stringify(currentValues.current) !== JSON.stringify(originalConfig)
-        setHasChanges(hasActualChanges)
-
-        // Notify parent about unsaved changes state
-        if (onUnsavedChanges) {
-            onUnsavedChanges(hasActualChanges)
-        }
-
-        // Trigger widget validation using dedicated API (async)
-        validateWidget(currentValues.current)
-
-        // Trigger real-time preview update (async)
-        triggerRealTimeUpdate(currentValues.current)
-    }, [originalConfig, triggerRealTimeUpdate, validateWidget, onUnsavedChanges])
-
-    // Get current config for saving (from ref, not state)
-    const getCurrentConfig = useCallback(() => {
-        return { ...initialValues.current, ...currentValues.current }
-    }, [])
-
     // Expose methods to parent component
     useImperativeHandle(ref, () => ({
-        getCurrentConfig: () => getCurrentConfig(),
+        getCurrentConfig: () => {
+            // This will be handled by the self-contained form
+            return widgetData?.config || {}
+        },
         hasUnsavedChanges: () => hasChanges,
         resetToOriginal: () => {
-            currentValues.current = {}
             setHasChanges(false)
         }
-    }), [getCurrentConfig, hasChanges])
-
-
-    // Initialize field values once when widget data loads
-    useEffect(() => {
-        if (widgetData?.config) {
-            initialValues.current = { ...widgetData.config }
-            currentValues.current = { ...widgetData.config }
-        }
-    }, [widgetData])
-
-    // Get stable initial value for field (doesn't change, no re-renders)
-    const getInitialFieldValue = useCallback((fieldName) => {
-        return initialValues.current[fieldName] || ''
-    }, []) // No dependencies = no re-renders
+    }), [hasChanges, widgetData])
 
     // Handle config changes from special editor
     const handleSpecialEditorConfigChange = useCallback((newConfig) => {
-        // Update values in ref (no re-renders)
-        currentValues.current = { ...newConfig }
-
-        // Check if we have changes compared to original
-        const hasActualChanges = JSON.stringify(newConfig) !== JSON.stringify(originalConfig)
-        setHasChanges(hasActualChanges)
-
-        // Notify parent about unsaved changes state
+        // The special editor will handle its own state and trigger events
+        // This is just for backward compatibility
+        setHasChanges(true)
         if (onUnsavedChanges) {
-            onUnsavedChanges(hasActualChanges)
+            onUnsavedChanges(true)
         }
-
-        // Trigger real-time preview update
-        triggerRealTimeUpdate(newConfig)
-    }, [originalConfig, triggerRealTimeUpdate, onUnsavedChanges])
+    }, [onUnsavedChanges])
 
     // Handle close - revert changes if not saved
     const handleClose = () => {
@@ -588,415 +660,6 @@ const WidgetEditorPanel = forwardRef(({
         }
     }, [widgetData, schema])
 
-    // Generate form fields from schema using enhanced UI components (stable, no config dependency)
-    const renderFormField = useCallback((fieldName, fieldSchema) => {
-        const activeSchema = fetchedSchema || schema
-        const fieldType = fieldSchema.type || 'string'
-        const fieldTitle = fieldSchema.title || fieldName
-        const fieldDescription = fieldSchema.description
-
-        // Hide fields that are managed by special editors
-        const hiddenFields = {
-            'core_widgets.ImageWidget': ['collectionId', 'collectionConfig', 'mediaItems']
-        }
-
-        const widgetType = widgetData?.type || ''
-        if (hiddenFields[widgetType]?.includes(fieldName)) {
-            return null // Don't render these fields
-        }
-
-        // Check if field specifies a custom component (from Pydantic json_schema_extra)
-        if (fieldSchema.component) {
-            const validation = validationResults[fieldName]
-
-            return (
-                <SchemaFieldRenderer
-                    key={fieldName}
-                    fieldName={fieldName}
-                    fieldSchema={fieldSchema}
-                    value={getInitialFieldValue(fieldName)}
-                    onChange={(newValue) => handleFieldChange(fieldName, newValue)}
-                    validation={validation}
-                    isValidating={isValidating}
-                    required={activeSchema?.required?.includes(fieldName) || false}
-                    disabled={false}
-                />
-            )
-        }
-
-        // Special handling for common widget fields
-        const isColorField = fieldName.toLowerCase().includes('color') || fieldSchema.format === 'color'
-        const isUrlField = fieldName.toLowerCase().includes('url') || fieldSchema.format === 'uri'
-        const isPercentageField = fieldName.toLowerCase().includes('percent') || fieldSchema.format === 'percentage'
-        const isPixelField = fieldName.toLowerCase().includes('pixel') || fieldName.toLowerCase().includes('px') || fieldSchema.format === 'pixel'
-        // Determine if field should show as required in UI
-        // Don't show as required if it's a string field that allows empty values (no min_length constraint)
-        const isSchemaRequired = activeSchema?.required?.includes(fieldName) || false
-        const isStringField = fieldType === 'string'
-        const hasMinLength = fieldSchema.minLength > 0 || fieldSchema.min_length > 0
-        const isRequired = isSchemaRequired && (!isStringField || hasMinLength)
-        const validation = validationResults[fieldName]
-        const fieldIsValidating = isValidating // Use global validation state
-
-        const handleChange = (e) => {
-            const newValue = e.target.value
-            handleFieldChange(fieldName, newValue)
-        }
-
-        switch (fieldType) {
-            case 'string':
-                // Enhanced textarea with character count
-                if (fieldSchema.format === 'textarea') {
-                    const maxLength = fieldSchema.maxLength || fieldSchema.max_length
-                    return (
-                        <div key={fieldName} className="space-y-2">
-                            <label className="block text-sm font-medium text-gray-700">
-                                {fieldTitle}
-                                {isRequired && <span className="text-red-500 ml-1">*</span>}
-                            </label>
-                            {fieldDescription && (
-                                <p className="text-xs text-gray-500">{fieldDescription}</p>
-                            )}
-                            <div className="relative">
-                                <textarea
-                                    value={value}
-                                    onChange={handleChange}
-                                    placeholder={fieldSchema.placeholder || ''}
-                                    rows={fieldSchema.rows || 3}
-                                    maxLength={maxLength}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-                                />
-                                {maxLength && (
-                                    <div className="absolute bottom-2 right-2 text-xs text-gray-400 bg-white px-1">
-                                        {value?.length || 0}/{maxLength}
-                                    </div>
-                                )}
-                            </div>
-                            {validation && !validation.isValid && (
-                                <div className="text-red-600 text-xs mt-1">
-                                    {validation.errors?.join(', ')}
-                                </div>
-                            )}
-                        </div>
-                    )
-                }
-
-                // Color picker for color fields
-                if (isColorField) {
-                    return (
-                        <div key={fieldName} className="space-y-2">
-                            <label className="block text-sm font-medium text-gray-700">
-                                {fieldTitle}
-                                {isRequired && <span className="text-red-500 ml-1">*</span>}
-                            </label>
-                            {fieldDescription && (
-                                <p className="text-xs text-gray-500">{fieldDescription}</p>
-                            )}
-                            <div className="flex items-center gap-3">
-                                <input
-                                    type="color"
-                                    value={value || '#000000'}
-                                    onChange={handleChange}
-                                    className="w-12 h-8 border border-gray-300 rounded cursor-pointer"
-                                />
-                                <input
-                                    type="text"
-                                    value={value}
-                                    onChange={handleChange}
-                                    placeholder="#000000"
-                                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                />
-                            </div>
-                            {validation && !validation.isValid && (
-                                <div className="text-red-600 text-xs mt-1">
-                                    {validation.errors?.join(', ')}
-                                </div>
-                            )}
-                        </div>
-                    )
-                }
-
-                // URL input with validation indicator
-                if (isUrlField) {
-                    const isValidUrl = value && (value.startsWith('http://') || value.startsWith('https://') || value.startsWith('/'))
-                    return (
-                        <div key={fieldName} className="space-y-2">
-                            <label className="block text-sm font-medium text-gray-700">
-                                {fieldTitle}
-                                {isRequired && <span className="text-red-500 ml-1">*</span>}
-                            </label>
-                            {fieldDescription && (
-                                <p className="text-xs text-gray-500">{fieldDescription}</p>
-                            )}
-                            <div className="relative">
-                                <input
-                                    type="url"
-                                    value={value}
-                                    onChange={handleChange}
-                                    placeholder={fieldSchema.placeholder || 'https://example.com/image.jpg'}
-                                    className={`w-full px-3 py-2 pr-10 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${value && !isValidUrl ? 'border-red-300 focus:border-red-500' : 'border-gray-300 focus:border-blue-500'
-                                        }`}
-                                />
-                                {value && (
-                                    <div className={`absolute right-3 top-1/2 transform -translate-y-1/2 w-2 h-2 rounded-full ${isValidUrl ? 'bg-green-500' : 'bg-red-500'
-                                        }`} />
-                                )}
-                            </div>
-                            {validation && !validation.isValid && (
-                                <div className="text-red-600 text-xs mt-1">
-                                    {validation.errors?.join(', ')}
-                                </div>
-                            )}
-                        </div>
-                    )
-                }
-
-                // Enhanced text input with better styling
-                return (
-                    <ValidatedInput
-                        key={fieldName}
-                        type="text"
-                        value={value}
-                        onChange={handleChange}
-                        label={fieldTitle}
-                        description={fieldDescription}
-                        placeholder={fieldSchema.placeholder || ''}
-                        required={isRequired}
-                        validation={validation}
-                        isValidating={isValidating}
-                    />
-                )
-
-            case 'boolean':
-                return (
-                    <div key={fieldName} className="space-y-2">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <label className="text-sm font-medium text-gray-700">
-                                    {fieldTitle}
-                                </label>
-                                {fieldDescription && (
-                                    <p className="text-xs text-gray-500 mt-1">{fieldDescription}</p>
-                                )}
-                            </div>
-                            <div className="relative">
-                                <input
-                                    type="checkbox"
-                                    checked={Boolean(value)}
-                                    onChange={(e) => handleFieldChange(fieldName, e.target.checked)}
-                                    className="sr-only"
-                                    id={`toggle-${fieldName}`}
-                                />
-                                <label
-                                    htmlFor={`toggle-${fieldName}`}
-                                    className={`block w-12 h-6 rounded-full cursor-pointer transition-colors ${Boolean(value) ? 'bg-blue-600' : 'bg-gray-300'
-                                        }`}
-                                >
-                                    <div
-                                        className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${Boolean(value) ? 'translate-x-6' : 'translate-x-0'
-                                            }`}
-                                    />
-                                </label>
-                            </div>
-                        </div>
-                    </div>
-                )
-
-            case 'number':
-                // Use choice chips for small ranges (like gallery columns)
-                if (fieldSchema.minimum >= 1 && fieldSchema.maximum <= 10 && (fieldSchema.maximum - fieldSchema.minimum) <= 8) {
-                    const options = []
-                    for (let i = fieldSchema.minimum || 1; i <= (fieldSchema.maximum || 6); i++) {
-                        options.push(i)
-                    }
-
-                    return (
-                        <div key={fieldName} className="space-y-2">
-                            <label className="block text-sm font-medium text-gray-700">
-                                {fieldTitle}
-                                {isRequired && <span className="text-red-500 ml-1">*</span>}
-                            </label>
-                            {fieldDescription && (
-                                <p className="text-xs text-gray-500">{fieldDescription}</p>
-                            )}
-                            <div className="flex gap-2">
-                                {options.map(option => (
-                                    <button
-                                        key={option}
-                                        type="button"
-                                        onClick={() => handleFieldChange(fieldName, option)}
-                                        className={`w-8 h-8 rounded-full text-sm font-medium transition-colors ${value === option
-                                            ? 'bg-blue-600 text-white'
-                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                            }`}
-                                    >
-                                        {option}
-                                    </button>
-                                ))}
-                            </div>
-                            {validation && !validation.isValid && (
-                                <div className="text-red-600 text-xs mt-1">
-                                    {validation.errors?.join(', ')}
-                                </div>
-                            )}
-                        </div>
-                    )
-                }
-
-                // Enhanced number input with unit indicators
-                if (isPercentageField || isPixelField) {
-                    const unit = isPercentageField ? '%' : 'px'
-                    return (
-                        <div key={fieldName} className="space-y-2">
-                            <label className="block text-sm font-medium text-gray-700">
-                                {fieldTitle}
-                                {isRequired && <span className="text-red-500 ml-1">*</span>}
-                            </label>
-                            {fieldDescription && (
-                                <p className="text-xs text-gray-500">{fieldDescription}</p>
-                            )}
-                            <div className="relative">
-                                <input
-                                    type="number"
-                                    value={value}
-                                    onChange={(e) => handleFieldChange(fieldName, parseFloat(e.target.value) || 0)}
-                                    placeholder={fieldSchema.placeholder || '0'}
-                                    min={fieldSchema.minimum}
-                                    max={fieldSchema.maximum}
-                                    className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                />
-                                <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-sm text-gray-500">
-                                    {unit}
-                                </div>
-                            </div>
-                            {validation && !validation.isValid && (
-                                <div className="text-red-600 text-xs mt-1">
-                                    {validation.errors?.join(', ')}
-                                </div>
-                            )}
-                        </div>
-                    )
-                }
-
-                // Regular number input for larger ranges
-                return (
-                    <ValidatedInput
-                        key={fieldName}
-                        type="number"
-                        value={value}
-                        onChange={(e) => handleFieldChange(fieldName, parseFloat(e.target.value) || 0)}
-                        label={fieldTitle}
-                        description={fieldDescription}
-                        placeholder={fieldSchema.placeholder || ''}
-                        required={isRequired}
-                        validation={validation}
-                        isValidating={isValidating}
-                        min={fieldSchema.minimum}
-                        max={fieldSchema.maximum}
-                    />
-                )
-
-            case 'array':
-                if (fieldSchema.items?.enum) {
-                    // Multi-select chips
-                    const arrayValue = Array.isArray(value) ? value : []
-
-                    return (
-                        <div key={fieldName} className="space-y-2">
-                            <label className="block text-sm font-medium text-gray-700">
-                                {fieldTitle}
-                                {isRequired && <span className="text-red-500 ml-1">*</span>}
-                            </label>
-                            {fieldDescription && (
-                                <p className="text-xs text-gray-500">{fieldDescription}</p>
-                            )}
-                            <div className="flex flex-wrap gap-2">
-                                {fieldSchema.items.enum.map(option => {
-                                    const isSelected = arrayValue.includes(option)
-                                    return (
-                                        <button
-                                            key={option}
-                                            type="button"
-                                            onClick={() => {
-                                                const newValue = isSelected
-                                                    ? arrayValue.filter(v => v !== option)
-                                                    : [...arrayValue, option]
-                                                handleFieldChange(fieldName, newValue)
-                                            }}
-                                            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors capitalize ${isSelected
-                                                ? 'bg-blue-600 text-white'
-                                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                                }`}
-                                        >
-                                            {option.replace(/_/g, ' ')}
-                                            {isSelected && (
-                                                <span className="ml-1 text-xs">✓</span>
-                                            )}
-                                        </button>
-                                    )
-                                })}
-                            </div>
-                            {validation && !validation.isValid && (
-                                <div className="text-red-600 text-xs mt-1">
-                                    {validation.errors?.join(', ')}
-                                </div>
-                            )}
-                        </div>
-                    )
-                }
-                break
-
-            default:
-                if (fieldSchema.enum) {
-                    // Choice chips for enum fields
-                    return (
-                        <div key={fieldName} className="space-y-2">
-                            <label className="block text-sm font-medium text-gray-700">
-                                {fieldTitle}
-                                {isRequired && <span className="text-red-500 ml-1">*</span>}
-                            </label>
-                            {fieldDescription && (
-                                <p className="text-xs text-gray-500">{fieldDescription}</p>
-                            )}
-                            <div className="flex flex-wrap gap-2">
-                                {fieldSchema.enum.map(option => (
-                                    <button
-                                        key={option}
-                                        type="button"
-                                        onClick={() => handleFieldChange(fieldName, option)}
-                                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors capitalize ${value === option
-                                            ? 'bg-blue-600 text-white'
-                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                            }`}
-                                    >
-                                        {option.replace(/_/g, ' ')}
-                                    </button>
-                                ))}
-                            </div>
-                            {validation && !validation.isValid && (
-                                <div className="text-red-600 text-xs mt-1">
-                                    {validation.errors?.join(', ')}
-                                </div>
-                            )}
-                        </div>
-                    )
-                }
-                return (
-                    <ValidatedInput
-                        key={fieldName}
-                        type="text"
-                        value={value}
-                        onChange={handleChange}
-                        label={fieldTitle}
-                        description={fieldDescription}
-                        placeholder={fieldSchema.placeholder || ''}
-                        required={isRequired}
-                        validation={validation}
-                        isValidating={isValidating}
-                    />
-                )
-        }
-    }, [fetchedSchema, schema, widgetData, validationResults, isValidating, handleFieldChange, getInitialFieldValue])
 
     if (!isOpen) return null
 
@@ -1069,7 +732,7 @@ const WidgetEditorPanel = forwardRef(({
                     </div>
 
                     {/* Form content - scrollable */}
-                    <div className={`flex-1 overflow-y-auto p-4 transition-all duration-500 ${showSpecialEditor && isAnimatingSpecialEditor ? 'animate-fade-in-up delay-300' : ''
+                    <div className={`flex-1 overflow-y-auto transition-all duration-500 ${showSpecialEditor && isAnimatingSpecialEditor ? 'animate-fade-in-up delay-300' : ''
                         } ${showSpecialEditor && isClosingSpecialEditor ? 'animate-fade-out-down' : ''
                         }`}>
                         {isValidatingType ? (
@@ -1078,7 +741,7 @@ const WidgetEditorPanel = forwardRef(({
                                 <span className="text-gray-600">Validating widget type...</span>
                             </div>
                         ) : widgetTypeValidation && !widgetTypeValidation.canEdit ? (
-                            <div className="space-y-4">
+                            <div className="space-y-4 p-4">
                                 <DeletedWidgetWarning
                                     widget={widgetData}
                                     onRefresh={handleRefreshWidgetTypes}
@@ -1094,35 +757,29 @@ const WidgetEditorPanel = forwardRef(({
                                 <span className="text-gray-600">Loading widget configuration...</span>
                             </div>
                         ) : schemaError ? (
-                            <div className="text-center py-8">
+                            <div className="text-center py-8 p-4">
                                 <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                                     <p className="text-red-800 font-medium">Failed to load widget configuration</p>
                                     <p className="text-red-600 text-sm mt-1">{schemaError}</p>
                                 </div>
                             </div>
-                        ) : (
-                            <StableFormRenderer
-                                activeSchema={fetchedSchema || schema}
-                                widgetType={widgetData?.type}
-                                renderFormField={renderFormField}
+                        ) : widgetData ? (
+                            <OptimizedFormRenderer
+                                widgetData={widgetData}
+                                schema={fetchedSchema || schema}
+                                onRealTimeUpdate={onRealTimeUpdate}
+                                onUnsavedChanges={handleUnsavedChanges}
+                                onValidatedWidgetSync={onValidatedWidgetSync}
+                                emitWidgetChanged={emitWidgetChanged}
+                                emitWidgetValidated={emitWidgetValidated}
                             />
+                        ) : (
+                            <div className="text-center text-gray-500 py-8 p-4">
+                                <p>No widget selected for editing.</p>
+                            </div>
                         )}
                     </div>
 
-                    {/* Footer with action buttons */}
-                    {showValidationWarning && (
-                        <div className="border-t border-gray-200 p-4 bg-gray-50">
-                            {/* Validation warning snackbar */}
-                            <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
-                                <p className="text-sm text-red-800 font-medium">
-                                    Cannot save: Please fix validation errors first
-                                </p>
-                                <p className="text-xs text-red-600 mt-1">
-                                    Check the form fields above for errors and correct them before saving.
-                                </p>
-                            </div>
-                        </div>
-                    )}
                 </div>
             </div>
         </>
