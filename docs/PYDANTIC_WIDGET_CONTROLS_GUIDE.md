@@ -597,6 +597,116 @@ const renderFormField = (fieldName, fieldSchema) => {
 - **Progressive enhancement** - Add controls without breaking existing functionality
 - **Optional controls** - Control specifications are optional, not required
 
+## 📋 Field Ordering and Grouping
+
+You can control field order and grouping using `order` and optional `group` properties:
+
+### Global Ordering
+All fields have a global order number (1, 2, 3, 4, 5...):
+```python
+class WidgetConfig(BaseModel):
+    title: str = Field(..., json_schema_extra={
+        "component": "TextInput",
+        "order": 1  # Appears first globally
+    })
+    
+    description: str = Field(..., json_schema_extra={
+        "component": "TextareaInput", 
+        "order": 2  # Appears second globally
+    })
+```
+
+### Optional Grouping
+Fields can optionally belong to named groups:
+```python
+class WidgetConfig(BaseModel):
+    # Non-grouped fields (appear first, in order)
+    title: str = Field(..., json_schema_extra={
+        "component": "TextInput",
+        "order": 1  # First non-grouped field
+    })
+    
+    enabled: bool = Field(True, json_schema_extra={
+        "component": "BooleanInput", 
+        "order": 2  # Second non-grouped field
+    })
+    
+    # Grouped fields (appear after non-grouped, in group order)
+    layout: str = Field("grid", json_schema_extra={
+        "component": "SegmentedControlInput",
+        "order": 3,
+        "group": "Display Options"  # This group appears first (order 3)
+    })
+    
+    theme: str = Field("light", json_schema_extra={
+        "component": "SelectInput",
+        "order": 4,
+        "group": "Display Options"  # Same group, appears after layout
+    })
+    
+    debug: bool = Field(False, json_schema_extra={
+        "component": "BooleanInput",
+        "order": 5, 
+        "group": "Advanced Settings"  # This group appears second (order 5)
+    })
+```
+
+### Rendering Logic
+1. **Non-grouped fields first** - Rendered in global order
+2. **Groups by lowest order** - Groups appear in order of their lowest-ordered field
+3. **Within groups by order** - Fields within each group sorted by their order
+
+### Real Example (ImageConfig)
+```python
+class ImageConfig(BaseModel):
+    # Non-grouped fields (appear first)
+    enableLightbox: bool = Field(True, json_schema_extra={
+        "component": "BooleanInput",
+        "order": 1  # First field
+    })
+    
+    showCaptions: bool = Field(True, json_schema_extra={
+        "component": "BooleanInput",
+        "order": 2  # Second field
+    })
+    
+    # Display Options group (appears next, starts at order 3)
+    displayType: str = Field("gallery", json_schema_extra={
+        "component": "SegmentedControlInput", 
+        "order": 3,
+        "group": "Display Options"
+    })
+    
+    imageStyle: str = Field(None, json_schema_extra={
+        "component": "SelectInput",
+        "order": 4,
+        "group": "Display Options" 
+    })
+    
+    # Advanced Settings group (appears last, starts at order 5)
+    autoPlay: bool = Field(False, json_schema_extra={
+        "component": "BooleanInput",
+        "order": 5,
+        "group": "Advanced Settings"
+    })
+    
+    autoPlayInterval: int = Field(3, json_schema_extra={
+        "component": "SliderInput", 
+        "order": 6,
+        "group": "Advanced Settings"
+    })
+```
+
+**Result:** 
+1. Enable Lightbox (order 1)
+2. Show Captions (order 2)  
+3. **Display Options** group header
+   - Display Type (order 3)
+   - Image Style (order 4)
+4. **Advanced Settings** group header
+   - Auto Play (order 5)
+   - Auto Play Interval (order 6)
+
 ## Benefits
 
 ### Developer Experience

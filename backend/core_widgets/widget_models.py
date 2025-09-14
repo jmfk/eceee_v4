@@ -72,6 +72,8 @@ class ImageConfig(BaseModel):
         json_schema_extra={
             "component": "SegmentedControlInput",
             "variant": "default",
+            "order": 1,
+            "group": "Display Options",
             "options": [
                 {"value": "gallery", "label": "Gallery", "icon": "Grid"},
                 {"value": "carousel", "label": "Carousel", "icon": "Play"},
@@ -83,6 +85,8 @@ class ImageConfig(BaseModel):
         description="Named image style from the current theme (falls back to default if not found)",
         json_schema_extra={
             "component": "SelectInput",
+            "order": 2,
+            "group": "Display Options",
             "valueListName": "image-styles",  # References a value list
             "placeholder": "Select image style...",
         },
@@ -92,6 +96,18 @@ class ImageConfig(BaseModel):
         description="Enable lightbox for full-size viewing",
         json_schema_extra={
             "component": "BooleanInput",
+            "group": "Display Options",
+            "order": 3,
+            "variant": "toggle",
+        },
+    )
+    showCaptions: bool = Field(
+        True,
+        description="Display captions",
+        json_schema_extra={
+            "component": "BooleanInput",
+            "group": "Display Options",
+            "order": 4,
             "variant": "toggle",
         },
     )
@@ -100,6 +116,8 @@ class ImageConfig(BaseModel):
         description="Auto-play videos (if applicable)",
         json_schema_extra={
             "component": "BooleanInput",
+            "order": 5,
+            "group": "Advanced Settings",
             "variant": "toggle",
         },
     )
@@ -110,19 +128,13 @@ class ImageConfig(BaseModel):
         description="Auto-play interval in seconds for carousel",
         json_schema_extra={
             "component": "SliderInput",
+            "order": 6,
+            "group": "Advanced Settings",
             "min": 1,
             "max": 30,
             "step": 1,
             "unit": "seconds",
             "showValue": True,
-        },
-    )
-    showCaptions: bool = Field(
-        True,
-        description="Display captions",
-        json_schema_extra={
-            "component": "BooleanInput",
-            "variant": "toggle",
         },
     )
 

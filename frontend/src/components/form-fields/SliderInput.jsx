@@ -69,7 +69,7 @@ const SliderInput = ({
     const hasError = validation && !validation.isValid
 
     return (
-        <div className="space-y-1">
+        <div className="space-y-1 slider-input">
             {label && (
                 <div className="flex items-center justify-between">
                     <label className="block text-sm font-medium text-gray-700">
@@ -237,39 +237,41 @@ const SliderInput = ({
                 </div>
             )}
 
-            <style jsx>{`
-                input[type="range"]::-webkit-slider-thumb {
-                    appearance: none;
-                    width: 20px;
-                    height: 20px;
-                    border-radius: 50%;
-                    background: #3b82f6;
-                    border: 2px solid white;
-                    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-                    cursor: pointer;
-                }
-                
-                input[type="range"]::-moz-range-thumb {
-                    width: 20px;
-                    height: 20px;
-                    border-radius: 50%;
-                    background: #3b82f6;
-                    border: 2px solid white;
-                    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-                    cursor: pointer;
-                    border: none;
-                }
-                
-                input[type="range"]:disabled::-webkit-slider-thumb {
-                    background: #9ca3af;
-                    cursor: not-allowed;
-                }
-                
-                input[type="range"]:disabled::-moz-range-thumb {
-                    background: #9ca3af;
-                    cursor: not-allowed;
-                }
-            `}</style>
+            <style dangerouslySetInnerHTML={{
+                __html: `
+                    .slider-input input[type="range"]::-webkit-slider-thumb {
+                        appearance: none;
+                        width: 20px;
+                        height: 20px;
+                        border-radius: 50%;
+                        background: #3b82f6;
+                        border: 2px solid white;
+                        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+                        cursor: pointer;
+                    }
+                    
+                    .slider-input input[type="range"]::-moz-range-thumb {
+                        width: 20px;
+                        height: 20px;
+                        border-radius: 50%;
+                        background: #3b82f6;
+                        border: 2px solid white;
+                        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+                        cursor: pointer;
+                        border: none;
+                    }
+                    
+                    .slider-input input[type="range"]:disabled::-webkit-slider-thumb {
+                        background: #9ca3af;
+                        cursor: not-allowed;
+                    }
+                    
+                    .slider-input input[type="range"]:disabled::-moz-range-thumb {
+                        background: #9ca3af;
+                        cursor: not-allowed;
+                    }
+                `
+            }} />
         </div>
     )
 }

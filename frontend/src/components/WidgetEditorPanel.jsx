@@ -8,6 +8,88 @@ import DeletedWidgetWarning from './DeletedWidgetWarning.jsx'
 import { useWidgetEventEmitter } from '../contexts/WidgetEventContext'
 import { WIDGET_CHANGE_TYPES } from '../types/widgetEvents'
 import { SpecialEditorRenderer, hasSpecialEditor } from './special-editors'
+import SchemaFieldRenderer from './forms/SchemaFieldRenderer.jsx'
+
+/**
+ * StableFormRenderer - Renders form fields without re-rendering on config changes
+ */
+const StableFormRenderer = React.memo(({ activeSchema, widgetType, renderFormField }) => {
+    if (!activeSchema?.properties) {
+        return (
+            <div className="text-center text-gray-500 py-8">
+                <p>No configuration options available for this widget.</p>
+            </div>
+        )
+    }
+
+    // Prepare fields with order and group info
+    const allFields = Object.entries(activeSchema.properties)
+        .map(([fieldName, fieldSchema]) => ({
+            name: fieldName,
+            schema: fieldSchema,
+            order: fieldSchema.order || 999,
+            group: fieldSchema.group || null
+        }))
+        .sort((a, b) => a.order - b.order) // Sort by global order
+
+    // Separate grouped and non-grouped fields
+    const nonGroupedFields = allFields.filter(f => !f.group)
+    const groupedFields = allFields.filter(f => f.group)
+
+    // Group the grouped fields by group name
+    const fieldsByGroup = groupedFields.reduce((acc, field) => {
+        if (!acc[field.group]) acc[field.group] = []
+        acc[field.group].push(field)
+        return acc
+    }, {})
+
+    // Find group order by lowest order number in each group
+    const groupOrder = Object.keys(fieldsByGroup)
+        .map(groupName => ({
+            name: groupName,
+            minOrder: Math.min(...fieldsByGroup[groupName].map(f => f.order))
+        }))
+        .sort((a, b) => a.minOrder - b.minOrder)
+        .map(g => g.name)
+
+    const renderElements = []
+
+    // 1. Render non-grouped fields first
+    nonGroupedFields.forEach(({ name, schema }) => {
+        renderElements.push(renderFormField(name, schema))
+    })
+
+    // 2. Render groups in order
+    groupOrder.forEach((groupName, groupIndex) => {
+        const groupFields = fieldsByGroup[groupName]
+        if (groupFields.length === 0) return
+
+        // Check if this is the first group and there are no non-grouped fields
+        const isFirstGroup = groupIndex === 0
+        const hasNonGroupedFields = nonGroupedFields.length > 0
+        const shouldHaveTopBorder = !isFirstGroup || hasNonGroupedFields
+
+        renderElements.push(
+            <div key={`group-${groupName}`} className="space-y-4">
+                {/* Group Header */}
+                <div className={shouldHaveTopBorder ? "border-t pt-4" : "pt-0"}>
+                    <h4 className="text-sm font-medium text-gray-900 mb-3">
+                        {groupName}
+                    </h4>
+                </div>
+
+                {/* Group Fields */}
+                <div className="space-y-4">
+                    {groupFields.map(({ name, schema }) =>
+                        renderFormField(name, schema)
+                    )}
+                </div>
+            </div>
+        )
+    })
+    console.log("render")
+    return <div className="space-y-4">{renderElements}</div>
+})
 
 /**
  * WidgetEditorPanel - Slide-out panel for editing widgets
@@ -31,7 +113,6 @@ const WidgetEditorPanel = forwardRef(({
     title = "Edit Widget",
     autoOpenSpecialEditor = false
 }, ref) => {
-    const [config, setConfig] = useState({})
     const [originalConfig, setOriginalConfig] = useState({})
     const [hasChanges, setHasChanges] = useState(false)
     const [validationResults, setValidationResults] = useState({})
@@ -59,6 +140,10 @@ const WidgetEditorPanel = forwardRef(({
     const rafRef = useRef(null)
     const updateTimeoutRef = useRef(null)
     const validationTimeoutRef = useRef(null)
+
+    // Form state refs (no re-renders)
+    const initialValues = useRef({})
+    const currentValues = useRef({})
 
     // Event system for widget communication (with fallback)
     let emitWidgetChanged = null, emitWidgetValidated = null, emitWidgetSaved = null
@@ -95,7 +180,6 @@ const WidgetEditorPanel = forwardRef(({
     useEffect(() => {
         if (widgetData?.config) {
             const initialConfig = { ...widgetData.config }
-            setConfig(initialConfig)
             setOriginalConfig(initialConfig)
             setHasChanges(false)
         }
@@ -246,6 +330,7 @@ const WidgetEditorPanel = forwardRef(({
 
                 // Emit validation event (no prop drilling!)
                 if (widgetData && emitWidgetValidated) {
+                    console.log("emitWidgetValidated")
                     emitWidgetValidated(widgetData.id, widgetData.slotName, {
                         isValid,
                         errors: formattedResults,
@@ -255,6 +340,7 @@ const WidgetEditorPanel = forwardRef(({
 
                 // Keep backward compatibility
                 if (isValid && onValidatedWidgetSync && widgetData) {
+                    console.log("onValidatedWidgetSync")
                     onValidatedWidgetSync({
                         ...widgetData,
                         config: configToValidate
@@ -365,6 +451,7 @@ const WidgetEditorPanel = forwardRef(({
 
             // Emit event for real-time updates (no prop drilling!)
             if (emitWidgetChanged) {
+                console.log("emitWidgetChanged 2")
                 emitWidgetChanged(
                     widgetData.id,
                     widgetData.slotName,
@@ -375,39 +462,72 @@ const WidgetEditorPanel = forwardRef(({
 
             // Fallback for components not yet using event system
             if (onRealTimeUpdate && !emitWidgetChanged) {
+                console.log("onRealTimeUpdate 2")
                 onRealTimeUpdate(updatedWidget)
             }
         }, 300) // 300ms debounce
     }, [widgetData, emitWidgetChanged, onRealTimeUpdate])
 
-    // Handle form field changes with real-time updates and validation
+
+    // Handle form field changes with pure event-driven updates (no state updates)
     const handleFieldChange = useCallback((fieldName, value) => {
-        const newConfig = {
-            ...config,
+        // Update values in ref (no re-renders)
+        currentValues.current = {
+            ...currentValues.current,
             [fieldName]: value
         }
 
-        setConfig(newConfig)
-
         // Check if we have changes compared to original
-        const hasActualChanges = JSON.stringify(newConfig) !== JSON.stringify(originalConfig)
+        const hasActualChanges = JSON.stringify(currentValues.current) !== JSON.stringify(originalConfig)
         setHasChanges(hasActualChanges)
 
         // Notify parent about unsaved changes state
         if (onUnsavedChanges) {
+            console.log("onUnsavedChanges 3")
             onUnsavedChanges(hasActualChanges)
         }
 
-        // Trigger widget validation using dedicated API
-        validateWidget(newConfig)
+        // Trigger widget validation using dedicated API (async)
+        validateWidget(currentValues.current)
 
-        // Trigger real-time preview update
-        triggerRealTimeUpdate(newConfig)
-    }, [config, originalConfig, triggerRealTimeUpdate, validateWidget])
+        // Trigger real-time preview update (async)
+        console.log("triggerRealTimeUpdate 3")
+        triggerRealTimeUpdate(currentValues.current)
+    }, [originalConfig, triggerRealTimeUpdate, validateWidget, onUnsavedChanges])
+
+    // Get current config for saving (from ref, not state)
+    const getCurrentConfig = useCallback(() => {
+        return { ...initialValues.current, ...currentValues.current }
+    }, [])
+
+    // Expose methods to parent component
+    useImperativeHandle(ref, () => ({
+        getCurrentConfig: () => getCurrentConfig(),
+        hasUnsavedChanges: () => hasChanges,
+        resetToOriginal: () => {
+            currentValues.current = {}
+            setHasChanges(false)
+        }
+    }), [getCurrentConfig, hasChanges])
+
+
+    // Initialize field values once when widget data loads
+    useEffect(() => {
+        if (widgetData?.config) {
+            initialValues.current = { ...widgetData.config }
+            currentValues.current = { ...widgetData.config }
+        }
+    }, [widgetData])
+
+    // Get stable initial value for field (doesn't change, no re-renders)
+    const getInitialFieldValue = useCallback((fieldName) => {
+        return initialValues.current[fieldName] || ''
+    }, []) // No dependencies = no re-renders
 
     // Handle config changes from special editor
     const handleSpecialEditorConfigChange = useCallback((newConfig) => {
-        setConfig(newConfig)
+        // Update values in ref (no re-renders)
+        currentValues.current = { ...newConfig }
 
         // Check if we have changes compared to original
         const hasActualChanges = JSON.stringify(newConfig) !== JSON.stringify(originalConfig)
@@ -415,10 +535,12 @@ const WidgetEditorPanel = forwardRef(({
 
         // Notify parent about unsaved changes state
         if (onUnsavedChanges) {
+            console.log("onUnsavedChanges 4")
             onUnsavedChanges(hasActualChanges)
         }
 
         // Trigger real-time preview update
+        console.log("triggerRealTimeUpdate 4")
         triggerRealTimeUpdate(newConfig)
     }, [originalConfig, triggerRealTimeUpdate, onUnsavedChanges])
 
@@ -448,7 +570,7 @@ const WidgetEditorPanel = forwardRef(({
     // Handle refresh widget types
     const handleRefreshWidgetTypes = useCallback(async () => {
         if (!widgetData) return
-
+        console.log("handleRefreshWidgetTypes 5")
         // Clear cache and re-validate
         clearWidgetTypesCache()
         setIsValidatingType(true)
@@ -476,10 +598,9 @@ const WidgetEditorPanel = forwardRef(({
         }
     }, [widgetData, schema])
 
-    // Generate form fields from schema using enhanced UI components
-    const renderFormField = (fieldName, fieldSchema) => {
+    // Generate form fields from schema using enhanced UI components (stable, no config dependency)
+    const renderFormField = useCallback((fieldName, fieldSchema) => {
         const activeSchema = fetchedSchema || schema
-        const value = config[fieldName] || ''
         const fieldType = fieldSchema.type || 'string'
         const fieldTitle = fieldSchema.title || fieldName
         const fieldDescription = fieldSchema.description
@@ -496,26 +617,20 @@ const WidgetEditorPanel = forwardRef(({
 
         // Check if field specifies a custom component (from Pydantic json_schema_extra)
         if (fieldSchema.component) {
-            // Use SchemaFieldRenderer for fields with custom components
-            const SchemaFieldRenderer = React.lazy(() => import('./forms/SchemaFieldRenderer.jsx'))
             const validation = validationResults[fieldName]
 
             return (
-                <React.Suspense
+                <SchemaFieldRenderer
                     key={fieldName}
-                    fallback={<div className="animate-pulse h-16 bg-gray-100 rounded"></div>}
-                >
-                    <SchemaFieldRenderer
-                        fieldName={fieldName}
-                        fieldSchema={fieldSchema}
-                        value={value}
-                        onChange={(newValue) => handleFieldChange(fieldName, newValue)}
-                        validation={validation}
-                        isValidating={isValidating}
-                        required={activeSchema?.required?.includes(fieldName) || false}
-                        disabled={false}
-                    />
-                </React.Suspense>
+                    fieldName={fieldName}
+                    fieldSchema={fieldSchema}
+                    value={getInitialFieldValue(fieldName)}
+                    onChange={(newValue) => handleFieldChange(fieldName, newValue)}
+                    validation={validation}
+                    isValidating={isValidating}
+                    required={activeSchema?.required?.includes(fieldName) || false}
+                    disabled={false}
+                />
             )
         }
 
@@ -891,7 +1006,7 @@ const WidgetEditorPanel = forwardRef(({
                     />
                 )
         }
-    }
+    }, [fetchedSchema, schema, widgetData, validationResults, isValidating, handleFieldChange, getInitialFieldValue])
 
     if (!isOpen) return null
 
@@ -996,20 +1111,11 @@ const WidgetEditorPanel = forwardRef(({
                                 </div>
                             </div>
                         ) : (
-                            <div className="space-y-4">
-                                {(() => {
-                                    const activeSchema = fetchedSchema || schema
-                                    return activeSchema?.properties ? (
-                                        Object.entries(activeSchema.properties).map(([fieldName, fieldSchema]) =>
-                                            renderFormField(fieldName, fieldSchema)
-                                        )
-                                    ) : (
-                                        <div className="text-center text-gray-500 py-8">
-                                            <p>No configuration options available for this widget.</p>
-                                        </div>
-                                    )
-                                })()}
-                            </div>
+                            <StableFormRenderer
+                                activeSchema={fetchedSchema || schema}
+                                widgetType={widgetData?.type}
+                                renderFormField={renderFormField}
+                            />
                         )}
                     </div>
 

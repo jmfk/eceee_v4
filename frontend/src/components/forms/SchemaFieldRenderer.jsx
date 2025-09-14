@@ -4,6 +4,110 @@ import { getFieldComponent, FIELD_COMPONENTS } from '../form-fields'
 import { Loader2 } from 'lucide-react'
 
 /**
+ * FieldPlaceholder - Shows a visual representation of the field while loading
+ * Looks as close as possible to the final component to avoid layout shifts
+ */
+const FieldPlaceholder = ({ componentName, label, value, ...props }) => {
+    const baseClasses = "w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500"
+
+    const renderPlaceholder = () => {
+        switch (componentName) {
+            case 'SegmentedControlInput':
+                return (
+                    <div className="flex rounded-md overflow-hidden border border-gray-300 bg-gray-50">
+                        {(props.options || []).map((option, index) => (
+                            <div
+                                key={index}
+                                className="flex-1 px-3 py-2 text-center text-sm text-gray-500 border-r border-gray-300 last:border-r-0"
+                            >
+                                {option.label || option.value || `Option ${index + 1}`}
+                            </div>
+                        ))}
+                        {(!props.options || props.options.length === 0) && (
+                            <>
+                                <div className="flex-1 px-3 py-2 text-center text-sm text-gray-500 border-r border-gray-300">Option 1</div>
+                                <div className="flex-1 px-3 py-2 text-center text-sm text-gray-500">Option 2</div>
+                            </>
+                        )}
+                    </div>
+                )
+
+            case 'SliderInput':
+                return (
+                    <div className="space-y-2">
+                        <div className="flex justify-between text-sm text-gray-500">
+                            <span>{props.min || 0}</span>
+                            <span className="font-medium">{value || props.min || 0}</span>
+                            <span>{props.max || 100}</span>
+                        </div>
+                        <div className="relative">
+                            <div className="w-full h-2 bg-gray-200 rounded-full">
+                                <div
+                                    className="h-2 bg-gray-400 rounded-full"
+                                    style={{ width: '50%' }}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                )
+
+            case 'BooleanInput':
+                return (
+                    <div className="flex items-center">
+                        <div className="w-12 h-6 bg-gray-300 rounded-full relative">
+                            <div className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm" />
+                        </div>
+                    </div>
+                )
+
+            case 'SelectInput':
+                return (
+                    <div className={`${baseClasses} flex justify-between items-center`}>
+                        <span>{props.placeholder || 'Select an option...'}</span>
+                        <span className="text-gray-400">▼</span>
+                    </div>
+                )
+
+            case 'TextareaInput':
+                return (
+                    <textarea
+                        className={`${baseClasses} resize-none`}
+                        rows={props.rows || 3}
+                        placeholder={props.placeholder || 'Enter text...'}
+                        value=""
+                        readOnly
+                    />
+                )
+
+            default:
+                return (
+                    <input
+                        type="text"
+                        className={baseClasses}
+                        placeholder={props.placeholder || 'Loading...'}
+                        value=""
+                        readOnly
+                    />
+                )
+        }
+    }
+
+    return (
+        <div className="space-y-1">
+            {label && (
+                <label className="block text-sm font-medium text-gray-700">
+                    {label}
+                </label>
+            )}
+            {renderPlaceholder()}
+            {props.description && (
+                <p className="text-sm text-gray-500">{props.description}</p>
+            )}
+        </div>
+    )
+}
+
+/**
  * SchemaFieldRenderer Component
  * 
  * Bridges between JSON Schema field definitions and our new field type system.
@@ -76,41 +180,127 @@ const SchemaFieldRenderer = ({
     const componentName = fieldSchema.component
 
     if (componentName) {
-        // Use the component directly from schema
-        const FieldComponent = React.lazy(() => {
-            if (FIELD_COMPONENTS[componentName]) {
-                return FIELD_COMPONENTS[componentName]()
+        // Filter out JSON Schema metadata and only pass component-relevant props
+        const {
+            // JSON Schema properties to exclude
+            type, format, title, description: schemaDescription,
+            component, category, order, enum: enumValues,
+            anyOf, oneOf, allOf, $ref, $defs, properties, items,
+            minimum, maximum, minLength, maxLength, pattern,
+            const: constValue, default: defaultValue,
+            // Include only component-relevant properties
+            ...componentProps
+        } = fieldSchema
+
+        // Create a stable field wrapper that manages its own state
+        const StableFieldWrapper = React.memo(({ initialValue, onFieldChange, onFieldValidation, ...wrapperProps }) => {
+            const [localValue, setLocalValue] = React.useState(initialValue)
+            const [isComponentReady, setIsComponentReady] = React.useState(false)
+            const [pendingInteraction, setPendingInteraction] = React.useState(null)
+            const componentRef = React.useRef(null)
+
+            // Load component asynchronously but show placeholder immediately
+            const [FieldComponent, setFieldComponent] = React.useState(null)
+
+            React.useEffect(() => {
+                let isMounted = true
+
+                const loadComponent = async () => {
+                    try {
+                        let componentModule
+                        if (FIELD_COMPONENTS[componentName]) {
+                            componentModule = await FIELD_COMPONENTS[componentName]()
+                        } else {
+                            console.warn(`Field component '${componentName}' not found, falling back to TextInput`)
+                            componentModule = await FIELD_COMPONENTS.TextInput()
+                        }
+
+                        if (isMounted) {
+                            setFieldComponent(() => componentModule.default)
+                            setIsComponentReady(true)
+
+                            // Handle any pending interaction
+                            if (pendingInteraction) {
+                                pendingInteraction()
+                                setPendingInteraction(null)
+                            }
+                        }
+                    } catch (error) {
+                        console.error(`Failed to load component ${componentName}:`, error)
+                        if (isMounted) {
+                            // Fallback to basic input
+                            setFieldComponent(() => ({ value, onChange, label, ...props }) => (
+                                <div className="space-y-1">
+                                    <label className="block text-sm font-medium text-gray-700">{label}</label>
+                                    <input
+                                        type="text"
+                                        value={value || ''}
+                                        onChange={(e) => onChange(e.target.value)}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        {...props}
+                                    />
+                                </div>
+                            ))
+                            setIsComponentReady(true)
+                        }
+                    }
+                }
+
+                loadComponent()
+                return () => { isMounted = false }
+            }, [componentName])
+
+            // Handle value changes internally
+            const handleChange = React.useCallback((newValue) => {
+                if (!isComponentReady) {
+                    // Defer interaction until component is ready
+                    setPendingInteraction(() => () => {
+                        setLocalValue(newValue)
+                        onFieldChange(newValue)
+                    })
+                    return
+                }
+
+                setLocalValue(newValue)
+                onFieldChange(newValue)
+            }, [isComponentReady, onFieldChange])
+
+            // Show placeholder that looks like the final component
+            if (!FieldComponent) {
+                return <FieldPlaceholder
+                    componentName={componentName}
+                    label={wrapperProps.label}
+                    value={localValue}
+                    {...componentProps}
+                />
             }
-            // Fallback to TextInput if component not found
-            console.warn(`Field component '${componentName}' not found, falling back to TextInput`)
-            return FIELD_COMPONENTS.TextInput()
+
+            return (
+                <FieldComponent
+                    ref={componentRef}
+                    value={localValue}
+                    onChange={handleChange}
+                    {...wrapperProps}
+                    {...componentProps}
+                />
+            )
         })
 
-        // Prepare props for the field component
-        const fieldProps = {
-            value,
-            onChange,
-            validation,
-            isValidating,
-            label: fieldSchema.title || fieldName,
-            description: fieldSchema.description,
-            required,
-            disabled,
-            placeholder: fieldSchema.placeholder,
-            // Pass all schema properties as props (for options, min, max, etc.)
-            ...fieldSchema,
-            ...props
-        }
-
         return (
-            <Suspense fallback={
-                <div className="flex items-center space-x-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span className="text-sm text-gray-500">Loading...</span>
-                </div>
-            }>
-                <FieldComponent {...fieldProps} />
-            </Suspense>
+            <StableFieldWrapper
+                key={fieldName}
+                initialValue={value}
+                onFieldChange={onChange}
+                onFieldValidation={(validation) => {
+                    // Emit validation events without causing re-renders
+                    if (props.onValidation) props.onValidation(fieldName, validation)
+                }}
+                label={fieldSchema.title || fieldName}
+                description={fieldSchema.description}
+                required={required}
+                disabled={disabled}
+                placeholder={fieldSchema.placeholder}
+            />
         )
     }
 
