@@ -1,36 +1,32 @@
+import React from 'react'
+
 /**
- * TextPropertyConfig - Text Field Property Configuration Component
+ * Text Property Configuration Component
  * 
- * Specialized configuration component for text input properties.
- * Handles text-specific options like min/max length, placeholder, patterns, etc.
+ * Handles configuration for text input fields including TextInput,
+ * TextareaInput, and PasswordInput components.
  */
-
-import React, { useCallback } from 'react'
-import { validateFieldName } from '../../../utils/schemaValidation'
-
-const TextPropertyConfig = ({ 
-  property, 
-  onChange, 
+export default function TextPropertyConfig({
+  property,
+  onChange,
   onValidate,
-  allProperties = [] 
-}) => {
-  // Handle field changes
-  const handleChange = useCallback((field, value) => {
+  errors = {}
+}) {
+  const handleChange = (field, value) => {
     const updated = { ...property, [field]: value }
     onChange(updated)
-    
-    if (onValidate) {
-      onValidate(updated)
+  }
+
+  const handleComponentConfigChange = (key, value) => {
+    const updated = {
+      ...property,
+      [key]: value
     }
-  }, [property, onChange, onValidate])
+    onChange(updated)
+  }
 
-  // Check if key is unique
-  const isKeyUnique = useCallback((key) => {
-    if (!key) return true
-    return !allProperties.some(prop => prop.key === key && prop.id !== property.id)
-  }, [allProperties, property.id])
-
-  const keyError = property.key && (!validateFieldName(property.key) || !isKeyUnique(property.key))
+  const isTextarea = property.component === 'TextareaInput'
+  const isPassword = property.component === 'PasswordInput'
 
   return (
     <div className="space-y-4">
@@ -38,56 +34,39 @@ const TextPropertyConfig = ({
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Property Key *
+            Property Key <span className="text-red-500">*</span>
           </label>
           <input
             type="text"
             value={property.key || ''}
             onChange={(e) => handleChange('key', e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault()
-              }
-            }}
-            className={`w-full border rounded-lg px-3 py-2 text-sm transition-colors ${
-              keyError ? 'border-red-300 bg-red-50' : 'border-gray-300 focus:border-blue-500'
-            }`}
+            className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.key ? 'border-red-300' : 'border-gray-300'
+              }`}
             placeholder="propertyName"
-            required
           />
-          {property.key && !validateFieldName(property.key) && (
-            <div className="text-red-500 text-xs mt-1">
-              Key must be camelCase (start with lowercase letter, followed by letters and numbers only)
-            </div>
-          )}
-          {property.key && validateFieldName(property.key) && !isKeyUnique(property.key) && (
-            <div className="text-red-500 text-xs mt-1">
-              Property key "{property.key}" already exists. Please choose a unique name.
-            </div>
+          {errors.key && (
+            <div className="text-red-500 text-xs mt-1">{errors.key}</div>
           )}
         </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Display Label *
+            Display Label <span className="text-red-500">*</span>
           </label>
           <input
             type="text"
             value={property.title || ''}
             onChange={(e) => handleChange('title', e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault()
-              }
-            }}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-blue-500 transition-colors"
+            className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.title ? 'border-red-300' : 'border-gray-300'
+              }`}
             placeholder="Display Name"
-            required
           />
+          {errors.title && (
+            <div className="text-red-500 text-xs mt-1">{errors.title}</div>
+          )}
         </div>
       </div>
 
-      {/* Description */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
           Description
@@ -96,41 +75,45 @@ const TextPropertyConfig = ({
           type="text"
           value={property.description || ''}
           onChange={(e) => handleChange('description', e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault()
-            }
-          }}
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-blue-500 transition-colors"
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           placeholder="Help text for this field"
         />
       </div>
 
-      {/* Text Field Options */}
-      <div className="pt-4 border-t border-gray-200">
-        <h4 className="text-sm font-medium text-gray-700 mb-3">Text Field Options</h4>
-        
-        {/* Placeholder */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Placeholder Text
-          </label>
-          <input
-            type="text"
-            value={property.placeholder || ''}
-            onChange={(e) => handleChange('placeholder', e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault()
-              }
-            }}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-blue-500 transition-colors"
-            placeholder="Enter placeholder text..."
-          />
+      {/* Text-Specific Configuration */}
+      <div className="border-t pt-4">
+        <h4 className="text-sm font-medium text-gray-900 mb-3">Text Field Options</h4>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Default Value
+            </label>
+            <input
+              type="text"
+              value={property.default || ''}
+              onChange={(e) => handleChange('default', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Default text value"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Placeholder Text
+            </label>
+            <input
+              type="text"
+              value={property.placeholder || ''}
+              onChange={(e) => handleComponentConfigChange('placeholder', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Enter placeholder text..."
+            />
+          </div>
         </div>
 
         {/* Length Constraints */}
-        <div className="grid grid-cols-2 gap-4 mb-4">
+        <div className="grid grid-cols-2 gap-4 mt-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Min Length
@@ -139,16 +122,12 @@ const TextPropertyConfig = ({
               type="number"
               value={property.minLength || ''}
               onChange={(e) => handleChange('minLength', e.target.value ? parseInt(e.target.value) : null)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault()
-                }
-              }}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-blue-500 transition-colors"
-              min="0"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="0"
+              min="0"
             />
           </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Max Length
@@ -157,133 +136,79 @@ const TextPropertyConfig = ({
               type="number"
               value={property.maxLength || ''}
               onChange={(e) => handleChange('maxLength', e.target.value ? parseInt(e.target.value) : null)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault()
-                }
-              }}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-blue-500 transition-colors"
-              min="0"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="255"
+              min="0"
             />
           </div>
         </div>
 
+        {/* Textarea-specific options */}
+        {isTextarea && (
+          <div className="mt-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Rows
+            </label>
+            <input
+              type="number"
+              value={property.rows || 3}
+              onChange={(e) => handleComponentConfigChange('rows', e.target.value ? parseInt(e.target.value) : 3)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              min="1"
+              max="20"
+            />
+          </div>
+        )}
+
+        {/* Password-specific options */}
+        {isPassword && (
+          <div className="mt-4">
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id={`show-strength-${property.key}`}
+                checked={property.showStrengthIndicator !== false}
+                onChange={(e) => handleComponentConfigChange('showStrengthIndicator', e.target.checked)}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              />
+              <label htmlFor={`show-strength-${property.key}`} className="text-sm text-gray-700">
+                Show password strength indicator
+              </label>
+            </div>
+          </div>
+        )}
+
         {/* Pattern Validation */}
-        <div className="mb-4">
+        <div className="mt-4">
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Pattern (RegExp)
+            Pattern (Regex)
           </label>
           <input
             type="text"
             value={property.pattern || ''}
             onChange={(e) => handleChange('pattern', e.target.value || null)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault()
-              }
-            }}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-blue-500 transition-colors font-mono"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             placeholder="^[a-zA-Z0-9]+$"
           />
           <div className="text-xs text-gray-500 mt-1">
-            Regular expression pattern for validation (optional)
-          </div>
-        </div>
-
-        {/* Format */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Format
-          </label>
-          <select
-            value={property.format || ''}
-            onChange={(e) => handleChange('format', e.target.value || null)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-blue-500 transition-colors"
-          >
-            <option value="">None</option>
-            <option value="email">Email</option>
-            <option value="uri">URL</option>
-            <option value="date">Date</option>
-            <option value="date-time">DateTime</option>
-            <option value="time">Time</option>
-            <option value="password">Password</option>
-          </select>
-        </div>
-
-        {/* Default Value */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Default Value
-          </label>
-          <input
-            type="text"
-            value={property.default || ''}
-            onChange={(e) => handleChange('default', e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault()
-              }
-            }}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-blue-500 transition-colors"
-            placeholder="Default value"
-          />
-        </div>
-      </div>
-
-      {/* Group and Order */}
-      <div className="pt-4 border-t border-gray-200">
-        <h4 className="text-sm font-medium text-gray-700 mb-3">Organization</h4>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Group
-            </label>
-            <select
-              value={property.group || 'Basic'}
-              onChange={(e) => handleChange('group', e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-blue-500 transition-colors"
-            >
-              <option value="Basic">Basic</option>
-              <option value="Selection">Selection</option>
-              <option value="DateTime">DateTime</option>
-              <option value="Media">Media</option>
-              <option value="Special">Special</option>
-              <option value="Advanced">Advanced</option>
-              <option value="Custom">Custom</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Order
-            </label>
-            <input
-              type="number"
-              value={property.order || ''}
-              onChange={(e) => handleChange('order', e.target.value ? parseInt(e.target.value) : null)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-blue-500 transition-colors"
-              min="0"
-              placeholder="0"
-            />
+            Optional regular expression pattern for validation
           </div>
         </div>
       </div>
 
-      {/* Required Toggle */}
+      {/* Required toggle */}
       <div className="flex items-center space-x-2 pt-4 border-t border-gray-200">
         <input
           type="checkbox"
-          id={`required-${property.id}`}
+          id={`required-${property.key}`}
           checked={property.required || false}
           onChange={(e) => handleChange('required', e.target.checked)}
-          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
         />
-        <label htmlFor={`required-${property.id}`} className="text-sm font-medium text-gray-700">
+        <label htmlFor={`required-${property.key}`} className="text-sm font-medium text-gray-700">
           Required field
         </label>
       </div>
     </div>
   )
 }
-
-export default TextPropertyConfig

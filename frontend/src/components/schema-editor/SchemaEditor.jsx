@@ -1,96 +1,112 @@
-/**
- * Schema Editor - Main Container Component
- * 
- * The main container component for the new modular schema editor system.
- * Manages schema state, converts between internal and JSON schema formats,
- * and coordinates between all child components.
- */
-
-import React, { useState, useCallback, useEffect } from 'react'
-import { Code, Edit, Eye, Save, RotateCcw } from 'lucide-react'
+import React, { useState, useEffect, useCallback } from 'react'
+import { Edit, Code, Eye, AlertCircle, CheckCircle, Loader } from 'lucide-react'
+import { initializePropertyRegistry, getAllPropertyTypes, isPropertyRegistryInitialized } from './PropertyTypeRegistry'
 import PropertyList from './PropertyList'
-import { validateSchemaShape } from '../../utils/schemaValidation'
-import { propertyTypeRegistry } from './PropertyTypeRegistry'
+import PropertyTypeSelector from './PropertyTypeSelector'
+import { validateFieldName, validateSchemaShape } from '../../utils/schemaValidation'
 
-const SchemaEditor = ({ 
-  schema, 
-  onChange, 
-  onValidate,
-  className = "",
-  showPreview = true,
-  showJsonView = true 
-}) => {
-  const [properties, setProperties] = useState([])
-  const [viewMode, setViewMode] = useState('visual') // 'visual', 'json', 'preview'
+/**
+ * SchemaEditor Component
+ * 
+ * Main schema editor component that provides a visual interface for
+ * creating and editing JSON schemas with dynamic property types.
+ */
+export default function SchemaEditor({
+  schema = {},
+  onChange,
+  disabled = false
+}) {
+  const [isLoading, setIsLoading] = useState(true)
+  const [initError, setInitError] = useState(null)
+  const [viewMode, setViewMode] = useState('visual') // 'visual' or 'json' or 'preview'
   const [jsonError, setJsonError] = useState('')
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const [properties, setProperties] = useState([])
+  const [validationErrors, setValidationErrors] = useState({})
 
-  // Convert JSON Schema to internal properties format
+  // Initialize the property registry and convert schema to internal format
+  useEffect(() => {
+    const initializeEditor = async () => {
+      try {
+        setIsLoading(true)
+
+        // Initialize property registry from backend field types
+        if (!isPropertyRegistryInitialized()) {
+          await initializePropertyRegistry()
+        }
+
+        // Convert schema to internal properties format
+        const internalProperties = convertSchemaToProperties(schema)
+        setProperties(internalProperties)
+
+        // Validate the initial schema
+        validateProperties(internalProperties)
+
+        console.log(`Schema editor initialized with ${internalProperties.length} properties`)
+      } catch (error) {
+        console.error('Failed to initialize schema editor:', error)
+        setInitError(error.message)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    initializeEditor()
+  }, []) // Only run once on mount
+
+  // Update properties when schema prop changes (but not during initialization)
+  useEffect(() => {
+    if (!isLoading && !initError) {
+      const internalProperties = convertSchemaToProperties(schema)
+      setProperties(internalProperties)
+      validateProperties(internalProperties)
+    }
+  }, [schema, isLoading, initError])
+
+  /**
+   * Convert JSON schema to internal properties format
+   */
   const convertSchemaToProperties = useCallback((inputSchema) => {
-    if (!inputSchema || !inputSchema.properties) return []
+    if (!inputSchema || !inputSchema.properties) {
+      return []
+    }
 
     const schemaProps = inputSchema.properties
     const required = inputSchema.required || []
-    const propertyOrder = inputSchema.propertyOrder || []
+    const propertyOrder = inputSchema.propertyOrder || Object.keys(schemaProps)
 
-    const convertedProperties = []
-
-    // Use propertyOrder if available, otherwise use object key order
-    const orderedKeys = propertyOrder.length > 0 
-      ? propertyOrder 
-      : Object.keys(schemaProps)
-
-    orderedKeys.forEach((key, index) => {
+    return propertyOrder.map((key, index) => {
       if (schemaProps[key]) {
-        const prop = schemaProps[key]
-        convertedProperties.push({
-          id: `prop-${index}-${key}`,
+        return {
+          ...schemaProps[key],
           key,
-          title: prop.title || '',
-          description: prop.description || '',
-          type: prop.type || 'string',
           required: required.includes(key),
-          component: prop.component || 'TextInput',
-          group: prop.group || 'Basic',
-          order: prop.order || index,
-          default: prop.default,
-          // Copy all other schema properties
-          ...prop,
-          // Ensure we don't override the converted values
-          key,
-          title: prop.title || '',
-          description: prop.description || ''
-        })
+          _id: `prop-${index}-${key}` // Stable ID for React keys
+        }
       }
-    })
-
-    return convertedProperties
+      return null
+    }).filter(Boolean)
   }, [])
 
-  // Convert internal properties to JSON Schema format
-  const convertPropertiesToSchema = useCallback((inputProperties) => {
+  /**
+   * Convert internal properties format to JSON schema
+   */
+  const convertPropertiesToSchema = useCallback((propertiesList) => {
     const newSchema = {
       type: 'object',
       properties: {},
-      propertyOrder: [],
-      required: []
+      required: [],
+      propertyOrder: []
     }
 
-    inputProperties.forEach(prop => {
-      const { id, key, required, ...schemaProp } = prop
-      
-      if (key && key.trim()) {
-        // Clean up the property by removing undefined values
-        const cleanedProp = {}
-        Object.entries(schemaProp).forEach(([propKey, value]) => {
-          if (value !== undefined && value !== null && value !== '') {
-            cleanedProp[propKey] = value
-          }
-        })
+    propertiesList.forEach(prop => {
+      const { key, required, _id, ...schemaProp } = prop
 
-        newSchema.properties[key] = cleanedProp
+      if (key && validateFieldName(key)) {
+        // Add to properties object
+        newSchema.properties[key] = schemaProp
         newSchema.propertyOrder.push(key)
-        
+
+        // Add to required array if property is required
         if (required) {
           newSchema.required.push(key)
         }
@@ -100,164 +116,248 @@ const SchemaEditor = ({
     return newSchema
   }, [])
 
-  // Initialize properties from schema
-  useEffect(() => {
-    const convertedProperties = convertSchemaToProperties(schema)
-    setProperties(convertedProperties)
-    setHasUnsavedChanges(false)
-  }, [schema, convertSchemaToProperties])
+  /**
+   * Validate properties and set validation errors
+   */
+  const validateProperties = useCallback((propertiesList) => {
+    const errors = {}
+    const usedKeys = new Set()
 
-  // Handle properties change
+    propertiesList.forEach((property, index) => {
+      const keyPrefix = `property-${index}-`
+
+      // Validate property key
+      if (!property.key || !property.key.trim()) {
+        errors[`${keyPrefix}key`] = 'Property key is required'
+      } else if (!validateFieldName(property.key)) {
+        errors[`${keyPrefix}key`] = 'Invalid key format. Use camelCase (e.g., firstName)'
+      } else if (usedKeys.has(property.key)) {
+        errors[`${keyPrefix}key`] = `Duplicate key "${property.key}"`
+      } else {
+        usedKeys.add(property.key)
+      }
+
+      // Validate property title
+      if (!property.title || !property.title.trim()) {
+        errors[`${keyPrefix}title`] = 'Display label is required'
+      }
+
+      // Validate component
+      if (!property.component) {
+        errors[`${keyPrefix}component`] = 'Component type is required'
+      }
+
+      // Type-specific validations
+      if (property.component === 'SelectInput' && (!property.enum || property.enum.length === 0)) {
+        errors[`${keyPrefix}enum`] = 'Choice fields must have at least one option'
+      }
+    })
+
+    setValidationErrors(errors)
+    return Object.keys(errors).length === 0
+  }, [])
+
+  /**
+   * Handle properties change and update schema
+   */
   const handlePropertiesChange = useCallback((newProperties) => {
     setProperties(newProperties)
-    setHasUnsavedChanges(true)
-    
-    // Convert to schema and trigger onChange
-    const newSchema = convertPropertiesToSchema(newProperties)
-    
-    // Validate schema if validation function provided
-    if (onValidate) {
-      const validation = onValidate(newSchema)
-      if (!validation.valid) {
-        console.warn('Schema validation failed:', validation.errors)
-      }
-    }
-    
-    onChange(newSchema)
-  }, [convertPropertiesToSchema, onChange, onValidate])
 
-  // Handle JSON view changes
-  const handleJsonChange = useCallback((jsonValue) => {
+    // Validate properties
+    const isValid = validateProperties(newProperties)
+
+    // Convert to schema format and notify parent
+    const newSchema = convertPropertiesToSchema(newProperties)
+    onChange(newSchema)
+  }, [onChange, validateProperties, convertPropertiesToSchema])
+
+  /**
+   * Handle adding a new property from the header button
+   */
+  const handleAddProperty = useCallback((newProperty) => {
+    const updatedProperties = [...properties, newProperty]
+    handlePropertiesChange(updatedProperties)
+  }, [properties, handlePropertiesChange])
+
+  /**
+   * Handle JSON mode changes
+   */
+  const handleJsonChange = useCallback((jsonString) => {
     try {
-      const parsed = JSON.parse(jsonValue)
+      const parsed = JSON.parse(jsonString)
       const { valid, reason } = validateSchemaShape(parsed)
-      
+
       if (!valid) {
         setJsonError(reason || 'Invalid schema shape')
         return
       }
-      
+
       setJsonError('')
-      const convertedProperties = convertSchemaToProperties(parsed)
-      setProperties(convertedProperties)
-      setHasUnsavedChanges(true)
+
+      // Convert to internal format and update
+      const newProperties = convertSchemaToProperties(parsed)
+      setProperties(newProperties)
+      validateProperties(newProperties)
+
       onChange(parsed)
     } catch (err) {
-      setJsonError('Invalid JSON syntax')
+      setJsonError('Invalid JSON')
     }
-  }, [convertSchemaToProperties, onChange])
+  }, [onChange, convertSchemaToProperties, validateProperties])
 
-  // Reset to original schema
-  const handleReset = useCallback(() => {
-    const convertedProperties = convertSchemaToProperties(schema)
-    setProperties(convertedProperties)
-    setHasUnsavedChanges(false)
-  }, [schema, convertSchemaToProperties])
+  const generatedSchema = convertPropertiesToSchema(properties)
+  const hasErrors = Object.keys(validationErrors).length > 0
+  const isValid = !hasErrors && properties.length > 0
 
-  const generatedSchema = JSON.stringify(convertPropertiesToSchema(properties), null, 2)
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-center">
+          <Loader className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-4" />
+          <div className="text-gray-600">Loading schema editor...</div>
+          <div className="text-sm text-gray-500 mt-1">Initializing property types</div>
+        </div>
+      </div>
+    )
+  }
+
+  // Error state
+  if (initError) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-md p-4">
+        <div className="flex items-start">
+          <AlertCircle className="w-5 h-5 text-red-600 mr-3 mt-0.5" />
+          <div>
+            <div className="text-red-800 font-medium">Failed to initialize schema editor</div>
+            <div className="text-red-700 mt-1">{initError}</div>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="mt-3 text-red-600 hover:text-red-800 underline text-sm"
+            >
+              Reload page
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div className={`space-y-6 ${className}`}>
-      {/* Header with controls */}
+    <div className="space-y-6">
+      {/* Header with view toggle and status */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <h3 className="text-lg font-semibold text-gray-900">Schema Editor</h3>
-          {hasUnsavedChanges && (
-            <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-amber-100 text-amber-800">
-              Unsaved changes
-            </span>
-          )}
+          <h3 className="text-lg font-medium">Schema Editor</h3>
+
+          {/* Status Indicator */}
+          <div className="flex items-center space-x-2">
+            {isValid ? (
+              <div className="flex items-center space-x-1 text-green-600">
+                <CheckCircle className="w-4 h-4" />
+                <span className="text-sm">Valid Schema</span>
+              </div>
+            ) : (
+              <div className="flex items-center space-x-1 text-red-600">
+                <AlertCircle className="w-4 h-4" />
+                <span className="text-sm">
+                  {properties.length === 0 ? 'No Properties' : `${Object.keys(validationErrors).length} Errors`}
+                </span>
+              </div>
+            )}
+          </div>
         </div>
-        
-        <div className="flex items-center space-x-2">
-          {/* View mode toggle */}
-          <div className="flex items-center bg-gray-100 rounded-lg p-1">
+
+        {/* Add Property Button and View Mode Toggle */}
+        <div className="flex items-center space-x-4">
+          {/* Add Property Button */}
+          <PropertyTypeSelector
+            onAddProperty={handleAddProperty}
+            existingProperties={properties}
+            disabled={disabled}
+          />
+
+          {/* View Mode Toggle */}
+          <div className="flex items-center space-x-2">
             <button
               type="button"
               onClick={() => setViewMode('visual')}
-              className={`flex items-center space-x-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                viewMode === 'visual' 
-                  ? 'bg-white text-blue-700 shadow-sm' 
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
+              className={`flex items-center space-x-1 px-3 py-1 rounded ${viewMode === 'visual' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'
+                }`}
             >
               <Edit className="w-4 h-4" />
               <span>Visual</span>
             </button>
-            
-            {showJsonView && (
-              <button
-                type="button"
-                onClick={() => setViewMode('json')}
-                className={`flex items-center space-x-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  viewMode === 'json' 
-                    ? 'bg-white text-blue-700 shadow-sm' 
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                <Code className="w-4 h-4" />
-                <span>JSON</span>
-              </button>
-            )}
-            
-            {showPreview && (
-              <button
-                type="button"
-                onClick={() => setViewMode('preview')}
-                className={`flex items-center space-x-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  viewMode === 'preview' 
-                    ? 'bg-white text-blue-700 shadow-sm' 
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                <Eye className="w-4 h-4" />
-                <span>Preview</span>
-              </button>
-            )}
-          </div>
 
-          {/* Reset button */}
-          {hasUnsavedChanges && (
             <button
               type="button"
-              onClick={handleReset}
-              className="flex items-center space-x-1 px-3 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
-              title="Reset to original"
+              onClick={() => setViewMode('json')}
+              className={`flex items-center space-x-1 px-3 py-1 rounded ${viewMode === 'json' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'
+                }`}
             >
-              <RotateCcw className="w-4 h-4" />
-              <span>Reset</span>
+              <Code className="w-4 h-4" />
+              <span>JSON</span>
             </button>
-          )}
+
+            <button
+              type="button"
+              onClick={() => setViewMode('preview')}
+              className={`flex items-center space-x-1 px-3 py-1 rounded ${viewMode === 'preview' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'
+                }`}
+            >
+              <Eye className="w-4 h-4" />
+              <span>Preview</span>
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Content based on view mode */}
       {viewMode === 'visual' && (
-        <PropertyList
-          properties={properties}
-          onChange={handlePropertiesChange}
-        />
+        <div>
+          {/* Global Validation Errors */}
+          {hasErrors && (
+            <div className="mb-6 bg-red-50 border border-red-200 rounded-md p-4">
+              <div className="flex items-start">
+                <AlertCircle className="w-5 h-5 text-red-400 mr-3 mt-0.5" />
+                <div>
+                  <h3 className="text-red-800 font-medium">Schema Validation Errors</h3>
+                  <div className="text-red-700 mt-1 text-sm">
+                    Please fix the following errors before the schema can be saved:
+                  </div>
+                  <ul className="mt-2 text-sm text-red-700 list-disc list-inside">
+                    {Object.values(validationErrors).map((error, index) => (
+                      <li key={index}>{error}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <PropertyList
+            properties={properties}
+            onChange={handlePropertiesChange}
+            errors={validationErrors}
+            disabled={disabled}
+          />
+        </div>
       )}
 
       {viewMode === 'json' && (
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              JSON Schema
-            </label>
+            <label className="block text-sm font-medium mb-2">Generated JSON Schema</label>
             <textarea
-              className={`w-full h-96 border rounded-lg px-3 py-2 font-mono text-sm resize-y ${
-                jsonError ? 'border-red-300 bg-red-50' : 'border-gray-300'
-              }`}
-              value={generatedSchema}
+              className="w-full h-96 border rounded px-3 py-2 font-mono text-sm"
+              value={JSON.stringify(generatedSchema, null, 2)}
               onChange={(e) => handleJsonChange(e.target.value)}
               placeholder="Enter JSON Schema..."
+              disabled={disabled}
             />
             {jsonError && (
-              <div className="text-red-600 text-sm mt-2 flex items-start space-x-1">
-                <span className="text-red-500 mt-0.5">⚠</span>
-                <span>{jsonError}</span>
-              </div>
+              <div className="text-red-600 text-sm mt-2">{jsonError}</div>
             )}
           </div>
         </div>
@@ -265,20 +365,38 @@ const SchemaEditor = ({
 
       {viewMode === 'preview' && (
         <div className="space-y-4">
-          <div className="text-sm font-medium text-gray-700 mb-4">
-            Form Preview
+          <div className="text-sm text-gray-600 mb-4">
+            This preview shows how the schema will appear when rendered as a form.
           </div>
-          <div className="border border-gray-200 rounded-lg p-6 bg-gray-50">
-            <div className="text-center text-gray-500">
-              <Eye className="w-8 h-8 mx-auto mb-2 opacity-50" />
-              <p>Form preview will be implemented in Phase 4</p>
-              <p className="text-xs">This will show how the form will appear to users</p>
-            </div>
+
+          <div className="bg-white border border-gray-200 rounded-lg p-6">
+            {properties.length === 0 ? (
+              <div className="text-center text-gray-500 py-8">
+                No properties to preview. Add some properties first.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {properties.map((property, index) => (
+                  <div key={property._id || index} className="space-y-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                      {property.title || property.key || 'Untitled Field'}
+                      {property.required && <span className="text-red-500 ml-1">*</span>}
+                    </label>
+
+                    {property.description && (
+                      <div className="text-sm text-gray-600">{property.description}</div>
+                    )}
+
+                    <div className="bg-gray-100 border border-gray-300 rounded-md p-3 text-center text-sm text-gray-500">
+                      {property.component} field preview
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
     </div>
   )
 }
-
-export default SchemaEditor
