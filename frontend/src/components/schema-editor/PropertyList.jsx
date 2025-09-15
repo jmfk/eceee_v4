@@ -20,12 +20,12 @@ const PropertyList = ({ properties = [], onChange }) => {
   const generateUniqueKey = useCallback((baseName, existingKeys = []) => {
     let uniqueKey = baseName
     let counter = 1
-    
+
     while (existingKeys.includes(uniqueKey)) {
       uniqueKey = `${baseName}${counter}`
       counter++
     }
-    
+
     return uniqueKey
   }, [])
 
@@ -86,7 +86,7 @@ const PropertyList = ({ properties = [], onChange }) => {
     const updatedProperties = [...properties]
     const [movedProperty] = updatedProperties.splice(fromIndex, 1)
     updatedProperties.splice(toIndex, 0, movedProperty)
-    
+
     // Update order values
     updatedProperties.forEach((prop, index) => {
       prop.order = index
@@ -117,11 +117,11 @@ const PropertyList = ({ properties = [], onChange }) => {
 
   const handleDrop = useCallback((e, dropIndex) => {
     e.preventDefault()
-    
+
     if (draggedIndex !== null && draggedIndex !== dropIndex) {
       handleMoveProperty(draggedIndex, dropIndex)
     }
-    
+
     setDraggedIndex(null)
     setDragOverIndex(null)
   }, [draggedIndex, handleMoveProperty])
@@ -135,28 +135,28 @@ const PropertyList = ({ properties = [], onChange }) => {
   const validateProperties = useCallback(() => {
     const errors = []
     const keys = new Set()
-    
+
     properties.forEach((prop, index) => {
       // Check for valid key
       if (!prop.key || !validateFieldName(prop.key)) {
         errors.push(`Property ${index + 1}: Invalid key format`)
       }
-      
+
       // Check for duplicate keys
       if (prop.key && keys.has(prop.key)) {
         errors.push(`Property ${index + 1}: Duplicate key '${prop.key}'`)
       }
-      
+
       if (prop.key) {
         keys.add(prop.key)
       }
-      
+
       // Check for required title
       if (!prop.title || !prop.title.trim()) {
         errors.push(`Property ${index + 1}: Title is required`)
       }
     })
-    
+
     return errors
   }, [properties])
 
@@ -206,11 +206,9 @@ const PropertyList = ({ properties = [], onChange }) => {
         {properties.map((property, index) => (
           <div
             key={property.id}
-            className={`transition-all duration-200 ${
-              draggedIndex === index ? 'opacity-50' : ''
-            } ${
-              dragOverIndex === index ? 'transform scale-105' : ''
-            }`}
+            className={`transition-all duration-200 ${draggedIndex === index ? 'opacity-50' : ''
+              } ${dragOverIndex === index ? 'transform scale-105' : ''
+              }`}
             draggable
             onDragStart={(e) => handleDragStart(e, index)}
             onDragOver={(e) => handleDragOver(e, index)}

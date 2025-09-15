@@ -20,9 +20,10 @@ const PropertyTypeSelector = ({ onAddProperty, className = "" }) => {
   const propertyTypesByCategory = propertyTypeRegistry.getPropertyTypesByCategory()
   const allPropertyTypes = propertyTypeRegistry.getAllPropertyTypes()
 
-  // Filter property types based on search term
+  // Filter property types based on search term and category
   const filteredPropertyTypes = React.useMemo(() => {
-    let types = allPropertyTypes
+    // Start with all types
+    let types = Object.values(allPropertyTypes)
 
     // Filter by search term
     if (searchTerm) {
@@ -50,12 +51,6 @@ const PropertyTypeSelector = ({ onAddProperty, className = "" }) => {
 
     return grouped
   }, [allPropertyTypes, searchTerm, selectedCategory])
-
-  // Get available categories
-  const categories = React.useMemo(() => {
-    const cats = ['all', ...Object.keys(propertyTypesByCategory)]
-    return cats
-  }, [propertyTypesByCategory])
 
   // Handle property type selection
   const handleSelectPropertyType = (propertyTypeKey) => {
@@ -100,6 +95,11 @@ const PropertyTypeSelector = ({ onAddProperty, className = "" }) => {
     }
   }, [isOpen])
 
+  // Get unique categories from propertyTypesByCategory
+  const categories = React.useMemo(() => {
+    return ['all', ...Object.keys(propertyTypesByCategory)].filter(Boolean)
+  }, [propertyTypesByCategory])
+
   return (
     <div className={`relative ${className}`}>
       {/* Add Property Button */}
@@ -117,7 +117,7 @@ const PropertyTypeSelector = ({ onAddProperty, className = "" }) => {
       {isOpen && (
         <div
           ref={dropdownRef}
-          className="absolute top-full left-0 mt-2 w-96 bg-white border border-gray-200 rounded-xl shadow-xl z-50 max-h-96 overflow-hidden"
+          className="absolute top-full right-0 mt-2 w-96 bg-white border border-gray-200 rounded-xl shadow-xl z-50 max-h-[calc(100vh-120px)] overflow-hidden"
         >
           {/* Header */}
           <div className="p-4 border-b border-gray-200 bg-gray-50">
@@ -155,14 +155,14 @@ const PropertyTypeSelector = ({ onAddProperty, className = "" }) => {
                       : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                   }`}
                 >
-                  {category === 'all' ? 'All' : category}
+                  {category === 'all' ? 'All Types' : category}
                 </button>
               ))}
             </div>
           </div>
 
           {/* Property Types List */}
-          <div className="max-h-80 overflow-y-auto">
+          <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 300px)' }}>
             {Object.keys(filteredPropertyTypes).length === 0 ? (
               <div className="p-6 text-center text-gray-500">
                 <Search className="w-8 h-8 mx-auto mb-2 opacity-50" />
