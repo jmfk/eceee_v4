@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Plus, Trash2, Settings, Hash, Type, Calendar, ToggleLeft, Check, Users, CheckCircle, XCircle } from 'lucide-react'
 import { objectTypesApi } from '../api/objectStorage'
-import VisualSchemaEditor from './VisualSchemaEditor'
+import { SchemaEditor } from './schema-editor'
 import InlineImageUpload from './InlineImageUpload'
 import { validateFieldName } from '../utils/schemaValidation'
 import { getAllFieldTypes } from '../utils/fieldTypeRegistry'
@@ -861,9 +861,11 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
                         </div>
                     )}
 
-                    <VisualSchemaEditor
+                    <SchemaEditor
                         schema={formData.schema}
                         onChange={handleSchemaChange}
+                        showPreview={true}
+                        showJsonView={true}
                     />
                 </div>
             )}
