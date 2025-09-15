@@ -33,6 +33,10 @@ const ImageWidget = ({ config = {}, mode = 'preview' }) => {
     const [collectionImages, setCollectionImages] = useState([])
     const [loadingCollection, setLoadingCollection] = useState(false)
 
+    // Carousel state - always initialized to avoid hook order issues
+    const [currentIndex, setCurrentIndex] = useState(0)
+    const [isPlaying, setIsPlaying] = useState(autoPlay)
+
     // Resolve image style from theme
     const resolvedImageStyle = React.useMemo(() => {
         if (!imageStyle || !currentTheme?.image_styles) {
@@ -143,6 +147,18 @@ const ImageWidget = ({ config = {}, mode = 'preview' }) => {
         altText: altText,
         caption: caption
     }] : [])
+
+    // Auto-play functionality for carousel
+    useEffect(() => {
+        // Only run if we're actually using carousel mode and have multiple items
+        if (displayType !== 'carousel' || !isPlaying || items.length <= 1) return
+
+        const interval = setInterval(() => {
+            setCurrentIndex(prev => prev < items.length - 1 ? prev + 1 : 0)
+        }, (autoPlayInterval || 3) * 1000)
+
+        return () => clearInterval(interval)
+    }, [displayType, isPlaying, items.length, autoPlayInterval])
 
     // Show loading state when collection is being loaded
     if (collectionId && loadingCollection) {
@@ -278,20 +294,6 @@ const ImageWidget = ({ config = {}, mode = 'preview' }) => {
     }
 
     const renderCarousel = () => {
-        // Simple carousel implementation with navigation and autoplay
-        const [currentIndex, setCurrentIndex] = React.useState(0)
-        const [isPlaying, setIsPlaying] = React.useState(autoPlay)
-
-        // Auto-play functionality
-        React.useEffect(() => {
-            if (!isPlaying || items.length <= 1) return
-
-            const interval = setInterval(() => {
-                setCurrentIndex(prev => prev < items.length - 1 ? prev + 1 : 0)
-            }, (autoPlayInterval || 3) * 1000)
-
-            return () => clearInterval(interval)
-        }, [isPlaying, items.length, autoPlayInterval])
 
         if (items.length === 0) return null
 

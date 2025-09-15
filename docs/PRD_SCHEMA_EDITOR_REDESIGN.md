@@ -16,6 +16,7 @@ This PRD outlines the complete redesign of the Object Type Schema Editor to crea
 3. **Limited Extensibility**: Adding new field types requires modifying core component code
 4. **Inconsistent Configuration**: Each field type has custom configuration logic embedded inline
 5. **Poor Separation of Concerns**: Property rendering, configuration, and management are tightly coupled
+6. **Inconsistent Form Rendering**: Object form fields use raw HTML inputs instead of the sophisticated React form components used elsewhere in the system
 
 ### Current JSON Schema Format
 The system currently uses a JSON Schema-like format for object types:
@@ -107,7 +108,7 @@ Widgets use Pydantic models that generate comprehensive JSON schemas with UI con
 
 ## Problem Statement
 
-The current Object Type Schema Editor lacks the modularity and extensibility needed for a modern CMS. Users cannot easily add new field types, the configuration interface is inconsistent across field types, and the codebase is difficult to maintain due to its monolithic structure.
+The current Object Type Schema Editor lacks the modularity and extensibility needed for a modern CMS. Users cannot easily add new field types, the configuration interface is inconsistent across field types, and the codebase is difficult to maintain due to its monolithic structure. Additionally, object form fields use raw HTML inputs instead of the sophisticated React form components available in the system, creating an inconsistent user experience compared to widget configuration forms and other parts of the application.
 
 ## Proposed Solution
 
@@ -311,9 +312,12 @@ export const initializePropertyRegistry = () => propertyTypeRegistry.initialize(
 - Default values
 - UI control specifications
 - Preview functionality
+- **Integration with existing React form components** for consistent UX
 
 Example `TextPropertyConfig.jsx`:
 ```jsx
+import { TextInput, NumberInput } from '../../form-fields'
+
 export default function TextPropertyConfig({ 
   property, 
   onChange, 
@@ -505,8 +509,10 @@ export default function SchemaEditor({ schema, onChange }) {
 **The new Schema Editor will integrate with**:
 - Existing `ObjectTypeForm.jsx` (replaces `VisualSchemaEditor`)
 - Field type registry system (reuses existing field types)
+- **React form component system** (uses `TextInput`, `NumberInput`, `BooleanInput`, etc.)
 - Form validation system (enhanced validation per property type)
 - Property preview system (live preview of form fields)
+- **Replace `ObjectSchemaForm.jsx`** with React form component-based rendering
 
 ## Success Criteria
 
@@ -518,6 +524,7 @@ export default function SchemaEditor({ schema, onChange }) {
 - ✅ Extensible architecture for adding new field types
 - ✅ Property reordering and management
 - ✅ Real-time validation and preview
+- ✅ **Consistent form rendering using React form components**
 
 ### Non-Functional Requirements
 - ✅ Maintainable and modular codebase
@@ -542,9 +549,10 @@ export default function SchemaEditor({ schema, onChange }) {
 
 ### Phase 3: Integration (Week 5)
 1. Replace existing `VisualSchemaEditor` in `ObjectTypeForm`
-2. Migrate existing schemas to new format
-3. Add backward compatibility layer
-4. Implement comprehensive testing
+2. **Replace `ObjectSchemaForm.jsx` with React form component-based rendering**
+3. Migrate existing schemas to new format
+4. Add backward compatibility layer
+5. Implement comprehensive testing
 
 ### Phase 4: Enhancement (Week 6)
 1. Add property templates and presets
@@ -569,5 +577,7 @@ export default function SchemaEditor({ schema, onChange }) {
 7. **Validation**: Should validation be handled at the property level or centrally in the main editor?
 
 8. **Preview System**: Should we implement live preview of how properties will appear in forms?
+
+9. **Form Component Integration**: Should we prioritize replacing `ObjectSchemaForm.jsx` first to establish the React form component pattern before building the new schema editor?
 
 Please review this PRD and provide feedback on any aspects that need clarification, modification, or additional consideration.
