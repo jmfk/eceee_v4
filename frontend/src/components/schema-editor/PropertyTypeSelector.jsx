@@ -27,7 +27,7 @@ const PropertyTypeSelector = ({ onAddProperty, className = "" }) => {
 
     // Filter by search term
     if (searchTerm) {
-      types = types.filter(type => 
+      types = types.filter(type =>
         type.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
         type.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
         type.category.toLowerCase().includes(searchTerm.toLowerCase())
@@ -64,7 +64,7 @@ const PropertyTypeSelector = ({ onAddProperty, className = "" }) => {
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (
-        dropdownRef.current && 
+        dropdownRef.current &&
         !dropdownRef.current.contains(event.target) &&
         buttonRef.current &&
         !buttonRef.current.contains(event.target)
@@ -148,12 +148,15 @@ const PropertyTypeSelector = ({ onAddProperty, className = "" }) => {
               {categories.map(category => (
                 <button
                   key={category}
-                  onClick={() => setSelectedCategory(category)}
-                  className={`px-2 py-1 text-xs rounded-md transition-colors ${
-                    selectedCategory === category
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setSelectedCategory(category);
+                  }}
+                  className={`px-2 py-1 text-xs rounded-md transition-colors ${selectedCategory === category
                       ? 'bg-blue-100 text-blue-700 font-medium'
                       : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
+                    }`}
                 >
                   {category === 'all' ? 'All Types' : category}
                 </button>
