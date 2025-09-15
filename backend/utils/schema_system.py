@@ -664,7 +664,9 @@ class SchemaValidator:
                 )
 
             # Get field type info from registry by component
-            field_type_info = field_registry.get_field_type_by_component(prop_def["component"])
+            field_type_info = field_registry.get_field_type_by_component(
+                prop_def["component"]
+            )
             expected_type = field_type_info["json_schema_type"]
 
         # Validate that type matches expected JSON Schema type

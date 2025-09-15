@@ -164,18 +164,28 @@ const PropertyList = ({ properties = [], onChange }) => {
 
   if (properties.length === 0) {
     return (
-      <div className="text-center py-12 bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-dashed border-blue-200 rounded-xl">
-        <div className="mb-6">
+      <div className="space-y-6">
+        {/* Add property button */}
+        <div className="flex justify-end">
+          <PropertyTypeSelector onAddProperty={handleAddProperty} />
+        </div>
+
+        {/* Empty state */}
+        <div className="text-center py-12 bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-dashed border-blue-200 rounded-xl">
           <div className="text-gray-600 text-lg mb-2">No properties defined yet</div>
           <div className="text-gray-500 text-sm">Add your first property to start building your schema</div>
         </div>
-        <PropertyTypeSelector onAddProperty={handleAddProperty} />
       </div>
     )
   }
 
   return (
     <div className="space-y-6">
+      {/* Add property button */}
+      <div className="flex justify-end">
+        <PropertyTypeSelector onAddProperty={handleAddProperty} />
+      </div>
+
       {/* Validation errors */}
       {validationErrors.length > 0 && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4">
@@ -220,11 +230,6 @@ const PropertyList = ({ properties = [], onChange }) => {
             />
           </div>
         ))}
-      </div>
-
-      {/* Add property button */}
-      <div className="flex justify-center pt-4 border-t border-gray-200">
-        <PropertyTypeSelector onAddProperty={handleAddProperty} />
       </div>
 
       {/* Properties summary */}
