@@ -1,10 +1,69 @@
-import React, { forwardRef } from 'react'
-import {
-    Type, Hash, Calendar, ToggleLeft, Image, FileText, User,
-    Link, Mail, ChevronDown
-} from 'lucide-react'
+import React, { forwardRef, useState, useEffect, Suspense } from 'react'
+import { FileText, Loader2 } from 'lucide-react'
+import { fieldTypeRegistry } from '../utils/fieldTypeRegistry'
+import { getFieldComponent } from './form-fields'
 
 const ObjectSchemaForm = forwardRef(({ schema, data = {}, onChange, errors = {} }, ref) => {
+    const [fieldComponents, setFieldComponents] = useState({})
+    const [loading, setLoading] = useState(true)
+    const [error, setError] = useState(null)
+
+    // Load field types and components on mount
+    useEffect(() => {
+        const loadComponents = async () => {
+            try {
+                setLoading(true)
+
+                if (!schema?.fields || !Array.isArray(schema.fields)) {
+                    setLoading(false)
+                    return
+                }
+
+                // Ensure field types are loaded from backend
+                await fieldTypeRegistry.ensureLoaded()
+
+                // Get all components that are used in the schema
+                const usedComponents = new Set()
+                schema.fields.forEach(field => {
+                    if (field.component) {
+                        usedComponents.add(field.component)
+                    }
+                })
+
+                // Load components
+                const componentPromises = {}
+                for (const componentName of usedComponents) {
+                    componentPromises[componentName] = getFieldComponent(componentName)
+                }
+
+                const resolvedComponents = {}
+                for (const [componentName, promise] of Object.entries(componentPromises)) {
+                    try {
+                        resolvedComponents[componentName] = await promise
+                    } catch (err) {
+                        console.error(`Failed to load component ${componentName}:`, err)
+                        // Fallback to TextInput
+                        resolvedComponents[componentName] = await getFieldComponent('TextInput')
+                    }
+                }
+
+                setFieldComponents(resolvedComponents)
+                setError(null)
+            } catch (err) {
+                console.error('Failed to load form components:', err)
+                setError(err.message)
+            } finally {
+                setLoading(false)
+            }
+        }
+
+        loadComponents()
+    }, [schema])
+
+    const handleFieldChange = (fieldName, value) => {
+        onChange?.(fieldName, value)
+    }
+
     if (!schema?.fields || !Array.isArray(schema.fields)) {
         return (
             <div className="text-center py-8 text-gray-500">
@@ -14,259 +73,77 @@ const ObjectSchemaForm = forwardRef(({ schema, data = {}, onChange, errors = {} 
         )
     }
 
-    const handleFieldChange = (fieldName, value) => {
-        onChange?.(fieldName, value)
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center p-8">
+                <Loader2 className="w-6 h-6 animate-spin mr-2" />
+                <span>Loading form components...</span>
+            </div>
+        )
     }
 
-    const getFieldIcon = (type) => {
-        switch (type) {
-            case 'text':
-            case 'rich_text':
-                return Type
-            case 'number':
-                return Hash
-            case 'date':
-            case 'datetime':
-                return Calendar
-            case 'boolean':
-                return ToggleLeft
-            case 'image':
-                return Image
-            case 'url':
-                return Link
-            case 'email':
-                return Mail
-            case 'user_reference':
-                return User
-            default:
-                return FileText
-        }
+    if (error) {
+        return (
+            <div className="p-4 border border-red-200 rounded bg-red-50">
+                <p className="text-red-700">Failed to load form: {error}</p>
+            </div>
+        )
     }
 
     const renderField = (field) => {
-        const Icon = getFieldIcon(field.type)
         const fieldValue = data[field.name]
         const fieldError = errors[`data_${field.name}`]
+        const componentName = field.component
 
-        const renderInput = () => {
-            switch (field.type) {
-                case 'text':
-                    return (
-                        <input
-                            type="text"
-                            value={fieldValue || ''}
-                            onChange={(e) => handleFieldChange(field.name, e.target.value)}
-                            className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${fieldError ? 'border-red-300' : 'border-gray-300'
-                                }`}
-                            placeholder={field.placeholder || `Enter ${field.label || field.name}...`}
-                            maxLength={field.maxLength}
-                        />
-                    )
+        // Get the dynamically loaded component
+        const FieldComponent = fieldComponents[componentName]
 
-                case 'rich_text':
-                    return (
-                        <textarea
-                            value={fieldValue || ''}
-                            onChange={(e) => handleFieldChange(field.name, e.target.value)}
-                            rows={4}
-                            className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${fieldError ? 'border-red-300' : 'border-gray-300'
-                                }`}
-                            placeholder={field.placeholder || `Enter ${field.label || field.name}...`}
-                        />
-                    )
+        if (!FieldComponent) {
+            return (
+                <div key={field.name} className="p-3 border border-yellow-200 rounded bg-yellow-50">
+                    <p className="text-sm text-yellow-700">
+                        Loading component: {componentName || 'Unknown'}
+                    </p>
+                </div>
+            )
+        }
 
-                case 'number':
-                    return (
-                        <input
-                            type="number"
-                            value={fieldValue || ''}
-                            onChange={(e) => handleFieldChange(field.name, e.target.value ? parseFloat(e.target.value) : null)}
-                            className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${fieldError ? 'border-red-300' : 'border-gray-300'
-                                }`}
-                            placeholder={field.placeholder || `Enter ${field.label || field.name}...`}
-                            min={field.min}
-                            max={field.max}
-                            step={field.step}
-                        />
-                    )
+        // Create validation object for the field
+        const validation = fieldError ? {
+            errors: [fieldError],
+            warnings: []
+        } : null
 
-                case 'date':
-                    return (
-                        <input
-                            type="date"
-                            value={fieldValue || ''}
-                            onChange={(e) => handleFieldChange(field.name, e.target.value)}
-                            className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${fieldError ? 'border-red-300' : 'border-gray-300'
-                                }`}
-                        />
-                    )
+        // Get field type definition for additional props
+        const fieldType = field.fieldType || field.type
+        const fieldTypeDef = fieldTypeRegistry.getFieldType(fieldType)
+        const uiProps = fieldTypeDef?.uiProps || {}
 
-                case 'datetime':
-                    return (
-                        <input
-                            type="datetime-local"
-                            value={fieldValue || ''}
-                            onChange={(e) => handleFieldChange(field.name, e.target.value)}
-                            className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${fieldError ? 'border-red-300' : 'border-gray-300'
-                                }`}
-                        />
-                    )
-
-                case 'boolean':
-                    return (
-                        <div className="flex items-center">
-                            <input
-                                type="checkbox"
-                                checked={fieldValue || false}
-                                onChange={(e) => handleFieldChange(field.name, e.target.checked)}
-                                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                            />
-                            <label className="ml-2 text-sm text-gray-700">
-                                {field.label || field.name}
-                            </label>
-                        </div>
-                    )
-
-                case 'choice':
-                    return (
-                        <div className="relative">
-                            <select
-                                value={fieldValue || ''}
-                                onChange={(e) => handleFieldChange(field.name, e.target.value)}
-                                className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none ${fieldError ? 'border-red-300' : 'border-gray-300'
-                                    }`}
-                            >
-                                <option value="">Select option...</option>
-                                {field.choices?.map((choice) => (
-                                    <option key={choice.value || choice} value={choice.value || choice}>
-                                        {choice.label || choice}
-                                    </option>
-                                ))}
-                            </select>
-                            <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-                        </div>
-                    )
-
-                case 'multi_choice':
-                    return (
-                        <div className="space-y-2">
-                            {field.choices?.map((choice) => {
-                                const choiceValue = choice.value || choice
-                                const choiceLabel = choice.label || choice
-                                const isSelected = Array.isArray(fieldValue) && fieldValue.includes(choiceValue)
-
-                                return (
-                                    <div key={choiceValue} className="flex items-center">
-                                        <input
-                                            type="checkbox"
-                                            checked={isSelected}
-                                            onChange={(e) => {
-                                                const currentValues = Array.isArray(fieldValue) ? fieldValue : []
-                                                if (e.target.checked) {
-                                                    handleFieldChange(field.name, [...currentValues, choiceValue])
-                                                } else {
-                                                    handleFieldChange(field.name, currentValues.filter(v => v !== choiceValue))
-                                                }
-                                            }}
-                                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                                        />
-                                        <label className="ml-2 text-sm text-gray-700">
-                                            {choiceLabel}
-                                        </label>
-                                    </div>
-                                )
-                            })}
-                        </div>
-                    )
-
-                case 'email':
-                    return (
-                        <input
-                            type="email"
-                            value={fieldValue || ''}
-                            onChange={(e) => handleFieldChange(field.name, e.target.value)}
-                            className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${fieldError ? 'border-red-300' : 'border-gray-300'
-                                }`}
-                            placeholder={field.placeholder || `Enter ${field.label || field.name}...`}
-                        />
-                    )
-
-                case 'url':
-                    return (
-                        <input
-                            type="url"
-                            value={fieldValue || ''}
-                            onChange={(e) => handleFieldChange(field.name, e.target.value)}
-                            className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${fieldError ? 'border-red-300' : 'border-gray-300'
-                                }`}
-                            placeholder={field.placeholder || `Enter ${field.label || field.name}...`}
-                        />
-                    )
-
-                case 'image':
-                    return (
-                        <div className="space-y-2">
-                            <input
-                                type="url"
-                                value={fieldValue || ''}
-                                onChange={(e) => handleFieldChange(field.name, e.target.value)}
-                                className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${fieldError ? 'border-red-300' : 'border-gray-300'
-                                    }`}
-                                placeholder="Enter image URL..."
-                            />
-                            {fieldValue && (
-                                <div className="mt-2">
-                                    <img
-                                        src={fieldValue}
-                                        alt="Preview"
-                                        className="max-w-xs max-h-32 object-cover rounded border"
-                                        onError={(e) => {
-                                            e.target.style.display = 'none'
-                                        }}
-                                    />
-                                </div>
-                            )}
-                        </div>
-                    )
-
-                case 'file':
-                    return (
-                        <div className="space-y-2">
-                            <input
-                                type="url"
-                                value={fieldValue || ''}
-                                onChange={(e) => handleFieldChange(field.name, e.target.value)}
-                                className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${fieldError ? 'border-red-300' : 'border-gray-300'
-                                    }`}
-                                placeholder="Enter file URL..."
-                            />
-                        </div>
-                    )
-
-                default:
-                    return (
-                        <input
-                            type="text"
-                            value={fieldValue || ''}
-                            onChange={(e) => handleFieldChange(field.name, e.target.value)}
-                            className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${fieldError ? 'border-red-300' : 'border-gray-300'
-                                }`}
-                            placeholder={field.placeholder || `Enter ${field.label || field.name}...`}
-                        />
-                    )
-            }
+        // Common props for all form components
+        const commonProps = {
+            label: field.label || field.name,
+            description: field.help || field.description,
+            value: fieldValue,
+            onChange: (value) => handleFieldChange(field.name, value),
+            required: field.required,
+            validation: validation,
+            placeholder: field.placeholder || `Enter ${field.label || field.name}...`,
+            // Pass through field type specific UI props
+            ...uiProps,
+            // Pass through field definition props (like min, max, options, etc.)
+            ...field
         }
 
         return (
-            <div key={field.name} className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700 flex items-center">
-                    <Icon className="h-4 w-4 mr-2" />
-                    {field.label || field.name}
-                    {field.required && <span className="text-red-500 ml-1">*</span>}
-                </label>
-                {renderInput()}
-                {fieldError && <p className="text-red-600 text-sm">{fieldError}</p>}
-                {field.help && <p className="text-gray-500 text-xs">{field.help}</p>}
+            <div key={field.name} className="space-y-1">
+                <Suspense fallback={
+                    <div className="flex items-center space-x-2 p-3 border border-gray-200 rounded">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span className="text-sm text-gray-500">Loading field...</span>
+                    </div>
+                }>
+                    <FieldComponent {...commonProps} />
+                </Suspense>
             </div>
         )
     }

@@ -45,11 +45,19 @@ export { default as RatingInput } from './RatingInput'
 export { default as SegmentedControlInput } from './SegmentedControlInput'
 export { default as NumericStepperInput } from './NumericStepperInput'
 
+// Media Components
+export { default as ImageInput } from './ImageInput'
+export { default as FileInput } from './FileInput'
+
+// Rich Text Components
+export { default as RichTextInput } from './RichTextInput'
+
+// Reference Components
+export { default as UserSelectorInput } from './UserSelectorInput'
+export { default as ObjectSelectorInput } from './ObjectSelectorInput'
+
 // TODO: Add more components as they are implemented
-// export { default as RichTextInput } from './RichTextInput'
 // export { default as AddressInput } from './AddressInput'
-// export { default as ImageInput } from './ImageInput'
-// export { default as FileInput } from './FileInput'
 
 // Component registry for dynamic loading
 export const FIELD_COMPONENTS = {
@@ -81,6 +89,14 @@ export const FIELD_COMPONENTS = {
     RatingInput: () => import('./RatingInput'),
     SegmentedControlInput: () => import('./SegmentedControlInput'),
     NumericStepperInput: () => import('./NumericStepperInput'),
+    // Media Components
+    ImageInput: () => import('./ImageInput'),
+    FileInput: () => import('./FileInput'),
+    // Rich Text Components
+    RichTextInput: () => import('./RichTextInput'),
+    // Reference Components
+    UserSelectorInput: () => import('./UserSelectorInput'),
+    ObjectSelectorInput: () => import('./ObjectSelectorInput'),
     // TODO: Add more components
 }
 
