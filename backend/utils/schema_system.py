@@ -546,6 +546,13 @@ class FieldTypeRegistry:
         """Get field type definition"""
         return self._field_types.get(key)
 
+    def get_field_type_by_component(self, component: str) -> Optional[Dict[str, Any]]:
+        """Get field type definition by component name"""
+        for field_type in self._field_types.values():
+            if field_type["component"] == component:
+                return field_type
+        return None
+
     def get_all_field_types(self) -> Dict[str, Dict[str, Any]]:
         """Get all registered field types"""
         return self._field_types.copy()
@@ -557,6 +564,10 @@ class FieldTypeRegistry:
     def is_valid_field_type(self, key: str) -> bool:
         """Check if field type is registered"""
         return key in self._field_types
+
+    def is_valid_component(self, component: str) -> bool:
+        """Check if component name is registered"""
+        return any(ft["component"] == component for ft in self._field_types.values())
 
 
 # Global field type registry instance
@@ -626,27 +637,40 @@ class SchemaValidator:
         if "type" not in prop_def:
             raise ValidationError(f"Property '{prop_name}' must have a 'type' field")
 
-        if "field_type" not in prop_def:
+        # Check for either field_type or component
+        if "field_type" not in prop_def and "component" not in prop_def:
             raise ValidationError(
-                f"Property '{prop_name}' must have a 'field_type' field"
+                f"Property '{prop_name}' must have either a 'field_type' or 'component' field"
             )
 
-        # Validate field type is registered
-        if not field_registry.is_valid_field_type(prop_def["field_type"]):
-            valid_types = list(field_registry.get_all_field_types().keys())
-            raise ValidationError(
-                f"Invalid field_type '{prop_def['field_type']}' for property '{prop_name}'. "
-                f"Valid types: {', '.join(valid_types)}"
-            )
+        # If field_type is present, validate it
+        if "field_type" in prop_def:
+            if not field_registry.is_valid_field_type(prop_def["field_type"]):
+                valid_types = list(field_registry.get_all_field_types().keys())
+                raise ValidationError(
+                    f"Invalid field_type '{prop_def['field_type']}' for property '{prop_name}'. "
+                    f"Valid types: {', '.join(valid_types)}"
+                )
 
-        # Validate that type matches field_type's expected JSON Schema type
-        field_type_info = field_registry.get_field_type(prop_def["field_type"])
-        expected_type = field_type_info["json_schema_type"]
+            # Get field type info from registry
+            field_type_info = field_registry.get_field_type(prop_def["field_type"])
+            expected_type = field_type_info["json_schema_type"]
 
+        # If component is present, validate it
+        elif "component" in prop_def:
+            if not field_registry.is_valid_component(prop_def["component"]):
+                raise ValidationError(
+                    f"Invalid component '{prop_def['component']}' for property '{prop_name}'"
+                )
+
+            # Get field type info from registry by component
+            field_type_info = field_registry.get_field_type_by_component(prop_def["component"])
+            expected_type = field_type_info["json_schema_type"]
+
+        # Validate that type matches expected JSON Schema type
         if prop_def["type"] != expected_type:
             raise ValidationError(
-                f"Property '{prop_name}' has type '{prop_def['type']}' but field_type "
-                f"'{prop_def['field_type']}' expects type '{expected_type}'"
+                f"Property '{prop_name}' has type '{prop_def['type']}' but expects type '{expected_type}'"
             )
 
     @staticmethod
