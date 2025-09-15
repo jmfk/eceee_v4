@@ -63,6 +63,12 @@ const ImageWidget = ({ config = {}, mode = 'preview' }) => {
         }
     }, [imageStyle, currentTheme, alignment, galleryColumns])
 
+    // Memoize collection config to prevent unnecessary re-renders
+    const stableCollectionConfig = React.useMemo(() => ({
+        randomize: collectionConfig.randomize || false,
+        maxItems: collectionConfig.maxItems || 0
+    }), [collectionConfig.randomize, collectionConfig.maxItems])
+
     // Load collection images when collectionId is present
     useEffect(() => {
         const loadCollectionImages = async () => {
@@ -105,13 +111,13 @@ const ImageWidget = ({ config = {}, mode = 'preview' }) => {
                     let finalImages = collectionMediaItems
 
                     // Apply randomization if requested
-                    if (collectionConfig.randomize) {
+                    if (stableCollectionConfig.randomize) {
                         finalImages = [...finalImages].sort(() => Math.random() - 0.5)
                     }
 
                     // Apply max items limit
-                    if (collectionConfig.maxItems > 0) {
-                        finalImages = finalImages.slice(0, collectionConfig.maxItems)
+                    if (stableCollectionConfig.maxItems > 0) {
+                        finalImages = finalImages.slice(0, stableCollectionConfig.maxItems)
                     }
 
                     setCollectionImages(finalImages)
@@ -125,7 +131,7 @@ const ImageWidget = ({ config = {}, mode = 'preview' }) => {
         }
 
         loadCollectionImages()
-    }, [collectionId, collectionConfig])
+    }, [collectionId, stableCollectionConfig])
 
     // Determine which images to use: collection images or individual media items
     const effectiveMediaItems = collectionId ? collectionImages : mediaItems

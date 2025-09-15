@@ -110,13 +110,30 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
         const updateWidgetEditorState = () => {
             if (objectContentEditorRef.current) {
                 const editorState = objectContentEditorRef.current
-                setWidgetEditorUI({
+                const newState = {
                     isOpen: editorState.widgetEditorOpen || false,
                     editingWidget: editorState.editingWidget || null,
                     hasUnsavedChanges: editorState.widgetHasUnsavedChanges || false,
                     widgetEditorRef: editorState.widgetEditorRef,
                     handleCloseWidgetEditor: editorState.handleCloseWidgetEditor,
                     handleSaveWidget: editorState.handleSaveWidget
+                }
+
+                // Only update state if it has actually changed
+                setWidgetEditorUI(prevState => {
+                    // Compare the key properties to avoid unnecessary updates
+                    if (
+                        prevState.isOpen === newState.isOpen &&
+                        prevState.editingWidget === newState.editingWidget &&
+                        prevState.hasUnsavedChanges === newState.hasUnsavedChanges &&
+                        prevState.widgetEditorRef === newState.widgetEditorRef &&
+                        prevState.handleCloseWidgetEditor === newState.handleCloseWidgetEditor &&
+                        prevState.handleSaveWidget === newState.handleSaveWidget
+                    ) {
+                        // No changes, return previous state to prevent re-render
+                        return prevState
+                    }
+                    return newState
                 })
             }
         }
@@ -528,8 +545,8 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
                                 <button
                                     onClick={() => setUseSelfContainedEditor(!useSelfContainedEditor)}
                                     className={`px-3 py-1 text-xs rounded-full transition-colors ${useSelfContainedEditor
-                                            ? 'bg-blue-600 text-white'
-                                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                        ? 'bg-blue-600 text-white'
+                                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                                         }`}
                                 >
                                     {useSelfContainedEditor ? 'Self-Contained' : 'Switch to Self-Contained'}
