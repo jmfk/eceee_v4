@@ -1,36 +1,28 @@
+import React from 'react'
+
 /**
- * BooleanPropertyConfig - Boolean Field Property Configuration Component
+ * Boolean Property Configuration Component
  * 
- * Specialized configuration component for boolean/toggle properties.
- * Handles boolean-specific options like default state, toggle variant, labels, etc.
+ * Handles configuration for boolean input fields including BooleanInput.
  */
-
-import React, { useCallback } from 'react'
-import { validateFieldName } from '../../../utils/schemaValidation'
-
-const BooleanPropertyConfig = ({ 
-  property, 
-  onChange, 
+export default function BooleanPropertyConfig({
+  property,
+  onChange,
   onValidate,
-  allProperties = [] 
-}) => {
-  // Handle field changes
-  const handleChange = useCallback((field, value) => {
+  errors = {}
+}) {
+  const handleChange = (field, value) => {
     const updated = { ...property, [field]: value }
     onChange(updated)
-    
-    if (onValidate) {
-      onValidate(updated)
+  }
+
+  const handleComponentConfigChange = (key, value) => {
+    const updated = {
+      ...property,
+      [key]: value
     }
-  }, [property, onChange, onValidate])
-
-  // Check if key is unique
-  const isKeyUnique = useCallback((key) => {
-    if (!key) return true
-    return !allProperties.some(prop => prop.key === key && prop.id !== property.id)
-  }, [allProperties, property.id])
-
-  const keyError = property.key && (!validateFieldName(property.key) || !isKeyUnique(property.key))
+    onChange(updated)
+  }
 
   return (
     <div className="space-y-4">
@@ -38,56 +30,39 @@ const BooleanPropertyConfig = ({
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Property Key *
+            Property Key <span className="text-red-500">*</span>
           </label>
           <input
             type="text"
             value={property.key || ''}
             onChange={(e) => handleChange('key', e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault()
-              }
-            }}
-            className={`w-full border rounded-lg px-3 py-2 text-sm transition-colors ${
-              keyError ? 'border-red-300 bg-red-50' : 'border-gray-300 focus:border-blue-500'
-            }`}
+            className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.key ? 'border-red-300' : 'border-gray-300'
+              }`}
             placeholder="propertyName"
-            required
           />
-          {property.key && !validateFieldName(property.key) && (
-            <div className="text-red-500 text-xs mt-1">
-              Key must be camelCase (start with lowercase letter, followed by letters and numbers only)
-            </div>
-          )}
-          {property.key && validateFieldName(property.key) && !isKeyUnique(property.key) && (
-            <div className="text-red-500 text-xs mt-1">
-              Property key "{property.key}" already exists. Please choose a unique name.
-            </div>
+          {errors.key && (
+            <div className="text-red-500 text-xs mt-1">{errors.key}</div>
           )}
         </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Display Label *
+            Display Label <span className="text-red-500">*</span>
           </label>
           <input
             type="text"
             value={property.title || ''}
             onChange={(e) => handleChange('title', e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault()
-              }
-            }}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-blue-500 transition-colors"
+            className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.title ? 'border-red-300' : 'border-gray-300'
+              }`}
             placeholder="Display Name"
-            required
           />
+          {errors.title && (
+            <div className="text-red-500 text-xs mt-1">{errors.title}</div>
+          )}
         </div>
       </div>
 
-      {/* Description */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
           Description
@@ -96,197 +71,179 @@ const BooleanPropertyConfig = ({
           type="text"
           value={property.description || ''}
           onChange={(e) => handleChange('description', e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault()
-            }
-          }}
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-blue-500 transition-colors"
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           placeholder="Help text for this field"
         />
       </div>
 
-      {/* Boolean Field Options */}
-      <div className="pt-4 border-t border-gray-200">
-        <h4 className="text-sm font-medium text-gray-700 mb-3">Boolean Field Options</h4>
-        
-        {/* Variant */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Display Style
-          </label>
-          <select
-            value={property.variant || 'toggle'}
-            onChange={(e) => handleChange('variant', e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-blue-500 transition-colors"
-          >
-            <option value="toggle">Toggle Switch</option>
-            <option value="checkbox">Checkbox</option>
-            <option value="radio">Radio Buttons</option>
-          </select>
-        </div>
+      {/* Boolean-Specific Configuration */}
+      <div className="border-t pt-4">
+        <h4 className="text-sm font-medium text-gray-900 mb-3">Boolean Field Options</h4>
 
         {/* Default Value */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Default State
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Default Value
           </label>
           <div className="space-y-2">
-            <label className="flex items-center space-x-2">
+            <div className="flex items-center">
               <input
                 type="radio"
-                name={`default-${property.id}`}
-                checked={property.default === true}
-                onChange={() => handleChange('default', true)}
-                className="text-blue-600 focus:ring-blue-500"
-              />
-              <span className="text-sm">Checked/True by default</span>
-            </label>
-            <label className="flex items-center space-x-2">
-              <input
-                type="radio"
-                name={`default-${property.id}`}
+                id={`default-false-${property.key}`}
+                name={`default-${property.key}`}
                 checked={property.default === false}
                 onChange={() => handleChange('default', false)}
-                className="text-blue-600 focus:ring-blue-500"
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
               />
-              <span className="text-sm">Unchecked/False by default</span>
-            </label>
-          </div>
-        </div>
-
-        {/* Custom Labels for Radio Variant */}
-        {property.variant === 'radio' && (
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Custom Labels
-            </label>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs text-gray-600 mb-1">True Label</label>
-                <input
-                  type="text"
-                  value={property.trueLabel || ''}
-                  onChange={(e) => handleChange('trueLabel', e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                    }
-                  }}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-blue-500 transition-colors"
-                  placeholder="Yes"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-gray-600 mb-1">False Label</label>
-                <input
-                  type="text"
-                  value={property.falseLabel || ''}
-                  onChange={(e) => handleChange('falseLabel', e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                    }
-                  }}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-blue-500 transition-colors"
-                  placeholder="No"
-                />
-              </div>
+              <label htmlFor={`default-false-${property.key}`} className="ml-2 text-sm text-gray-700">
+                False (unchecked)
+              </label>
+            </div>
+            <div className="flex items-center">
+              <input
+                type="radio"
+                id={`default-true-${property.key}`}
+                name={`default-${property.key}`}
+                checked={property.default === true}
+                onChange={() => handleChange('default', true)}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+              />
+              <label htmlFor={`default-true-${property.key}`} className="ml-2 text-sm text-gray-700">
+                True (checked)
+              </label>
             </div>
           </div>
-        )}
+        </div>
 
-        {/* Size (for toggle variant) */}
-        {property.variant === 'toggle' && (
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Toggle Size
-            </label>
-            <select
-              value={property.size || 'medium'}
-              onChange={(e) => handleChange('size', e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-blue-500 transition-colors"
-            >
-              <option value="small">Small</option>
-              <option value="medium">Medium</option>
-              <option value="large">Large</option>
-            </select>
+        {/* Display Variant */}
+        <div className="mt-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Display Style
+          </label>
+          <div className="space-y-2">
+            <div className="flex items-center">
+              <input
+                type="radio"
+                id={`variant-toggle-${property.key}`}
+                name={`variant-${property.key}`}
+                checked={property.variant === 'toggle' || !property.variant}
+                onChange={() => handleComponentConfigChange('variant', 'toggle')}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+              />
+              <label htmlFor={`variant-toggle-${property.key}`} className="ml-2 text-sm text-gray-700">
+                Toggle switch (recommended)
+              </label>
+            </div>
+            <div className="flex items-center">
+              <input
+                type="radio"
+                id={`variant-checkbox-${property.key}`}
+                name={`variant-${property.key}`}
+                checked={property.variant === 'checkbox'}
+                onChange={() => handleComponentConfigChange('variant', 'checkbox')}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+              />
+              <label htmlFor={`variant-checkbox-${property.key}`} className="ml-2 text-sm text-gray-700">
+                Checkbox
+              </label>
+            </div>
           </div>
-        )}
+        </div>
 
-        {/* Help Text Position */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Help Text Position
+        {/* Custom Labels */}
+        <div className="mt-4">
+          <h5 className="text-sm font-medium text-gray-900 mb-2">Custom Labels (Optional)</h5>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                True Label
+              </label>
+              <input
+                type="text"
+                value={property.trueLabel || ''}
+                onChange={(e) => handleComponentConfigChange('trueLabel', e.target.value)}
+                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                placeholder="Yes, On, Enabled"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                False Label
+              </label>
+              <input
+                type="text"
+                value={property.falseLabel || ''}
+                onChange={(e) => handleComponentConfigChange('falseLabel', e.target.value)}
+                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                placeholder="No, Off, Disabled"
+              />
+            </div>
+          </div>
+
+          <div className="text-xs text-gray-500 mt-1">
+            Custom labels to display instead of true/false
+          </div>
+        </div>
+
+        {/* Size Option */}
+        <div className="mt-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Size
           </label>
           <select
-            value={property.helpTextPosition || 'below'}
-            onChange={(e) => handleChange('helpTextPosition', e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-blue-500 transition-colors"
+            value={property.size || 'default'}
+            onChange={(e) => handleComponentConfigChange('size', e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           >
-            <option value="below">Below field</option>
-            <option value="right">Right of field</option>
-            <option value="tooltip">In tooltip</option>
+            <option value="small">Small</option>
+            <option value="default">Default</option>
+            <option value="large">Large</option>
           </select>
         </div>
-      </div>
 
-      {/* Group and Order */}
-      <div className="pt-4 border-t border-gray-200">
-        <h4 className="text-sm font-medium text-gray-700 mb-3">Organization</h4>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Group
-            </label>
-            <select
-              value={property.group || 'Basic'}
-              onChange={(e) => handleChange('group', e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-blue-500 transition-colors"
-            >
-              <option value="Basic">Basic</option>
-              <option value="Selection">Selection</option>
-              <option value="DateTime">DateTime</option>
-              <option value="Media">Media</option>
-              <option value="Special">Special</option>
-              <option value="Advanced">Advanced</option>
-              <option value="Custom">Custom</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Order
-            </label>
+        {/* Disabled State */}
+        <div className="mt-4">
+          <div className="flex items-center space-x-2">
             <input
-              type="number"
-              value={property.order || ''}
-              onChange={(e) => handleChange('order', e.target.value ? parseInt(e.target.value) : null)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-blue-500 transition-colors"
-              min="0"
-              placeholder="0"
+              type="checkbox"
+              id={`disabled-${property.key}`}
+              checked={property.disabled || false}
+              onChange={(e) => handleComponentConfigChange('disabled', e.target.checked)}
+              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
             />
+            <label htmlFor={`disabled-${property.key}`} className="text-sm text-gray-700">
+              Disabled by default
+            </label>
           </div>
         </div>
       </div>
 
-      {/* Required Toggle */}
+      {/* Note about required for boolean fields */}
+      <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+        <div className="text-sm text-blue-800">
+          <div className="font-medium">Note about Required Boolean Fields</div>
+          <div className="mt-1">
+            Boolean fields are typically not marked as "required" since they always have a value (true or false).
+            Consider if you need a three-state field (true/false/null) instead.
+          </div>
+        </div>
+      </div>
+
+      {/* Required toggle (kept for consistency but with warning) */}
       <div className="flex items-center space-x-2 pt-4 border-t border-gray-200">
         <input
           type="checkbox"
-          id={`required-${property.id}`}
+          id={`required-${property.key}`}
           checked={property.required || false}
           onChange={(e) => handleChange('required', e.target.checked)}
-          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
         />
-        <label htmlFor={`required-${property.id}`} className="text-sm font-medium text-gray-700">
+        <label htmlFor={`required-${property.key}`} className="text-sm font-medium text-gray-700">
           Required field
         </label>
-        <div className="text-xs text-gray-500 ml-2">
-          (User must explicitly choose true/false)
-        </div>
       </div>
     </div>
   )
 }
-
-export default BooleanPropertyConfig

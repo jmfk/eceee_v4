@@ -204,61 +204,103 @@ Each field type gets its own configuration component:
 - `DatePropertyConfig.jsx`
 - etc.
 
-### 3. Property Type Registry
+### 3. Dynamic Property Type Registry
 
-**Implement a central registry system** that manages all available property types:
+**Leverage the existing field type registry system** to dynamically load all available property types from the backend:
 
 ```javascript
 // PropertyTypeRegistry.js
-const propertyTypeRegistry = {
-  text: {
-    label: "Text Field",
-    icon: Type,
-    description: "Single line text input",
-    component: TextPropertyConfig,
-    defaultConfig: {
-      type: "string",
-      title: "Text Field",
-      description: "",
-      default: "",
-      component: "TextInput",
-      placeholder: "Enter text...",
-      minLength: 0,
-      maxLength: 255
-    }
-  },
-  rich_text: {
-    label: "Rich Text",
-    icon: FileText,
-    description: "Multi-line rich text editor",
-    component: RichTextPropertyConfig,
-    defaultConfig: {
-      type: "string",
-      title: "Rich Text Field",
-      description: "",
-      default: "",
-      component: "RichTextInput",
-      rows: 6,
-      toolbar: "full"
-    }
-  },
-  choice: {
-    label: "Choice Field",
-    icon: List,
-    description: "Select from predefined options",
-    component: ChoicePropertyConfig,
-    defaultConfig: {
-      type: "string",
-      title: "Choice Field",
-      description: "",
-      enum: ["Option 1", "Option 2"],
-      default: null,
-      component: "SelectInput",
-      placeholder: "Select an option..."
-    }
+import { fieldTypeRegistry, ensureFieldTypesLoaded } from '../utils/fieldTypeRegistry'
+
+class PropertyTypeRegistry {
+  constructor() {
+    this.propertyConfigComponents = new Map()
+    this.initialized = false
   }
-  // ... more property types
+
+  async initialize() {
+    if (this.initialized) return
+
+    // Load field types from backend via existing registry
+    await ensureFieldTypesLoaded()
+    
+    // Register property config components for each field type
+    const fieldTypes = fieldTypeRegistry.getAllFieldTypes()
+    
+    fieldTypes.forEach(fieldType => {
+      // Map field type to property config component
+      const configComponent = this.getConfigComponentForFieldType(fieldType)
+      
+      this.propertyConfigComponents.set(fieldType.key, {
+        key: fieldType.key,
+        label: fieldType.label,
+        icon: fieldType.icon,
+        description: fieldType.description,
+        category: fieldType.category,
+        component: configComponent,
+        defaultConfig: {
+          type: fieldType.jsonSchemaType,
+          title: fieldType.label,
+          description: "",
+          component: fieldType.component,
+          ...fieldType.defaultProps,
+          ...fieldType.uiProps
+        }
+      })
+    })
+
+    this.initialized = true
+  }
+
+  getConfigComponentForFieldType(fieldType) {
+    // Map component names to property config components
+    const componentMap = {
+      'TextInput': TextPropertyConfig,
+      'RichTextInput': RichTextPropertyConfig,
+      'NumberInput': NumberPropertyConfig,
+      'BooleanInput': BooleanPropertyConfig,
+      'SelectInput': ChoicePropertyConfig,
+      'MultiSelectInput': MultiChoicePropertyConfig,
+      'ImageInput': ImagePropertyConfig,
+      'FileInput': FilePropertyConfig,
+      'DateInput': DatePropertyConfig,
+      'DateTimeInput': DateTimePropertyConfig,
+      'EmailInput': EmailPropertyConfig,
+      'URLInput': URLPropertyConfig,
+      'ColorInput': ColorPropertyConfig,
+      'SliderInput': SliderPropertyConfig,
+      // ... more mappings as needed
+    }
+
+    return componentMap[fieldType.component] || GenericPropertyConfig
+  }
+
+  getPropertyType(key) {
+    return this.propertyConfigComponents.get(key)
+  }
+
+  getAllPropertyTypes() {
+    return Array.from(this.propertyConfigComponents.values())
+  }
+
+  getPropertyTypeByComponent(componentName) {
+    for (const propertyType of this.propertyConfigComponents.values()) {
+      if (propertyType.defaultConfig.component === componentName) {
+        return propertyType
+      }
+    }
+    return null
+  }
 }
+
+// Global instance
+export const propertyTypeRegistry = new PropertyTypeRegistry()
+
+// Convenience functions
+export const getPropertyType = (key) => propertyTypeRegistry.getPropertyType(key)
+export const getAllPropertyTypes = () => propertyTypeRegistry.getAllPropertyTypes()
+export const getPropertyTypeByComponent = (component) => propertyTypeRegistry.getPropertyTypeByComponent(component)
+export const initializePropertyRegistry = () => propertyTypeRegistry.initialize()
 ```
 
 ### 4. Self-Contained Property Configuration Components
@@ -397,46 +439,58 @@ frontend/src/components/schema-editor/
 
 ### Component Registration System
 
-**Automatic component registration** when the module loads:
+**Dynamic registration based on backend field types** when the schema editor initializes:
 
 ```javascript
-// property-configs/index.js
-import TextPropertyConfig from './TextPropertyConfig'
-import RichTextPropertyConfig from './RichTextPropertyConfig'
-// ... other imports
+// SchemaEditor.jsx
+import { initializePropertyRegistry } from './PropertyTypeRegistry'
 
-// Auto-register all property config components
-export const registerPropertyComponents = () => {
-  registerPropertyType('TextInput', {
-    label: 'Text Field',
-    icon: Type,
-    description: 'Single line text input',
-    component: TextPropertyConfig,
-    defaultConfig: {
-      type: "string",
-      component: "TextInput",
-      placeholder: "Enter text...",
-      minLength: 0,
-      maxLength: 255
+export default function SchemaEditor({ schema, onChange }) {
+  const [isLoading, setIsLoading] = useState(true)
+  const [propertyTypes, setPropertyTypes] = useState([])
+
+  useEffect(() => {
+    const initializeEditor = async () => {
+      try {
+        // Initialize property registry from backend field types
+        await initializePropertyRegistry()
+        
+        // Get all available property types
+        const types = getAllPropertyTypes()
+        setPropertyTypes(types)
+        
+        console.log(`Loaded ${types.length} property types:`, types.map(t => t.label))
+      } catch (error) {
+        console.error('Failed to initialize schema editor:', error)
+      } finally {
+        setIsLoading(false)
+      }
     }
-  })
-  
-  registerPropertyType('RichTextInput', {
-    label: 'Rich Text',
-    icon: FileText,
-    description: 'Multi-line rich text editor', 
-    component: RichTextPropertyConfig,
-    defaultConfig: {
-      type: "string",
-      component: "RichTextInput",
-      rows: 6,
-      toolbar: "full"
-    }
-  })
-  
-  // ... register other types
+
+    initializeEditor()
+  }, [])
+
+  if (isLoading) {
+    return <div>Loading property types...</div>
+  }
+
+  return (
+    <div className="schema-editor">
+      <PropertyTypeSelector 
+        availableTypes={propertyTypes}
+        onAddProperty={handleAddProperty}
+      />
+      {/* ... rest of editor */}
+    </div>
+  )
 }
 ```
+
+**Benefits of Dynamic Registration:**
+- **Always Up-to-Date**: Automatically includes all field types defined in the backend
+- **No Manual Maintenance**: New field types are automatically available in the schema editor
+- **Consistent**: Uses the same field type definitions as the rest of the system
+- **Extensible**: Custom field types added to the backend registry are immediately available
 
 ### Data Flow
 

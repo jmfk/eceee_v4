@@ -1,93 +1,79 @@
+import React from 'react'
+import { AlertTriangle } from 'lucide-react'
+
 /**
- * GenericPropertyConfig - Fallback Property Configuration Component
+ * Generic Property Configuration Component
  * 
- * A generic property configuration component that handles basic property settings
- * and serves as a fallback when specific property config components are not available.
+ * Fallback component used when no specific property config component
+ * is available for a field type. Provides basic property configuration.
  */
-
-import React, { useCallback } from 'react'
-import { validateFieldName } from '../../../utils/schemaValidation'
-
-const GenericPropertyConfig = ({ 
-  property, 
-  onChange, 
+export default function GenericPropertyConfig({
+  property,
+  onChange,
   onValidate,
-  allProperties = [] 
-}) => {
-  // Handle field changes
-  const handleChange = useCallback((field, value) => {
+  errors = {}
+}) {
+  const handleChange = (field, value) => {
     const updated = { ...property, [field]: value }
     onChange(updated)
-    
-    if (onValidate) {
-      onValidate(updated)
+  }
+
+  const handleComponentConfigChange = (key, value) => {
+    const updated = {
+      ...property,
+      [key]: value
     }
-  }, [property, onChange, onValidate])
-
-  // Check if key is unique
-  const isKeyUnique = useCallback((key) => {
-    if (!key) return true
-    return !allProperties.some(prop => prop.key === key && prop.id !== property.id)
-  }, [allProperties, property.id])
-
-  const keyError = property.key && (!validateFieldName(property.key) || !isKeyUnique(property.key))
+    onChange(updated)
+  }
 
   return (
     <div className="space-y-4">
+      {/* Warning about generic config */}
+      <div className="bg-amber-50 border border-amber-200 rounded-md p-3 flex items-start">
+        <AlertTriangle className="w-4 h-4 text-amber-600 mr-2 mt-0.5" />
+        <div className="text-sm text-amber-800">
+          <div className="font-medium">Generic Configuration</div>
+          <div>No specific configuration component found for "{property.component}". Using generic settings.</div>
+        </div>
+      </div>
+
       {/* Basic Configuration */}
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Property Key *
+            Property Key <span className="text-red-500">*</span>
           </label>
           <input
             type="text"
             value={property.key || ''}
             onChange={(e) => handleChange('key', e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault()
-              }
-            }}
-            className={`w-full border rounded-lg px-3 py-2 text-sm transition-colors ${
-              keyError ? 'border-red-300 bg-red-50' : 'border-gray-300 focus:border-blue-500'
-            }`}
+            className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.key ? 'border-red-300' : 'border-gray-300'
+              }`}
             placeholder="propertyName"
-            required
           />
-          {property.key && !validateFieldName(property.key) && (
-            <div className="text-red-500 text-xs mt-1">
-              Key must be camelCase (start with lowercase letter, followed by letters and numbers only)
-            </div>
-          )}
-          {property.key && validateFieldName(property.key) && !isKeyUnique(property.key) && (
-            <div className="text-red-500 text-xs mt-1">
-              Property key "{property.key}" already exists. Please choose a unique name.
-            </div>
+          {errors.key && (
+            <div className="text-red-500 text-xs mt-1">{errors.key}</div>
           )}
         </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Display Label *
+            Display Label <span className="text-red-500">*</span>
           </label>
           <input
             type="text"
             value={property.title || ''}
             onChange={(e) => handleChange('title', e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault()
-              }
-            }}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-blue-500 transition-colors"
+            className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.title ? 'border-red-300' : 'border-gray-300'
+              }`}
             placeholder="Display Name"
-            required
           />
+          {errors.title && (
+            <div className="text-red-500 text-xs mt-1">{errors.title}</div>
+          )}
         </div>
       </div>
 
-      {/* Description */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
           Description
@@ -96,47 +82,9 @@ const GenericPropertyConfig = ({
           type="text"
           value={property.description || ''}
           onChange={(e) => handleChange('description', e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault()
-            }
-          }}
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-blue-500 transition-colors"
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           placeholder="Help text for this field"
         />
-      </div>
-
-      {/* Component Type (read-only) */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Component Type
-        </label>
-        <input
-          type="text"
-          value={property.component || 'TextInput'}
-          readOnly
-          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-600"
-        />
-      </div>
-
-      {/* Group */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Group
-        </label>
-        <select
-          value={property.group || 'Basic'}
-          onChange={(e) => handleChange('group', e.target.value)}
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-blue-500 transition-colors"
-        >
-          <option value="Basic">Basic</option>
-          <option value="Selection">Selection</option>
-          <option value="DateTime">DateTime</option>
-          <option value="Media">Media</option>
-          <option value="Special">Special</option>
-          <option value="Advanced">Advanced</option>
-          <option value="Custom">Custom</option>
-        </select>
       </div>
 
       {/* Default Value */}
@@ -145,125 +93,53 @@ const GenericPropertyConfig = ({
           Default Value
         </label>
         <input
-          type={property.type === 'number' ? 'number' : 'text'}
+          type="text"
           value={property.default || ''}
-          onChange={(e) => {
-            let value = e.target.value
-            if (property.type === 'number') {
-              value = value ? parseFloat(value) : null
-            } else if (property.type === 'boolean') {
-              value = e.target.checked
-            }
-            handleChange('default', value)
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault()
-            }
-          }}
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-blue-500 transition-colors"
+          onChange={(e) => handleChange('default', e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           placeholder="Default value"
         />
       </div>
 
-      {/* Required Toggle */}
+      {/* Required toggle */}
       <div className="flex items-center space-x-2 pt-2 border-t border-gray-200">
         <input
           type="checkbox"
-          id={`required-${property.id}`}
+          id={`required-${property.key}`}
           checked={property.required || false}
           onChange={(e) => handleChange('required', e.target.checked)}
-          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
         />
-        <label htmlFor={`required-${property.id}`} className="text-sm font-medium text-gray-700">
+        <label htmlFor={`required-${property.key}`} className="text-sm font-medium text-gray-700">
           Required field
         </label>
       </div>
 
-      {/* Additional JSON Schema Properties */}
-      {property.type === 'string' && (
-        <div className="pt-4 border-t border-gray-200">
-          <h4 className="text-sm font-medium text-gray-700 mb-3">String Options</h4>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Min Length
-              </label>
-              <input
-                type="number"
-                value={property.minLength || ''}
-                onChange={(e) => handleChange('minLength', e.target.value ? parseInt(e.target.value) : null)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-blue-500 transition-colors"
-                min="0"
-                placeholder="0"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Max Length
-              </label>
-              <input
-                type="number"
-                value={property.maxLength || ''}
-                onChange={(e) => handleChange('maxLength', e.target.value ? parseInt(e.target.value) : null)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-blue-500 transition-colors"
-                min="0"
-                placeholder="255"
-              />
-            </div>
+      {/* Raw JSON Configuration for advanced users */}
+      <details className="mt-4">
+        <summary className="text-sm font-medium text-gray-700 cursor-pointer">
+          Advanced: Raw Configuration
+        </summary>
+        <div className="mt-2">
+          <textarea
+            value={JSON.stringify(property, null, 2)}
+            onChange={(e) => {
+              try {
+                const parsed = JSON.parse(e.target.value)
+                onChange(parsed)
+              } catch (err) {
+                // Invalid JSON, ignore for now
+              }
+            }}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-sm"
+            rows={8}
+            placeholder="Raw property configuration..."
+          />
+          <div className="text-xs text-gray-500 mt-1">
+            Edit the raw JSON configuration. Changes will be applied if valid JSON is entered.
           </div>
         </div>
-      )}
-
-      {property.type === 'number' && (
-        <div className="pt-4 border-t border-gray-200">
-          <h4 className="text-sm font-medium text-gray-700 mb-3">Number Options</h4>
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Minimum
-              </label>
-              <input
-                type="number"
-                value={property.minimum || ''}
-                onChange={(e) => handleChange('minimum', e.target.value ? parseFloat(e.target.value) : null)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-blue-500 transition-colors"
-                placeholder="0"
-                step="any"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Maximum
-              </label>
-              <input
-                type="number"
-                value={property.maximum || ''}
-                onChange={(e) => handleChange('maximum', e.target.value ? parseFloat(e.target.value) : null)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-blue-500 transition-colors"
-                placeholder="100"
-                step="any"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Step
-              </label>
-              <input
-                type="number"
-                value={property.step || ''}
-                onChange={(e) => handleChange('step', e.target.value ? parseFloat(e.target.value) : null)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-blue-500 transition-colors"
-                placeholder="1"
-                step="any"
-                min="0"
-              />
-            </div>
-          </div>
-        </div>
-      )}
+      </details>
     </div>
   )
 }
-
-export default GenericPropertyConfig
