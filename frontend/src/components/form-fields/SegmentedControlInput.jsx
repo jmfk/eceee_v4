@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useCallback, useMemo } from 'react'
 import { Check, Grid, Play } from 'lucide-react'
 import * as LucideIcons from 'lucide-react'
 
@@ -7,8 +7,11 @@ import * as LucideIcons from 'lucide-react'
  * 
  * Segmented control for selecting one or multiple options from a group.
  * Provides a clean, iOS-style interface for choice selection.
+ * 
+ * Optimized with React.memo, useCallback, and useMemo to prevent
+ * unnecessary re-renders.
  */
-const SegmentedControlInput = ({
+const SegmentedControlInput = React.memo(({
     value,
     onChange,
     validation,
@@ -26,11 +29,11 @@ const SegmentedControlInput = ({
     showValue = false, // Show selected value below the control
     ...props
 }) => {
-    // Normalize options to consistent format
-    const normalizeOptions = (opts) => {
-        if (!Array.isArray(opts)) return []
+    // Memoize normalized options to prevent recalculation
+    const normalizedOptions = useMemo(() => {
+        if (!Array.isArray(options)) return []
 
-        return opts.map((option, index) => {
+        return options.map((option, index) => {
             if (typeof option === 'string') {
                 return { value: option, label: option, id: `option-${index}` }
             }
@@ -46,13 +49,14 @@ const SegmentedControlInput = ({
             }
             return { value: String(option), label: String(option), id: `option-${index}` }
         })
-    }
+    }, [options])
 
-    const normalizedOptions = normalizeOptions(options)
-    const selectedValues = multiple ? (Array.isArray(value) ? value : []) : (value ? [value] : [])
+    const selectedValues = useMemo(() =>
+        multiple ? (Array.isArray(value) ? value : []) : (value ? [value] : [])
+        , [multiple, value])
 
-    // Handle option selection
-    const handleOptionClick = (optionValue) => {
+    // Handle option selection with useCallback
+    const handleOptionClick = useCallback((optionValue) => {
         if (disabled) return
 
         if (multiple) {
@@ -73,7 +77,7 @@ const SegmentedControlInput = ({
                 onChange(optionValue)
             }
         }
-    }
+    }, [disabled, multiple, selectedValues, allowDeselect, value, onChange])
 
     // Size classes
     const sizeClasses = {
@@ -283,7 +287,7 @@ const SegmentedControlInput = ({
             )}
         </div>
     )
-}
+})
 
 SegmentedControlInput.displayName = 'SegmentedControlInput'
 
