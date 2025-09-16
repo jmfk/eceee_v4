@@ -112,7 +112,6 @@ class FieldTypeRegistry {
                 })
             }
 
-            console.log(`Loaded ${data.fieldTypes?.length || 0} field types from backend`)
         } catch (error) {
             console.error('Error fetching field types:', error)
             throw error

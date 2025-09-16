@@ -2,9 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { getWidgetSchema, validateWidgetConfiguration } from '../api/widgetSchemas.js'
 import { WIDGET_CHANGE_TYPES } from '../types/widgetEvents'
 import SchemaFieldRenderer from './forms/SchemaFieldRenderer.jsx'
-import ValidatedInput from './validation/ValidatedInput.jsx'
-import useLocalFormState from '../hooks/useLocalFormState'
-import LocalStateFieldWrapper from './forms/LocalStateFieldWrapper.jsx'
+import { useFormDataBuffer } from '../hooks/useFormDataBuffer.js'
 
 /**
  * IsolatedFieldWrapper - Simplified wrapper that uses LocalStateFieldWrapper
@@ -131,15 +129,29 @@ const IsolatedFormRenderer = React.memo(({
     const updateTimeoutRef = useRef(null)
     const fieldValidationsRef = useRef({})
 
-    // Initialize widget data only once - don't update when initWidgetData changes
-    const [widgetData] = useState(initWidgetData)
+    // Use form data buffer to store changes without re-renders
+    const formBuffer = useFormDataBuffer(
+        initWidgetData,
+        onValidatedWidgetSync,
+        {
+            onDirtyChange: onUnsavedChanges,
+            onRealTimeUpdate: (data) => {
+                // Trigger real-time updates for preview
+                onRealTimeUpdate?.(data)
+                emitWidgetChanged?.(data, WIDGET_CHANGE_TYPES.CONFIG_UPDATED)
+            }
+        }
+    )
+
+    // Keep original state for schema and type info (these don't change frequently)
     const [schema] = useState(initschema)
     // Store schema in ref
     useEffect(() => {
-        if (widgetData && !schema) {
+        const currentData = formBuffer.getCurrentData()
+        if (currentData && !schema) {
             const fetchSchema = async () => {
                 try {
-                    const schemaData = await getWidgetSchema(widgetData.type)
+                    const schemaData = await getWidgetSchema(currentData.type)
                     schemaRef.current = schemaData
                 } catch (error) {
                     console.error('Failed to fetch widget schema:', error)
@@ -149,19 +161,20 @@ const IsolatedFormRenderer = React.memo(({
         } else if (schema) {
             schemaRef.current = schema
         }
-    }, [widgetData, schema])
+    }, [schema, formBuffer])
 
     // Immediate real-time update function
     const triggerRealTimeUpdate = useCallback((newConfig) => {
-        if (!widgetData) return
+        const currentData = formBuffer.getCurrentData()
+        if (!currentData) return
 
-        const updatedWidget = { ...widgetData, config: newConfig }
+        const updatedWidget = { ...currentData, config: newConfig }
 
         // Emit event for real-time updates
         if (emitWidgetChanged) {
             emitWidgetChanged(
-                widgetData.id,
-                widgetData.slotName,
+                currentData.id,
+                currentData.slotName,
                 updatedWidget,
                 WIDGET_CHANGE_TYPES.CONFIG
             )
@@ -171,22 +184,18 @@ const IsolatedFormRenderer = React.memo(({
         if (onRealTimeUpdate && !emitWidgetChanged) {
             onRealTimeUpdate(updatedWidget)
         }
-    }, [widgetData, emitWidgetChanged, onRealTimeUpdate])
+    }, [formBuffer, emitWidgetChanged, onRealTimeUpdate])
 
     // Handle field changes from isolated fields
     const handleFieldChange = useCallback((fieldName, value, triggerValidation) => {
-        // Just mark the page/object as dirty - field components manage their own data
-        if (onUnsavedChanges) {
-            onUnsavedChanges(true)
-        }
+        // Update field in buffer without re-rendering
+        const fieldPath = `config.${fieldName}`
+        formBuffer.updateField(fieldPath, value)
 
-        // Trigger real-time updates - build config from current widget data + this change
-        const updatedConfig = {
-            ...widgetData.config,
-            [fieldName]: value
-        }
-        triggerRealTimeUpdate(updatedConfig)
-    }, [widgetData.config, triggerRealTimeUpdate, onUnsavedChanges])
+        // Get updated config for real-time updates
+        const currentData = formBuffer.getCurrentData()
+        triggerRealTimeUpdate(currentData.config)
+    }, [formBuffer, triggerRealTimeUpdate])
 
     // Handle validation changes from individual fields
     const handleValidationChange = useCallback((fieldName, validation) => {
@@ -198,13 +207,14 @@ const IsolatedFormRenderer = React.memo(({
 
         // Emit validation event
         if (emitWidgetValidated) {
-            emitWidgetValidated(widgetData.id, widgetData.slotName, {
+            const currentData = formBuffer.getCurrentData()
+            emitWidgetValidated(currentData.id, currentData.slotName, {
                 isValid,
                 errors: fieldValidationsRef.current,
                 warnings: {}
             })
         }
-    }, [widgetData, emitWidgetValidated, onValidatedWidgetSync])
+    }, [formBuffer, emitWidgetValidated, onValidatedWidgetSync])
 
     // Cleanup timeouts
     useEffect(() => {
@@ -236,8 +246,8 @@ const IsolatedFormRenderer = React.memo(({
                         key={fieldName}
                         fieldName={fieldName}
                         fieldSchema={fieldSchema}
-                        widgetData={widgetData}
-                        widgetType={widgetData?.type || ''}
+                        widgetData={formBuffer.getCurrentData()}
+                        widgetType={formBuffer.getCurrentData()?.type || ''}
                         isRequired={isRequired}
                         onFieldChange={handleFieldChange}
                         onValidationChange={handleValidationChange}
