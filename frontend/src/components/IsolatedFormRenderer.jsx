@@ -7,8 +7,8 @@ import useLocalFormState from '../hooks/useLocalFormState'
 import LocalStateFieldWrapper from './forms/LocalStateFieldWrapper.jsx'
 
 /**
- * IsolatedFieldWrapper - Wraps each field to prevent cross-field rerenders
- * Each field manages its own state and validation independently
+ * IsolatedFieldWrapper - Simplified wrapper that uses LocalStateFieldWrapper
+ * Removes double state management and relies on LocalStateFieldWrapper for all state logic
  */
 const IsolatedFieldWrapper = React.memo(({
     fieldName,
@@ -19,88 +19,8 @@ const IsolatedFieldWrapper = React.memo(({
     onFieldChange,
     onValidationChange
 }) => {
-    // Local state for this field only
-    const [fieldValue, setFieldValue] = useState('')
-    const [validation, setValidation] = useState(null)
-    const [isValidating, setIsValidating] = useState(false)
-
-    // Refs to prevent rerenders
-    const validationTimeoutRef = useRef(null)
-    const initializedRef = useRef(false)
-
-    // Initialize field value when widget data changes
-    useEffect(() => {
-        if (widgetData?.config && !initializedRef.current) {
-            const initialValue = widgetData.config[fieldName] ?? ''
-            setFieldValue(initialValue)
-            initializedRef.current = true
-        }
-    }, [widgetData, fieldName])
-
-    // Reset when widget changes
-    useEffect(() => {
-        if (widgetData?.config) {
-            const newValue = widgetData.config[fieldName] ?? ''
-            setFieldValue(newValue)
-            setValidation(null)
-            initializedRef.current = true
-        }
-    }, [widgetData?.id, fieldName])
-
-    // Debounced validation for this field only
-    const validateField = useCallback(async (value, fullConfig) => {
-        if (!widgetData?.type) return
-
-        if (validationTimeoutRef.current) {
-            clearTimeout(validationTimeoutRef.current)
-        }
-
-        validationTimeoutRef.current = setTimeout(async () => {
-            setIsValidating(true)
-            try {
-                const result = await validateWidgetConfiguration(widgetData.type, fullConfig)
-
-                const fieldValidation = result.errors?.[fieldName] ? {
-                    isValid: false,
-                    errors: Array.isArray(result.errors[fieldName]) ? result.errors[fieldName] : [result.errors[fieldName]],
-                    warnings: result.warnings?.[fieldName] || []
-                } : null
-
-                setValidation(fieldValidation)
-                setIsValidating(false)
-
-                // Notify parent about this field's validation state
-                if (onValidationChange) {
-                    onValidationChange(fieldName, fieldValidation)
-                }
-            } catch (error) {
-                console.error(`Field validation failed for ${fieldName}:`, error)
-                setIsValidating(false)
-            }
-        }, 300)
-    }, [fieldName, widgetData, onValidationChange])
-
-    // Handle field change
-    const handleChange = useCallback((newValue) => {
-        setFieldValue(newValue)
-
-        // Notify parent of the change
-        if (onFieldChange) {
-            onFieldChange(fieldName, newValue, (fullConfig) => {
-                // Trigger validation with full config
-                validateField(newValue, fullConfig)
-            })
-        }
-    }, [fieldName, onFieldChange, validateField])
-
-    // Cleanup timeout
-    useEffect(() => {
-        return () => {
-            if (validationTimeoutRef.current) {
-                clearTimeout(validationTimeoutRef.current)
-            }
-        }
-    }, [])
+    // Get initial value from widget data
+    const initialValue = widgetData?.config?.[fieldName] ?? ''
 
     // Hide fields that are managed by special editors
     const hiddenFields = {
@@ -111,113 +31,84 @@ const IsolatedFieldWrapper = React.memo(({
         return null
     }
 
-    // Use SchemaFieldRenderer for custom components
+    // Custom validation function for this field
+    const handleFieldValidation = useCallback(async (fieldName, value) => {
+        if (!widgetData?.type) return null
+
+        try {
+            // Get current config and update with new value
+            const fullConfig = {
+                ...widgetData.config,
+                [fieldName]: value
+            }
+
+            const result = await validateWidgetConfiguration(widgetData.type, fullConfig)
+
+            const fieldValidation = result.errors?.[fieldName] ? {
+                isValid: false,
+                errors: Array.isArray(result.errors[fieldName]) ? result.errors[fieldName] : [result.errors[fieldName]],
+                warnings: result.warnings?.[fieldName] || []
+            } : {
+                isValid: true,
+                errors: [],
+                warnings: result.warnings?.[fieldName] || []
+            }
+
+            // Notify parent about this field's validation state
+            if (onValidationChange) {
+                onValidationChange(fieldName, fieldValidation)
+            }
+
+            return fieldValidation
+        } catch (error) {
+            console.error(`Field validation failed for ${fieldName}:`, error)
+            const errorValidation = {
+                isValid: false,
+                errors: ['Validation failed'],
+                warnings: []
+            }
+            if (onValidationChange) {
+                onValidationChange(fieldName, errorValidation)
+            }
+            return errorValidation
+        }
+    }, [fieldName, widgetData, onValidationChange])
+
+    // Handle field changes
+    const handleFieldChange = useCallback((fieldName, value) => {
+        if (onFieldChange) {
+            onFieldChange(fieldName, value, (fullConfig) => {
+                // Validation is now handled by LocalStateFieldWrapper
+                // This callback is kept for backward compatibility
+            })
+        }
+    }, [fieldName, onFieldChange])
+
+    // Use SchemaFieldRenderer for custom components or fallback to basic rendering
     if (fieldSchema.component) {
         return (
             <SchemaFieldRenderer
                 fieldName={fieldName}
                 fieldSchema={fieldSchema}
-                value={fieldValue}
-                onChange={handleChange}
-                validation={validation}
-                isValidating={isValidating}
+                value={initialValue}
+                onChange={handleFieldChange}
+                onValidation={handleFieldValidation}
                 required={isRequired}
                 disabled={false}
             />
         )
     }
 
-    // Enhanced form fields for common types
-    const fieldType = fieldSchema.type || 'string'
-    const fieldTitle = fieldSchema.title || fieldName
-    const fieldDescription = fieldSchema.description
-
-    // Handle different field types with enhanced UI
-    if (fieldType === 'boolean') {
-        return (
-            <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <label className="text-sm font-medium text-gray-700">
-                            {fieldTitle}
-                        </label>
-                        {fieldDescription && (
-                            <p className="text-xs text-gray-500 mt-1">{fieldDescription}</p>
-                        )}
-                    </div>
-                    <div className="relative">
-                        <input
-                            type="checkbox"
-                            checked={Boolean(fieldValue)}
-                            onChange={(e) => handleChange(e.target.checked)}
-                            className="sr-only"
-                            id={`toggle-${fieldName}`}
-                        />
-                        <label
-                            htmlFor={`toggle-${fieldName}`}
-                            className={`block w-12 h-6 rounded-full cursor-pointer transition-colors ${Boolean(fieldValue) ? 'bg-blue-600' : 'bg-gray-300'
-                                }`}
-                        >
-                            <div
-                                className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${Boolean(fieldValue) ? 'translate-x-6' : 'translate-x-0'
-                                    }`}
-                            />
-                        </label>
-                    </div>
-                </div>
-            </div>
-        )
-    }
-
-    // Handle enum fields with choice chips
-    if (fieldSchema.enum) {
-        return (
-            <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">
-                    {fieldTitle}
-                    {isRequired && <span className="text-red-500 ml-1">*</span>}
-                </label>
-                {fieldDescription && (
-                    <p className="text-xs text-gray-500">{fieldDescription}</p>
-                )}
-                <div className="flex flex-wrap gap-2">
-                    {fieldSchema.enum.map(option => (
-                        <button
-                            key={option}
-                            type="button"
-                            onClick={() => handleChange(option)}
-                            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors capitalize ${fieldValue === option
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                }`}
-                        >
-                            {option.replace(/_/g, ' ')}
-                        </button>
-                    ))}
-                </div>
-                {validation && !validation.isValid && (
-                    <div className="text-red-600 text-xs mt-1">
-                        {validation.errors?.join(', ')}
-                    </div>
-                )}
-            </div>
-        )
-    }
-
-    // Use ValidatedInput for other field types
+    // For non-component fields, use SchemaFieldRenderer which handles LocalStateFieldWrapper internally
     return (
-        <ValidatedInput
-            type={fieldType === 'number' ? 'number' : 'text'}
-            value={fieldValue}
-            onChange={(e) => handleChange(e.target.value)}
-            label={fieldTitle}
-            description={fieldDescription}
-            placeholder={fieldSchema.placeholder || ''}
+        <SchemaFieldRenderer
+            fieldName={fieldName}
+            fieldSchema={fieldSchema}
+            value={initialValue}
+            onChange={handleFieldChange}
+            onValidation={handleFieldValidation}
             required={isRequired}
-            validation={validation}
-            isValidating={isValidating}
-            min={fieldSchema.minimum}
-            max={fieldSchema.maximum}
+            disabled={false}
         />
     )
 })
@@ -227,29 +118,22 @@ const IsolatedFieldWrapper = React.memo(({
  * Each field is completely independent and only re-renders when its own data changes
  */
 const IsolatedFormRenderer = React.memo(({
-    widgetData,
-    schema,
+    initWidgetData,
+    initschema,
     onRealTimeUpdate,
     onUnsavedChanges,
     onValidatedWidgetSync,
     emitWidgetChanged,
     emitWidgetValidated
 }) => {
-    // Use refs for form state to prevent rerenders
-    const originalConfigRef = useRef({})
-    const currentConfigRef = useRef({})
     const schemaRef = useRef(null)
+    // Use refs for form state to prevent rerenders
     const updateTimeoutRef = useRef(null)
     const fieldValidationsRef = useRef({})
 
-    // Initialize form data when widget changes
-    useEffect(() => {
-        if (widgetData?.config) {
-            originalConfigRef.current = { ...widgetData.config }
-            currentConfigRef.current = { ...widgetData.config }
-        }
-    }, [widgetData])
-
+    // Initialize widget data only once - don't update when initWidgetData changes
+    const [widgetData] = useState(initWidgetData)
+    const [schema] = useState(initschema)
     // Store schema in ref
     useEffect(() => {
         if (widgetData && !schema) {
@@ -267,57 +151,42 @@ const IsolatedFormRenderer = React.memo(({
         }
     }, [widgetData, schema])
 
-    // Debounced real-time update function
+    // Immediate real-time update function
     const triggerRealTimeUpdate = useCallback((newConfig) => {
         if (!widgetData) return
 
-        if (updateTimeoutRef.current) {
-            clearTimeout(updateTimeoutRef.current)
+        const updatedWidget = { ...widgetData, config: newConfig }
+
+        // Emit event for real-time updates
+        if (emitWidgetChanged) {
+            emitWidgetChanged(
+                widgetData.id,
+                widgetData.slotName,
+                updatedWidget,
+                WIDGET_CHANGE_TYPES.CONFIG
+            )
         }
 
-        updateTimeoutRef.current = setTimeout(() => {
-            const updatedWidget = { ...widgetData, config: newConfig }
-
-            // Emit event for real-time updates
-            if (emitWidgetChanged) {
-                emitWidgetChanged(
-                    widgetData.id,
-                    widgetData.slotName,
-                    updatedWidget,
-                    WIDGET_CHANGE_TYPES.CONFIG
-                )
-            }
-
-            // Fallback for components not using event system
-            if (onRealTimeUpdate && !emitWidgetChanged) {
-                onRealTimeUpdate(updatedWidget)
-            }
-        }, 200)
+        // Fallback for components not using event system
+        if (onRealTimeUpdate && !emitWidgetChanged) {
+            onRealTimeUpdate(updatedWidget)
+        }
     }, [widgetData, emitWidgetChanged, onRealTimeUpdate])
 
     // Handle field changes from isolated fields
     const handleFieldChange = useCallback((fieldName, value, triggerValidation) => {
-        // Update config in ref (no rerenders)
-        currentConfigRef.current = {
-            ...currentConfigRef.current,
+        // Just mark the page/object as dirty - field components manage their own data
+        if (onUnsavedChanges) {
+            onUnsavedChanges(true)
+        }
+
+        // Trigger real-time updates - build config from current widget data + this change
+        const updatedConfig = {
+            ...widgetData.config,
             [fieldName]: value
         }
-
-        // Check if we have changes
-        const hasActualChanges = JSON.stringify(currentConfigRef.current) !== JSON.stringify(originalConfigRef.current)
-
-        if (onUnsavedChanges) {
-            onUnsavedChanges(hasActualChanges)
-        }
-
-        // Trigger validation for this field with full config
-        if (triggerValidation) {
-            triggerValidation(currentConfigRef.current)
-        }
-
-        // Trigger real-time updates
-        triggerRealTimeUpdate(currentConfigRef.current)
-    }, [triggerRealTimeUpdate, onUnsavedChanges])
+        triggerRealTimeUpdate(updatedConfig)
+    }, [widgetData.config, triggerRealTimeUpdate, onUnsavedChanges])
 
     // Handle validation changes from individual fields
     const handleValidationChange = useCallback((fieldName, validation) => {
@@ -333,14 +202,6 @@ const IsolatedFormRenderer = React.memo(({
                 isValid,
                 errors: fieldValidationsRef.current,
                 warnings: {}
-            })
-        }
-
-        // Keep backward compatibility
-        if (isValid && onValidatedWidgetSync) {
-            onValidatedWidgetSync({
-                ...widgetData,
-                config: currentConfigRef.current
             })
         }
     }, [widgetData, emitWidgetValidated, onValidatedWidgetSync])
@@ -384,6 +245,13 @@ const IsolatedFormRenderer = React.memo(({
                 )
             })}
         </div>
+    )
+}, (prevProps, nextProps) => {
+    // Custom comparison: only re-render if widget data or schema changes
+    // Ignore callback prop changes to prevent unnecessary re-renders
+    return (
+        prevProps.initWidgetData === nextProps.initWidgetData &&
+        prevProps.initschema === nextProps.initschema
     )
 })
 
