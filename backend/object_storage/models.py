@@ -21,6 +21,7 @@ from django.utils.text import slugify
 from mptt.models import MPTTModel, TreeForeignKey
 import json
 from utils.schema_system import validate_schema, get_field_types_for_django_choices
+from content.models import Namespace
 
 
 class ObjectTypeDefinition(models.Model):
@@ -80,6 +81,13 @@ class ObjectTypeDefinition(models.Model):
         default="both",
         help_text="Where this object type can appear in the content hierarchy",
     )
+    namespace = models.ForeignKey(
+        Namespace,
+        on_delete=models.PROTECT,
+        blank=True,
+        null=True,
+        help_text="Namespace for organizing content and media for this object type",
+    )
     is_active = models.BooleanField(
         default=True, help_text="Whether this object type is available for use"
     )
@@ -95,12 +103,20 @@ class ObjectTypeDefinition(models.Model):
         indexes = [
             models.Index(fields=["name"]),
             models.Index(fields=["is_active"]),
+            models.Index(fields=["namespace"]),
             GinIndex(fields=["schema"]),
             GinIndex(fields=["slot_configuration"]),
         ]
 
     def __str__(self):
         return self.label
+
+    def get_effective_namespace(self):
+        """Get the effective namespace for this object type (assigned namespace or default)"""
+        if self.namespace:
+            return self.namespace
+        # Return the default namespace
+        return Namespace.objects.filter(is_default=True).first()
 
     def clean(self):
         """Validate the object type definition."""

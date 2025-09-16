@@ -19,20 +19,27 @@ const ObjectDataForm = ({
 }) => {
     const [namespace, setNamespace] = useState(null)
 
-    // Load default namespace for media operations
+    // Load namespace for media operations (object type's namespace or default)
     useEffect(() => {
         const loadNamespace = async () => {
             try {
-                const defaultNamespace = await namespacesApi.getDefault()
-                setNamespace(defaultNamespace?.slug || null)
+                if (objectType?.namespace?.slug) {
+                    // Use the object type's specific namespace
+                    setNamespace(objectType.namespace.slug)
+                } else {
+                    // Fall back to default namespace
+                    const defaultNamespace = await namespacesApi.getDefault()
+                    setNamespace(defaultNamespace?.slug || null)
+                }
             } catch (error) {
-                console.error('Failed to load default namespace:', error)
+                console.error('Failed to load namespace:', error)
                 setNamespace(null)
             }
         }
 
         loadNamespace()
-    }, [])
+    }, [objectType?.namespace])
+
     return (
         <>
             {/* Object Type Selection (only for new instances) */}

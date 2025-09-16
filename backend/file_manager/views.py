@@ -18,6 +18,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.pagination import PageNumberPagination
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 
@@ -40,6 +41,15 @@ from .storage import storage
 from .ai_services import ai_service
 
 logger = logging.getLogger(__name__)
+
+
+class MediaFilePagination(PageNumberPagination):
+    """Custom pagination for media files."""
+
+    page_size = 20
+    page_size_query_param = "pageSize"  # Allow frontend to specify page size
+    max_page_size = 100
+    page_query_param = "page"
 
 
 class MediaTagViewSet(viewsets.ModelViewSet):
@@ -293,6 +303,7 @@ class MediaFileViewSet(viewsets.ModelViewSet):
     ]
     ordering_fields = ["title", "created_at", "updated_at", "file_size"]
     ordering = ["-created_at"]
+    pagination_class = MediaFilePagination
 
     def get_permissions(self):
         """Get permissions based on action."""

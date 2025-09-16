@@ -95,6 +95,7 @@ const ObjectSchemaForm = React.memo(forwardRef(({ schema, data = {}, onChange, n
         const fieldValue = data[field.name]
         const componentName = field.component
 
+
         // Get the dynamically loaded component
         const FieldComponent = fieldComponents[componentName]
 
@@ -180,10 +181,14 @@ const ObjectSchemaForm = React.memo(forwardRef(({ schema, data = {}, onChange, n
         }
     }
 
-    // IGNORE ALL OTHER CHANGES:
+    // Check if namespace changed (important for media fields)
+    if (prevProps.namespace !== nextProps.namespace) {
+        return false // Namespace changed, need to re-render
+    }
+
+    // IGNORE OTHER CHANGES:
     // - data prop changes (LocalStateFieldWrapper manages initial values)
     // - onChange prop changes (LocalStateFieldWrapper manages callbacks)
-    // - Any other prop changes
     // Note: errors prop removed - LocalStateFieldWrapper handles validation internally
 
     return true // Props are "equal" - skip re-render

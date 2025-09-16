@@ -27,7 +27,8 @@ const WidgetEditorPanel = forwardRef(({
     widgetData,
     schema,
     title = "Edit Widget",
-    autoOpenSpecialEditor = false
+    autoOpenSpecialEditor = false,
+    namespace = null
 }, ref) => {
     const [hasChanges, setHasChanges] = useState(false)
     const [widgetTypeName, setWidgetTypeName] = useState(null)
@@ -392,6 +393,7 @@ const WidgetEditorPanel = forwardRef(({
                         isAnimating={isAnimatingSpecialEditor}
                         isClosing={isClosingSpecialEditor}
                         onConfigChange={handleSpecialEditorConfigChange}
+                        namespace={namespace}
                     />
                 )}
 
@@ -454,6 +456,7 @@ const WidgetEditorPanel = forwardRef(({
                                 onValidatedWidgetSync={onValidatedWidgetSync}
                                 emitWidgetChanged={emitWidgetChanged}
                                 emitWidgetValidated={emitWidgetValidated}
+                                namespace={namespace}
                             />
                         ) : (
                             <div className="text-center text-gray-500 py-8 p-4">

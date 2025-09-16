@@ -15,7 +15,8 @@ const IsolatedFieldWrapper = React.memo(({
     widgetType,
     isRequired,
     onFieldChange,
-    onValidationChange
+    onValidationChange,
+    namespace = null
 }) => {
     // Get initial value from widget data
     const initialValue = widgetData?.config?.[fieldName] ?? ''
@@ -93,6 +94,7 @@ const IsolatedFieldWrapper = React.memo(({
                 onValidation={handleFieldValidation}
                 required={isRequired}
                 disabled={false}
+                namespace={namespace}
             />
         )
     }
@@ -107,6 +109,7 @@ const IsolatedFieldWrapper = React.memo(({
             onValidation={handleFieldValidation}
             required={isRequired}
             disabled={false}
+            namespace={namespace}
         />
     )
 })
@@ -122,7 +125,8 @@ const IsolatedFormRenderer = React.memo(({
     onUnsavedChanges,
     onValidatedWidgetSync,
     emitWidgetChanged,
-    emitWidgetValidated
+    emitWidgetValidated,
+    namespace = null
 }) => {
     const schemaRef = useRef(null)
     // Use refs for form state to prevent rerenders
@@ -251,6 +255,7 @@ const IsolatedFormRenderer = React.memo(({
                         isRequired={isRequired}
                         onFieldChange={handleFieldChange}
                         onValidationChange={handleValidationChange}
+                        namespace={namespace}
                     />
                 )
             })}
