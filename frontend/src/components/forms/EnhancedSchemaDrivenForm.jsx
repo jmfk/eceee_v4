@@ -159,6 +159,7 @@ const EnhancedSchemaDrivenForm = ({
                     validation={validation}
                     isValidating={isValidating}
                     required={isRequired}
+                    namespace={namespace}
                 />
             )
         }

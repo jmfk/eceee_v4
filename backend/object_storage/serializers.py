@@ -8,6 +8,7 @@ following camelCase API conventions and existing patterns.
 from rest_framework import serializers
 from django.contrib.auth.models import User
 from .models import ObjectTypeDefinition, ObjectInstance, ObjectVersion
+from content.models import Namespace
 from utils.schema_system import validate_schema
 from django.core.exceptions import ValidationError
 from django.utils import timezone
@@ -22,10 +23,28 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = ["id"]
 
 
+class NamespaceSerializer(serializers.ModelSerializer):
+    """Basic namespace serializer for references"""
+
+    class Meta:
+        model = Namespace
+        fields = ["id", "name", "slug", "description", "is_active", "is_default"]
+        read_only_fields = ["id"]
+
+
 class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
     """Serializer for Object Type Definitions"""
 
     created_by = UserSerializer(read_only=True)
+    namespace = NamespaceSerializer(read_only=True)
+    namespace_id = serializers.PrimaryKeyRelatedField(
+        queryset=Namespace.objects.all(),
+        source="namespace",
+        write_only=True,
+        required=False,
+        allow_null=True,
+        help_text="Namespace for organizing content and media for this object type",
+    )
     allowed_child_types = serializers.SerializerMethodField()
     allowed_child_types_input = serializers.ListField(
         child=serializers.CharField(),
@@ -52,6 +71,8 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
             "allowed_child_types",
             "allowed_child_types_input",
             "hierarchy_level",
+            "namespace",
+            "namespace_id",
             "is_active",
             "created_at",
             "updated_at",

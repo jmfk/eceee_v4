@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Plus, Trash2, Settings, Hash, Type, Calendar, ToggleLeft, Check, Users, CheckCircle, XCircle } from 'lucide-react'
+import { Plus, Trash2, Settings, Hash, Type, Calendar, ToggleLeft, Check, Users, CheckCircle, XCircle, FolderOpen } from 'lucide-react'
 import { objectTypesApi } from '../api/objectStorage'
+import { namespacesApi } from '../api'
 import { SchemaEditor } from './schema-editor'
 import InlineImageUpload from './InlineImageUpload'
 import { validateFieldName } from '../utils/schemaValidation'
@@ -30,6 +31,7 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
         slotConfiguration: { slots: [] },
         allowedChildTypes: [],
         hierarchyLevel: 'both', // 'top_level_only', 'sub_object_only', 'both'
+        namespaceId: null, // Use null for default namespace
         metadata: {}
     })
 
@@ -60,7 +62,14 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
         queryFn: () => objectTypesApi.list()
     })
 
+    // Load available namespaces
+    const { data: namespacesResponse } = useQuery({
+        queryKey: ['namespaces'],
+        queryFn: () => namespacesApi.list()
+    })
+
     const existingTypes = existingTypesResponse?.data?.results || existingTypesResponse?.data || []
+    const availableNamespaces = namespacesResponse?.results || namespacesResponse || []
 
     useEffect(() => {
 
@@ -83,6 +92,7 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
                 slotConfiguration: objectType.slotConfiguration || { slots: [] },
                 allowedChildTypes: allowedChildTypeNames,
                 hierarchyLevel: objectType.hierarchyLevel || 'both',
+                namespaceId: objectType.namespace?.id || null,
                 metadata: objectType.metadata || {}
             })
             setOriginalSchema(JSON.parse(JSON.stringify(schema))) // Deep copy
@@ -95,7 +105,8 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
                 pluralLabel: objectType.pluralLabel || '',
                 description: objectType.description || '',
                 isActive: objectType.isActive ?? true,
-                hierarchyLevel: objectType.hierarchyLevel || 'both'
+                hierarchyLevel: objectType.hierarchyLevel || 'both',
+                namespaceId: objectType.namespace?.id || null
             }
             setOriginalBasicInfo(JSON.parse(JSON.stringify(basicInfo)))
             setHasUnsavedBasicChanges(false)
@@ -196,7 +207,7 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
         }
 
         // Check if basic info has changed
-        if (['name', 'label', 'pluralLabel', 'description', 'isActive', 'hierarchyLevel'].includes(field)) {
+        if (['name', 'label', 'pluralLabel', 'description', 'isActive', 'hierarchyLevel', 'namespaceId'].includes(field)) {
             setTimeout(() => {
                 const currentBasicInfo = {
                     name: formData.name,
@@ -204,7 +215,8 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
                     pluralLabel: formData.pluralLabel,
                     description: formData.description,
                     isActive: formData.isActive,
-                    hierarchyLevel: formData.hierarchyLevel
+                    hierarchyLevel: formData.hierarchyLevel,
+                    namespaceId: formData.namespaceId
                 }
 
                 // Apply the current change
@@ -444,7 +456,8 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
                 pluralLabel: formData.pluralLabel,
                 description: formData.description,
                 isActive: formData.isActive,
-                hierarchyLevel: formData.hierarchyLevel
+                hierarchyLevel: formData.hierarchyLevel,
+                namespaceId: formData.namespaceId
             }
 
             // Use the dedicated basic info update endpoint
@@ -797,6 +810,30 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                             placeholder="Describe what this object type represents..."
                         />
+                    </div>
+
+                    {/* Namespace Selection */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <FolderOpen className="inline w-4 h-4 mr-1" />
+                            Namespace
+                        </label>
+                        <select
+                            value={formData.namespaceId || ''}
+                            onChange={(e) => handleInputChange('namespaceId', e.target.value || null)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        >
+                            <option value="">Use Default Namespace</option>
+                            {availableNamespaces.map((namespace) => (
+                                <option key={namespace.id} value={namespace.id}>
+                                    {namespace.name} ({namespace.slug})
+                                    {namespace.isDefault && ' - Default'}
+                                </option>
+                            ))}
+                        </select>
+                        <p className="text-gray-500 text-xs mt-1">
+                            Namespace for organizing content and media for this object type. Leave empty to use the default namespace.
+                        </p>
                     </div>
 
                     {/* Icon Image Upload */}

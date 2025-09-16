@@ -3,6 +3,7 @@ import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Save, AlertCircle } from 'lucide-react'
 import { objectInstancesApi, objectTypesApi } from '../../api/objectStorage'
+import { namespacesApi } from '../../api'
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext'
 import { getWidgetDisplayName } from '../../hooks/useWidgets'
 import { widgetsApi } from '../../api'
@@ -20,6 +21,7 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
 
     // Track widget changes locally (don't auto-save)
     const [localWidgets, setLocalWidgets] = useState(instance?.widgets || {})
+    const [namespace, setNamespace] = useState(null)
 
 
     // Widget editor ref and state
@@ -52,6 +54,27 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
         },
         staleTime: 5 * 60 * 1000, // 5 minutes
     })
+
+    // Load namespace for media operations (object type's namespace or default)
+    useEffect(() => {
+        const loadNamespace = async () => {
+            try {
+                if (objectType?.namespace?.slug) {
+                    // Use the object type's specific namespace
+                    setNamespace(objectType.namespace.slug)
+                } else {
+                    // Fall back to default namespace
+                    const defaultNamespace = await namespacesApi.getDefault()
+                    setNamespace(defaultNamespace?.slug || null)
+                }
+            } catch (error) {
+                console.error('Failed to load namespace:', error)
+                setNamespace(null)
+            }
+        }
+
+        loadNamespace()
+    }, [objectType?.namespace])
 
     // Update local widgets when instance changes
     useEffect(() => {
@@ -456,6 +479,7 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
                     widgetData={widgetEditorUI.editingWidget}
                     title={widgetEditorUI.editingWidget ? `Edit ${getWidgetDisplayName(widgetEditorUI.editingWidget.type, widgetTypes)}` : 'Edit Widget'}
                     autoOpenSpecialEditor={widgetEditorUI.editingWidget?.type === 'core_widgets.ImageWidget'}
+                    namespace={namespace}
                 />
             )}
         </div>

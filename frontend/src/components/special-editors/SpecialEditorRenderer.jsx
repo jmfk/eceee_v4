@@ -31,7 +31,8 @@ const SpecialEditorRenderer = ({
     specialEditorWidth = 60,
     isAnimating = false,
     isClosing = false,
-    onConfigChange
+    onConfigChange,
+    namespace = null
 }) => {
     if (!widgetData?.type || !hasSpecialEditor(widgetData.type)) {
         return null
@@ -55,6 +56,7 @@ const SpecialEditorRenderer = ({
                 isAnimating={isAnimating}
                 isClosing={isClosing}
                 onConfigChange={onConfigChange}
+                namespace={namespace}
             />
         </div>
     )

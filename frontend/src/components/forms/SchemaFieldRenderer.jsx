@@ -123,6 +123,7 @@ const SchemaFieldRenderer = ({
     isValidating,
     required = false,
     disabled = false,
+    namespace = null,
     ...props
 }) => {
     // Map JSON Schema type/format to our field type system
@@ -208,6 +209,7 @@ const SchemaFieldRenderer = ({
             required,
             disabled,
             placeholder: fieldSchema.placeholder,
+            namespace: namespace,
             ...componentProps
         }
         return (
@@ -278,6 +280,7 @@ const SchemaFieldRenderer = ({
         required,
         disabled,
         placeholder: fieldSchema.placeholder,
+        namespace: namespace,
         // Map schema properties to field-specific props
         ...(fieldType === 'textarea' && {
             rows: fieldSchema.rows || 3,

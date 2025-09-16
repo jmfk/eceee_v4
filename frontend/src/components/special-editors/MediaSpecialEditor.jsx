@@ -18,7 +18,8 @@ const MediaSpecialEditor = ({
     widgetData,
     isAnimating = false,
     isClosing = false,
-    onConfigChange
+    onConfigChange,
+    namespace: providedNamespace = null
 }) => {
     // Get current theme for image styles
     const { currentTheme } = useTheme()
@@ -105,18 +106,25 @@ const MediaSpecialEditor = ({
         setLocalConfig({})
     }, [widgetData])
 
-    // Load default namespace and initial data
+    // Load namespace and initial data (use provided namespace or default)
     useEffect(() => {
         const loadInitialData = async () => {
             try {
-                const defaultNamespace = await namespacesApi.getDefault()
-                setNamespace(defaultNamespace?.slug || null)
+                let effectiveNamespace = providedNamespace
 
-                if (defaultNamespace?.slug) {
+                if (!effectiveNamespace) {
+                    // Fall back to default namespace if none provided
+                    const defaultNamespace = await namespacesApi.getDefault()
+                    effectiveNamespace = defaultNamespace?.slug || null
+                }
+
+                setNamespace(effectiveNamespace)
+
+                if (effectiveNamespace) {
                     // Load collections and tags
                     const [collectionsResult, tagsResult] = await Promise.all([
-                        mediaCollectionsApi.list({ namespace: defaultNamespace.slug })(),
-                        mediaTagsApi.list({ namespace: defaultNamespace.slug })()
+                        mediaCollectionsApi.list({ namespace: effectiveNamespace })(),
+                        mediaTagsApi.list({ namespace: effectiveNamespace })()
                     ])
 
                     const collectionsData = collectionsResult.results || collectionsResult || []
@@ -134,7 +142,7 @@ const MediaSpecialEditor = ({
         }
 
         loadInitialData()
-    }, [])
+    }, [providedNamespace])
 
     // Load all images or search for specific images
     const loadImages = useCallback(async (term = '') => {

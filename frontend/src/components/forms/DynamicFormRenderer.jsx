@@ -23,6 +23,7 @@ const DynamicFormRenderer = React.memo(({
     submitLabel = 'Submit',
     disabled = false,
     className = '',
+    namespace = null,
 }) => {
     const [fieldComponents, setFieldComponents] = useState({})
     const [loading, setLoading] = useState(true)
@@ -126,6 +127,7 @@ const DynamicFormRenderer = React.memo(({
             disabled,
             validation: fieldValidation,
             isValidating: fieldIsValidating,
+            namespace: namespace,
             // Pass through field type specific UI props
             ...uiProps,
             // Pass through field definition props
