@@ -114,7 +114,6 @@ const LocalStateFieldWrapper = React.memo(({
     const handleChange = useCallback((newValue) => {
         setLocalValue(newValue)
         setIsDirty(true)
-
         // Immediately notify parent for real-time updates
         notifyParentChange(newValue)
 
@@ -127,7 +126,6 @@ const LocalStateFieldWrapper = React.memo(({
     // Handle field blur events
     const handleBlur = useCallback((e) => {
         setIsTouched(true)
-
         // Validate on blur if enabled
         if (validateOnBlur && !validateOnChange) {
             validateField(localValue)
@@ -200,7 +198,6 @@ const LocalStateFieldWrapper = React.memo(({
             }
         }
     }, [])
-
     // Render the field component with enhanced props
     if (!FieldComponent) {
         return (

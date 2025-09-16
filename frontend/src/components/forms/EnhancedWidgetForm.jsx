@@ -166,7 +166,6 @@ const EnhancedWidgetForm = ({
                         </div>
                     )
                 }
-
                 // Use the new field system for standard fields
                 return (
                     <SchemaFieldRenderer

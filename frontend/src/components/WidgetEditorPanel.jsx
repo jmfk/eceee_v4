@@ -447,8 +447,8 @@ const WidgetEditorPanel = forwardRef(({
                             </div>
                         ) : widgetData ? (
                             <IsolatedFormRenderer
-                                widgetData={widgetData}
-                                schema={fetchedSchema || schema}
+                                initWidgetData={widgetData}
+                                initschema={fetchedSchema || schema}
                                 onRealTimeUpdate={onRealTimeUpdate}
                                 onUnsavedChanges={handleUnsavedChanges}
                                 onValidatedWidgetSync={onValidatedWidgetSync}
