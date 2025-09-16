@@ -267,7 +267,7 @@ const SlotIconMenu = ({ slotName, slot, availableWidgetTypes, isFilteringTypes, 
     )
 }
 
-const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange, mode = 'object' }, ref) => {
+const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange, mode = 'object', onWidgetEditorStateChange }, ref) => {
     const [selectedWidgets, setSelectedWidgets] = useState({}) // For bulk operations
 
     // Create ObjectEditor-specific event system
@@ -552,6 +552,20 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
         setWidgetHasUnsavedChanges(false)
         handleCloseWidgetEditor()
     }, [editingWidget, handleCloseWidgetEditor, objectEventSystem, objectType])
+
+    // Notify parent of widget editor state changes
+    useEffect(() => {
+        if (onWidgetEditorStateChange) {
+            onWidgetEditorStateChange({
+                isOpen: widgetEditorOpen,
+                editingWidget,
+                hasUnsavedChanges: widgetHasUnsavedChanges,
+                widgetEditorRef,
+                handleCloseWidgetEditor,
+                handleSaveWidget
+            })
+        }
+    }, [widgetEditorOpen, editingWidget, widgetHasUnsavedChanges, onWidgetEditorStateChange, handleCloseWidgetEditor, handleSaveWidget])
 
     const handleEditWidget = (slotName, widgetIndex, widget) => {
         // Add slotName to widget data for editor
@@ -951,7 +965,7 @@ const ObjectContentEditorWithRef = forwardRef(ObjectContentEditorComponent)
 // Wrap with memo and custom comparison
 const ObjectContentEditor = React.memo(ObjectContentEditorWithRef, (prevProps, nextProps) => {
     // Custom comparison function for React.memo
-    // Note: We don't compare onWidgetChange since we handle it internally with a stable reference
+    // Note: We don't compare onWidgetChange or onWidgetEditorStateChange since we handle them internally with stable references
     return (
         prevProps.objectType === nextProps.objectType &&
         prevProps.widgets === nextProps.widgets &&

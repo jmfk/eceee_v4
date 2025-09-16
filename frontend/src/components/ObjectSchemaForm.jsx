@@ -4,7 +4,7 @@ import { fieldTypeRegistry } from '../utils/fieldTypeRegistry'
 import { getFieldComponent } from './form-fields'
 import LocalStateFieldWrapper from './forms/LocalStateFieldWrapper'
 
-const ObjectSchemaForm = React.memo(forwardRef(({ schema, data = {}, onChange }, ref) => {
+const ObjectSchemaForm = React.memo(forwardRef(({ schema, data = {}, onChange, namespace }, ref) => {
     const [fieldComponents, setFieldComponents] = useState({})
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
@@ -120,6 +120,8 @@ const ObjectSchemaForm = React.memo(forwardRef(({ schema, data = {}, onChange },
             description: field.help || field.description,
             required: field.required,
             placeholder: field.placeholder || `Enter ${field.label || field.name}...`,
+            // Pass namespace for media operations
+            namespace: namespace,
             // Pass through field type specific UI props
             ...uiProps,
             // Pass through field definition props (like min, max, options, etc.)
@@ -134,7 +136,6 @@ const ObjectSchemaForm = React.memo(forwardRef(({ schema, data = {}, onChange },
                         <span className="text-sm text-gray-500">Loading field...</span>
                     </div>
                 }>
-                    <p>{field.name}</p>
                     <LocalStateFieldWrapper
                         fieldName={field.name}
                         initialValue={fieldValue}

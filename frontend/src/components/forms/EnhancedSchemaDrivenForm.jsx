@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react'
+import React, { useEffect, useMemo, useState, useCallback, useRef, Suspense } from 'react'
 import { fieldTypeRegistry } from '../../utils/fieldTypeRegistry'
 import SchemaFieldRenderer from './SchemaFieldRenderer'
 import ValidatedInput from '../validation/ValidatedInput'
@@ -105,6 +105,30 @@ const EnhancedSchemaDrivenForm = ({
         if (useNewFieldSystem && fieldTypesLoaded) {
             // Handle media fields specially (they already exist)
             if (def.format === 'media') {
+                // Use ExpandableImageField for image-only media fields
+                if (def.mediaTypes && def.mediaTypes.length === 1 && def.mediaTypes[0] === 'image') {
+                    const ImageField = React.lazy(() => import('../form-fields/ExpandableImageField'))
+                    return (
+                        <Suspense key={key} fallback={<div className="animate-pulse h-20 bg-gray-200 rounded"></div>}>
+                            <ImageField
+                                value={value}
+                                onChange={handleChange}
+                                label={title}
+                                description={description}
+                                required={isRequired}
+                                multiple={def.multiple || type === 'array'}
+                                maxItems={def.maxItems}
+                                minItems={def.minItems}
+                                validation={validation}
+                                isValidating={isValidating}
+                                showValidation={true}
+                                namespace={namespace}
+                            />
+                        </Suspense>
+                    )
+                }
+
+                // Use regular MediaField for other media types
                 return (
                     <MediaField
                         key={key}

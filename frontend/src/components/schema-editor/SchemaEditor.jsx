@@ -80,7 +80,7 @@ export default function SchemaEditor({
           ...schemaProps[key],
           key,
           required: required.includes(key),
-          _id: `prop-${index}-${key}` // Stable ID for React keys
+          _id: `prop-${index}` // Stable ID for React keys based on position only
         }
       }
       return null
