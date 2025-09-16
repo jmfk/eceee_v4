@@ -2,6 +2,7 @@ import React, { Suspense } from 'react'
 import { fieldTypeRegistry } from '../../utils/fieldTypeRegistry'
 import { getFieldComponent, FIELD_COMPONENTS } from '../form-fields'
 import { Loader2 } from 'lucide-react'
+import LocalStateFieldWrapper from './LocalStateFieldWrapper'
 
 /**
  * FieldPlaceholder - Shows a visual representation of the field while loading
@@ -192,115 +193,45 @@ const SchemaFieldRenderer = ({
             ...componentProps
         } = fieldSchema
 
-        // Create a stable field wrapper that manages its own state
-        const StableFieldWrapper = React.memo(({ initialValue, onFieldChange, onFieldValidation, ...wrapperProps }) => {
-            const [localValue, setLocalValue] = React.useState(initialValue)
-            const [isComponentReady, setIsComponentReady] = React.useState(false)
-            const [pendingInteraction, setPendingInteraction] = React.useState(null)
-            const componentRef = React.useRef(null)
-
-            // Load component asynchronously but show placeholder immediately
-            const [FieldComponent, setFieldComponent] = React.useState(null)
-
-            React.useEffect(() => {
-                let isMounted = true
-
-                const loadComponent = async () => {
-                    try {
-                        let componentModule
-                        if (FIELD_COMPONENTS[componentName]) {
-                            componentModule = await FIELD_COMPONENTS[componentName]()
-                        } else {
-                            console.warn(`Field component '${componentName}' not found, falling back to TextInput`)
-                            componentModule = await FIELD_COMPONENTS.TextInput()
-                        }
-
-                        if (isMounted) {
-                            setFieldComponent(() => componentModule.default)
-                            setIsComponentReady(true)
-
-                            // Handle any pending interaction
-                            if (pendingInteraction) {
-                                pendingInteraction()
-                                setPendingInteraction(null)
-                            }
-                        }
-                    } catch (error) {
-                        console.error(`Failed to load component ${componentName}:`, error)
-                        if (isMounted) {
-                            // Fallback to basic input
-                            setFieldComponent(() => ({ value, onChange, label, ...props }) => (
-                                <div className="space-y-1">
-                                    <label className="block text-sm font-medium text-gray-700">{label}</label>
-                                    <input
-                                        type="text"
-                                        value={value || ''}
-                                        onChange={(e) => onChange(e.target.value)}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        {...props}
-                                    />
-                                </div>
-                            ))
-                            setIsComponentReady(true)
-                        }
-                    }
-                }
-
-                loadComponent()
-                return () => { isMounted = false }
-            }, [componentName])
-
-            // Handle value changes internally
-            const handleChange = React.useCallback((newValue) => {
-                if (!isComponentReady) {
-                    // Defer interaction until component is ready
-                    setPendingInteraction(() => () => {
-                        setLocalValue(newValue)
-                        onFieldChange(newValue)
-                    })
-                    return
-                }
-
-                setLocalValue(newValue)
-                onFieldChange(newValue)
-            }, [isComponentReady, onFieldChange])
-
-            // Show placeholder that looks like the final component
-            if (!FieldComponent) {
-                return <FieldPlaceholder
-                    componentName={componentName}
-                    label={wrapperProps.label}
-                    value={localValue}
-                    {...componentProps}
-                />
+        // Load component asynchronously
+        const FieldComponent = React.lazy(() => {
+            if (FIELD_COMPONENTS[componentName]) {
+                return FIELD_COMPONENTS[componentName]()
             }
-
-            return (
-                <FieldComponent
-                    ref={componentRef}
-                    value={localValue}
-                    onChange={handleChange}
-                    {...wrapperProps}
-                    {...componentProps}
-                />
-            )
+            console.warn(`Field component '${componentName}' not found, falling back to TextInput`)
+            return FIELD_COMPONENTS.TextInput()
         })
 
+        const fieldProps = {
+            label: fieldSchema.title || fieldName,
+            description: fieldSchema.description,
+            required,
+            disabled,
+            placeholder: fieldSchema.placeholder,
+            ...componentProps
+        }
+
         return (
-            <StableFieldWrapper
-                key={fieldName}
-                initialValue={value}
-                onFieldChange={onChange}
-                onFieldValidation={(validation) => {
-                    // Emit validation events without causing re-renders
-                    if (props.onValidation) props.onValidation(fieldName, validation)
-                }}
-                label={fieldSchema.title || fieldName}
-                description={fieldSchema.description}
-                required={required}
-                disabled={disabled}
-                placeholder={fieldSchema.placeholder}
-            />
+            <Suspense fallback={
+                <FieldPlaceholder
+                    componentName={componentName}
+                    label={fieldProps.label}
+                    value={value}
+                    {...componentProps}
+                />
+            }>
+                <LocalStateFieldWrapper
+                    key={fieldName}
+                    fieldName={fieldName}
+                    initialValue={value}
+                    FieldComponent={FieldComponent}
+                    fieldProps={fieldProps}
+                    onFieldChange={onChange}
+                    onFieldValidation={props.onValidation}
+                    debounceMs={200}
+                    validateOnChange={true}
+                />
+            </Suspense>
         )
     }
 
@@ -343,10 +274,6 @@ const SchemaFieldRenderer = ({
 
     // Prepare props for the field component
     const fieldProps = {
-        value,
-        onChange,
-        validation,
-        isValidating,
         label: fieldSchema.title || fieldName,
         description: fieldSchema.description,
         required,
@@ -399,7 +326,17 @@ const SchemaFieldRenderer = ({
                 <span className="text-sm text-gray-500">Loading field...</span>
             </div>
         }>
-            <FieldComponent {...fieldProps} />
+            <LocalStateFieldWrapper
+                key={fieldName}
+                fieldName={fieldName}
+                initialValue={value}
+                FieldComponent={FieldComponent}
+                fieldProps={fieldProps}
+                onFieldChange={onChange}
+                onFieldValidation={props.onValidation}
+                debounceMs={200}
+                validateOnChange={true}
+            />
         </Suspense>
     )
 }

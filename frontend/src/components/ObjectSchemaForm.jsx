@@ -2,8 +2,9 @@ import React, { forwardRef, useState, useEffect, Suspense } from 'react'
 import { FileText, Loader2 } from 'lucide-react'
 import { fieldTypeRegistry } from '../utils/fieldTypeRegistry'
 import { getFieldComponent } from './form-fields'
+import LocalStateFieldWrapper from './forms/LocalStateFieldWrapper'
 
-const ObjectSchemaForm = forwardRef(({ schema, data = {}, onChange, errors = {} }, ref) => {
+const ObjectSchemaForm = React.memo(forwardRef(({ schema, data = {}, onChange }, ref) => {
     const [fieldComponents, setFieldComponents] = useState({})
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
@@ -92,7 +93,6 @@ const ObjectSchemaForm = forwardRef(({ schema, data = {}, onChange, errors = {} 
 
     const renderField = (field) => {
         const fieldValue = data[field.name]
-        const fieldError = errors[`data_${field.name}`]
         const componentName = field.component
 
         // Get the dynamically loaded component
@@ -108,25 +108,17 @@ const ObjectSchemaForm = forwardRef(({ schema, data = {}, onChange, errors = {} 
             )
         }
 
-        // Create validation object for the field
-        const validation = fieldError ? {
-            errors: [fieldError],
-            warnings: []
-        } : null
-
         // Get field type definition for additional props
         const fieldType = field.fieldType || field.type
         const fieldTypeDef = fieldTypeRegistry.getFieldType(fieldType)
         const uiProps = fieldTypeDef?.uiProps || {}
 
-        // Common props for all form components
-        const commonProps = {
+        // Props for the field component (without value and onChange)
+        // LocalStateFieldWrapper will handle validation internally
+        const fieldProps = {
             label: field.label || field.name,
             description: field.help || field.description,
-            value: fieldValue,
-            onChange: (value) => handleFieldChange(field.name, value),
             required: field.required,
-            validation: validation,
             placeholder: field.placeholder || `Enter ${field.label || field.name}...`,
             // Pass through field type specific UI props
             ...uiProps,
@@ -142,7 +134,16 @@ const ObjectSchemaForm = forwardRef(({ schema, data = {}, onChange, errors = {} 
                         <span className="text-sm text-gray-500">Loading field...</span>
                     </div>
                 }>
-                    <FieldComponent {...commonProps} />
+                    <p>{field.name}</p>
+                    <LocalStateFieldWrapper
+                        fieldName={field.name}
+                        initialValue={fieldValue}
+                        FieldComponent={FieldComponent}
+                        fieldProps={fieldProps}
+                        onFieldChange={handleFieldChange}
+                        debounceMs={300}
+                        validateOnChange={true}
+                    />
                 </Suspense>
             </div>
         )
@@ -153,6 +154,38 @@ const ObjectSchemaForm = forwardRef(({ schema, data = {}, onChange, errors = {} 
             {schema.fields.map(renderField)}
         </div>
     )
+}), (prevProps, nextProps) => {
+    // Custom comparison function for React.memo
+    // Return true = "props are equal" = SKIP re-render
+    // Return false = "props changed" = DO re-render
+
+    // ONLY re-render if the actual field structure changes
+    const prevFields = prevProps.schema?.fields || []
+    const nextFields = nextProps.schema?.fields || []
+
+    // Compare field structure (names and components)
+    if (prevFields.length !== nextFields.length) {
+        return false // Different number of fields
+    }
+
+    for (let i = 0; i < prevFields.length; i++) {
+        const prevField = prevFields[i]
+        const nextField = nextFields[i]
+
+        // Only care about structural changes that affect rendering
+        if (prevField?.name !== nextField?.name ||
+            prevField?.component !== nextField?.component) {
+            return false // Field structure changed
+        }
+    }
+
+    // IGNORE ALL OTHER CHANGES:
+    // - data prop changes (LocalStateFieldWrapper manages initial values)
+    // - onChange prop changes (LocalStateFieldWrapper manages callbacks)
+    // - Any other prop changes
+    // Note: errors prop removed - LocalStateFieldWrapper handles validation internally
+
+    return true // Props are "equal" - skip re-render
 })
 
 ObjectSchemaForm.displayName = 'ObjectSchemaForm'

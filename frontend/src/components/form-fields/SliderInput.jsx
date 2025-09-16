@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { Minus, Plus } from 'lucide-react'
 
 /**
@@ -6,8 +6,11 @@ import { Minus, Plus } from 'lucide-react'
  * 
  * Range slider input with numeric display and optional step buttons.
  * Supports custom formatting and validation.
+ * 
+ * Optimized with React.memo, useCallback, and local state management
+ * to prevent unnecessary re-renders.
  */
-const SliderInput = ({
+const SliderInput = React.memo(({
     value,
     onChange,
     validation,
@@ -30,43 +33,47 @@ const SliderInput = ({
     const [localValue, setLocalValue] = useState(value || min)
     const [isDragging, setIsDragging] = useState(false)
 
-    // Sync local value with prop value
+    // Sync local value with prop value only when not dragging
     useEffect(() => {
         if (value !== localValue && !isDragging) {
             setLocalValue(value || min)
         }
-    }, [value, min, isDragging])
+    }, [value, min, isDragging, localValue])
 
-    const handleSliderChange = (e) => {
+    const handleSliderChange = useCallback((e) => {
         const newValue = Number(e.target.value)
         setLocalValue(newValue)
         onChange(newValue)
-    }
+    }, [onChange])
 
-    const handleStepUp = () => {
+    const handleStepUp = useCallback(() => {
         const newValue = Math.min(localValue + step, max)
         setLocalValue(newValue)
         onChange(newValue)
-    }
+    }, [localValue, step, max, onChange])
 
-    const handleStepDown = () => {
+    const handleStepDown = useCallback(() => {
         const newValue = Math.max(localValue - step, min)
         setLocalValue(newValue)
         onChange(newValue)
-    }
+    }, [localValue, step, min, onChange])
 
-    const handleMouseDown = () => {
+    const handleMouseDown = useCallback(() => {
         setIsDragging(true)
-    }
+    }, [])
 
-    const handleMouseUp = () => {
+    const handleMouseUp = useCallback(() => {
         setIsDragging(false)
-    }
+    }, [])
 
-    // Calculate percentage for styling
-    const percentage = ((localValue - min) / (max - min)) * 100
+    // Memoize calculated values
+    const percentage = useMemo(() =>
+        ((localValue - min) / (max - min)) * 100
+        , [localValue, min, max])
 
-    const hasError = validation && !validation.isValid
+    const hasError = useMemo(() =>
+        validation && !validation.isValid
+        , [validation])
 
     return (
         <div className="space-y-1 slider-input">
@@ -274,7 +281,7 @@ const SliderInput = ({
             }} />
         </div>
     )
-}
+})
 
 SliderInput.displayName = 'SliderInput'
 

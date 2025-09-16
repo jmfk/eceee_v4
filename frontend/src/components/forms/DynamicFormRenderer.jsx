@@ -2,14 +2,18 @@ import React, { useState, useEffect, Suspense } from 'react'
 import { fieldTypeRegistry } from '../../utils/fieldTypeRegistry'
 import { getFieldComponent } from '../form-fields'
 import { Loader2 } from 'lucide-react'
+import useLocalFormState from '../../hooks/useLocalFormState'
+import LocalStateFieldWrapper from './LocalStateFieldWrapper'
 
 /**
  * DynamicFormRenderer Component
  * 
  * Renders forms dynamically based on field type definitions from the backend.
  * Uses the field type registry to determine which components to render for each field.
+ * 
+ * Refactored to use local state management and prevent unnecessary re-renders.
  */
-const DynamicFormRenderer = ({
+const DynamicFormRenderer = React.memo(({
     schema,
     data = {},
     onChange,
@@ -23,6 +27,23 @@ const DynamicFormRenderer = ({
     const [fieldComponents, setFieldComponents] = useState({})
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
+
+    // Use local form state management
+    const {
+        handleFieldChange,
+        handleSubmit,
+        updateFormData,
+        getFormData
+    } = useLocalFormState(data, {
+        onChange,
+        onSubmit,
+        validateOnSubmit: true
+    })
+
+    // Initialize form data when data prop changes
+    useEffect(() => {
+        updateFormData(data)
+    }, [data, updateFormData])
 
     // Load field types and components on mount
     useEffect(() => {
@@ -76,15 +97,6 @@ const DynamicFormRenderer = ({
         loadComponents()
     }, [schema])
 
-    const handleFieldChange = (fieldName, value) => {
-        onChange?.(fieldName, value)
-    }
-
-    const handleSubmit = (e) => {
-        e.preventDefault()
-        onSubmit?.(data)
-    }
-
     const renderField = (fieldName, fieldDef) => {
         const fieldType = fieldDef.fieldType
         const FieldComponent = fieldComponents[fieldType]
@@ -107,6 +119,19 @@ const DynamicFormRenderer = ({
         const fieldTypeDef = fieldTypeRegistry.getFieldType(fieldType)
         const uiProps = fieldTypeDef?.uiProps || {}
 
+        const fieldProps = {
+            label: fieldDef.title || fieldName,
+            description: fieldDef.description,
+            required: schema?.required?.includes(fieldName),
+            disabled,
+            validation: fieldValidation,
+            isValidating: fieldIsValidating,
+            // Pass through field type specific UI props
+            ...uiProps,
+            // Pass through field definition props
+            ...fieldDef
+        }
+
         return (
             <div key={fieldName} className="space-y-1">
                 <Suspense fallback={
@@ -115,19 +140,14 @@ const DynamicFormRenderer = ({
                         <span className="text-sm text-gray-500">Loading field...</span>
                     </div>
                 }>
-                    <FieldComponent
-                        value={fieldValue}
-                        onChange={(value) => handleFieldChange(fieldName, value)}
-                        validation={fieldValidation}
-                        isValidating={fieldIsValidating}
-                        label={fieldDef.title || fieldName}
-                        description={fieldDef.description}
-                        required={schema?.required?.includes(fieldName)}
-                        disabled={disabled}
-                        // Pass through field type specific UI props
-                        {...uiProps}
-                        // Pass through field definition props
-                        {...fieldDef}
+                    <LocalStateFieldWrapper
+                        fieldName={fieldName}
+                        initialValue={fieldValue}
+                        FieldComponent={FieldComponent}
+                        fieldProps={fieldProps}
+                        onFieldChange={handleFieldChange}
+                        debounceMs={200}
+                        validateOnChange={true}
                     />
                 </Suspense>
             </div>
@@ -188,7 +208,7 @@ const DynamicFormRenderer = ({
             )}
         </form>
     )
-}
+})
 
 DynamicFormRenderer.displayName = 'DynamicFormRenderer'
 

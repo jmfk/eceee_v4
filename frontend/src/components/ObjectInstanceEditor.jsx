@@ -132,7 +132,6 @@ const ObjectInstanceEditor = ({ instanceId, objectTypeId, onSave, onCancel, isVi
 
     const handleInputChange = (field, value) => {
         setFormData(prev => ({ ...prev, [field]: value }))
-
         // Clear field error when user starts typing
         if (errors[field]) {
             setErrors(prev => ({ ...prev, [field]: null }))
@@ -326,7 +325,6 @@ const ObjectInstanceEditor = ({ instanceId, objectTypeId, onSave, onCancel, isVi
                                                 schema={getSchemaFromObjectType(objectType)}
                                                 data={formData.data}
                                                 onChange={handleDataFieldChange}
-                                                errors={errors}
                                             />
                                         </div>
                                     )}

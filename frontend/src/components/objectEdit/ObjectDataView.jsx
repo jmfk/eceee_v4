@@ -70,7 +70,6 @@ const ObjectDataView = ({ objectType, instance, isNewInstance, onSave, onCancel 
     const handleInputChange = (field, value) => {
         setFormData(prev => ({ ...prev, [field]: value }))
         setIsDirty(true)
-
         // Clear error when user starts typing
         if (errors[field]) {
             setErrors(prev => ({ ...prev, [field]: null }))
@@ -190,10 +189,9 @@ const ObjectDataView = ({ objectType, instance, isNewInstance, onSave, onCancel 
                                         {objectType.label} Fields
                                     </h3>
                                     <ObjectSchemaForm
-                                        objectType={objectType}
+                                        schema={getSchemaFromObjectType(objectType)}
                                         data={formData.data}
                                         onChange={handleDataFieldChange}
-                                        errors={errors}
                                     />
                                 </div>
                             )}

@@ -3,6 +3,8 @@ import { getWidgetSchema, validateWidgetConfiguration } from '../api/widgetSchem
 import { WIDGET_CHANGE_TYPES } from '../types/widgetEvents'
 import SchemaFieldRenderer from './forms/SchemaFieldRenderer.jsx'
 import ValidatedInput from './validation/ValidatedInput.jsx'
+import useLocalFormState from '../hooks/useLocalFormState'
+import LocalStateFieldWrapper from './forms/LocalStateFieldWrapper.jsx'
 
 /**
  * IsolatedFieldWrapper - Wraps each field to prevent cross-field rerenders
@@ -185,8 +187,8 @@ const IsolatedFieldWrapper = React.memo(({
                             type="button"
                             onClick={() => handleChange(option)}
                             className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors capitalize ${fieldValue === option
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                                 }`}
                         >
                             {option.replace(/_/g, ' ')}

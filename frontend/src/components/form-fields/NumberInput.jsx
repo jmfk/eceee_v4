@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useCallback } from 'react'
 import ValidatedInput from '../validation/ValidatedInput'
 
 /**
@@ -6,8 +6,10 @@ import ValidatedInput from '../validation/ValidatedInput'
  * 
  * Numeric input field component that integrates with the validation system.
  * Handles both integers and floating-point numbers.
+ * 
+ * Optimized with React.memo and useCallback to prevent unnecessary re-renders.
  */
-const NumberInput = ({
+const NumberInput = React.memo(({
     value,
     onChange,
     validation,
@@ -22,10 +24,12 @@ const NumberInput = ({
     step = 'any',
     ...props
 }) => {
-    const handleChange = (e) => {
-        const numericValue = e.target.value === '' ? '' : Number(e.target.value)
-        onChange(e.target.value === '' ? null : numericValue)
-    }
+    const handleChange = useCallback((e) => {
+        // Extract value from event if it's an event object, otherwise use as-is
+        const eventValue = e && e.target ? e.target.value : e
+        const numericValue = eventValue === '' ? '' : Number(eventValue)
+        onChange(eventValue === '' ? null : numericValue)
+    }, [onChange])
 
     return (
         <ValidatedInput
@@ -45,7 +49,7 @@ const NumberInput = ({
             {...props}
         />
     )
-}
+})
 
 NumberInput.displayName = 'NumberInput'
 

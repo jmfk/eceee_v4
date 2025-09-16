@@ -264,7 +264,6 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
     const handleInputChange = (field, value) => {
         setFormData(prev => ({ ...prev, [field]: value }))
         setIsDirty(true)
-
         // Clear error when user starts typing
         if (errors[field]) {
             setErrors(prev => ({ ...prev, [field]: null }))
@@ -447,7 +446,6 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
                                             schema={getSchemaFromObjectType(objectType)}
                                             data={formData.data}
                                             onChange={handleDataFieldChange}
-                                            errors={errors}
                                         />
                                     </div>
                                 )}
@@ -525,7 +523,6 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
                                         schema={getSchemaFromObjectType(objectType)}
                                         data={formData.data}
                                         onChange={handleDataFieldChange}
-                                        errors={errors}
                                     />
                                 </div>
                             )}
