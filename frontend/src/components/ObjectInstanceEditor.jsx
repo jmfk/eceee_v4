@@ -28,10 +28,13 @@ const ObjectInstanceEditor = ({ instanceId, objectTypeId, onSave, onCancel, isVi
             }
 
             if (properties[propName]) {
+                const property = properties[propName]
                 return {
                     name: propName,
                     required: required.includes(propName),
-                    ...properties[propName]
+                    ...property,
+                    // Map title to label for ObjectSchemaForm compatibility
+                    label: property.title || property.label || propName
                 }
             }
             return null

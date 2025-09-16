@@ -26,7 +26,8 @@ const MediaField = ({
     validation,
     isValidating,
     showValidation = true,
-    namespace
+    namespace,
+    mode = 'modal' // 'modal' | 'inline'
 }) => {
     const [showMediaPicker, setShowMediaPicker] = useState(false)
 
@@ -205,10 +206,10 @@ const MediaField = ({
                 </div>
             )}
 
-            {/* MediaPicker Modal */}
+            {/* MediaPicker */}
             {showMediaPicker && (
                 <MediaPicker
-                    mode="modal"
+                    mode={mode}
                     multiple={multiple}
                     fileTypes={mediaTypes}
                     namespace={namespace}

@@ -9,7 +9,7 @@ import { widgetsApi } from '../../api'
 import ObjectContentEditor from '../ObjectContentEditor'
 import ObjectSchemaForm from '../ObjectSchemaForm'
 import WidgetEditorPanel from '../WidgetEditorPanel'
-import SelfContainedWidgetEditor from '../forms/SelfContainedWidgetEditor.jsx'
+import ObjectDataForm from './ObjectDataForm'
 import { WidgetEventProvider, useWidgetEventListener } from '../../contexts/WidgetEventContext'
 import { WIDGET_EVENTS, WIDGET_CHANGE_TYPES } from '../../types/widgetEvents'
 
@@ -21,8 +21,6 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
     // Track widget changes locally (don't auto-save)
     const [localWidgets, setLocalWidgets] = useState(instance?.widgets || {})
 
-    // Feature flag for new self-contained widget editor
-    const [useSelfContainedEditor, setUseSelfContainedEditor] = useState(false)
 
     // Widget editor ref and state
     const objectContentEditorRef = useRef(null)
@@ -105,43 +103,19 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
         setHasWidgetChanges(true)
     }, [])
 
-    // Sync widget editor state with ObjectContentEditor
-    useEffect(() => {
-        const updateWidgetEditorState = () => {
-            if (objectContentEditorRef.current) {
-                const editorState = objectContentEditorRef.current
-                const newState = {
-                    isOpen: editorState.widgetEditorOpen || false,
-                    editingWidget: editorState.editingWidget || null,
-                    hasUnsavedChanges: editorState.widgetHasUnsavedChanges || false,
-                    widgetEditorRef: editorState.widgetEditorRef,
-                    handleCloseWidgetEditor: editorState.handleCloseWidgetEditor,
-                    handleSaveWidget: editorState.handleSaveWidget
-                }
-
-                // Only update state if it has actually changed
-                setWidgetEditorUI(prevState => {
-                    // Compare the key properties to avoid unnecessary updates
-                    if (
-                        prevState.isOpen === newState.isOpen &&
-                        prevState.editingWidget === newState.editingWidget &&
-                        prevState.hasUnsavedChanges === newState.hasUnsavedChanges &&
-                        prevState.widgetEditorRef === newState.widgetEditorRef &&
-                        prevState.handleCloseWidgetEditor === newState.handleCloseWidgetEditor &&
-                        prevState.handleSaveWidget === newState.handleSaveWidget
-                    ) {
-                        // No changes, return previous state to prevent re-render
-                        return prevState
-                    }
-                    return newState
-                })
+    // Widget editor state management - direct callback approach instead of polling
+    const handleWidgetEditorStateChange = useCallback((newState) => {
+        setWidgetEditorUI(prevState => {
+            // Only update if state has actually changed
+            if (
+                prevState.isOpen === newState.isOpen &&
+                prevState.editingWidget === newState.editingWidget &&
+                prevState.hasUnsavedChanges === newState.hasUnsavedChanges
+            ) {
+                return prevState
             }
-        }
-
-        // Set up polling to sync state (since we can't use React context here)
-        const interval = setInterval(updateWidgetEditorState, 100)
-
-        return () => clearInterval(interval)
+            return { ...prevState, ...newState }
+        })
     }, [])
 
     // Helper function to convert object type schema to ObjectSchemaForm format
@@ -164,10 +138,13 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
             }
 
             if (properties[propName]) {
+                const property = properties[propName]
                 return {
                     name: propName,
                     required: required.includes(propName),
-                    ...properties[propName]
+                    ...property,
+                    // Map title to label for ObjectSchemaForm compatibility
+                    label: property.title || property.label || propName
                 }
             }
             return null
@@ -175,6 +152,13 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
 
         return { fields }
     }
+    const [errors, setErrors] = useState({})
+    const [saveMode, setSaveMode] = useState('update_current') // 'update_current' or 'create_new'
+
+    const queryClient = useQueryClient()
+    const { addNotification } = useGlobalNotifications()
+
+    // Simple form state management
     const [formData, setFormData] = useState({
         objectTypeId: objectType?.id || '',
         title: instance?.title || '',
@@ -183,12 +167,9 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
         widgets: instance?.widgets || {},
         metadata: instance?.metadata || {}
     })
-    const [errors, setErrors] = useState({})
-    const [isDirty, setIsDirty] = useState(false)
-    const [saveMode, setSaveMode] = useState('update_current') // 'update_current' or 'create_new'
 
-    const queryClient = useQueryClient()
-    const { addNotification } = useGlobalNotifications()
+    // Track if form has been modified
+    const [isFormDirty, setIsFormDirty] = useState(false)
 
     // Fetch available object types for selection (when creating)
     const { data: typesResponse } = useQuery({
@@ -199,44 +180,52 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
 
     const availableTypes = typesResponse?.data || []
 
+
+    // Update form data when instance changes
     useEffect(() => {
         if (instance) {
-            setFormData({
+            const newFormData = {
                 objectTypeId: instance.objectType?.id || '',
                 title: instance.title || '',
                 data: instance.data || {},
                 status: instance.status || 'draft',
                 widgets: instance.widgets || {},
                 metadata: instance.metadata || {}
-            })
+            }
+
+            setFormData(newFormData)
+            setIsFormDirty(false)
+
             // Sync local widgets with instance
             setLocalWidgets(instance.widgets || {})
             setHasWidgetChanges(false)
         }
     }, [instance])
 
-    // Save mutation
-    const saveMutation = useMutation({
-        mutationFn: ({ data, mode }) => {
-            if (isNewInstance) {
-                return objectInstancesApi.create(data)
-            } else if (mode === 'update_current') {
-                return objectInstancesApi.updateCurrentVersion(instance.id, data)
-            } else {
-                return objectInstancesApi.update(instance.id, data)
-            }
-        },
-        onSuccess: (response, variables) => {
+    // Internal save handler used by form buffer and direct saves
+    const handleSaveInternal = useCallback(async (data, mode) => {
+        let apiCall
+        if (isNewInstance) {
+            apiCall = objectInstancesApi.create(data)
+        } else if (mode === 'update_current') {
+            apiCall = objectInstancesApi.updateCurrentVersion(instance.id, data)
+        } else {
+            apiCall = objectInstancesApi.update(instance.id, data)
+        }
+
+        try {
+            const response = await apiCall
+
+            // Invalidate queries
             queryClient.invalidateQueries(['objectInstances'])
             queryClient.invalidateQueries(['objectInstance', instance?.id])
-            setIsDirty(false)
             setHasWidgetChanges(false)
 
             // Show success message based on save mode
             let successMessage
             if (isNewInstance) {
                 successMessage = 'Object created successfully'
-            } else if (variables.mode === 'update_current') {
+            } else if (mode === 'update_current') {
                 successMessage = `Current version (v${instance?.version || 1}) updated successfully`
             } else {
                 successMessage = `New version (v${(instance?.version || 1) + 1}) created successfully`
@@ -248,8 +237,9 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
             if (isNewInstance && response?.data?.object?.id) {
                 navigate(`/objects/${response.data.object.id}/edit/content`, { replace: true })
             }
-        },
-        onError: (error) => {
+
+            return response
+        } catch (error) {
             console.error('Save failed:', error)
             const errorMessage = error.response?.data?.error || 'Failed to save object'
             addNotification(errorMessage, 'error')
@@ -258,36 +248,48 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
             if (error.response?.data?.errors) {
                 setErrors(error.response.data.errors)
             }
+            throw error
         }
-    })
+    }, [isNewInstance, instance?.id, instance?.version, queryClient, addNotification, navigate, setHasWidgetChanges])
 
-    const handleInputChange = (field, value) => {
+
+    // Update form field and mark as dirty
+    const handleInputChange = useCallback((field, value) => {
         setFormData(prev => ({ ...prev, [field]: value }))
-        setIsDirty(true)
+        setIsFormDirty(true)
+
         // Clear error when user starts typing
         if (errors[field]) {
             setErrors(prev => ({ ...prev, [field]: null }))
         }
-    }
+    }, [errors])
 
-    // Check if there are any unsaved changes (form data or widgets)
-    const hasUnsavedChanges = isDirty || hasWidgetChanges
-
-    const handleDataFieldChange = (fieldName, value) => {
+    // Update nested data field
+    const handleDataFieldChange = useCallback((fieldName, value) => {
         setFormData(prev => ({
             ...prev,
             data: { ...prev.data, [fieldName]: value }
         }))
-        setIsDirty(true)
+        setIsFormDirty(true)
 
         // Clear error when user starts typing
         const errorKey = `data_${fieldName}`
         if (errors[errorKey]) {
             setErrors(prev => ({ ...prev, [errorKey]: null }))
         }
-    }
+    }, [errors])
 
-    const validateForm = () => {
+    // Check if there are any unsaved changes (form data or widgets)
+    const hasUnsavedChanges = isFormDirty || hasWidgetChanges
+
+    // Notify parent about unsaved changes
+    useEffect(() => {
+        if (onUnsavedChanges) {
+            onUnsavedChanges(hasUnsavedChanges)
+        }
+    }, [hasUnsavedChanges, onUnsavedChanges])
+
+    const validateForm = useCallback(() => {
         const newErrors = {}
 
         if (!formData.objectTypeId) {
@@ -310,23 +312,30 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
 
         setErrors(newErrors)
         return Object.keys(newErrors).length === 0
-    }
+    }, [formData, objectType])
 
-    const handleSave = (mode = saveMode) => {
+    const handleSave = useCallback(async (mode = saveMode) => {
         if (!validateForm()) {
             addNotification('Please fix the validation errors', 'error')
             return
         }
 
-        // Include local widget changes and parent ID in the save data
+        // Prepare save data
         const saveData = {
             ...formData,
             widgets: localWidgets,
             // Set parent if creating new instance and parentId is provided
             ...(isNewInstance && parentId && { parent: parentId })
         }
-        saveMutation.mutate({ data: saveData, mode })
-    }
+
+        try {
+            await handleSaveInternal(saveData, mode)
+            setIsFormDirty(false)
+        } catch (error) {
+            // Error handling is done in handleSaveInternal
+            console.error('Save failed:', error)
+        }
+    }, [validateForm, addNotification, formData, localWidgets, isNewInstance, parentId, handleSaveInternal, saveMode])
 
     // Expose methods to parent component
     useImperativeHandle(ref, () => ({
@@ -343,22 +352,33 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
         }
     }), [handleSave])
 
-    // Get widget editor state from ObjectContentEditor
-    const editorState = objectContentEditorRef.current
-    const isWidgetEditorOpen = editorState?.widgetEditorOpen || false
+    // Get widget editor state directly from local state
+    const isWidgetEditorOpen = widgetEditorUI.isOpen
 
     return (
         <div className="h-full flex flex-col relative">
             {/* Content Header - Styled like PageEditor */}
             <div className="flex-shrink-0 bg-white border-b border-gray-200 shadow-sm px-4 py-3">
-                <h1 className="text-lg font-semibold text-gray-900 flex items-center">
-                    Object Content & Data
-                    {objectType && (
-                        <span className="ml-3 text-sm font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                            {objectType.label}
-                        </span>
-                    )}
-                </h1>
+                <div className="flex items-center justify-between">
+                    <h1 className="text-lg font-semibold text-gray-900 flex items-center">
+                        Object Content & Data
+                        {objectType && (
+                            <span className="ml-3 text-sm font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                                {objectType.label}
+                            </span>
+                        )}
+                    </h1>
+
+                    {/* Auto-save Status */}
+                    <div className="flex items-center space-x-3">
+                        {hasUnsavedChanges && (
+                            <span className="text-sm text-amber-600 flex items-center">
+                                <div className="w-2 h-2 bg-amber-500 rounded-full mr-2"></div>
+                                Unsaved changes
+                            </span>
+                        )}
+                    </div>
+                </div>
             </div>
 
             {/* Scrollable Content Area */}
@@ -377,6 +397,7 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
                                             setLocalWidgets(newWidgets)
                                             setHasWidgetChanges(true)
                                         }}
+                                        onWidgetEditorStateChange={handleWidgetEditorStateChange}
                                         mode="object"
                                     />
                                 </div>
@@ -384,71 +405,16 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
 
                             {/* Right Column - Object Data */}
                             <div className="space-y-6">
-                                {/* Object Type Selection (only for new instances) */}
-                                {isNewInstance && (
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            Object Type <span className="text-red-500">*</span>
-                                        </label>
-                                        <select
-                                            value={formData.objectTypeId}
-                                            onChange={(e) => handleInputChange('objectTypeId', e.target.value)}
-                                            className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.objectTypeId ? 'border-red-300' : 'border-gray-300'
-                                                }`}
-                                        >
-                                            <option value="">Select object type...</option>
-                                            {availableTypes.map((type) => (
-                                                <option key={type.id} value={type.id}>
-                                                    {type.label}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        {errors.objectTypeId && (
-                                            <p className="text-red-600 text-sm mt-1 flex items-center">
-                                                <AlertCircle className="h-4 w-4 mr-1" />
-                                                {errors.objectTypeId}
-                                            </p>
-                                        )}
-                                    </div>
-                                )}
-
-                                {/* Title - Model Field */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Object Title <span className="text-red-500">*</span>
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={formData.title}
-                                        onChange={(e) => handleInputChange('title', e.target.value)}
-                                        className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.title ? 'border-red-300' : 'border-gray-300'
-                                            }`}
-                                        placeholder="Enter object title..."
-                                    />
-                                    {errors.title && (
-                                        <p className="text-red-600 text-sm mt-1 flex items-center">
-                                            <AlertCircle className="h-4 w-4 mr-1" />
-                                            {errors.title}
-                                        </p>
-                                    )}
-                                    <p className="text-gray-500 text-sm mt-1">
-                                        This is the object's display title (stored on the object, not in schema data)
-                                    </p>
-                                </div>
-
-                                {/* Dynamic Schema Fields */}
-                                {objectType && (
-                                    <div className="border-t pt-4">
-                                        <h4 className="font-medium text-gray-900 mb-4">
-                                            {objectType.label} Fields
-                                        </h4>
-                                        <ObjectSchemaForm
-                                            schema={getSchemaFromObjectType(objectType)}
-                                            data={formData.data}
-                                            onChange={handleDataFieldChange}
-                                        />
-                                    </div>
-                                )}
+                                <ObjectDataForm
+                                    objectType={objectType}
+                                    isNewInstance={isNewInstance}
+                                    availableTypes={availableTypes}
+                                    formData={formData}
+                                    errors={errors}
+                                    handleInputChange={handleInputChange}
+                                    handleDataFieldChange={handleDataFieldChange}
+                                    getSchemaFromObjectType={getSchemaFromObjectType}
+                                />
                             </div>
                         </div>
                     ) : (
@@ -461,71 +427,16 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
                                 </h3>
                             </div>
 
-                            {/* Object Type Selection (only for new instances) */}
-                            {isNewInstance && (
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Object Type <span className="text-red-500">*</span>
-                                    </label>
-                                    <select
-                                        value={formData.objectTypeId}
-                                        onChange={(e) => handleInputChange('objectTypeId', e.target.value)}
-                                        className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.objectTypeId ? 'border-red-300' : 'border-gray-300'
-                                            }`}
-                                    >
-                                        <option value="">Select object type...</option>
-                                        {availableTypes.map((type) => (
-                                            <option key={type.id} value={type.id}>
-                                                {type.label}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    {errors.objectTypeId && (
-                                        <p className="text-red-600 text-sm mt-1 flex items-center">
-                                            <AlertCircle className="h-4 w-4 mr-1" />
-                                            {errors.objectTypeId}
-                                        </p>
-                                    )}
-                                </div>
-                            )}
-
-                            {/* Title - Model Field */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Object Title <span className="text-red-500">*</span>
-                                </label>
-                                <input
-                                    type="text"
-                                    value={formData.title}
-                                    onChange={(e) => handleInputChange('title', e.target.value)}
-                                    className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.title ? 'border-red-300' : 'border-gray-300'
-                                        }`}
-                                    placeholder="Enter object title..."
-                                />
-                                {errors.title && (
-                                    <p className="text-red-600 text-sm mt-1 flex items-center">
-                                        <AlertCircle className="h-4 w-4 mr-1" />
-                                        {errors.title}
-                                    </p>
-                                )}
-                                <p className="text-gray-500 text-sm mt-1">
-                                    This is the object's display title (stored on the object, not in schema data)
-                                </p>
-                            </div>
-
-                            {/* Dynamic Schema Fields */}
-                            {objectType && (
-                                <div className="border-t pt-4">
-                                    <h4 className="font-medium text-gray-900 mb-4">
-                                        {objectType.label} Fields
-                                    </h4>
-                                    <ObjectSchemaForm
-                                        schema={getSchemaFromObjectType(objectType)}
-                                        data={formData.data}
-                                        onChange={handleDataFieldChange}
-                                    />
-                                </div>
-                            )}
+                            <ObjectDataForm
+                                objectType={objectType}
+                                isNewInstance={isNewInstance}
+                                availableTypes={availableTypes}
+                                formData={formData}
+                                errors={errors}
+                                handleInputChange={handleInputChange}
+                                handleDataFieldChange={handleDataFieldChange}
+                                getSchemaFromObjectType={getSchemaFromObjectType}
+                            />
                         </div>
                     )}
                 </div>
@@ -533,57 +444,19 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
 
             {/* Widget Editor Panel - positioned at top level for full-screen slide-out */}
             {widgetEditorUI && (
-                <>
-                    {/* Development Toggle for Widget Editor */}
-                    {widgetEditorUI.isOpen && (
-                        <div className="fixed top-4 left-4 z-50 bg-white border border-gray-200 rounded-lg p-3 shadow-lg">
-                            <div className="flex items-center space-x-3">
-                                <span className="text-sm font-medium text-gray-700">Editor Mode:</span>
-                                <button
-                                    onClick={() => setUseSelfContainedEditor(!useSelfContainedEditor)}
-                                    className={`px-3 py-1 text-xs rounded-full transition-colors ${useSelfContainedEditor
-                                        ? 'bg-blue-600 text-white'
-                                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                                        }`}
-                                >
-                                    {useSelfContainedEditor ? 'Self-Contained' : 'Switch to Self-Contained'}
-                                </button>
-                            </div>
-                        </div>
-                    )}
-
-                    {useSelfContainedEditor ? (
-                        <SelfContainedWidgetEditor
-                            ref={widgetEditorUI.widgetEditorRef}
-                            isOpen={widgetEditorUI.isOpen}
-                            onClose={widgetEditorUI.handleCloseWidgetEditor}
-                            onSave={widgetEditorUI.handleSaveWidget}
-                            onRealTimeUpdate={handleRealTimeWidgetUpdate}
-                            onUnsavedChanges={(hasChanges) => {
-                                setWidgetEditorUI(prev => ({ ...prev, hasUnsavedChanges: hasChanges }))
-                            }}
-                            widgetData={widgetEditorUI.editingWidget}
-                            title={widgetEditorUI.editingWidget ? `Edit ${getWidgetDisplayName(widgetEditorUI.editingWidget.type, widgetTypes)} (Self-Contained)` : 'Edit Widget (Self-Contained)'}
-                            autoSave={true}
-                            showValidationInline={true}
-                            showSaveStatus={true}
-                        />
-                    ) : (
-                        <WidgetEditorPanel
-                            ref={widgetEditorUI.widgetEditorRef}
-                            isOpen={widgetEditorUI.isOpen}
-                            onClose={widgetEditorUI.handleCloseWidgetEditor}
-                            onSave={widgetEditorUI.handleSaveWidget}
-                            onRealTimeUpdate={handleRealTimeWidgetUpdate}
-                            onUnsavedChanges={(hasChanges) => {
-                                setWidgetEditorUI(prev => ({ ...prev, hasUnsavedChanges: hasChanges }))
-                            }}
-                            widgetData={widgetEditorUI.editingWidget}
-                            title={widgetEditorUI.editingWidget ? `Edit ${getWidgetDisplayName(widgetEditorUI.editingWidget.type, widgetTypes)}` : 'Edit Widget'}
-                            autoOpenSpecialEditor={widgetEditorUI.editingWidget?.type === 'core_widgets.ImageWidget'}
-                        />
-                    )}
-                </>
+                <WidgetEditorPanel
+                    ref={widgetEditorUI.widgetEditorRef}
+                    isOpen={widgetEditorUI.isOpen}
+                    onClose={widgetEditorUI.handleCloseWidgetEditor}
+                    onSave={widgetEditorUI.handleSaveWidget}
+                    onRealTimeUpdate={handleRealTimeWidgetUpdate}
+                    onUnsavedChanges={(hasChanges) => {
+                        setWidgetEditorUI(prev => ({ ...prev, hasUnsavedChanges: hasChanges }))
+                    }}
+                    widgetData={widgetEditorUI.editingWidget}
+                    title={widgetEditorUI.editingWidget ? `Edit ${getWidgetDisplayName(widgetEditorUI.editingWidget.type, widgetTypes)}` : 'Edit Widget'}
+                    autoOpenSpecialEditor={widgetEditorUI.editingWidget?.type === 'core_widgets.ImageWidget'}
+                />
             )}
         </div>
     )

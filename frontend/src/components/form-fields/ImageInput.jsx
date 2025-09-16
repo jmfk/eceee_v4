@@ -1,11 +1,11 @@
 import React from 'react'
-import MediaField from './MediaField'
+import ExpandableImageField from './ExpandableImageField'
 
 /**
  * ImageInput Component
  * 
- * A specialized media field component specifically for image selection.
- * Built on top of MediaField with image-specific defaults.
+ * A specialized image field component with expandable inline media picker.
+ * Features expandable interface with search and 9x9 thumbnail grid.
  */
 const ImageInput = ({
     value,
@@ -23,7 +23,7 @@ const ImageInput = ({
     ...props
 }) => {
     return (
-        <MediaField
+        <ExpandableImageField
             value={value}
             onChange={onChange}
             validation={validation}
@@ -36,8 +36,6 @@ const ImageInput = ({
             maxItems={maxItems}
             minItems={minItems}
             namespace={namespace}
-            // Image-specific settings
-            mediaTypes={['image']}  // Only allow images
             showValidation={true}
             {...props}
         />
