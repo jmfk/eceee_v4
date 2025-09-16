@@ -124,7 +124,6 @@ const EnhancedSchemaDrivenForm = ({
                     />
                 )
             }
-
             // Use the new field system for other fields
             return (
                 <SchemaFieldRenderer

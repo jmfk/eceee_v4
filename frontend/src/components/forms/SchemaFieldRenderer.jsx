@@ -210,7 +210,6 @@ const SchemaFieldRenderer = ({
             placeholder: fieldSchema.placeholder,
             ...componentProps
         }
-
         return (
             <Suspense fallback={
                 <FieldPlaceholder
@@ -318,7 +317,6 @@ const SchemaFieldRenderer = ({
         // Allow override with explicit props
         ...props,
     }
-
     return (
         <Suspense fallback={
             <div className="flex items-center space-x-2 p-3 border border-gray-200 rounded">
