@@ -53,22 +53,17 @@ const MediaEditForm = ({
         if (file) {
             // Update local file state
             setLocalFile(file);
-            // Convert tags to array of tag NAMES for MediaTagWidget
+            // Convert tags to array of tag OBJECTS for MediaTagWidget
             let tagsArray = [];
 
             if (Array.isArray(file.tags)) {
-                // If tags is an array of tag objects, extract names
-                tagsArray = file.tags.map(tag => {
-                    if (typeof tag === 'object' && tag.name) {
-                        return tag.name;
-                    } else if (typeof tag === 'string') {
-                        return tag;
-                    }
-                    return tag;
-                });
+                // If tags is an array of tag objects, use them directly
+                tagsArray = file.tags.filter(tag => tag && (tag.name || tag.id));
             } else if (typeof file.tags === 'string' && file.tags) {
-                // If tags is a string, split it
-                tagsArray = file.tags.split(',').map(tag => tag.trim()).filter(tag => tag);
+                // If tags is a string, we need to convert to tag objects
+                // This is a fallback case - ideally tags should be objects
+                const tagNames = file.tags.split(',').map(tag => tag.trim()).filter(tag => tag);
+                tagsArray = tagNames.map(name => ({ name, id: null })); // Temporary objects
             }
 
 
@@ -208,36 +203,50 @@ const MediaEditForm = ({
 
         setSaving(true);
         try {
-            // Convert tag names to tag IDs
-            const tagNames = formData.tags || [];
+            // Convert tags to tag IDs
+            const tags = formData.tags || [];
             const tagIds = [];
             const safeAvailableTags = Array.isArray(availableTags) ? availableTags : [];
-            // mediaTagsApi call should end with ()
-            for (const tagName of tagNames) {
-                let tag = safeAvailableTags.find(t => t.name.toLowerCase() === tagName.toLowerCase());
-                if (!tag) {
-                    // Create new tag
-                    try {
-                        // Generate slug from tag name
-                        const tagSlug = tagName.toLowerCase()
-                            .replace(/[^a-z0-9]+/g, '-')
-                            .replace(/^-+|-+$/g, '');
 
-                        tag = await mediaTagsApi.create({
-                            name: tagName,
-                            slug: tagSlug,
-                            namespace: namespace
-                        })();
-                        setAvailableTags(prev => {
-                            const safePrev = Array.isArray(prev) ? prev : [];
-                            return [...safePrev, tag];
-                        });
-                    } catch (error) {
-                        console.error(`Failed to create tag ${tagName}:`, error);
-                        continue;
+            for (const tagItem of tags) {
+                let tag;
+
+                if (typeof tagItem === 'object' && tagItem.id) {
+                    // Tag object with ID - use it directly
+                    tag = tagItem;
+                } else {
+                    // Tag name or object without ID - find or create
+                    const tagName = typeof tagItem === 'string' ? tagItem : tagItem?.name;
+                    if (!tagName) continue;
+
+                    tag = safeAvailableTags.find(t => t?.name?.toLowerCase() === tagName.toLowerCase());
+                    if (!tag) {
+                        // Create new tag
+                        try {
+                            // Generate slug from tag name
+                            const tagSlug = tagName.toLowerCase()
+                                .replace(/[^a-z0-9]+/g, '-')
+                                .replace(/^-+|-+$/g, '');
+
+                            tag = await mediaTagsApi.create({
+                                name: tagName,
+                                slug: tagSlug,
+                                namespace: namespace
+                            })();
+                            setAvailableTags(prev => {
+                                const safePrev = Array.isArray(prev) ? prev : [];
+                                return [...safePrev, tag];
+                            });
+                        } catch (error) {
+                            console.error(`Failed to create tag ${tagName}:`, error);
+                            continue;
+                        }
                     }
                 }
-                tagIds.push(tag.id);
+
+                if (tag?.id) {
+                    tagIds.push(tag.id);
+                }
             }
 
             let result;

@@ -87,7 +87,7 @@ const MediaTagWidget = ({ tags = [], onChange, disabled = false, namespace }) =>
     // Server-side search already handles the text filtering
     const suggestions = availableTags
         .filter(tag =>
-            !tags.some(existingTag => existingTag.toLowerCase() === tag.name.toLowerCase())
+            !tags.some(existingTag => existingTag?.name?.toLowerCase() === tag?.name?.toLowerCase())
         )
         .slice(0, 10)
 
@@ -112,7 +112,7 @@ const MediaTagWidget = ({ tags = [], onChange, disabled = false, namespace }) =>
 
         // Calculate total options (suggestions + create new option if applicable)
         const hasCreateOption = inputValue.trim() && !suggestions.some(tag =>
-            tag.name.toLowerCase() === inputValue.toLowerCase()
+            tag?.name?.toLowerCase() === inputValue.toLowerCase()
         )
         const totalOptions = suggestions.length + (hasCreateOption ? 1 : 0)
 
@@ -157,13 +157,13 @@ const MediaTagWidget = ({ tags = [], onChange, disabled = false, namespace }) =>
 
         // Check for duplicates (case-insensitive) in current tags
         const isDuplicate = tags.some(existingTag =>
-            existingTag.toLowerCase() === normalizedTagName.toLowerCase()
+            existingTag?.name?.toLowerCase() === normalizedTagName.toLowerCase()
         )
         if (isDuplicate) return
 
         // Check if this tag already exists in our available tags
         const existingTag = availableTags.find(tag =>
-            tag.name.toLowerCase() === normalizedTagName.toLowerCase()
+            tag?.name?.toLowerCase() === normalizedTagName.toLowerCase()
         )
 
         if (existingTag) {
@@ -186,12 +186,14 @@ const MediaTagWidget = ({ tags = [], onChange, disabled = false, namespace }) =>
     }
 
     const removeTag = (tagToRemove) => {
-        const newTags = tags.filter(tag => tag !== tagToRemove)
+        const newTags = tags.filter(tag => tag?.id !== tagToRemove?.id)
         onChange(newTags)
     }
 
     const handleSuggestionClick = (tag) => {
-        addTag(tag.name)
+        if (tag?.name) {
+            addTag(tag.name)
+        }
     }
 
     // Close suggestions when clicking outside
@@ -216,13 +218,13 @@ const MediaTagWidget = ({ tags = [], onChange, disabled = false, namespace }) =>
             {/* Selected Tags Display */}
             {tags.length > 0 && (
                 <div className="flex flex-wrap gap-2 items-start">
-                    {tags.map((tag, index) => (
+                    {tags.filter(tag => tag && tag.name).map((tag, index) => (
                         <span
-                            key={index}
+                            key={tag.id || index}
                             className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800"
                         >
                             <Hash className="w-3 h-3 mr-1" />
-                            {tag}
+                            {tag.name}
                             {!disabled && (
                                 <button
                                     onClick={() => removeTag(tag)}
@@ -294,8 +296,8 @@ const MediaTagWidget = ({ tags = [], onChange, disabled = false, namespace }) =>
                                         }`}
                                 >
                                     <Hash className="w-4 h-4 mr-2 text-gray-400" />
-                                    <span className="font-medium">{tag.name}</span>
-                                    {tag.usageCount > 0 && (
+                                    <span className="font-medium">{tag?.name || 'Unnamed Tag'}</span>
+                                    {tag?.usageCount > 0 && (
                                         <span className="ml-auto text-xs text-gray-500">
                                             {tag.usageCount} uses
                                         </span>
@@ -311,7 +313,7 @@ const MediaTagWidget = ({ tags = [], onChange, disabled = false, namespace }) =>
                             )}
 
                             {/* Create new tag option */}
-                            {!isSearching && inputValue.trim() && !suggestions.some(tag => tag.name.toLowerCase() === inputValue.toLowerCase()) && (
+                            {!isSearching && inputValue.trim() && !suggestions.some(tag => tag?.name?.toLowerCase() === inputValue.toLowerCase()) && (
                                 <button
                                     type="button"
                                     onClick={() => addTag(inputValue.trim())}
