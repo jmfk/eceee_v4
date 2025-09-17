@@ -20,6 +20,10 @@ const ImageInput = ({
     maxItems = null,
     minItems = null,
     namespace,
+    constraints = {},
+    autoTags = '', // Comma-separated string of auto-tags for uploads
+    defaultCollection = null, // Default collection object for uploads
+    maxFiles = null, // Maximum number of images allowed in field
     ...props
 }) => {
     return (
@@ -36,6 +40,10 @@ const ImageInput = ({
             maxItems={maxItems}
             minItems={minItems}
             namespace={namespace}
+            constraints={constraints}
+            autoTags={autoTags}
+            defaultCollection={defaultCollection}
+            maxFiles={maxFiles}
             showValidation={true}
             {...props}
         />
