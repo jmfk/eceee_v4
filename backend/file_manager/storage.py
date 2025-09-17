@@ -200,7 +200,9 @@ class S3MediaStorage:
         middle = file_hash[2:4]
 
         if folder_path:
-            return f"{folder_path}/{prefix}/{middle}/{file_hash}{extension}"
+            # Validate folder_path to prevent path traversal attacks
+            sanitized_folder_path = self._validate_folder_path(folder_path)
+            return f"{sanitized_folder_path}/{prefix}/{middle}/{file_hash}{extension}"
         else:
             return f"media/{prefix}/{middle}/{file_hash}{extension}"
 
@@ -239,9 +241,101 @@ class S3MediaStorage:
                 name_hash = hashlib.md5(filename.encode("utf-8")).hexdigest()[:8]
                 # Take first part of encoded name and add hash
                 truncated = encoded[:180]
+                # Sanitize the truncated part to prevent XSS
+                truncated = self._sanitize_filename_for_display(truncated)
                 encoded = f"{truncated}...{name_hash}"
 
             return encoded
+
+    def _sanitize_filename_for_display(self, filename: str) -> str:
+        """
+        Sanitize filename to prevent XSS when displayed in frontend.
+
+        Args:
+            filename: The filename to sanitize
+
+        Returns:
+            Sanitized filename safe for display
+        """
+        import re
+
+        if not filename:
+            return ""
+
+        # Remove or replace potentially dangerous characters
+        # Remove HTML/XML tags
+        sanitized = re.sub(r"<[^>]*>", "", filename)
+
+        # Remove JavaScript event handlers and other dangerous patterns
+        sanitized = re.sub(
+            r"(on\w+\s*=|javascript:|data:)", "", sanitized, flags=re.IGNORECASE
+        )
+
+        # Remove control characters but keep basic punctuation
+        sanitized = re.sub(r"[\x00-\x1f\x7f-\x9f]", "", sanitized)
+
+        # Limit consecutive special characters to prevent visual confusion
+        sanitized = re.sub(r'[<>"\'\&]{2,}', "", sanitized)
+
+        return sanitized.strip()
+
+    def _validate_folder_path(self, folder_path: str) -> str:
+        """
+        Validate and sanitize folder path to prevent path traversal attacks.
+
+        Args:
+            folder_path: The folder path to validate
+
+        Returns:
+            Sanitized folder path
+
+        Raises:
+            ValueError: If path contains dangerous patterns
+        """
+        import os
+        import re
+
+        if not folder_path:
+            return ""
+
+        # Remove any leading/trailing whitespace
+        folder_path = folder_path.strip()
+
+        # Check for dangerous path traversal patterns
+        dangerous_patterns = [
+            "..",  # Parent directory traversal
+            "~",  # Home directory
+            "/",  # Absolute path (at start)
+            "\\",  # Windows path separator
+            "\x00",  # Null byte
+        ]
+
+        # Check for dangerous patterns
+        for pattern in dangerous_patterns:
+            if pattern in folder_path:
+                raise ValueError(
+                    f"Invalid folder path: contains dangerous pattern '{pattern}'"
+                )
+
+        # Check for absolute paths (starting with /)
+        if folder_path.startswith("/"):
+            raise ValueError("Absolute paths are not allowed")
+
+        # Remove any control characters
+        folder_path = re.sub(r"[\x00-\x1f\x7f-\x9f]", "", folder_path)
+
+        # Normalize the path to resolve any remaining relative components
+        normalized = os.path.normpath(folder_path)
+
+        # Ensure the normalized path doesn't start with .. or contain ..
+        if normalized.startswith("..") or "/.." in normalized or "\\.." in normalized:
+            raise ValueError("Path traversal attempt detected")
+
+        # Only allow alphanumeric, hyphens, underscores, and forward slashes
+        if not re.match(r"^[a-zA-Z0-9/_-]+$", normalized):
+            raise ValueError("Folder path contains invalid characters")
+
+        return normalized
 
     def _decode_filename_from_s3(self, encoded_filename: str) -> str:
         """

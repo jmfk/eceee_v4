@@ -27,3 +27,4 @@ from .tests.test_models import *
 from .tests.test_api import *
 from .tests.test_storage import *
 from .tests.test_ai_services import *
+from .tests.test_security import *
