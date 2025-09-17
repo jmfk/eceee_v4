@@ -229,9 +229,19 @@ class FileUploadValidator:
     @classmethod
     def _validate_file_content(cls, uploaded_file: UploadedFile, results: Dict):
         """Validate file content and MIME type."""
-        # Read file content for analysis
+        # Validate file extension before processing content
+        file_ext = os.path.splitext(uploaded_file.name)[1].lower()
+        if not cls._validate_file_extension(file_ext, results):
+            return
+
+        # Read file content for analysis (limit size for memory safety)
         uploaded_file.seek(0)
-        file_content = uploaded_file.read()
+        max_content_size = 50 * 1024 * 1024  # 50MB limit for content analysis
+        if uploaded_file.size > max_content_size:
+            # For very large files, only read the first portion for MIME detection
+            file_content = uploaded_file.read(1024 * 1024)  # 1MB sample
+        else:
+            file_content = uploaded_file.read()
         uploaded_file.seek(0)
 
         # Detect actual MIME type using python-magic
@@ -699,8 +709,12 @@ class MediaSecurityMiddleware:
 
         if any(agent in user_agent.lower() for agent in suspicious_agents):
             if not request.user.is_authenticated:
+                # Sanitize user agent string to prevent log injection
+                sanitized_user_agent = self._sanitize_log_string(user_agent)
                 SecurityAuditLogger.log_security_violation(
-                    request.user, "suspicious_user_agent", f"User agent: {user_agent}"
+                    request.user,
+                    "suspicious_user_agent",
+                    f"User agent: {sanitized_user_agent}",
                 )
 
     def _add_security_headers(self, response):
@@ -715,3 +729,95 @@ class MediaSecurityMiddleware:
             response["Cache-Control"] = "no-cache, no-store, must-revalidate"
             response["Pragma"] = "no-cache"
             response["Expires"] = "0"
+
+    def _sanitize_log_string(self, value: str, max_length: int = 200) -> str:
+        """
+        Sanitize strings for safe logging to prevent log injection attacks.
+
+        Args:
+            value: The string to sanitize
+            max_length: Maximum length of the sanitized string
+
+        Returns:
+            Sanitized string safe for logging
+        """
+        import re
+
+        if not value:
+            return ""
+
+        # Remove or replace dangerous characters
+        # Replace newlines, carriage returns, and other control characters
+        sanitized = re.sub(r"[\r\n\t\x00-\x1f\x7f-\x9f]", " ", str(value))
+
+        # Remove or escape potentially dangerous sequences
+        sanitized = re.sub(r'[<>"\']', "", sanitized)
+
+        # Limit length to prevent log flooding
+        if len(sanitized) > max_length:
+            sanitized = sanitized[:max_length] + "..."
+
+        return sanitized.strip()
+
+    @classmethod
+    def _validate_file_extension(cls, file_ext: str, results: Dict) -> bool:
+        """
+        Validate file extension before MIME type detection to prevent malicious files.
+
+        Args:
+            file_ext: File extension (including the dot)
+            results: Results dictionary to update with errors
+
+        Returns:
+            True if extension is valid, False otherwise
+        """
+        # Get all allowed extensions from ALLOWED_MIME_TYPES
+        allowed_extensions = set()
+        for extensions_list in cls.ALLOWED_MIME_TYPES.values():
+            allowed_extensions.update(extensions_list)
+
+        # Check if extension is in allowed list
+        if file_ext not in allowed_extensions:
+            results["errors"].append(
+                f"File extension '{file_ext}' is not allowed. Allowed extensions: {', '.join(sorted(allowed_extensions))}"
+            )
+            results["is_valid"] = False
+            return False
+
+        # Additional checks for potentially dangerous extensions
+        dangerous_extensions = [
+            ".exe",
+            ".bat",
+            ".cmd",
+            ".com",
+            ".scr",
+            ".pif",
+            ".vbs",
+            ".js",
+            ".jar",
+            ".app",
+            ".deb",
+            ".pkg",
+            ".dmg",
+            ".msi",
+            ".run",
+            ".bin",
+            ".sh",
+            ".ps1",
+            ".py",
+            ".rb",
+            ".pl",
+            ".php",
+            ".jsp",
+            ".asp",
+            ".aspx",
+        ]
+
+        if file_ext in dangerous_extensions:
+            results["errors"].append(
+                f"File extension '{file_ext}' is potentially dangerous and not allowed"
+            )
+            results["is_valid"] = False
+            return False
+
+        return True

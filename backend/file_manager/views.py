@@ -573,11 +573,27 @@ class MediaUploadView(APIView):
                     )
                     continue
             else:
+                # Force upload is restricted to admin users only
+                if not request.user.is_staff:
+                    errors.append(
+                        {
+                            "filename": uploaded_file.name,
+                            "error": "Force upload is only allowed for admin users",
+                            "status": "error",
+                        }
+                    )
+                    SecurityAuditLogger.log_security_violation(
+                        request.user,
+                        "unauthorized_force_upload_attempt",
+                        f"Non-admin user attempted force upload for file: {uploaded_file.name}",
+                    )
+                    continue
+                    
                 # Log force upload for security audit
                 SecurityAuditLogger.log_security_violation(
                     request.user,
                     "force_upload_used",
-                    f"User bypassed security validation for file: {uploaded_file.name}",
+                    f"Admin user bypassed security validation for file: {uploaded_file.name}",
                 )
 
             # Log warnings if any (only if validation was performed)
@@ -595,152 +611,153 @@ class MediaUploadView(APIView):
                     uploaded_file
                 )
             try:
-                # Calculate file hash first for duplicate detection
-                uploaded_file.seek(0)
-                file_content = uploaded_file.read()
-                uploaded_file.seek(0)
-                file_hash = hashlib.sha256(file_content).hexdigest()
-                # Check for existing files with same hash in MediaFile (approved files)
-                existing_media_file = MediaFile.objects.filter(
-                    file_hash=file_hash
-                ).first()
+                # Calculate file hash using streaming to prevent memory issues with large files
+                file_hash = self._calculate_file_hash_streaming(uploaded_file)
+                
+                # Use atomic transaction with proper locking to prevent race conditions
+                from django.db import transaction
+                with transaction.atomic():
+                    # Check for existing files with same hash in MediaFile (approved files) with lock
+                    existing_media_file = MediaFile.objects.select_for_update().filter(
+                        file_hash=file_hash
+                    ).first()
 
-                if existing_media_file:
-                    errors.append(
-                        {
-                            "filename": uploaded_file.name,
-                            "error": f"File rejected: identical file already exists as '{existing_media_file.title}'",
-                            "status": "rejected",
-                            "reason": "duplicate",
-                            "existing_file": {
-                                "id": str(existing_media_file.id),
-                                "title": existing_media_file.title,
-                                "slug": existing_media_file.slug,
-                                "created_at": existing_media_file.created_at.isoformat(),
-                            },
-                        }
-                    )
-                    SecurityAuditLogger.log_file_upload(
-                        request.user,
-                        {
-                            "filename": uploaded_file.name,
-                            "size": uploaded_file.size,
-                            "hash": file_hash,
-                            "rejection_reason": "duplicate_file",
-                        },
-                        success=False,
-                    )
-                    continue
-
-                # Check for existing files with same hash in PendingMediaFile (pending files)
-                existing_pending_file = PendingMediaFile.objects.filter(
-                    file_hash=file_hash, status__in=["pending", "approved"]
-                ).first()
-                if existing_pending_file:
-                    errors.append(
-                        {
-                            "filename": uploaded_file.name,
-                            "error": f"File rejected: identical file already pending approval (uploaded {existing_pending_file.created_at.strftime('%Y-%m-%d %H:%M')})",
-                            "status": "rejected",
-                            "reason": "duplicate_pending",
-                            "existing_file": {
-                                "id": str(existing_pending_file.id),
-                                "original_filename": existing_pending_file.original_filename,
-                                "status": existing_pending_file.status,
-                                "created_at": existing_pending_file.created_at.isoformat(),
-                            },
-                        }
-                    )
-                    SecurityAuditLogger.log_file_upload(
-                        request.user,
-                        {
-                            "filename": uploaded_file.name,
-                            "size": uploaded_file.size,
-                            "hash": file_hash,
-                            "rejection_reason": "duplicate_pending_file",
-                        },
-                        success=False,
-                    )
-                    continue
-
-                # Upload to S3 (will also detect S3-level duplicates)
-                upload_result = storage.upload_file(uploaded_file, folder_path)
-
-                # Double-check if S3 detected existing file (shouldn't happen with our hash checks above)
-                if upload_result.get("existing_file"):
-                    if not existing_media_file and not existing_pending_file:
-                        pass  # add to pending
-                    else:
-                        logger.warning(
-                            f"S3 detected existing file that database checks missed: {upload_result['file_hash']}"
-                        )
+                    if existing_media_file:
                         errors.append(
                             {
                                 "filename": uploaded_file.name,
-                                "error": "File rejected: identical file detected in storage",
+                                "error": f"File rejected: identical file already exists as '{existing_media_file.title}'",
                                 "status": "rejected",
-                                "reason": "duplicate_storage",
+                                "reason": "duplicate",
+                                "existing_file": {
+                                    "id": str(existing_media_file.id),
+                                    "title": existing_media_file.title,
+                                    "slug": existing_media_file.slug,
+                                    "created_at": existing_media_file.created_at.isoformat(),
+                                },
                             }
+                        )
+                        SecurityAuditLogger.log_file_upload(
+                            request.user,
+                            {
+                                "filename": uploaded_file.name,
+                                "size": uploaded_file.size,
+                                "hash": file_hash,
+                                "rejection_reason": "duplicate_file",
+                            },
+                            success=False,
                         )
                         continue
 
-                # AI analysis
-                ai_analysis = ai_service.analyze_media_file(
-                    uploaded_file.read(),
-                    uploaded_file.name,
-                    upload_result["content_type"],
-                )
-                uploaded_file.seek(0)  # Reset file pointer
+                    # Check for existing files with same hash in PendingMediaFile (pending files) with lock
+                    existing_pending_file = PendingMediaFile.objects.select_for_update().filter(
+                        file_hash=file_hash, status__in=["pending", "approved"]
+                    ).first()
+                    if existing_pending_file:
+                        errors.append(
+                            {
+                                "filename": uploaded_file.name,
+                                "error": f"File rejected: identical file already pending approval (uploaded {existing_pending_file.created_at.strftime('%Y-%m-%d %H:%M')})",
+                                "status": "rejected",
+                                "reason": "duplicate_pending",
+                                "existing_file": {
+                                    "id": str(existing_pending_file.id),
+                                    "original_filename": existing_pending_file.original_filename,
+                                    "status": existing_pending_file.status,
+                                    "created_at": existing_pending_file.created_at.isoformat(),
+                                },
+                            }
+                        )
+                        SecurityAuditLogger.log_file_upload(
+                            request.user,
+                            {
+                                "filename": uploaded_file.name,
+                                "size": uploaded_file.size,
+                                "hash": file_hash,
+                                "rejection_reason": "duplicate_pending_file",
+                            },
+                            success=False,
+                        )
+                        continue
 
-                # Determine file type
-                content_type = upload_result["content_type"]
-                if content_type.startswith("image/"):
-                    file_type = "image"
-                elif content_type.startswith("video/"):
-                    file_type = "video"
-                elif content_type.startswith("audio/"):
-                    file_type = "audio"
-                elif content_type in ["application/pdf", "application/msword"]:
-                    file_type = "document"
-                else:
-                    file_type = "other"
+                    # Upload to S3 (will also detect S3-level duplicates)
+                    upload_result = storage.upload_file(uploaded_file, folder_path)
 
-                # Get user for file ownership
-                user = request.user
+                    # Double-check if S3 detected existing file (shouldn't happen with our hash checks above)
+                    if upload_result.get("existing_file"):
+                        if not existing_media_file and not existing_pending_file:
+                            pass  # add to pending
+                        else:
+                            logger.warning(
+                                f"S3 detected existing file that database checks missed: {upload_result['file_hash']}"
+                            )
+                            errors.append(
+                                {
+                                    "filename": uploaded_file.name,
+                                    "error": "File rejected: identical file detected in storage",
+                                    "status": "rejected",
+                                    "reason": "duplicate_storage",
+                                }
+                            )
+                            continue
 
-                # Set expiration time (24 hours from now)
-                from django.utils import timezone
-                from datetime import timedelta
-
-                expires_at = timezone.now() + timedelta(hours=24)
-
-                namespace_obj = namespace
-
-                # Create PendingMediaFile record instead of MediaFile
-                try:
-                    pending_file = PendingMediaFile.objects.create(
-                        original_filename=uploaded_file.name,
-                        file_path=upload_result["file_path"],
-                        file_size=upload_result["file_size"],
-                        content_type=upload_result["content_type"],
-                        file_hash=upload_result["file_hash"],
-                        file_type=file_type,
-                        width=upload_result.get("width"),
-                        height=upload_result.get("height"),
-                        ai_generated_tags=ai_analysis.get("suggested_tags", []),
-                        ai_suggested_title=ai_analysis.get("suggested_title", ""),
-                        ai_extracted_text=ai_analysis.get("extracted_text", ""),
-                        ai_confidence_score=ai_analysis.get("confidence_score", 0.0),
-                        namespace=namespace_obj,
-                        folder_path=folder_path,
-                        uploaded_by=user,
-                        expires_at=expires_at,
+                    # AI analysis
+                    ai_analysis = ai_service.analyze_media_file(
+                        uploaded_file.read(),
+                        uploaded_file.name,
+                        upload_result["content_type"],
                     )
-                except IntegrityError as integrity_error:
-                    # Handle duplicate file hash constraint specifically
-                    if "file_hash" in str(integrity_error) and "uniq" in str(
-                        integrity_error
-                    ):
+                    uploaded_file.seek(0)  # Reset file pointer
+
+                    # Determine file type
+                    content_type = upload_result["content_type"]
+                    if content_type.startswith("image/"):
+                        file_type = "image"
+                    elif content_type.startswith("video/"):
+                        file_type = "video"
+                    elif content_type.startswith("audio/"):
+                        file_type = "audio"
+                    elif content_type in ["application/pdf", "application/msword"]:
+                        file_type = "document"
+                    else:
+                        file_type = "other"
+
+                    # Get user for file ownership
+                    user = request.user
+
+                    # Set expiration time (24 hours from now)
+                    from django.utils import timezone
+                    from datetime import timedelta
+
+                    expires_at = timezone.now() + timedelta(hours=24)
+
+                    namespace_obj = namespace
+
+                    # Create PendingMediaFile record instead of MediaFile
+                    try:
+                        pending_file = PendingMediaFile.objects.create(
+                            original_filename=uploaded_file.name,
+                            file_path=upload_result["file_path"],
+                            file_size=upload_result["file_size"],
+                            content_type=upload_result["content_type"],
+                            file_hash=upload_result["file_hash"],
+                            file_type=file_type,
+                            width=upload_result.get("width"),
+                            height=upload_result.get("height"),
+                            ai_generated_tags=ai_analysis.get("suggested_tags", []),
+                            ai_suggested_title=ai_analysis.get("suggested_title", ""),
+                            ai_extracted_text=ai_analysis.get("extracted_text", ""),
+                            ai_confidence_score=ai_analysis.get("confidence_score", 0.0),
+                            namespace=namespace_obj,
+                            folder_path=folder_path,
+                            uploaded_by=user,
+                            expires_at=expires_at,
+                        )
+                    except IntegrityError as integrity_error:
+                        # Handle duplicate file hash constraint specifically
+                        if "file_hash" in str(integrity_error) and "uniq" in str(
+                            integrity_error
+                        ):
                         # Check if there's an existing pending file with the same hash
                         existing_pending = PendingMediaFile.objects.filter(
                             file_hash=upload_result["file_hash"]
@@ -1887,3 +1904,34 @@ class BulkMediaOperationsView(APIView):
                 "errors": errors,
             }
         )
+
+    def _calculate_file_hash_streaming(self, uploaded_file) -> str:
+        """
+        Calculate SHA256 hash of file using streaming to prevent memory issues.
+        
+        Args:
+            uploaded_file: The uploaded file object
+            
+        Returns:
+            SHA256 hash as hexadecimal string
+        """
+        import hashlib
+        
+        # Reset file pointer
+        uploaded_file.seek(0)
+        
+        # Create hash object
+        sha256_hash = hashlib.sha256()
+        
+        # Read file in chunks to avoid loading entire file into memory
+        chunk_size = 8192  # 8KB chunks
+        while True:
+            chunk = uploaded_file.read(chunk_size)
+            if not chunk:
+                break
+            sha256_hash.update(chunk)
+        
+        # Reset file pointer for subsequent operations
+        uploaded_file.seek(0)
+        
+        return sha256_hash.hexdigest()
