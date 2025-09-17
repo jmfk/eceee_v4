@@ -1,20 +1,72 @@
-import React, { useState, useEffect, useCallback } from 'react'
-import { Image, FolderOpen, X, Eye, Search, Grid3X3, List, Loader2, ChevronDown, ChevronUp, Upload, Tag, Check } from 'lucide-react'
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { Image, FolderOpen, ChevronDown, ChevronUp } from 'lucide-react'
 import { mediaApi } from '../../api'
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext'
 import { generateThumbnailUrl } from '../../utils/imgproxy'
 import MediaSearchWidget from '../media/MediaSearchWidget'
-import MediaTagWidget from '../media/MediaTagWidget'
+import ImageUploadSection from './ImageUploadSection'
+import ImageDisplaySection from './ImageDisplaySection'
+import {
+    validateImageFile,
+    getImageTypeInfo,
+    formatFileSize,
+    getImageUrl,
+    getImageAcceptAttribute,
+    getAllowedImageTypes,
+    isImageFile
+} from './ImageValidationUtils'
 
 /**
- * ExpandableImageField - Form field component for image selection with inline expansion
+ * Memoized image grid item to prevent unnecessary rerenders
+ */
+const ImageGridItem = React.memo(({ image, isSelected, thumbnailUrl, onSelect }) => {
+    const handleClick = useCallback(() => {
+        onSelect(image)
+    }, [image, onSelect])
+
+    return (
+        <div
+            className={`relative aspect-square cursor-pointer border-2 rounded-lg overflow-hidden transition-all duration-200 ${isSelected
+                ? 'border-blue-500 bg-blue-50 shadow-lg scale-105'
+                : 'border-gray-200 hover:border-gray-300 hover:shadow-md'
+                }`}
+            onClick={handleClick}
+            title={image.title || image.original_filename}
+        >
+            {isSelected && (
+                <div className="absolute top-1 right-1 z-10 w-4 h-4 bg-blue-600 rounded-full flex items-center justify-center">
+                    <div className="w-2 h-2 bg-white rounded-full" />
+                </div>
+            )}
+
+            <div className="w-full h-full bg-gray-100">
+                {thumbnailUrl ? (
+                    <img
+                        src={thumbnailUrl}
+                        alt={image.title || image.original_filename || 'Image'}
+                        className="w-full h-full object-cover"
+                    />
+                ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                        <Image className="w-8 h-8 text-gray-400" />
+                    </div>
+                )}
+            </div>
+        </div>
+    )
+})
+
+ImageGridItem.displayName = 'ImageGridItem'
+
+/**
+ * ExpandableImageField - Refactored version with modular components
  * 
  * Features:
- * - Expandable interface with search form and thumbnail grid
- * - 9x9 thumbnail grid layout for image results
- * - Inline search and filtering
+ * - Expandable interface with search form and image grid
+ * - Configurable image constraints and filtering
  * - Single or multiple image selection
- * - Preview of selected images
+ * - Upload functionality with drag & drop
+ * - Auto-tags and collection assignment
  */
 const ExpandableImageField = ({
     value,
@@ -25,20 +77,45 @@ const ExpandableImageField = ({
     multiple = false,
     maxItems = null,
     minItems = null,
+    allowedFileTypes = ['image', 'video', 'audio'],
+    allowedMimeTypes = [],
+    allowedExtensions = '',
     validation,
     isValidating,
     showValidation = true,
-    namespace
+    namespace,
+    // Image constraints
+    constraints = {},
+    // Auto-tags for uploads
+    autoTags = '',
+    // Default collection for uploads
+    defaultCollection = null,
+    // Max files limit
+    maxFiles = null
 }) => {
+    // Memoize constraints to prevent recreation on every render
+    const imageConstraints = useMemo(() => {
+        const defaultConstraints = {
+            allowedTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
+            minWidth: null,
+            maxWidth: null,
+            minHeight: null,
+            maxHeight: null,
+            minSize: null,
+            maxSize: 10 * 1024 * 1024, // 10MB
+            aspectRatio: null,
+            exactDimensions: null
+        }
+        return { ...defaultConstraints, ...constraints }
+    }, [constraints])
     const [isExpanded, setIsExpanded] = useState(false)
     const [searchTerms, setSearchTerms] = useState([])
     const [images, setImages] = useState([])
     const [loading, setLoading] = useState(false)
-    const [selectedImageIds, setSelectedImageIds] = useState(new Set())
-    const [viewMode, setViewMode] = useState('grid') // 'grid' | 'list'
+    const [viewMode, setViewMode] = useState('grid')
     const [pagination, setPagination] = useState({
         page: 1,
-        pageSize: 12, // 4x3 grid = 12 images per page
+        pageSize: 12,
         total: 0,
         hasNext: false,
         hasPrev: false
@@ -49,56 +126,102 @@ const ExpandableImageField = ({
     const [uploading, setUploading] = useState(false)
     const [uploadTags, setUploadTags] = useState([])
     const [dragOver, setDragOver] = useState(false)
+    const [uploadErrors, setUploadErrors] = useState([])
+    const [showForceUpload, setShowForceUpload] = useState(false)
+    const [collectionOverride, setCollectionOverride] = useState(null) // null = use default, false = no collection
 
     const { addNotification } = useGlobalNotifications()
+    const fieldRef = useRef(null)
 
-    // Format file size
-    const formatFileSize = (bytes) => {
-        if (!bytes || bytes === 0) return '0 Bytes'
-        const k = 1024
-        const sizes = ['Bytes', 'KB', 'MB', 'GB']
-        const i = Math.floor(Math.log(bytes) / Math.log(k))
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
-    }
+    // Parse auto-tags array into tag objects
+    const parseAutoTags = useCallback(async (autoTagsConfig) => {
+        if (!autoTagsConfig || !namespace) return []
 
-    // Generate image URL for display
-    const getImageUrl = (image, size = null) => {
-        // For full-size images, prefer imgproxy base URL or file URL
-        if (!size) {
-            return image.imgproxyBaseUrl || image.fileUrl || image.file_url || image.url
+        // Handle both string (legacy) and array (new) formats
+        let tagsToProcess = []
+
+        if (typeof autoTagsConfig === 'string') {
+            const tagNames = autoTagsConfig.split(',').map(name => name.trim()).filter(name => name.length > 0)
+            tagsToProcess = tagNames.map(name => ({ name }))
+        } else if (Array.isArray(autoTagsConfig)) {
+            tagsToProcess = autoTagsConfig.filter(tag => tag && tag.name)
+        } else {
+            return []
         }
 
-        // For thumbnails, use thumbnail_url if available and matches size
-        if (image.thumbnail_url && size <= 150) {
-            return image.thumbnail_url
+        if (tagsToProcess.length === 0) return []
+
+        try {
+            const tagPromises = tagsToProcess.map(async (tagConfig) => {
+                const tagName = tagConfig.name
+                try {
+                    if (tagConfig.id) {
+                        return tagConfig
+                    }
+
+                    const response = await mediaApi.tags.list({
+                        namespace,
+                        name: tagName,
+                        pageSize: 1
+                    })()
+
+                    if (response.results?.length > 0) {
+                        return response.results[0]
+                    }
+
+                    const slug = tagName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+                    return await mediaApi.tags.create({
+                        name: tagName,
+                        slug: slug,
+                        namespace,
+                        description: `Auto-generated tag: ${tagName}`
+                    })()
+                } catch (error) {
+                    console.warn(`Failed to get/create tag "${tagName}":`, error)
+                    return null
+                }
+            })
+
+            const tags = await Promise.all(tagPromises)
+            return tags.filter(tag => tag !== null)
+        } catch (error) {
+            console.warn('Failed to parse auto-tags:', error)
+            return []
+        }
+    }, [namespace])
+
+    // Scroll field into view
+    const scrollToField = useCallback(() => {
+        if (fieldRef.current) {
+            fieldRef.current.scrollIntoView({
+                behavior: 'smooth',
+                block: 'start',
+                inline: 'nearest'
+            })
+        }
+    }, [])
+
+    // Generate thumbnail URL for images
+    const getThumbnailUrl = (image, size = 150) => {
+        if (image.imgproxyBaseUrl && size <= 150) {
+            return image.imgproxyBaseUrl
         }
 
-        // Generate thumbnail using imgproxy
-        const sourceUrl = image.imgproxyBaseUrl || image.fileUrl || image.file_url || image.url
+        const sourceUrl = getImageUrl(image)
         return sourceUrl ? generateThumbnailUrl(sourceUrl, size, size) : null
     }
 
-    // Generate full-size image URL for viewing
-    const getFullImageUrl = (image) => {
-        // Use the best available full-size URL
-        return image.imgproxyBaseUrl || image.fileUrl || image.file_url || image.url
-    }
-
-    // Load images
-    const loadImages = useCallback(async (page = 1, append = false) => {
-        if (!namespace || !isExpanded) {
-            return
-        }
+    // Load images from media library
+    const loadImages = useCallback(async (page = 1) => {
+        if (!namespace || !isExpanded) return
 
         setLoading(true)
         try {
             const params = {
                 page,
-                pageSize: pagination.pageSize, // Use pageSize like other components
+                pageSize: pagination.pageSize,
                 namespace,
-                fileType: 'image', // Use fileType like other components
                 ordering: '-created_at',
-                // Convert search terms to structured search parameters
                 ...((() => {
                     const textTerms = searchTerms.filter(term => term.type === 'text')
                     const tagTerms = searchTerms.filter(term => term.type === 'tag')
@@ -113,18 +236,20 @@ const ExpandableImageField = ({
                     }
 
                     return searchParams
-                })())
+                })()),
+                file_types: allowedFileTypes,
+                mime_types: allowedMimeTypes
             }
-
-            // Use search API if there are search terms, otherwise use files list
             let result
             if (searchTerms.length > 0) {
-                result = await mediaApi.search.search(params)()
+                result = await mediaApi.search.search(params)
             } else {
                 result = await mediaApi.files.list(params)()
             }
-            const newImages = result.results || result || []
-            setImages(newImages) // Always replace, no more appending
+            let newImages = result.results || result || []
+
+            // Backend now handles filtering, so we can use the results directly
+            setImages(newImages)
             setPagination({
                 page,
                 pageSize: pagination.pageSize,
@@ -138,26 +263,48 @@ const ExpandableImageField = ({
         } finally {
             setLoading(false)
         }
-    }, [namespace, searchTerms, pagination.pageSize, addNotification, isExpanded])
+    }, [namespace, searchTerms, pagination.pageSize, addNotification, isExpanded, imageConstraints])
 
-    // Load images when expanded or dependencies change
+    // Load images when expanded
     useEffect(() => {
         if (isExpanded) {
-            loadImages(1, false)
+            loadImages(1)
         }
     }, [loadImages, isExpanded])
 
-    // Handle image selection
+    // Initialize search terms with auto-tags when component mounts or auto-tags change
+    useEffect(() => {
+        const initializeSearchWithAutoTags = async () => {
+            if (autoTags && namespace && searchTerms.length === 0) {
+                try {
+                    const tags = await parseAutoTags(autoTags)
+                    if (tags.length > 0) {
+                        const tagSearchTerms = tags.map(tag => ({
+                            type: 'tag',
+                            value: tag.name,
+                            label: tag.name,
+                            id: tag.id
+                        }))
+                        setSearchTerms(tagSearchTerms)
+                    }
+                } catch (error) {
+                    console.warn('Failed to initialize search with auto-tags:', error)
+                }
+            }
+        }
+
+        initializeSearchWithAutoTags()
+    }, [autoTags, namespace, parseAutoTags, searchTerms.length])
+
+    // Handle image selection from media library
     const handleImageSelect = (image) => {
         if (multiple) {
             const currentImages = Array.isArray(value) ? value : []
             const isAlreadySelected = currentImages.some(img => img.id === image.id)
 
             if (isAlreadySelected) {
-                // Remove from selection
                 onChange(currentImages.filter(img => img.id !== image.id))
             } else {
-                // Add to selection
                 if (maxItems && currentImages.length >= maxItems) {
                     addNotification(`Maximum ${maxItems} images allowed`, 'warning')
                     return
@@ -165,13 +312,13 @@ const ExpandableImageField = ({
                 onChange([...currentImages, image])
             }
         } else {
-            // Single selection
             onChange(image)
-            setIsExpanded(false) // Collapse after selection
+            setIsExpanded(false)
+            setTimeout(scrollToField, 100)
         }
     }
 
-    // Remove an image
+    // Remove an image from field
     const handleRemoveImage = (imageId) => {
         if (multiple) {
             const currentImages = Array.isArray(value) ? value : []
@@ -187,40 +334,72 @@ const ExpandableImageField = ({
         setPagination(prev => ({ ...prev, page: 1 }))
     }
 
-    // Pagination handlers
-    const goToNextPage = () => {
-        if (pagination.hasNext && !loading) {
-            loadImages(pagination.page + 1, false)
-        }
-    }
-
-    const goToPrevPage = () => {
-        if (pagination.hasPrev && !loading) {
-            loadImages(pagination.page - 1, false)
-        }
-    }
-
-    const goToPage = (page) => {
-        if (page !== pagination.page && !loading) {
-            loadImages(page, false)
-        }
-    }
-
-    // Handle file drop
+    // Drag and drop handlers
     const handleDrop = useCallback((e) => {
         e.preventDefault()
         setDragOver(false)
 
-        const files = Array.from(e.dataTransfer.files).filter(file =>
-            file.type.startsWith('image/')
-        )
-
-        if (files.length > 0) {
-            setUploadFiles(files)
+        if (!isExpanded) {
+            setIsExpanded(true)
         }
-    }, [])
 
-    // Handle drag events
+        const droppedFiles = Array.from(e.dataTransfer.files)
+        const validFiles = []
+        const invalidFiles = []
+        const uploadOnlyFiles = []
+
+        const currentImageCount = multiple ? (Array.isArray(value) ? value.length : 0) : 0
+
+        droppedFiles.forEach(file => {
+            // Only process image files
+            if (!isImageFile(file)) {
+                invalidFiles.push({ file, errors: ['Only image files are allowed'] })
+                return
+            }
+
+            const validation = validateImageFile(file, imageConstraints, currentImageCount, maxFiles)
+            if (validation.isValid) {
+                if (validation.canAddToField) {
+                    validFiles.push(file)
+                } else {
+                    uploadOnlyFiles.push({ file, fieldErrors: validation.fieldErrors })
+                }
+            } else {
+                invalidFiles.push({ file, errors: validation.uploadErrors })
+            }
+        })
+
+        if (validFiles.length > 0) {
+            setUploadFiles(validFiles)
+
+            // Initialize auto-tags if configured
+            if (autoTags && ((typeof autoTags === 'string' && autoTags.trim()) || (Array.isArray(autoTags) && autoTags.length > 0))) {
+                parseAutoTags(autoTags).then(tags => {
+                    if (tags.length > 0) {
+                        setUploadTags(tags)
+                    }
+                }).catch(error => {
+                    console.warn('Failed to initialize auto-tags:', error)
+                })
+            }
+        }
+
+        // Show warnings and errors
+        if (uploadOnlyFiles.length > 0) {
+            const warningMessages = uploadOnlyFiles.map(({ file, fieldErrors }) =>
+                `${file.name}: ${fieldErrors.join(', ')} - will be uploaded to media library only`
+            )
+            addNotification(`Type mismatch warnings:\n${warningMessages.join('\n')}`, 'warning')
+        }
+
+        if (invalidFiles.length > 0) {
+            const errorMessages = invalidFiles.map(({ file, errors }) =>
+                `${file.name}: ${errors.join(', ')}`
+            )
+            addNotification(`Upload rejected:\n${errorMessages.join('\n')}`, 'error')
+        }
+    }, [imageConstraints, maxFiles, addNotification, autoTags, parseAutoTags, isExpanded, setIsExpanded, setUploadFiles, setUploadTags, multiple, value])
+
     const handleDragOver = useCallback((e) => {
         e.preventDefault()
         setDragOver(true)
@@ -231,286 +410,155 @@ const ExpandableImageField = ({
         setDragOver(false)
     }, [])
 
-    // Handle file input change
-    const handleFileSelect = useCallback((e) => {
-        const files = Array.from(e.target.files).filter(file =>
-            file.type.startsWith('image/')
-        )
+    const handleFileInputChange = useCallback((e) => {
+        const selectedFiles = Array.from(e.target.files)
+        const validFiles = []
+        const invalidFiles = []
+        const uploadOnlyFiles = []
 
-        if (files.length > 0) {
-            setUploadFiles(files)
-        }
+        const currentImageCount = multiple ? (Array.isArray(value) ? value.length : 0) : 0
 
-        // Reset input
-        e.target.value = ''
-    }, [])
-
-    // Upload and approve images
-    const handleUploadAndApprove = useCallback(async () => {
-        if (!uploadFiles.length || !namespace) {
-            return
-        }
-
-        setUploading(true)
-        try {
-            // Upload files
-            const uploadData = {
-                files: uploadFiles,
-                namespace: namespace
+        selectedFiles.forEach(file => {
+            // Only process image files
+            if (!isImageFile(file)) {
+                invalidFiles.push({ file, errors: ['Only image files are allowed'] })
+                return
             }
 
-            const onProgress = (percentCompleted, progressEvent) => {
-                // Progress tracking could be added here if needed
-            }
-
-            const uploadResult = await mediaApi.upload.upload(uploadData, onProgress)
-
-            // Handle both uploaded files and rejected files (duplicates)
-            const uploadedFiles = uploadResult.uploadedFiles || uploadResult.uploaded_files || []
-            const rejectedFiles = uploadResult.rejectedFiles || uploadResult.rejected_files || []
-
-            // Combine files to approve - use existing file ID for duplicates
-            const filesToApprove = [
-                ...uploadedFiles,
-                ...rejectedFiles.filter(file => file.reason === 'duplicate_pending').map(file => ({
-                    id: file.existingFileId || file.existingFile?.id,
-                    originalFilename: file.existingFile?.originalFilename || file.filename,
-                    filename: file.existingFile?.originalFilename || file.filename
-                }))
-            ]
-
-            // Auto-approve with tags for single image widget
-            const approvalPromises = filesToApprove.map(async (file) => {
-                try {
-                    // Use the file's original filename or fallback
-                    const filename = file.originalFilename || file.original_filename || file.filename || 'untitled'
-
-                    // Generate a proper slug
-                    const slug = filename
-                        .toLowerCase()
-                        .replace(/\.[^/.]+$/, '') // Remove file extension
-                        .replace(/[^a-z0-9]+/g, '-')
-                        .replace(/^-+|-+$/g, '')
-                        .substring(0, 50) // Limit length
-
-                    // Ensure we have at least one tag
-                    if (uploadTags.length === 0) {
-                        console.error('No tags provided for approval')
-                        return null
-                    }
-
-                    const approvalData = {
-                        title: filename.replace(/\.[^/.]+$/, ''), // Remove extension from title
-                        description: '',
-                        slug: slug || 'untitled',
-                        tag_ids: uploadTags.map(tag => String(tag.id)), // Ensure string format
-                        access_level: 'public'
-                    }
-
-                    return await mediaApi.pendingFiles.approve(file.id, approvalData)()
-                } catch (error) {
-                    console.error('Failed to approve file:', error)
-                    console.error('Approval error response:', error.response?.data)
-                    console.error('Approval error status:', error.response?.status)
-                    return null
+            const validation = validateImageFile(file, imageConstraints, currentImageCount, maxFiles)
+            if (validation.isValid) {
+                if (validation.canAddToField) {
+                    validFiles.push(file)
+                } else {
+                    uploadOnlyFiles.push({ file, fieldErrors: validation.fieldErrors })
                 }
-            })
-
-            const approvedFiles = (await Promise.all(approvalPromises)).filter(Boolean)
-
-            if (approvedFiles.length > 0) {
-                const approvalResponse = approvedFiles[0]
-
-                // Extract the actual media file from the response
-                const selectedImage = approvalResponse.mediaFile || approvalResponse
-
-                // Ensure the image object has all required fields for display
-                const formattedImage = {
-                    id: selectedImage.id,
-                    title: selectedImage.title,
-                    file_type: selectedImage.fileType || 'image',
-                    fileSize: selectedImage.fileSize,
-                    file_size: selectedImage.fileSize,
-                    dimensions: selectedImage.dimensions,
-                    description: selectedImage.description,
-                    thumbnail_url: selectedImage.thumbnail_url,
-                    imgproxyBaseUrl: selectedImage.imgproxyBaseUrl,
-                    fileUrl: selectedImage.fileUrl,
-                    file_url: selectedImage.fileUrl,
-                    url: selectedImage.url || selectedImage.fileUrl
-                }
-
-                // For single image widget, replace the current image
-                onChange(formattedImage)
-
-                // Refresh the image list to show the newly approved image
-                if (isExpanded) {
-                    loadImages(1, false)
-                }
-
-                setIsExpanded(false)
-                addNotification('Image uploaded and added successfully', 'success')
             } else {
-                addNotification('No files were successfully approved', 'warning')
+                invalidFiles.push({ file, errors: validation.uploadErrors })
             }
-
-            // Clear upload state
-            setUploadFiles([])
-            setUploadTags([])
-
-        } catch (error) {
-            console.error('Upload failed:', error)
-            console.error('Error details:', {
-                message: error.message,
-                response: error.response?.data,
-                status: error.response?.status,
-                stack: error.stack
-            })
-
-            // Show more specific error message
-            const errorMessage = error.response?.data?.detail ||
-                error.response?.data?.error ||
-                error.message ||
-                'Upload failed'
-            addNotification(`Failed to upload image: ${errorMessage}`, 'error')
-        } finally {
-            setUploading(false)
+        })
+        if (validFiles.length > 0) {
+            setUploadFiles(validFiles)
+            // Initialize auto-tags if configured
+            if (autoTags && ((typeof autoTags === 'string' && autoTags.trim()) || (Array.isArray(autoTags) && autoTags.length > 0))) {
+                parseAutoTags(autoTags).then(tags => {
+                    if (tags.length > 0) {
+                        setUploadTags(tags)
+                    }
+                }).catch(error => {
+                    console.warn('Failed to initialize auto-tags:', error)
+                })
+            }
         }
-    }, [uploadFiles, namespace, uploadTags, onChange, addNotification])
 
-    // Remove upload file
-    const removeUploadFile = useCallback((index) => {
-        setUploadFiles(prev => prev.filter((_, i) => i !== index))
-    }, [])
+        // Show warnings and errors
+        if (uploadOnlyFiles.length > 0) {
+            const warningMessages = uploadOnlyFiles.map(({ file, fieldErrors }) =>
+                `${file.name}: ${fieldErrors.join(', ')} - will be uploaded to media library only`
+            )
+            addNotification(`Type mismatch warnings:\n${warningMessages.join('\n')}`, 'warning')
+        }
 
-    // Get display value for rendering
-    const getDisplayValue = () => {
+        if (invalidFiles.length > 0) {
+            const errorMessages = invalidFiles.map(({ file, errors }) =>
+                `${file.name}: ${errors.join(', ')}`
+            )
+            addNotification(`Upload rejected:\n${errorMessages.join('\n')}`, 'error')
+        }
+
+        e.target.value = ''
+    }, [imageConstraints, maxFiles, addNotification, autoTags, parseAutoTags, setUploadFiles, setUploadTags, multiple, value])
+
+    // Memoize display values to prevent recalculation
+    const displayImages = useMemo(() => {
         if (multiple) {
             return Array.isArray(value) ? value : []
         }
-        const result = value ? [value] : []
-        return result
-    }
+        return value ? [value] : []
+    }, [value, multiple])
 
-    const displayImages = getDisplayValue()
     const hasImages = displayImages.length > 0
-    const canAddMore = multiple ? (!maxItems || displayImages.length < maxItems) : !hasImages
-    const canReplace = !multiple && hasImages // Allow replacement for single image fields
-
-    // Validation state
     const hasError = showValidation && validation && !validation.isValid
     const errorMessage = hasError ? validation.message : null
 
-    // Check if image is selected
-    const isImageSelected = (image) => {
-        if (multiple) {
-            const currentImages = Array.isArray(value) ? value : []
-            return currentImages.some(img => img.id === image.id)
+    const handleUploadComplete = useCallback(() => {
+        if (isExpanded) {
+            loadImages(1)
         }
-        return value && value.id === image.id
-    }
+        setIsExpanded(false)
+        setTimeout(scrollToField, 100)
+    }, [isExpanded, loadImages, scrollToField])
 
-    // Render grid item
-    const renderGridItem = (image) => {
-        const isSelected = isImageSelected(image)
+    // Get effective collection (considering override) - must be defined before useMemo
+    const getEffectiveCollection = useCallback(() => {
+        if (collectionOverride === false) return null // User opted out
+        return defaultCollection // Use default or null if none configured
+    }, [collectionOverride, defaultCollection])
 
-        return (
-            <div
-                key={image.id}
-                className={`relative aspect-square cursor-pointer border-2 rounded-lg overflow-hidden transition-all duration-200 ${isSelected
-                    ? 'border-blue-500 bg-blue-50 shadow-lg scale-105'
-                    : 'border-gray-200 hover:border-gray-300 hover:shadow-md'
-                    }`}
-                onClick={() => handleImageSelect(image)}
-                title={image.title}
-            >
-                {/* Selection indicator */}
-                {isSelected && (
-                    <div className="absolute top-1 right-1 z-10 w-4 h-4 bg-blue-600 rounded-full flex items-center justify-center">
-                        <div className="w-2 h-2 bg-white rounded-full" />
-                    </div>
-                )}
+    // Handle collection removal
+    const handleRemoveDefaultCollection = useCallback(() => {
+        setCollectionOverride(false)
+        addNotification('Images will not be added to any collection', 'info')
+    }, [addNotification])
 
-                {/* Image */}
-                <img
-                    src={getImageUrl(image, 200) || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="100%" height="100%" fill="%23f3f4f6"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="%236b7280" font-size="12">IMG</text></svg>'}
-                    alt={image.title}
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                        e.target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="100%" height="100%" fill="%23f3f4f6"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="%236b7280" font-size="12">IMG</text></svg>'
-                    }}
-                />
+    // Memoize upload section props to prevent unnecessary rerenders
+    const uploadSectionProps = useMemo(() => ({
+        uploadFiles,
+        setUploadFiles,
+        uploading,
+        setUploading,
+        uploadTags,
+        setUploadTags,
+        uploadErrors,
+        setUploadErrors,
+        showForceUpload,
+        setShowForceUpload,
+        dragOver,
+        namespace,
+        constraints: imageConstraints,
+        defaultCollection: getEffectiveCollection(),
+        onRemoveDefaultCollection: handleRemoveDefaultCollection,
+        maxFiles,
+        value,
+        multiple,
+        onChange,
+        onUploadComplete: handleUploadComplete,
+        parseAutoTags,
+        autoTags,
+        handleDrop,
+        handleDragOver,
+        handleDragLeave,
+        handleFileInputChange
+    }), [
+        uploadFiles, setUploadFiles, uploading, setUploading, uploadTags, setUploadTags,
+        uploadErrors, setUploadErrors, showForceUpload, setShowForceUpload, dragOver,
+        namespace, imageConstraints, getEffectiveCollection, handleRemoveDefaultCollection, maxFiles, value, multiple,
+        onChange, handleUploadComplete, parseAutoTags, autoTags, handleDrop,
+        handleDragOver, handleDragLeave, handleFileInputChange
+    ])
 
-                {/* Hover overlay */}
-                <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
-                    <Eye className="w-4 h-4 text-white" />
-                </div>
-            </div>
-        )
-    }
+    // Memoize display section props
+    const displaySectionProps = useMemo(() => ({
+        images: displayImages,
+        multiple,
+        maxFiles,
+        isExpanded,
+        setIsExpanded,
+        onRemoveImage: handleRemoveImage,
+        getThumbnailUrl
+    }), [displayImages, multiple, maxFiles, isExpanded, setIsExpanded, handleRemoveImage, getThumbnailUrl])
 
-    // Render list item
-    const renderListItem = (image) => {
-        const isSelected = isImageSelected(image)
+    // Memoize stable handlers to prevent recreation
+    const toggleExpanded = useCallback(() => {
+        setIsExpanded(!isExpanded)
+    }, [isExpanded])
 
-        return (
-            <div
-                key={image.id}
-                className={`flex items-center gap-4 p-3 cursor-pointer border rounded-lg transition-all duration-200 ${isSelected
-                    ? 'border-blue-500 bg-blue-50'
-                    : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                    }`}
-                onClick={() => handleImageSelect(image)}
-            >
-                {/* Selection checkbox */}
-                <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${isSelected ? 'bg-blue-600 border-blue-600' : 'border-gray-300'
-                    }`}>
-                    {isSelected && <Check className="w-3 h-3 text-white" />}
-                </div>
-
-                {/* Image thumbnail */}
-                <div className="w-12 h-12 bg-gray-100 rounded flex items-center justify-center flex-shrink-0">
-                    <img
-                        src={getImageUrl(image, 48) || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48"><rect width="100%" height="100%" fill="%23f3f4f6"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="%236b7280" font-size="12">IMG</text></svg>'}
-                        alt={image.title}
-                        className="w-full h-full object-cover rounded"
-                        onError={(e) => {
-                            e.target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48"><rect width="100%" height="100%" fill="%23f3f4f6"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="%236b7280" font-size="12">IMG</text></svg>'
-                        }}
-                    />
-                </div>
-
-                {/* Image details */}
-                <div className="flex-1 min-w-0">
-                    <h4 className="font-medium text-gray-900 truncate">{image.title}</h4>
-                    <div className="flex items-center gap-4 text-sm text-gray-500 mt-1">
-                        <span className="capitalize">{image.file_type}</span>
-                        <span>{formatFileSize(image.fileSize || image.file_size)}</span>
-                        {image.dimensions && <span>{image.dimensions}</span>}
-                    </div>
-                </div>
-
-                {/* Actions */}
-                <div className="flex items-center gap-2">
-                    {getFullImageUrl(image) && (
-                        <button
-                            className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
-                            onClick={(e) => {
-                                e.stopPropagation()
-                                window.open(getFullImageUrl(image), '_blank')
-                            }}
-                            title="View full-size image"
-                        >
-                            <Eye className="w-4 h-4" />
-                        </button>
-                    )}
-                </div>
-            </div>
-        )
-    }
+    const closeAndScroll = useCallback(() => {
+        setIsExpanded(false)
+        setTimeout(scrollToField, 100)
+    }, [scrollToField])
 
     return (
-        <div className="space-y-3">
+        <div ref={fieldRef} className="space-y-3">
             {/* Label and Description */}
             <div>
                 <label className="block text-sm font-medium text-gray-700">
@@ -522,214 +570,58 @@ const ExpandableImageField = ({
                 )}
             </div>
 
-            {/* Unified Container with Border */}
-            <div className={`border-2 rounded-lg transition-all duration-300 ${hasError
-                ? 'border-red-300'
-                : isExpanded
-                    ? 'border-blue-300 shadow-md'
-                    : 'border-gray-300'
-                }`}>
-                {/* Unified Image Selection/Display */}
+            {/* Main Container with Dropzone */}
+            <div
+                className={`border-2 rounded-lg transition-all duration-300 ${hasError
+                    ? 'border-red-300'
+                    : dragOver && !isExpanded && !hasImages
+                        ? 'border-blue-400 bg-blue-50'
+                        : isExpanded
+                            ? 'border-blue-300 shadow-md'
+                            : 'border-gray-300'
+                    }`}
+                onDrop={!hasImages ? handleDrop : undefined}
+                onDragOver={!hasImages ? handleDragOver : undefined}
+                onDragLeave={!hasImages ? handleDragLeave : undefined}
+            >
                 {hasImages ? (
-                    /* Selected Image Display with Replace Button */
-                    <div className={`transition-colors ${isExpanded
-                        ? 'border-b border-gray-200 bg-gray-50 rounded-t-md'
-                        : 'rounded-md'
-                        }`}>
-                        {displayImages.map((image) => (
-                            <div key={image.id} className="flex items-center space-x-3 p-4">
-                                {/* Image Preview */}
-                                <div className="flex-shrink-0">
-                                    <img
-                                        src={getImageUrl(image, 48) || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48"><rect width="100%" height="100%" fill="%23f3f4f6"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="%236b7280" font-size="12">IMG</text></svg>'}
-                                        alt={image.title}
-                                        className="w-12 h-12 object-cover rounded"
-                                        onError={(e) => {
-                                            e.target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48"><rect width="100%" height="100%" fill="%23f3f4f6"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="%236b7280" font-size="12">IMG</text></svg>'
-                                        }}
-                                    />
-                                </div>
-
-                                {/* Image Info */}
-                                <div className="flex-1 min-w-0">
-                                    <div className="font-medium text-sm text-gray-900 truncate">
-                                        {image.title}
-                                    </div>
-                                    <div className="text-xs text-gray-500 truncate">
-                                        {image.file_type} • {formatFileSize(image.fileSize)}
-                                    </div>
-                                    {image.dimensions && (
-                                        <div className="text-xs text-gray-400 truncate mt-1">
-                                            {image.dimensions}
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Actions */}
-                                <div className="flex items-center space-x-1">
-                                    {getFullImageUrl(image) && (
-                                        <a
-                                            href={getFullImageUrl(image)}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="p-1 text-gray-400 hover:text-blue-600"
-                                            title="View full-size image"
-                                        >
-                                            <Eye className="w-4 h-4" />
-                                        </a>
-                                    )}
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsExpanded(!isExpanded)}
-                                        className="p-1 text-gray-400 hover:text-blue-600"
-                                        title={isExpanded ? "Collapse" : "Replace image"}
-                                    >
-                                        {isExpanded ? (
-                                            <ChevronUp className="w-4 h-4" />
-                                        ) : (
-                                            <FolderOpen className="w-4 h-4" />
-                                        )}
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => handleRemoveImage(image.id)}
-                                        className="p-1 text-gray-400 hover:text-red-600"
-                                        title="Remove image"
-                                    >
-                                        <X className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
+                    /* Selected Images Display */
+                    <ImageDisplaySection {...displaySectionProps} />
                 ) : (
-                    /* Empty State Selection Button */
+                    /* Empty State with Dropzone */
                     <button
                         type="button"
-                        onClick={() => setIsExpanded(!isExpanded)}
+                        onClick={toggleExpanded}
                         className={`w-full flex items-center justify-center gap-2 p-6 transition-colors ${isExpanded
                             ? 'border-b border-gray-200 bg-gray-50 hover:bg-gray-100 rounded-t-md'
                             : hasError
                                 ? 'border-dashed hover:bg-red-50 rounded-md'
-                                : 'border-dashed hover:bg-blue-50 rounded-md'
+                                : dragOver
+                                    ? 'border-dashed bg-blue-100 rounded-md'
+                                    : 'border-dashed hover:bg-blue-50 rounded-md'
                             }`}
                     >
-                        <FolderOpen className="w-6 h-6 text-gray-400" />
-                        <span className="text-gray-600">
-                            Select Image from Media Library
+                        <Image className={`w-6 h-6 ${dragOver && !isExpanded ? 'text-blue-500' : 'text-gray-400'}`} />
+                        <span className={`${dragOver && !isExpanded ? 'text-blue-700' : 'text-gray-600'}`}>
+                            {dragOver && !isExpanded
+                                ? 'Drop images here to upload'
+                                : `Select Image${multiple ? 's' : ''} from Media Library`
+                            }
                         </span>
                         {isExpanded ? (
                             <ChevronUp className="w-5 h-5 text-gray-400" />
                         ) : (
-                            <ChevronDown className="w-5 h-5 text-gray-400" />
+                            <ChevronDown className={`w-5 h-5 ${dragOver ? 'text-blue-500' : 'text-gray-400'}`} />
                         )}
                     </button>
                 )}
 
-                {/* Expandable Media Picker */}
+                {/* Expanded Media Picker */}
                 {isExpanded && (
                     <div className="bg-white rounded-b-md">
-                        {/* Upload Dropzone */}
+                        {/* Upload Section */}
                         <div className="p-4 border-b border-gray-200 bg-gray-50">
-                            {/* Dropzone */}
-                            <div
-                                onDrop={handleDrop}
-                                onDragOver={handleDragOver}
-                                onDragLeave={handleDragLeave}
-                                className={`relative border border-dashed rounded-md p-3 text-center transition-colors ${dragOver
-                                    ? 'border-blue-400 bg-blue-50'
-                                    : 'border-gray-300 hover:border-gray-400'
-                                    }`}
-                            >
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={handleFileSelect}
-                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                    disabled={uploading}
-                                />
-                                <Upload className="w-5 h-5 text-gray-400 mx-auto mb-1" />
-                                <p className="text-xs text-gray-600">
-                                    {dragOver ? 'Drop image here' : 'Drag & drop or click to select'}
-                                </p>
-                            </div>
-
-                            {/* Upload Files Preview */}
-                            {uploadFiles.length > 0 && (
-                                <div className="mt-4 space-y-3">
-                                    <h5 className="text-sm font-medium text-gray-700">Files to Upload:</h5>
-                                    {uploadFiles.map((file, index) => (
-                                        <div key={index} className="flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-lg">
-                                            <div className="w-12 h-12 bg-gray-100 rounded overflow-hidden">
-                                                <img
-                                                    src={URL.createObjectURL(file)}
-                                                    alt={file.name}
-                                                    className="w-full h-full object-cover"
-                                                />
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <p className="text-sm font-medium text-gray-900 truncate">{file.name}</p>
-                                                <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
-                                            </div>
-                                            <button
-                                                onClick={() => removeUploadFile(index)}
-                                                className="p-1 text-gray-400 hover:text-red-600"
-                                                disabled={uploading}
-                                            >
-                                                <X className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                    ))}
-
-                                    {/* Tag Field */}
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            <Tag className="inline w-4 h-4 mr-1" />
-                                            Tags (required for approval)
-                                        </label>
-                                        <MediaTagWidget
-                                            tags={uploadTags}
-                                            onChange={setUploadTags}
-                                            namespace={namespace}
-                                            disabled={uploading}
-                                        />
-                                        <p className="text-xs text-gray-500 mt-1">
-                                            Add tags to help organize and find this image later
-                                        </p>
-                                    </div>
-
-                                    {/* Upload Button */}
-                                    <div className="flex justify-end gap-2">
-                                        <button
-                                            onClick={() => {
-                                                setUploadFiles([])
-                                                setUploadTags([])
-                                            }}
-                                            className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
-                                            disabled={uploading}
-                                        >
-                                            Cancel
-                                        </button>
-                                        <button
-                                            onClick={handleUploadAndApprove}
-                                            disabled={uploading || uploadTags.length === 0}
-                                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                        >
-                                            {uploading ? (
-                                                <>
-                                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                                    Uploading...
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <Check className="w-4 h-4" />
-                                                    Upload & Use Image
-                                                </>
-                                            )}
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
+                            <ImageUploadSection {...uploadSectionProps} />
                         </div>
 
                         {/* Search Section */}
@@ -738,31 +630,12 @@ const ExpandableImageField = ({
                                 <h3 className="text-lg font-semibold text-gray-900">
                                     Select Images {multiple && displayImages.length > 0 && `(${displayImages.length}${maxItems ? `/${maxItems}` : ''})`}
                                 </h3>
-                                <div className="flex items-center gap-2">
-                                    {/* View mode toggle */}
-                                    <div className="flex border border-gray-300 rounded-md">
-                                        <button
-                                            className={`p-2 ${viewMode === 'grid' ? 'bg-gray-100' : 'hover:bg-gray-50'}`}
-                                            onClick={() => setViewMode('grid')}
-                                            title="Grid view"
-                                        >
-                                            <Grid3X3 className="w-4 h-4" />
-                                        </button>
-                                        <button
-                                            className={`p-2 ${viewMode === 'list' ? 'bg-gray-100' : 'hover:bg-gray-50'}`}
-                                            onClick={() => setViewMode('list')}
-                                            title="List view"
-                                        >
-                                            <List className="w-4 h-4" />
-                                        </button>
-                                    </div>
-                                    <button
-                                        onClick={() => setIsExpanded(false)}
-                                        className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-                                    >
-                                        <X className="w-5 h-5" />
-                                    </button>
-                                </div>
+                                <button
+                                    onClick={closeAndScroll}
+                                    className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                                >
+                                    <ChevronUp className="w-5 h-5" />
+                                </button>
                             </div>
 
                             <MediaSearchWidget
@@ -775,91 +648,46 @@ const ExpandableImageField = ({
 
                         {/* Image Grid */}
                         <div className="p-4">
-                            {loading && images.length === 0 ? (
+                            {loading ? (
                                 <div className="flex items-center justify-center h-64">
-                                    <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                                 </div>
                             ) : images.length === 0 ? (
                                 <div className="flex flex-col items-center justify-center h-64 text-gray-500">
-                                    <Image className="w-16 h-16 mb-4" />
+                                    <FolderOpen className="w-16 h-16 mb-4" />
                                     <p className="text-lg font-medium">No images found</p>
                                     <p className="text-sm">Try adjusting your search terms</p>
                                 </div>
                             ) : (
-                                <>
-                                    {/* Pagination Controls - Above Images */}
-                                    {(pagination.hasNext || pagination.hasPrev || pagination.total > 12) && (
-                                        <div className="flex items-center justify-between pb-4 mb-4 border-b border-gray-200">
-                                            <div className="flex items-center gap-2">
-                                                <button
-                                                    onClick={goToPrevPage}
-                                                    disabled={!pagination.hasPrev || loading}
-                                                    className="flex items-center gap-1 px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                                >
-                                                    <ChevronDown className="w-4 h-4 rotate-90" />
-                                                    Previous
-                                                </button>
-                                                <button
-                                                    onClick={goToNextPage}
-                                                    disabled={!pagination.hasNext || loading}
-                                                    className="flex items-center gap-1 px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                                >
-                                                    Next
-                                                    <ChevronDown className="w-4 h-4 -rotate-90" />
-                                                </button>
-                                            </div>
+                                <div className="grid grid-cols-4 gap-3">
+                                    {images.slice(0, 12).map((image) => {
+                                        const isSelected = multiple
+                                            ? displayImages.some(img => img.id === image.id)
+                                            : value && value.id === image.id
+                                        const thumbnailUrl = getThumbnailUrl(image, 150)
 
-                                            <div className="flex items-center gap-2 text-sm text-gray-600">
-                                                <span>Page {pagination.page}</span>
-                                                {pagination.total > 0 && (
-                                                    <span>• Showing {Math.min(12, images.length)} of {pagination.total} images</span>
-                                                )}
-                                                {loading && <Loader2 className="w-4 h-4 animate-spin ml-2" />}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Image Display */}
-                                    <div className={
-                                        viewMode === 'grid'
-                                            ? 'grid grid-cols-4 gap-3'
-                                            : 'space-y-2'
-                                    }>
-                                        {images.slice(0, 12).map((image) =>
-                                            viewMode === 'grid' ? renderGridItem(image) : renderListItem(image)
-                                        )}
-                                    </div>
-
-                                    {/* Image Count Info */}
-                                    {images.length > 0 && (
-                                        <div className="text-center py-3 text-sm text-gray-500">
-                                            Showing {Math.min(12, images.length)} images
-                                            {pagination.total > 12 && ` (${pagination.total} total)`}
-                                        </div>
-                                    )}
-                                </>
+                                        return (
+                                            <ImageGridItem
+                                                key={image.id}
+                                                image={image}
+                                                isSelected={isSelected}
+                                                thumbnailUrl={thumbnailUrl}
+                                                onSelect={handleImageSelect}
+                                            />
+                                        )
+                                    })}
+                                </div>
                             )}
                         </div>
                     </div>
                 )}
             </div>
 
-
-            {/* Validation Message */}
-            {hasError && (
-                <div className="text-sm text-red-600">
-                    {errorMessage}
-                </div>
+            {/* Validation and Help Text */}
+            {showValidation && hasError && (
+                <div className="text-red-500 text-sm mt-1">{errorMessage}</div>
             )}
 
-            {/* Loading State */}
-            {isValidating && (
-                <div className="text-sm text-blue-600">
-                    Validating...
-                </div>
-            )}
-
-            {/* Limits Info */}
             {multiple && (maxItems || minItems) && (
                 <div className="text-xs text-gray-500">
                     {minItems && `Minimum: ${minItems} image${minItems !== 1 ? 's' : ''}`}
