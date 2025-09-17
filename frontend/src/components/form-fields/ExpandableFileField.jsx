@@ -74,11 +74,11 @@ const ExpandableFileField = ({
     const [uploadErrors, setUploadErrors] = useState([])
     const [showForceUpload, setShowForceUpload] = useState(false)
     const [collectionOverride, setCollectionOverride] = useState(null) // null = use default, false = no collection
+    const [originalAutoTags, setOriginalAutoTags] = useState([]) // Store original auto-tags for restoration
 
     const { addNotification } = useGlobalNotifications()
     const fieldRef = useRef(null)
 
-    console.log("autoTags", autoTags)
     // Parse auto-tags array into tag objects
     const parseAutoTags = useCallback(async (autoTagsConfig) => {
         if (!autoTagsConfig || !namespace) return []
@@ -230,29 +230,40 @@ const ExpandableFileField = ({
         }
     }, [loadFiles, isExpanded])
 
-    // Initialize search terms with auto-tags when component mounts or auto-tags change
+    // Initialize search terms and store original auto-tags when component mounts or auto-tags change
     useEffect(() => {
-        const initializeSearchWithAutoTags = async () => {
-            if (autoTags && namespace && searchTerms.length === 0) {
+        const initializeWithAutoTags = async () => {
+            if (autoTags && namespace) {
                 try {
                     const tags = await parseAutoTags(autoTags)
                     if (tags.length > 0) {
-                        const tagSearchTerms = tags.map(tag => ({
-                            type: 'tag',
-                            value: tag.name,
-                            label: tag.name,
-                            id: tag.id
-                        }))
-                        setSearchTerms(tagSearchTerms)
+                        // Store original auto-tags for restoration
+                        setOriginalAutoTags(tags)
+
+                        // Set search terms if empty
+                        if (searchTerms.length === 0) {
+                            const tagSearchTerms = tags.map(tag => ({
+                                type: 'tag',
+                                value: tag.name,
+                                label: tag.name,
+                                id: tag.id
+                            }))
+                            setSearchTerms(tagSearchTerms)
+                        }
+
+                        // Initialize upload tags if empty
+                        if (uploadTags.length === 0) {
+                            setUploadTags(tags)
+                        }
                     }
                 } catch (error) {
-                    console.warn('Failed to initialize search with auto-tags:', error)
+                    console.warn('Failed to initialize auto-tags:', error)
                 }
             }
         }
 
-        initializeSearchWithAutoTags()
-    }, [autoTags, namespace, parseAutoTags, searchTerms.length])
+        initializeWithAutoTags()
+    }, [autoTags, namespace, parseAutoTags])
 
     // Handle file selection from media library
     const handleFileSelect = (file) => {
@@ -455,6 +466,14 @@ const ExpandableFileField = ({
         addNotification('Files will not be added to any collection', 'info')
     }, [addNotification])
 
+    // Restore original auto-tags
+    const handleRestoreAutoTags = useCallback(() => {
+        if (originalAutoTags.length > 0) {
+            setUploadTags([...originalAutoTags])
+            addNotification(`Restored ${originalAutoTags.length} default tag${originalAutoTags.length !== 1 ? 's' : ''}`, 'info')
+        }
+    }, [originalAutoTags, addNotification])
+
     // Get effective collection (considering override)
     const getEffectiveCollection = useCallback(() => {
         if (collectionOverride === false) return null // User opted out
@@ -554,6 +573,8 @@ const ExpandableFileField = ({
                                 allowedFileTypes={allowedFileTypes}
                                 defaultCollection={getEffectiveCollection()}
                                 onRemoveDefaultCollection={handleRemoveDefaultCollection}
+                                originalAutoTags={originalAutoTags}
+                                onRestoreAutoTags={handleRestoreAutoTags}
                                 maxFiles={maxFiles}
                                 value={value}
                                 multiple={multiple}
