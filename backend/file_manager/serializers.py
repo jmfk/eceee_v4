@@ -107,8 +107,17 @@ class MediaTagSerializer(serializers.ModelSerializer):
             validated_data["namespace"] = Namespace.get_default()
 
         # Check if tag with same name already exists in this namespace
-        existing_tag, _ = MediaTag.objects.get_or_create(
-            name=validated_data["name"], namespace=validated_data["namespace"]
+        existing_tag, created = MediaTag.objects.get_or_create(
+            name=validated_data["name"],
+            namespace=validated_data["namespace"],
+            defaults={
+                "slug": validated_data.get(
+                    "slug", validated_data["name"].lower().replace(" ", "-")
+                ),
+                "created_by": validated_data["created_by"],
+                "color": validated_data.get("color", "#3B82F6"),
+                "description": validated_data.get("description", ""),
+            },
         )
 
         return existing_tag
@@ -470,6 +479,7 @@ class MediaUploadSerializer(serializers.Serializer):
         max_length=200, required=False, allow_blank=True
     )
     namespace = serializers.CharField(required=True)
+    force_upload = serializers.BooleanField(required=False, default=False)
 
     def validate_namespace(self, value):
         """Validate namespace exists and user has access."""
@@ -540,6 +550,15 @@ class MediaSearchSerializer(serializers.Serializer):
     # Existing fields
     file_type = serializers.ChoiceField(
         choices=MediaFile.FILE_TYPE_CHOICES, required=False, allow_blank=True
+    )
+    # New fields for multiple file type and MIME type filtering
+    file_types = serializers.ListField(
+        child=serializers.ChoiceField(choices=MediaFile.FILE_TYPE_CHOICES),
+        required=False,
+        allow_empty=True,
+    )
+    mime_types = serializers.ListField(
+        child=serializers.CharField(max_length=100), required=False, allow_empty=True
     )
     tags = serializers.ListField(
         child=serializers.UUIDField(), required=False, allow_empty=True
