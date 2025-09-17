@@ -21,6 +21,8 @@ const ImageUploadSection = ({
     constraints,
     defaultCollection,
     onRemoveDefaultCollection,
+    originalAutoTags,
+    onRestoreAutoTags,
     maxFiles,
     value,
     multiple,
@@ -488,15 +490,35 @@ const ImageUploadSection = ({
 
             {/* Tags */}
             <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                    <Tag className="w-4 h-4 inline mr-1" />
-                    Tags (required for approval) {uploadTags.length > 0 && `(${uploadTags.length} selected)`}
-                </label>
+                <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                        <Tag className="w-4 h-4 inline mr-1" />
+                        Tags (required for approval) {uploadTags.length > 0 && `(${uploadTags.length} selected)`}
+                    </label>
+                    {originalAutoTags.length > 0 && uploadTags.length === 0 && (
+                        <button
+                            onClick={onRestoreAutoTags}
+                            className="text-xs text-blue-600 hover:text-blue-800 underline"
+                        >
+                            Restore default tags
+                        </button>
+                    )}
+                </div>
                 <MediaTagWidget
                     tags={uploadTags}
                     onChange={setUploadTags}
                     namespace={namespace}
                 />
+                {originalAutoTags.length > 0 && uploadTags.length > 0 && (
+                    <div className="mt-2 text-xs text-gray-500">
+                        <button
+                            onClick={onRestoreAutoTags}
+                            className="text-blue-600 hover:text-blue-800 underline"
+                        >
+                            Reset to default tags ({originalAutoTags.map(tag => tag.name).join(', ')})
+                        </button>
+                    </div>
+                )}
             </div>
 
             {/* Upload Actions */}

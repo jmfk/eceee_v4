@@ -129,6 +129,7 @@ const ExpandableImageField = ({
     const [uploadErrors, setUploadErrors] = useState([])
     const [showForceUpload, setShowForceUpload] = useState(false)
     const [collectionOverride, setCollectionOverride] = useState(null) // null = use default, false = no collection
+    const [originalAutoTags, setOriginalAutoTags] = useState([]) // Store original auto-tags for restoration
 
     const { addNotification } = useGlobalNotifications()
     const fieldRef = useRef(null)
@@ -272,29 +273,40 @@ const ExpandableImageField = ({
         }
     }, [loadImages, isExpanded])
 
-    // Initialize search terms with auto-tags when component mounts or auto-tags change
+    // Initialize search terms and store original auto-tags when component mounts or auto-tags change
     useEffect(() => {
-        const initializeSearchWithAutoTags = async () => {
-            if (autoTags && namespace && searchTerms.length === 0) {
+        const initializeWithAutoTags = async () => {
+            if (autoTags && namespace) {
                 try {
                     const tags = await parseAutoTags(autoTags)
                     if (tags.length > 0) {
-                        const tagSearchTerms = tags.map(tag => ({
-                            type: 'tag',
-                            value: tag.name,
-                            label: tag.name,
-                            id: tag.id
-                        }))
-                        setSearchTerms(tagSearchTerms)
+                        // Store original auto-tags for restoration
+                        setOriginalAutoTags(tags)
+
+                        // Set search terms if empty
+                        if (searchTerms.length === 0) {
+                            const tagSearchTerms = tags.map(tag => ({
+                                type: 'tag',
+                                value: tag.name,
+                                label: tag.name,
+                                id: tag.id
+                            }))
+                            setSearchTerms(tagSearchTerms)
+                        }
+
+                        // Initialize upload tags if empty
+                        if (uploadTags.length === 0) {
+                            setUploadTags(tags)
+                        }
                     }
                 } catch (error) {
-                    console.warn('Failed to initialize search with auto-tags:', error)
+                    console.warn('Failed to initialize auto-tags:', error)
                 }
             }
         }
 
-        initializeSearchWithAutoTags()
-    }, [autoTags, namespace, parseAutoTags, searchTerms.length])
+        initializeWithAutoTags()
+    }, [autoTags, namespace, parseAutoTags])
 
     // Handle image selection from media library
     const handleImageSelect = (image) => {
@@ -500,6 +512,14 @@ const ExpandableImageField = ({
         addNotification('Images will not be added to any collection', 'info')
     }, [addNotification])
 
+    // Restore original auto-tags
+    const handleRestoreAutoTags = useCallback(() => {
+        if (originalAutoTags.length > 0) {
+            setUploadTags([...originalAutoTags])
+            addNotification(`Restored ${originalAutoTags.length} default tag${originalAutoTags.length !== 1 ? 's' : ''}`, 'info')
+        }
+    }, [originalAutoTags, addNotification])
+
     // Memoize upload section props to prevent unnecessary rerenders
     const uploadSectionProps = useMemo(() => ({
         uploadFiles,
@@ -517,6 +537,8 @@ const ExpandableImageField = ({
         constraints: imageConstraints,
         defaultCollection: getEffectiveCollection(),
         onRemoveDefaultCollection: handleRemoveDefaultCollection,
+        originalAutoTags,
+        onRestoreAutoTags: handleRestoreAutoTags,
         maxFiles,
         value,
         multiple,
@@ -531,7 +553,8 @@ const ExpandableImageField = ({
     }), [
         uploadFiles, setUploadFiles, uploading, setUploading, uploadTags, setUploadTags,
         uploadErrors, setUploadErrors, showForceUpload, setShowForceUpload, dragOver,
-        namespace, imageConstraints, getEffectiveCollection, handleRemoveDefaultCollection, maxFiles, value, multiple,
+        namespace, imageConstraints, getEffectiveCollection, handleRemoveDefaultCollection,
+        originalAutoTags, handleRestoreAutoTags, maxFiles, value, multiple,
         onChange, handleUploadComplete, parseAutoTags, autoTags, handleDrop,
         handleDragOver, handleDragLeave, handleFileInputChange
     ])
