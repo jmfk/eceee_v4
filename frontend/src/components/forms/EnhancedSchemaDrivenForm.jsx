@@ -100,7 +100,6 @@ const EnhancedSchemaDrivenForm = ({
         const handleBlur = (e) => {
             // Validation logic would go here
         }
-
         // Use new field system if enabled and field types are loaded
         if (useNewFieldSystem && fieldTypesLoaded) {
             // Handle media fields specially (they already exist)
@@ -108,6 +107,34 @@ const EnhancedSchemaDrivenForm = ({
                 // Use ExpandableImageField for image-only media fields
                 if (def.mediaTypes && def.mediaTypes.length === 1 && def.mediaTypes[0] === 'image') {
                     const ImageField = React.lazy(() => import('../form-fields/ExpandableImageField'))
+
+                    // Extract image constraints from field definition
+                    // Parse accept attribute if present (fallback for older configs)
+                    let parsedMimeTypes = def.allowedMimeTypes || def.allowedTypes || []
+                    if (!parsedMimeTypes.length && def.accept) {
+                        // Parse accept attribute like "image/*" or "image/jpeg,image/png"
+                        if (def.accept === 'image/*') {
+                            parsedMimeTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+                        } else if (def.accept.includes(',')) {
+                            parsedMimeTypes = def.accept.split(',').map(type => type.trim())
+                        } else {
+                            parsedMimeTypes = [def.accept.trim()]
+                        }
+                    }
+
+                    const constraints = {
+                        allowedMimeTypes: parsedMimeTypes,
+                        allowedTypes: parsedMimeTypes, // For backward compatibility
+                        minWidth: def.minWidth,
+                        maxWidth: def.maxWidth,
+                        minHeight: def.minHeight,
+                        maxHeight: def.maxHeight,
+                        minSize: def.minSize,
+                        maxSize: def.maxSize,
+                        aspectRatio: def.aspectRatio,
+                        exactDimensions: def.exactDimensions
+                    }
+
                     return (
                         <Suspense key={key} fallback={<div className="animate-pulse h-20 bg-gray-200 rounded"></div>}>
                             <ImageField
@@ -123,6 +150,11 @@ const EnhancedSchemaDrivenForm = ({
                                 isValidating={isValidating}
                                 showValidation={true}
                                 namespace={namespace}
+                                constraints={constraints}
+                                autoTags={def.autoTags}
+                                defaultCollection={def.defaultCollection}
+                                maxFiles={def.maxFiles}
+                                allowedMimeTypes={parsedMimeTypes}
                             />
                         </Suspense>
                     )
