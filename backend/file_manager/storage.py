@@ -286,6 +286,18 @@ class S3MediaStorage:
         except Exception as e:
             logger.warning(f"Failed to detect MIME type: {e}")
 
+        # Fallback: if content type is still missing or generic, use file extension
+        if not metadata["content_type"] or metadata["content_type"] in [
+            "application/octet-stream",
+            "text/plain",
+        ]:
+            extension_based_type = self._get_content_type_from_extension(file.name)
+            if extension_based_type:
+                metadata["content_type"] = extension_based_type
+                logger.info(
+                    f"Using extension-based content_type: {extension_based_type} for file: {file.name}"
+                )
+
         # Determine file type
         content_type = metadata["content_type"].lower()
         if content_type.startswith("image/"):
@@ -480,6 +492,64 @@ class S3MediaStorage:
         except Exception as e:
             logger.error(f"Failed to get file content for {file_path}: {e}")
             return None
+
+    def _get_content_type_from_extension(self, filename: str) -> str:
+        """Get content type from file extension as fallback."""
+        import os
+
+        if not filename:
+            return ""
+
+        file_ext = os.path.splitext(filename)[1].lower()
+
+        # Extension to MIME type mapping
+        extension_mime_map = {
+            # Images
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".png": "image/png",
+            ".gif": "image/gif",
+            ".webp": "image/webp",
+            ".svg": "image/svg+xml",
+            ".bmp": "image/bmp",
+            ".tiff": "image/tiff",
+            ".ico": "image/x-icon",
+            # Documents
+            ".pdf": "application/pdf",
+            ".doc": "application/msword",
+            ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            ".xls": "application/vnd.ms-excel",
+            ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            ".ppt": "application/vnd.ms-powerpoint",
+            ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            ".txt": "text/plain",
+            ".csv": "text/csv",
+            ".rtf": "application/rtf",
+            # Videos
+            ".mp4": "video/mp4",
+            ".webm": "video/webm",
+            ".avi": "video/x-msvideo",
+            ".mov": "video/quicktime",
+            ".wmv": "video/x-ms-wmv",
+            ".flv": "video/x-flv",
+            ".mkv": "video/x-matroska",
+            # Audio
+            ".mp3": "audio/mpeg",
+            ".wav": "audio/wav",
+            ".ogg": "audio/ogg",
+            ".aac": "audio/aac",
+            ".flac": "audio/flac",
+            ".wma": "audio/x-ms-wma",
+            ".m4a": "audio/mp4",
+            # Archives
+            ".zip": "application/zip",
+            ".rar": "application/x-rar-compressed",
+            ".7z": "application/x-7z-compressed",
+            ".tar": "application/x-tar",
+            ".gz": "application/gzip",
+        }
+
+        return extension_mime_map.get(file_ext, "")
 
 
 # Global storage instance

@@ -169,6 +169,14 @@ class FileUploadValidator:
         """
         results = {"is_valid": True, "errors": [], "warnings": [], "metadata": {}}
 
+        # Extract basic file info immediately for use throughout validation
+        results["filename"] = uploaded_file.name
+        results["content_type"] = uploaded_file.content_type
+        results["file_size"] = uploaded_file.size
+
+        # Extract metadata
+        results["metadata"] = cls._extract_safe_metadata(uploaded_file)
+
         try:
             # Basic file checks
             cls._validate_file_basic(uploaded_file, results)
@@ -178,9 +186,6 @@ class FileUploadValidator:
 
             # Security checks
             cls._validate_file_security(uploaded_file, results)
-
-            # Extract metadata
-            results["metadata"] = cls._extract_safe_metadata(uploaded_file)
 
         except Exception as e:
             logger.error(f"File validation error: {e}")
@@ -348,11 +353,36 @@ class FileUploadValidator:
     @classmethod
     def _check_malicious_patterns(cls, file_content: bytes, results: Dict):
         """Check for common malicious patterns."""
-        # Get the detected MIME type from results
-        content_type = results.get("content_type", "")
+        # Get content type and filename from results (extracted at start of validation)
+        content_type = results.get("metadata", {}).get(
+            "content_type", ""
+        ) or results.get("content_type", "")
+        filename = results.get("filename", "")
 
-        # Skip pattern detection for binary files (images, videos, audio)
-        if content_type.startswith(("image/", "video/", "audio/")):
+        # Fallback: if content_type is missing or generic, use file extension
+        if not content_type or content_type in [
+            "application/octet-stream",
+            "text/plain",
+        ]:
+            content_type = cls._get_content_type_from_extension(filename)
+            logger.info(
+                f"Using extension-based content_type: {content_type} for file: {filename}"
+            )
+            # Update both locations with the corrected content type
+            results["content_type"] = content_type
+            results["metadata"]["content_type"] = content_type
+
+        # Skip pattern detection for binary files (images, videos, audio, documents)
+        binary_types = (
+            "image/",
+            "video/",
+            "audio/",
+            "application/pdf",
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.",
+            "application/vnd.ms-",
+        )
+        if content_type.startswith(binary_types):
             # For binary files, only check for very specific executable patterns
             executable_patterns = [
                 b"#!/bin/",  # Shell scripts
@@ -389,6 +419,9 @@ class FileUploadValidator:
         content_lower = file_content.lower()
         for pattern in malicious_patterns:
             if pattern in content_lower:
+                logger.warning(
+                    f"Found malicious pattern {pattern} in content_type {content_type}"
+                )
                 results["errors"].append(
                     f"Malicious pattern detected: {pattern.decode('utf-8', errors='ignore')}"
                 )
@@ -433,6 +466,65 @@ class FileUploadValidator:
             return "document"
         else:
             return "other"
+
+    @classmethod
+    def _get_content_type_from_extension(cls, filename: str) -> str:
+        """Get content type from file extension as fallback."""
+        import os
+
+        if not filename:
+            return ""
+
+        file_ext = os.path.splitext(filename)[1].lower()
+
+        # Extension to MIME type mapping
+        extension_mime_map = {
+            # Images
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".png": "image/png",
+            ".gif": "image/gif",
+            ".webp": "image/webp",
+            ".svg": "image/svg+xml",
+            ".bmp": "image/bmp",
+            ".tiff": "image/tiff",
+            ".ico": "image/x-icon",
+            # Documents
+            ".pdf": "application/pdf",
+            ".doc": "application/msword",
+            ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            ".xls": "application/vnd.ms-excel",
+            ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            ".ppt": "application/vnd.ms-powerpoint",
+            ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            ".txt": "text/plain",
+            ".csv": "text/csv",
+            ".rtf": "application/rtf",
+            # Videos
+            ".mp4": "video/mp4",
+            ".webm": "video/webm",
+            ".avi": "video/x-msvideo",
+            ".mov": "video/quicktime",
+            ".wmv": "video/x-ms-wmv",
+            ".flv": "video/x-flv",
+            ".mkv": "video/x-matroska",
+            # Audio
+            ".mp3": "audio/mpeg",
+            ".wav": "audio/wav",
+            ".ogg": "audio/ogg",
+            ".aac": "audio/aac",
+            ".flac": "audio/flac",
+            ".wma": "audio/x-ms-wma",
+            ".m4a": "audio/mp4",
+            # Archives
+            ".zip": "application/zip",
+            ".rar": "application/x-rar-compressed",
+            ".7z": "application/x-7z-compressed",
+            ".tar": "application/x-tar",
+            ".gz": "application/gzip",
+        }
+
+        return extension_mime_map.get(file_ext, "")
 
 
 class RateLimitMixin:
@@ -539,6 +631,17 @@ class SecurityAuditLogger:
             f"Security violation - User: {user.username if user.is_authenticated else 'Anonymous'}, "
             f"Type: {violation_type}, "
             f"Details: {details}"
+        )
+
+    @staticmethod
+    def log_file_deletion(user, file_obj, context: Dict = None):
+        """Log file deletion events."""
+        context_info = f", Context: {context}" if context else ""
+        logger.info(
+            f"File deletion - User: {user.username}, "
+            f"File: {file_obj.title} ({file_obj.id}), "
+            f"Filename: {file_obj.original_filename}"
+            f"{context_info}"
         )
 
     @staticmethod
