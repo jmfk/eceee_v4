@@ -113,7 +113,8 @@ const ObjectSchemaForm = React.memo(forwardRef(({ schema, data = {}, onChange, n
         const fieldType = field.fieldType || field.type
         const fieldTypeDef = fieldTypeRegistry.getFieldType(fieldType)
         const uiProps = fieldTypeDef?.uiProps || {}
-
+        // Get field config values from field definition
+        const configValues = field.config || {}
         // Props for the field component (without value and onChange)
         // LocalStateFieldWrapper will handle validation internally
         const fieldProps = {

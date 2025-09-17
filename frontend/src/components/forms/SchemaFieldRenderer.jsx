@@ -315,6 +315,41 @@ const SchemaFieldRenderer = ({
             max: fieldSchema.maximum,
             step: fieldSchema.step || 60,
         }),
+        // Handle image field types
+        ...(fieldType === 'image' && {
+            constraints: {
+                allowedTypes: fieldSchema.allowedTypes,
+                minWidth: fieldSchema.minWidth,
+                maxWidth: fieldSchema.maxWidth,
+                minHeight: fieldSchema.minHeight,
+                maxHeight: fieldSchema.maxHeight,
+                minSize: fieldSchema.minSize,
+                maxSize: fieldSchema.maxSize,
+                aspectRatio: fieldSchema.aspectRatio,
+                exactDimensions: fieldSchema.exactDimensions,
+            },
+            autoTags: fieldSchema.autoTags,
+            defaultCollection: fieldSchema.defaultCollection,
+            maxFiles: fieldSchema.maxFiles,
+            multiple: fieldSchema.multiple,
+            maxItems: fieldSchema.maxItems,
+            minItems: fieldSchema.minItems,
+        }),
+        // Handle file field types
+        ...(fieldType === 'file' && {
+            allowedFileTypes: fieldSchema.allowedFileTypes,
+            allowedMimeTypes: fieldSchema.allowedMimeTypes,
+            allowedExtensions: fieldSchema.allowedExtensions,
+            fileTypeLabel: fieldSchema.fileTypeLabel,
+            maxFileSize: fieldSchema.maxFileSize,
+            minFileSize: fieldSchema.minFileSize,
+            autoTags: fieldSchema.autoTags,
+            defaultCollection: fieldSchema.defaultCollection,
+            maxFiles: fieldSchema.maxFiles,
+            multiple: fieldSchema.multiple,
+            maxItems: fieldSchema.maxItems,
+            minItems: fieldSchema.minItems,
+        }),
         // Pass through any additional UI props from field type definition
         ...(fieldTypeDef.uiProps || {}),
         // Allow override with explicit props

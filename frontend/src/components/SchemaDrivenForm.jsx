@@ -375,7 +375,6 @@ export default function SchemaDrivenForm({ pageVersionData, onChange, onValidati
                 />
             )
         }
-
         // Handle media fields
         if (def.format === 'media') {
             return (
