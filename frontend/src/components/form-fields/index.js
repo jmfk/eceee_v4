@@ -48,6 +48,9 @@ export { default as NumericStepperInput } from './NumericStepperInput'
 // Media Components
 export { default as ImageInput } from './ImageInput'
 export { default as FileInput } from './FileInput'
+export { default as DocumentInput } from './DocumentInput'
+export { default as VideoInput } from './VideoInput'
+export { default as AudioInput } from './AudioInput'
 
 // Rich Text Components
 export { default as RichTextInput } from './RichTextInput'
@@ -92,6 +95,9 @@ export const FIELD_COMPONENTS = {
     // Media Components
     ImageInput: () => import('./ImageInput'),
     FileInput: () => import('./FileInput'),
+    DocumentInput: () => import('./DocumentInput'),
+    VideoInput: () => import('./VideoInput'),
+    AudioInput: () => import('./AudioInput'),
     // Rich Text Components
     RichTextInput: () => import('./RichTextInput'),
     // Reference Components
