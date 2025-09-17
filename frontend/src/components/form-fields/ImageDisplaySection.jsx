@@ -19,7 +19,7 @@ const ImageDisplaySection = ({
     if (multiple && displayImages.length > 1) {
         // Multiple images - show header with count and first few thumbnails
         return (
-            <div className="bg-white">
+            <div className="bg-white rounded-lg">
                 {/* Header */}
                 <div className="flex items-center justify-between p-4 border-b border-gray-200">
                     <div className="flex items-center gap-3">
@@ -93,7 +93,7 @@ const ImageDisplaySection = ({
 
                                         {/* Remove button */}
                                         <button
-                                            onClick={() => onRemoveImage(image.id)}
+                                            onClick={(event) => onRemoveImage(image.id, event)}
                                             className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
                                             title="Remove image"
                                         >
@@ -124,7 +124,7 @@ const ImageDisplaySection = ({
     const thumbnailUrl = getThumbnailUrl ? getThumbnailUrl(image, 150) : getImageUrl(image)
 
     return (
-        <div className="bg-white">
+        <div className="bg-white rounded-lg">
             <div className="flex items-center justify-between p-4 border-b border-gray-200">
                 <div className="flex items-center gap-3">
                     <div className="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
@@ -163,7 +163,7 @@ const ImageDisplaySection = ({
 
                     {/* Remove button */}
                     <button
-                        onClick={() => onRemoveImage(image.id)}
+                        onClick={(event) => onRemoveImage(image.id, event)}
                         className="p-2 text-gray-400 hover:text-red-600 transition-colors"
                         title="Remove image"
                     >

@@ -228,7 +228,7 @@ REST_FRAMEWORK.update(
 # Media system specific settings
 MEDIA_SYSTEM_SETTINGS = {
     "MAX_FILE_SIZE": 100 * 1024 * 1024,  # 100MB
-    "MAX_FILES_PER_UPLOAD": 10,
+    "MAX_FILES_PER_UPLOAD": 50,
     "ALLOWED_FILE_TYPES": [
         "image/jpeg",
         "image/png",

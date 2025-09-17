@@ -1,5 +1,5 @@
 import React from 'react'
-import { FolderOpen, Eye, ChevronUp, ChevronDown, X } from 'lucide-react'
+import { Eye, X, ChevronDown, ChevronUp } from 'lucide-react'
 
 /**
  * FileDisplaySection Component
@@ -31,27 +31,29 @@ const FileDisplaySection = ({
     return (
         <div className={`transition-colors ${isExpanded ? 'border-b border-gray-200 bg-gray-50 rounded-t-md' : 'rounded-md'
             }`}>
-            {/* Multiple files header */}
-            {multiple && files.length > 1 && !isExpanded && (
-                <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 rounded-t-md">
+            {/* Multiple files header - always visible */}
+            {multiple && files.length > 1 && (
+                <button
+                    onClick={() => setIsExpanded(!isExpanded)}
+                    className="w-full px-4 py-2 bg-gray-50 border-b border-gray-200 rounded-t-md hover:bg-gray-100 transition-colors"
+                >
                     <div className="flex items-center justify-between">
                         <span className="text-sm font-medium text-gray-700">
                             {files.length} {fileTypeLabel}{files.length > 1 ? 's' : ''} selected
                             {maxFiles && ` (max: ${maxFiles})`}
                         </span>
-                        <button
-                            onClick={() => setIsExpanded(true)}
-                            className="text-xs text-blue-600 hover:text-blue-800"
-                        >
-                            Manage Files
-                        </button>
+                        {isExpanded ? (
+                            <ChevronUp className="w-4 h-4 text-gray-500" />
+                        ) : (
+                            <ChevronDown className="w-4 h-4 text-gray-500" />
+                        )}
                     </div>
-                </div>
+                </button>
             )}
 
             {/* Selected Files Display */}
             {files.map((file, index) => {
-                const fileTypeInfo = getFileTypeInfo(file.file_type || file.fileType)
+                const fileTypeInfo = getFileTypeInfo(file.fileType, file.originalFilename || file.title)
                 const thumbnailUrl = getThumbnailUrl(file, 48)
                 const IconComponent = fileTypeInfo.icon
 
@@ -109,29 +111,18 @@ const FileDisplaySection = ({
                             {multiple && (
                                 <button
                                     type="button"
-                                    onClick={() => onRemoveFile(file.id)}
+                                    onClick={(event) => onRemoveFile(file.id, event)}
                                     className="p-1 text-gray-400 hover:text-red-600"
                                     title={`Remove ${fileTypeLabel.toLowerCase()}`}
                                 >
                                     <X className="w-4 h-4" />
                                 </button>
                             )}
-                            <button
-                                type="button"
-                                onClick={() => setIsExpanded(!isExpanded)}
-                                className="p-1 text-gray-400 hover:text-blue-600"
-                                title={isExpanded ? "Collapse" : `Replace ${fileTypeLabel.toLowerCase()}`}
-                            >
-                                {isExpanded ? (
-                                    <ChevronUp className="w-4 h-4" />
-                                ) : (
-                                    <FolderOpen className="w-4 h-4" />
-                                )}
-                            </button>
                         </div>
                     </div>
                 )
             })}
+
         </div>
     )
 }

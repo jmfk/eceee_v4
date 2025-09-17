@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { FolderOpen, ChevronDown, ChevronUp } from 'lucide-react'
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { FolderOpen, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react'
 import { mediaApi } from '../../api'
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext'
 import { generateThumbnailUrl } from '../../utils/imgproxy'
@@ -19,7 +19,7 @@ import {
  * ExpandableFileField - Refactored version with modular components
  * 
  * Features:
- * - Expandable interface with search form and file grid/list
+ * - Expandable interface with search form and file list
  * - Configurable file type filtering
  * - Single or multiple file selection
  * - Upload functionality with drag & drop
@@ -57,7 +57,6 @@ const ExpandableFileField = ({
     const [searchTerms, setSearchTerms] = useState([])
     const [files, setFiles] = useState([])
     const [loading, setLoading] = useState(false)
-    const [viewMode, setViewMode] = useState('grid')
     const [pagination, setPagination] = useState({
         page: 1,
         pageSize: 12,
@@ -75,9 +74,19 @@ const ExpandableFileField = ({
     const [showForceUpload, setShowForceUpload] = useState(false)
     const [collectionOverride, setCollectionOverride] = useState(null) // null = use default, false = no collection
     const [originalAutoTags, setOriginalAutoTags] = useState([]) // Store original auto-tags for restoration
+    const [animatingItemId, setAnimatingItemId] = useState(null) // Track item being animated
+    const [animationState, setAnimationState] = useState(null) // Track complex animation state
 
     const { addNotification } = useGlobalNotifications()
     const fieldRef = useRef(null)
+
+    // Memoize display values to prevent recalculation - must be defined early
+    const displayFiles = useMemo(() => {
+        if (multiple) {
+            return Array.isArray(value) ? value : []
+        }
+        return value ? [value] : []
+    }, [value, multiple])
 
     // Parse auto-tags array into tag objects
     const parseAutoTags = useCallback(async (autoTagsConfig) => {
@@ -206,7 +215,10 @@ const ExpandableFileField = ({
 
             let newFiles = result.results || result || []
 
-            // Backend now handles filtering, so we can use the results directly
+            // Filter out already selected files
+            const selectedFileIds = new Set(displayFiles.map(file => file.id))
+            newFiles = newFiles.filter(file => !selectedFileIds.has(file.id))
+
             setFiles(newFiles)
             setPagination({
                 page,
@@ -221,7 +233,7 @@ const ExpandableFileField = ({
         } finally {
             setLoading(false)
         }
-    }, [namespace, searchTerms, pagination.pageSize, addNotification, isExpanded, allowedFileTypes, allowedMimeTypes])
+    }, [namespace, searchTerms, pagination.pageSize, addNotification, isExpanded, allowedFileTypes, allowedMimeTypes, displayFiles])
 
     // Load files when expanded
     useEffect(() => {
@@ -265,8 +277,8 @@ const ExpandableFileField = ({
         initializeWithAutoTags()
     }, [autoTags, namespace, parseAutoTags])
 
-    // Handle file selection from media library
-    const handleFileSelect = (file) => {
+    // Handle file selection with clone animation (same as image field)
+    const handleFileSelect = useCallback((file, event) => {
         if (multiple) {
             const currentFiles = Array.isArray(value) ? value : []
             const isAlreadySelected = currentFiles.some(f => f.id === file.id)
@@ -278,24 +290,122 @@ const ExpandableFileField = ({
                     addNotification(`Maximum ${maxItems} ${fileTypeLabel.toLowerCase()}s allowed`, 'warning')
                     return
                 }
-                onChange([...currentFiles, file])
+
+                startSelectionAnimation(file, event)
             }
         } else {
-            onChange(file)
-            setIsExpanded(false)
-            setTimeout(scrollToField, 100)
+            startSelectionAnimation(file, event, true) // Single selection closes field
         }
-    }
+    }, [multiple, value, maxItems, addNotification, fileTypeLabel])
 
-    // Remove a file from field
-    const handleRemoveFile = (fileId) => {
-        if (multiple) {
+    // Start selection animation (same as image field)
+    const startSelectionAnimation = useCallback((file, event, closesField = false) => {
+        const sourceElement = event?.currentTarget
+        if (!sourceElement || !fieldRef.current) return
+
+        const sourceRect = sourceElement.getBoundingClientRect()
+        const fieldRect = fieldRef.current.getBoundingClientRect()
+
+        // Calculate destination position (top of the field)
+        const destinationTop = fieldRect.top - 20
+        const destinationLeft = fieldRect.left + 20
+
+        const fileTypeInfo = getFileTypeInfo(file.fileType || file.file_type, file.originalFilename || file.original_filename || file.title)
+        const thumbnailUrl = getThumbnailUrl(file, 80)
+
+        // Create animation state
+        setAnimationState({
+            type: 'selection',
+            file,
+            fileTypeInfo,
+            thumbnailUrl,
+            clone: {
+                startPos: { top: sourceRect.top, left: sourceRect.left, width: sourceRect.width, height: sourceRect.height },
+                endPos: { top: destinationTop, left: destinationLeft, width: 60, height: 60 }
+            }
+        })
+
+        // Start shadow state
+        setAnimatingItemId(file.id)
+
+        // Trigger CSS animation
+        setTimeout(() => {
+            setAnimationState(prev => prev ? { ...prev, animating: true } : null)
+        }, 50)
+
+        // Complete selection
+        setTimeout(() => {
             const currentFiles = Array.isArray(value) ? value : []
-            onChange(currentFiles.filter(f => f.id !== fileId))
-        } else {
-            onChange(null)
+            onChange(closesField ? file : [...currentFiles, file])
+            if (closesField) setIsExpanded(false)
+
+            // Cleanup
+            setAnimatingItemId(null)
+            setAnimationState(null)
+        }, 600)
+    }, [value, onChange, setIsExpanded, getThumbnailUrl, fileTypeLabel])
+
+    // Start removal animation (reverse of selection)
+    const startRemovalAnimation = useCallback((file, sourceElement) => {
+        if (!sourceElement || !isExpanded) {
+            // If field is closed or no source element, just remove without animation
+            if (multiple) {
+                const currentFiles = Array.isArray(value) ? value : []
+                onChange(currentFiles.filter(f => f.id !== file.id))
+            } else {
+                onChange(null)
+            }
+            return
         }
-    }
+
+        const sourceRect = sourceElement.getBoundingClientRect()
+
+        // Find a position in the search results area
+        const searchArea = document.querySelector('[data-search-results]')
+        const searchRect = searchArea?.getBoundingClientRect()
+        const destinationTop = searchRect ? searchRect.top + 100 : sourceRect.top + 200
+        const destinationLeft = searchRect ? searchRect.left + 100 : sourceRect.left
+
+        const fileTypeInfo = getFileTypeInfo(file.fileType || file.file_type, file.originalFilename || file.original_filename || file.title)
+        const thumbnailUrl = getThumbnailUrl(file, 80)
+
+        // Create reverse animation state
+        setAnimationState({
+            type: 'removal',
+            file,
+            fileTypeInfo,
+            thumbnailUrl,
+            clone: {
+                startPos: { top: sourceRect.top, left: sourceRect.left, width: sourceRect.width, height: sourceRect.height },
+                endPos: { top: destinationTop, left: destinationLeft, width: sourceRect.width, height: sourceRect.height }
+            }
+        })
+
+        // Trigger animation
+        setTimeout(() => {
+            setAnimationState(prev => prev ? { ...prev, animating: true } : null)
+        }, 50)
+
+        // Complete removal
+        setTimeout(() => {
+            if (multiple) {
+                const currentFiles = Array.isArray(value) ? value : []
+                onChange(currentFiles.filter(f => f.id !== file.id))
+            } else {
+                onChange(null)
+            }
+
+            setAnimationState(null)
+        }, 600)
+    }, [multiple, value, onChange, isExpanded, getThumbnailUrl, fileTypeLabel])
+
+    // Remove a file from field with animation
+    const handleRemoveFile = useCallback((fileId, event) => {
+        const file = displayFiles.find(f => f.id === fileId)
+        if (file) {
+            startRemovalAnimation(file, event?.currentTarget)
+        }
+    }, [displayFiles, startRemovalAnimation])
 
     // Handle search
     const handleSearchChange = (newSearchTerms) => {
@@ -439,15 +549,6 @@ const ExpandableFileField = ({
         e.target.value = ''
     }, [allowedFileTypes, allowedMimeTypes, allowedExtensions, maxFileSize, minFileSize, addNotification, autoTags, parseAutoTags, setUploadFiles, setUploadTags])
 
-    // Get display value for rendering
-    const getDisplayValue = () => {
-        if (multiple) {
-            return Array.isArray(value) ? value : []
-        }
-        return value ? [value] : []
-    }
-
-    const displayFiles = getDisplayValue()
     const hasFiles = displayFiles.length > 0
     const hasError = showValidation && validation && !validation.isValid
     const errorMessage = hasError ? validation.message : null
@@ -457,7 +558,6 @@ const ExpandableFileField = ({
             loadFiles(1)
         }
         setIsExpanded(false)
-        setTimeout(scrollToField, 100)
     }
 
     // Handle collection removal
@@ -516,7 +616,7 @@ const ExpandableFileField = ({
                         maxFiles={maxFiles}
                         isExpanded={isExpanded}
                         setIsExpanded={setIsExpanded}
-                        onRemoveFile={handleRemoveFile}
+                        onRemoveFile={(fileId, event) => handleRemoveFile(fileId, event)}
                         getFileTypeInfo={getFileTypeInfo}
                         getThumbnailUrl={getThumbnailUrl}
                         getFileUrl={getFileUrl}
@@ -528,12 +628,12 @@ const ExpandableFileField = ({
                         type="button"
                         onClick={() => setIsExpanded(!isExpanded)}
                         className={`w-full flex items-center justify-center gap-2 p-6 transition-colors ${isExpanded
-                            ? 'border-b border-gray-200 bg-gray-50 hover:bg-gray-100 rounded-t-md'
+                            ? 'border-b border-gray-200 bg-gray-50 rounded-lg hover:bg-gray-100'
                             : hasError
-                                ? 'border-dashed hover:bg-red-50 rounded-md'
+                                ? 'border-dashed hover:bg-red-50'
                                 : dragOver
-                                    ? 'border-dashed bg-blue-100 rounded-md'
-                                    : 'border-dashed hover:bg-blue-50 rounded-md'
+                                    ? 'border-dashed bg-blue-100'
+                                    : 'border-dashed hover:bg-blue-50'
                             }`}
                     >
                         <FolderOpen className={`w-6 h-6 ${dragOver && !isExpanded ? 'text-blue-500' : 'text-gray-400'}`} />
@@ -553,9 +653,9 @@ const ExpandableFileField = ({
 
                 {/* Expanded Media Picker */}
                 {isExpanded && (
-                    <div className="bg-white rounded-b-md">
+                    <div className="bg-white rounded-lg">
                         {/* Upload Section */}
-                        <div className="p-4 border-b border-gray-200 bg-gray-50">
+                        <div className="p-4 border-b border-gray-200 bg-gray-50 rounded-lg">
                             <FileUploadSection
                                 uploadFiles={uploadFiles}
                                 setUploadFiles={setUploadFiles}
@@ -601,21 +701,6 @@ const ExpandableFileField = ({
 
                         {/* Search Section */}
                         <div className="p-4 border-b border-gray-200">
-                            <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-lg font-semibold text-gray-900">
-                                    Select {fileTypeLabel}s {multiple && displayFiles.length > 0 && `(${displayFiles.length}${maxItems ? `/${maxItems}` : ''})`}
-                                </h3>
-                                <button
-                                    onClick={() => {
-                                        setIsExpanded(false)
-                                        setTimeout(scrollToField, 100)
-                                    }}
-                                    className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-                                >
-                                    <ChevronUp className="w-5 h-5" />
-                                </button>
-                            </div>
-
                             <MediaSearchWidget
                                 searchTerms={searchTerms}
                                 onChange={handleSearchChange}
@@ -624,8 +709,39 @@ const ExpandableFileField = ({
                             />
                         </div>
 
-                        {/* File Grid - Simplified for now */}
-                        <div className="p-4">
+                        {/* Pagination Controls */}
+                        {!loading && files.length > 0 && (pagination.hasNext || pagination.hasPrev) && (
+                            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50 rounded-lg">
+                                <div className="text-sm text-gray-500">
+                                    Page {pagination.page} of {Math.ceil(pagination.total / pagination.pageSize)}
+                                    {pagination.total > 0 && ` • ${pagination.total} total ${fileTypeLabel.toLowerCase()}s`}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => loadFiles(pagination.page - 1)}
+                                        disabled={!pagination.hasPrev || loading}
+                                        className="p-2 text-gray-400 hover:text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                        title="Previous page"
+                                    >
+                                        <ChevronLeft className="w-4 h-4" />
+                                    </button>
+                                    <span className="text-sm text-gray-600">
+                                        {pagination.page}
+                                    </span>
+                                    <button
+                                        onClick={() => loadFiles(pagination.page + 1)}
+                                        disabled={!pagination.hasNext || loading}
+                                        className="p-2 text-gray-400 hover:text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                        title="Next page"
+                                    >
+                                        <ChevronRight className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* File List */}
+                        <div className="p-4" data-search-results>
                             {loading ? (
                                 <div className="flex items-center justify-center h-64">
                                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -637,33 +753,69 @@ const ExpandableFileField = ({
                                     <p className="text-sm">Try adjusting your search terms</p>
                                 </div>
                             ) : (
-                                <div className="grid grid-cols-4 gap-3">
+                                /* List View Only */
+                                <div className="space-y-2">
                                     {files.slice(0, 12).map((file) => {
-                                        const fileTypeInfo = getFileTypeInfo(file.file_type || file.fileType)
+                                        const fileTypeInfo = getFileTypeInfo(file.fileType || file.file_type, file.originalFilename || file.original_filename || file.title)
                                         const IconComponent = fileTypeInfo.icon
                                         const isSelected = multiple
                                             ? displayFiles.some(f => f.id === file.id)
                                             : value && value.id === file.id
+                                        const thumbnailUrl = getThumbnailUrl(file, 80)
 
                                         return (
                                             <div
                                                 key={file.id}
-                                                className={`relative aspect-square cursor-pointer border-2 rounded-lg overflow-hidden transition-all duration-200 ${isSelected
-                                                    ? 'border-blue-500 bg-blue-50 shadow-lg scale-105'
-                                                    : 'border-gray-200 hover:border-gray-300 hover:shadow-md'
+                                                className={`flex items-center p-3 border rounded-lg cursor-pointer transition-all duration-500 ${animatingItemId === file.id
+                                                    ? 'opacity-30 scale-95' // Shadow state - faded and slightly smaller
+                                                    : isSelected
+                                                        ? 'border-blue-500 bg-blue-50 shadow-sm'
+                                                        : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50 rounded-lg'
                                                     }`}
-                                                onClick={() => handleFileSelect(file)}
-                                                title={file.title}
+                                                onClick={(event) => handleFileSelect(file, event)}
                                             >
+                                                {/* File Icon/Thumbnail */}
+                                                <div className={`w-16 h-16 rounded-lg overflow-hidden mr-4 flex-shrink-0 ${fileTypeInfo.bgColor} flex items-center justify-center`}>
+                                                    {thumbnailUrl && fileTypeInfo.category === 'image' ? (
+                                                        <img
+                                                            src={thumbnailUrl}
+                                                            alt={file.title || file.original_filename || 'File'}
+                                                            className="w-full h-full object-cover"
+                                                        />
+                                                    ) : (
+                                                        <IconComponent className={`w-8 h-8 ${fileTypeInfo.color}`} />
+                                                    )}
+                                                </div>
+
+                                                {/* File Info */}
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="text-sm font-medium text-gray-900 truncate">
+                                                        {file.title || file.originalFilename || file.original_filename || 'Untitled'}
+                                                    </div>
+                                                    <div className="text-xs text-gray-500 mt-1 flex items-center gap-2">
+                                                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${fileTypeInfo.bgColor} ${fileTypeInfo.color}`}>
+                                                            {fileTypeInfo.category.charAt(0).toUpperCase() + fileTypeInfo.category.slice(1)}
+                                                        </span>
+                                                        {(file.fileSize || file.file_size) && (
+                                                            <span>{formatFileSize(file.fileSize || file.file_size)}</span>
+                                                        )}
+                                                        {(file.createdAt || file.created_at) && (
+                                                            <span>{new Date(file.createdAt || file.created_at).toLocaleDateString()}</span>
+                                                        )}
+                                                    </div>
+                                                    {file.description && (
+                                                        <div className="text-xs text-gray-400 mt-1 truncate">
+                                                            {file.description}
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Selection Indicator */}
                                                 {isSelected && (
-                                                    <div className="absolute top-1 right-1 z-10 w-4 h-4 bg-blue-600 rounded-full flex items-center justify-center">
+                                                    <div className="ml-3 w-5 h-5 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
                                                         <div className="w-2 h-2 bg-white rounded-full" />
                                                     </div>
                                                 )}
-
-                                                <div className={`w-full h-full ${fileTypeInfo.bgColor} flex items-center justify-center`}>
-                                                    <IconComponent className={`w-8 h-8 ${fileTypeInfo.color}`} />
-                                                </div>
                                             </div>
                                         )
                                     })}
@@ -684,6 +836,50 @@ const ExpandableFileField = ({
                     {minItems && `Minimum: ${minItems} ${fileTypeLabel.toLowerCase()}${minItems !== 1 ? 's' : ''}`}
                     {minItems && maxItems && ' • '}
                     {maxItems && `Maximum: ${maxItems} ${fileTypeLabel.toLowerCase()}${maxItems !== 1 ? 's' : ''}`}
+                </div>
+            )}
+
+            {/* Clone Animation Overlay */}
+            {animationState && (
+                <div
+                    className={`fixed pointer-events-none z-50 transition-all duration-600 ease-out ${animationState.animating ? 'opacity-0' : 'opacity-100'
+                        }`}
+                    style={{
+                        top: animationState.animating ? animationState.clone.endPos.top : animationState.clone.startPos.top,
+                        left: animationState.animating ? animationState.clone.endPos.left : animationState.clone.startPos.left,
+                        width: animationState.animating ? animationState.clone.endPos.width : animationState.clone.startPos.width,
+                        height: animationState.animating ? animationState.clone.endPos.height : animationState.clone.startPos.height,
+                    }}
+                >
+                    <div className={`w-full h-full border-2 rounded-lg overflow-hidden shadow-xl flex items-center p-3 ${animationState.type === 'selection'
+                        ? 'border-green-500 bg-green-50'
+                        : 'border-red-500 bg-red-50'
+                        }`}>
+                        {/* File Icon */}
+                        <div className={`w-16 h-16 rounded-lg mr-4 flex-shrink-0 ${animationState.fileTypeInfo.bgColor} flex items-center justify-center`}>
+                            {animationState.thumbnailUrl && animationState.fileTypeInfo.originalCategory === 'image' ? (
+                                <img
+                                    src={animationState.thumbnailUrl}
+                                    alt={animationState.file.title || animationState.file.originalFilename || 'File'}
+                                    className="w-full h-full object-cover"
+                                />
+                            ) : (
+                                <animationState.fileTypeInfo.icon className={`w-8 h-8 ${animationState.fileTypeInfo.color}`} />
+                            )}
+                        </div>
+
+                        {/* File Info */}
+                        <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium text-gray-900 truncate">
+                                {animationState.file.title || animationState.file.originalFilename || animationState.file.original_filename || 'Untitled'}
+                            </div>
+                            <div className="text-xs text-gray-500 mt-1">
+                                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${animationState.fileTypeInfo.bgColor} ${animationState.fileTypeInfo.color}`}>
+                                    {animationState.fileTypeInfo.category}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

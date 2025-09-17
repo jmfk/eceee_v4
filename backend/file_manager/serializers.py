@@ -473,7 +473,9 @@ class MediaUploadSerializer(serializers.Serializer):
     files = serializers.ListField(
         child=serializers.FileField(),
         allow_empty=False,
-        max_length=10,  # Limit to 10 files per upload
+        max_length=getattr(
+            settings, "MEDIA_MAX_FILES_PER_UPLOAD", 50
+        ),  # Configurable limit (field limits handled separately)
     )
     folder_path = serializers.CharField(
         max_length=200, required=False, allow_blank=True

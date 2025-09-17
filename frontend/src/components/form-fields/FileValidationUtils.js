@@ -6,38 +6,74 @@ import { FileText, FileImage, FileVideo, FileAudio, File } from 'lucide-react'
  * Shared validation logic and utilities for file field components
  */
 
-// File type configuration
+// File type configuration with comprehensive MIME type and extension support
 export const fileTypeCategories = {
     image: {
-        mimeTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'],
+        mimeTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml', 'image/bmp', 'image/tiff'],
+        extensions: ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp', '.tiff', '.tif'],
         icon: FileImage,
         color: 'text-green-600',
         bgColor: 'bg-green-100'
     },
-    document: {
+    pdf: {
+        mimeTypes: ['application/pdf'],
+        extensions: ['.pdf'],
+        icon: FileText,
+        color: 'text-red-600',
+        bgColor: 'bg-red-100',
+        label: 'PDF'
+    },
+    word: {
         mimeTypes: [
-            'application/pdf',
             'application/msword',
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            'application/vnd.ms-excel',
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'application/vnd.ms-powerpoint',
-            'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-            'text/plain',
-            'text/csv'
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
         ],
+        extensions: ['.doc', '.docx'],
         icon: FileText,
         color: 'text-blue-600',
-        bgColor: 'bg-blue-100'
+        bgColor: 'bg-blue-100',
+        label: 'Word'
+    },
+    excel: {
+        mimeTypes: [
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        ],
+        extensions: ['.xls', '.xlsx'],
+        icon: FileText,
+        color: 'text-green-600',
+        bgColor: 'bg-green-100',
+        label: 'Excel'
+    },
+    powerpoint: {
+        mimeTypes: [
+            'application/vnd.ms-powerpoint',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+        ],
+        extensions: ['.ppt', '.pptx'],
+        icon: FileText,
+        color: 'text-orange-600',
+        bgColor: 'bg-orange-100',
+        label: 'PowerPoint'
+    },
+    text: {
+        mimeTypes: ['text/plain', 'text/csv', 'text/html', 'text/css', 'text/javascript'],
+        extensions: ['.txt', '.csv', '.html', '.css', '.js', '.json', '.xml'],
+        icon: FileText,
+        color: 'text-gray-600',
+        bgColor: 'bg-gray-100',
+        label: 'Text'
     },
     video: {
-        mimeTypes: ['video/mp4', 'video/webm', 'video/ogg', 'video/avi', 'video/mov'],
+        mimeTypes: ['video/mp4', 'video/webm', 'video/ogg', 'video/avi', 'video/mov', 'video/quicktime'],
+        extensions: ['.mp4', '.webm', '.ogg', '.avi', '.mov', '.qt'],
         icon: FileVideo,
         color: 'text-purple-600',
         bgColor: 'bg-purple-100'
     },
     audio: {
-        mimeTypes: ['audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/aac', 'audio/mp3'],
+        mimeTypes: ['audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/aac', 'audio/mp3', 'audio/flac'],
+        extensions: ['.mp3', '.wav', '.ogg', '.aac', '.flac', '.m4a'],
         icon: FileAudio,
         color: 'text-orange-600',
         bgColor: 'bg-orange-100'
@@ -111,16 +147,77 @@ export const validateFile = (file, config) => {
     }
 }
 
-// Get file type info for display
-export const getFileTypeInfo = (fileType) => {
+// Get file type info for display with enhanced detection
+export const getFileTypeInfo = (fileType, filename = '') => {
+    // First try MIME type matching
     for (const [category, config] of Object.entries(fileTypeCategories)) {
         if (config.mimeTypes.includes(fileType)) {
-            return { category, ...config }
+            return {
+                category: config.label || category,
+                originalCategory: category,
+                ...config
+            }
         }
     }
+
+    // Fallback to extension matching if MIME type doesn't match
+    if (filename) {
+        const extension = '.' + filename.toLowerCase().split('.').pop()
+        for (const [category, config] of Object.entries(fileTypeCategories)) {
+            if (config.extensions && config.extensions.includes(extension)) {
+                return {
+                    category: config.label || category,
+                    originalCategory: category,
+                    ...config
+                }
+            }
+        }
+    }
+
+    // Enhanced fallback based on common patterns
+    if (fileType) {
+        if (fileType.startsWith('image/')) {
+            return {
+                category: 'Image',
+                originalCategory: 'image',
+                icon: FileImage,
+                color: 'text-green-600',
+                bgColor: 'bg-green-100'
+            }
+        }
+        if (fileType.startsWith('video/')) {
+            return {
+                category: 'Video',
+                originalCategory: 'video',
+                icon: FileVideo,
+                color: 'text-purple-600',
+                bgColor: 'bg-purple-100'
+            }
+        }
+        if (fileType.startsWith('audio/')) {
+            return {
+                category: 'Audio',
+                originalCategory: 'audio',
+                icon: FileAudio,
+                color: 'text-orange-600',
+                bgColor: 'bg-orange-100'
+            }
+        }
+        if (fileType.includes('text') || fileType.includes('document')) {
+            return {
+                category: 'Document',
+                originalCategory: 'document',
+                icon: FileText,
+                color: 'text-blue-600',
+                bgColor: 'bg-blue-100'
+            }
+        }
+    }
+
     // Default for unknown file types
     return {
-        category: 'unknown',
+        category: 'File',
+        originalCategory: 'unknown',
         icon: File,
         color: 'text-gray-600',
         bgColor: 'bg-gray-100'
