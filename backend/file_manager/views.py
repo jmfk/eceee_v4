@@ -388,10 +388,21 @@ class MediaFileViewSet(viewsets.ModelViewSet):
             except (ValueError, TypeError):
                 pass
 
-        # Filter by file type if provided
-        file_type = self.request.query_params.get("file_type")
-        if file_type:
-            queryset = queryset.filter(file_type=file_type)
+        # Filter by file type if provided (supports multiple types)
+        file_types = self.request.query_params.getlist("file_types")
+        if not file_types:
+            # Fallback to single file_type for backward compatibility
+            file_type = self.request.query_params.get("file_type")
+            if file_type:
+                file_types = [file_type]
+
+        if file_types:
+            queryset = queryset.filter(file_type__in=file_types)
+
+        # Filter by MIME types if provided
+        mime_types = self.request.query_params.getlist("mime_types")
+        if mime_types:
+            queryset = queryset.filter(content_type__in=mime_types)
 
         # Text search across multiple fields
         text_search = self.request.query_params.get("text_search")
@@ -452,6 +463,20 @@ class MediaFileViewSet(viewsets.ModelViewSet):
         """Set last_modified_by when updating file."""
         serializer.save(last_modified_by=self.request.user)
 
+    def perform_destroy(self, instance):
+        """Handle file deletion with security logging."""
+        from .security import SecurityAuditLogger
+
+        # Log the deletion for security audit
+        SecurityAuditLogger.log_file_deletion(
+            user=self.request.user,
+            file_obj=instance,
+            context={"single_file_deletion": True},
+        )
+
+        # Delete the instance (will trigger custom delete method)
+        instance.delete()
+
     @action(detail=True, methods=["get"])
     def download(self, request, pk=None):
         """Download file with access tracking."""
@@ -495,6 +520,7 @@ class MediaUploadView(APIView):
         files = serializer.validated_data["files"]
         folder_path = serializer.validated_data.get("folder_path", "")
         namespace_slug = serializer.validated_data["namespace"]
+        force_upload = serializer.validated_data.get("force_upload", False)
 
         # Get namespace object from slug
         from content.models import Namespace
@@ -526,27 +552,48 @@ class MediaUploadView(APIView):
         errors = []
 
         for uploaded_file in files:
-            # Comprehensive security validation
-            validation_result = FileUploadValidator.validate_file(uploaded_file)
+            # Comprehensive security validation (unless force upload is enabled)
+            validation_result = None
+            if not force_upload:
+                validation_result = FileUploadValidator.validate_file(uploaded_file)
 
-            if not validation_result["is_valid"]:
-                error_msg = f"File '{uploaded_file.name}' failed validation: {'; '.join(validation_result['errors'])}"
-                errors.append(error_msg)
-                SecurityAuditLogger.log_file_upload(
+                if not validation_result["is_valid"]:
+                    error_msg = f"File '{uploaded_file.name}' failed validation: {'; '.join(validation_result['errors'])}"
+                    errors.append(
+                        {
+                            "filename": uploaded_file.name,
+                            "error": error_msg,
+                            "status": "error",
+                        }
+                    )
+                    SecurityAuditLogger.log_file_upload(
+                        request.user,
+                        {"filename": uploaded_file.name, "size": uploaded_file.size},
+                        success=False,
+                    )
+                    continue
+            else:
+                # Log force upload for security audit
+                SecurityAuditLogger.log_security_violation(
                     request.user,
-                    {"filename": uploaded_file.name, "size": uploaded_file.size},
-                    success=False,
+                    "force_upload_used",
+                    f"User bypassed security validation for file: {uploaded_file.name}",
                 )
-                continue
 
-            # Log warnings if any
-            if validation_result["warnings"]:
+            # Log warnings if any (only if validation was performed)
+            if validation_result and validation_result["warnings"]:
                 logger.warning(
                     f"File upload warnings for '{uploaded_file.name}': {validation_result['warnings']}"
                 )
 
-            # Use validated metadata
-            validated_metadata = validation_result["metadata"]
+            # Use validated metadata (or extract basic metadata for force uploads)
+            if validation_result:
+                validated_metadata = validation_result["metadata"]
+            else:
+                # For force uploads, extract basic metadata without security validation
+                validated_metadata = FileUploadValidator._extract_safe_metadata(
+                    uploaded_file
+                )
             try:
                 # Calculate file hash first for duplicate detection
                 uploaded_file.seek(0)
@@ -914,8 +961,16 @@ class MediaSearchView(APIView):
             for tag_name in tag_names:
                 queryset = queryset.filter(tags__name__iexact=tag_name)
 
-        if filters.get("file_type"):
+        # Handle file type filtering (multiple types supported)
+        if filters.get("file_types"):
+            queryset = queryset.filter(file_type__in=filters["file_types"])
+        elif filters.get("file_type"):
+            # Backward compatibility for single file_type
             queryset = queryset.filter(file_type=filters["file_type"])
+
+        # Handle MIME type filtering
+        if filters.get("mime_types"):
+            queryset = queryset.filter(content_type__in=filters["mime_types"])
 
         # Legacy tags filter (by UUID) - for backward compatibility
         if filters.get("tags"):
@@ -1354,6 +1409,9 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         try:
+            logger.info(
+                f"Starting approval process for pending file: {pending_file.id}"
+            )
             # Create the approved media file
             media_file = pending_file.approve_and_create_media_file(
                 title=serializer.validated_data["title"],
@@ -1361,6 +1419,9 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
                 description=serializer.validated_data.get("description", ""),
                 tags=serializer.validated_data.get("tag_ids", []),
                 access_level=serializer.validated_data.get("access_level", "public"),
+            )
+            logger.info(
+                f"Successfully created MediaFile: {media_file.id} from pending file: {pending_file.id}"
             )
 
             # Handle collection assignment
@@ -1744,6 +1805,8 @@ class BulkMediaOperationsView(APIView):
 
         for file_obj in files:
             try:
+                file_id = str(file_obj.id)  # Store file ID before any operations
+
                 if operation == "add_tags":
                     tag_names = data.get("tag_names", [])
                     for tag_name in tag_names:
@@ -1809,10 +1872,12 @@ class BulkMediaOperationsView(APIView):
                     file_obj.delete()
 
                 successful_count += 1
-                results.append({"file_id": str(file_obj.id), "status": "success"})
+                results.append({"file_id": file_id, "status": "success"})
 
             except Exception as e:
-                errors.append({"file_id": str(file_obj.id), "message": str(e)})
+                # Use stored file_id if available, otherwise try to get current id
+                error_file_id = file_id if "file_id" in locals() else str(file_obj.id)
+                errors.append({"file_id": error_file_id, "message": str(e)})
 
         return Response(
             {
