@@ -98,7 +98,7 @@ export const mediaUploadApi = {
      * @param {Function} onProgress - Progress callback function
      * @returns {Promise} API response with upload results
      */
-    upload: (uploadData, onProgress) => {
+    upload: async (uploadData, onProgress) => {
         const formData = new FormData();
 
         // Add files to form data
@@ -111,25 +111,47 @@ export const mediaUploadApi = {
         if (uploadData.folderPath) {
             formData.append('folder_path', uploadData.folderPath);
         }
+        if (uploadData.forceUpload) {
+            formData.append('force_upload', 'true');
+        }
 
-        const wrappedCall = wrapApiCall(() =>
-            apiClient.post(endpoints.media.upload, formData, {
-                headers: {
-                    'Content-Type': 'multipart/form-data',
-                },
-                onUploadProgress: (progressEvent) => {
-                    if (onProgress && progressEvent.total) {
-                        const percentCompleted = Math.round(
-                            (progressEvent.loaded * 100) / progressEvent.total
-                        );
-                        onProgress(percentCompleted, progressEvent);
-                    }
-                },
-            }),
-            'media-upload'
-        );
+        try {
+            const wrappedCall = wrapApiCall(() =>
+                apiClient.post(endpoints.media.upload, formData, {
+                    headers: {
+                        'Content-Type': 'multipart/form-data',
+                    },
+                    onUploadProgress: (progressEvent) => {
+                        if (onProgress && progressEvent.total) {
+                            const percentCompleted = Math.round(
+                                (progressEvent.loaded * 100) / progressEvent.total
+                            );
+                            onProgress(percentCompleted, progressEvent);
+                        }
+                    },
+                }),
+                'media-upload'
+            );
 
-        return wrappedCall();
+            return await wrappedCall();
+        } catch (error) {
+            // Access the original axios error to get the response data
+            const responseData = error.context.data
+            if (responseData && responseData?.errorCount && responseData?.errorCount > 0) {
+                return {
+                    uploadedFiles: responseData.uploadedFiles || [],
+                    rejectedFiles: responseData.rejectedFiles || [],
+                    successCount: responseData.successCount || 0,
+                    rejectedCount: responseData.rejectedCount || 0,
+                    errorCount: responseData.errorCount || 0,
+                    errors: responseData.errors || [],
+                    hasErrors: true // Flag to indicate this is an error response
+                };
+            }
+
+            // Re-throw other errors (500, network issues, etc.)
+            throw error;
+        }
     },
 
     /**
