@@ -242,39 +242,60 @@ class PendingMediaFile(models.Model):
             MediaFile instance
         """
         from django.utils import timezone
+        import logging
 
-        # Create the MediaFile
-        media_file = MediaFile.objects.create(
-            title=title,
-            slug=slug,
-            description=description,
-            original_filename=self.original_filename,
-            file_path=self.file_path,
-            file_size=self.file_size,
-            content_type=self.content_type,
-            file_hash=self.file_hash,
-            file_type=self.file_type,
-            width=self.width,
-            height=self.height,
-            ai_generated_tags=self.ai_generated_tags,
-            ai_suggested_title=self.ai_suggested_title,
-            ai_extracted_text=self.ai_extracted_text,
-            ai_confidence_score=self.ai_confidence_score,
-            namespace=self.namespace,
-            access_level=access_level,
-            created_by=self.uploaded_by,
-            last_modified_by=self.uploaded_by,
-        )
+        logger = logging.getLogger(__name__)
+        logger.info(f"Approving pending file: {self.original_filename} (ID: {self.id})")
 
-        # Associate tags if provided
-        if tags:
-            media_file.tags.set(tags)
+        try:
+            # Create the MediaFile
+            media_file = MediaFile.objects.create(
+                title=title,
+                slug=slug,
+                description=description,
+                original_filename=self.original_filename,
+                file_path=self.file_path,
+                file_size=self.file_size,
+                content_type=self.content_type,
+                file_hash=self.file_hash,
+                file_type=self.file_type,
+                width=self.width,
+                height=self.height,
+                ai_generated_tags=self.ai_generated_tags,
+                ai_suggested_title=self.ai_suggested_title,
+                ai_extracted_text=self.ai_extracted_text,
+                ai_confidence_score=self.ai_confidence_score,
+                namespace=self.namespace,
+                access_level=access_level,
+                created_by=self.uploaded_by,
+                last_modified_by=self.uploaded_by,
+            )
 
-        # Update status
-        self.status = "approved"
-        self.save()
+            logger.info(
+                f"Created MediaFile: {media_file.id} for file: {self.original_filename}"
+            )
 
-        return media_file
+            # Associate tags if provided
+            if tags:
+                media_file.tags.set(tags)
+                logger.info(
+                    f"Associated {len(tags)} tags with MediaFile: {media_file.id}"
+                )
+
+            # Update status
+            self.status = "approved"
+            self.save()
+
+            logger.info(f"Successfully approved pending file: {self.original_filename}")
+            return media_file
+
+        except Exception as e:
+            logger.error(
+                f"Failed to create MediaFile for pending file {self.original_filename}: {e}"
+            )
+            logger.error(f"Exception details: {type(e).__name__}: {str(e)}")
+            # Don't update status if MediaFile creation failed
+            raise
 
     def reject(self):
         """Reject this pending file and clean up storage."""
@@ -490,6 +511,55 @@ class MediaFile(models.Model):
         if not self.slug:
             self.slug = self._generate_unique_slug()
         super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        """Custom delete method to handle S3 cleanup and related files."""
+        from .storage import S3MediaStorage
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.info(
+            f"Deleting MediaFile: {self.title} (ID: {self.id}, File: {self.original_filename})"
+        )
+
+        # Check if other files reference the same S3 object (same file_hash)
+        other_media_files = (
+            MediaFile.objects.filter(file_hash=self.file_hash)
+            .exclude(id=self.id)
+            .exists()
+        )
+
+        other_pending_files = PendingMediaFile.objects.filter(
+            file_hash=self.file_hash, status__in=["pending", "approved"]
+        ).exists()
+
+        # Only delete from S3 if no other files reference it
+        if not other_media_files and not other_pending_files:
+            try:
+                storage = S3MediaStorage()
+                storage.delete_file(self.file_path)
+                logger.info(f"Deleted S3 file: {self.file_path}")
+            except Exception as e:
+                logger.error(f"Failed to delete S3 file {self.file_path}: {e}")
+                # Don't fail the database deletion if S3 cleanup fails
+        else:
+            logger.info(
+                f"Not deleting S3 file {self.file_path} - other files reference it"
+            )
+
+        # Delete any related PendingMediaFile records with same hash that are approved
+        related_pending = PendingMediaFile.objects.filter(
+            file_hash=self.file_hash, status="approved"
+        )
+        if related_pending.exists():
+            logger.info(
+                f"Deleting {related_pending.count()} related approved pending files"
+            )
+            related_pending.delete()
+
+        # Call parent delete to remove from database
+        super().delete(*args, **kwargs)
+        logger.info(f"Successfully deleted MediaFile: {self.title}")
 
     def _generate_unique_slug(self):
         """Generate a unique, SEO-friendly slug for the media file."""
