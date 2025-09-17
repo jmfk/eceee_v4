@@ -185,7 +185,7 @@ const FileUploadSection = ({
 
                         if (filesNotAdded.length > 0) {
                             addNotification(
-                                `${filesToAdd.length} files added to field, ${filesNotAdded.length} uploaded to media library only (max limit: ${maxFiles})`,
+                                `${filesToAdd.length} files added to field, ${filesNotAdded.length} uploaded to media library only (field limit: ${maxFiles})`,
                                 'info'
                             )
                         }
@@ -286,7 +286,7 @@ const FileUploadSection = ({
                 <div className="flex items-center gap-2">
                     {maxFiles && uploadFiles.length > availableSlots && (
                         <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded">
-                            Limit: {availableSlots} of {uploadFiles.length} will be added to field
+                            {availableSlots} of {uploadFiles.length} will be added to field (limit: {maxFiles})
                         </span>
                     )}
                     <button
@@ -352,6 +352,7 @@ const FileUploadSection = ({
                     <p className="text-sm text-blue-800">
                         <strong>Note:</strong> All {uploadFiles.length} files will be uploaded to your media library,
                         but only the first {availableSlots} will be added to this field due to the maximum limit of {maxFiles}.
+                        The remaining {uploadFiles.length - availableSlots} files will be available in your media library for use elsewhere.
                     </p>
                 </div>
             )}

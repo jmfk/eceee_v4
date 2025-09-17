@@ -316,6 +316,7 @@ DATA_UPLOAD_MAX_NUMBER_FIELDS = 1000  # Allow more form fields
 
 # Media file settings
 MEDIA_FILE_MAX_SIZE = 100 * 1024 * 1024  # 100MB per file
+MEDIA_MAX_FILES_PER_UPLOAD = 50  # Allow up to 50 files per upload
 MEDIA_ALLOWED_TYPES = [
     "image/jpeg",
     "image/png",

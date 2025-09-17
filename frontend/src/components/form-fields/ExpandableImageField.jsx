@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { Image, FolderOpen, ChevronDown, ChevronUp } from 'lucide-react'
+import { Image, FolderOpen, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Grid3X3, List } from 'lucide-react'
 import { mediaApi } from '../../api'
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext'
 import { generateThumbnailUrl } from '../../utils/imgproxy'
@@ -19,19 +19,21 @@ import {
 /**
  * Memoized image grid item to prevent unnecessary rerenders
  */
-const ImageGridItem = React.memo(({ image, isSelected, thumbnailUrl, onSelect }) => {
-    const handleClick = useCallback(() => {
-        onSelect(image)
+const ImageGridItem = React.memo(({ image, isSelected, thumbnailUrl, onSelect, isAnimating }) => {
+    const handleClick = useCallback((event) => {
+        onSelect(image, event)
     }, [image, onSelect])
 
     return (
         <div
-            className={`relative aspect-square cursor-pointer border-2 rounded-lg overflow-hidden transition-all duration-200 ${isSelected
-                ? 'border-blue-500 bg-blue-50 shadow-lg scale-105'
-                : 'border-gray-200 hover:border-gray-300 hover:shadow-md'
+            className={`relative aspect-square cursor-pointer border-2 rounded-lg overflow-hidden transition-all duration-500 ${isAnimating
+                ? 'opacity-30 scale-95' // Shadow state - faded and slightly smaller
+                : isSelected
+                    ? 'border-blue-500 bg-blue-50 shadow-lg scale-105'
+                    : 'border-gray-200 hover:border-gray-300 hover:shadow-md'
                 }`}
             onClick={handleClick}
-            title={image.title || image.original_filename}
+            title={image.title || image.originalFilename || image.original_filename}
         >
             {isSelected && (
                 <div className="absolute top-1 right-1 z-10 w-4 h-4 bg-blue-600 rounded-full flex items-center justify-center">
@@ -130,9 +132,19 @@ const ExpandableImageField = ({
     const [showForceUpload, setShowForceUpload] = useState(false)
     const [collectionOverride, setCollectionOverride] = useState(null) // null = use default, false = no collection
     const [originalAutoTags, setOriginalAutoTags] = useState([]) // Store original auto-tags for restoration
+    const [animatingItemId, setAnimatingItemId] = useState(null) // Track item being animated
+    const [animationState, setAnimationState] = useState(null) // Track complex animation state
 
     const { addNotification } = useGlobalNotifications()
     const fieldRef = useRef(null)
+
+    // Memoize display values to prevent recalculation - must be defined early
+    const displayImages = useMemo(() => {
+        if (multiple) {
+            return Array.isArray(value) ? value : []
+        }
+        return value ? [value] : []
+    }, [value, multiple])
 
     // Parse auto-tags array into tag objects
     const parseAutoTags = useCallback(async (autoTagsConfig) => {
@@ -249,7 +261,10 @@ const ExpandableImageField = ({
             }
             let newImages = result.results || result || []
 
-            // Backend now handles filtering, so we can use the results directly
+            // Filter out already selected images
+            const selectedImageIds = new Set(displayImages.map(img => img.id))
+            newImages = newImages.filter(image => !selectedImageIds.has(image.id))
+
             setImages(newImages)
             setPagination({
                 page,
@@ -264,7 +279,7 @@ const ExpandableImageField = ({
         } finally {
             setLoading(false)
         }
-    }, [namespace, searchTerms, pagination.pageSize, addNotification, isExpanded, imageConstraints])
+    }, [namespace, searchTerms, pagination.pageSize, addNotification, isExpanded, imageConstraints, displayImages])
 
     // Load images when expanded
     useEffect(() => {
@@ -308,8 +323,8 @@ const ExpandableImageField = ({
         initializeWithAutoTags()
     }, [autoTags, namespace, parseAutoTags])
 
-    // Handle image selection from media library
-    const handleImageSelect = (image) => {
+    // Handle image selection with clone animation
+    const handleImageSelect = useCallback((image, event) => {
         if (multiple) {
             const currentImages = Array.isArray(value) ? value : []
             const isAlreadySelected = currentImages.some(img => img.id === image.id)
@@ -321,24 +336,119 @@ const ExpandableImageField = ({
                     addNotification(`Maximum ${maxItems} images allowed`, 'warning')
                     return
                 }
-                onChange([...currentImages, image])
+
+                startSelectionAnimation(image, event)
             }
         } else {
-            onChange(image)
-            setIsExpanded(false)
-            setTimeout(scrollToField, 100)
+            startSelectionAnimation(image, event, true) // Single selection closes field
         }
-    }
+    }, [multiple, value, maxItems, addNotification])
 
-    // Remove an image from field
-    const handleRemoveImage = (imageId) => {
-        if (multiple) {
+    // Start selection animation
+    const startSelectionAnimation = useCallback((image, event, closesField = false) => {
+        const sourceElement = event?.currentTarget
+        if (!sourceElement || !fieldRef.current) return
+
+        const sourceRect = sourceElement.getBoundingClientRect()
+        const fieldRect = fieldRef.current.getBoundingClientRect()
+
+        // Calculate destination position (top of the field)
+        const destinationTop = fieldRect.top - 20
+        const destinationLeft = fieldRect.left + 20
+
+        const thumbnailUrl = getThumbnailUrl(image, 150)
+
+        // Create animation state
+        setAnimationState({
+            type: 'selection',
+            image,
+            thumbnailUrl,
+            clone: {
+                startPos: { top: sourceRect.top, left: sourceRect.left, width: sourceRect.width, height: sourceRect.height },
+                endPos: { top: destinationTop, left: destinationLeft, width: 60, height: 60 },
+                element: sourceElement.cloneNode(true)
+            }
+        })
+
+        // Start shadow state
+        setAnimatingItemId(image.id)
+
+        // Trigger CSS animation
+        setTimeout(() => {
+            setAnimationState(prev => prev ? { ...prev, animating: true } : null)
+        }, 50)
+
+        // Complete selection
+        setTimeout(() => {
             const currentImages = Array.isArray(value) ? value : []
-            onChange(currentImages.filter(img => img.id !== imageId))
-        } else {
-            onChange(null)
+            onChange(closesField ? image : [...currentImages, image])
+            if (closesField) setIsExpanded(false)
+
+            // Cleanup
+            setAnimatingItemId(null)
+            setAnimationState(null)
+        }, 600)
+    }, [value, onChange, setIsExpanded, getThumbnailUrl])
+
+    // Start removal animation (reverse of selection)
+    const startRemovalAnimation = useCallback((image, sourceElement) => {
+        if (!sourceElement || !isExpanded) {
+            // If field is closed or no source element, just remove without animation
+            if (multiple) {
+                const currentImages = Array.isArray(value) ? value : []
+                onChange(currentImages.filter(img => img.id !== image.id))
+            } else {
+                onChange(null)
+            }
+            return
         }
-    }
+
+        const sourceRect = sourceElement.getBoundingClientRect()
+
+        // Find a position in the search results area (approximate)
+        const searchArea = document.querySelector('[data-search-results]')
+        const searchRect = searchArea?.getBoundingClientRect()
+        const destinationTop = searchRect ? searchRect.top + 100 : sourceRect.top + 200
+        const destinationLeft = searchRect ? searchRect.left + 100 : sourceRect.left
+
+        const thumbnailUrl = getThumbnailUrl(image, 150)
+
+        // Create reverse animation state
+        setAnimationState({
+            type: 'removal',
+            image,
+            thumbnailUrl,
+            clone: {
+                startPos: { top: sourceRect.top, left: sourceRect.left, width: sourceRect.width, height: sourceRect.height },
+                endPos: { top: destinationTop, left: destinationLeft, width: 100, height: 100 }
+            }
+        })
+
+        // Trigger animation
+        setTimeout(() => {
+            setAnimationState(prev => prev ? { ...prev, animating: true } : null)
+        }, 50)
+
+        // Complete removal
+        setTimeout(() => {
+            if (multiple) {
+                const currentImages = Array.isArray(value) ? value : []
+                onChange(currentImages.filter(img => img.id !== image.id))
+            } else {
+                onChange(null)
+            }
+
+            setAnimationState(null)
+        }, 600)
+    }, [multiple, value, onChange, isExpanded, getThumbnailUrl])
+
+    // Remove an image from field with animation
+    const handleRemoveImage = useCallback((imageId, event) => {
+        const image = displayImages.find(img => img.id === imageId)
+        if (image) {
+            startRemovalAnimation(image, event?.currentTarget)
+        }
+    }, [displayImages, startRemovalAnimation])
 
     // Handle search
     const handleSearchChange = (newSearchTerms) => {
@@ -480,14 +590,6 @@ const ExpandableImageField = ({
         e.target.value = ''
     }, [imageConstraints, maxFiles, addNotification, autoTags, parseAutoTags, setUploadFiles, setUploadTags, multiple, value])
 
-    // Memoize display values to prevent recalculation
-    const displayImages = useMemo(() => {
-        if (multiple) {
-            return Array.isArray(value) ? value : []
-        }
-        return value ? [value] : []
-    }, [value, multiple])
-
     const hasImages = displayImages.length > 0
     const hasError = showValidation && validation && !validation.isValid
     const errorMessage = hasError ? validation.message : null
@@ -497,8 +599,7 @@ const ExpandableImageField = ({
             loadImages(1)
         }
         setIsExpanded(false)
-        setTimeout(scrollToField, 100)
-    }, [isExpanded, loadImages, scrollToField])
+    }, [isExpanded, loadImages])
 
     // Get effective collection (considering override) - must be defined before useMemo
     const getEffectiveCollection = useCallback(() => {
@@ -566,7 +667,7 @@ const ExpandableImageField = ({
         maxFiles,
         isExpanded,
         setIsExpanded,
-        onRemoveImage: handleRemoveImage,
+        onRemoveImage: (imageId, event) => handleRemoveImage(imageId, event),
         getThumbnailUrl
     }), [displayImages, multiple, maxFiles, isExpanded, setIsExpanded, handleRemoveImage, getThumbnailUrl])
 
@@ -577,8 +678,7 @@ const ExpandableImageField = ({
 
     const closeAndScroll = useCallback(() => {
         setIsExpanded(false)
-        setTimeout(scrollToField, 100)
-    }, [scrollToField])
+    }, [])
 
     return (
         <div ref={fieldRef} className="space-y-3">
@@ -616,12 +716,12 @@ const ExpandableImageField = ({
                         type="button"
                         onClick={toggleExpanded}
                         className={`w-full flex items-center justify-center gap-2 p-6 transition-colors ${isExpanded
-                            ? 'border-b border-gray-200 bg-gray-50 hover:bg-gray-100 rounded-t-md'
+                            ? 'border-b border-gray-200 bg-gray-50 hover:bg-gray-100'
                             : hasError
-                                ? 'border-dashed hover:bg-red-50 rounded-md'
+                                ? 'border-dashed hover:bg-red-50'
                                 : dragOver
-                                    ? 'border-dashed bg-blue-100 rounded-md'
-                                    : 'border-dashed hover:bg-blue-50 rounded-md'
+                                    ? 'border-dashed bg-blue-100'
+                                    : 'border-dashed hover:bg-blue-50'
                             }`}
                     >
                         <Image className={`w-6 h-6 ${dragOver && !isExpanded ? 'text-blue-500' : 'text-gray-400'}`} />
@@ -641,7 +741,7 @@ const ExpandableImageField = ({
 
                 {/* Expanded Media Picker */}
                 {isExpanded && (
-                    <div className="bg-white rounded-b-md">
+                    <div className="bg-white rounded-lg">
                         {/* Upload Section */}
                         <div className="p-4 border-b border-gray-200 bg-gray-50">
                             <ImageUploadSection {...uploadSectionProps} />
@@ -653,12 +753,37 @@ const ExpandableImageField = ({
                                 <h3 className="text-lg font-semibold text-gray-900">
                                     Select Images {multiple && displayImages.length > 0 && `(${displayImages.length}${maxItems ? `/${maxItems}` : ''})`}
                                 </h3>
-                                <button
-                                    onClick={closeAndScroll}
-                                    className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-                                >
-                                    <ChevronUp className="w-5 h-5" />
-                                </button>
+                                <div className="flex items-center gap-2">
+                                    {/* View Mode Toggle */}
+                                    <div className="flex items-center bg-gray-100 rounded-md p-1">
+                                        <button
+                                            onClick={() => setViewMode('grid')}
+                                            className={`p-1.5 rounded transition-colors ${viewMode === 'grid'
+                                                ? 'bg-white text-gray-900 shadow-sm'
+                                                : 'text-gray-500 hover:text-gray-700'
+                                                }`}
+                                            title="Grid view"
+                                        >
+                                            <Grid3X3 className="w-4 h-4" />
+                                        </button>
+                                        <button
+                                            onClick={() => setViewMode('list')}
+                                            className={`p-1.5 rounded transition-colors ${viewMode === 'list'
+                                                ? 'bg-white text-gray-900 shadow-sm'
+                                                : 'text-gray-500 hover:text-gray-700'
+                                                }`}
+                                            title="List view"
+                                        >
+                                            <List className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                    <button
+                                        onClick={closeAndScroll}
+                                        className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                                    >
+                                        <ChevronUp className="w-5 h-5" />
+                                    </button>
+                                </div>
                             </div>
 
                             <MediaSearchWidget
@@ -669,8 +794,39 @@ const ExpandableImageField = ({
                             />
                         </div>
 
+                        {/* Pagination Controls */}
+                        {!loading && images.length > 0 && (pagination.hasNext || pagination.hasPrev) && (
+                            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50">
+                                <div className="text-sm text-gray-500">
+                                    Page {pagination.page} of {Math.ceil(pagination.total / pagination.pageSize)}
+                                    {pagination.total > 0 && ` • ${pagination.total} total images`}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => loadImages(pagination.page - 1)}
+                                        disabled={!pagination.hasPrev || loading}
+                                        className="p-2 text-gray-400 hover:text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                        title="Previous page"
+                                    >
+                                        <ChevronLeft className="w-4 h-4" />
+                                    </button>
+                                    <span className="text-sm text-gray-600">
+                                        {pagination.page}
+                                    </span>
+                                    <button
+                                        onClick={() => loadImages(pagination.page + 1)}
+                                        disabled={!pagination.hasNext || loading}
+                                        className="p-2 text-gray-400 hover:text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                        title="Next page"
+                                    >
+                                        <ChevronRight className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Image Grid */}
-                        <div className="p-4">
+                        <div className="p-4" data-search-results>
                             {loading ? (
                                 <div className="flex items-center justify-center h-64">
                                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -681,7 +837,7 @@ const ExpandableImageField = ({
                                     <p className="text-lg font-medium">No images found</p>
                                     <p className="text-sm">Try adjusting your search terms</p>
                                 </div>
-                            ) : (
+                            ) : viewMode === 'grid' ? (
                                 <div className="grid grid-cols-4 gap-3">
                                     {images.slice(0, 12).map((image) => {
                                         const isSelected = multiple
@@ -696,7 +852,70 @@ const ExpandableImageField = ({
                                                 isSelected={isSelected}
                                                 thumbnailUrl={thumbnailUrl}
                                                 onSelect={handleImageSelect}
+                                                isAnimating={animatingItemId === image.id}
                                             />
+                                        )
+                                    })}
+                                </div>
+                            ) : (
+                                /* List View */
+                                <div className="space-y-2">
+                                    {images.slice(0, 12).map((image) => {
+                                        const isSelected = multiple
+                                            ? displayImages.some(img => img.id === image.id)
+                                            : value && value.id === image.id
+                                        const thumbnailUrl = getThumbnailUrl(image, 80)
+
+                                        return (
+                                            <div
+                                                key={image.id}
+                                                className={`flex items-center p-3 border rounded-lg cursor-pointer transition-all duration-500 ${animatingItemId === image.id
+                                                    ? 'opacity-30 scale-95' // Shadow state - faded and slightly smaller
+                                                    : isSelected
+                                                        ? 'border-blue-500 bg-blue-50 shadow-sm'
+                                                        : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                                                    }`}
+                                                onClick={(event) => handleImageSelect(image, event)}
+                                            >
+                                                {/* Thumbnail */}
+                                                <div className="w-16 h-16 bg-gray-100 rounded-lg overflow-hidden mr-4 flex-shrink-0">
+                                                    {thumbnailUrl ? (
+                                                        <img
+                                                            src={thumbnailUrl}
+                                                            alt={image.title || image.originalFilename || image.original_filename || 'Image'}
+                                                            className="w-full h-full object-cover"
+                                                        />
+                                                    ) : (
+                                                        <div className="w-full h-full flex items-center justify-center">
+                                                            <Image className="w-6 h-6 text-gray-400" />
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Image Info */}
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="text-sm font-medium text-gray-900 truncate">
+                                                        {image.title || image.originalFilename || image.original_filename || 'Untitled'}
+                                                    </div>
+                                                    <div className="text-xs text-gray-500 mt-1">
+                                                        {image.width && image.height && `${image.width}×${image.height} • `}
+                                                        {(image.fileSize || image.file_size) && formatFileSize(image.fileSize || image.file_size)}
+                                                        {(image.createdAt || image.created_at) && ` • ${new Date(image.createdAt || image.created_at).toLocaleDateString()}`}
+                                                    </div>
+                                                    {image.description && (
+                                                        <div className="text-xs text-gray-400 mt-1 truncate">
+                                                            {image.description}
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Selection Indicator */}
+                                                {isSelected && (
+                                                    <div className="ml-3 w-5 h-5 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
+                                                        <div className="w-2 h-2 bg-white rounded-full" />
+                                                    </div>
+                                                )}
+                                            </div>
                                         )
                                     })}
                                 </div>
@@ -716,6 +935,37 @@ const ExpandableImageField = ({
                     {minItems && `Minimum: ${minItems} image${minItems !== 1 ? 's' : ''}`}
                     {minItems && maxItems && ' • '}
                     {maxItems && `Maximum: ${maxItems} image${maxItems !== 1 ? 's' : ''}`}
+                </div>
+            )}
+
+            {/* Clone Animation Overlay */}
+            {animationState && (
+                <div
+                    className={`fixed pointer-events-none z-50 transition-all duration-600 ease-out ${animationState.animating ? 'opacity-0' : 'opacity-100'
+                        }`}
+                    style={{
+                        top: animationState.animating ? animationState.clone.endPos.top : animationState.clone.startPos.top,
+                        left: animationState.animating ? animationState.clone.endPos.left : animationState.clone.startPos.left,
+                        width: animationState.animating ? animationState.clone.endPos.width : animationState.clone.startPos.width,
+                        height: animationState.animating ? animationState.clone.endPos.height : animationState.clone.startPos.height,
+                    }}
+                >
+                    <div className={`w-full h-full border-2 rounded-lg overflow-hidden shadow-xl ${animationState.type === 'selection'
+                        ? 'border-green-500 bg-green-50'
+                        : 'border-red-500 bg-red-50'
+                        }`}>
+                        {animationState.thumbnailUrl ? (
+                            <img
+                                src={animationState.thumbnailUrl}
+                                alt={animationState.image.title || animationState.image.originalFilename || 'Image'}
+                                className="w-full h-full object-cover"
+                            />
+                        ) : (
+                            <div className="w-full h-full bg-gray-100 flex items-center justify-center">
+                                <Image className="w-8 h-8 text-gray-400" />
+                            </div>
+                        )}
+                    </div>
                 </div>
             )}
         </div>
