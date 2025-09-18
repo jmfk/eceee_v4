@@ -42,6 +42,11 @@ export const mediaFilesApi = {
      * @returns {Promise} API response with file list
      */
     list: (params = {}) => wrapApiCall(() => {
+        // Convert showDeleted to show_deleted for Django
+        if ('showDeleted' in params) {
+            params.show_deleted = params.showDeleted;
+            delete params.showDeleted;
+        }
         // Use our custom buildQueryParams to handle Django-style array parameters
         const queryString = buildQueryParams(params);
         return apiClient.get(`${endpoints.media.files}${queryString}`);

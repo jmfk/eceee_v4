@@ -1084,7 +1084,16 @@ const PendingMediaManager = ({ namespace, onFilesProcessed }) => {
                                                                                 }`}>
                                                                                 <MediaTagWidget
                                                                                     tags={formData.tags || []}
-                                                                                    onChange={(tags) => updateFormData(file.id, 'tags', tags)}
+                                                                                    onChange={(tags) => {
+                                                                                        // Ensure we're passing an array of tag objects
+                                                                                        const formattedTags = tags.map(tag => {
+                                                                                            if (typeof tag === 'string') {
+                                                                                                return { name: tag };
+                                                                                            }
+                                                                                            return tag;
+                                                                                        });
+                                                                                        updateFormData(file.id, 'tags', formattedTags);
+                                                                                    }}
                                                                                     namespace={namespace}
                                                                                     disabled={false}
                                                                                 />

@@ -26,7 +26,9 @@ import {
     ChevronLeft,
     ChevronRight,
     Edit3,
-    ArrowLeft
+    ArrowLeft,
+    RefreshCw,
+    Trash2
 } from 'lucide-react';
 import { mediaApi } from '../../api';
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext';
@@ -313,11 +315,20 @@ const MediaBrowser = ({
             }
 
             if (rejectedCount > 0) {
-                addNotification(`${rejectedCount} file${rejectedCount > 1 ? 's' : ''} rejected: identical files already exist`, 'warning');
+                // Show detailed rejection messages
+                result.rejectedFiles.forEach(rejection => {
+                    const message = rejection.error || 'File rejected';
+                    addNotification(message, 'warning');
+                });
             }
 
             if (errorCount > 0) {
-                addNotification(`${errorCount} files failed to upload`, 'error');
+                // Show detailed error messages
+                result.errors.forEach(error => {
+                    const message = error.error || 'Upload failed';
+                    const details = error.technical_details ? `: ${error.technical_details}` : '';
+                    addNotification(`${error.filename}: ${message}${details}`, 'error');
+                });
             }
 
             setUploadState('complete');
@@ -328,8 +339,32 @@ const MediaBrowser = ({
         } catch (error) {
             console.error('Upload error:', error);
 
-            const errorMessage = extractErrorMessage(error, 'Upload failed');
-            addNotification(errorMessage, 'error');
+            // Handle structured error responses
+            if (error.context?.data) {
+                const responseData = error.context.data;
+
+                // Show rejected file messages
+                if (responseData.rejectedFiles?.length > 0) {
+                    responseData.rejectedFiles.forEach(rejection => {
+                        const message = rejection.error || 'File rejected';
+                        addNotification(message, 'warning');
+                    });
+                }
+
+                // Show error messages
+                if (responseData.errors?.length > 0) {
+                    responseData.errors.forEach(error => {
+                        const message = error.error || 'Upload failed';
+                        const details = error.technical_details ? `: ${error.technical_details}` : '';
+                        addNotification(`${error.filename}: ${message}${details}`, 'error');
+                    });
+                }
+            } else {
+                // Handle generic errors
+                const errorMessage = extractErrorMessage(error, 'Upload failed');
+                addNotification(errorMessage, 'error');
+            }
+
             setUploadState('idle');
         }
     };

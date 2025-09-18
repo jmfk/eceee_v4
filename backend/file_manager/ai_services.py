@@ -86,7 +86,9 @@ class MediaAIService:
                 if attempt < self.max_retries - 1:
                     time.sleep(self.retry_delay)
                 else:
-                    logger.error(f"AI service request failed after {self.max_retries} attempts")
+                    logger.error(
+                        f"AI service request failed after {self.max_retries} attempts"
+                    )
                     return {}
 
     def _get_cache_key(self, method: str, **kwargs) -> str:

@@ -177,6 +177,9 @@ class S3MediaStorage(Storage):
         key = self._get_key(name)
         if self.custom_domain:
             return f"https://{self.custom_domain}/{key}"
+        if self.endpoint_url:
+            # Handle MinIO or custom S3-compatible storage
+            return f"{self.endpoint_url}/{self.bucket_name}/{key}"
         return f"https://{self.bucket_name}.s3.{self.region_name}.amazonaws.com/{key}"
 
     def get_public_url(self, name: str) -> str:

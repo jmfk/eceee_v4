@@ -11,8 +11,11 @@ import {
     Shuffle, Hash, AlertCircle, Loader2
 } from 'lucide-react'
 import { namespacesApi, mediaApi, mediaCollectionsApi, mediaTagsApi } from '../../api'
+import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext'
+import MediaTagWidget from '../media/MediaTagWidget'
 import ImageWidget from '../../widgets/core/ImageWidget'
 import { useTheme } from '../../hooks/useTheme'
+import FloatingMessage from '../common/FloatingMessage'
 
 const MediaSpecialEditor = ({
     widgetData,
@@ -21,8 +24,9 @@ const MediaSpecialEditor = ({
     onConfigChange,
     namespace: providedNamespace = null
 }) => {
-    // Get current theme for image styles
+    // Get current theme for image styles and notifications
     const { currentTheme } = useTheme()
+    const { addNotification } = useGlobalNotifications()
 
     // Core state
     const [namespace, setNamespace] = useState(null)
@@ -39,6 +43,15 @@ const MediaSpecialEditor = ({
     // UI state
     const [loading, setLoading] = useState(false)
     const [searchTerm, setSearchTerm] = useState('')
+    const [floatingMessages, setFloatingMessages] = useState([])
+
+    // Helper function to show floating messages
+    const showFloatingMessage = useCallback((message, type = 'info') => {
+        const id = Date.now()
+        setFloatingMessages(prev => [...prev, { id, message, type }])
+        return id
+    }, [])
+
     const [selectedImage, setSelectedImage] = useState(null)
     const [selectedCollection, setSelectedCollection] = useState(null)
     const [editingItem, setEditingItem] = useState(null)
@@ -47,12 +60,20 @@ const MediaSpecialEditor = ({
     const [showCreateCollectionForm, setShowCreateCollectionForm] = useState(false)
     const [createCollectionName, setCreateCollectionName] = useState('')
     const [tempSelectedImages, setTempSelectedImages] = useState([])
-    const [localConfig, setLocalConfig] = useState({})
+    const [localConfig, setLocalConfig] = useState({ mediaItems: [] })
 
     // Use local config that updates immediately, fallback to widgetData config
     const currentConfig = useMemo(() => {
         const baseConfig = widgetData?.config || {}
+        // Ensure mediaItems is always an array
+        if (!baseConfig.mediaItems) {
+            baseConfig.mediaItems = []
+        }
         const mergedConfig = { ...baseConfig, ...localConfig }
+        // Double-check mediaItems is still an array after merge
+        if (!Array.isArray(mergedConfig.mediaItems)) {
+            mergedConfig.mediaItems = []
+        }
         return mergedConfig
     }, [widgetData?.config, localConfig])
 
@@ -159,7 +180,7 @@ const MediaSpecialEditor = ({
                     fileType: 'image',
                     page: 1,
                     pageSize: 20
-                })()
+                })
             } else {
                 // Use files list API for browsing all images
                 result = await mediaApi.files.list({
@@ -171,7 +192,9 @@ const MediaSpecialEditor = ({
                 })()
             }
             const imagesData = result.results || result || []
-            setSearchResults(imagesData)
+            // Filter to ensure only images are shown
+            const onlyImages = imagesData.filter(file => file.fileType === 'image' || file.file_type === 'image')
+            setSearchResults(onlyImages)
         } catch (error) {
             console.error('Failed to load images:', error)
             setSearchResults([])
@@ -527,10 +550,10 @@ const MediaSpecialEditor = ({
     // Handle actual upload to media manager with auto-approval
     const handleActualUpload = async () => {
         if (!namespace || pendingUploads.length === 0) return
-
+        console.log("handleActualUpload")
         setLoading(true)
         try {
-            // Step 1: Upload files to pending
+            // Step 1: Upload files to pending with force_upload to handle deleted files
             const uploadData = {
                 files: pendingUploads.map(upload => upload.file),
                 namespace: namespace
@@ -566,13 +589,32 @@ const MediaSpecialEditor = ({
                 }
             }
 
-            // Handle rejected files (duplicates) - check if they're pending and can be approved
+            // Handle rejected files - check if they can be approved or are duplicates
             for (let i = 0; i < rejectedFiles.length; i++) {
                 const rejectedFile = rejectedFiles[i]
                 const originalUpload = pendingUploads[i]
 
-                if (rejectedFile.reason === 'duplicate_pending' && originalUpload.metadata.tags.length > 0) {
-                    // Find and approve the existing pending file
+                // For duplicates, use the existing file and merge tags
+                if (rejectedFile.reason === 'duplicate' && rejectedFile.existingFile) {
+                    // Show floating message about using existing file
+                    showFloatingMessage(rejectedFile.error, 'info')
+
+                    // Add the existing file to our widget
+                    const existingFile = {
+                        id: rejectedFile.existingFile.id,
+                        title: rejectedFile.existingFile.title,
+                        slug: rejectedFile.existingFile.slug,
+                        // Add tags from the upload
+                        tags: originalUpload?.metadata?.tags || []
+                    }
+                    filesToAddToWidget.push(existingFile)
+                    continue
+                }
+
+                // For other cases (pending/deleted), check if we can approve
+                if (!originalUpload?.metadata?.tags?.length) continue;
+                if ((rejectedFile.reason === 'duplicate_pending' || rejectedFile.reason === 'deleted') && rejectedFile.existingFile) {
+                    // Prepare approval data
                     const approvalData = {
                         title: originalUpload.metadata.title,
                         description: originalUpload.metadata.caption,
@@ -580,10 +622,15 @@ const MediaSpecialEditor = ({
                         access_level: 'public',
                         slug: ''
                     }
-
-                    approvalPromises.push(
-                        mediaApi.pendingFiles.approve(rejectedFile.existingFileId, approvalData)()
-                    )
+                    console.log("approvalData", approvalData)
+                    try {
+                        approvalPromises.push(
+                            mediaApi.pendingFiles.approve(rejectedFile.existingFileId, approvalData)()
+                        )
+                    } catch (error) {
+                        console.error('Failed to approve file:', error)
+                        // Continue with other files even if one fails
+                    }
                 }
             }
 
@@ -608,9 +655,23 @@ const MediaSpecialEditor = ({
                 }
             }
 
-            // Step 3: Add approved images to widget
-            if (approvedMediaFiles.length > 0) {
-                const newMediaItems = approvedMediaFiles.map(mediaFile => ({
+            // Step 3: Add approved images and duplicates to widget
+            const allMediaFiles = [...approvedMediaFiles, ...filesToAddToWidget]
+            if (allMediaFiles.length > 0) {
+                // Fetch full details for any files we only have IDs for
+                const fileDetailsPromises = allMediaFiles.map(file => {
+                    if (!file.url) {
+                        // This is a duplicate file that needs details
+                        return mediaApi.files.get(file.id)().then(response => ({
+                            ...response,
+                            tags: file.tags // Preserve the new tags
+                        }))
+                    }
+                    return Promise.resolve(file)
+                })
+
+                const allFileDetails = await Promise.all(fileDetailsPromises)
+                const newMediaItems = allFileDetails.map(mediaFile => ({
                     id: mediaFile.id,
                     url: mediaFile.imgproxyBaseUrl || mediaFile.fileUrl || mediaFile.file_url,
                     type: 'image',
@@ -621,7 +682,8 @@ const MediaSpecialEditor = ({
                     source: mediaFile.source || '',
                     width: mediaFile.width,
                     height: mediaFile.height,
-                    thumbnailUrl: mediaFile.imgproxyBaseUrl || mediaFile.fileUrl || mediaFile.file_url
+                    thumbnailUrl: mediaFile.imgproxyBaseUrl || mediaFile.fileUrl || mediaFile.file_url,
+                    tags: mediaFile.tags || [] // Include tags
                 }))
 
                 // Update widget config with new images
@@ -639,6 +701,53 @@ const MediaSpecialEditor = ({
                     onConfigChange(updatedConfig)
                 }
 
+                // Update tags for duplicate files
+                const duplicateFiles = filesToAddToWidget.filter(file => file.tags?.length > 0)
+                if (duplicateFiles.length > 0) {
+                    // First, ensure all tags exist
+                    const allTagIds = duplicateFiles.flatMap(file => file.tags)
+                    const uniqueTagIds = [...new Set(allTagIds)]
+
+                    // Get existing tags
+                    const existingTags = await mediaApi.tags.list({ tag_ids: uniqueTagIds })()
+                    const existingTagIds = new Set(existingTags.results.map(tag => tag.id))
+
+                    // Create any missing tags and map old IDs to new UUIDs
+                    const missingTagIds = uniqueTagIds.filter(id => !existingTagIds.has(id))
+                    const tagIdMapping = new Map() // Map old IDs to new UUIDs
+
+                    if (missingTagIds.length > 0) {
+                        const createdTags = await Promise.all(missingTagIds.map(async tagId => {
+                            // Generate a slug from the tag name
+                            const slug = tagId.toLowerCase()
+                                .replace(/[^a-z0-9]+/g, '-')
+                                .replace(/^-+|-+$/g, '')
+                                .substring(0, 50)
+
+                            const newTag = await mediaApi.tags.create({
+                                name: tagId,
+                                slug: slug,
+                                namespace: namespace
+                            })()
+
+                            // Store the mapping between old ID and new UUID
+                            tagIdMapping.set(tagId, newTag.id)
+                            return newTag
+                        }))
+
+                        // Update the tag IDs in our files to use the new UUIDs
+                        duplicateFiles.forEach(file => {
+                            file.tags = file.tags.map(tagId =>
+                                tagIdMapping.get(tagId) || tagId
+                            )
+                        })
+                    }
+
+                    // Now update the files with the tags
+                    await Promise.all(duplicateFiles.map(file =>
+                        mediaApi.files.update(file.id, { tag_ids: file.tags })()
+                    ))
+                }
             }
 
             // Handle results
@@ -646,22 +755,61 @@ const MediaSpecialEditor = ({
             const autoApproved = approvalPromises.length
             const stillPending = totalUploaded - autoApproved
 
+            // Show success messages
             if (totalUploaded > 0) {
                 if (autoApproved > 0) {
+                    addNotification(`${autoApproved} files uploaded and approved`, 'success')
                 }
                 if (stillPending > 0) {
+                    addNotification(`${stillPending} files pending approval`, 'info')
                 }
-
-                // Clear pending uploads
-                setPendingUploads([])
-                setCurrentView('overview')
-
-                // Refresh the browse results to show new images
-                loadImages('')
             }
+
+            // Show rejection messages
+            if (rejectedFiles.length > 0) {
+                rejectedFiles.forEach(rejection => {
+                    // Use floating message for duplicates, regular notification for other rejections
+                    if (rejection.reason === 'duplicate') {
+                        showFloatingMessage(rejection.error, 'info')
+                    } else {
+                        addNotification(rejection.error, 'warning')
+                    }
+                })
+            }
+
+            // Clear pending uploads and return to overview
+            setPendingUploads([])
+            setCurrentView('overview')
+
+            // Refresh the browse results to show new images
+            loadImages('')
 
         } catch (error) {
             console.error('Upload failed:', error)
+
+            // Handle structured error responses
+            if (error.context?.data) {
+                const responseData = error.context.data
+
+                // Show rejected file messages
+                if (responseData.rejectedFiles?.length > 0) {
+                    responseData.rejectedFiles.forEach(rejection => {
+                        addNotification(rejection.error, rejection.reason === 'duplicate' ? 'info' : 'warning')
+                    })
+                }
+
+                // Show error messages
+                if (responseData.errors?.length > 0) {
+                    responseData.errors.forEach(error => {
+                        const message = error.error || 'Upload failed'
+                        const details = error.technical_details ? `: ${error.technical_details}` : ''
+                        addNotification(`${error.filename}: ${message}${details}`, 'error')
+                    })
+                }
+            } else {
+                // Handle generic errors
+                addNotification('Upload failed: ' + (error.message || 'Unknown error'), 'error')
+            }
         } finally {
             setLoading(false)
         }
@@ -777,17 +925,15 @@ const MediaSpecialEditor = ({
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation()
-                                                // TODO: Edit collection image
-                                            }}
-                                            className="p-1 bg-white rounded shadow-sm border border-gray-200 text-gray-700 hover:text-blue-600 hover:border-blue-300 transition-colors"
-                                            title="Edit image"
-                                        >
-                                            <Edit3 className="w-3 h-3" />
-                                        </button>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation()
-                                                // TODO: Remove from collection
+                                                console.log("currentImages", currentImages)
+                                                const updatedConfig = {
+                                                    ...currentConfig,
+                                                    mediaItems: currentImages.filter(img => img.id !== image.id)
+                                                }
+                                                setLocalConfig(updatedConfig)
+                                                if (onConfigChange) {
+                                                    onConfigChange(updatedConfig)
+                                                }
                                             }}
                                             className="p-1 bg-white rounded shadow-sm border border-gray-200 text-gray-700 hover:text-red-600 hover:border-red-300 transition-colors"
                                             title="Remove from collection"
@@ -1314,38 +1460,14 @@ const MediaSpecialEditor = ({
                                         <label className="block text-sm font-medium text-gray-700 mb-1">
                                             Tags <span className="text-red-500">*</span>
                                         </label>
-                                        <div className="flex flex-wrap gap-1 mb-2">
-                                            {upload.metadata.tags.map((tag, tagIndex) => (
-                                                <span
-                                                    key={tagIndex}
-                                                    className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded"
-                                                >
-                                                    {tag}
-                                                    <button
-                                                        onClick={() => {
-                                                            const updated = [...pendingUploads]
-                                                            updated[index].metadata.tags.splice(tagIndex, 1)
-                                                            setPendingUploads(updated)
-                                                        }}
-                                                        className="hover:text-red-600"
-                                                    >
-                                                        <X className="w-3 h-3" />
-                                                    </button>
-                                                </span>
-                                            ))}
-                                        </div>
-                                        <input
-                                            type="text"
-                                            placeholder="Add tag and press Enter"
-                                            onKeyPress={(e) => {
-                                                if (e.key === 'Enter' && e.target.value.trim()) {
-                                                    const updated = [...pendingUploads]
-                                                    updated[index].metadata.tags.push(e.target.value.trim())
-                                                    setPendingUploads(updated)
-                                                    e.target.value = ''
-                                                }
+                                        <MediaTagWidget
+                                            tags={upload.metadata.tags}
+                                            onChange={(newTags) => {
+                                                const updated = [...pendingUploads]
+                                                updated[index].metadata.tags = newTags
+                                                setPendingUploads(updated)
                                             }}
-                                            className="w-full px-3 py-1 border border-gray-300 rounded text-sm"
+                                            namespace={namespace}
                                         />
                                         {upload.metadata.tags.length === 0 && (
                                             <p className="text-xs text-red-500 mt-1">At least one tag is required</p>
@@ -1466,6 +1588,16 @@ const MediaSpecialEditor = ({
 
     return (
         <div className="h-full flex flex-col">
+            {/* Floating Messages */}
+            {floatingMessages.map(msg => (
+                <FloatingMessage
+                    key={msg.id}
+                    message={msg.message}
+                    type={msg.type}
+                    onClose={() => setFloatingMessages(prev => prev.filter(m => m.id !== msg.id))}
+                />
+            ))}
+
             {/* Header */}
             <div className={`px-4 py-3 border-b border-gray-200 bg-white transition-all duration-300 ${isAnimating ? 'animate-fade-in-up delay-100' : ''
                 } ${isClosing ? 'animate-fade-out-down' : ''

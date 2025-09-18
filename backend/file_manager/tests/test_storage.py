@@ -43,15 +43,26 @@ class S3MediaStorageTest(TestCase):
     def test_s3_storage_initialization(self):
         """Test S3MediaStorage initialization"""
         # Create mock S3 bucket
-        conn = boto3.resource("s3", region_name="us-east-1")
+        conn = boto3.resource(
+            "s3",
+            region_name="us-east-1",
+            endpoint_url="http://minio:9000",
+            aws_access_key_id="minioadmin",
+            aws_secret_access_key="minioadmin",
+        )
         conn.create_bucket(Bucket="test-bucket")
 
         with override_settings(
-            AWS_STORAGE_BUCKET_NAME="test-bucket", AWS_S3_REGION_NAME="us-east-1"
+            AWS_STORAGE_BUCKET_NAME="test-bucket",
+            AWS_S3_REGION_NAME="us-east-1",
+            AWS_S3_ENDPOINT_URL="http://minio:9000",
+            AWS_ACCESS_KEY_ID="minioadmin",
+            AWS_SECRET_ACCESS_KEY="minioadmin",
         ):
             storage = S3MediaStorage()
             self.assertIsNotNone(storage.bucket_name)
             self.assertEqual(storage.bucket_name, "test-bucket")
+            self.assertEqual(storage.endpoint_url, "http://minio:9000")
 
     @patch("file_manager.storage.boto3.client")
     def test_upload_file_to_s3(self, mock_boto_client):
@@ -104,13 +115,14 @@ class S3MediaStorageTest(TestCase):
     def test_get_file_url(self):
         """Test getting file URL"""
         with override_settings(
-            AWS_STORAGE_BUCKET_NAME="test-bucket", AWS_S3_REGION_NAME="us-east-1"
+            AWS_STORAGE_BUCKET_NAME="test-bucket",
+            AWS_S3_REGION_NAME="us-east-1",
+            AWS_S3_ENDPOINT_URL="http://minio:9000",
         ):
             storage = S3MediaStorage()
             url = storage.url("uploads/test.jpg")
 
-            self.assertIn("test-bucket", url)
-            self.assertIn("uploads/test.jpg", url)
+            self.assertEqual(url, "http://minio:9000/test-bucket/uploads/test.jpg")
 
 
 class ThumbnailGenerationTest(TestCase):

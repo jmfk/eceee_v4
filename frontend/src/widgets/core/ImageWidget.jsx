@@ -69,9 +69,9 @@ const ImageWidget = ({ config = {}, mode = 'preview' }) => {
 
     // Memoize collection config to prevent unnecessary re-renders
     const stableCollectionConfig = React.useMemo(() => ({
-        randomize: collectionConfig.randomize || false,
-        maxItems: collectionConfig.maxItems || 0
-    }), [collectionConfig.randomize, collectionConfig.maxItems])
+        randomize: collectionConfig?.randomize || false,
+        maxItems: collectionConfig?.maxItems || 0
+    }), [collectionConfig?.randomize, collectionConfig?.maxItems])
 
     // Load collection images when collectionId is present
     useEffect(() => {

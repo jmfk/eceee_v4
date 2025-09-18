@@ -94,7 +94,8 @@ const MediaTagWidget = ({ tags = [], onChange, disabled = false, namespace }) =>
     const handleInputChange = (e) => {
         const value = e.target.value
         setInputValue(value)
-        setShowSuggestions(value.length > 0)
+        // Always show suggestions when input has value
+        setShowSuggestions(true)
         setSelectedIndex(-1)
 
         // Trigger server-side search
@@ -102,12 +103,12 @@ const MediaTagWidget = ({ tags = [], onChange, disabled = false, namespace }) =>
     }
 
     const handleKeyDown = (e) => {
-        if (!showSuggestions || isSearching) {
-            if (e.key === 'Enter') {
-                e.preventDefault()
-                addTag(inputValue.trim())
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            if (!showSuggestions || isSearching) {
+                addTag(inputValue.trim());
+                return;
             }
-            return
         }
 
         // Calculate total options (suggestions + create new option if applicable)
@@ -186,8 +187,14 @@ const MediaTagWidget = ({ tags = [], onChange, disabled = false, namespace }) =>
     }
 
     const removeTag = (tagToRemove) => {
-        const newTags = tags.filter(tag => tag?.id !== tagToRemove?.id)
-        onChange(newTags)
+        const newTags = tags.filter(tag => {
+            // Handle both tag objects and tag name strings
+            if (typeof tag === 'string') {
+                return tag !== tagToRemove.name;
+            }
+            return tag?.id !== tagToRemove?.id && tag?.name !== tagToRemove?.name;
+        });
+        onChange(newTags);
     }
 
     const handleSuggestionClick = (tag) => {
@@ -218,13 +225,13 @@ const MediaTagWidget = ({ tags = [], onChange, disabled = false, namespace }) =>
             {/* Selected Tags Display */}
             {tags.length > 0 && (
                 <div className="flex flex-wrap gap-2 items-start">
-                    {tags.filter(tag => tag && tag.name).map((tag, index) => (
+                    {tags.filter(tag => tag && (typeof tag === 'string' || tag.name)).map((tag, index) => (
                         <span
                             key={tag.id || index}
                             className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800"
                         >
                             <Hash className="w-3 h-3 mr-1" />
-                            {tag.name}
+                            {typeof tag === 'string' ? tag : tag.name}
                             {!disabled && (
                                 <button
                                     onClick={() => removeTag(tag)}
@@ -273,7 +280,7 @@ const MediaTagWidget = ({ tags = [], onChange, disabled = false, namespace }) =>
                     </div>
 
                     {/* Suggestions Dropdown */}
-                    {showSuggestions && inputValue.trim() && (
+                    {showSuggestions && (
                         <div
                             ref={suggestionsRef}
                             className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto"
@@ -306,9 +313,9 @@ const MediaTagWidget = ({ tags = [], onChange, disabled = false, namespace }) =>
                             ))}
 
                             {/* Show no results message */}
-                            {!isSearching && suggestions.length === 0 && availableTags.length === 0 && (
+                            {!isSearching && suggestions.length === 0 && (
                                 <div className="px-4 py-3 text-center text-gray-500">
-                                    <span className="text-sm">No tags found</span>
+                                    <span className="text-sm">No matching tags found</span>
                                 </div>
                             )}
 

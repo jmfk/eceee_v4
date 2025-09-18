@@ -313,6 +313,70 @@ class PageVersionViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+    @action(
+        detail=False,
+        methods=["get"],
+        url_path="pages/(?P<page_id>[^/.]+)/versions",
+    )
+    def by_page(self, request, page_id=None):
+        """Get all versions for a specific page"""
+        try:
+            # Verify page exists
+            page = get_object_or_404(WebPage, id=page_id)
+
+            # Get queryset and apply filters
+            queryset = self.get_queryset().filter(page=page)
+
+            # Apply pagination
+            page = self.paginate_queryset(queryset)
+            if page is not None:
+                serializer = self.get_serializer(page, many=True)
+                return self.get_paginated_response(serializer.data)
+
+            serializer = self.get_serializer(queryset, many=True)
+            return Response(serializer.data)
+
+        except ValueError:
+            return Response(
+                {"error": "Invalid page ID"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except Exception as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+    @action(
+        detail=False,
+        methods=["get"],
+        url_path="pages/(?P<page_id>[^/.]+)/versions/current",
+    )
+    def current_for_page(self, request, page_id=None):
+        """Get current published version for a specific page"""
+        try:
+            page = get_object_or_404(WebPage, id=page_id)
+        except ValueError:
+            return Response(
+                {"error": "Invalid page ID"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        current_version = page.get_current_published_version()
+        if not current_version:
+            # Fallback to latest version for staff users
+            if request.user.is_staff:
+                current_version = page.get_latest_version()
+
+        if not current_version:
+            return Response(
+                {"detail": "No versions found for this page"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        serializer = self.get_serializer(current_version)
+        return Response(serializer.data)
+
     @action(detail=False, methods=["post"], url_path="pack-drafts")
     def pack_drafts(self, request):
         """Remove only draft versions older than current published"""
