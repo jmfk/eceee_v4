@@ -76,7 +76,9 @@ class MediaAIService:
                 return response.json()
 
             except requests.exceptions.RequestException as e:
-                logger.warning(f"AI service request failed (attempt {attempt + 1}): {e}")
+                logger.warning(
+                    f"AI service request failed (attempt {attempt + 1}): {e}"
+                )
                 if attempt < self.max_retries - 1:
                     time.sleep(self.retry_delay)
                 else:
@@ -100,6 +102,7 @@ class MediaAIService:
             elif isinstance(v, (bytes, bytearray)):
                 # Hash binary content
                 import hashlib
+
                 key_parts.append(f"{k}:{hashlib.sha256(v).hexdigest()}")
         return "ai_service:" + ":".join(key_parts)
 
@@ -304,7 +307,9 @@ class MediaAIService:
                 if extracted_text:
                     results["extracted_text"] = extracted_text
                     # Suggest additional tags from extracted text
-                    text_tags = self.suggest_tags_from_content(extracted_text, namespace_id)
+                    text_tags = self.suggest_tags_from_content(
+                        extracted_text, namespace_id
+                    )
                     results["tags"].extend(text_tags)
 
             except Exception:
@@ -326,3 +331,7 @@ class MediaAIService:
         except Exception as e:
             logger.error(f"Failed to run complete analysis workflow: {e}")
             return results
+
+
+# Create a singleton instance
+ai_service = MediaAIService()
