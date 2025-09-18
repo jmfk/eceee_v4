@@ -311,6 +311,50 @@ class MediaFileViewSet(viewsets.ModelViewSet):
 
         return [MediaFilePermission()]
 
+    @action(detail=True, methods=["post"])
+    def restore(self, request, pk=None):
+        """Restore a soft-deleted file."""
+        instance = self.get_object()
+
+        if not instance.is_deleted:
+            return Response(
+                {"error": "File is not deleted"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        success = instance.restore(request.user)
+        if success:
+            serializer = self.get_serializer(instance)
+            return Response(serializer.data)
+        else:
+            return Response(
+                {"error": "Failed to restore file"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+    @action(detail=True, methods=["post"])
+    def force_delete(self, request, pk=None):
+        """Permanently delete a file, bypassing reference checks."""
+        if not request.user.is_staff:
+            return Response(
+                {"error": "Only staff users can force delete files"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        instance = self.get_object()
+        instance.delete(user=request.user, force=True)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=["get"])
+    def references(self, request, pk=None):
+        """Get all references to this file."""
+        instance = self.get_object()
+        return Response(
+            {
+                "reference_count": instance.reference_count,
+                "last_referenced": instance.last_referenced,
+                "references": instance.get_references(),
+            }
+        )
+
     def get_queryset(self):
         """
         Filter queryset based on user permissions and namespace access.
@@ -321,10 +365,23 @@ class MediaFileViewSet(viewsets.ModelViewSet):
         - collection: Exclude files already in this collection (shows potential additions)
         - file_type: Filter by file type (image, video, audio, document, etc.)
         - text_search: Search across title, description, filename, and AI text
+        - show_deleted: Include soft-deleted files (staff only)
         """
         from .security import SecurityAuditLogger
 
         user = self.request.user
+
+        # Get base queryset (respecting soft deletes)
+        queryset = MediaFile.objects.all()
+
+        # Handle soft deletes
+        show_deleted = (
+            self.request.query_params.get("show_deleted", "").lower() == "true"
+        )
+        if show_deleted and user.is_staff:
+            queryset = MediaFile.objects.with_deleted()
+        elif show_deleted:
+            return MediaFile.objects.none()  # Non-staff users can't see deleted files
 
         # Staff users see all files
         if user.is_staff:
@@ -464,7 +521,30 @@ class MediaFileViewSet(viewsets.ModelViewSet):
         serializer.save(last_modified_by=self.request.user)
 
     def perform_destroy(self, instance):
-        """Handle file deletion with security logging."""
+        """Handle file deletion with soft delete and security logging."""
+        from .security import SecurityAuditLogger
+
+        success = instance.delete(user=self.request.user)
+
+        if not success:
+            from rest_framework.exceptions import ValidationError
+
+            raise ValidationError(
+                {
+                    "error": "Cannot delete file that is referenced in content",
+                    "reference_count": instance.reference_count,
+                    "references": instance.get_references(),
+                }
+            )
+
+        SecurityAuditLogger.log_file_deletion(
+            self.request.user,
+            {
+                "filename": instance.original_filename,
+                "id": str(instance.id),
+                "soft_delete": True,
+            },
+        )
         from .security import SecurityAuditLogger
 
         # Log the deletion for security audit

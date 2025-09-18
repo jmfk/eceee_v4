@@ -10,6 +10,7 @@ from django.contrib.auth.models import User
 from django.conf import settings
 from content.models import Namespace
 from .models import MediaFile, MediaTag, MediaCollection, MediaUsage, PendingMediaFile
+from utils.serializers import UserSerializer
 
 
 def convert_tag_names_to_ids(tag_items, namespace, user):
@@ -343,6 +344,14 @@ class MediaFileListSerializer(serializers.ModelSerializer):
 class MediaFileDetailSerializer(serializers.ModelSerializer):
     """Detailed serializer for individual media files."""
 
+    deleted_by = UserSerializer(read_only=True)
+    reference_count = serializers.IntegerField(read_only=True)
+    is_deletable = serializers.SerializerMethodField()
+
+    def get_is_deletable(self, obj):
+        """Check if file can be deleted (no references)."""
+        return obj.reference_count == 0
+
     tags = MediaTagSerializer(many=True, read_only=True)
     collections = MediaCollectionSerializer(many=True, read_only=True)
     usage_records = MediaUsageSerializer(many=True, read_only=True)
@@ -406,6 +415,14 @@ class MediaFileDetailSerializer(serializers.ModelSerializer):
             "created_by_name",
             "last_modified_by",
             "last_modified_by_name",
+            # Soft delete fields
+            "is_deleted",
+            "deleted_at",
+            "deleted_by",
+            # Reference tracking fields
+            "reference_count",
+            "last_referenced",
+            "is_deletable",
         ]
         read_only_fields = [
             "id",
@@ -431,6 +448,14 @@ class MediaFileDetailSerializer(serializers.ModelSerializer):
             "file_size_human",
             "dimensions",
             "file_url",
+            # Soft delete fields
+            "is_deleted",
+            "deleted_at",
+            "deleted_by",
+            # Reference tracking fields
+            "reference_count",
+            "last_referenced",
+            "is_deletable",
         ]
 
     def get_file_url(self, obj):

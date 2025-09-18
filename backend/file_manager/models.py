@@ -449,14 +449,20 @@ class MediaFile(models.Model):
     # File information
     original_filename = models.CharField(max_length=255)
     file_path = models.CharField(max_length=500, help_text="S3 key/path")
-    file_url = models.URLField(max_length=500, help_text="Public URL for the file")
+    file_url = models.URLField(
+        max_length=500, help_text="Public URL for the file", null=True, blank=True
+    )
     file_size = models.BigIntegerField(help_text="File size in bytes")
     content_type = models.CharField(max_length=100)
     file_hash = models.CharField(
         max_length=64, unique=True, help_text="SHA-256 hash for deduplication"
     )
     uploaded_by = models.ForeignKey(
-        User, on_delete=models.PROTECT, related_name="uploaded_media_files"
+        User,
+        on_delete=models.PROTECT,
+        related_name="uploaded_media_files",
+        null=True,
+        blank=True,
     )
 
     # Media-specific metadata
