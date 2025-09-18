@@ -268,6 +268,7 @@ class ContentWidgetEditorRenderer {
         this.container = container
         this.content = options.content || ''
         this.className = options.className || ''
+        this.onChange = options.onChange || (() => { })
 
         // Theme configuration
         this.maxHeaderLevel = options.maxHeaderLevel || this.getThemeHeaderLevel() || 3
@@ -586,45 +587,21 @@ class ContentWidgetEditorRenderer {
      * Handle content changes
      */
     handleContentChange() {
-        console.log("handleContentChange")
         if (this.editorElement) {
-            // console.log('ContentWidgetEditorRenderer: handleContentChange', {
-            //     currentHTML: this.editorElement.innerHTML,
-            //     currentContent: this.content,
-            //     selection: window.getSelection()?.toString() || 'none'
-            // });
-
-            const cleanedContent = cleanHTML(this.editorElement.innerHTML)
+            const currentContent = this.editorElement.innerHTML
             // Only call onChange if content actually changed
-            if (cleanedContent !== this.content) {
-                // console.log('ContentWidgetEditorRenderer: Content changed', {
-                //     oldContent: this.content,
-                //     newContent: cleanedContent,
-                //     selection: window.getSelection()?.toString() || 'none'
-                // });
+            if (currentContent !== this.content) {
+                this.content = currentContent
 
-                // Store selection only if we have one
-                const selection = window.getSelection();
-                let range = null;
-
-                if (selection && selection.rangeCount > 0) {
-                    range = selection.getRangeAt(0);
-                }
-
-                this.content = cleanedContent
+                // Call onChange to notify parent of changes
+                this.onChange(currentContent)
 
                 // Dispatch event for HTML editor
                 const event = new CustomEvent('content-changed', {
-                    detail: cleanedContent,
+                    detail: currentContent,
                     bubbles: true
                 });
                 window.dispatchEvent(event);
-
-                // Restore selection if we had one
-                if (range && selection) {
-                    selection.removeAllRanges();
-                    selection.addRange(range);
-                }
             }
         }
 
@@ -1066,30 +1043,39 @@ class ContentWidgetEditorRenderer {
      * Set editor content
      */
     setContent(content) {
-        // console.log('ContentWidgetEditorRenderer: setContent called', {
-        //     newContent: content,
-        //     currentHTML: this.editorElement?.innerHTML,
-        //     currentContent: this.content
-        // });
+        if (!this.editorElement) return;
 
-        if (this.editorElement && content !== this.editorElement.innerHTML) {
-            // Store selection only if we have one
+        // First set the raw content to ensure editor is usable
+        if (content !== this.editorElement.innerHTML) {
+            this.content = content;
+            this.editorElement.innerHTML = content;
+        }
+
+        // Then schedule the HTML cleaning for the next tick
+        // This ensures the editor is responsive before cleaning
+        setTimeout(() => {
+            if (!this.editorElement) return;
+
+            // Store selection
             const selection = window.getSelection();
             let range = null;
-
             if (selection && selection.rangeCount > 0) {
                 range = selection.getRangeAt(0);
             }
 
-            this.content = content;
-            this.editorElement.innerHTML = content;
+            // Clean the HTML
+            const cleanedContent = cleanHTML(this.editorElement.innerHTML);
+            if (cleanedContent !== this.editorElement.innerHTML) {
+                this.content = cleanedContent;
+                this.editorElement.innerHTML = cleanedContent;
 
-            // Restore selection if we had one
-            if (range && selection) {
-                selection.removeAllRanges();
-                selection.addRange(range);
+                // Restore selection if we had one
+                if (range && selection) {
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                }
             }
-        }
+        }, 0);
     }
 
     /**
@@ -1098,6 +1084,9 @@ class ContentWidgetEditorRenderer {
     updateConfig(options = {}) {
         if (options.content !== undefined) {
             this.setContent(options.content)
+        }
+        if (options.onChange !== undefined) {
+            this.onChange = options.onChange
         }
         if (options.className !== undefined) {
             this.className = options.className
