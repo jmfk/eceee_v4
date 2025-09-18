@@ -18,9 +18,8 @@ class ContentConfig(BaseModel):
         description="HTML content to display",
         # Control specifications
         json_schema_extra={
-            "component": "RichTextInput",
+            "component": "HtmlSource",
             "rows": 6,
-            "toolbar": "full",
         },
     )
     allow_scripts: bool = Field(

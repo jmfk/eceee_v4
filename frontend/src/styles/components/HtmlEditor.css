@@ -1,0 +1,93 @@
+.html-editor-close-button:hover {
+    background-color: #e5e7eb !important;
+    color: #1f2937 !important;
+}
+
+/* CodeMirror wrapper styles */
+.cm-editor {
+    height: 100% !important;
+    max-height: 100% !important;
+    background-color: #000000 !important;
+    color: #ffffff !important;
+}
+
+.cm-scroller {
+    overflow: auto !important;
+}
+
+/* Ensure long lines wrap */
+.cm-line {
+    white-space: pre-wrap !important;
+    word-break: break-word !important;
+    max-width: 100% !important;
+}
+
+/* Add some padding for better readability */
+.cm-content {
+    padding: 8px !important;
+    background-color: #000000 !important;
+}
+
+/* Improve gutter appearance */
+.cm-gutters {
+    border-right: 1px solid #333333 !important;
+    background-color: #000000 !important;
+    color: #666666 !important;
+}
+
+/* Improve active line highlight */
+.cm-activeLine {
+    background-color: #1a1a1a !important;
+}
+
+/* Improve selection color */
+.cm-selectionBackground {
+    background-color: #264f78 !important;
+}
+
+/* Improve syntax highlighting for HTML */
+.cm-tag {
+    color: #7ee787 !important;
+}
+
+.cm-attribute {
+    color: #79c0ff !important;
+}
+
+.cm-string {
+    color: #ffa657 !important;
+}
+
+.cm-bracket {
+    color: #7ee787 !important;
+}
+
+.cm-comment {
+    color: #6a737d !important;
+}
+
+/* Scrollbar styling */
+.cm-scroller::-webkit-scrollbar {
+    width: 12px !important;
+    height: 12px !important;
+}
+
+.cm-scroller::-webkit-scrollbar-track {
+    background: #1a1a1a !important;
+}
+
+.cm-scroller::-webkit-scrollbar-thumb {
+    background-color: #333333 !important;
+    border-radius: 6px !important;
+    border: 2px solid #1a1a1a !important;
+}
+
+.cm-scroller::-webkit-scrollbar-thumb:hover {
+    background-color: #444444 !important;
+}
+
+/* Ensure the editor container takes full height */
+.html-editor-content {
+    height: calc(100% - 45px) !important;
+    overflow: hidden !important;
+}

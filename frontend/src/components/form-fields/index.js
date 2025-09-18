@@ -103,6 +103,8 @@ export const FIELD_COMPONENTS = {
     // Reference Components
     UserSelectorInput: () => import('./UserSelectorInput'),
     ObjectSelectorInput: () => import('./ObjectSelectorInput'),
+    // HTML Source Editor
+    HtmlSource: () => import('../fields/HtmlSourceField'),
     // TODO: Add more components
 }
 
