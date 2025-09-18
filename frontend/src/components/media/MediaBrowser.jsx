@@ -53,7 +53,8 @@ const MediaBrowser = ({
     const [filters, setFilters] = useState({
         fileType: '',
         tags: [],
-        collections: []
+        collections: [],
+        showDeleted: false
     });
     const [pagination, setPagination] = useState({
         page: 1,
@@ -94,6 +95,7 @@ const MediaBrowser = ({
                 page: currentPage,
                 pageSize: currentPageSize,
                 namespace: namespace,
+                show_deleted: memoizedFilters.showDeleted,
                 ...memoizedFilters
             };
 
@@ -165,6 +167,36 @@ const MediaBrowser = ({
     };
 
     // Handle edit button click
+    const handleRestoreClick = async (file, event) => {
+        event.stopPropagation(); // Prevent file selection
+
+        try {
+            await mediaApi.files.restore(file.id)();
+            addNotification('File restored successfully', 'success');
+            loadFiles(); // Refresh the list
+        } catch (error) {
+            console.error('Failed to restore file:', error);
+            addNotification('Failed to restore file', 'error');
+        }
+    };
+
+    const handleForceDeleteClick = async (file, event) => {
+        event.stopPropagation(); // Prevent file selection
+
+        if (!window.confirm('Are you sure you want to permanently delete this file? This action cannot be undone.')) {
+            return;
+        }
+
+        try {
+            await mediaApi.files.forceDelete(file.id)();
+            addNotification('File permanently deleted', 'success');
+            loadFiles(); // Refresh the list
+        } catch (error) {
+            console.error('Failed to delete file:', error);
+            addNotification('Failed to delete file', 'error');
+        }
+    };
+
     const handleEditClick = async (file, event) => {
         event.stopPropagation(); // Prevent file selection
 
@@ -381,14 +413,42 @@ const MediaBrowser = ({
                     `}
                     onClick={() => handleFileClick(file)}
                 >
-                    {/* Edit Button */}
-                    <button
-                        onClick={(e) => handleEditClick(file, e)}
-                        className="absolute top-2 right-2 z-10 p-1.5 bg-white rounded-full shadow-md transition-opacity duration-200 hover:bg-gray-50"
-                        title="Edit file"
-                    >
-                        <Edit3 className="w-3.5 h-3.5 text-gray-600" />
-                    </button>
+                    {/* Action Buttons */}
+                    <div className="absolute top-2 right-2 z-10 flex gap-1">
+                        {file.is_deleted ? (
+                            <>
+                                <button
+                                    onClick={(e) => handleRestoreClick(file, e)}
+                                    className="p-1.5 bg-green-500 text-white rounded-full shadow-md transition-opacity duration-200 hover:bg-green-600"
+                                    title="Restore file"
+                                >
+                                    <RefreshCw className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                    onClick={(e) => handleForceDeleteClick(file, e)}
+                                    className="p-1.5 bg-red-500 text-white rounded-full shadow-md transition-opacity duration-200 hover:bg-red-600"
+                                    title="Permanently delete file"
+                                >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                            </>
+                        ) : (
+                            <button
+                                onClick={(e) => handleEditClick(file, e)}
+                                className="p-1.5 bg-white rounded-full shadow-md transition-opacity duration-200 hover:bg-gray-50"
+                                title="Edit file"
+                            >
+                                <Edit3 className="w-3.5 h-3.5 text-gray-600" />
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Deleted Status Badge */}
+                    {file.is_deleted && (
+                        <div className="absolute top-2 left-2 z-10 px-2 py-1 bg-red-500 text-white text-xs font-medium rounded-full shadow-md">
+                            Deleted
+                        </div>
+                    )}
 
                     <div className="aspect-square p-2">
                         {renderThumbnail(file, 200)}
@@ -446,15 +506,39 @@ const MediaBrowser = ({
                     <div className="col-span-2 text-sm text-gray-600 capitalize flex items-center">{file.fileType || file.file_type}</div>
                     <div className="col-span-2 text-sm text-gray-600 flex items-center">{formatFileSize(file.fileSize || file.file_size)}</div>
                     <div className="col-span-3 text-sm text-gray-600 flex items-center">{formatDate(file.createdAt || file.created_at)}</div>
-                    <div className="col-span-1 flex justify-center items-center">
-                        <button
-                            onClick={(e) => handleEditClick(file, e)}
-                            className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
-                            title="Edit file"
-                        >
-                            <Edit3 className="w-4 h-4" />
-                        </button>
+                    <div className="col-span-1 flex justify-center items-center gap-1">
+                        {file.is_deleted ? (
+                            <>
+                                <button
+                                    onClick={(e) => handleRestoreClick(file, e)}
+                                    className="p-1.5 text-green-600 hover:text-green-700 hover:bg-green-50 rounded transition-colors"
+                                    title="Restore file"
+                                >
+                                    <RefreshCw className="w-4 h-4" />
+                                </button>
+                                <button
+                                    onClick={(e) => handleForceDeleteClick(file, e)}
+                                    className="p-1.5 text-red-600 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
+                                    title="Permanently delete file"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
+                            </>
+                        ) : (
+                            <button
+                                onClick={(e) => handleEditClick(file, e)}
+                                className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                                title="Edit file"
+                            >
+                                <Edit3 className="w-4 h-4" />
+                            </button>
+                        )}
                     </div>
+                    {file.is_deleted && (
+                        <div className="absolute right-full mr-2 px-2 py-0.5 bg-red-500 text-white text-xs font-medium rounded-full">
+                            Deleted
+                        </div>
+                    )}
                 </div>
             ))}
         </div>
@@ -540,6 +624,20 @@ const MediaBrowser = ({
                             <option value="document">Documents</option>
                             <option value="other">Other</option>
                         </select>
+
+                        <button
+                            onClick={() => handleFilterChange('showDeleted', !filters.showDeleted)}
+                            className={`
+                                flex items-center gap-2 px-3 py-2 text-sm font-medium border border-gray-300 rounded-md transition-colors whitespace-nowrap
+                                ${filters.showDeleted
+                                    ? 'bg-red-600 text-white border-red-600'
+                                    : 'bg-white text-gray-700 hover:bg-gray-50'
+                                }
+                            `}
+                        >
+                            <Trash2 className="w-4 h-4" />
+                            Show Deleted
+                        </button>
 
                         <div className="flex rounded-md border border-gray-300 overflow-hidden">
                             <button

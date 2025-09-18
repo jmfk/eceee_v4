@@ -20,6 +20,7 @@ import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext
 import OptimizedImage from './OptimizedImage';
 import { generateThumbnailUrl } from '../../utils/imgproxy';
 import MediaTagWidget from './MediaTagWidget';
+import MediaReferencesDisplay from './MediaReferencesDisplay';
 
 const MediaEditForm = ({
     file,
@@ -429,6 +430,14 @@ const MediaEditForm = ({
 
 
 
+
+                    {/* References Display */}
+                    {mode === 'edit' && (
+                        <div>
+                            <h4 className="text-sm font-medium text-gray-700 mb-2">References</h4>
+                            <MediaReferencesDisplay fileId={file.id} />
+                        </div>
+                    )}
 
                     {/* AI Confidence Score */}
                     {file.aiSuggestions?.confidenceScore && (
