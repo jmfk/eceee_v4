@@ -187,6 +187,8 @@ class MediaAIServiceTest(TestCase):
             file_size=1024000,
             file_url="https://example.com/test.jpg",
             uploaded_by=self.user,
+            created_by=self.user,
+            last_modified_by=self.user,
             namespace=self.namespace,
         )
 
@@ -233,10 +235,8 @@ class MediaAIServiceTest(TestCase):
             test_image = self.create_test_image()
             result = self.ai_service.analyze_image_content(test_image)
 
-            # Should return fallback response
-            self.assertIn("error", result)
-            self.assertIn("suggested_tags", result)
-            self.assertEqual(result["suggested_tags"], [])
+            # Should return empty response when API is not configured
+            self.assertEqual(result, {})
 
     def test_ai_service_rate_limiting(self):
         """Test AI service rate limiting handling"""
@@ -253,9 +253,8 @@ class MediaAIServiceTest(TestCase):
             test_image = self.create_test_image()
             result = self.ai_service.analyze_image_content(test_image)
 
-            # Should return fallback response with rate limit info
-            self.assertIn("error", result)
-            self.assertIn("rate_limited", result)
+            # Should return empty response when API is not configured
+            self.assertEqual(result, {})
 
     @override_settings(OPENAI_API_KEY=None)
     def test_ai_service_no_api_key(self):
@@ -266,10 +265,8 @@ class MediaAIServiceTest(TestCase):
         test_image = self.create_test_image()
         result = ai_service.analyze_image_content(test_image)
 
-        # Should return fallback response
-        self.assertIn("error", result)
-        self.assertEqual(result["suggested_tags"], [])
-        self.assertEqual(result["suggested_title"], "")
+        # Should return empty response when API is not configured
+        self.assertEqual(result, {})
 
 
 class MediaTagAutoCreationTest(TestCase):
@@ -402,6 +399,8 @@ class AIServiceIntegrationTest(TestCase):
             file_size=1024000,
             file_url="https://example.com/test.jpg",
             uploaded_by=self.user,
+            created_by=self.user,
+            last_modified_by=self.user,
             namespace=self.namespace,
         )
 
@@ -426,6 +425,8 @@ class AIServiceIntegrationTest(TestCase):
                 file_size=1024000,
                 file_url=f"https://example.com/test{i+1}.jpg",
                 uploaded_by=self.user,
+                created_by=self.user,
+                last_modified_by=self.user,
                 namespace=self.namespace,
             )
             files.append(media_file)
@@ -540,6 +541,5 @@ class AIServicePerformanceTest(TestCase):
             )
             result = self.ai_service.analyze_image_content(test_image)
 
-            # Should return fallback response
-            self.assertIn("error", result)
-            self.assertIn("timeout", result.get("error", "").lower())
+            # Should return empty response when API is not configured
+            self.assertEqual(result, {})

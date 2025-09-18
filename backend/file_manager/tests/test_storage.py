@@ -15,7 +15,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.contrib.auth.models import User
 from unittest.mock import patch, MagicMock, Mock
 import boto3
-from moto import mock_s3
+from moto import mock_aws
 import io
 from PIL import Image
 
@@ -39,7 +39,7 @@ class S3MediaStorageTest(TestCase):
         )
         self.storage = S3MediaStorage()
 
-    @mock_s3
+    @mock_aws
     def test_s3_storage_initialization(self):
         """Test S3MediaStorage initialization"""
         # Create mock S3 bucket
@@ -179,7 +179,9 @@ class MetadataExtractionTest(TestCase):
         test_file = self.create_test_image_with_exif()
 
         # Test metadata extraction
-        metadata = self.storage.extract_metadata(test_file)
+        metadata = self.storage.extract_metadata(
+            test_file.read(), test_file.content_type
+        )
 
         self.assertEqual(metadata["width"], 1920)
         self.assertEqual(metadata["height"], 1080)
@@ -194,7 +196,9 @@ class MetadataExtractionTest(TestCase):
         )
 
         # Test metadata extraction
-        metadata = self.storage.extract_metadata(test_file)
+        metadata = self.storage.extract_metadata(
+            test_file.read(), test_file.content_type
+        )
 
         self.assertIn("file_size", metadata)
         self.assertIn("content_type", metadata)
@@ -208,7 +212,9 @@ class MetadataExtractionTest(TestCase):
         )
 
         # Test metadata extraction (should not crash)
-        metadata = self.storage.extract_metadata(corrupted_file)
+        metadata = self.storage.extract_metadata(
+            corrupted_file.read(), corrupted_file.content_type
+        )
 
         # Should still return basic metadata
         self.assertIn("file_size", metadata)

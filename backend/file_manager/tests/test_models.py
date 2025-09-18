@@ -54,6 +54,8 @@ class MediaFileModelTest(TestCase):
             file_size=1024000,
             file_url="https://example.com/test.jpg",
             uploaded_by=self.user,
+            created_by=self.user,
+            last_modified_by=self.user,
             namespace=self.namespace,
         )
 
@@ -76,6 +78,8 @@ class MediaFileModelTest(TestCase):
                 file_size=1024,
                 file_url="https://example.com/test.jpg",
                 uploaded_by=self.user,
+                created_by=self.user,
+                last_modified_by=self.user,
                 namespace=self.namespace,
             )
             media_file.full_clean()
@@ -89,6 +93,8 @@ class MediaFileModelTest(TestCase):
                 file_size=1024,
                 file_url="https://example.com/test.jpg",
                 uploaded_by=self.user,
+                created_by=self.user,
+                last_modified_by=self.user,
                 namespace=self.namespace,
             )
             media_file.full_clean()
@@ -102,6 +108,8 @@ class MediaFileModelTest(TestCase):
             file_size=2048000,
             file_url="https://example.com/test.pdf",
             uploaded_by=self.user,
+            created_by=self.user,
+            last_modified_by=self.user,
             namespace=self.namespace,
         )
 
@@ -117,6 +125,8 @@ class MediaFileModelTest(TestCase):
             file_size=512,
             file_url="https://example.com/small.txt",
             uploaded_by=self.user,
+            created_by=self.user,
+            last_modified_by=self.user,
             namespace=self.namespace,
         )
         self.assertEqual(media_file.file_size_display, "512 B")
@@ -146,6 +156,8 @@ class MediaFileModelTest(TestCase):
             file_size=1024,
             file_url="https://example.com/test.jpg",
             uploaded_by=self.user,
+            created_by=self.user,
+            last_modified_by=self.user,
             namespace=self.namespace,
         )
         self.assertTrue(image_file.is_image)
@@ -158,6 +170,8 @@ class MediaFileModelTest(TestCase):
             file_size=1024,
             file_url="https://example.com/test.pdf",
             uploaded_by=self.user,
+            created_by=self.user,
+            last_modified_by=self.user,
             namespace=self.namespace,
         )
         self.assertFalse(doc_file.is_image)
@@ -172,6 +186,8 @@ class MediaFileModelTest(TestCase):
             file_size=10240000,
             file_url="https://example.com/test.mp4",
             uploaded_by=self.user,
+            created_by=self.user,
+            last_modified_by=self.user,
             namespace=self.namespace,
         )
         self.assertTrue(video_file.is_video)
@@ -184,6 +200,8 @@ class MediaFileModelTest(TestCase):
             file_size=1024,
             file_url="https://example.com/test.jpg",
             uploaded_by=self.user,
+            created_by=self.user,
+            last_modified_by=self.user,
             namespace=self.namespace,
         )
         self.assertFalse(image_file.is_video)
@@ -198,6 +216,8 @@ class MediaFileModelTest(TestCase):
             file_size=1024,
             file_url="https://example.com/test.jpg",
             uploaded_by=self.user,
+            created_by=self.user,
+            last_modified_by=self.user,
             namespace=self.namespace,
         )
 
@@ -210,6 +230,8 @@ class MediaFileModelTest(TestCase):
                 file_size=2048,
                 file_url="https://example.com/test2.png",
                 uploaded_by=self.user,
+                created_by=self.user,
+                last_modified_by=self.user,
                 namespace=self.namespace,  # Same namespace
             )
 
@@ -230,6 +252,8 @@ class MediaFileModelTest(TestCase):
             file_size=2048,
             file_url="https://example.com/test2.png",
             uploaded_by=self.user,
+            created_by=self.user,
+            last_modified_by=self.user,
             namespace=other_namespace,
         )
 
@@ -240,6 +264,9 @@ class MediaTagModelTest(TestCase):
     """Test MediaTag model functionality"""
 
     def setUp(self):
+        self.user = User.objects.create_user(
+            username="testuser", password="testpass", email="test@example.com"
+        )
         self.namespace, _ = Namespace.objects.get_or_create(
             slug="test-namespace",
             defaults={
@@ -252,7 +279,7 @@ class MediaTagModelTest(TestCase):
     def test_media_tag_creation(self):
         """Test basic MediaTag creation"""
         tag = MediaTag.objects.create(
-            name="Nature", slug="nature", namespace=self.namespace
+            name="Nature", slug="nature", namespace=self.namespace, created_by=self.user
         )
 
         self.assertEqual(tag.name, "Nature")
@@ -263,7 +290,10 @@ class MediaTagModelTest(TestCase):
     def test_media_tag_str_representation(self):
         """Test MediaTag string representation"""
         tag = MediaTag.objects.create(
-            name="Photography", slug="photography", namespace=self.namespace
+            name="Photography",
+            slug="photography",
+            namespace=self.namespace,
+            created_by=self.user,
         )
 
         self.assertEqual(str(tag), "Photography")
@@ -272,7 +302,10 @@ class MediaTagModelTest(TestCase):
         """Test namespace constraint on MediaTag"""
         # Create first tag
         MediaTag.objects.create(
-            name="Landscape", slug="landscape", namespace=self.namespace
+            name="Landscape",
+            slug="landscape",
+            namespace=self.namespace,
+            created_by=self.user,
         )
 
         # Try to create another tag with same slug in same namespace
@@ -281,6 +314,7 @@ class MediaTagModelTest(TestCase):
                 name="Different Landscape",
                 slug="landscape",  # Same slug
                 namespace=self.namespace,  # Same namespace
+                created_by=self.user,
             )
 
 
@@ -307,6 +341,7 @@ class MediaCollectionModelTest(TestCase):
             slug="summer-photos",
             description="Photos from summer vacation",
             created_by=self.user,
+            last_modified_by=self.user,
             namespace=self.namespace,
         )
 
@@ -323,6 +358,7 @@ class MediaCollectionModelTest(TestCase):
             title="Winter Gallery",
             slug="winter-gallery",
             created_by=self.user,
+            last_modified_by=self.user,
             namespace=self.namespace,
         )
 
@@ -334,6 +370,7 @@ class MediaCollectionModelTest(TestCase):
             title="Test Collection",
             slug="test-collection",
             created_by=self.user,
+            last_modified_by=self.user,
             namespace=self.namespace,
         )
 
@@ -389,6 +426,8 @@ class MediaUsageModelTest(TestCase):
             file_size=1024000,
             file_url="https://example.com/test.jpg",
             uploaded_by=self.user,
+            created_by=self.user,
+            last_modified_by=self.user,
             namespace=self.namespace,
         )
         self.webpage = WebPage.objects.create(
@@ -449,16 +488,21 @@ class MediaModelRelationshipsTest(TestCase):
             file_size=1024000,
             file_url="https://example.com/nature.jpg",
             uploaded_by=self.user,
+            created_by=self.user,
+            last_modified_by=self.user,
             namespace=self.namespace,
         )
 
         # Create tags
         tag1 = MediaTag.objects.create(
-            name="Nature", slug="nature", namespace=self.namespace
+            name="Nature", slug="nature", namespace=self.namespace, created_by=self.user
         )
 
         tag2 = MediaTag.objects.create(
-            name="Landscape", slug="landscape", namespace=self.namespace
+            name="Landscape",
+            slug="landscape",
+            namespace=self.namespace,
+            created_by=self.user,
         )
 
         # Add tags to media file
@@ -480,6 +524,7 @@ class MediaModelRelationshipsTest(TestCase):
             title="Summer Photos",
             slug="summer-photos",
             created_by=self.user,
+            last_modified_by=self.user,
             namespace=self.namespace,
         )
 
@@ -491,6 +536,8 @@ class MediaModelRelationshipsTest(TestCase):
             file_size=1024000,
             file_url="https://example.com/beach.jpg",
             uploaded_by=self.user,
+            created_by=self.user,
+            last_modified_by=self.user,
             namespace=self.namespace,
         )
 
@@ -501,6 +548,8 @@ class MediaModelRelationshipsTest(TestCase):
             file_size=2048000,
             file_url="https://example.com/mountain.jpg",
             uploaded_by=self.user,
+            created_by=self.user,
+            last_modified_by=self.user,
             namespace=self.namespace,
         )
 

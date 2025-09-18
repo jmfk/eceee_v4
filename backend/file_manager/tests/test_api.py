@@ -52,6 +52,8 @@ class MediaFileAPITest(APITestCase):
             file_size=1024000,
             file_url="https://example.com/test.jpg",
             uploaded_by=self.user,
+            created_by=self.user,
+            last_modified_by=self.user,
             namespace=self.namespace,
         )
 
@@ -434,7 +436,7 @@ class MediaTagAPITest(APITestCase):
         )
 
         self.tag = MediaTag.objects.create(
-            name="Nature", slug="nature", namespace=self.namespace
+            name="Nature", slug="nature", namespace=self.namespace, created_by=self.user
         )
 
     def test_list_tags(self):
@@ -525,7 +527,10 @@ class MediaBulkOperationsAPITest(APITestCase):
         """Test bulk tagging of files"""
         # Create tag
         tag = MediaTag.objects.create(
-            name="Bulk Tag", slug="bulk-tag", namespace=self.namespace
+            name="Bulk Tag",
+            slug="bulk-tag",
+            namespace=self.namespace,
+            created_by=self.user,
         )
 
         url = reverse("mediafile-bulk-tag")
