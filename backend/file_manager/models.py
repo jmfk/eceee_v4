@@ -404,8 +404,23 @@ class PendingMediaFile(models.Model):
                 )
 
 
+class MediaFileManager(models.Manager):
+    """Custom manager for MediaFile model to handle soft deletes."""
+
+    def get_queryset(self):
+        return super().get_queryset().filter(is_deleted=False)
+
+    def with_deleted(self):
+        return super().get_queryset()
+
+    def only_deleted(self):
+        return super().get_queryset().filter(is_deleted=True)
+
+
 class MediaFile(models.Model):
     """Core media file model with S3 storage integration."""
+
+    objects = MediaFileManager()
 
     # File type choices
     FILE_TYPE_CHOICES = [
@@ -434,10 +449,14 @@ class MediaFile(models.Model):
     # File information
     original_filename = models.CharField(max_length=255)
     file_path = models.CharField(max_length=500, help_text="S3 key/path")
+    file_url = models.URLField(max_length=500, help_text="Public URL for the file")
     file_size = models.BigIntegerField(help_text="File size in bytes")
     content_type = models.CharField(max_length=100)
     file_hash = models.CharField(
         max_length=64, unique=True, help_text="SHA-256 hash for deduplication"
+    )
+    uploaded_by = models.ForeignKey(
+        User, on_delete=models.PROTECT, related_name="uploaded_media_files"
     )
 
     # Media-specific metadata
@@ -477,6 +496,28 @@ class MediaFile(models.Model):
     download_count = models.PositiveIntegerField(default=0)
     last_accessed = models.DateTimeField(null=True, blank=True)
 
+    # Reference tracking
+    reference_count = models.PositiveIntegerField(
+        default=0, help_text="Number of times this file is referenced in content"
+    )
+    last_referenced = models.DateTimeField(null=True, blank=True)
+    referenced_in = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Dictionary of content references {content_type: [ids]}",
+    )
+
+    # Soft delete
+    is_deleted = models.BooleanField(default=False, help_text="Soft delete flag")
+    deleted_at = models.DateTimeField(null=True, blank=True)
+    deleted_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="deleted_media_files",
+    )
+
     # Timestamps and ownership
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -512,54 +553,147 @@ class MediaFile(models.Model):
             self.slug = self._generate_unique_slug()
         super().save(*args, **kwargs)
 
-    def delete(self, *args, **kwargs):
-        """Custom delete method to handle S3 cleanup and related files."""
-        from .storage import S3MediaStorage
-        import logging
+    def add_reference(self, content_type, content_id):
+        """
+        Add a reference to this media file.
 
-        logger = logging.getLogger(__name__)
-        logger.info(
-            f"Deleting MediaFile: {self.title} (ID: {self.id}, File: {self.original_filename})"
-        )
+        Args:
+            content_type: The type of content (e.g., 'webpage', 'widget')
+            content_id: The ID of the content
+        """
+        from django.utils import timezone
 
-        # Check if other files reference the same S3 object (same file_hash)
-        other_media_files = (
-            MediaFile.objects.filter(file_hash=self.file_hash)
-            .exclude(id=self.id)
-            .exists()
-        )
+        refs = self.referenced_in
+        if content_type not in refs:
+            refs[content_type] = []
 
-        other_pending_files = PendingMediaFile.objects.filter(
-            file_hash=self.file_hash, status__in=["pending", "approved"]
-        ).exists()
-
-        # Only delete from S3 if no other files reference it
-        if not other_media_files and not other_pending_files:
-            try:
-                storage = S3MediaStorage()
-                storage.delete_file(self.file_path)
-                logger.info(f"Deleted S3 file: {self.file_path}")
-            except Exception as e:
-                logger.error(f"Failed to delete S3 file {self.file_path}: {e}")
-                # Don't fail the database deletion if S3 cleanup fails
-        else:
-            logger.info(
-                f"Not deleting S3 file {self.file_path} - other files reference it"
+        if content_id not in refs[content_type]:
+            refs[content_type].append(content_id)
+            self.reference_count = self.reference_count + 1
+            self.last_referenced = timezone.now()
+            self.referenced_in = refs
+            self.save(
+                update_fields=["reference_count", "last_referenced", "referenced_in"]
             )
 
-        # Delete any related PendingMediaFile records with same hash that are approved
-        related_pending = PendingMediaFile.objects.filter(
-            file_hash=self.file_hash, status="approved"
-        )
-        if related_pending.exists():
-            logger.info(
-                f"Deleting {related_pending.count()} related approved pending files"
-            )
-            related_pending.delete()
+    def remove_reference(self, content_type, content_id):
+        """
+        Remove a reference to this media file.
 
-        # Call parent delete to remove from database
-        super().delete(*args, **kwargs)
-        logger.info(f"Successfully deleted MediaFile: {self.title}")
+        Args:
+            content_type: The type of content (e.g., 'webpage', 'widget')
+            content_id: The ID of the content
+
+        Returns:
+            bool: True if reference was removed, False if not found
+        """
+        refs = self.referenced_in
+        if content_type not in refs or content_id not in refs[content_type]:
+            return False
+
+        refs[content_type].remove(content_id)
+        if not refs[content_type]:
+            del refs[content_type]
+
+        self.reference_count = self.reference_count - 1
+        self.referenced_in = refs
+        self.save(update_fields=["reference_count", "referenced_in"])
+        return True
+
+    def get_references(self):
+        """
+        Get all references to this media file.
+
+        Returns:
+            dict: Dictionary of content references {content_type: [ids]}
+        """
+        return self.referenced_in
+
+    def restore(self, user=None):
+        """
+        Restore a soft-deleted media file.
+
+        Args:
+            user: The user performing the restore action
+        """
+        if not self.is_deleted:
+            return False
+
+        self.is_deleted = False
+        self.deleted_at = None
+        self.deleted_by = None
+        self.save(update_fields=["is_deleted", "deleted_at", "deleted_by"])
+        return True
+
+    def delete(self, user=None, force=False, *args, **kwargs):
+        """
+        Override delete to implement soft delete functionality.
+
+        Args:
+            user: The user performing the delete action
+            force: If True, performs a hard delete regardless of reference count
+
+        Returns:
+            bool: True if delete was successful, False if prevented due to references
+        """
+        if force:
+            # Handle S3 cleanup and related files
+            from .storage import S3MediaStorage
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.info(
+                f"Deleting MediaFile: {self.title} (ID: {self.id}, File: {self.original_filename})"
+            )
+
+            # Check if other files reference the same S3 object (same file_hash)
+            other_media_files = (
+                MediaFile.objects.filter(file_hash=self.file_hash)
+                .exclude(id=self.id)
+                .exists()
+            )
+
+            other_pending_files = PendingMediaFile.objects.filter(
+                file_hash=self.file_hash, status__in=["pending", "approved"]
+            ).exists()
+
+            # Only delete from S3 if no other files reference it
+            if not other_media_files and not other_pending_files:
+                try:
+                    storage = S3MediaStorage()
+                    storage.delete_file(self.file_path)
+                    logger.info(f"Deleted S3 file: {self.file_path}")
+                except Exception as e:
+                    logger.error(f"Failed to delete S3 file {self.file_path}: {e}")
+                    # Don't fail the database deletion if S3 cleanup fails
+            else:
+                logger.info(
+                    f"Not deleting S3 file {self.file_path} - other files reference it"
+                )
+
+            # Delete any related PendingMediaFile records with same hash that are approved
+            related_pending = PendingMediaFile.objects.filter(
+                file_hash=self.file_hash, status="approved"
+            )
+            if related_pending.exists():
+                logger.info(
+                    f"Deleting {related_pending.count()} related approved pending files"
+                )
+                related_pending.delete()
+
+            # Call parent delete to remove from database
+            return super().delete(*args, **kwargs)
+
+        if self.reference_count > 0:
+            return False
+
+        from django.utils import timezone
+
+        self.is_deleted = True
+        self.deleted_at = timezone.now()
+        self.deleted_by = user
+        self.save(update_fields=["is_deleted", "deleted_at", "deleted_by"])
+        return True
 
     def _generate_unique_slug(self):
         """Generate a unique, SEO-friendly slug for the media file."""
