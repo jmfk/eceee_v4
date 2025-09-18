@@ -41,7 +41,9 @@ class S3MediaStorage(Storage):
         self.querystring_auth = getattr(settings, "AWS_QUERYSTRING_AUTH", True)
         self.file_overwrite = getattr(settings, "AWS_S3_FILE_OVERWRITE", False)
         self.object_parameters = getattr(settings, "AWS_S3_OBJECT_PARAMETERS", {})
-        self.max_file_size = getattr(settings, "MAX_FILE_SIZE", 100 * 1024 * 1024)  # 100MB
+        self.max_file_size = getattr(
+            settings, "MAX_FILE_SIZE", 100 * 1024 * 1024
+        )  # 100MB
         self.allowed_file_types = getattr(
             settings,
             "ALLOWED_FILE_TYPES",
@@ -243,7 +245,9 @@ class S3MediaStorage(Storage):
         """
         return file.size <= self.max_file_size
 
-    def extract_metadata(self, file_content: bytes, content_type: str) -> Dict[str, Any]:
+    def extract_metadata(
+        self, file_content: bytes, content_type: str
+    ) -> Dict[str, Any]:
         """
         Extract metadata from file content.
 
@@ -259,12 +263,14 @@ class S3MediaStorage(Storage):
         if content_type.startswith("image/"):
             try:
                 image = Image.open(io.BytesIO(file_content))
-                metadata.update({
-                    "width": image.width,
-                    "height": image.height,
-                    "format": image.format,
-                    "mode": image.mode,
-                })
+                metadata.update(
+                    {
+                        "width": image.width,
+                        "height": image.height,
+                        "format": image.format,
+                        "mode": image.mode,
+                    }
+                )
 
                 # Extract EXIF data if available
                 if hasattr(image, "_getexif") and image._getexif():
@@ -293,3 +299,7 @@ class S3MediaStorage(Storage):
             if content_type in allowed_types:
                 return file_type
         return "other"
+
+
+# Create a singleton instance
+storage = S3MediaStorage()
