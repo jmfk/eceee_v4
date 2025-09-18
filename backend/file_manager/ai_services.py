@@ -29,8 +29,8 @@ class MediaAIService:
 
     def __init__(self):
         """Initialize AI service with settings."""
-        self.api_key = settings.AI_SERVICE_API_KEY
-        self.api_url = settings.AI_SERVICE_URL
+        self.api_key = getattr(settings, "AI_SERVICE_API_KEY", None)
+        self.api_url = getattr(settings, "AI_SERVICE_URL", None)
         self.confidence_threshold = getattr(settings, "AI_CONFIDENCE_THRESHOLD", 0.7)
         self.cache_timeout = getattr(settings, "AI_CACHE_TIMEOUT", 3600)  # 1 hour
         self.request_timeout = getattr(settings, "AI_REQUEST_TIMEOUT", 30)  # 30 seconds
@@ -51,6 +51,10 @@ class MediaAIService:
         Returns:
             API response data
         """
+        if not self.api_key or not self.api_url:
+            logger.warning("AI service not configured (missing API key or URL)")
+            return {}
+
         headers = {"Authorization": f"Bearer {self.api_key}"}
         url = f"{self.api_url}/{endpoint}"
 
@@ -82,7 +86,8 @@ class MediaAIService:
                 if attempt < self.max_retries - 1:
                     time.sleep(self.retry_delay)
                 else:
-                    raise
+                    logger.error(f"AI service request failed after {self.max_retries} attempts")
+                    return {}
 
     def _get_cache_key(self, method: str, **kwargs) -> str:
         """
