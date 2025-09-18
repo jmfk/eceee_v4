@@ -15,13 +15,15 @@ const cleanHTML = (html) => {
     tempDiv.innerHTML = html
 
     // Define allowed HTML tags (whitelist approach)
-    const allowedTags = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'ul', 'ol', 'li', 'strong', 'b', 'em', 'i', 'a', 'br']
+    const blockTags = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'ul', 'ol', 'li']
+    const inlineTags = ['strong', 'b', 'em', 'i', 'a', 'br']
+    const allowedTags = [...blockTags, ...inlineTags]
     const allowedAttributes = ['href', 'target']
 
     // Convert tables to paragraphs before cleaning
     convertTablesToParagraphs(tempDiv)
 
-    // Remove all non-allowed tags while preserving their text content
+    // First pass: Remove all non-allowed tags while preserving their text content
     const allElements = tempDiv.querySelectorAll('*')
     const elementsToProcess = Array.from(allElements).reverse() // Process from innermost to outermost
 
@@ -64,7 +66,106 @@ const cleanHTML = (html) => {
     // Clean up empty paragraphs and normalize whitespace
     cleanupEmptyElements(tempDiv)
 
-    return tempDiv.innerHTML
+    // Second pass: Ensure all text nodes that aren't inside block elements are wrapped in <p> tags
+    const wrapTextNodesInParagraphs = (node) => {
+        if (node.nodeType === Node.TEXT_NODE) {
+            const text = node.textContent.trim()
+            if (text) {
+                // Create a new paragraph and replace the text node
+                const p = document.createElement('p')
+                p.textContent = node.textContent
+                node.parentNode.replaceChild(p, node)
+            } else {
+                // Remove empty text nodes
+                node.remove()
+            }
+            return
+        }
+
+        // For element nodes, check if it's a block element
+        if (node.nodeType === Node.ELEMENT_NODE) {
+            const tagName = node.tagName.toLowerCase()
+
+            // If it's not a block element, we need to process its children
+            if (!blockTags.includes(tagName)) {
+                // Convert the contents to an array because the NodeList will be live
+                // and will change as we modify the DOM
+                const children = Array.from(node.childNodes)
+                children.forEach(child => wrapTextNodesInParagraphs(child))
+            }
+        }
+    }
+
+    // Clean up whitespace in block elements
+    const cleanBlockElement = (element) => {
+        // First clean up text nodes
+        Array.from(element.childNodes).forEach(node => {
+            if (node.nodeType === Node.TEXT_NODE) {
+                // Collapse multiple spaces to single space and trim
+                node.textContent = node.textContent.replace(/\s+/g, ' ').trim();
+            } else if (node.nodeType === Node.ELEMENT_NODE) {
+                cleanBlockElement(node);
+            }
+        });
+
+        // Remove empty text nodes at the start and end
+        while (element.firstChild &&
+            element.firstChild.nodeType === Node.TEXT_NODE &&
+            !element.firstChild.textContent.trim()) {
+            element.removeChild(element.firstChild);
+        }
+        while (element.lastChild &&
+            element.lastChild.nodeType === Node.TEXT_NODE &&
+            !element.lastChild.textContent.trim()) {
+            element.removeChild(element.lastChild);
+        }
+    };
+
+    // Process all block elements first
+    blockTags.forEach(tag => {
+        const elements = tempDiv.getElementsByTagName(tag);
+        Array.from(elements).forEach(cleanBlockElement);
+    });
+
+    // Process all direct children of the container
+    Array.from(tempDiv.childNodes).forEach(node => {
+        if (node.nodeType === Node.TEXT_NODE) {
+            const text = node.textContent.trim()
+            if (text) {
+                // Create a new paragraph and replace the text node
+                const p = document.createElement('p')
+                p.textContent = text
+                node.parentNode.replaceChild(p, node)
+            } else {
+                // Remove empty text nodes
+                node.remove()
+            }
+        } else if (node.nodeType === Node.ELEMENT_NODE) {
+            const tagName = node.tagName.toLowerCase()
+            if (!blockTags.includes(tagName)) {
+                // If it's not a block element, wrap it in a paragraph
+                const p = document.createElement('p')
+                node.parentNode.insertBefore(p, node)
+                p.appendChild(node)
+            }
+        }
+    })
+
+    // Get the HTML content and format it
+    let content = tempDiv.innerHTML;
+
+    // Add newlines after block elements
+    blockTags.forEach(tag => {
+        const regex = new RegExp(`</${tag}>`, 'g');
+        content = content.replace(regex, `</${tag}>\n`);
+    });
+
+    // Clean up multiple newlines
+    content = content
+        .replace(/\n\s*\n/g, '\n')  // Replace multiple newlines with single
+        .replace(/^\s+|\s+$/g, ''); // Trim whitespace at start and end
+
+    return content;
 }
 
 /**
@@ -492,6 +593,13 @@ class ContentWidgetEditorRenderer {
             if (cleanedContent !== this.content) {
                 this.content = cleanedContent
                 this.onChange(cleanedContent)
+
+                // Dispatch event for HTML editor
+                const event = new CustomEvent('content-changed', {
+                    detail: cleanedContent,
+                    bubbles: true
+                });
+                window.dispatchEvent(event);
             }
         }
 
