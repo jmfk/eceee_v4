@@ -56,7 +56,7 @@ app.conf.timezone = settings.TIME_ZONE
 @app.task(bind=True)
 def debug_task(self):
     """Debug task for testing Celery setup."""
-    print(f"Request: {self.request!r}")
+    logger.debug(f"Request: {self.request!r}")
     return "Debug task completed"
 
 
@@ -68,6 +68,12 @@ app.conf.beat_schedule = {
     "cleanup-old-ai-tasks": {
         "task": "utils.tasks.cleanup_old_tasks",
         "schedule": crontab(hour=2, minute=0),
+    },
+    # Clean up soft-deleted files daily at 3 AM
+    "cleanup-deleted-files": {
+        "task": "file_manager.tasks.cleanup_deleted_files",
+        "schedule": crontab(hour=3, minute=0),
+        "args": (30, 100),  # 30 days retention, batch size 100
     },
     # Cancel stuck tasks every 30 minutes
     "cancel-stuck-tasks": {
@@ -86,8 +92,8 @@ app.conf.beat_schedule = {
 @app.task(bind=True)
 def error_handler(self, uuid, exception, traceback):
     """Handle task errors."""
-    print(f"Task {uuid} failed: {exception}")
-    print(f"Traceback: {traceback}")
+    logger.error(f"Task {uuid} failed: {exception}")
+    logger.error(f"Traceback: {traceback}")
 
 
 if __name__ == "__main__":
