@@ -1578,6 +1578,57 @@ class PageVersion(models.Model):
     def __str__(self):
         return f"{self.version_title} v{self.version_number}"
 
+    def extract_widget_content(self):
+        """
+        Extract all HTML content from widgets in this version.
+
+        Returns:
+            str: Combined HTML content from all widgets
+        """
+        html_content = []
+
+        for slot_widgets in self.widgets.values():
+            for widget in slot_widgets:
+                # Extract content from widget data based on widget type
+                if widget.get("type") == "Content":
+                    if "content" in widget.get("data", {}):
+                        html_content.append(widget["data"]["content"])
+                # Add other widget types that may contain HTML content here
+
+        return "\n".join(html_content)
+
+    def update_media_references(self):
+        """
+        Update media references for this version's content.
+        Should be called whenever widget content changes.
+        """
+        from file_manager.utils import update_media_references
+
+        # Get old content before save
+        if self.pk:
+            old_version = PageVersion.objects.get(pk=self.pk)
+            old_content = old_version.extract_widget_content()
+        else:
+            old_content = ""
+
+        new_content = self.extract_widget_content()
+
+        # Update references
+        update_media_references(
+            content_type="webpage",
+            content_id=str(self.page.id),
+            old_content=old_content,
+            new_content=new_content,
+        )
+
+    def save(self, *args, **kwargs):
+        """Override save to handle media references"""
+        # First do the actual save
+        super().save(*args, **kwargs)
+
+        # Then update media references
+        self.update_media_references()
+
     def clean(self):
         """Validate the version data"""
         super().clean()

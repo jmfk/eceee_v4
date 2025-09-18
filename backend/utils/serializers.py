@@ -1,397 +1,102 @@
 """
-Serializers for utility models including Value Lists and AI Agent Tasks.
+Common serializers used across the project.
 """
 
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import (
-    ValueList,
-    ValueListItem,
-    AIAgentTask,
-    AIAgentTaskUpdate,
-    AIAgentTaskTemplate,
-)
+from typing import Any, Dict, List
 
 
-# Value List Serializers
+class ValueListItemSerializer(serializers.Serializer):
+    """Serializer for a single value in a list."""
+
+    value = serializers.CharField()
+    label = serializers.CharField(required=False)
 
 
-class ValueListItemSerializer(serializers.ModelSerializer):
-    """Serializer for value list items."""
+class ValueListItemCreateSerializer(serializers.Serializer):
+    """Serializer for creating a single value in a list."""
 
-    effective_value = serializers.CharField(read_only=True)
-    typed_value = serializers.SerializerMethodField()
-
-    class Meta:
-        model = ValueListItem
-        fields = [
-            "id",
-            "label",
-            "slug",
-            "value",
-            "effective_value",
-            "typed_value",
-            "description",
-            "order",
-            "is_active",
-            "created_at",
-            "updated_at",
-        ]
-        read_only_fields = ["id", "slug", "created_at", "updated_at"]
-
-    def get_typed_value(self, obj):
-        """Get the typed value based on the value list type."""
-        return obj.get_typed_value()
+    value = serializers.CharField()
+    label = serializers.CharField(required=False)
 
 
-class ValueListSerializer(serializers.ModelSerializer):
-    """Serializer for value lists."""
+class ValueListCreateSerializer(serializers.Serializer):
+    """Serializer for creating a list of values."""
 
-    items = ValueListItemSerializer(many=True, read_only=True)
-    item_count = serializers.IntegerField(read_only=True)
-    created_by_username = serializers.CharField(
-        source="created_by.username", read_only=True
-    )
-    items_dict = serializers.SerializerMethodField()
-    items_list = serializers.SerializerMethodField()
-
-    class Meta:
-        model = ValueList
-        fields = [
-            "id",
-            "name",
-            "slug",
-            "description",
-            "value_type",
-            "is_active",
-            "is_system",
-            "created_by",
-            "created_by_username",
-            "created_at",
-            "updated_at",
-            "item_count",
-            "items",
-            "items_dict",
-            "items_list",
-        ]
-        read_only_fields = ["id", "slug", "created_at", "updated_at", "item_count"]
-
-    def get_items_dict(self, obj):
-        """Get items as dictionary."""
-        return obj.get_items_dict()
-
-    def get_items_list(self, obj):
-        """Get items as list."""
-        return obj.get_items_list()
+    values = serializers.ListField(child=ValueListItemSerializer())
 
 
-class ValueListCreateSerializer(serializers.ModelSerializer):
-    """Serializer for creating value lists."""
+class ValueListUpdateSerializer(serializers.Serializer):
+    """Serializer for updating a list of values."""
 
-    class Meta:
-        model = ValueList
-        fields = ["name", "description", "value_type", "is_active"]
-
-    def create(self, validated_data):
-        """Create a new value list."""
-        validated_data["created_by"] = self.context["request"].user
-        return super().create(validated_data)
+    values = serializers.ListField(child=ValueListItemSerializer())
 
 
-class ValueListUpdateSerializer(serializers.ModelSerializer):
-    """Serializer for updating value lists."""
+class ValueListSerializer(serializers.Serializer):
+    """Serializer for a list of values."""
 
-    class Meta:
-        model = ValueList
-        fields = ["name", "description", "value_type", "is_active"]
+    values = serializers.ListField(child=serializers.CharField())
 
-
-class ValueListItemCreateSerializer(serializers.ModelSerializer):
-    """Serializer for creating value list items."""
-
-    class Meta:
-        model = ValueListItem
-        fields = ["label", "value", "description", "order", "is_active"]
-
-    def create(self, validated_data):
-        """Create a new value list item."""
-        value_list = self.context["value_list"]
-        validated_data["value_list"] = value_list
-        return super().create(validated_data)
+    def to_representation(self, instance: List[Any]) -> Dict[str, List[Any]]:
+        """Convert list to dictionary with 'values' key."""
+        return {"values": instance}
 
 
-# AI Agent Task Serializers
-
-
-class AIAgentTaskUpdateSerializer(serializers.ModelSerializer):
-    """Serializer for task updates."""
-
-    class Meta:
-        model = AIAgentTaskUpdate
-        fields = [
-            "id",
-            "update_type",
-            "message",
-            "data",
-            "progress_percentage",
-            "timestamp",
-        ]
-        read_only_fields = ["id", "timestamp"]
-
-
-class AIAgentTaskSerializer(serializers.ModelSerializer):
+class AIAgentTaskSerializer(serializers.Serializer):
     """Serializer for AI agent tasks."""
 
-    created_by_username = serializers.CharField(
-        source="created_by.username", read_only=True
-    )
-    progress_display = serializers.CharField(
-        source="get_progress_display", read_only=True
-    )
-    is_active = serializers.BooleanField(read_only=True)
-    is_finished = serializers.BooleanField(read_only=True)
-    updates = AIAgentTaskUpdateSerializer(many=True, read_only=True)
-
-    class Meta:
-        model = AIAgentTask
-        fields = [
-            "id",
-            "title",
-            "description",
-            "task_type",
-            "task_config",
-            "status",
-            "priority",
-            "progress",
-            "progress_display",
-            "result_data",
-            "error_message",
-            "created_by",
-            "created_by_username",
-            "created_at",
-            "updated_at",
-            "started_at",
-            "completed_at",
-            "celery_task_id",
-            "estimated_duration",
-            "actual_duration",
-            "is_active",
-            "is_finished",
-            "updates",
-        ]
-        read_only_fields = [
-            "id",
-            "created_by",
-            "created_by_username",
-            "created_at",
-            "updated_at",
-            "started_at",
-            "completed_at",
-            "celery_task_id",
-            "actual_duration",
-            "is_active",
-            "is_finished",
-            "progress_display",
-            "updates",
-        ]
-
-    def create(self, validated_data):
-        """Create a new AI agent task."""
-        validated_data["created_by"] = self.context["request"].user
-        return super().create(validated_data)
-
-    def validate_task_config(self, value):
-        """Validate task configuration based on task type."""
-        task_type = self.initial_data.get("task_type", "custom")
-
-        if task_type == "summary":
-            required_fields = []
-            if not value.get("content") and not value.get("urls"):
-                raise serializers.ValidationError(
-                    "Summary tasks require either 'content' or 'urls' in task_config"
-                )
-        elif task_type == "research":
-            if not value.get("topic") and not value.get("urls"):
-                raise serializers.ValidationError(
-                    "Research tasks require either 'topic' or 'urls' in task_config"
-                )
-        elif task_type == "content_generation":
-            if not value.get("topic"):
-                raise serializers.ValidationError(
-                    "Content generation tasks require 'topic' in task_config"
-                )
-        elif task_type == "data_analysis":
-            if not value.get("data"):
-                raise serializers.ValidationError(
-                    "Data analysis tasks require 'data' in task_config"
-                )
-
-        return value
+    task_id = serializers.UUIDField()
+    status = serializers.CharField()
+    result = serializers.JSONField(required=False)
+    error = serializers.CharField(required=False)
+    created_at = serializers.DateTimeField()
+    completed_at = serializers.DateTimeField(required=False)
 
 
-class AIAgentTaskCreateSerializer(serializers.ModelSerializer):
-    """Simplified serializer for creating AI agent tasks."""
+class AIAgentTaskCreateSerializer(serializers.Serializer):
+    """Serializer for creating AI agent tasks."""
 
-    class Meta:
-        model = AIAgentTask
-        fields = ["title", "description", "task_type", "task_config", "priority"]
-
-    def create(self, validated_data):
-        """Create a new AI agent task and start execution."""
-        validated_data["created_by"] = self.context["request"].user
-        task = super().create(validated_data)
-
-        # Start the Celery task
-        from .tasks import execute_ai_agent_task
-
-        celery_task = execute_ai_agent_task.delay(str(task.id))
-
-        # Update task with Celery task ID
-        task.celery_task_id = celery_task.id
-        task.save(update_fields=["celery_task_id"])
-
-        return task
+    task_type = serializers.CharField()
+    input_data = serializers.JSONField()
 
 
-class AIAgentTaskTemplateSerializer(serializers.ModelSerializer):
+class AIAgentTaskTemplateSerializer(serializers.Serializer):
     """Serializer for AI agent task templates."""
 
-    created_by_username = serializers.CharField(
-        source="created_by.username", read_only=True
-    )
-
-    class Meta:
-        model = AIAgentTaskTemplate
-        fields = [
-            "id",
-            "name",
-            "description",
-            "task_type",
-            "default_config",
-            "config_schema",
-            "created_by",
-            "created_by_username",
-            "created_at",
-            "updated_at",
-            "usage_count",
-            "is_active",
-        ]
-        read_only_fields = [
-            "id",
-            "created_by",
-            "created_by_username",
-            "created_at",
-            "updated_at",
-            "usage_count",
-        ]
-
-    def create(self, validated_data):
-        """Create a new task template."""
-        validated_data["created_by"] = self.context["request"].user
-        return super().create(validated_data)
+    name = serializers.CharField()
+    description = serializers.CharField()
+    task_type = serializers.CharField()
+    input_schema = serializers.JSONField()
+    output_schema = serializers.JSONField()
 
 
 class AIAgentTaskFromTemplateSerializer(serializers.Serializer):
-    """Serializer for creating tasks from templates."""
+    """Serializer for creating AI agent tasks from templates."""
 
-    template_id = serializers.UUIDField()
-    title = serializers.CharField(max_length=255)
-    description = serializers.CharField(required=False, allow_blank=True)
-    task_config = serializers.JSONField()
-    priority = serializers.ChoiceField(
-        choices=AIAgentTask.PRIORITY_CHOICES, default="normal"
-    )
-
-    def validate_template_id(self, value):
-        """Validate that template exists and is active."""
-        try:
-            template = AIAgentTaskTemplate.objects.get(id=value, is_active=True)
-            self.template = template
-            return value
-        except AIAgentTaskTemplate.DoesNotExist:
-            raise serializers.ValidationError("Template not found or inactive")
-
-    def create(self, validated_data):
-        """Create task from template."""
-        template = self.template
-
-        # Merge template config with provided config
-        merged_config = template.default_config.copy()
-        merged_config.update(validated_data["task_config"])
-
-        # Create task
-        task = AIAgentTask.objects.create(
-            title=validated_data["title"],
-            description=validated_data.get("description", template.description),
-            task_type=template.task_type,
-            task_config=merged_config,
-            priority=validated_data["priority"],
-            created_by=self.context["request"].user,
-        )
-
-        # Increment template usage
-        template.increment_usage()
-
-        # Start the Celery task
-        from .tasks import execute_ai_agent_task
-
-        celery_task = execute_ai_agent_task.delay(str(task.id))
-
-        # Update task with Celery task ID
-        task.celery_task_id = celery_task.id
-        task.save(update_fields=["celery_task_id"])
-
-        return task
+    template_name = serializers.CharField()
+    input_data = serializers.JSONField()
 
 
 class TaskStatusUpdateSerializer(serializers.Serializer):
     """Serializer for updating task status."""
 
-    status = serializers.ChoiceField(choices=AIAgentTask.STATUS_CHOICES)
-
-    def validate_status(self, value):
-        """Validate status transition."""
-        task = self.context.get("task")
-        if not task:
-            return value
-
-        current_status = task.status
-
-        # Define allowed transitions
-        allowed_transitions = {
-            "pending": ["running", "cancelled"],
-            "running": ["completed", "failed", "cancelled"],
-            "completed": [],  # Completed tasks can't be changed
-            "failed": ["pending"],  # Failed tasks can be retried
-            "cancelled": ["pending"],  # Cancelled tasks can be restarted
-        }
-
-        if value not in allowed_transitions.get(current_status, []):
-            raise serializers.ValidationError(
-                f"Cannot change status from {current_status} to {value}"
-            )
-
-        return value
+    status = serializers.CharField()
+    result = serializers.JSONField(required=False)
+    error = serializers.CharField(required=False)
 
 
 class TaskConfigValidationSerializer(serializers.Serializer):
-    """Serializer for validating task configurations."""
+    """Serializer for validating task configuration."""
 
-    task_type = serializers.ChoiceField(choices=AIAgentTask.TASK_TYPE_CHOICES)
-    task_config = serializers.JSONField()
+    task_type = serializers.CharField()
+    config = serializers.JSONField()
 
-    def validate(self, data):
-        """Validate the complete configuration."""
-        task_type = data["task_type"]
-        config = data["task_config"]
 
-        # Use the main serializer's validation logic
-        serializer = AIAgentTaskSerializer()
-        serializer.initial_data = {"task_type": task_type}
+class UserSerializer(serializers.ModelSerializer):
+    """Simple serializer for User model."""
 
-        try:
-            serializer.validate_task_config(config)
-        except serializers.ValidationError as e:
-            raise serializers.ValidationError({"task_config": e.detail})
-
-        return data
+    class Meta:
+        model = User
+        fields = ["id", "username", "first_name", "last_name", "email"]
+        read_only_fields = fields

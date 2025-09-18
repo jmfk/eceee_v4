@@ -308,7 +308,7 @@ class ContentWidgetEditorRenderer {
      */
     render() {
         if (this.isDestroyed) {
-            console.warn('ContentWidgetEditorRenderer: Cannot render on destroyed instance')
+            // Silently return when instance is destroyed - this is expected behavior
             return
         }
 
