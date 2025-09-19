@@ -13,6 +13,7 @@ import {
 import { namespacesApi, mediaApi, mediaCollectionsApi, mediaTagsApi } from '../../api'
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext'
 import MediaTagWidget from '../media/MediaTagWidget'
+import MediaSearchWidget from '../media/MediaSearchWidget'
 import ImageWidget from '../../widgets/core/ImageWidget'
 import { useTheme } from '../../hooks/useTheme'
 import FloatingMessage from '../common/FloatingMessage'
@@ -35,6 +36,8 @@ const MediaSpecialEditor = ({
 
     // Data state
     const [searchResults, setSearchResults] = useState([])
+    const [totalResults, setTotalResults] = useState(0)
+    const [currentPage, setCurrentPage] = useState(1)
     const [collections, setCollections] = useState([])
     const [availableTags, setAvailableTags] = useState([])
     const [pendingUploads, setPendingUploads] = useState([])
@@ -42,7 +45,7 @@ const MediaSpecialEditor = ({
 
     // UI state
     const [loading, setLoading] = useState(false)
-    const [searchTerm, setSearchTerm] = useState('')
+    const [searchTerms, setSearchTerms] = useState([])
     const [floatingMessages, setFloatingMessages] = useState([])
 
     // Helper function to show floating messages
@@ -55,12 +58,13 @@ const MediaSpecialEditor = ({
     const [selectedImage, setSelectedImage] = useState(null)
     const [selectedCollection, setSelectedCollection] = useState(null)
     const [editingItem, setEditingItem] = useState(null)
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(null)
     const [showCloneForm, setShowCloneForm] = useState(false)
     const [cloneCollectionName, setCloneCollectionName] = useState('')
     const [showCreateCollectionForm, setShowCreateCollectionForm] = useState(false)
     const [createCollectionName, setCreateCollectionName] = useState('')
     const [tempSelectedImages, setTempSelectedImages] = useState([])
-    const [localConfig, setLocalConfig] = useState({ mediaItems: [] })
+    const [localConfig, setLocalConfig] = useState({ mediaItems: [], searchTerms: [] })
 
     // Use local config that updates immediately, fallback to widgetData config
     const currentConfig = useMemo(() => {
@@ -69,10 +73,17 @@ const MediaSpecialEditor = ({
         if (!baseConfig.mediaItems) {
             baseConfig.mediaItems = []
         }
+        // Ensure searchTerms is always an array
+        if (!baseConfig.searchTerms) {
+            baseConfig.searchTerms = []
+        }
         const mergedConfig = { ...baseConfig, ...localConfig }
-        // Double-check mediaItems is still an array after merge
+        // Double-check arrays after merge
         if (!Array.isArray(mergedConfig.mediaItems)) {
             mergedConfig.mediaItems = []
+        }
+        if (!Array.isArray(mergedConfig.searchTerms)) {
+            mergedConfig.searchTerms = []
         }
         return mergedConfig
     }, [widgetData?.config, localConfig])
@@ -124,7 +135,9 @@ const MediaSpecialEditor = ({
 
     // Reset local config when widgetData changes
     useEffect(() => {
-        setLocalConfig({})
+        setLocalConfig({
+            mediaItems: []
+        })
     }, [widgetData])
 
     // Load namespace and initial data (use provided namespace or default)
@@ -166,47 +179,43 @@ const MediaSpecialEditor = ({
     }, [providedNamespace])
 
     // Load all images or search for specific images
-    const loadImages = useCallback(async (term = '') => {
+    const loadImages = useCallback(async (terms = [], page = 1) => {
         if (!namespace) return
 
         setLoading(true)
         try {
             let result
-            if (term.trim()) {
-                // Use search API for text search
-                result = await mediaApi.search.search({
-                    namespace,
-                    q: term,
-                    fileType: 'image',
-                    page: 1,
-                    pageSize: 20
-                })
-            } else {
-                // Use files list API for browsing all images
-                result = await mediaApi.files.list({
-                    namespace,
-                    fileType: 'image',
-                    page: 1,
-                    pageSize: 20,
-                    ordering: '-created_at'
-                })()
-            }
+            // Always use search API to support tag filtering
+            result = await mediaApi.search.search({
+                namespace,
+                file_types: ['image'],  // Use file_types instead of fileType
+                page,
+                pageSize: 20,
+                text_tags: terms.map(tag => tag.value),
+                ordering: '-created_at'
+            })
             const imagesData = result.results || result || []
-            // Filter to ensure only images are shown
-            const onlyImages = imagesData.filter(file => file.fileType === 'image' || file.file_type === 'image')
-            setSearchResults(onlyImages)
+            setSearchResults(imagesData)
+            setTotalResults(result.count || 0)
+            setCurrentPage(page)
         } catch (error) {
             console.error('Failed to load images:', error)
             setSearchResults([])
+            setTotalResults(0)
         } finally {
             setLoading(false)
         }
     }, [namespace])
 
     // Handle search
-    const handleSearch = async (term = searchTerm) => {
-        await loadImages(term)
+    const handleSearch = async (term = searchTerms, page = 1) => {
+        await loadImages(term, page)
     }
+
+    // Calculate pagination info
+    const totalPages = useMemo(() => Math.ceil(totalResults / 20), [totalResults])
+    const hasPreviousPage = currentPage > 1
+    const hasNextPage = currentPage < totalPages
 
     // Load collection images
     const loadCollectionImages = useCallback(async (collectionId) => {
@@ -225,10 +234,23 @@ const MediaSpecialEditor = ({
         }
     }, [namespace])
 
-    // Load images when entering browse view
+    // Load images and refresh tags when entering browse view
     useEffect(() => {
         if (currentView === 'browse' && namespace) {
-            loadImages('')
+            // Load images
+            loadImages([])
+
+            // Refresh available tags
+            const loadTags = async () => {
+                try {
+                    const tagsResult = await mediaTagsApi.list({ namespace })()
+                    const tagsData = tagsResult.results || tagsResult || []
+                    setAvailableTags(tagsData)
+                } catch (error) {
+                    console.error('Failed to load tags:', error)
+                }
+            }
+            loadTags()
         }
     }, [currentView, namespace, loadImages])
 
@@ -272,6 +294,18 @@ const MediaSpecialEditor = ({
                 // Refresh collection images to show the new additions
                 await loadCollectionImages(currentCollectionId)
 
+                // Update local config and call onConfigChange to reflect collection changes
+                const updatedConfig = {
+                    ...currentConfig,
+                    collectionId: currentCollectionId // Ensure collection ID is preserved
+                }
+
+                setLocalConfig(updatedConfig)
+                if (onConfigChange) {
+                    onConfigChange(updatedConfig)
+                } else {
+                    console.warn('onConfigChange not available for collection update')
+                }
 
                 // Clear temporary selection and return to overview
                 setTempSelectedImages([])
@@ -324,6 +358,7 @@ const MediaSpecialEditor = ({
     const handleClearTempSelection = useCallback(() => {
         setTempSelectedImages([])
     }, [])
+
 
     // Handle collection selection - immediate save without modal
     const handleCollectionSelect = useCallback((collection) => {
@@ -550,7 +585,6 @@ const MediaSpecialEditor = ({
     // Handle actual upload to media manager with auto-approval
     const handleActualUpload = async () => {
         if (!namespace || pendingUploads.length === 0) return
-        console.log("handleActualUpload")
         setLoading(true)
         try {
             // Step 1: Upload files to pending with force_upload to handle deleted files
@@ -622,7 +656,6 @@ const MediaSpecialEditor = ({
                         access_level: 'public',
                         slug: ''
                     }
-                    console.log("approvalData", approvalData)
                     try {
                         approvalPromises.push(
                             mediaApi.pendingFiles.approve(rejectedFile.existingFileId, approvalData)()
@@ -782,7 +815,7 @@ const MediaSpecialEditor = ({
             setCurrentView('overview')
 
             // Refresh the browse results to show new images
-            loadImages('')
+            loadImages([])
 
         } catch (error) {
             console.error('Upload failed:', error)
@@ -925,14 +958,18 @@ const MediaSpecialEditor = ({
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation()
-                                                console.log("currentImages", currentImages)
-                                                const updatedConfig = {
-                                                    ...currentConfig,
-                                                    mediaItems: currentImages.filter(img => img.id !== image.id)
-                                                }
-                                                setLocalConfig(updatedConfig)
-                                                if (onConfigChange) {
-                                                    onConfigChange(updatedConfig)
+                                                if (isCollectionMode && currentCollectionId) {
+                                                    setShowDeleteConfirm(image)
+                                                } else {
+                                                    // For free images mode, just remove from mediaItems
+                                                    const updatedConfig = {
+                                                        ...currentConfig,
+                                                        mediaItems: currentImages.filter(img => img.id !== image.id)
+                                                    }
+                                                    setLocalConfig(updatedConfig)
+                                                    if (onConfigChange) {
+                                                        onConfigChange(updatedConfig)
+                                                    }
                                                 }
                                             }}
                                             className="p-1 bg-white rounded shadow-sm border border-gray-200 text-gray-700 hover:text-red-600 hover:border-red-300 transition-colors"
@@ -1029,27 +1066,6 @@ const MediaSpecialEditor = ({
                                         className="w-full h-full object-cover"
                                     />
                                     <div className="absolute top-1 right-1 flex gap-1">
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation()
-                                                setEditingItem({
-                                                    type: 'editImage',
-                                                    data: image,
-                                                    index: index,
-                                                    metadata: {
-                                                        title: image.title || '',
-                                                        altText: image.altText || '',
-                                                        caption: image.caption || '',
-                                                        photographer: image.photographer || '',
-                                                        source: image.source || ''
-                                                    }
-                                                })
-                                            }}
-                                            className="p-1 bg-white rounded shadow-sm border border-gray-200 text-gray-700 hover:text-blue-600 hover:border-blue-300 transition-colors"
-                                            title="Edit image"
-                                        >
-                                            <Edit3 className="w-3 h-3" />
-                                        </button>
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation()
@@ -1175,25 +1191,19 @@ const MediaSpecialEditor = ({
                     <h6 className="font-medium text-gray-900">Browse Images</h6>
                 </div>
 
-                <div className="flex gap-2">
-                    <div className="flex-1 relative">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                        <input
-                            type="text"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                            placeholder="Search images..."
-                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                    </div>
-                    <button
-                        onClick={() => handleSearch()}
-                        disabled={loading}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
-                    >
-                        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Search'}
-                    </button>
+                <div className="space-y-2">
+                    <MediaSearchWidget
+                        searchTerms={searchTerms}
+                        onChange={(newTags) => {
+                            setSearchTerms(newTags)
+                            loadImages(newTags)
+
+                            // Just update the search state and load images
+                        }}
+                        namespace={namespace}
+                        placeholder="Search images or select tags..."
+                        className="w-full"
+                    />
                 </div>
             </div>
 
@@ -1255,6 +1265,58 @@ const MediaSpecialEditor = ({
             )}
 
             <div className="flex-1 overflow-y-auto p-4">
+                {/* Pagination */}
+                {totalResults > 0 && (
+                    <div className="flex items-center justify-between mb-4 text-sm text-gray-500">
+                        <p>
+                            {((currentPage - 1) * 20) + 1}-{Math.min(currentPage * 20, totalResults)} of {totalResults}
+                        </p>
+                        <div className="flex items-center gap-1">
+                            <button
+                                onClick={() => handleSearch(searchTerms, currentPage - 1)}
+                                disabled={!hasPreviousPage || loading}
+                                className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:hover:text-gray-400"
+                            >
+                                <ArrowLeft className="h-4 w-4" />
+                            </button>
+                            <div className="flex items-center gap-0.5">
+                                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                    let pageNum
+                                    if (totalPages <= 5) {
+                                        pageNum = i + 1
+                                    } else if (currentPage <= 3) {
+                                        pageNum = i + 1
+                                    } else if (currentPage >= totalPages - 2) {
+                                        pageNum = totalPages - 4 + i
+                                    } else {
+                                        pageNum = currentPage - 2 + i
+                                    }
+                                    return (
+                                        <button
+                                            key={pageNum}
+                                            onClick={() => handleSearch(searchTerms, pageNum)}
+                                            disabled={loading}
+                                            className={`px-2 py-0.5 text-sm ${currentPage === pageNum
+                                                ? 'text-blue-600 font-medium'
+                                                : 'text-gray-500 hover:text-gray-700'
+                                                } disabled:opacity-30`}
+                                        >
+                                            {pageNum}
+                                        </button>
+                                    )
+                                })}
+                            </div>
+                            <button
+                                onClick={() => handleSearch(searchTerms, currentPage + 1)}
+                                disabled={!hasNextPage || loading}
+                                className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:hover:text-gray-400"
+                            >
+                                <ArrowLeft className="h-4 w-4 transform rotate-180" />
+                            </button>
+                        </div>
+                    </div>
+                )}
+
                 {searchResults.length > 0 ? (
                     <div className="grid grid-cols-3 gap-2">
                         {searchResults.map(image => {
@@ -1299,17 +1361,17 @@ const MediaSpecialEditor = ({
                             )
                         })}
                     </div>
-                ) : searchTerm && !loading ? (
+                ) : searchTerms.length > 0 && !loading ? (
                     <div className="text-center py-8 text-gray-500">
                         <Search className="w-12 h-12 mx-auto mb-3 text-gray-400" />
-                        <p>No images found for "{searchTerm}"</p>
+                        <p>No images found for "{searchTerms.map(t => t.value).join(', ')}"</p>
                     </div>
-                ) : !searchTerm ? (
+                ) : searchTerms.length === 0 ? (
                     <div className="text-center py-8 text-gray-500">
                         <Search className="w-12 h-12 mx-auto mb-3 text-gray-400" />
                         <p className="mb-4">Browse all images or search for specific ones</p>
                         <button
-                            onClick={() => loadImages('')}
+                            onClick={() => loadImages([])}
                             disabled={loading}
                             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
                         >
@@ -1320,9 +1382,10 @@ const MediaSpecialEditor = ({
                 ) : (
                     <div className="text-center py-8 text-gray-500">
                         <Search className="w-12 h-12 mx-auto mb-3 text-gray-400" />
-                        <p>No images found for "{searchTerm}"</p>
+                        <p>No images found for "{searchTerms.map(t => t.value).join(', ')}"</p>
                     </div>
                 )}
+
             </div>
         </div>
     )
@@ -1676,13 +1739,72 @@ const MediaSpecialEditor = ({
                 {renderView()}
             </div>
 
-            {/* Image/Collection Configuration Modal */}
-            {editingItem && (
+            {/* Delete Confirmation Modal */}
+            {showDeleteConfirm && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+                        <div className="flex items-center justify-between mb-4">
+                            <h5 className="font-medium text-gray-900">
+                                Remove Image from Collection
+                            </h5>
+                            <button
+                                onClick={() => setShowDeleteConfirm(null)}
+                                className="p-1 text-gray-400 hover:text-gray-600"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+                        <div className="space-y-4">
+                            <div className="aspect-video bg-gray-100 rounded overflow-hidden">
+                                <img
+                                    src={showDeleteConfirm.imgproxyBaseUrl || showDeleteConfirm.fileUrl}
+                                    alt={showDeleteConfirm.title || 'Image'}
+                                    className="w-full h-full object-cover"
+                                />
+                            </div>
+                            <p className="text-gray-600">
+                                Are you sure you want to remove <strong>{showDeleteConfirm.title || 'this image'}</strong> from the collection?
+                            </p>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => setShowDeleteConfirm(null)}
+                                    className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={async () => {
+                                        try {
+                                            setLoading(true)
+                                            // Remove image from collection via API
+                                            await mediaCollectionsApi.removeFiles(currentCollectionId, [showDeleteConfirm.id])()
+                                            // Refresh collection images
+                                            await loadCollectionImages(currentCollectionId)
+                                            setShowDeleteConfirm(null)
+                                        } catch (error) {
+                                            console.error('Failed to remove image from collection:', error)
+                                            showFloatingMessage('Failed to remove image from collection', 'error')
+                                        } finally {
+                                            setLoading(false)
+                                        }
+                                    }}
+                                    className="flex-1 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
+                                >
+                                    Remove Image
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Collection Configuration Modal */}
+            {editingItem && editingItem.type === 'editCollection' && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                     <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 max-h-[80vh] overflow-y-auto">
                         <div className="flex items-center justify-between mb-4">
                             <h5 className="font-medium text-gray-900">
-                                Edit Image Details
+                                Collection Settings
                             </h5>
                             <button
                                 onClick={() => setEditingItem(null)}
@@ -1691,393 +1813,201 @@ const MediaSpecialEditor = ({
                                 <X className="w-4 h-4" />
                             </button>
                         </div>
-
-                        {editingItem.type === 'editImage' ? (
-                            <div className="space-y-4">
-                                <div className="aspect-video bg-gray-100 rounded overflow-hidden">
-                                    <img
-                                        src={editingItem.data.imgproxyBaseUrl || editingItem.data.fileUrl}
-                                        alt="Preview"
-                                        className="w-full h-full object-cover"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
-                                    <input
-                                        type="text"
-                                        value={editingItem.metadata.title}
-                                        onChange={(e) => setEditingItem(prev => ({
-                                            ...prev,
-                                            metadata: { ...prev.metadata, title: e.target.value }
-                                        }))}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Alt Text</label>
-                                    <input
-                                        type="text"
-                                        value={editingItem.metadata.altText}
-                                        onChange={(e) => setEditingItem(prev => ({
-                                            ...prev,
-                                            metadata: { ...prev.metadata, altText: e.target.value }
-                                        }))}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Caption</label>
-                                    <textarea
-                                        value={editingItem.metadata.caption}
-                                        onChange={(e) => setEditingItem(prev => ({
-                                            ...prev,
-                                            metadata: { ...prev.metadata, caption: e.target.value }
-                                        }))}
-                                        rows={3}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                                    />
-                                </div>
-
-                                <div className="flex gap-2">
-                                    <button
-                                        onClick={() => setEditingItem(null)}
-                                        className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button
-                                        onClick={handleSaveImage}
-                                        className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                                    >
-                                        Add Image
-                                    </button>
-                                </div>
+                        <div className="space-y-4">
+                            <div className="p-3 bg-gray-50 rounded">
+                                <p className="font-medium text-gray-900">{editingItem.data.title}</p>
+                                <p className="text-sm text-gray-600">{editingItem.data.description}</p>
+                                <p className="text-xs text-gray-500 mt-1">
+                                    {editingItem.data.fileCount || 0} images
+                                </p>
                             </div>
-                        ) : editingItem.type === 'editImage' ? (
-                            <div className="space-y-4">
-                                <div className="aspect-video bg-gray-100 rounded overflow-hidden">
-                                    <img
-                                        src={editingItem.data.thumbnailUrl || editingItem.data.url}
-                                        alt="Preview"
-                                        className="w-full h-full object-cover"
-                                    />
-                                </div>
 
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                            <div>
+                                <label className="flex items-center gap-2">
                                     <input
-                                        type="text"
-                                        value={editingItem.metadata.title}
+                                        type="checkbox"
+                                        checked={editingItem.config.randomize}
                                         onChange={(e) => setEditingItem(prev => ({
                                             ...prev,
-                                            metadata: { ...prev.metadata, title: e.target.value }
+                                            config: { ...prev.config, randomize: e.target.checked }
                                         }))}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                                     />
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Alt Text</label>
-                                    <input
-                                        type="text"
-                                        value={editingItem.metadata.altText}
-                                        onChange={(e) => setEditingItem(prev => ({
-                                            ...prev,
-                                            metadata: { ...prev.metadata, altText: e.target.value }
-                                        }))}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Caption</label>
-                                    <textarea
-                                        value={editingItem.metadata.caption}
-                                        onChange={(e) => setEditingItem(prev => ({
-                                            ...prev,
-                                            metadata: { ...prev.metadata, caption: e.target.value }
-                                        }))}
-                                        rows={3}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                                    />
-                                </div>
-
-                                <div className="flex gap-2">
-                                    <button
-                                        onClick={() => setEditingItem(null)}
-                                        className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            // Update the existing image in the widget config
-                                            const updatedImages = [...currentImages]
-                                            updatedImages[editingItem.index] = {
-                                                ...editingItem.data,
-                                                title: editingItem.metadata.title,
-                                                altText: editingItem.metadata.altText,
-                                                caption: editingItem.metadata.caption,
-                                                photographer: editingItem.metadata.photographer,
-                                                source: editingItem.metadata.source
-                                            }
-
-                                            const updatedConfig = {
-                                                ...currentConfig,
-                                                mediaItems: updatedImages
-                                            }
-
-
-                                            if (onConfigChange) {
-                                                onConfigChange(updatedConfig)
-                                            }
-                                            setEditingItem(null)
-                                        }}
-                                        className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                                    >
-                                        Update Image
-                                    </button>
-                                </div>
+                                    <span className="text-sm">Randomize order</span>
+                                </label>
                             </div>
-                        ) : editingItem.type === 'editCollection' ? (
-                            <div className="space-y-4">
-                                <div className="p-3 bg-gray-50 rounded">
-                                    <p className="font-medium text-gray-900">{editingItem.data.title}</p>
-                                    <p className="text-sm text-gray-600">{editingItem.data.description}</p>
-                                    <p className="text-xs text-gray-500 mt-1">
-                                        {editingItem.data.fileCount || 0} images
-                                    </p>
-                                </div>
 
-                                <div>
-                                    <label className="flex items-center gap-2">
-                                        <input
-                                            type="checkbox"
-                                            checked={editingItem.config.randomize}
-                                            onChange={(e) => setEditingItem(prev => ({
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Display Type</label>
+                                <div className="flex gap-2">
+                                    {['gallery', 'carousel'].map((type) => (
+                                        <button
+                                            key={type}
+                                            onClick={() => setEditingItem(prev => ({
                                                 ...prev,
-                                                config: { ...prev.config, randomize: e.target.checked }
+                                                config: { ...prev.config, displayType: type }
                                             }))}
-                                        />
-                                        <span className="text-sm">Randomize order</span>
-                                    </label>
+                                            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${editingItem.config.displayType === type
+                                                ? 'bg-blue-600 text-white'
+                                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                                }`}
+                                        >
+                                            {type === 'gallery' ? 'Gallery' : 'Carousel'}
+                                        </button>
+                                    ))}
                                 </div>
+                            </div>
 
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Display Type</label>
-                                    <div className="flex gap-2">
-                                        {['gallery', 'carousel'].map((type) => (
-                                            <button
-                                                key={type}
-                                                onClick={() => setEditingItem(prev => ({
-                                                    ...prev,
-                                                    config: { ...prev.config, displayType: type }
-                                                }))}
-                                                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${editingItem.config.displayType === type
-                                                    ? 'bg-blue-600 text-white'
-                                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                                    }`}
-                                            >
-                                                {type === 'gallery' ? 'Gallery' : 'Carousel'}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Image Style</label>
+                                <select
+                                    value={editingItem.config.imageStyle || ''}
+                                    onChange={(e) => setEditingItem(prev => ({
+                                        ...prev,
+                                        config: { ...prev.config, imageStyle: e.target.value || null }
+                                    }))}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                >
+                                    <option value="">Default Style</option>
+                                    {availableImageStyles.map((style) => (
+                                        <option key={style.name} value={style.name}>
+                                            {style.name} ({style.config.alignment || 'center'}, {style.config.galleryColumns || 3} cols)
+                                        </option>
+                                    ))}
+                                </select>
+                                {availableImageStyles.length === 0 && (
+                                    <p className="text-sm text-gray-500 mt-1">
+                                        No image styles defined in current theme. Go to Theme Manager to create image styles.
+                                    </p>
+                                )}
+                            </div>
 
+                            {editingItem.config.displayType === 'carousel' && (
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Image Style</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Auto-play Interval</label>
                                     <select
-                                        value={editingItem.config.imageStyle || ''}
+                                        value={editingItem.config.autoPlayInterval || 3}
                                         onChange={(e) => setEditingItem(prev => ({
                                             ...prev,
-                                            config: { ...prev.config, imageStyle: e.target.value || null }
+                                            config: { ...prev.config, autoPlayInterval: parseInt(e.target.value) }
                                         }))}
                                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                     >
-                                        <option value="">Default Style</option>
-                                        {availableImageStyles.map((style) => (
-                                            <option key={style.name} value={style.name}>
-                                                {style.name} ({style.config.alignment || 'center'}, {style.config.galleryColumns || 3} cols)
-                                            </option>
-                                        ))}
+                                        <option value={1}>1 second</option>
+                                        <option value={2}>2 seconds</option>
+                                        <option value={3}>3 seconds</option>
+                                        <option value={4}>4 seconds</option>
+                                        <option value={5}>5 seconds</option>
+                                        <option value={7}>7 seconds</option>
+                                        <option value={10}>10 seconds</option>
+                                        <option value={15}>15 seconds</option>
+                                        <option value={30}>30 seconds</option>
                                     </select>
-                                    {availableImageStyles.length === 0 && (
-                                        <p className="text-sm text-gray-500 mt-1">
-                                            No image styles defined in current theme. Go to Theme Manager to create image styles.
-                                        </p>
-                                    )}
                                 </div>
+                            )}
 
-                                {editingItem.config.displayType === 'carousel' && (
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">Auto-play Interval</label>
-                                        <select
-                                            value={editingItem.config.autoPlayInterval || 3}
-                                            onChange={(e) => setEditingItem(prev => ({
-                                                ...prev,
-                                                config: { ...prev.config, autoPlayInterval: parseInt(e.target.value) }
-                                            }))}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                        >
-                                            <option value={1}>1 second</option>
-                                            <option value={2}>2 seconds</option>
-                                            <option value={3}>3 seconds</option>
-                                            <option value={4}>4 seconds</option>
-                                            <option value={5}>5 seconds</option>
-                                            <option value={7}>7 seconds</option>
-                                            <option value={10}>10 seconds</option>
-                                            <option value={15}>15 seconds</option>
-                                            <option value={30}>30 seconds</option>
-                                        </select>
-                                    </div>
-                                )}
-
-                                <div className="flex gap-2">
-                                    <button
-                                        onClick={() => setEditingItem(null)}
-                                        className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            // Update existing collection config
-                                            const updatedConfig = {
-                                                ...currentConfig,
-                                                collectionConfig: editingItem.config,
-                                                displayType: editingItem.config.displayType,
-                                                imageStyle: editingItem.config.imageStyle
-                                            }
-                                            if (onConfigChange) {
-                                                onConfigChange(updatedConfig)
-                                            }
-                                            setEditingItem(null)
-                                        }}
-                                        className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                                    >
-                                        Update Settings
-                                    </button>
-                                </div>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => setEditingItem(null)}
+                                    className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        // Update existing collection config
+                                        const updatedConfig = {
+                                            ...currentConfig,
+                                            collectionConfig: editingItem.config,
+                                            displayType: editingItem.config.displayType,
+                                            imageStyle: editingItem.config.imageStyle
+                                        }
+                                        if (onConfigChange) {
+                                            onConfigChange(updatedConfig)
+                                        }
+                                        setEditingItem(null)
+                                    }}
+                                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                                >
+                                    Update Settings
+                                </button>
                             </div>
+                        </div>
                         ) : (
-                            <div className="space-y-4">
-                                <div className="p-3 bg-gray-50 rounded">
-                                    <p className="font-medium text-gray-900">{editingItem.data.title}</p>
-                                    <p className="text-sm text-gray-600">{editingItem.data.description}</p>
-                                    <p className="text-xs text-gray-500 mt-1">
-                                        {editingItem.data.fileCount || 0} images
-                                    </p>
-                                </div>
+                        <div className="space-y-4">
+                            <div className="p-3 bg-gray-50 rounded">
+                                <p className="font-medium text-gray-900">{editingItem.data.title}</p>
+                                <p className="text-sm text-gray-600">{editingItem.data.description}</p>
+                                <p className="text-xs text-gray-500 mt-1">
+                                    {editingItem.data.fileCount || 0} images
+                                </p>
+                            </div>
 
-                                <div>
-                                    <label className="flex items-center gap-2">
-                                        <input
-                                            type="checkbox"
-                                            checked={editingItem.config.randomize}
-                                            onChange={(e) => setEditingItem(prev => ({
-                                                ...prev,
-                                                config: { ...prev.config, randomize: e.target.checked }
-                                            }))}
-                                        />
-                                        <span className="text-sm">Randomize order</span>
-                                    </label>
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Display Type</label>
-                                    <div className="flex gap-2">
-                                        {['gallery', 'carousel'].map((type) => (
-                                            <button
-                                                key={type}
-                                                onClick={() => setEditingItem(prev => ({
-                                                    ...prev,
-                                                    config: { ...prev.config, displayType: type }
-                                                }))}
-                                                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${editingItem.config.displayType === type
-                                                    ? 'bg-blue-600 text-white'
-                                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                                    }`}
-                                            >
-                                                {type === 'gallery' ? 'Gallery' : 'Carousel'}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Image Style</label>
-                                    <select
-                                        value={editingItem.config.imageStyle || ''}
+                            <div>
+                                <label className="flex items-center gap-2">
+                                    <input
+                                        type="checkbox"
+                                        checked={editingItem.config.randomize}
                                         onChange={(e) => setEditingItem(prev => ({
                                             ...prev,
-                                            config: { ...prev.config, imageStyle: e.target.value || null }
+                                            config: { ...prev.config, randomize: e.target.checked }
                                         }))}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                    >
-                                        <option value="">Default Style</option>
-                                        {availableImageStyles.map((style) => (
-                                            <option key={style.name} value={style.name}>
-                                                {style.name} ({style.config.alignment || 'center'}, {style.config.galleryColumns || 3} cols)
-                                            </option>
-                                        ))}
-                                    </select>
-                                    {availableImageStyles.length === 0 && (
-                                        <p className="text-sm text-gray-500 mt-1">
-                                            No image styles defined in current theme. Go to Theme Manager to create image styles.
-                                        </p>
-                                    )}
-                                </div>
+                                    />
+                                    <span className="text-sm">Randomize order</span>
+                                </label>
+                            </div>
 
-                                {editingItem.config.displayType === 'carousel' && (
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">Auto-play Interval</label>
-                                        <select
-                                            value={editingItem.config.autoPlayInterval || 3}
-                                            onChange={(e) => setEditingItem(prev => ({
-                                                ...prev,
-                                                config: { ...prev.config, autoPlayInterval: parseInt(e.target.value) }
-                                            }))}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                        >
-                                            <option value={1}>1 second</option>
-                                            <option value={2}>2 seconds</option>
-                                            <option value={3}>3 seconds</option>
-                                            <option value={4}>4 seconds</option>
-                                            <option value={5}>5 seconds</option>
-                                            <option value={7}>7 seconds</option>
-                                            <option value={10}>10 seconds</option>
-                                            <option value={15}>15 seconds</option>
-                                            <option value={30}>30 seconds</option>
-                                        </select>
-                                    </div>
-                                )}
-
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Display Type</label>
                                 <div className="flex gap-2">
-                                    <button
-                                        onClick={() => setEditingItem(null)}
-                                        className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button
-                                        onClick={handleSaveCollection}
-                                        className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                                    >
-                                        Use Collection
-                                    </button>
+                                    {['gallery', 'carousel'].map((type) => (
+                                        <button
+                                            key={type}
+                                            onClick={() => setEditingItem(prev => ({
+                                                ...prev,
+                                                config: { ...prev.config, displayType: type }
+                                            }))}
+                                            className={`flex-1 px-4 py-2 border rounded-md transition-colors ${editingItem.config.displayType === type
+                                                ? 'bg-blue-50 border-blue-300 text-blue-700'
+                                                : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                                                }`}
+                                        >
+                                            {type.charAt(0).toUpperCase() + type.slice(1)}
+                                        </button>
+                                    ))}
                                 </div>
                             </div>
-                        )}
+
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => setEditingItem(null)}
+                                    className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        const updatedConfig = {
+                                            ...currentConfig,
+                                            collectionConfig: editingItem.config
+                                        }
+                                        if (onConfigChange) {
+                                            onConfigChange(updatedConfig)
+                                        }
+                                        setEditingItem(null)
+                                    }}
+                                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                                >
+                                    Save Settings
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}
         </div>
-    )
-}
+    );
+};
 
-MediaSpecialEditor.displayName = 'MediaSpecialEditor'
+MediaSpecialEditor.displayName = 'MediaSpecialEditor';
 
-export default MediaSpecialEditor
+export default MediaSpecialEditor;
