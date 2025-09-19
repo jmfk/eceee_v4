@@ -22,10 +22,11 @@ ContentWidget → emits event → PageEditor (listens directly)
 
 ### Core Components
 
-1. **WidgetEventContext** - Centralized event bus
+1. **WidgetEventContext** - Centralized event bus with global state management
 2. **Widget Event Types** - Type-safe event definitions  
-3. **Event Emitters** - Convenience hooks for emitting events
+3. **Event Emitters** - Direct event emission using emit
 4. **Event Subscriptions** - Direct subscription to events using useWidgetEvents
+5. **Global State** - Centralized dirty state and unsaved changes tracking
 
 ### Event Flow
 
@@ -153,6 +154,11 @@ const PageEditor = () => {
 ### 1. **No Prop Drilling**
 - Components communicate directly through events
 - No need to pass callbacks through multiple layers
+
+### 2. **Centralized State Management**
+- Global tracking of dirty state
+- Unified widget unsaved changes tracking
+- Automatic state updates based on events
 - Cleaner component interfaces
 
 ### 2. **Easy Debugging**

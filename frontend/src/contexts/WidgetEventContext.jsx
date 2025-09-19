@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useCallback, useRef, useEffect } from 'react'
+import React, { createContext, useContext, useCallback, useRef, useEffect, useState } from 'react'
+import { useAppStatus } from './AppStatusContext'
 
 /**
  * Widget Event Context - Centralized event system for widget communication
@@ -30,6 +31,12 @@ const WidgetEventContext = createContext()
 export const WidgetEventProvider = ({ children }) => {
     // Create event bus
     const listenersRef = useRef(new Map())
+
+    // Get app status context
+    const { setIsDirty } = useAppStatus()
+
+    // Global dirty state tracking
+    const [widgetHasUnsavedChanges, setWidgetHasUnsavedChanges] = useState(false)
 
     // Emit an event to all subscribers
     const emit = useCallback((eventType, payload = {}) => {
@@ -82,9 +89,41 @@ export const WidgetEventProvider = ({ children }) => {
         }
     }, [])
 
+    // Update dirty state based on events
+    useEffect(() => {
+
+        const handleWidgetChanged = (payload) => {
+            if (payload.changeType === 'config') {
+                setIsDirty(true)
+            }
+        }
+
+        const handleWidgetSaved = () => {
+            setIsDirty(false)
+            setWidgetHasUnsavedChanges(false)
+        }
+
+        const handleWidgetEditorChanges = (payload) => {
+            setWidgetHasUnsavedChanges(payload.hasUnsavedChanges)
+        }
+
+        // Subscribe to relevant events
+        const unsubscribeChanged = subscribe('widget:changed', handleWidgetChanged)
+        const unsubscribeSaved = subscribe('widget:saved', handleWidgetSaved)
+        const unsubscribeEditor = subscribe('widget:editor:changes', handleWidgetEditorChanges)
+
+        return () => {
+            unsubscribeChanged()
+            unsubscribeSaved()
+            unsubscribeEditor()
+        }
+    }, [subscribe])
+
     const contextValue = {
         emit,
-        subscribe
+        subscribe,
+        widgetHasUnsavedChanges,
+        setWidgetHasUnsavedChanges
     }
 
     return (

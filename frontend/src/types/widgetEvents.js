@@ -19,7 +19,6 @@ export const WIDGET_EVENTS = {
     MOVED: 'widget:moved',
 
     // Validation
-    VALIDATED: 'widget:validated',
     ERROR: 'widget:error',
 
     // Editor state
@@ -108,7 +107,6 @@ export const validateEventPayload = (eventType, payload) => {
         [WIDGET_EVENTS.ADDED]: ['slotName', 'widget'],
         [WIDGET_EVENTS.REMOVED]: ['slotName', 'widgetId'],
         [WIDGET_EVENTS.MOVED]: ['slotName', 'widgetId', 'fromIndex', 'toIndex'],
-        [WIDGET_EVENTS.VALIDATED]: ['widgetId', 'slotName', 'isValid'],
         [WIDGET_EVENTS.ERROR]: ['widgetId', 'slotName', 'error']
     }
 
