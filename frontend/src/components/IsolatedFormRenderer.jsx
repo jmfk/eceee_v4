@@ -53,11 +53,6 @@ const IsolatedFieldWrapper = React.memo(({
                 warnings: result.warnings?.[fieldName] || []
             }
 
-            // Notify parent about this field's validation state
-            if (onValidationChange) {
-                onValidationChange(fieldName, fieldValidation)
-            }
-
             return fieldValidation
         } catch (error) {
             console.error(`Field validation failed for ${fieldName}:`, error)
@@ -66,12 +61,9 @@ const IsolatedFieldWrapper = React.memo(({
                 errors: ['Validation failed'],
                 warnings: []
             }
-            if (onValidationChange) {
-                onValidationChange(fieldName, errorValidation)
-            }
             return errorValidation
         }
-    }, [fieldName, widgetData, onValidationChange])
+    }, [fieldName, widgetData])
 
     // Handle field changes
     const handleFieldChange = useCallback((fieldName, value) => {
@@ -123,9 +115,7 @@ const IsolatedFormRenderer = React.memo(({
     initschema,
     onRealTimeUpdate,
     onUnsavedChanges,
-    onValidatedWidgetSync,
     emitWidgetChanged,
-    emitWidgetValidated,
     namespace = null
 }) => {
     const schemaRef = useRef(null)
@@ -136,7 +126,6 @@ const IsolatedFormRenderer = React.memo(({
     // Use form data buffer to store changes without re-renders
     const formBuffer = useFormDataBuffer(
         initWidgetData,
-        onValidatedWidgetSync,
         {
             onDirtyChange: onUnsavedChanges,
             onRealTimeUpdate: (data) => {
@@ -209,16 +198,7 @@ const IsolatedFormRenderer = React.memo(({
         const hasErrors = Object.values(fieldValidationsRef.current).some(v => v && !v.isValid)
         const isValid = !hasErrors
 
-        // Emit validation event
-        if (emitWidgetValidated) {
-            const currentData = formBuffer.getCurrentData()
-            emitWidgetValidated(currentData.id, currentData.slotName, {
-                isValid,
-                errors: fieldValidationsRef.current,
-                warnings: {}
-            })
-        }
-    }, [formBuffer, emitWidgetValidated, onValidatedWidgetSync])
+    }, [formBuffer])
 
     // Cleanup timeouts
     useEffect(() => {
