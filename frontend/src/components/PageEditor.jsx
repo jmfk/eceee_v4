@@ -169,6 +169,9 @@ const PageEditor = () => {
         return path
     }
 
+    // Use widget event context for tracking unsaved changes
+    const { widgetHasUnsavedChanges, setWidgetHasUnsavedChanges } = useWidgetEvents()
+
     // Redirect to content tab if no tab is specified
     useEffect(() => {
         if (!tab) {
@@ -202,18 +205,13 @@ const PageEditor = () => {
         Boolean(currentVersion?.id) && Boolean(pageVersionData?.id) && currentVersion.id === pageVersionData.id
     )
 
-
-
     // Save mutation state
     const [isSaving, setIsSaving] = useState(false)
 
     // Widget editor panel state
     const [widgetEditorOpen, setWidgetEditorOpen] = useState(false)
     const [editingWidget, setEditingWidget] = useState(null)
-    const [widgetHasUnsavedChanges, setWidgetHasUnsavedChanges] = useState(false)
     const widgetEditorRef = useRef(null)
-
-    console.log("widgetHasUnsavedChanges", widgetHasUnsavedChanges)
 
     // Ref to track current editing widget for callbacks
     const editingWidgetRef = useRef(null)
@@ -230,10 +228,6 @@ const PageEditor = () => {
     const queryClient = useQueryClient()
     const { showError, showConfirm } = useNotificationContext()
     const { addNotification } = useGlobalNotifications()
-
-
-
-
 
     // Initialize data for new page
     useEffect(() => {
@@ -585,6 +579,7 @@ const PageEditor = () => {
 
     // Handle page data updates - route to appropriate data structure
     const updatePageData = useCallback((updates) => {
+        console.log("updatePageData", updates)
         // Handle version changes from LayoutRenderer
         if (updates.versionChanged && updates.pageVersionData) {
             // This is a version switch from LayoutRenderer, use switchToVersion
@@ -640,32 +635,6 @@ const PageEditor = () => {
         setIsDirty(true) // Mark as dirty since we have new validated data
     }, [])
 
-    const handleValidatedWidgetSync = useCallback((validatedWidget) => {
-        logValidationSync('widget', validatedWidget, 'WidgetEditorPanel')
-
-        setPageVersionData(prev => {
-            const widgets = prev?.widgets || {}
-            const slot = widgets[validatedWidget.slotName] || []
-            const updatedSlot = slot.map(w =>
-                w.id === validatedWidget.id ? validatedWidget : w
-            )
-
-            // If widget not found, add it
-            if (!updatedSlot.find(w => w.id === validatedWidget.id)) {
-                updatedSlot.push(validatedWidget)
-            }
-
-            return {
-                ...prev,
-                widgets: {
-                    ...widgets,
-                    [validatedWidget.slotName]: updatedSlot
-                }
-            }
-        })
-        setIsDirty(true)
-        setWidgetHasUnsavedChanges(false) // Clear since data is now in canonical state
-    }, [])
 
     // Load versions when page data is available
     useEffect(() => {
@@ -954,18 +923,18 @@ const PageEditor = () => {
         if (currentEditingWidget && widgetData && currentEditingWidget.id === widgetData.id) {
             setWidgetEditorOpen(false)
             setEditingWidget(null)
-            setWidgetHasUnsavedChanges(false)
+            //setWidgetHasUnsavedChanges(false)
         } else {
             setEditingWidget(widgetData)
             setWidgetEditorOpen(true)
-            setWidgetHasUnsavedChanges(false)
+            //setWidgetHasUnsavedChanges(false)
         }
     }, [])
 
     const handleCloseWidgetEditor = useCallback(() => {
         setWidgetEditorOpen(false)
         setEditingWidget(null)
-        setWidgetHasUnsavedChanges(false)
+        //setWidgetHasUnsavedChanges(false)
     }, [])
 
     const handleRealTimeWidgetUpdate = useCallback((updatedWidget) => {
@@ -996,7 +965,7 @@ const PageEditor = () => {
         })
 
         // Clear unsaved changes flag since save is complete
-        setWidgetHasUnsavedChanges(false)
+        //setWidgetHasUnsavedChanges(false)
 
         handleCloseWidgetEditor()
     }, [addNotification, handleCloseWidgetEditor])
@@ -1012,6 +981,7 @@ const PageEditor = () => {
     useEffect(() => {
         // Handler for widget changes
         const handleWidgetChanged = (payload) => {
+            console.log("handleWidgetChanged", payload)
             if (payload.changeType === WIDGET_CHANGE_TYPES.CONFIG) {
                 // CRITICAL FIX: Config changes must update persistent data, not just mark as dirty
                 // This fixes the split-brain issue where config changes were only preview-only
@@ -1054,16 +1024,6 @@ const PageEditor = () => {
             }
         }
 
-        // Handler for validation events
-        const handleWidgetValidated = (payload) => {
-            if (!payload.isValid && Object.keys(payload.errors).length > 0) {
-                addNotification({
-                    type: 'warning',
-                    message: `Widget validation failed: ${Object.values(payload.errors).flat().join(', ')}`
-                })
-            }
-        }
-
         // Handler for error events
         const handleWidgetError = (payload) => {
             addNotification({
@@ -1074,13 +1034,11 @@ const PageEditor = () => {
 
         // Subscribe to events
         const unsubscribeChanged = subscribe(WIDGET_EVENTS.CHANGED, handleWidgetChanged)
-        const unsubscribeValidated = subscribe(WIDGET_EVENTS.VALIDATED, handleWidgetValidated)
         const unsubscribeError = subscribe(WIDGET_EVENTS.ERROR, handleWidgetError)
 
         // Cleanup subscriptions
         return () => {
             unsubscribeChanged()
-            unsubscribeValidated()
             unsubscribeError()
         }
     }, [subscribe, addNotification])
@@ -1440,8 +1398,6 @@ const PageEditor = () => {
                         onClose={handleCloseWidgetEditor}
                         onSave={handleSaveWidget}
                         onRealTimeUpdate={handleRealTimeWidgetUpdate}
-                        onUnsavedChanges={setWidgetHasUnsavedChanges}
-                        onValidatedWidgetSync={handleValidatedWidgetSync}
                         widgetData={editingWidget}
                         title={editingWidget ? `Edit ${editingWidget.name}` : 'Edit Widget'}
                         autoOpenSpecialEditor={editingWidget?.type === 'core_widgets.ImageWidget'}

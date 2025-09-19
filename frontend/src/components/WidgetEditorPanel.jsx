@@ -23,8 +23,6 @@ const WidgetEditorPanel = forwardRef(({
     onClose,
     onSave,
     onRealTimeUpdate,
-    onUnsavedChanges,
-    onValidatedWidgetSync,
     widgetData,
     schema,
     title = "Edit Widget",
@@ -53,53 +51,26 @@ const WidgetEditorPanel = forwardRef(({
     const rafRef = useRef(null)
     const updateTimeoutRef = useRef(null)
 
-    console.log("hasChanges", hasChanges)
-
-    // Event system for widget communication (with fallback)
-    let emit = null
-    try {
-        const { emit: contextEmit } = useWidgetEvents()
-        emit = contextEmit
-    } catch (error) {
-        // Fallback when context is not available
-        console.warn('WidgetEventContext not available in WidgetEditorPanel, using callback-only mode')
-    }
+    const { emit } = useWidgetEvents()
 
     // Event emitter functions
     const emitWidgetChanged = useCallback((widgetId, slotName, updatedWidget, changeType = 'config') => {
-        if (emit) {
-            emit(WIDGET_EVENTS.CHANGED, {
-                widgetId,
-                slotName,
-                widget: updatedWidget,
-                changeType,
-                timestamp: Date.now()
-            })
-        }
-    }, [emit])
-
-    const emitWidgetValidated = useCallback((widgetId, slotName, validationResult) => {
-        if (emit) {
-            emit(WIDGET_EVENTS.VALIDATED, {
-                widgetId,
-                slotName,
-                isValid: validationResult.isValid,
-                errors: validationResult.errors,
-                warnings: validationResult.warnings,
-                timestamp: Date.now()
-            })
-        }
+        emit(WIDGET_EVENTS.CHANGED, {
+            widgetId,
+            slotName,
+            widget: updatedWidget,
+            changeType,
+            timestamp: Date.now()
+        })
     }, [emit])
 
     const emitWidgetSaved = useCallback((widgetId, slotName, savedWidget) => {
-        if (emit) {
-            emit(WIDGET_EVENTS.SAVED, {
-                widgetId,
-                slotName,
-                widget: savedWidget,
-                timestamp: Date.now()
-            })
-        }
+        emit(WIDGET_EVENTS.SAVED, {
+            widgetId,
+            slotName,
+            widget: savedWidget,
+            timestamp: Date.now()
+        })
     }, [emit])
 
     // Check if widget supports special editor mode
@@ -227,10 +198,10 @@ const WidgetEditorPanel = forwardRef(({
     // Handle unsaved changes from isolated form
     const handleUnsavedChanges = useCallback((hasUnsavedChanges) => {
         setHasChanges(hasUnsavedChanges)
-        if (onUnsavedChanges) {
-            onUnsavedChanges(hasUnsavedChanges)
-        }
-    }, [onUnsavedChanges])
+        // if (onUnsavedChanges) {
+        //     onUnsavedChanges(hasUnsavedChanges)
+        // }
+    }, [])
 
     // Handle resize drag with useCallback and RAF for smooth performance
     const handleResizeMove = useCallback((e) => {
@@ -320,15 +291,12 @@ const WidgetEditorPanel = forwardRef(({
     }), [hasChanges, widgetData])
 
     // Handle config changes from special editor
-    const handleSpecialEditorConfigChange = useCallback((newConfig) => {
-        // The special editor will handle its own state and trigger events
-        // This is just for backward compatibility
-        setHasChanges(true)
-        if (onUnsavedChanges) {
-            console.log("onUnsavedChanges", onUnsavedChanges)
-            onUnsavedChanges(true)
-        }
-    }, [onUnsavedChanges])
+    // const handleSpecialEditorConfigChange = useCallback((newConfig) => {
+    //     // The special editor will handle its own state and trigger events
+    //     // This is just for backward compatibility
+    //     console.log("handleSpecialEditorConfigChange")
+    //     setHasChanges(true)
+    // }, [])
 
     // Handle close - revert changes if not saved
     const handleClose = () => {
@@ -431,7 +399,6 @@ const WidgetEditorPanel = forwardRef(({
                         specialEditorWidth={specialEditorWidth}
                         isAnimating={isAnimatingSpecialEditor}
                         isClosing={isClosingSpecialEditor}
-                        onConfigChange={handleSpecialEditorConfigChange}
                         namespace={namespace}
                     />
                 )}
@@ -492,9 +459,7 @@ const WidgetEditorPanel = forwardRef(({
                                 initschema={fetchedSchema || schema}
                                 onRealTimeUpdate={onRealTimeUpdate}
                                 onUnsavedChanges={handleUnsavedChanges}
-                                onValidatedWidgetSync={onValidatedWidgetSync}
                                 emitWidgetChanged={emitWidgetChanged}
-                                emitWidgetValidated={emitWidgetValidated}
                                 namespace={namespace}
                             />
                         ) : (

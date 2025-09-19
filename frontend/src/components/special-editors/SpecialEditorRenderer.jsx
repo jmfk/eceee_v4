@@ -4,8 +4,11 @@
  * Renders the appropriate special editor based on widget type.
  * This component serves as a registry and renderer for different special editors.
  */
-import React from 'react'
+import React, { useCallback } from 'react'
 import MediaSpecialEditor from './MediaSpecialEditor'
+import { useWidgetEvents } from '../../contexts/WidgetEventContext'
+import { WIDGET_EVENTS } from '../../types/widgetEvents'
+
 
 // Registry of special editors mapped to widget types
 const SPECIAL_EDITORS = {
@@ -31,7 +34,6 @@ const SpecialEditorRenderer = ({
     specialEditorWidth = 60,
     isAnimating = false,
     isClosing = false,
-    onConfigChange,
     namespace = null
 }) => {
     if (!widgetData?.type || !hasSpecialEditor(widgetData.type)) {
@@ -43,6 +45,20 @@ const SpecialEditorRenderer = ({
     if (!SpecialEditorComponent) {
         return null
     }
+
+    const { emit } = useWidgetEvents()
+
+    const onConfigChange = useCallback((newConfig) => {
+        emit(WIDGET_EVENTS.CHANGED, {
+            widgetId: widgetData.id,
+            slotName: widgetData.slotName,
+            widget: newConfig,
+            changeType: 'config',
+            timestamp: Date.now()
+        })
+    }, [])
+
+
 
     return (
         <div

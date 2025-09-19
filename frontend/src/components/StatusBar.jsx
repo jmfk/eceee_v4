@@ -1,9 +1,9 @@
-import { ChevronLeft, ChevronRight, Trash2, Save } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Trash2, Save, AlertCircle } from 'lucide-react'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
+import { useAppStatus } from '../contexts/AppStatusContext'
 import VersionSelector from './VersionSelector'
 
 const StatusBar = ({
-    isDirty = false,
     customStatusContent = null,
     className = "",
     // Version management props
@@ -25,6 +25,14 @@ const StatusBar = ({
         clearNotifications,
         navigateNotifications
     } = useGlobalNotifications()
+
+    // Get global app status
+    const {
+        isDirty,
+        hasUnsavedChanges,
+        errors,
+        warnings
+    } = useAppStatus()
 
     return (
         <div className={`bg-white border-t border-gray-200 px-4 py-2 ${className}`}>
@@ -89,7 +97,21 @@ const StatusBar = ({
                         /* Default status when no notifications */
                         <div className="flex items-center space-x-4 text-gray-600">
                             {customStatusContent || (
-                                <span>Ready</span>
+                                <div className="flex items-center space-x-4">
+                                    <span>{errors.length > 0 || warnings.length > 0 ? 'Issues Found' : 'Ready'}</span>
+                                    {errors.length > 0 && (
+                                        <span className="flex items-center text-red-600">
+                                            <AlertCircle className="w-4 h-4 mr-1" />
+                                            {errors.length} Error{errors.length !== 1 ? 's' : ''}
+                                        </span>
+                                    )}
+                                    {warnings.length > 0 && (
+                                        <span className="flex items-center text-yellow-600">
+                                            <AlertCircle className="w-4 h-4 mr-1" />
+                                            {warnings.length} Warning{warnings.length !== 1 ? 's' : ''}
+                                        </span>
+                                    )}
+                                </div>
                             )}
                         </div>
                     )}

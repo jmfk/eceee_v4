@@ -291,7 +291,7 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
     // Widget editor panel state
     const [widgetEditorOpen, setWidgetEditorOpen] = useState(false)
     const [editingWidget, setEditingWidget] = useState(null)
-    const [widgetHasUnsavedChanges, setWidgetHasUnsavedChanges] = useState(false)
+    const { widgetHasUnsavedChanges, setWidgetHasUnsavedChanges } = useWidgetEvents()
     const widgetEditorRef = useRef(null)
 
     // Widget selection modal state
