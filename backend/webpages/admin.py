@@ -125,17 +125,12 @@ class PageVersionInline(admin.TabularInline):
     extra = 0
     readonly_fields = [
         "version_number",
-        "created_at",
-        "created_by",
+        "version_title",
         "admin_link",
-        "publication_status_display",
     ]
     fields = [
         "version_number",
         "version_title",
-        "effective_date",
-        "expiry_date",
-        "publication_status_display",
         "admin_link",
     ]
 
