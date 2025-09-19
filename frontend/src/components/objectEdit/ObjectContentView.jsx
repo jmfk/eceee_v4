@@ -11,7 +11,7 @@ import ObjectContentEditor from '../ObjectContentEditor'
 import ObjectSchemaForm from '../ObjectSchemaForm'
 import WidgetEditorPanel from '../WidgetEditorPanel'
 import ObjectDataForm from './ObjectDataForm'
-import { WidgetEventProvider, useWidgetEventListener } from '../../contexts/WidgetEventContext'
+import { WidgetEventProvider, useWidgetEvents } from '../../contexts/WidgetEventContext'
 import { WIDGET_EVENTS, WIDGET_CHANGE_TYPES } from '../../types/widgetEvents'
 
 // Internal component that uses widget event hooks
@@ -82,27 +82,40 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
         setHasWidgetChanges(false)
     }, [instance])
 
-    // Listen to widget events for real-time updates and dirty state management
-    useWidgetEventListener(WIDGET_EVENTS.CHANGED, useCallback((payload) => {
-        if (payload.changeType === WIDGET_CHANGE_TYPES.CONFIG) {
-            // Handle real-time config changes - mark as dirty but don't auto-save
-            setHasWidgetChanges(true)
+    // Subscribe to widget events for real-time updates and dirty state management
+    const { subscribe } = useWidgetEvents()
 
-            // Update local widgets for live preview
-            setLocalWidgets(prevWidgets => {
-                const newWidgets = { ...prevWidgets }
-                const slotName = payload.slotName
+    useEffect(() => {
+        // Handler for widget changes
+        const handleWidgetChanged = (payload) => {
+            if (payload.changeType === WIDGET_CHANGE_TYPES.CONFIG) {
+                // Handle real-time config changes - mark as dirty but don't auto-save
+                setHasWidgetChanges(true)
 
-                if (newWidgets[slotName]) {
-                    newWidgets[slotName] = newWidgets[slotName].map(widget =>
-                        widget.id === payload.widgetId ? payload.widget : widget
-                    )
-                }
+                // Update local widgets for live preview
+                setLocalWidgets(prevWidgets => {
+                    const newWidgets = { ...prevWidgets }
+                    const slotName = payload.slotName
 
-                return newWidgets
-            })
+                    if (newWidgets[slotName]) {
+                        newWidgets[slotName] = newWidgets[slotName].map(widget =>
+                            widget.id === payload.widgetId ? payload.widget : widget
+                        )
+                    }
+
+                    return newWidgets
+                })
+            }
         }
-    }, []), [])
+
+        // Subscribe to widget change events
+        const unsubscribe = subscribe(WIDGET_EVENTS.CHANGED, handleWidgetChanged)
+
+        // Cleanup subscription
+        return () => {
+            unsubscribe()
+        }
+    }, [subscribe])
 
     // Handle real-time widget updates from WidgetEditorPanel
     const handleRealTimeWidgetUpdate = useCallback((updatedWidget) => {

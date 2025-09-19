@@ -3,7 +3,8 @@ import { X, RefreshCw } from 'lucide-react'
 import { getWidgetSchema } from '../api/widgetSchemas.js'
 import { validateWidgetType, clearWidgetTypesCache } from '../utils/widgetTypeValidation.js'
 import DeletedWidgetWarning from './DeletedWidgetWarning.jsx'
-import { useWidgetEventEmitter } from '../contexts/WidgetEventContext'
+import { useWidgetEvents } from '../contexts/WidgetEventContext'
+import { WIDGET_EVENTS } from '../types/widgetEvents'
 import { SpecialEditorRenderer, hasSpecialEditor } from './special-editors'
 import IsolatedFormRenderer from './IsolatedFormRenderer.jsx'
 
@@ -55,16 +56,51 @@ const WidgetEditorPanel = forwardRef(({
     console.log("hasChanges", hasChanges)
 
     // Event system for widget communication (with fallback)
-    let emitWidgetChanged = null, emitWidgetValidated = null, emitWidgetSaved = null
+    let emit = null
     try {
-        const eventEmitter = useWidgetEventEmitter()
-        emitWidgetChanged = eventEmitter.emitWidgetChanged
-        emitWidgetValidated = eventEmitter.emitWidgetValidated
-        emitWidgetSaved = eventEmitter.emitWidgetSaved
+        const { emit: contextEmit } = useWidgetEvents()
+        emit = contextEmit
     } catch (error) {
         // Fallback when context is not available
         console.warn('WidgetEventContext not available in WidgetEditorPanel, using callback-only mode')
     }
+
+    // Event emitter functions
+    const emitWidgetChanged = useCallback((widgetId, slotName, updatedWidget, changeType = 'config') => {
+        if (emit) {
+            emit(WIDGET_EVENTS.CHANGED, {
+                widgetId,
+                slotName,
+                widget: updatedWidget,
+                changeType,
+                timestamp: Date.now()
+            })
+        }
+    }, [emit])
+
+    const emitWidgetValidated = useCallback((widgetId, slotName, validationResult) => {
+        if (emit) {
+            emit(WIDGET_EVENTS.VALIDATED, {
+                widgetId,
+                slotName,
+                isValid: validationResult.isValid,
+                errors: validationResult.errors,
+                warnings: validationResult.warnings,
+                timestamp: Date.now()
+            })
+        }
+    }, [emit])
+
+    const emitWidgetSaved = useCallback((widgetId, slotName, savedWidget) => {
+        if (emit) {
+            emit(WIDGET_EVENTS.SAVED, {
+                widgetId,
+                slotName,
+                widget: savedWidget,
+                timestamp: Date.now()
+            })
+        }
+    }, [emit])
 
     // Check if widget supports special editor mode
     const supportsSpecialEditor = useCallback(() => {

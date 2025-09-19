@@ -27,18 +27,8 @@ const DEBUG_ENABLED = false
 
 const WidgetEventContext = createContext()
 
-export const WidgetEventProvider = ({ children, sharedEventBus = null }) => {
-    // If we have a shared event bus, use its functions directly
-    if (sharedEventBus) {
-        // Return the shared context directly
-        return React.createElement(
-            WidgetEventContext.Provider,
-            { value: sharedEventBus },
-            children
-        )
-    }
-
-    // Create new event bus if no shared one provided
+export const WidgetEventProvider = ({ children }) => {
+    // Create event bus
     const listenersRef = useRef(new Map())
 
     // Emit an event to all subscribers
@@ -92,24 +82,9 @@ export const WidgetEventProvider = ({ children, sharedEventBus = null }) => {
         }
     }, [])
 
-    // Get current listener count for debugging
-    const getListenerCount = useCallback((eventType) => {
-        return listenersRef.current.get(eventType)?.length || 0
-    }, [])
-
-    // Clear all listeners (useful for cleanup)
-    const clearAllListeners = useCallback(() => {
-        listenersRef.current.clear()
-        if (DEBUG_ENABLED) {
-            console.log('🧹 Cleared all widget event listeners')
-        }
-    }, [])
-
     const contextValue = {
         emit,
-        subscribe,
-        getListenerCount,
-        clearAllListeners
+        subscribe
     }
 
     return (
@@ -128,96 +103,5 @@ export const useWidgetEvents = () => {
     return context
 }
 
-// Convenience hook for subscribing to events with automatic cleanup
-export const useWidgetEventListener = (eventType, callback, dependencies = []) => {
-    const { subscribe } = useWidgetEvents()
-
-    useEffect(() => {
-        const unsubscribe = subscribe(eventType, callback)
-        return unsubscribe
-    }, [subscribe, eventType, callback]) // Remove spread dependencies to prevent infinite loops
-}
-
-// Convenience hook for emitting events
-export const useWidgetEventEmitter = () => {
-    const { emit } = useWidgetEvents()
-
-    const emitWidgetChanged = useCallback((widgetId, slotName, updatedWidget, changeType = 'config') => {
-        emit('widget:changed', {
-            widgetId,
-            slotName,
-            widget: updatedWidget,
-            changeType,
-            timestamp: Date.now()
-        })
-    }, [emit])
-
-    const emitWidgetSaved = useCallback((widgetId, slotName, savedWidget) => {
-        emit('widget:saved', {
-            widgetId,
-            slotName,
-            widget: savedWidget,
-            timestamp: Date.now()
-        })
-    }, [emit])
-
-    const emitWidgetAdded = useCallback((slotName, newWidget) => {
-        emit('widget:added', {
-            slotName,
-            widget: newWidget,
-            timestamp: Date.now()
-        })
-    }, [emit])
-
-    const emitWidgetRemoved = useCallback((slotName, widgetId) => {
-        emit('widget:removed', {
-            slotName,
-            widgetId,
-            timestamp: Date.now()
-        })
-    }, [emit])
-
-    const emitWidgetMoved = useCallback((slotName, widgetId, fromIndex, toIndex) => {
-        emit('widget:moved', {
-            slotName,
-            widgetId,
-            fromIndex,
-            toIndex,
-            timestamp: Date.now()
-        })
-    }, [emit])
-
-    const emitWidgetValidated = useCallback((widgetId, slotName, validationResult) => {
-        emit('widget:validated', {
-            widgetId,
-            slotName,
-            isValid: validationResult.isValid,
-            errors: validationResult.errors,
-            warnings: validationResult.warnings,
-            timestamp: Date.now()
-        })
-    }, [emit])
-
-    const emitWidgetError = useCallback((widgetId, slotName, error, context = 'unknown') => {
-        emit('widget:error', {
-            widgetId,
-            slotName,
-            error: error.message || error,
-            context,
-            timestamp: Date.now()
-        })
-    }, [emit])
-
-    return {
-        emit,
-        emitWidgetChanged,
-        emitWidgetSaved,
-        emitWidgetAdded,
-        emitWidgetRemoved,
-        emitWidgetMoved,
-        emitWidgetValidated,
-        emitWidgetError
-    }
-}
 
 export default WidgetEventContext

@@ -25,7 +25,7 @@ import { smartSave, analyzeChanges, determineSaveStrategy, generateChangeSummary
 import { WIDGET_ACTIONS } from '../utils/widgetConstants'
 import { useNotificationContext } from './NotificationManager'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
-import { useWidgetEventListener } from '../contexts/WidgetEventContext'
+import { useWidgetEvents } from '../contexts/WidgetEventContext'
 import { WIDGET_EVENTS, WIDGET_CHANGE_TYPES } from '../types/widgetEvents'
 import ContentEditor from './ContentEditor'
 import PageContentEditor from '../editors/page-editor/PageContentEditor'
@@ -34,7 +34,6 @@ import SchemaDrivenForm from './SchemaDrivenForm'
 import LayoutSelector from './LayoutSelector'
 import StatusBar from './StatusBar'
 import WidgetEditorPanel from './WidgetEditorPanel'
-import SelfContainedWidgetEditor from './forms/SelfContainedWidgetEditor.jsx'
 import PageTagWidget from './PageTagWidget'
 import ThemeSelector from './ThemeSelector'
 
@@ -188,7 +187,6 @@ const PageEditor = () => {
     const [isLoadingLayout, setIsLoadingLayout] = useState(false)
 
     // Feature flag for new self-contained widget editor
-    const [useSelfContainedEditor, setUseSelfContainedEditor] = useState(false)
     const contentEditorRef = useRef(null)
     const settingsEditorRef = useRef(null)
 
@@ -1008,67 +1006,84 @@ const PageEditor = () => {
         setIsDirty(isDirty);
     }, [])
 
-    // Listen to widget events (no prop drilling!)
-    useWidgetEventListener(WIDGET_EVENTS.CHANGED, useCallback((payload) => {
-        if (payload.changeType === WIDGET_CHANGE_TYPES.CONFIG) {
-            // CRITICAL FIX: Config changes must update persistent data, not just mark as dirty
-            // This fixes the split-brain issue where config changes were only preview-only
+    // Subscribe to widget events using direct subscription
+    const { subscribe } = useWidgetEvents()
 
-            // Update the persistent widget data in pageVersionData
-            setPageVersionData(prev => {
-                const widgets = prev?.widgets || {}
-                const slotWidgets = widgets[payload.slotName] || []
+    useEffect(() => {
+        // Handler for widget changes
+        const handleWidgetChanged = (payload) => {
+            if (payload.changeType === WIDGET_CHANGE_TYPES.CONFIG) {
+                // CRITICAL FIX: Config changes must update persistent data, not just mark as dirty
+                // This fixes the split-brain issue where config changes were only preview-only
 
-                const updatedSlotWidgets = slotWidgets.map(widget =>
-                    widget.id === payload.widgetId ? payload.widget : widget
-                )
+                // Update the persistent widget data in pageVersionData
+                setPageVersionData(prev => {
+                    const widgets = prev?.widgets || {}
+                    const slotWidgets = widgets[payload.slotName] || []
 
-                return {
-                    ...prev,
-                    widgets: {
-                        ...widgets,
-                        [payload.slotName]: updatedSlotWidgets
+                    const updatedSlotWidgets = slotWidgets.map(widget =>
+                        widget.id === payload.widgetId ? payload.widget : widget
+                    )
+
+                    return {
+                        ...prev,
+                        widgets: {
+                            ...widgets,
+                            [payload.slotName]: updatedSlotWidgets
+                        }
                     }
-                }
-            })
+                })
 
-            // Also update the visual representation for real-time preview
+                // Also update the visual representation for real-time preview
+                if (contentEditorRef.current && contentEditorRef.current.layoutRenderer) {
+                    const renderer = contentEditorRef.current.layoutRenderer
+                    renderer.executeWidgetDataCallback(WIDGET_ACTIONS.UPDATE, payload.slotName, payload.widget)
+                    renderer.updateSlot(payload.slotName, renderer.getSlotWidgetData(payload.slotName))
+                }
+
+                // Mark page as dirty so user knows there are unsaved changes
+                setIsDirty(true)
+                return
+            }
+
+            // For structural changes (position, add, remove), trigger full re-render
             if (contentEditorRef.current && contentEditorRef.current.layoutRenderer) {
                 const renderer = contentEditorRef.current.layoutRenderer
                 renderer.executeWidgetDataCallback(WIDGET_ACTIONS.UPDATE, payload.slotName, payload.widget)
                 renderer.updateSlot(payload.slotName, renderer.getSlotWidgetData(payload.slotName))
             }
-
-            // Mark page as dirty so user knows there are unsaved changes
-            setIsDirty(true)
-            return
         }
 
-        // For structural changes (position, add, remove), trigger full re-render
-        if (contentEditorRef.current && contentEditorRef.current.layoutRenderer) {
-            const renderer = contentEditorRef.current.layoutRenderer
-            renderer.executeWidgetDataCallback(WIDGET_ACTIONS.UPDATE, payload.slotName, payload.widget)
-            renderer.updateSlot(payload.slotName, renderer.getSlotWidgetData(payload.slotName))
+        // Handler for validation events
+        const handleWidgetValidated = (payload) => {
+            if (!payload.isValid && Object.keys(payload.errors).length > 0) {
+                addNotification({
+                    type: 'warning',
+                    message: `Widget validation failed: ${Object.values(payload.errors).flat().join(', ')}`
+                })
+            }
         }
-    }, []), [])
 
-    useWidgetEventListener(WIDGET_EVENTS.VALIDATED, useCallback((payload) => {
-        // Handle validation results
-        if (!payload.isValid && Object.keys(payload.errors).length > 0) {
+        // Handler for error events
+        const handleWidgetError = (payload) => {
             addNotification({
-                type: 'warning',
-                message: `Widget validation failed: ${Object.values(payload.errors).flat().join(', ')}`
+                type: 'error',
+                message: `Widget error: ${payload.error}`
             })
         }
-    }, [addNotification]), [addNotification])
 
-    useWidgetEventListener(WIDGET_EVENTS.ERROR, useCallback((payload) => {
-        // Handle widget errors
-        addNotification({
-            type: 'error',
-            message: `Widget error: ${payload.error}`
-        })
-    }, [addNotification]), [addNotification])
+        // Subscribe to events
+        const unsubscribeChanged = subscribe(WIDGET_EVENTS.CHANGED, handleWidgetChanged)
+        const unsubscribeValidated = subscribe(WIDGET_EVENTS.VALIDATED, handleWidgetValidated)
+        const unsubscribeError = subscribe(WIDGET_EVENTS.ERROR, handleWidgetError)
+
+        // Cleanup subscriptions
+        return () => {
+            unsubscribeChanged()
+            unsubscribeValidated()
+            unsubscribeError()
+        }
+    }, [subscribe, addNotification])
 
     // Tab navigation (main tabs)
     const tabs = [
@@ -1300,40 +1315,6 @@ const PageEditor = () => {
                                     </div>
                                 ) : (
                                     <div className="h-full flex flex-col">
-                                        {/* Development Toggle for Widget Editor */}
-                                        <div className="flex-shrink-0 bg-blue-50 border-l-4 border-blue-400 p-3 mb-2">
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex items-center">
-                                                    <div className="flex-shrink-0">
-                                                        <Settings className="h-4 w-4 text-blue-400" />
-                                                    </div>
-                                                    <div className="ml-3">
-                                                        <p className="text-sm text-blue-700 font-medium">
-                                                            Widget Editor Mode
-                                                        </p>
-                                                        <p className="text-xs text-blue-600">
-                                                            Switch between React-based and self-contained widget editors
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-center space-x-2">
-                                                    <span className="text-xs text-blue-600">
-                                                        {useSelfContainedEditor ? 'Self-Contained' : 'React-based'}
-                                                    </span>
-                                                    <button
-                                                        onClick={() => setUseSelfContainedEditor(!useSelfContainedEditor)}
-                                                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${useSelfContainedEditor ? 'bg-blue-600' : 'bg-gray-300'
-                                                            }`}
-                                                    >
-                                                        <span
-                                                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${useSelfContainedEditor ? 'translate-x-6' : 'translate-x-1'
-                                                                }`}
-                                                        />
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-
                                         {/* Layout fallback warning */}
                                         {!(pageVersionData?.codeLayout) && (
                                             <div className="flex-shrink-0 bg-amber-50 border-l-4 border-amber-400 p-4 mb-2">
@@ -1453,35 +1434,18 @@ const PageEditor = () => {
                     )}
 
                     {/* Widget Editor Panel - positioned within content area */}
-                    {useSelfContainedEditor ? (
-                        <SelfContainedWidgetEditor
-                            ref={widgetEditorRef}
-                            isOpen={widgetEditorOpen}
-                            onClose={handleCloseWidgetEditor}
-                            onSave={handleSaveWidget}
-                            onRealTimeUpdate={handleRealTimeWidgetUpdate}
-                            onUnsavedChanges={setWidgetHasUnsavedChanges}
-                            widgetData={editingWidget}
-                            title={editingWidget ? `Edit ${editingWidget.name} (Self-Contained)` : 'Edit Widget (Self-Contained)'}
-                            autoSave={true}
-                            showValidationInline={true}
-                            showSaveStatus={true}
-                            panelWidth={400}
-                        />
-                    ) : (
-                        <WidgetEditorPanel
-                            ref={widgetEditorRef}
-                            isOpen={widgetEditorOpen}
-                            onClose={handleCloseWidgetEditor}
-                            onSave={handleSaveWidget}
-                            onRealTimeUpdate={handleRealTimeWidgetUpdate}
-                            onUnsavedChanges={setWidgetHasUnsavedChanges}
-                            onValidatedWidgetSync={handleValidatedWidgetSync}
-                            widgetData={editingWidget}
-                            title={editingWidget ? `Edit ${editingWidget.name}` : 'Edit Widget'}
-                            autoOpenSpecialEditor={editingWidget?.type === 'core_widgets.ImageWidget'}
-                        />
-                    )}
+                    <WidgetEditorPanel
+                        ref={widgetEditorRef}
+                        isOpen={widgetEditorOpen}
+                        onClose={handleCloseWidgetEditor}
+                        onSave={handleSaveWidget}
+                        onRealTimeUpdate={handleRealTimeWidgetUpdate}
+                        onUnsavedChanges={setWidgetHasUnsavedChanges}
+                        onValidatedWidgetSync={handleValidatedWidgetSync}
+                        widgetData={editingWidget}
+                        title={editingWidget ? `Edit ${editingWidget.name}` : 'Edit Widget'}
+                        autoOpenSpecialEditor={editingWidget?.type === 'core_widgets.ImageWidget'}
+                    />
                 </div>
             </div>
 

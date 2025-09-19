@@ -25,7 +25,7 @@ ContentWidget → emits event → PageEditor (listens directly)
 1. **WidgetEventContext** - Centralized event bus
 2. **Widget Event Types** - Type-safe event definitions  
 3. **Event Emitters** - Convenience hooks for emitting events
-4. **Event Listeners** - Hooks for subscribing to events
+4. **Event Subscriptions** - Direct subscription to events using useWidgetEvents
 
 ### Event Flow
 
@@ -66,44 +66,60 @@ graph TD
 ### Emitting Events
 
 ```jsx
-import { useWidgetEventEmitter } from '../contexts/WidgetEventContext'
-import { WIDGET_CHANGE_TYPES } from '../types/widgetEvents'
+import { useWidgetEvents } from '../contexts/WidgetEventContext'
+import { WIDGET_EVENTS } from '../types/widgetEvents'
 
 const MyWidget = ({ widgetId, slotName, config }) => {
-  const { emitWidgetChanged } = useWidgetEventEmitter()
+  const { emit } = useWidgetEvents()
   
   const handleChange = (newConfig) => {
     // Emit event - no prop drilling needed!
-    emitWidgetChanged(
-      widgetId, 
-      slotName, 
-      { id: widgetId, config: newConfig }, 
-      WIDGET_CHANGE_TYPES.CONFIG
-    )
+    emit(WIDGET_EVENTS.CHANGED, {
+      widgetId,
+      slotName,
+      widget: { id: widgetId, config: newConfig },
+      changeType: 'config',
+      timestamp: Date.now()
+    })
   }
   
   return <div>...</div>
 }
 ```
 
-### Listening to Events
+### Subscribing to Events
 
 ```jsx
-import { useWidgetEventListener } from '../contexts/WidgetEventContext'
+import { useWidgetEvents } from '../contexts/WidgetEventContext'
 import { WIDGET_EVENTS } from '../types/widgetEvents'
 
 const PageEditor = () => {
-  // Listen to widget changes - no prop drilling needed!
-  useWidgetEventListener(WIDGET_EVENTS.CHANGED, (payload) => {
-    // Update layout renderer
-    updateWidgetInRenderer(payload.slotName, payload.widget)
-  }, [])
-  
-  useWidgetEventListener(WIDGET_EVENTS.VALIDATED, (payload) => {
-    if (!payload.isValid) {
-      showValidationErrors(payload.errors)
+  const { subscribe } = useWidgetEvents()
+
+  useEffect(() => {
+    // Handler for widget changes
+    const handleWidgetChanged = (payload) => {
+      // Update layout renderer
+      updateWidgetInRenderer(payload.slotName, payload.widget)
     }
-  }, [])
+
+    // Handler for validation events
+    const handleWidgetValidated = (payload) => {
+      if (!payload.isValid) {
+        showValidationErrors(payload.errors)
+      }
+    }
+
+    // Subscribe to events
+    const unsubscribeChanged = subscribe(WIDGET_EVENTS.CHANGED, handleWidgetChanged)
+    const unsubscribeValidated = subscribe(WIDGET_EVENTS.VALIDATED, handleWidgetValidated)
+
+    // Cleanup subscriptions
+    return () => {
+      unsubscribeChanged()
+      unsubscribeValidated()
+    }
+  }, [subscribe])
   
   return <div>...</div>
 }
