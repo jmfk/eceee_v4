@@ -573,6 +573,12 @@ class MediaSearchSerializer(serializers.Serializer):
     tag_names = serializers.ListField(
         child=serializers.CharField(max_length=100), required=False, allow_empty=True
     )
+    text_tags = serializers.ListField(
+        child=serializers.CharField(max_length=100),
+        required=False,
+        allow_empty=True,
+        help_text="Search for tags by text, matching against tag names and slugs",
+    )
 
     # Existing fields
     file_type = serializers.ChoiceField(

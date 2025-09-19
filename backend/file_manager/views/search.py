@@ -64,6 +64,15 @@ class MediaSearchView(APIView):
             for tag_name in tag_names:
                 queryset = queryset.filter(tags__name__iexact=tag_name)
 
+        # Text-based tag search - match against tag names and slugs
+        if filters.get("text_tags"):
+            text_tags = filters["text_tags"]
+            for text_tag in text_tags:
+                queryset = queryset.filter(
+                    Q(tags__name__icontains=text_tag)
+                    | Q(tags__slug__icontains=text_tag)
+                ).distinct()
+
         # Handle file type filtering (multiple types supported)
         if filters.get("file_types"):
             queryset = queryset.filter(file_type__in=filters["file_types"])
