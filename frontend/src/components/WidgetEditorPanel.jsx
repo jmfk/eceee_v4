@@ -52,6 +52,8 @@ const WidgetEditorPanel = forwardRef(({
     const rafRef = useRef(null)
     const updateTimeoutRef = useRef(null)
 
+    console.log("hasChanges", hasChanges)
+
     // Event system for widget communication (with fallback)
     let emitWidgetChanged = null, emitWidgetValidated = null, emitWidgetSaved = null
     try {
@@ -287,6 +289,7 @@ const WidgetEditorPanel = forwardRef(({
         // This is just for backward compatibility
         setHasChanges(true)
         if (onUnsavedChanges) {
+            console.log("onUnsavedChanges", onUnsavedChanges)
             onUnsavedChanges(true)
         }
     }, [onUnsavedChanges])

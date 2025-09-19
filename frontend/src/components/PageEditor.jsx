@@ -215,6 +215,8 @@ const PageEditor = () => {
     const [widgetHasUnsavedChanges, setWidgetHasUnsavedChanges] = useState(false)
     const widgetEditorRef = useRef(null)
 
+    console.log("widgetHasUnsavedChanges", widgetHasUnsavedChanges)
+
     // Ref to track current editing widget for callbacks
     const editingWidgetRef = useRef(null)
 
