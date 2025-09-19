@@ -184,9 +184,32 @@ const PageWidgetFactory = ({
                             <p className="text-xs text-red-600">
                                 Widget type "{widget.type}" is not supported in PageEditor
                             </p>
+                            {onDelete && (
+                                <div className="mt-3">
+                                    <button
+                                        onClick={handleDelete}
+                                        className="inline-flex items-center px-3 py-1 bg-red-100 text-red-700 text-xs rounded-md hover:bg-red-200 transition-colors"
+                                    >
+                                        <Trash2 className="w-3 h-3 mr-1" />
+                                        Delete Broken Widget
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
+
+                {/* Delete Confirmation Modal */}
+                <DeleteConfirmationModal
+                    isOpen={showDeleteConfirm}
+                    onClose={handleCancelDelete}
+                    onConfirm={handleConfirmDelete}
+                    title="Delete Unsupported Widget"
+                    message={`Are you sure you want to delete this unsupported widget of type "${widget.type}"? This action cannot be undone.`}
+                    itemName={`Unsupported Widget (${widget.type})`}
+                    isDeleting={isDeleting}
+                    deleteButtonText="Delete Broken Widget"
+                />
             </div>
         )
     }

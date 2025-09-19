@@ -182,9 +182,33 @@ const ObjectWidgetFactory = ({
                                     Allowed types: {allowedWidgetTypes.join(', ')}
                                 </p>
                             )}
+                            {onDelete && (
+                                <div className="mt-3">
+                                    <button
+                                        onClick={handleDelete}
+                                        className="inline-flex items-center px-3 py-1 bg-red-100 text-red-700 text-xs rounded-md hover:bg-red-200 transition-colors"
+                                    >
+                                        <Trash2 className="w-3 h-3 mr-1" />
+                                        Delete Broken Widget
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
+
+                {/* Delete Confirmation Modal */}
+                <DeleteConfirmationModal
+                    isOpen={showDeleteConfirm}
+                    onClose={handleCancelDelete}
+                    onConfirm={handleConfirmDelete}
+                    title="Delete Unsupported Widget"
+                    message={`Are you sure you want to delete this unsupported widget of type "${widget.type}"?${slotConfig?.required ? ' This is a required slot and deleting this widget may cause validation errors.' : ' This action cannot be undone.'}`}
+                    itemName={`Unsupported Widget (${widget.type})`}
+                    isDeleting={isDeleting}
+                    deleteButtonText="Delete Broken Widget"
+                    warningText={slotConfig?.required ? "This widget is in a required slot" : null}
+                />
             </div>
         )
     }
