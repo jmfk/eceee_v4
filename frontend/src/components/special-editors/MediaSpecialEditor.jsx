@@ -17,6 +17,7 @@ import MediaSearchWidget from '../media/MediaSearchWidget'
 import ImageWidget from '../../widgets/core/ImageWidget'
 import { useTheme } from '../../hooks/useTheme'
 import FloatingMessage from '../common/FloatingMessage'
+//import { useWidgetEvents } from '../../contexts/WidgetEventContext'
 
 const MediaSpecialEditor = ({
     widgetData,
@@ -301,11 +302,7 @@ const MediaSpecialEditor = ({
                 }
 
                 setLocalConfig(updatedConfig)
-                if (onConfigChange) {
-                    onConfigChange(updatedConfig)
-                } else {
-                    console.warn('onConfigChange not available for collection update')
-                }
+                onConfigChange(updatedConfig)
 
                 // Clear temporary selection and return to overview
                 setTempSelectedImages([])
@@ -341,12 +338,7 @@ const MediaSpecialEditor = ({
 
             // Update local config immediately for UI feedback
             setLocalConfig(updatedConfig)
-
-            if (onConfigChange) {
-                onConfigChange(updatedConfig)
-            } else {
-                console.warn('onConfigChange not available for adding images')
-            }
+            onConfigChange(updatedConfig)
 
             // Clear temporary selection and return to overview
             setTempSelectedImages([])
@@ -381,12 +373,7 @@ const MediaSpecialEditor = ({
 
         // Update local config immediately for UI feedback
         setLocalConfig(updatedConfig)
-
-        if (onConfigChange) {
-            onConfigChange(updatedConfig)
-        } else {
-            console.warn('onConfigChange not available')
-        }
+        onConfigChange(updatedConfig)
 
         setCurrentView('overview')
     }, [currentConfig, onConfigChange])
@@ -399,11 +386,31 @@ const MediaSpecialEditor = ({
             ...currentConfig,
             mediaItems: currentImages.filter(img => img.id !== imageId)
         }
-
-        if (onConfigChange) {
-            onConfigChange(updatedConfig)
-        }
         setLocalConfig(updatedConfig)
+        onConfigChange(updatedConfig)
+    }
+
+    // Remove image from collection
+    const handleRemoveImageFromCollection = (image) => {
+        if (isCollectionMode && currentCollectionId) {
+            setShowDeleteConfirm(image)
+        }
+    }
+
+    // Handle actual removal of image from collection after confirmation
+    const handleConfirmedRemoveFromCollection = async () => {
+        try {
+            setLoading(true)
+            await mediaCollectionsApi.removeFiles(currentCollectionId, [showDeleteConfirm.id])()
+            await loadCollectionImages(currentCollectionId)
+            setShowDeleteConfirm(null)
+            onConfigChange(currentConfig)
+        } catch (error) {
+            console.error('Failed to remove image from collection:', error)
+            showFloatingMessage('Failed to remove image from collection', 'error')
+        } finally {
+            setLoading(false)
+        }
     }
 
     // Remove collection
@@ -414,12 +421,8 @@ const MediaSpecialEditor = ({
             collectionConfig: null
         }
 
-        if (onConfigChange) {
-            onConfigChange(updatedConfig)
-        } else {
-            console.warn('onConfigChange not available')
-        }
         setLocalConfig(updatedConfig)
+        onConfigChange(updatedConfig)
 
         // Clear the selected collection from UI state
         setSelectedCollection(null)
@@ -447,10 +450,8 @@ const MediaSpecialEditor = ({
             displayType: 'gallery' // Default to gallery, widget will handle single image display
         }
 
-        if (onConfigChange) {
-            onConfigChange(updatedConfig)
-        }
         setLocalConfig(updatedConfig)
+        onConfigChange(updatedConfig)
 
         // Clear the selected collection from UI state since we're no longer using it
         setSelectedCollection(null)
@@ -488,10 +489,8 @@ const MediaSpecialEditor = ({
                 displayType: 'gallery' // Default to gallery, widget will handle single image display
             }
 
-            if (onConfigChange) {
-                onConfigChange(updatedConfig)
-            }
             setLocalConfig(updatedConfig)
+            onConfigChange(updatedConfig)
 
             // Refresh collections list
             const collectionsResult = await mediaCollectionsApi.list({ namespace })()
@@ -539,10 +538,8 @@ const MediaSpecialEditor = ({
                 }
             }
 
-            if (onConfigChange) {
-                onConfigChange(updatedConfig)
-            }
             setLocalConfig(updatedConfig)
+            onConfigChange(updatedConfig)
 
             // Refresh collections list
             const collectionsResult = await mediaCollectionsApi.list({ namespace })()
@@ -729,10 +726,7 @@ const MediaSpecialEditor = ({
 
                 // Update local config immediately for UI feedback
                 setLocalConfig(updatedConfig)
-
-                if (onConfigChange) {
-                    onConfigChange(updatedConfig)
-                }
+                onConfigChange(updatedConfig)
 
                 // Update tags for duplicate files
                 const duplicateFiles = filesToAddToWidget.filter(file => file.tags?.length > 0)
@@ -958,19 +952,7 @@ const MediaSpecialEditor = ({
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation()
-                                                if (isCollectionMode && currentCollectionId) {
-                                                    setShowDeleteConfirm(image)
-                                                } else {
-                                                    // For free images mode, just remove from mediaItems
-                                                    const updatedConfig = {
-                                                        ...currentConfig,
-                                                        mediaItems: currentImages.filter(img => img.id !== image.id)
-                                                    }
-                                                    setLocalConfig(updatedConfig)
-                                                    if (onConfigChange) {
-                                                        onConfigChange(updatedConfig)
-                                                    }
-                                                }
+                                                handleRemoveImageFromCollection(image)
                                             }}
                                             className="p-1 bg-white rounded shadow-sm border border-gray-200 text-gray-700 hover:text-red-600 hover:border-red-300 transition-colors"
                                             title="Remove from collection"
@@ -1140,38 +1122,42 @@ const MediaSpecialEditor = ({
             </div>
 
             {/* Widget Preview */}
-            {(currentImages.length > 0 || currentCollectionId) && (
-                <div className="bg-white rounded-lg border border-gray-200 p-4">
-                    <div className="flex items-center gap-2 mb-3">
-                        <Eye className="w-5 h-5 text-gray-600" />
-                        <h5 className="font-medium text-gray-900">Preview</h5>
+            {
+                (currentImages.length > 0 || currentCollectionId) && (
+                    <div className="bg-white rounded-lg border border-gray-200 p-4">
+                        <div className="flex items-center gap-2 mb-3">
+                            <Eye className="w-5 h-5 text-gray-600" />
+                            <h5 className="font-medium text-gray-900">Preview</h5>
+                        </div>
+                        <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                            <ImageWidget
+                                config={previewConfig}
+                                mode="preview"
+                            />
+                        </div>
                     </div>
-                    <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                        <ImageWidget
-                            config={previewConfig}
-                            mode="preview"
-                        />
-                    </div>
-                </div>
-            )}
+                )
+            }
 
             {/* Additional Actions */}
-            {pendingUploads.length > 0 && (
-                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                        <AlertCircle className="w-5 h-5 text-orange-600" />
-                        <p className="font-medium text-orange-900">Pending Uploads</p>
+            {
+                pendingUploads.length > 0 && (
+                    <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                        <div className="flex items-center gap-2 mb-2">
+                            <AlertCircle className="w-5 h-5 text-orange-600" />
+                            <p className="font-medium text-orange-900">Pending Uploads</p>
+                        </div>
+                        <p className="text-sm text-orange-700 mb-3">{pendingUploads.length} files waiting for verification</p>
+                        <button
+                            onClick={() => setCurrentView('verify')}
+                            className="w-full px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 transition-colors"
+                        >
+                            Review & Verify
+                        </button>
                     </div>
-                    <p className="text-sm text-orange-700 mb-3">{pendingUploads.length} files waiting for verification</p>
-                    <button
-                        onClick={() => setCurrentView('verify')}
-                        className="w-full px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 transition-colors"
-                    >
-                        Review & Verify
-                    </button>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     )
 
     // Browse view - search and select individual images
@@ -1773,21 +1759,7 @@ const MediaSpecialEditor = ({
                                     Cancel
                                 </button>
                                 <button
-                                    onClick={async () => {
-                                        try {
-                                            setLoading(true)
-                                            // Remove image from collection via API
-                                            await mediaCollectionsApi.removeFiles(currentCollectionId, [showDeleteConfirm.id])()
-                                            // Refresh collection images
-                                            await loadCollectionImages(currentCollectionId)
-                                            setShowDeleteConfirm(null)
-                                        } catch (error) {
-                                            console.error('Failed to remove image from collection:', error)
-                                            showFloatingMessage('Failed to remove image from collection', 'error')
-                                        } finally {
-                                            setLoading(false)
-                                        }
-                                    }}
+                                    onClick={handleConfirmedRemoveFromCollection}
                                     className="flex-1 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
                                 >
                                     Remove Image
@@ -1921,10 +1893,8 @@ const MediaSpecialEditor = ({
                                             displayType: editingItem.config.displayType,
                                             imageStyle: editingItem.config.imageStyle
                                         }
-                                        if (onConfigChange) {
-                                            onConfigChange(updatedConfig)
-                                        }
                                         setEditingItem(null)
+                                        onConfigChange(updatedConfig)
                                     }}
                                     className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
                                 >
@@ -1990,10 +1960,8 @@ const MediaSpecialEditor = ({
                                             ...currentConfig,
                                             collectionConfig: editingItem.config
                                         }
-                                        if (onConfigChange) {
-                                            onConfigChange(updatedConfig)
-                                        }
                                         setEditingItem(null)
+                                        onConfigChange(updatedConfig)
                                     }}
                                     className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
                                 >
