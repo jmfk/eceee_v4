@@ -120,13 +120,17 @@ class ValueListViewSet(viewsets.ModelViewSet):
 
     queryset = ValueList.objects.all()
     permission_classes = [IsAuthenticated]
+    serializer_class = ValueListSerializer  # Set default serializer
 
     def get_serializer_class(self):
+        """Return appropriate serializer based on action."""
         if self.action == "create":
             return ValueListCreateSerializer
         elif self.action in ["update", "partial_update"]:
             return ValueListUpdateSerializer
-        return ValueListSerializer
+        elif self.action == "list":
+            return ValueListSerializer
+        return ValueListSerializer  # Default for other actions like retrieve
 
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
@@ -215,21 +219,8 @@ class ValueListViewSet(viewsets.ModelViewSet):
 def get_value_lists_for_field(request):
     """Get value lists that can be used for selection fields"""
     value_lists = ValueList.objects.filter(is_active=True).order_by("name")
-
-    result = []
-    for value_list in value_lists:
-        result.append(
-            {
-                "id": value_list.id,
-                "name": value_list.name,
-                "slug": value_list.slug,
-                "value_type": value_list.value_type,
-                "item_count": value_list.item_count,
-                "items": value_list.get_items_list(),
-            }
-        )
-
-    return Response({"value_lists": result, "count": len(result)})
+    serializer = ValueListSerializer(value_lists, many=True)
+    return Response({"value_lists": serializer.data, "count": len(serializer.data)})
 
 
 class AIAgentTaskViewSet(viewsets.ModelViewSet):
