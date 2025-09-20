@@ -21,6 +21,9 @@ export { useDataSubscriptions } from './useDataSubscriptions';
 export { useDataLoader } from './useDataLoader';
 export { useWidgetSync } from './useWidgetSync';
 export { useAPIIntegration } from './useAPIIntegration';
+export { useAutoSave } from './useAutoSave';
+export { useValidation } from './useValidation';
+export { usePerformanceMonitor } from './usePerformanceMonitor';
 
 // Re-export types for convenience
 export type { UseWidgetOperationsResult } from './useWidgetOperations';
