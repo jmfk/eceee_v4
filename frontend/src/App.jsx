@@ -47,7 +47,11 @@ function App() {
       <NotificationProvider>
         <GlobalNotificationProvider>
           <AppStatusProvider>
-            <UnifiedDataProvider enableDevTools={process.env.NODE_ENV === 'development'}>
+            <UnifiedDataProvider
+              enableDevTools={process.env.NODE_ENV === 'development'}
+              enableAPIIntegration={true}
+              enableOptimisticUpdates={true}
+            >
               <AuthProvider>
                 <Router>
                   <Routes>

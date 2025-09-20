@@ -227,7 +227,7 @@ export class DataManager {
     /**
      * Process a single operation with rollback support
      */
-    private async processOperation(operation: Operation): Promise<void> {
+    protected async processOperation(operation: Operation): Promise<void> {
         const previousState = { ...this.state };
         
         try {
@@ -457,6 +457,653 @@ export class DataManager {
                             }
                         };
                     });
+                    break;
+
+                case OperationTypes.LOAD_PAGE_DATA:
+                    this.setState(state => {
+                        console.log('📥 Loading page data into UnifiedDataContext:', operation.payload);
+                        
+                        return {
+                            pages: {
+                                ...state.pages,
+                                [operation.payload.pageId]: operation.payload.pageData
+                            },
+                            widgets: {
+                                ...state.widgets,
+                                ...operation.payload.widgets
+                            },
+                            layouts: operation.payload.layouts ? {
+                                ...state.layouts,
+                                ...operation.payload.layouts
+                            } : state.layouts,
+                            versions: operation.payload.versions ? {
+                                ...state.versions,
+                                ...operation.payload.versions
+                            } : state.versions,
+                            metadata: {
+                                ...state.metadata,
+                                isLoading: false,
+                                lastUpdated: new Date().toISOString()
+                            }
+                        };
+                    });
+                    break;
+
+                case OperationTypes.LOAD_WIDGET_DATA:
+                    this.setState(state => ({
+                        widgets: {
+                            ...state.widgets,
+                            ...operation.payload.widgets
+                        },
+                        metadata: {
+                            ...state.metadata,
+                            lastUpdated: new Date().toISOString()
+                        }
+                    }));
+                    break;
+
+                case OperationTypes.LOAD_LAYOUT_DATA:
+                    this.setState(state => ({
+                        layouts: {
+                            ...state.layouts,
+                            [operation.payload.layoutId]: operation.payload.layoutData
+                        },
+                        metadata: {
+                            ...state.metadata,
+                            lastUpdated: new Date().toISOString()
+                        }
+                    }));
+                    break;
+
+                case OperationTypes.SYNC_FROM_API:
+                    this.setState(state => ({
+                        ...state,
+                        ...operation.payload.stateUpdates,
+                        metadata: {
+                            ...state.metadata,
+                            ...operation.payload.stateUpdates?.metadata,
+                            lastUpdated: new Date().toISOString()
+                        }
+                    }));
+                    break;
+
+                // Page operations
+                case OperationTypes.UPDATE_PAGE:
+                    this.setState(state => {
+                        const page = state.pages[operation.payload.pageId];
+                        if (!page) return state;
+
+                        return {
+                            pages: {
+                                ...state.pages,
+                                [operation.payload.pageId]: {
+                                    ...page,
+                                    ...operation.payload.updates,
+                                    updated_at: new Date().toISOString()
+                                }
+                            },
+                            metadata: {
+                                ...state.metadata,
+                                isDirty: true
+                            }
+                        };
+                    });
+                    break;
+
+                case OperationTypes.UPDATE_PAGE_METADATA:
+                    this.setState(state => {
+                        const page = state.pages[operation.payload.pageId || operation.payload.id];
+                        if (!page) return state;
+
+                        return {
+                            pages: {
+                                ...state.pages,
+                                [page.id]: {
+                                    ...page,
+                                    metadata: {
+                                        ...page.metadata,
+                                        ...operation.payload.metadata
+                                    },
+                                    updated_at: new Date().toISOString()
+                                }
+                            },
+                            metadata: {
+                                ...state.metadata,
+                                isDirty: true
+                            }
+                        };
+                    });
+                    break;
+
+                case OperationTypes.CREATE_PAGE:
+                    this.setState(state => {
+                        const newPage = {
+                            id: operation.payload.pageId,
+                            title: operation.payload.title || 'New Page',
+                            slug: operation.payload.slug || 'new-page',
+                            metadata: operation.payload.metadata || {},
+                            layout: operation.payload.layout || 'single_column',
+                            version: operation.payload.versionId || '',
+                            status: 'draft',
+                            created_at: new Date().toISOString(),
+                            updated_at: new Date().toISOString()
+                        };
+
+                        return {
+                            pages: {
+                                ...state.pages,
+                                [newPage.id]: newPage
+                            },
+                            metadata: {
+                                ...state.metadata,
+                                isDirty: true
+                            }
+                        };
+                    });
+                    break;
+
+                case OperationTypes.DELETE_PAGE:
+                    this.setState(state => {
+                        const { [operation.payload.pageId]: deletedPage, ...remainingPages } = state.pages;
+                        
+                        // Also remove associated widgets and versions
+                        const remainingWidgets = Object.fromEntries(
+                            Object.entries(state.widgets).filter(([_, widget]) => 
+                                widget.pageId !== operation.payload.pageId
+                            )
+                        );
+                        
+                        const remainingVersions = Object.fromEntries(
+                            Object.entries(state.versions).filter(([_, version]) => 
+                                version.page_id !== operation.payload.pageId
+                            )
+                        );
+
+                        return {
+                            pages: remainingPages,
+                            widgets: remainingWidgets,
+                            versions: remainingVersions,
+                            metadata: {
+                                ...state.metadata,
+                                isDirty: true
+                            }
+                        };
+                    });
+                    break;
+
+                case OperationTypes.PUBLISH_PAGE:
+                    this.setState(state => {
+                        const page = state.pages[operation.payload.pageId];
+                        if (!page) return state;
+
+                        return {
+                            pages: {
+                                ...state.pages,
+                                [operation.payload.pageId]: {
+                                    ...page,
+                                    status: 'published',
+                                    updated_at: new Date().toISOString()
+                                }
+                            },
+                            metadata: {
+                                ...state.metadata,
+                                isDirty: true
+                            }
+                        };
+                    });
+                    break;
+
+                case OperationTypes.UNPUBLISH_PAGE:
+                    this.setState(state => {
+                        const page = state.pages[operation.payload.pageId];
+                        if (!page) return state;
+
+                        return {
+                            pages: {
+                                ...state.pages,
+                                [operation.payload.pageId]: {
+                                    ...page,
+                                    status: 'draft',
+                                    updated_at: new Date().toISOString()
+                                }
+                            },
+                            metadata: {
+                                ...state.metadata,
+                                isDirty: true
+                            }
+                        };
+                    });
+                    break;
+
+                case OperationTypes.SCHEDULE_PAGE:
+                    this.setState(state => {
+                        const page = state.pages[operation.payload.pageId];
+                        if (!page) return state;
+
+                        return {
+                            pages: {
+                                ...state.pages,
+                                [operation.payload.pageId]: {
+                                    ...page,
+                                    status: 'scheduled',
+                                    metadata: {
+                                        ...page.metadata,
+                                        scheduledPublishAt: operation.payload.publishAt
+                                    },
+                                    updated_at: new Date().toISOString()
+                                }
+                            },
+                            metadata: {
+                                ...state.metadata,
+                                isDirty: true
+                            }
+                        };
+                    });
+                    break;
+
+                case OperationTypes.DUPLICATE_PAGE:
+                    this.setState(state => {
+                        const originalPage = state.pages[operation.payload.pageId];
+                        if (!originalPage) return state;
+
+                        const newPageId = operation.payload.newPageId || 
+                                        `page-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                        
+                        const duplicatedPage = {
+                            ...originalPage,
+                            id: newPageId,
+                            title: `${originalPage.title} (Copy)`,
+                            slug: operation.payload.newSlug || `${originalPage.slug}-copy`,
+                            status: 'draft',
+                            created_at: new Date().toISOString(),
+                            updated_at: new Date().toISOString()
+                        };
+
+                        // Duplicate associated widgets
+                        const duplicatedWidgets: Record<string, any> = {};
+                        Object.values(state.widgets).forEach(widget => {
+                            if (widget.pageId === operation.payload.pageId) {
+                                const newWidgetId = `widget-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                                duplicatedWidgets[newWidgetId] = {
+                                    ...widget,
+                                    id: newWidgetId,
+                                    pageId: newPageId,
+                                    created_at: new Date().toISOString(),
+                                    updated_at: new Date().toISOString()
+                                };
+                            }
+                        });
+
+                        return {
+                            pages: {
+                                ...state.pages,
+                                [newPageId]: duplicatedPage
+                            },
+                            widgets: {
+                                ...state.widgets,
+                                ...duplicatedWidgets
+                            },
+                            metadata: {
+                                ...state.metadata,
+                                isDirty: true
+                            }
+                        };
+                    });
+                    break;
+
+                // Layout operations
+                case OperationTypes.CREATE_LAYOUT:
+                    this.setState(state => {
+                        const newLayout = {
+                            id: operation.payload.layoutId,
+                            name: operation.payload.name || 'New Layout',
+                            slots: operation.payload.slots || [],
+                            theme: operation.payload.theme,
+                            metadata: operation.payload.metadata || {},
+                            created_at: new Date().toISOString(),
+                            updated_at: new Date().toISOString()
+                        };
+
+                        return {
+                            layouts: {
+                                ...state.layouts,
+                                [newLayout.id]: newLayout
+                            },
+                            metadata: {
+                                ...state.metadata,
+                                isDirty: true
+                            }
+                        };
+                    });
+                    break;
+
+                case OperationTypes.UPDATE_LAYOUT:
+                    this.setState(state => {
+                        const layout = state.layouts[operation.payload.layoutId];
+                        if (!layout) return state;
+
+                        return {
+                            layouts: {
+                                ...state.layouts,
+                                [operation.payload.layoutId]: {
+                                    ...layout,
+                                    ...operation.payload.updates,
+                                    updated_at: new Date().toISOString()
+                                }
+                            },
+                            metadata: {
+                                ...state.metadata,
+                                isDirty: true
+                            }
+                        };
+                    });
+                    break;
+
+                case OperationTypes.UPDATE_LAYOUT_THEME:
+                    this.setState(state => {
+                        const layout = state.layouts[operation.payload.layoutId];
+                        if (!layout) return state;
+
+                        return {
+                            layouts: {
+                                ...state.layouts,
+                                [operation.payload.layoutId]: {
+                                    ...layout,
+                                    theme: operation.payload.theme,
+                                    updated_at: new Date().toISOString()
+                                }
+                            },
+                            metadata: {
+                                ...state.metadata,
+                                isDirty: true
+                            }
+                        };
+                    });
+                    break;
+
+                case OperationTypes.ADD_LAYOUT_SLOT:
+                    this.setState(state => {
+                        const layout = state.layouts[operation.payload.layoutId];
+                        if (!layout) return state;
+
+                        const newSlot = {
+                            id: operation.payload.slot.id || `slot-${Date.now()}`,
+                            name: operation.payload.slot.name || 'New Slot',
+                            allowedWidgets: operation.payload.slot.allowedWidgets || [],
+                            metadata: operation.payload.slot.metadata || {}
+                        };
+
+                        return {
+                            layouts: {
+                                ...state.layouts,
+                                [operation.payload.layoutId]: {
+                                    ...layout,
+                                    slots: [...layout.slots, newSlot],
+                                    updated_at: new Date().toISOString()
+                                }
+                            },
+                            metadata: {
+                                ...state.metadata,
+                                isDirty: true
+                            }
+                        };
+                    });
+                    break;
+
+                case OperationTypes.REMOVE_LAYOUT_SLOT:
+                    this.setState(state => {
+                        const layout = state.layouts[operation.payload.layoutId];
+                        if (!layout) return state;
+
+                        return {
+                            layouts: {
+                                ...state.layouts,
+                                [operation.payload.layoutId]: {
+                                    ...layout,
+                                    slots: layout.slots.filter(slot => slot.id !== operation.payload.slotId),
+                                    updated_at: new Date().toISOString()
+                                }
+                            },
+                            metadata: {
+                                ...state.metadata,
+                                isDirty: true
+                            }
+                        };
+                    });
+                    break;
+
+                case OperationTypes.UPDATE_LAYOUT_SLOT:
+                    this.setState(state => {
+                        const layout = state.layouts[operation.payload.layoutId];
+                        if (!layout) return state;
+
+                        return {
+                            layouts: {
+                                ...state.layouts,
+                                [operation.payload.layoutId]: {
+                                    ...layout,
+                                    slots: layout.slots.map(slot =>
+                                        slot.id === operation.payload.slotId
+                                            ? { ...slot, ...operation.payload.updates }
+                                            : slot
+                                    ),
+                                    updated_at: new Date().toISOString()
+                                }
+                            },
+                            metadata: {
+                                ...state.metadata,
+                                isDirty: true
+                            }
+                        };
+                    });
+                    break;
+
+                case OperationTypes.REORDER_LAYOUT_SLOTS:
+                    this.setState(state => {
+                        const layout = state.layouts[operation.payload.layoutId];
+                        if (!layout) return state;
+
+                        const reorderedSlots = operation.payload.slotIds.map(slotId =>
+                            layout.slots.find(slot => slot.id === slotId)
+                        ).filter(Boolean);
+
+                        return {
+                            layouts: {
+                                ...state.layouts,
+                                [operation.payload.layoutId]: {
+                                    ...layout,
+                                    slots: reorderedSlots,
+                                    updated_at: new Date().toISOString()
+                                }
+                            },
+                            metadata: {
+                                ...state.metadata,
+                                isDirty: true
+                            }
+                        };
+                    });
+                    break;
+
+                case OperationTypes.DUPLICATE_LAYOUT:
+                    this.setState(state => {
+                        const originalLayout = state.layouts[operation.payload.layoutId];
+                        if (!originalLayout) return state;
+
+                        const newLayoutId = operation.payload.newLayoutId || 
+                                          `layout-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+                        const duplicatedLayout = {
+                            ...originalLayout,
+                            id: newLayoutId,
+                            name: operation.payload.newName || `${originalLayout.name} (Copy)`,
+                            created_at: new Date().toISOString(),
+                            updated_at: new Date().toISOString()
+                        };
+
+                        return {
+                            layouts: {
+                                ...state.layouts,
+                                [newLayoutId]: duplicatedLayout
+                            },
+                            metadata: {
+                                ...state.metadata,
+                                isDirty: true
+                            }
+                        };
+                    });
+                    break;
+
+                case OperationTypes.DELETE_LAYOUT:
+                    this.setState(state => {
+                        const { [operation.payload.layoutId]: deletedLayout, ...remainingLayouts } = state.layouts;
+
+                        return {
+                            layouts: remainingLayouts,
+                            metadata: {
+                                ...state.metadata,
+                                isDirty: true
+                            }
+                        };
+                    });
+                    break;
+
+                // Version operations
+                case OperationTypes.CREATE_VERSION:
+                    this.setState(state => {
+                        const pageId = operation.payload.pageId;
+                        const page = state.pages[pageId];
+                        if (!page) return state;
+
+                        const newVersionId = operation.payload.versionId || 
+                                           `version-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+                        // Get current page widgets for this version
+                        const pageWidgets = Object.fromEntries(
+                            Object.entries(state.widgets).filter(([_, widget]) => widget.pageId === pageId)
+                        );
+
+                        const newVersion = {
+                            id: newVersionId,
+                            page_id: pageId,
+                            number: (Object.values(state.versions).filter(v => v.page_id === pageId).length + 1),
+                            data: {
+                                layout: page.layout,
+                                widgets: pageWidgets,
+                                metadata: page.metadata
+                            },
+                            created_at: new Date().toISOString(),
+                            created_by: operation.payload.createdBy || 'system',
+                            status: 'draft'
+                        };
+
+                        return {
+                            versions: {
+                                ...state.versions,
+                                [newVersionId]: newVersion
+                            },
+                            pages: {
+                                ...state.pages,
+                                [pageId]: {
+                                    ...page,
+                                    version: newVersionId,
+                                    updated_at: new Date().toISOString()
+                                }
+                            },
+                            metadata: {
+                                ...state.metadata,
+                                isDirty: true
+                            }
+                        };
+                    });
+                    break;
+
+                case OperationTypes.PUBLISH_VERSION:
+                    this.setState(state => {
+                        const version = state.versions[operation.payload.versionId];
+                        if (!version) return state;
+
+                        // Unpublish other versions of the same page
+                        const updatedVersions = Object.fromEntries(
+                            Object.entries(state.versions).map(([id, v]) => [
+                                id,
+                                v.page_id === version.page_id && v.id !== version.id
+                                    ? { ...v, status: 'draft' as const }
+                                    : v
+                            ])
+                        );
+
+                        // Publish this version
+                        updatedVersions[version.id] = {
+                            ...version,
+                            status: 'published' as const
+                        };
+
+                        return {
+                            versions: updatedVersions,
+                            metadata: {
+                                ...state.metadata,
+                                isDirty: true
+                            }
+                        };
+                    });
+                    break;
+
+                case OperationTypes.REVERT_VERSION:
+                    this.setState(state => {
+                        const version = state.versions[operation.payload.versionId];
+                        const pageId = operation.payload.pageId;
+                        if (!version || !pageId) return state;
+
+                        // Update page to use this version's data
+                        const page = state.pages[pageId];
+                        if (!page) return state;
+
+                        // Replace current widgets with version's widgets
+                        const versionWidgets = version.data.widgets || {};
+                        const otherWidgets = Object.fromEntries(
+                            Object.entries(state.widgets).filter(([_, widget]) => widget.pageId !== pageId)
+                        );
+
+                        return {
+                            pages: {
+                                ...state.pages,
+                                [pageId]: {
+                                    ...page,
+                                    layout: version.data.layout,
+                                    metadata: version.data.metadata,
+                                    version: version.id,
+                                    updated_at: new Date().toISOString()
+                                }
+                            },
+                            widgets: {
+                                ...otherWidgets,
+                                ...versionWidgets
+                            },
+                            metadata: {
+                                ...state.metadata,
+                                isDirty: true
+                            }
+                        };
+                    });
+                    break;
+
+                case OperationTypes.DELETE_VERSION:
+                    this.setState(state => {
+                        const { [operation.payload.versionId]: deletedVersion, ...remainingVersions } = state.versions;
+
+                        return {
+                            versions: remainingVersions,
+                            metadata: {
+                                ...state.metadata,
+                                isDirty: true
+                            }
+                        };
+                    });
+                    break;
+
+                case OperationTypes.COMPARE_VERSIONS:
+                    // This operation doesn't modify state, just returns comparison data
+                    // The comparison logic would be handled in the hook
                     break;
             }
 

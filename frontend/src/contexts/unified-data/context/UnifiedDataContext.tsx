@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useRef, useMemo, useCallback, useEffect } from 'react';
 import { DataManager } from '../core/DataManager';
+import { APIDataManager } from '../core/APIDataManager';
 import { UnifiedDataContextValue, UnifiedDataProviderProps, UseUnifiedDataResult } from '../types/context';
 import { Operation } from '../types/operations';
 import { StateSelector } from '../types/state';
@@ -15,12 +16,21 @@ export function UnifiedDataProvider({
     children,
     initialState,
     enableDevTools = false,
+    enableAPIIntegration = true,
+    enableOptimisticUpdates = true,
     onError
 }: UnifiedDataProviderProps) {
-    // Create DataManager instance
+    // Create DataManager instance (API-enabled or basic)
     const managerRef = useRef<DataManager | null>(null);
     if (!managerRef.current) {
-        managerRef.current = new DataManager(initialState);
+        if (enableAPIIntegration) {
+            managerRef.current = new APIDataManager(initialState, {
+                enableAPIIntegration,
+                enableOptimisticUpdates
+            }) as DataManager;
+        } else {
+            managerRef.current = new DataManager(initialState);
+        }
     }
     const manager = managerRef.current;
 

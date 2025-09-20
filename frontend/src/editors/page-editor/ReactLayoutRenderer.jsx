@@ -9,7 +9,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo, forwardRef, u
 import { Layout } from 'lucide-react';
 import { getLayoutComponent, getLayoutMetadata, layoutExists, LAYOUT_REGISTRY } from './layouts/LayoutRegistry';
 // Removed PageEditorEventSystem - now using unified data operations
-import { useUnifiedData } from '../../contexts/unified-data';
+import { useUnifiedData, useWidgetSync } from '../../contexts/unified-data';
 import { createDefaultWidgetConfig } from '../../hooks/useWidgets';
 import PageWidgetSelectionModal from './PageWidgetSelectionModal';
 
@@ -26,8 +26,13 @@ const ReactLayoutRenderer = forwardRef(({
     onOpenWidgetEditor
 }, ref) => {
 
-    // Use unified data operations for isDirty tracking
+    // Use unified data operations for isDirty tracking and widget sync
     const { dispatch } = useUnifiedData();
+    const widgetSync = useWidgetSync(
+        currentVersion?.page_id?.toString() ||
+        pageVersionData?.pageId?.toString() ||
+        ''
+    );
 
     // Get version context
     const versionId = currentVersion?.id || pageVersionData?.versionId;
@@ -93,17 +98,24 @@ const ReactLayoutRenderer = forwardRef(({
                     onDirtyChange(true, `added widget to ${slotName}`);
                 }
 
-                // Also dispatch to UnifiedDataContext for isDirty tracking
+                // Sync to UnifiedDataContext using proper ADD_WIDGET operation
                 try {
+                    const pageId = currentVersion?.page_id?.toString() ||
+                        pageVersionData?.pageId?.toString() || '';
+
                     await dispatch({
-                        type: 'UPDATE_WIDGET_CONFIG',
+                        type: 'ADD_WIDGET',
                         payload: {
-                            id: newWidgetId,
-                            config: widgetConfig
+                            pageId: pageId,
+                            slotId: slotName,
+                            widgetType: widgetType,
+                            config: widgetConfig,
+                            widgetId: newWidgetId
                         }
                     });
+                    console.log('✅ Widget added to UnifiedDataContext');
                 } catch (error) {
-                    console.error('Failed to sync widget to UnifiedDataContext:', error);
+                    console.error('❌ Failed to sync widget add to UnifiedDataContext:', error);
                 }
                 break;
 
@@ -140,17 +152,17 @@ const ReactLayoutRenderer = forwardRef(({
                     onWidgetChange(removedWidgets);
                 }
 
-                // Also dispatch to UnifiedDataContext for isDirty tracking
+                // Sync to UnifiedDataContext using proper REMOVE_WIDGET operation
                 try {
                     await dispatch({
-                        type: 'UPDATE_WIDGET_CONFIG',
+                        type: 'REMOVE_WIDGET',
                         payload: {
-                            id: widget.id,
-                            config: {} // Trigger isDirty
+                            id: widget.id
                         }
                     });
+                    console.log('✅ Widget removed from UnifiedDataContext');
                 } catch (error) {
-                    console.error('Failed to sync widget removal to UnifiedDataContext:', error);
+                    console.error('❌ Failed to sync widget removal to UnifiedDataContext:', error);
                 }
                 break;
 
@@ -185,17 +197,19 @@ const ReactLayoutRenderer = forwardRef(({
                             onWidgetChange(movedUpWidgets);
                         }
 
-                        // Also dispatch to UnifiedDataContext for isDirty tracking
+                        // Sync to UnifiedDataContext using proper MOVE_WIDGET operation
                         try {
                             await dispatch({
-                                type: 'UPDATE_WIDGET_CONFIG',
+                                type: 'MOVE_WIDGET',
                                 payload: {
                                     id: widget.id,
-                                    config: widget.config // Trigger isDirty
+                                    slot: slotName,
+                                    order: moveUpIndex - 1
                                 }
                             });
+                            console.log('✅ Widget move up synced to UnifiedDataContext');
                         } catch (error) {
-                            console.error('Failed to sync widget move to UnifiedDataContext:', error);
+                            console.error('❌ Failed to sync widget move to UnifiedDataContext:', error);
                         }
                     }
                 }
@@ -233,17 +247,19 @@ const ReactLayoutRenderer = forwardRef(({
                             onWidgetChange(movedDownWidgets);
                         }
 
-                        // Also dispatch to UnifiedDataContext for isDirty tracking
+                        // Sync to UnifiedDataContext using proper MOVE_WIDGET operation
                         try {
                             await dispatch({
-                                type: 'UPDATE_WIDGET_CONFIG',
+                                type: 'MOVE_WIDGET',
                                 payload: {
                                     id: widget.id,
-                                    config: widget.config // Trigger isDirty
+                                    slot: slotName,
+                                    order: moveDownIndex + 1
                                 }
                             });
+                            console.log('✅ Widget move down synced to UnifiedDataContext');
                         } catch (error) {
-                            console.error('Failed to sync widget move to UnifiedDataContext:', error);
+                            console.error('❌ Failed to sync widget move to UnifiedDataContext:', error);
                         }
                     }
                 }
@@ -325,19 +341,19 @@ const ReactLayoutRenderer = forwardRef(({
             onWidgetChange(clearedSlotWidgets);
         }
 
-        // Also dispatch to UnifiedDataContext for isDirty tracking
+        // Sync to UnifiedDataContext using proper REMOVE_WIDGET operations
         try {
             for (const widget of clearedWidgets) {
                 await dispatch({
-                    type: 'UPDATE_WIDGET_CONFIG',
+                    type: 'REMOVE_WIDGET',
                     payload: {
-                        id: widget.id,
-                        config: {} // Trigger isDirty
+                        id: widget.id
                     }
                 });
             }
+            console.log(`✅ Slot ${slotName} cleared in UnifiedDataContext`);
         } catch (error) {
-            console.error('Failed to sync slot clear to UnifiedDataContext:', error);
+            console.error('❌ Failed to sync slot clear to UnifiedDataContext:', error);
         }
     }, [widgets, onWidgetChange, onDirtyChange, versionId, isPublished, dispatch]);
 

@@ -52,7 +52,7 @@ export function usePageOperations(pageId: string): UsePageOperationsResult {
         await dispatch({
             type: OperationTypes.UPDATE_PAGE_METADATA,
             payload: {
-                id: pageId,
+                pageId: pageId,
                 metadata: newMetadata
             }
         });
@@ -62,7 +62,7 @@ export function usePageOperations(pageId: string): UsePageOperationsResult {
         await dispatch({
             type: OperationTypes.UPDATE_PAGE,
             payload: {
-                id: pageId,
+                pageId: pageId,
                 updates
             }
         });
@@ -72,7 +72,7 @@ export function usePageOperations(pageId: string): UsePageOperationsResult {
         await dispatch({
             type: OperationTypes.PUBLISH_PAGE,
             payload: {
-                id: pageId
+                pageId: pageId
             }
         });
     }, [dispatch, pageId]);
@@ -81,7 +81,7 @@ export function usePageOperations(pageId: string): UsePageOperationsResult {
         await dispatch({
             type: OperationTypes.UNPUBLISH_PAGE,
             payload: {
-                id: pageId
+                pageId: pageId
             }
         });
     }, [dispatch, pageId]);
@@ -90,28 +90,32 @@ export function usePageOperations(pageId: string): UsePageOperationsResult {
         await dispatch({
             type: OperationTypes.SCHEDULE_PAGE,
             payload: {
-                id: pageId,
+                pageId: pageId,
                 publishAt
             }
         });
     }, [dispatch, pageId]);
 
     const duplicatePage = useCallback(async (newSlug?: string): Promise<string> => {
-        const result = await dispatch({
+        const newPageId = `page-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        
+        await dispatch({
             type: OperationTypes.DUPLICATE_PAGE,
             payload: {
-                id: pageId,
+                pageId: pageId,
+                newPageId: newPageId,
                 newSlug
             }
         });
-        return result.newPageId;
+        
+        return newPageId;
     }, [dispatch, pageId]);
 
     const deletePage = useCallback(async () => {
         await dispatch({
             type: OperationTypes.DELETE_PAGE,
             payload: {
-                id: pageId
+                pageId: pageId
             }
         });
     }, [dispatch, pageId]);

@@ -25,7 +25,7 @@ import { smartSave, analyzeChanges, determineSaveStrategy, generateChangeSummary
 import { WIDGET_ACTIONS } from '../utils/widgetConstants'
 import { useNotificationContext } from './NotificationManager'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
-import { useUnifiedData, usePageOperations } from '../contexts/unified-data'
+import { useUnifiedData, usePageOperations, useDataLoader, useWidgetSync } from '../contexts/unified-data'
 import ContentEditor from './ContentEditor'
 import PageContentEditor from '../editors/page-editor/PageContentEditor'
 import ErrorTodoSidebar from './ErrorTodoSidebar'
@@ -168,9 +168,11 @@ const PageEditor = () => {
         return path
     }
 
-    // Use unified data context for tracking unsaved changes
+    // Use unified data context for tracking unsaved changes and data loading
     const { hasUnsavedChanges, isDirty, setIsDirty } = useUnifiedData()
     const pageOperations = usePageOperations(pageId || '')
+    const dataLoader = useDataLoader()
+    const widgetSync = useWidgetSync(pageId || '')
 
     // Redirect to content tab if no tab is specified
     useEffect(() => {
@@ -323,6 +325,21 @@ const PageEditor = () => {
             setOriginalPageVersionData(processedVersionData) // Track original for smart saving
         }
     }, [pageVersion, isNewPage])
+
+    // Load data into UnifiedDataContext when page data is available
+    useEffect(() => {
+        if (webpage && pageVersion && layoutData && !isNewPage) {
+            console.log('🔄 PageEditor: Loading data into UnifiedDataContext');
+
+            dataLoader.loadPageData(webpage, pageVersion, layoutData)
+                .then(() => {
+                    console.log('✅ PageEditor: Data loaded into UnifiedDataContext successfully');
+                })
+                .catch(error => {
+                    console.error('❌ PageEditor: Failed to load data into UnifiedDataContext', error);
+                });
+        }
+    }, [webpage, pageVersion, layoutData, isNewPage, dataLoader])
 
     // Fetch layout data when page has a codeLayout, with fallback support
     useEffect(() => {
@@ -979,21 +996,41 @@ const PageEditor = () => {
     const { subscribeToOperations } = useUnifiedData()
 
     useEffect(() => {
-        // Handler for widget operations
+        // Handler for widget operations - sync UnifiedDataContext changes to PageEditor
         const handleWidgetOperation = (operation) => {
-            console.log("handleWidgetOperation", operation)
+            console.log("🔄 PageEditor: handleWidgetOperation", operation.type, operation.payload.id)
 
+            // If UnifiedDataContext is primary, sync changes to PageEditor's local state
+            if (widgetSync.isContextPrimary) {
+                console.log("📊 Syncing UnifiedDataContext changes to PageEditor local state");
+
+                // Get updated widgets from UnifiedDataContext
+                const updatedSlotWidgets = widgetSync.syncWidgetsFromContext();
+
+                // Update PageEditor's local state
+                setPageVersionData(prev => ({
+                    ...prev,
+                    widgets: updatedSlotWidgets
+                }));
+
+                // Update visual representation
+                if (contentEditorRef.current && contentEditorRef.current.layoutRenderer) {
+                    const renderer = contentEditorRef.current.layoutRenderer;
+                    // Force update to reflect UnifiedDataContext changes
+                    renderer.forceUpdate?.();
+                }
+
+                return;
+            }
+
+            // Legacy handling for when PageEditor is primary (backward compatibility)
             if (operation.type === 'UPDATE_WIDGET_CONFIG') {
-                // CRITICAL FIX: Config changes must update persistent data, not just mark as dirty
-                // This fixes the split-brain issue where config changes were only preview-only
                 const { id: widgetId, config } = operation.payload
 
-                // Update the persistent widget data in pageVersionData
                 setPageVersionData(prev => {
                     const widgets = prev?.widgets || {}
-
-                    // Find widget across all slots
                     const updatedWidgets = { ...widgets }
+
                     for (const [slotName, slotWidgets] of Object.entries(widgets)) {
                         const updatedSlotWidgets = slotWidgets.map(widget =>
                             widget.id === widgetId
@@ -1003,7 +1040,6 @@ const PageEditor = () => {
                         if (updatedSlotWidgets.some(w => w.id === widgetId)) {
                             updatedWidgets[slotName] = updatedSlotWidgets
 
-                            // Also update the visual representation for real-time preview
                             if (contentEditorRef.current && contentEditorRef.current.layoutRenderer) {
                                 const renderer = contentEditorRef.current.layoutRenderer
                                 const updatedWidget = updatedSlotWidgets.find(w => w.id === widgetId)
@@ -1014,25 +1050,8 @@ const PageEditor = () => {
                         }
                     }
 
-                    return {
-                        ...prev,
-                        widgets: updatedWidgets
-                    }
+                    return { ...prev, widgets: updatedWidgets }
                 })
-
-                // Mark page as dirty so user knows there are unsaved changes
-                setIsDirty(true)
-                return
-            }
-
-            // Handle other widget operations (move, add, remove)
-            if (['MOVE_WIDGET', 'ADD_WIDGET', 'REMOVE_WIDGET'].includes(operation.type)) {
-                // For structural changes, trigger full re-render
-                if (contentEditorRef.current && contentEditorRef.current.layoutRenderer) {
-                    const renderer = contentEditorRef.current.layoutRenderer
-                    // The renderer will handle the operation through its own state management
-                    renderer.forceUpdate?.()
-                }
             }
         }
 
@@ -1046,7 +1065,7 @@ const PageEditor = () => {
         return () => {
             unsubscribeOperations()
         }
-    }, [subscribeToOperations, addNotification])
+    }, [subscribeToOperations, addNotification, widgetSync])
 
     // Tab navigation (main tabs)
     const tabs = [

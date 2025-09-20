@@ -46,23 +46,27 @@ export function useVersionOperations(pageId: string): UseVersionOperationsResult
 
     // Operations
     const createVersion = useCallback(async (data?: any): Promise<string> => {
-        const result = await dispatch({
+        const newVersionId = `version-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        
+        await dispatch({
             type: OperationTypes.CREATE_VERSION,
             payload: {
-                pageId,
-                data
+                pageId: pageId,
+                versionId: newVersionId,
+                data: data,
+                createdBy: 'user'
             }
         });
-        return result.versionId;
+        
+        return newVersionId;
     }, [dispatch, pageId]);
 
     const publishVersion = useCallback(async (versionId: string) => {
         await dispatch({
             type: OperationTypes.PUBLISH_VERSION,
             payload: {
-                pageId,
-                versionId,
-                action: 'publish'
+                pageId: pageId,
+                versionId: versionId
             }
         });
     }, [dispatch, pageId]);
@@ -81,23 +85,58 @@ export function useVersionOperations(pageId: string): UseVersionOperationsResult
         await dispatch({
             type: OperationTypes.DELETE_VERSION,
             payload: {
-                pageId,
-                versionId
+                versionId: versionId
             }
         });
-    }, [dispatch, pageId]);
+    }, [dispatch]);
 
     const compareVersions = useCallback(async (versionId1: string, versionId2: string) => {
-        const result = await dispatch({
+        // Get versions from state
+        const version1 = versions.find(v => v.id === versionId1);
+        const version2 = versions.find(v => v.id === versionId2);
+        
+        if (!version1 || !version2) {
+            throw new Error('One or both versions not found');
+        }
+
+        // Compare version data
+        const comparison = {
+            version1: {
+                id: version1.id,
+                number: version1.number,
+                created_at: version1.created_at,
+                status: version1.status
+            },
+            version2: {
+                id: version2.id,
+                number: version2.number,
+                created_at: version2.created_at,
+                status: version2.status
+            },
+            differences: {
+                layout: version1.data.layout !== version2.data.layout,
+                metadata: JSON.stringify(version1.data.metadata) !== JSON.stringify(version2.data.metadata),
+                widgets: JSON.stringify(version1.data.widgets) !== JSON.stringify(version2.data.widgets),
+                widgetCount: {
+                    version1: Object.keys(version1.data.widgets || {}).length,
+                    version2: Object.keys(version2.data.widgets || {}).length
+                }
+            }
+        };
+
+        // Dispatch for logging/tracking purposes
+        await dispatch({
             type: OperationTypes.COMPARE_VERSIONS,
             payload: {
                 pageId,
                 versionId1,
-                versionId2
+                versionId2,
+                comparison
             }
         });
-        return result.comparison;
-    }, [dispatch, pageId]);
+
+        return comparison;
+    }, [versions, dispatch, pageId]);
 
     // Utilities
     const getVersion = useCallback((versionId: string): VersionData | null => {

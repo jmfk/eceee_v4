@@ -38,7 +38,7 @@ export function useLayoutOperations(layoutId: string): UseLayoutOperationsResult
         await dispatch({
             type: OperationTypes.UPDATE_LAYOUT,
             payload: {
-                id: layoutId,
+                layoutId: layoutId,
                 updates
             }
         });
@@ -48,7 +48,7 @@ export function useLayoutOperations(layoutId: string): UseLayoutOperationsResult
         await dispatch({
             type: OperationTypes.UPDATE_LAYOUT_THEME,
             payload: {
-                id: layoutId,
+                layoutId: layoutId,
                 theme: newTheme
             }
         });
@@ -96,21 +96,25 @@ export function useLayoutOperations(layoutId: string): UseLayoutOperationsResult
     }, [dispatch, layoutId]);
 
     const duplicateLayout = useCallback(async (newName?: string): Promise<string> => {
-        const result = await dispatch({
+        const newLayoutId = `layout-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        
+        await dispatch({
             type: OperationTypes.DUPLICATE_LAYOUT,
             payload: {
-                id: layoutId,
+                layoutId: layoutId,
+                newLayoutId: newLayoutId,
                 newName
             }
         });
-        return result.newLayoutId;
+        
+        return newLayoutId;
     }, [dispatch, layoutId]);
 
     const deleteLayout = useCallback(async () => {
         await dispatch({
             type: OperationTypes.DELETE_LAYOUT,
             payload: {
-                id: layoutId
+                layoutId: layoutId
             }
         });
     }, [dispatch, layoutId]);

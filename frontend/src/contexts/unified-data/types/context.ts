@@ -50,6 +50,8 @@ export interface UnifiedDataProviderProps {
     children: React.ReactNode;
     initialState?: Partial<AppState>;
     enableDevTools?: boolean;
+    enableAPIIntegration?: boolean;
+    enableOptimisticUpdates?: boolean;
     onError?: (error: Error) => void;
 }
 

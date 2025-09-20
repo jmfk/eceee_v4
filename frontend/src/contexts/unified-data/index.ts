@@ -24,6 +24,7 @@ export type { UnifiedDataContextValue, UnifiedDataProviderProps } from './types/
 
 // Utility functions
 export { defaultEqualityFn, shallowEqual, deepEqual } from './utils/equality';
+export * from './utils/dataLoaders';
 
 // Error types and utilities
 export { OperationError, ValidationError, StateError, ErrorCodes } from './utils/errors';
