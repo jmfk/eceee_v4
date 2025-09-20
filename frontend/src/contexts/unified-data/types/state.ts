@@ -89,6 +89,7 @@ export interface AppState {
   widgets: Record<string, WidgetData>;
   layouts: Record<string, LayoutData>;
   versions: Record<string, VersionData>;
+  // Note: Metadata state is now managed in UnifiedDataContext
 }
 
 /**

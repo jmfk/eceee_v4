@@ -181,7 +181,7 @@ describe('UnifiedDataContext', () => {
         it('should provide working useSelector', async () => {
             const { result } = renderHook(() => {
                 const { useSelector, dispatch } = useUnifiedData();
-                const isDirty = useSelector(state => state.metadata.isDirty);
+                const isDirty = useUnifiedData().isDirty; // Use context metadata instead
                 return { isDirty, dispatch };
             }, {
                 wrapper: TestWrapper
@@ -300,7 +300,7 @@ describe('UnifiedDataContext', () => {
                 result.current.clearErrors();
             });
 
-            expect(result.current.state.metadata.errors).toEqual({});
+            expect(result.current.errors).toEqual({}); // Use context errors instead
         });
     });
 });

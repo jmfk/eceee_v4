@@ -110,7 +110,7 @@ export class DataManager {
             : { ...prevState, ...update };
 
         this.state = newState;
-        
+                
         // Clear selector cache
         this.selectorCache.clear();
         
@@ -168,19 +168,19 @@ export class DataManager {
             // Payload validation based on operation type
             switch (operation.type) {
                 case OperationTypes.UPDATE_WIDGET_CONFIG:
-                    if (!operation.payload?.id || !operation.payload?.config) {
+                    if (!operationWithValidation.payload?.id || !operationWithValidation.payload?.config) {
                         throw new ValidationError(operation,
                             'Widget ID and config are required',
-                            { payload: operation.payload }
+                            { payload: operationWithValidation.payload }
                         );
                     }
                     break;
                 
                 case OperationTypes.MOVE_WIDGET:
-                    if (!operation.payload?.id || !operation.payload?.slot) {
+                    if (!operationWithValidation.payload?.id || !operationWithValidation.payload?.slot) {
                         throw new ValidationError(operation,
                             'Widget ID and slot are required',
-                            { payload: operation.payload }
+                            { payload: operationWithValidation.payload }
                         );
                     }
                     break;
@@ -215,12 +215,19 @@ export class DataManager {
      */
     protected async processOperation(operation: Operation): Promise<void> {
         const previousState = { ...this.state };
+        const updatedOperation: Operation = {
+            ...operation,
+            metadata: {
+                ...operation.metadata,
+                timestamp: Date.now()
+            }
+        };
         
         try {
-            const validation = this.validateOperation(operation);
+            const validation = this.validateOperation(updatedOperation);
             if (!validation.isValid && validation.errors && validation.errors.length > 0) {
                 throw new ValidationError(
-                    operation,
+                    updatedOperation,
                     `Invalid operation: ${validation.errors[0].message}`,
                     validation.errors
                 );
@@ -228,10 +235,9 @@ export class DataManager {
 
             // Add validation result to operation metadata
             const operationWithValidation: Operation = {
-                ...operation,
+                ...updatedOperation,
                 metadata: {
-                    ...operation.metadata,
-                    timestamp: Date.now(),
+                    ...updatedOperation.metadata,
                     validation
                 }
             };
@@ -268,7 +274,6 @@ export class DataManager {
                     const { id, slot, order } = operationWithValidation.payload;
                     this.setState(state => {
                         const widget = state.widgets[id];
-                        
                         if (!widget) {
                             return state;
                         }
@@ -321,7 +326,6 @@ export class DataManager {
                         };
                     });
                     break;
-                }
 
                 case OperationTypes.BATCH:
                     if (Array.isArray(operationWithValidation.payload)) {
@@ -332,6 +336,9 @@ export class DataManager {
                     break;
 
                 case OperationTypes.SET_DIRTY:
+                    // No-op: isDirty is now handled in UnifiedDataContext
+                    break;
+
                 case OperationTypes.RESET_STATE:
                 case OperationTypes.CLEAR_ERRORS:
                 case OperationTypes.MARK_WIDGET_SAVED:
@@ -340,6 +347,7 @@ export class DataManager {
 
                 case OperationTypes.LOAD_PAGE_DATA:
                     this.setState(state => {
+                        console.log('📥 Loading page data into UnifiedDataContext:', operationWithValidation.payload);
                         
                         return {
                             pages: {
@@ -357,7 +365,8 @@ export class DataManager {
                             versions: operationWithValidation.payload.versions ? {
                                 ...state.versions,
                                 ...operationWithValidation.payload.versions
-                            } : state.versions
+                            } : state.versions,
+                            // No metadata updates needed
                         };
                     });
                     break;
@@ -436,7 +445,7 @@ export class DataManager {
                             metadata: operationWithValidation.payload.metadata || {},
                             layout: operationWithValidation.payload.layout || 'single_column',
                             version: operationWithValidation.payload.versionId || '',
-                            status: 'draft' as const,
+                            status: 'draft',
                             created_at: new Date().toISOString(),
                             updated_at: new Date().toISOString()
                         };
@@ -470,7 +479,10 @@ export class DataManager {
                         return {
                             pages: remainingPages,
                             widgets: remainingWidgets,
-                            versions: remainingVersions
+                            versions: remainingVersions,
+                            // No metadata updates needed
+                                isDirty: true
+                            }
                         };
                     });
                     break;
@@ -485,7 +497,7 @@ export class DataManager {
                                 ...state.pages,
                                 [operationWithValidation.payload.pageId]: {
                                     ...page,
-                                    status: 'published' as const,
+                                    status: 'published',
                                     updated_at: new Date().toISOString()
                                 }
                             }
@@ -503,7 +515,7 @@ export class DataManager {
                                 ...state.pages,
                                 [operationWithValidation.payload.pageId]: {
                                     ...page,
-                                    status: 'draft' as const,
+                                    status: 'draft',
                                     updated_at: new Date().toISOString()
                                 }
                             }
@@ -521,7 +533,7 @@ export class DataManager {
                                 ...state.pages,
                                 [operationWithValidation.payload.pageId]: {
                                     ...page,
-                                    status: 'scheduled' as const,
+                                    status: 'scheduled',
                                     metadata: {
                                         ...page.metadata,
                                         scheduledPublishAt: operationWithValidation.payload.publishAt
@@ -546,7 +558,7 @@ export class DataManager {
                             id: newPageId,
                             title: `${originalPage.title} (Copy)`,
                             slug: operationWithValidation.payload.newSlug || `${originalPage.slug}-copy`,
-                            status: 'draft' as const,
+                            status: 'draft',
                             created_at: new Date().toISOString(),
                             updated_at: new Date().toISOString()
                         };
@@ -707,7 +719,7 @@ export class DataManager {
                         const layout = state.layouts[operationWithValidation.payload.layoutId];
                         if (!layout) return state;
 
-                        const reorderedSlots = operationWithValidation.payload.slotIds.map((slotId: string) =>
+                        const reorderedSlots = operationWithValidation.payload.slotIds.map(slotId =>
                             layout.slots.find(slot => slot.id === slotId)
                         ).filter(Boolean);
 
@@ -754,7 +766,10 @@ export class DataManager {
                         const { [operationWithValidation.payload.layoutId]: deletedLayout, ...remainingLayouts } = state.layouts;
 
                         return {
-                            layouts: remainingLayouts
+                            layouts: remainingLayouts,
+                            // No metadata updates needed
+                                isDirty: true
+                            }
                         };
                     });
                     break;
@@ -785,7 +800,7 @@ export class DataManager {
                             },
                             created_at: new Date().toISOString(),
                             created_by: operationWithValidation.payload.createdBy || 'system',
-                            status: 'draft' as const
+                            status: 'draft'
                         };
 
                         return {
@@ -827,7 +842,10 @@ export class DataManager {
                         };
 
                         return {
-                            versions: updatedVersions
+                            versions: updatedVersions,
+                            // No metadata updates needed
+                                isDirty: true
+                            }
                         };
                     });
                     break;
@@ -872,7 +890,10 @@ export class DataManager {
                         const { [operationWithValidation.payload.versionId]: deletedVersion, ...remainingVersions } = state.versions;
 
                         return {
-                            versions: remainingVersions
+                            versions: remainingVersions,
+                            // No metadata updates needed
+                                isDirty: true
+                            }
                         };
                     });
                     break;
@@ -884,7 +905,7 @@ export class DataManager {
             }
 
             // Notify operation subscribers
-            this.subscriptionManager.notifyOperation(operationWithValidation);
+            this.subscriptionManager.notifyOperation(updatedOperation);
             
         } catch (error) {
             // Rollback on failure

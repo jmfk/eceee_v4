@@ -367,7 +367,7 @@ The context includes built-in error handling:
 function ErrorBoundary() {
   const { useSelector } = useUnifiedData();
   
-  const errors = useSelector(state => state.metadata.errors);
+  const { errors } = useUnifiedData(); // Use context metadata instead
   
   return errors && Object.keys(errors).length > 0 ? (
     <ErrorDisplay errors={errors} />

@@ -24,7 +24,7 @@ import SimpleFormDemo from '@components/demos/SimpleFormDemo'
 import { NotificationProvider } from '@components/NotificationManager'
 import { GlobalNotificationProvider } from './contexts/GlobalNotificationContext'
 import { AuthProvider } from './contexts/AuthContext'
-import { UnifiedDataProvider, DevToolsTrigger } from './contexts/unified-data'
+import { UnifiedDataProvider } from './contexts/unified-data'
 import { AppStatusProvider } from './contexts/AppStatusContext'
 import PrivateRoute from './components/PrivateRoute'
 import LoginPage from './pages/LoginPage'
@@ -48,7 +48,7 @@ function App() {
         <GlobalNotificationProvider>
           <AppStatusProvider>
             <UnifiedDataProvider
-              enableDevTools={process.env.NODE_ENV === 'development'}
+              enableDevTools={false}
               enableAPIIntegration={true}
               enableOptimisticUpdates={true}
             >
@@ -449,8 +449,6 @@ function App() {
                   </Toaster>
                 </Router>
               </AuthProvider>
-              {/* DevTools trigger (development only) */}
-              <DevToolsTrigger />
             </UnifiedDataProvider>
 
           </AppStatusProvider>

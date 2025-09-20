@@ -349,12 +349,10 @@ const PageEditor = () => {
 
         const loadData = async () => {
             if (webpage && pageVersion && layoutData && !isNewPage) {
-                console.log('🔄 PageEditor: Loading data into UnifiedDataContext');
 
                 try {
                     await dataLoader.loadPageData(webpage, pageVersion, layoutData);
                     if (isValid) {
-                        console.log('✅ PageEditor: Data loaded into UnifiedDataContext successfully');
                         // Set primary source after successful load
                         widgetSync.setContextAsPrimary(true);
                     }
@@ -630,7 +628,6 @@ const PageEditor = () => {
 
     // Handle page data updates - route to appropriate data structure
     const updatePageData = useCallback((updates) => {
-        console.log("updatePageData", updates)
         // Handle version changes from LayoutRenderer
         if (updates.versionChanged && updates.pageVersionData) {
             // This is a version switch from LayoutRenderer, use switchToVersion
@@ -1041,11 +1038,9 @@ const PageEditor = () => {
     useEffect(() => {
         // Handler for widget operations - sync UnifiedDataContext changes to PageEditor
         const handleWidgetOperation = (operation) => {
-            console.log("🔄 PageEditor: handleWidgetOperation", operation.type, operation.payload.id)
 
             // If UnifiedDataContext is primary, sync changes to PageEditor's local state
             if (widgetSync.isContextPrimary) {
-                console.log("📊 Syncing UnifiedDataContext changes to PageEditor local state");
 
                 // Get updated widgets from UnifiedDataContext
                 const updatedSlotWidgets = widgetSync.syncWidgetsFromContext();

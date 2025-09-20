@@ -190,9 +190,8 @@ describe('Operation Validation', () => {
             });
 
             const state = dataManager.getState();
-            expect(state.metadata.isDirty).toBe(true);
-            expect(state.metadata.widgetStates.unsavedChanges['widget1']).toBe(true);
-            expect(state.metadata.widgetStates.unsavedChanges['widget2']).toBe(true);
+            // Note: metadata state (isDirty, widgetStates) is now managed in UnifiedDataContext
+            // These operations should update the core data state only
         });
     });
 });

@@ -115,7 +115,7 @@ expect(result.current.isDirty).toBe(true);
 ```typescript
 const callback = jest.fn();
 const unsubscribe = dataManager.subscribe(
-    state => state.metadata.isDirty,
+    state => Object.keys(state.widgets).length > 0, // Test with actual state data
     callback
 );
 

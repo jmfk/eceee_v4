@@ -3,7 +3,7 @@ import { renderHook, act } from '@testing-library/react';
 import { UnifiedDataProvider } from '../context/UnifiedDataContext';
 import { useAutoSave } from '../hooks/useAutoSave';
 import { useValidation } from '../hooks/useValidation';
-import { usePerformanceMonitor } from '../hooks/usePerformanceMonitor';
+// usePerformanceMonitor removed with DevTools
 import { OperationTypes } from '../types/operations';
 
 const TestWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -268,9 +268,9 @@ describe('Auto-save and Validation Features', () => {
             const { result } = renderHook(() => {
                 const autoSave = useAutoSave({ interval: 5000 });
                 const validation = useValidation();
-                const performance = usePerformanceMonitor();
+                // performance monitoring removed with DevTools
 
-                return { autoSave, validation, performance };
+                return { autoSave, validation };
             }, {
                 wrapper: TestWrapper
             });

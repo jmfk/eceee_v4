@@ -34,7 +34,7 @@ describe('SubscriptionManager', () => {
     describe('State Subscriptions', () => {
         it('should subscribe to state changes', () => {
             const callback = jest.fn();
-            const selector = (state: AppState) => state.metadata.isDirty;
+            const selector = (state: AppState) => Object.keys(state.widgets).length > 0;
 
             const unsubscribe = subscriptionManager.subscribe(selector, callback);
 
@@ -48,7 +48,7 @@ describe('SubscriptionManager', () => {
 
         it('should not call callback when value unchanged', () => {
             const callback = jest.fn();
-            const selector = (state: AppState) => state.metadata.isDirty;
+            const selector = (state: AppState) => Object.keys(state.widgets).length > 0;
 
             subscriptionManager.subscribe(selector, callback);
 
@@ -63,7 +63,7 @@ describe('SubscriptionManager', () => {
 
         it('should call callback when value changes', () => {
             const callback = jest.fn();
-            const selector = (state: AppState) => state.metadata.isDirty;
+            const selector = (state: AppState) => Object.keys(state.widgets).length > 0;
 
             subscriptionManager.subscribe(selector, callback);
 
@@ -83,7 +83,7 @@ describe('SubscriptionManager', () => {
 
         it('should unsubscribe correctly', () => {
             const callback = jest.fn();
-            const selector = (state: AppState) => state.metadata.isDirty;
+            const selector = (state: AppState) => Object.keys(state.widgets).length > 0;
 
             const unsubscribe = subscriptionManager.subscribe(selector, callback);
             unsubscribe();
@@ -158,7 +158,7 @@ describe('SubscriptionManager', () => {
             const callback = jest.fn();
             
             const unsubscribe1 = subscriptionManager.subscribe(
-                state => state.metadata.isDirty,
+                state => Object.keys(state.widgets).length > 0,
                 callback
             );
             const unsubscribe2 = subscriptionManager.subscribeToOperations(callback);
@@ -178,7 +178,7 @@ describe('SubscriptionManager', () => {
         it('should clear all subscriptions', () => {
             const callback = jest.fn();
             
-            subscriptionManager.subscribe(state => state.metadata.isDirty, callback);
+            subscriptionManager.subscribe(state => Object.keys(state.widgets).length > 0, callback);
             subscriptionManager.subscribeToOperations(callback);
 
             subscriptionManager.clearAllSubscriptions();
@@ -196,7 +196,7 @@ describe('SubscriptionManager', () => {
             });
             const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
 
-            subscriptionManager.subscribe(state => state.metadata.isDirty, errorCallback);
+            subscriptionManager.subscribe(state => Object.keys(state.widgets).length > 0, errorCallback);
             subscriptionManager.notifyStateUpdate(mockState);
 
             expect(consoleErrorSpy).toHaveBeenCalledWith(

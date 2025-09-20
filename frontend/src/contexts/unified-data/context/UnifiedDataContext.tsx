@@ -15,7 +15,7 @@ const UnifiedDataContext = createContext<UnifiedDataContextValue | null>(null);
 export function UnifiedDataProvider({
     children,
     initialState,
-    enableDevTools = false,
+    // enableDevTools removed
     enableAPIIntegration = true,
     enableOptimisticUpdates = true,
     onError
@@ -45,18 +45,75 @@ export function UnifiedDataProvider({
         activeEditors: [] as string[]
     });
 
-    // Subscribe to widget changes to compute unsaved changes state
+    // Subscribe to operations to update metadata state
     useEffect(() => {
-        return manager.subscribe(
-            state => state.widgets,
-            () => {
-                // Check if any widgets have unsaved changes
-                const hasChanges = Object.values(widgetStates.unsavedChanges).some(Boolean);
-                setHasUnsavedChangesState(hasChanges);
-                setIsDirtyState(hasChanges);
+        return manager.subscribeToOperations((operation) => {
+            // Update metadata state based on operations
+            switch (operation.type) {
+                case 'UPDATE_WIDGET_CONFIG':
+                case 'MOVE_WIDGET':
+                case 'ADD_WIDGET':
+                    // Mark widget as dirty
+                    const widgetId = operation.payload.id || operation.payload.widgetId;
+                    if (widgetId) {
+                        setWidgetStates(prev => {
+                            const newUnsavedChanges = { ...prev.unsavedChanges, [widgetId]: true };
+                            const hasChanges = Object.values(newUnsavedChanges).some(Boolean);
+                            setHasUnsavedChangesState(hasChanges);
+                            setIsDirtyState(hasChanges);
+                            return {
+                                ...prev,
+                                unsavedChanges: newUnsavedChanges
+                            };
+                        });
+                    }
+                    break;
+                case 'REMOVE_WIDGET':
+                    // Remove widget from unsaved changes
+                    const removedWidgetId = operation.payload.id;
+                    if (removedWidgetId) {
+                        setWidgetStates(prev => {
+                            const { [removedWidgetId]: _, ...remainingChanges } = prev.unsavedChanges;
+                            const hasChanges = Object.values(remainingChanges).some(Boolean);
+                            setHasUnsavedChangesState(hasChanges);
+                            setIsDirtyState(hasChanges);
+                            return {
+                                ...prev,
+                                unsavedChanges: remainingChanges
+                            };
+                        });
+                    }
+                    break;
+                case 'SET_DIRTY':
+                    setIsDirtyState(operation.payload.isDirty);
+                    setHasUnsavedChangesState(operation.payload.isDirty);
+                    break;
+                case 'RESET_STATE':
+                    setWidgetStates(prev => ({
+                        ...prev,
+                        unsavedChanges: {}
+                    }));
+                    setIsDirtyState(false);
+                    setHasUnsavedChangesState(false);
+                    break;
+                case 'MARK_WIDGET_SAVED':
+                    const savedWidgetId = operation.payload.widgetId;
+                    if (savedWidgetId) {
+                        setWidgetStates(prev => {
+                            const { [savedWidgetId]: _, ...remainingChanges } = prev.unsavedChanges;
+                            const hasChanges = Object.values(remainingChanges).some(Boolean);
+                            setHasUnsavedChangesState(hasChanges);
+                            setIsDirtyState(hasChanges);
+                            return {
+                                ...prev,
+                                unsavedChanges: remainingChanges
+                            };
+                        });
+                    }
+                    break;
             }
-        );
-    }, [manager, widgetStates.unsavedChanges]);
+        });
+    }, [manager]);
 
     // Error handling
     const handleError = useCallback((error: Error) => {
@@ -143,6 +200,11 @@ export function UnifiedDataProvider({
             try {
                 await manager.dispatch(operation, options);
             } catch (error) {
+                // Update error state in context
+                setErrorsState(prev => ({
+                    ...prev,
+                    [operation.type]: error as Error
+                }));
                 handleError(error as Error);
                 throw error;
             }
@@ -188,22 +250,7 @@ export function UnifiedDataProvider({
         markWidgetDirty, markWidgetSaved, setWidgetError
     ]);
 
-    // Set up dev tools if enabled
-    useEffect(() => {
-        if (enableDevTools && typeof window !== 'undefined') {
-            (window as any).__UNIFIED_DATA__ = {
-                getState: manager.getState.bind(manager),
-                dispatch: manager.dispatch.bind(manager),
-                subscribe: manager.subscribe.bind(manager)
-            };
-        }
-
-        return () => {
-            if (enableDevTools && typeof window !== 'undefined') {
-                delete (window as any).__UNIFIED_DATA__;
-            }
-        };
-    }, [enableDevTools, manager]);
+    // DevTools integration removed to simplify the system
 
     // Cleanup on unmount
     useEffect(() => {

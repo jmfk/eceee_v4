@@ -33,12 +33,10 @@ export class APIDataManager extends DataManager {
         try {
             // Step 1: Optimistic update (update local state first)
             if (this.optimisticUpdates) {
-                console.log(`🔄 Optimistic update for ${operation.type}`);
                 await super.processOperation(operation);
             }
 
             // Step 2: Execute API operation
-            console.log(`📡 Executing API operation: ${operation.type}`);
             const apiResult = await executeAPIOperation(operation);
 
             if (!apiResult.success) {
@@ -60,7 +58,6 @@ export class APIDataManager extends DataManager {
                 this.mergeAPIResponse(operation, apiResult.data);
             }
 
-            console.log(`✅ API operation completed: ${operation.type}`);
 
         } catch (error) {
             console.error(`❌ API operation failed: ${operation.type}`, error);
@@ -68,7 +65,6 @@ export class APIDataManager extends DataManager {
             // Step 4: Handle API failure
             if (this.optimisticUpdates) {
                 // Rollback optimistic update
-                console.log(`🔄 Rolling back optimistic update for ${operation.type}`);
                 this.setState(() => previousState);
             }
 
@@ -79,17 +75,7 @@ export class APIDataManager extends DataManager {
                 console.error('API rollback failed:', rollbackError);
             }
 
-            // Update error state
-            this.setState(state => ({
-                metadata: {
-                    ...state.metadata,
-                    errors: {
-                        ...state.metadata.errors,
-                        [operation.type]: error
-                    }
-                }
-            }));
-
+            // Just throw the error, error state is handled in UnifiedDataContext
             throw error;
         }
     }
