@@ -3,9 +3,8 @@ import React, { createContext, useContext, useState, useCallback } from 'react'
 const AppStatusContext = createContext()
 
 export const AppStatusProvider = ({ children }) => {
-    // Global dirty state
-    const [isDirty, setIsDirty] = useState(false)
-    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+    // Note: isDirty and hasUnsavedChanges moved to UnifiedDataContext
+    // This context now focuses on error/warning handling
 
     // Global error tracking
     const [errors, setErrors] = useState([])
@@ -40,13 +39,7 @@ export const AppStatusProvider = ({ children }) => {
     }, [])
 
     const contextValue = {
-        // Dirty state
-        isDirty,
-        setIsDirty,
-        hasUnsavedChanges,
-        setHasUnsavedChanges,
-
-        // Error handling
+        // Error handling (isDirty/hasUnsavedChanges moved to UnifiedDataContext)
         errors,
         warnings,
         addError,

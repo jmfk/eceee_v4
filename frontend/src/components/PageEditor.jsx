@@ -25,8 +25,7 @@ import { smartSave, analyzeChanges, determineSaveStrategy, generateChangeSummary
 import { WIDGET_ACTIONS } from '../utils/widgetConstants'
 import { useNotificationContext } from './NotificationManager'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
-import { useWidgetEvents } from '../contexts/WidgetEventContext'
-import { WIDGET_EVENTS, WIDGET_CHANGE_TYPES } from '../types/widgetEvents'
+import { useUnifiedData, usePageOperations } from '../contexts/unified-data'
 import ContentEditor from './ContentEditor'
 import PageContentEditor from '../editors/page-editor/PageContentEditor'
 import ErrorTodoSidebar from './ErrorTodoSidebar'
@@ -169,8 +168,9 @@ const PageEditor = () => {
         return path
     }
 
-    // Use widget event context for tracking unsaved changes
-    const { widgetHasUnsavedChanges, setWidgetHasUnsavedChanges } = useWidgetEvents()
+    // Use unified data context for tracking unsaved changes
+    const { hasUnsavedChanges, isDirty, setIsDirty } = useUnifiedData()
+    const pageOperations = usePageOperations(pageId || '')
 
     // Redirect to content tab if no tab is specified
     useEffect(() => {
@@ -185,7 +185,7 @@ const PageEditor = () => {
     const [pageVersionData, setPageVersionData] = useState(null)
     const [originalWebpageData, setOriginalWebpageData] = useState(null) // Track original for smart saving
     const [originalPageVersionData, setOriginalPageVersionData] = useState(null) // Track original for smart saving
-    const [isDirty, setIsDirty] = useState(false)
+    // isDirty now comes from UnifiedDataContext
     const [layoutData, setLayoutData] = useState(null)
     const [isLoadingLayout, setIsLoadingLayout] = useState(false)
 
@@ -406,7 +406,7 @@ const PageEditor = () => {
     // Handle close with unsaved changes check
     const handleClose = async () => {
         // Check for widget unsaved changes first
-        if (widgetHasUnsavedChanges) {
+        if (hasUnsavedChanges) {
             const confirmed = await showConfirm({
                 title: 'Unsaved Widget Changes',
                 message: 'You have unsaved widget changes. What would you like to do?',
@@ -975,73 +975,78 @@ const PageEditor = () => {
         setIsDirty(isDirty);
     }, [])
 
-    // Subscribe to widget events using direct subscription
-    const { subscribe } = useWidgetEvents()
+    // Subscribe to widget operations using unified data context
+    const { subscribeToOperations } = useUnifiedData()
 
     useEffect(() => {
-        // Handler for widget changes
-        const handleWidgetChanged = (payload) => {
-            console.log("handleWidgetChanged", payload)
-            if (payload.changeType === WIDGET_CHANGE_TYPES.CONFIG) {
+        // Handler for widget operations
+        const handleWidgetOperation = (operation) => {
+            console.log("handleWidgetOperation", operation)
+
+            if (operation.type === 'UPDATE_WIDGET_CONFIG') {
                 // CRITICAL FIX: Config changes must update persistent data, not just mark as dirty
                 // This fixes the split-brain issue where config changes were only preview-only
+                const { id: widgetId, config } = operation.payload
 
                 // Update the persistent widget data in pageVersionData
                 setPageVersionData(prev => {
                     const widgets = prev?.widgets || {}
-                    const slotWidgets = widgets[payload.slotName] || []
 
-                    const updatedSlotWidgets = slotWidgets.map(widget =>
-                        widget.id === payload.widgetId ? payload.widget : widget
-                    )
+                    // Find widget across all slots
+                    const updatedWidgets = { ...widgets }
+                    for (const [slotName, slotWidgets] of Object.entries(widgets)) {
+                        const updatedSlotWidgets = slotWidgets.map(widget =>
+                            widget.id === widgetId
+                                ? { ...widget, config: { ...widget.config, ...config } }
+                                : widget
+                        )
+                        if (updatedSlotWidgets.some(w => w.id === widgetId)) {
+                            updatedWidgets[slotName] = updatedSlotWidgets
+
+                            // Also update the visual representation for real-time preview
+                            if (contentEditorRef.current && contentEditorRef.current.layoutRenderer) {
+                                const renderer = contentEditorRef.current.layoutRenderer
+                                const updatedWidget = updatedSlotWidgets.find(w => w.id === widgetId)
+                                renderer.executeWidgetDataCallback(WIDGET_ACTIONS.UPDATE, slotName, updatedWidget)
+                                renderer.updateSlot(slotName, renderer.getSlotWidgetData(slotName))
+                            }
+                            break
+                        }
+                    }
 
                     return {
                         ...prev,
-                        widgets: {
-                            ...widgets,
-                            [payload.slotName]: updatedSlotWidgets
-                        }
+                        widgets: updatedWidgets
                     }
                 })
-
-                // Also update the visual representation for real-time preview
-                if (contentEditorRef.current && contentEditorRef.current.layoutRenderer) {
-                    const renderer = contentEditorRef.current.layoutRenderer
-                    renderer.executeWidgetDataCallback(WIDGET_ACTIONS.UPDATE, payload.slotName, payload.widget)
-                    renderer.updateSlot(payload.slotName, renderer.getSlotWidgetData(payload.slotName))
-                }
 
                 // Mark page as dirty so user knows there are unsaved changes
                 setIsDirty(true)
                 return
             }
 
-            // For structural changes (position, add, remove), trigger full re-render
-            if (contentEditorRef.current && contentEditorRef.current.layoutRenderer) {
-                const renderer = contentEditorRef.current.layoutRenderer
-                renderer.executeWidgetDataCallback(WIDGET_ACTIONS.UPDATE, payload.slotName, payload.widget)
-                renderer.updateSlot(payload.slotName, renderer.getSlotWidgetData(payload.slotName))
+            // Handle other widget operations (move, add, remove)
+            if (['MOVE_WIDGET', 'ADD_WIDGET', 'REMOVE_WIDGET'].includes(operation.type)) {
+                // For structural changes, trigger full re-render
+                if (contentEditorRef.current && contentEditorRef.current.layoutRenderer) {
+                    const renderer = contentEditorRef.current.layoutRenderer
+                    // The renderer will handle the operation through its own state management
+                    renderer.forceUpdate?.()
+                }
             }
         }
 
-        // Handler for error events
-        const handleWidgetError = (payload) => {
-            addNotification({
-                type: 'error',
-                message: `Widget error: ${payload.error}`
-            })
-        }
-
-        // Subscribe to events
-        const unsubscribeChanged = subscribe(WIDGET_EVENTS.CHANGED, handleWidgetChanged)
-        const unsubscribeError = subscribe(WIDGET_EVENTS.ERROR, handleWidgetError)
+        // Subscribe to widget operations
+        const unsubscribeOperations = subscribeToOperations(
+            handleWidgetOperation,
+            ['UPDATE_WIDGET_CONFIG', 'MOVE_WIDGET', 'ADD_WIDGET', 'REMOVE_WIDGET']
+        )
 
         // Cleanup subscriptions
         return () => {
-            unsubscribeChanged()
-            unsubscribeError()
+            unsubscribeOperations()
         }
-    }, [subscribe, addNotification])
+    }, [subscribeToOperations, addNotification])
 
     // Tab navigation (main tabs)
     const tabs = [
@@ -1093,7 +1098,7 @@ const PageEditor = () => {
             }
 
             // Check for unsaved changes before closing
-            if (widgetHasUnsavedChanges) {
+            if (hasUnsavedChanges) {
                 // Show confirmation modal for unsaved changes
                 const handleUnsavedChanges = async () => {
                     const confirmed = await showConfirm({
@@ -1133,7 +1138,7 @@ const PageEditor = () => {
                 handleCloseWidgetEditor()
             }
         }
-    }, [activeTab, widgetEditorOpen, widgetHasUnsavedChanges, editingWidget, handleCloseWidgetEditor, handleSaveWidget, showConfirm, addNotification])
+    }, [activeTab, widgetEditorOpen, hasUnsavedChanges, editingWidget, handleCloseWidgetEditor, handleSaveWidget, showConfirm, addNotification])
 
     if (isLoading && !isNewPage) {
         return (

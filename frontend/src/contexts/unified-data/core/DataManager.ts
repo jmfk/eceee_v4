@@ -1,6 +1,7 @@
 import { AppState, StateUpdate, StateSelector } from '../types/state';
 import { Operation, ValidationResult, OperationTypes } from '../types/operations';
-import { SubscriptionManager, StateUpdateCallback, SubscriptionOptions } from '../types/subscriptions';
+import { StateUpdateCallback, SubscriptionOptions } from '../types/subscriptions';
+import { SubscriptionManager } from './SubscriptionManager';
 import { defaultEqualityFn } from '../utils/equality';
 import { OperationError, ValidationError, StateError, ErrorCodes, isRetryableError } from '../utils/errors';
 
@@ -41,6 +42,7 @@ export class DataManager {
             metadata: {
                 lastUpdated: new Date().toISOString(),
                 isLoading: false,
+                isDirty: false,
                 errors: {},
                 widgetStates: {
                     unsavedChanges: {},
@@ -170,7 +172,7 @@ export class DataManager {
     private validateOperation(operation: Operation): ValidationResult {
         try {
             // Basic validation
-            if (!operation.type || !Object.values(OperationTypes).includes(operation.type)) {
+            if (!operation.type || !Object.values(OperationTypes).includes(operation.type as any)) {
                 throw new ValidationError(operation, 
                     `Invalid operation type: ${operation.type}`,
                     { type: operation.type }
@@ -248,34 +250,79 @@ export class DataManager {
             // Process based on operation type
             switch (operation.type) {
                 case OperationTypes.UPDATE_WIDGET_CONFIG:
-                    this.setState(state => ({
-                        widgets: {
-                            ...state.widgets,
-                            [operation.payload.id]: {
-                                ...state.widgets[operation.payload.id],
-                                config: {
-                                    ...state.widgets[operation.payload.id].config,
-                                    ...operation.payload.config
-                                }
-                            }
-                        },
-                        metadata: {
+                    this.setState(state => {
+                        const existingWidget = state.widgets[operation.payload.id];
+                        
+                        // Update unsaved changes - isDirty will be computed automatically
+                        const updatedUnsavedChanges = {
+                            ...state.metadata.widgetStates.unsavedChanges,
+                            [operation.payload.id]: true
+                        };
+                        
+                        const newIsDirty = Object.values(updatedUnsavedChanges).some(Boolean);
+                        
+                        const baseMetadata = {
                             ...state.metadata,
+                            isDirty: newIsDirty, // Compute isDirty from unsavedChanges
                             widgetStates: {
                                 ...state.metadata.widgetStates,
-                                unsavedChanges: {
-                                    ...state.metadata.widgetStates.unsavedChanges,
-                                    [operation.payload.id]: true
-                                }
+                                unsavedChanges: updatedUnsavedChanges
                             }
+                        };
+
+                        // If widget doesn't exist in our state, just update metadata
+                        if (!existingWidget) {
+                            return {
+                                ...state,
+                                metadata: baseMetadata
+                            };
                         }
-                    }));
+
+                        // Widget exists, update it and metadata
+                        return {
+                            widgets: {
+                                ...state.widgets,
+                                [operation.payload.id]: {
+                                    ...existingWidget,
+                                    config: {
+                                        ...existingWidget.config,
+                                        ...operation.payload.config
+                                    },
+                                    updated_at: new Date().toISOString()
+                                }
+                            },
+                            metadata: baseMetadata
+                        };
+                    });
                     break;
 
                 case OperationTypes.MOVE_WIDGET:
                     this.setState(state => {
                         const widget = state.widgets[operation.payload.id];
-                        if (!widget) return state;
+                        
+                        // Update unsaved changes - isDirty will be computed automatically
+                        const updatedUnsavedChanges = {
+                            ...state.metadata.widgetStates.unsavedChanges,
+                            [operation.payload.id]: true
+                        };
+                        
+                        const newIsDirty = Object.values(updatedUnsavedChanges).some(Boolean);
+                        
+                        const baseMetadata = {
+                            ...state.metadata,
+                            isDirty: newIsDirty, // Compute isDirty from unsavedChanges
+                            widgetStates: {
+                                ...state.metadata.widgetStates,
+                                unsavedChanges: updatedUnsavedChanges
+                            }
+                        };
+
+                        if (!widget) {
+                            return {
+                                ...state,
+                                metadata: baseMetadata
+                            };
+                        }
 
                         return {
                             widgets: {
@@ -283,9 +330,11 @@ export class DataManager {
                                 [operation.payload.id]: {
                                     ...widget,
                                     slot: operation.payload.slot,
-                                    order: operation.payload.order
+                                    order: operation.payload.order,
+                                    updated_at: new Date().toISOString()
                                 }
-                            }
+                            },
+                            metadata: baseMetadata
                         };
                     });
                     break;
@@ -296,6 +345,62 @@ export class DataManager {
                             await this.processOperation(op);
                         }
                     }
+                    break;
+
+                case OperationTypes.SET_DIRTY:
+                    this.setState(state => ({
+                        metadata: {
+                            ...state.metadata,
+                            isDirty: operation.payload.isDirty
+                        }
+                    }));
+                    break;
+
+                case OperationTypes.RESET_STATE:
+                    this.setState(state => {
+                        const clearedUnsavedChanges = {};
+                        const newIsDirty = Object.values(clearedUnsavedChanges).some(Boolean); // Should be false
+                        
+                        return {
+                            metadata: {
+                                ...state.metadata,
+                                isDirty: newIsDirty,
+                                widgetStates: {
+                                    ...state.metadata.widgetStates,
+                                    unsavedChanges: clearedUnsavedChanges
+                                }
+                            }
+                        };
+                    });
+                    break;
+
+                case OperationTypes.CLEAR_ERRORS:
+                    this.setState(state => ({
+                        metadata: {
+                            ...state.metadata,
+                            errors: {}
+                        }
+                    }));
+                    break;
+
+                case OperationTypes.MARK_WIDGET_SAVED:
+                    this.setState(state => {
+                        const updatedUnsavedChanges = { ...state.metadata.widgetStates.unsavedChanges };
+                        delete updatedUnsavedChanges[operation.payload.widgetId];
+                        
+                        const newIsDirty = Object.values(updatedUnsavedChanges).some(Boolean);
+                        
+                        return {
+                            metadata: {
+                                ...state.metadata,
+                                isDirty: newIsDirty, // Recompute isDirty
+                                widgetStates: {
+                                    ...state.metadata.widgetStates,
+                                    unsavedChanges: updatedUnsavedChanges
+                                }
+                            }
+                        };
+                    });
                     break;
             }
 

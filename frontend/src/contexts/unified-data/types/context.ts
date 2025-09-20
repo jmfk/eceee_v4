@@ -37,6 +37,10 @@ export interface UnifiedDataContextValue {
     // Utilities
     useSelector: <T>(selector: StateSelector<T>) => T;
     createSelector: <T>(selector: StateSelector<T>) => StateSelector<T>;
+    
+    // React state values for reliable re-renders
+    isDirtyState: boolean;
+    hasUnsavedChangesState: boolean;
 }
 
 /**
@@ -58,6 +62,8 @@ export interface UseUnifiedDataResult extends UnifiedDataContextValue {
     clearErrors: () => void;
     isLoading: boolean;
     hasUnsavedChanges: boolean;
+    isDirty: boolean;
+    setIsDirty: (dirty: boolean) => void;
 }
 
 /**

@@ -18,11 +18,34 @@ export function UnifiedDataProvider({
     onError
 }: UnifiedDataProviderProps) {
     // Create DataManager instance
-    const managerRef = useRef<DataManager>();
+    const managerRef = useRef<DataManager | null>(null);
     if (!managerRef.current) {
         managerRef.current = new DataManager(initialState);
     }
     const manager = managerRef.current;
+
+    // Direct state management for isDirty to ensure React re-renders
+    const [isDirtyState, setIsDirtyState] = React.useState(false);
+    const [hasUnsavedChangesState, setHasUnsavedChangesState] = React.useState(false);
+
+    // Subscribe to DataManager state changes and update React state
+    useEffect(() => {
+        return manager.subscribe(
+            state => state.metadata.isDirty,
+            (newIsDirty) => {
+                setIsDirtyState(newIsDirty);
+            }
+        );
+    }, [manager]);
+
+    useEffect(() => {
+        return manager.subscribe(
+            state => Object.values(state.metadata.widgetStates.unsavedChanges).some(Boolean),
+            (newHasUnsavedChanges) => {
+                setHasUnsavedChangesState(newHasUnsavedChanges);
+            }
+        );
+    }, [manager]);
 
     // Error handling
     const handleError = useCallback((error: Error) => {
@@ -33,14 +56,16 @@ export function UnifiedDataProvider({
     // Create selector hook
     const useSelector = useCallback(<T,>(selector: StateSelector<T>): T => {
         const [value, setValue] = React.useState(() => selector(manager.getState()));
+        const selectorRef = React.useRef(selector);
+        selectorRef.current = selector;
 
         useEffect(() => {
             return manager.subscribe(
-                selector,
+                (state) => selectorRef.current(state),
                 (newValue) => setValue(newValue),
                 { equalityFn: defaultEqualityFn }
             );
-        }, [selector]);
+        }, []); // Empty dependency array - subscription stays stable
 
         return value;
     }, [manager]);
@@ -86,8 +111,12 @@ export function UnifiedDataProvider({
 
         // Utilities
         useSelector,
-        createSelector
-    }), [manager, batchDispatch, useSelector, createSelector, handleError]);
+        createSelector,
+
+        // React state values for reliable re-renders
+        isDirtyState,
+        hasUnsavedChangesState
+    }), [manager, batchDispatch, useSelector, createSelector, handleError, isDirtyState, hasUnsavedChangesState]);
 
     // Set up dev tools if enabled
     useEffect(() => {
@@ -151,11 +180,18 @@ export function useUnifiedData(): UseUnifiedDataResult {
         });
     }, [dispatch]);
 
-    // Derived state
+    // Derived state (using direct React state for reliable re-renders)
     const isLoading = useSelector(state => state.metadata.isLoading);
-    const hasUnsavedChanges = useSelector(state =>
-        Object.values(state.metadata.widgetStates.unsavedChanges).some(Boolean)
-    );
+    const hasUnsavedChanges = context.hasUnsavedChangesState; // Use React state from context
+    const isDirty = context.isDirtyState; // Use React state from context
+
+    // setIsDirty method
+    const setIsDirty = useCallback((dirty: boolean) => {
+        dispatch({
+            type: 'SET_DIRTY',
+            payload: { isDirty: dirty }
+        });
+    }, [dispatch]);
 
     return {
         state,
@@ -165,7 +201,9 @@ export function useUnifiedData(): UseUnifiedDataResult {
         reset,
         clearErrors,
         isLoading,
-        hasUnsavedChanges
+        hasUnsavedChanges,
+        isDirty,
+        setIsDirty
     };
 }
 

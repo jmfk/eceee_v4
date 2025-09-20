@@ -1,6 +1,8 @@
+import React, { useEffect } from 'react'
 import { ChevronLeft, ChevronRight, Trash2, Save, AlertCircle } from 'lucide-react'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import { useAppStatus } from '../contexts/AppStatusContext'
+import { useUnifiedData } from '../contexts/unified-data'
 import VersionSelector from './VersionSelector'
 
 const StatusBar = ({
@@ -28,11 +30,12 @@ const StatusBar = ({
 
     // Get global app status
     const {
-        isDirty,
-        hasUnsavedChanges,
         errors,
         warnings
     } = useAppStatus()
+
+    // Get dirty state from UnifiedDataContext
+    const { isDirty, hasUnsavedChanges } = useUnifiedData()
 
     return (
         <div className={`bg-white border-t border-gray-200 px-4 py-2 ${className}`}>

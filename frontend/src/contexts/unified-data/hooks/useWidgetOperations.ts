@@ -61,6 +61,14 @@ export function useWidgetOperations(widgetId: string): UseWidgetOperationsResult
                 id: widgetId
             }
         });
+        
+        // Mark widget as saved (clears unsaved changes and recomputes isDirty)
+        await dispatch({
+            type: OperationTypes.MARK_WIDGET_SAVED,
+            payload: {
+                widgetId: widgetId
+            }
+        });
     }, [dispatch, widgetId]);
 
     const deleteWidget = useCallback(async () => {

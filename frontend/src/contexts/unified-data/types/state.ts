@@ -2,6 +2,12 @@
  * Core state types for the Unified Data Context
  */
 
+export interface ValidationError {
+  field: string;
+  message: string;
+  code: string;
+}
+
 export interface PageData {
   id: string;
   title: string;
@@ -25,10 +31,15 @@ export interface WidgetData {
   id: string;
   type: string;
   slot: string;
+  slotName?: string; // Alternative slot reference
   config: WidgetConfig;
   content?: any;
   order: number;
   parent_id?: string;
+  pageId?: string; // Reference to parent page
+  name?: string; // Widget display name
+  widgetType?: { name: string }; // Alternative type reference
+  widget_type?: { name: string }; // Alternative type reference
   created_at: string;
   updated_at: string;
 }
@@ -84,7 +95,13 @@ export interface AppState {
     lastUpdated: string;
     currentUser?: string;
     isLoading: boolean;
+    isDirty: boolean;
     errors: Record<string, Error>;
+    widgetStates: {
+      unsavedChanges: Record<string, boolean>;
+      errors: Record<string, ValidationError[]>;
+      activeEditors: string[];
+    };
   };
 }
 

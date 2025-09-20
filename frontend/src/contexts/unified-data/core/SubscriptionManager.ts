@@ -5,9 +5,9 @@ import {
     OperationSubscription,
     StateUpdateCallback,
     OperationCallback,
-    SubscriptionOptions,
-    defaultEqualityFn
+    SubscriptionOptions
 } from '../types/subscriptions';
+import { defaultEqualityFn } from '../utils/equality';
 
 /**
  * Manages subscriptions to state changes and operations

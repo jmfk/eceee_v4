@@ -8,9 +8,9 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react';
 import { Layout } from 'lucide-react';
 import { getLayoutComponent, getLayoutMetadata, layoutExists, LAYOUT_REGISTRY } from './layouts/LayoutRegistry';
-import { createPageEditorEventSystem } from './PageEditorEventSystem';
-import { useWidgetEvents } from '../../contexts/WidgetEventContext';
-import { useWidgets, createDefaultWidgetConfig } from '../../hooks/useWidgets';
+// Removed PageEditorEventSystem - now using unified data operations
+import { useUnifiedData, usePageWidgets } from '../../contexts/unified-data';
+import { createDefaultWidgetConfig } from '../../hooks/useWidgets';
 import PageWidgetSelectionModal from './PageWidgetSelectionModal';
 
 const ReactLayoutRenderer = forwardRef(({
@@ -26,23 +26,15 @@ const ReactLayoutRenderer = forwardRef(({
     onOpenWidgetEditor
 }, ref) => {
 
-    // Create PageEditor event system
-    const baseWidgetEvents = useWidgetEvents();
-    const pageEventSystem = useMemo(() =>
-        createPageEditorEventSystem(baseWidgetEvents),
-        [baseWidgetEvents]
-    );
+    // Use unified data operations
+    const { dispatch } = useUnifiedData();
+    const pageWidgetsOps = usePageWidgets(currentVersion?.page_id || pageVersionData?.pageId || '');
 
     // Get version context
     const versionId = currentVersion?.id || pageVersionData?.versionId;
     const isPublished = pageVersionData?.publicationStatus === 'published';
 
-    // Use shared widget hook
-    const {
-        addWidget,
-        updateWidget,
-        deleteWidget
-    } = useWidgets(widgets);
+    // Widget management is now handled by UnifiedDataContext through pageWidgetsOps
 
     // Widget modal state
     const [widgetModalOpen, setWidgetModalOpen] = useState(false);
@@ -71,7 +63,7 @@ const ReactLayoutRenderer = forwardRef(({
     }), [versionId, isPublished, onVersionChange]);
 
     // Handle widget actions
-    const handleWidgetAction = useCallback((action, slotName, widget, ...args) => {
+    const handleWidgetAction = useCallback(async (action, slotName, widget, ...args) => {
 
         switch (action) {
             case 'add':
@@ -79,23 +71,17 @@ const ReactLayoutRenderer = forwardRef(({
 
 
                 const widgetConfig = createDefaultWidgetConfig(widgetType);
-                const newWidget = addWidget(slotName, widgetType, widgetConfig);
 
-                // Update widgets
-                const updatedWidgets = { ...widgets };
-                if (!updatedWidgets[slotName]) updatedWidgets[slotName] = [];
-                updatedWidgets[slotName].push(newWidget);
+                // Dispatch add widget operation - this will handle state updates
+                try {
+                    const newWidgetId = await pageWidgetsOps.addWidget(slotName, widgetType, widgetConfig);
 
-                if (onWidgetChange) {
-                    onWidgetChange(updatedWidgets);
+                    if (onDirtyChange) {
+                        onDirtyChange(true, `added widget to ${slotName}`);
+                    }
+                } catch (error) {
+                    console.error('Failed to add widget:', error);
                 }
-
-                if (onDirtyChange) {
-                    onDirtyChange(true, `added widget to ${slotName}`);
-                }
-
-                // Emit event
-                pageEventSystem.emitWidgetAdded(slotName, newWidget, { versionId, isPublished });
                 break;
 
             case 'edit':
@@ -121,8 +107,12 @@ const ReactLayoutRenderer = forwardRef(({
                     onDirtyChange(true, `removed widget from ${slotName}`);
                 }
 
-                // Emit event
-                pageEventSystem.emitWidgetRemoved(slotName, widget.id, { versionId, isPublished });
+                // Dispatch remove widget operation
+                try {
+                    await pageWidgetsOps.removeWidget(widget.id);
+                } catch (error) {
+                    console.error('Failed to remove widget:', error);
+                }
                 break;
 
             case 'moveUp':
@@ -144,8 +134,12 @@ const ReactLayoutRenderer = forwardRef(({
                         onDirtyChange(true, `moved widget up in ${slotName}`);
                     }
 
-                    // Emit event
-                    pageEventSystem.emitWidgetMoved(slotName, widget.id, moveUpIndex, moveUpIndex - 1, { versionId, isPublished });
+                    // Dispatch move widget operation
+                    try {
+                        await pageWidgetsOps.moveWidget(widget.id, slotName, moveUpIndex - 1);
+                    } catch (error) {
+                        console.error('Failed to move widget up:', error);
+                    }
                 }
                 break;
 
@@ -169,8 +163,12 @@ const ReactLayoutRenderer = forwardRef(({
                         onDirtyChange(true, `moved widget down in ${slotName}`);
                     }
 
-                    // Emit event
-                    pageEventSystem.emitWidgetMoved(slotName, widget.id, moveDownIndex, moveDownIndex + 1, { versionId, isPublished });
+                    // Dispatch move widget operation
+                    try {
+                        await pageWidgetsOps.moveWidget(widget.id, slotName, moveDownIndex + 1);
+                    } catch (error) {
+                        console.error('Failed to move widget down:', error);
+                    }
                 }
                 break;
 
@@ -191,14 +189,24 @@ const ReactLayoutRenderer = forwardRef(({
                     onDirtyChange(true, `updated widget config in ${slotName}`);
                 }
 
-                // Emit event
-                pageEventSystem.emitWidgetChanged(widget.id, slotName, { ...widget, config: newConfig }, 'config', { versionId, isPublished });
+                // Dispatch widget config update operation
+                try {
+                    await dispatch({
+                        type: 'UPDATE_WIDGET_CONFIG',
+                        payload: {
+                            id: widget.id,
+                            config: newConfig
+                        }
+                    });
+                } catch (error) {
+                    console.error('Failed to update widget config:', error);
+                }
                 break;
 
             default:
                 break;
         }
-    }, [widgets, onWidgetChange, onDirtyChange, onOpenWidgetEditor, addWidget, pageEventSystem, versionId, isPublished, onVersionChange]);
+    }, [widgets, onWidgetChange, onDirtyChange, onOpenWidgetEditor, pageWidgetsOps, versionId, isPublished, onVersionChange]);
 
     // Widget modal handlers
     const handleShowWidgetModal = useCallback((slotName) => {
@@ -219,7 +227,7 @@ const ReactLayoutRenderer = forwardRef(({
     }, [selectedSlotForModal, handleWidgetAction, handleCloseWidgetModal]);
 
     // Clear slot handler
-    const handleClearSlot = useCallback((slotName) => {
+    const handleClearSlot = useCallback(async (slotName) => {
         const updatedWidgets = { ...widgets };
         updatedWidgets[slotName] = [];
 
@@ -231,9 +239,16 @@ const ReactLayoutRenderer = forwardRef(({
             onDirtyChange(true, `cleared slot ${slotName}`);
         }
 
-        // Emit event
-        pageEventSystem.emitSlotCleared(slotName, { versionId, isPublished });
-    }, [widgets, onWidgetChange, onDirtyChange, pageEventSystem, versionId, isPublished]);
+        // Clear slot by removing all widgets
+        try {
+            const slotWidgets = widgets[slotName] || [];
+            for (const widget of slotWidgets) {
+                await pageWidgetsOps.removeWidget(widget.id);
+            }
+        } catch (error) {
+            console.error('Failed to clear slot:', error);
+        }
+    }, [widgets, onWidgetChange, onDirtyChange, pageWidgetsOps, versionId, isPublished, dispatch]);
 
     // Get layout component
     const LayoutComponent = getLayoutComponent(layoutName);
@@ -255,8 +270,7 @@ const ReactLayoutRenderer = forwardRef(({
     useImperativeHandle(ref, () => ({
         saveWidgets: async () => {
             try {
-                // Emit save event
-                pageEventSystem.emitPageSaved({ widgets }, { versionId, isPublished });
+                // Page save is handled by the unified context automatically
 
                 return {
                     success: true,
@@ -278,8 +292,8 @@ const ReactLayoutRenderer = forwardRef(({
         getLayoutName: () => layoutName,
         getLayoutMetadata: () => getLayoutMetadata(layoutName),
         getCurrentWidgets: () => widgets,
-        pageEventSystem
-    }), [widgets, layoutName, pageEventSystem, versionId, isPublished]);
+        // Removed pageEventSystem - now using unified data operations
+    }), [widgets, layoutName, versionId, isPublished]);
 
     // Render the layout component
     return (
