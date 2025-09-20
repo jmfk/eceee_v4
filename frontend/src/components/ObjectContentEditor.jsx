@@ -10,8 +10,7 @@ import {
 } from '../widgets'
 
 import WidgetEditorPanel from './WidgetEditorPanel'
-import { useWidgetEvents } from '../contexts/WidgetEventContext'
-import { WIDGET_EVENTS, WIDGET_CHANGE_TYPES } from '../types/widgetEvents'
+import { useUnifiedData, useWidgetOperations } from '../contexts/unified-data'
 
 // WidgetSelectionModal component that replicates the PageEditor widget selection modal
 const WidgetSelectionModal = ({ isOpen, onClose, onSelectWidget, slot, availableWidgetTypes, isFilteringTypes }) => {
@@ -270,12 +269,8 @@ const SlotIconMenu = ({ slotName, slot, availableWidgetTypes, isFilteringTypes, 
 const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange, mode = 'object', onWidgetEditorStateChange }, ref) => {
     const [selectedWidgets, setSelectedWidgets] = useState({}) // For bulk operations
 
-    // Create ObjectEditor-specific event system
-    const baseWidgetEvents = useWidgetEvents();
-    const objectEventSystem = useMemo(() =>
-        createObjectEditorEventSystem(baseWidgetEvents),
-        [baseWidgetEvents]
-    );
+    // Use unified data operations
+    const { hasUnsavedChanges } = useUnifiedData();
 
     // Keep onWidgetChange reference for potential external API compatibility
     const stableOnWidgetChange = useRef(onWidgetChange)
@@ -291,7 +286,6 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
     // Widget editor panel state
     const [widgetEditorOpen, setWidgetEditorOpen] = useState(false)
     const [editingWidget, setEditingWidget] = useState(null)
-    const { widgetHasUnsavedChanges, setWidgetHasUnsavedChanges } = useWidgetEvents()
     const widgetEditorRef = useRef(null)
 
     // Widget selection modal state
@@ -517,12 +511,12 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
         if (isSameWidget) {
             setWidgetEditorOpen(false)
             setEditingWidget(null)
-            setWidgetHasUnsavedChanges(false)
+            // Unsaved changes now tracked by UnifiedDataContext
         } else {
             // Open panel with new widget
             setEditingWidget(widgetData)
             setWidgetEditorOpen(true)
-            setWidgetHasUnsavedChanges(false)
+            // Unsaved changes now tracked by UnifiedDataContext
         }
     }, [editingWidget])
 
@@ -559,13 +553,13 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
             onWidgetEditorStateChange({
                 isOpen: widgetEditorOpen,
                 editingWidget,
-                hasUnsavedChanges: widgetHasUnsavedChanges,
+                hasUnsavedChanges: hasUnsavedChanges,
                 widgetEditorRef,
                 handleCloseWidgetEditor,
                 handleSaveWidget
             })
         }
-    }, [widgetEditorOpen, editingWidget, widgetHasUnsavedChanges, onWidgetEditorStateChange, handleCloseWidgetEditor, handleSaveWidget])
+    }, [widgetEditorOpen, editingWidget, hasUnsavedChanges, onWidgetEditorStateChange, handleCloseWidgetEditor, handleSaveWidget])
 
     const handleEditWidget = (slotName, widgetIndex, widget) => {
         // Add slotName to widget data for editor
@@ -923,13 +917,13 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
         // Widget editor state
         widgetEditorOpen,
         editingWidget,
-        widgetHasUnsavedChanges,
+        hasUnsavedChanges,
         widgetEditorRef,
         // Widget editor handlers
         handleOpenWidgetEditor,
         handleCloseWidgetEditor,
         handleSaveWidget
-    }), [widgetEditorOpen, editingWidget, widgetHasUnsavedChanges, handleOpenWidgetEditor, handleCloseWidgetEditor, handleSaveWidget])
+    }), [widgetEditorOpen, editingWidget, hasUnsavedChanges, handleOpenWidgetEditor, handleCloseWidgetEditor, handleSaveWidget])
 
     return (
         <div ref={ref} className="space-y-4">

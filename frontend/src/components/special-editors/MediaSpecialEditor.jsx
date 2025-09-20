@@ -17,7 +17,6 @@ import MediaSearchWidget from '../media/MediaSearchWidget'
 import ImageWidget from '../../widgets/core/ImageWidget'
 import { useTheme } from '../../hooks/useTheme'
 import FloatingMessage from '../common/FloatingMessage'
-//import { useWidgetEvents } from '../../contexts/WidgetEventContext'
 
 const MediaSpecialEditor = ({
     widgetData,

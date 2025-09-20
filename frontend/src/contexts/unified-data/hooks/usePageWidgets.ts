@@ -56,16 +56,21 @@ export function usePageWidgets(pageId: string): UsePageWidgetsResult {
         widgetType: string, 
         config: any = {}
     ): Promise<string> => {
-        const result = await dispatch({
+        // Generate a unique widget ID
+        const newWidgetId = `widget-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        
+        await dispatch({
             type: OperationTypes.ADD_WIDGET,
             payload: {
                 pageId,
                 slotId,
                 widgetType,
-                config
+                config,
+                widgetId: newWidgetId
             }
         });
-        return result.widgetId;
+        
+        return newWidgetId;
     }, [dispatch, pageId]);
 
     const removeWidget = useCallback(async (widgetId: string) => {

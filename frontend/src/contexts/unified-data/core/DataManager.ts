@@ -339,6 +339,62 @@ export class DataManager {
                     });
                     break;
 
+                case OperationTypes.ADD_WIDGET:
+                    this.setState(state => {
+                        const newWidget = {
+                            id: operation.payload.widgetId,
+                            type: operation.payload.widgetType,
+                            slot: operation.payload.slotId,
+                            config: operation.payload.config || {},
+                            order: 0,
+                            pageId: operation.payload.pageId,
+                            created_at: new Date().toISOString(),
+                            updated_at: new Date().toISOString()
+                        };
+
+                        const updatedUnsavedChanges = {
+                            ...state.metadata.widgetStates.unsavedChanges,
+                            [newWidget.id]: true
+                        };
+
+                        return {
+                            widgets: {
+                                ...state.widgets,
+                                [newWidget.id]: newWidget
+                            },
+                            metadata: {
+                                ...state.metadata,
+                                isDirty: Object.values(updatedUnsavedChanges).some(Boolean),
+                                widgetStates: {
+                                    ...state.metadata.widgetStates,
+                                    unsavedChanges: updatedUnsavedChanges
+                                }
+                            }
+                        };
+                    });
+                    break;
+
+                case OperationTypes.REMOVE_WIDGET:
+                    this.setState(state => {
+                        const { [operation.payload.id]: removedWidget, ...remainingWidgets } = state.widgets;
+                        
+                        const updatedUnsavedChanges = { ...state.metadata.widgetStates.unsavedChanges };
+                        delete updatedUnsavedChanges[operation.payload.id];
+
+                        return {
+                            widgets: remainingWidgets,
+                            metadata: {
+                                ...state.metadata,
+                                isDirty: Object.values(updatedUnsavedChanges).some(Boolean),
+                                widgetStates: {
+                                    ...state.metadata.widgetStates,
+                                    unsavedChanges: updatedUnsavedChanges
+                                }
+                            }
+                        };
+                    });
+                    break;
+
                 case OperationTypes.BATCH:
                     if (Array.isArray(operation.payload)) {
                         for (const op of operation.payload) {

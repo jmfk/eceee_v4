@@ -11,7 +11,7 @@ import ObjectContentEditor from '../ObjectContentEditor'
 import ObjectSchemaForm from '../ObjectSchemaForm'
 import WidgetEditorPanel from '../WidgetEditorPanel'
 import ObjectDataForm from './ObjectDataForm'
-import { WidgetEventProvider, useWidgetEvents } from '../../contexts/WidgetEventContext'
+import { useUnifiedData } from '../../contexts/unified-data'
 import { WIDGET_EVENTS, WIDGET_CHANGE_TYPES } from '../../types/widgetEvents'
 
 // Internal component that uses widget event hooks
@@ -83,12 +83,12 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
     }, [instance])
 
     // Subscribe to widget events for real-time updates and dirty state management
-    const { subscribe } = useWidgetEvents()
+    const { subscribeToOperations } = useUnifiedData()
 
     useEffect(() => {
-        // Handler for widget changes
-        const handleWidgetChanged = (payload) => {
-            if (payload.changeType === WIDGET_CHANGE_TYPES.CONFIG) {
+        // Handler for widget operations
+        const handleWidgetOperation = (operation) => {
+            if (operation.type === 'UPDATE_WIDGET_CONFIG') {
                 // Handle real-time config changes - mark as dirty but don't auto-save
                 setHasWidgetChanges(true)
 
@@ -109,13 +109,13 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
         }
 
         // Subscribe to widget change events
-        const unsubscribe = subscribe(WIDGET_EVENTS.CHANGED, handleWidgetChanged)
+        const unsubscribe = subscribeToOperations(handleWidgetOperation, ['UPDATE_WIDGET_CONFIG'])
 
         // Cleanup subscription
         return () => {
             unsubscribe()
         }
-    }, [subscribe])
+    }, [subscribeToOperations])
 
     // Handle real-time widget updates from WidgetEditorPanel
     const handleRealTimeWidgetUpdate = useCallback((updatedWidget) => {
@@ -501,13 +501,9 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
 
 ObjectContentViewInternal.displayName = 'ObjectContentViewInternal'
 
-// Main component that provides the WidgetEventContext
+// Main component that uses UnifiedDataContext (no wrapper needed)
 const ObjectContentView = forwardRef((props, ref) => {
-    return (
-        <WidgetEventProvider>
-            <ObjectContentViewInternal {...props} ref={ref} />
-        </WidgetEventProvider>
-    )
+    return <ObjectContentViewInternal {...props} ref={ref} />
 })
 
 ObjectContentView.displayName = 'ObjectContentView'
