@@ -44,9 +44,9 @@ function StateNode({ data, path = '', level = 0, maxLevel = 3 }) {
             <div className="flex items-center space-x-2 py-1">
                 <span className="text-sm font-mono text-gray-600">{path}:</span>
                 <span className={`text-sm font-mono ${typeof data === 'string' ? 'text-green-600' :
-                        typeof data === 'number' ? 'text-blue-600' :
-                            typeof data === 'boolean' ? 'text-purple-600' :
-                                'text-gray-600'
+                    typeof data === 'number' ? 'text-blue-600' :
+                        typeof data === 'boolean' ? 'text-purple-600' :
+                            'text-gray-600'
                     }`}>
                     {JSON.stringify(data)}
                 </span>
@@ -123,7 +123,7 @@ function StateNode({ data, path = '', level = 0, maxLevel = 3 }) {
     );
 }
 
-export function StateInspector({ state, onClose }) {
+function StateInspector({ state, onClose }) {
     const [selectedEntity, setSelectedEntity] = useState('pages');
     const [showMetadata, setShowMetadata] = useState(true);
     const [maxDepth, setMaxDepth] = useState(3);
@@ -159,8 +159,8 @@ export function StateInspector({ state, onClose }) {
                                 key={entity.key}
                                 onClick={() => setSelectedEntity(entity.key)}
                                 className={`w-full text-left p-2 rounded text-sm ${selectedEntity === entity.key
-                                        ? 'bg-blue-100 text-blue-700'
-                                        : 'hover:bg-gray-100'
+                                    ? 'bg-blue-100 text-blue-700'
+                                    : 'hover:bg-gray-100'
                                     }`}
                             >
                                 <div className="flex justify-between items-center">
@@ -260,7 +260,7 @@ export function StateInspector({ state, onClose }) {
 /**
  * Performance Profiler Panel
  */
-export function PerformanceProfilerPanel({ report, onClose }) {
+function PerformanceProfilerPanel({ report, onClose }) {
     if (!report) return null;
 
     const getScoreColor = (score) => {

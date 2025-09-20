@@ -45,10 +45,11 @@ export function usePageWidgets(pageId: string): UsePageWidgetsResult {
         }, {} as Record<string, WidgetData[]>);
     });
 
+    // Get state from context
+    const { widgetStates } = useUnifiedData();
+    
     const widgetCount = widgets.length;
-    const hasUnsavedChanges = useSelector(state => 
-        widgets.some(widget => state.metadata.widgetStates.unsavedChanges[widget.id])
-    );
+    const hasUnsavedChanges = widgets.some(widget => widgetStates.unsavedChanges[widget.id]);
 
     // Operations
     const addWidget = useCallback(async (

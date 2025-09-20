@@ -23,14 +23,15 @@ export interface UseWidgetOperationsResult {
 export function useWidgetOperations(widgetId: string): UseWidgetOperationsResult {
     const { dispatch, useSelector } = useUnifiedData();
 
+    // Get state from context
+    const { widgetStates } = useUnifiedData();
+    
     // Selectors
     const widget = useSelector(state => state.widgets[widgetId] || null);
-    const hasUnsavedChanges = useSelector(
-        state => state.metadata.widgetStates.unsavedChanges[widgetId] || false
-    );
-    const hasErrors = useSelector(
-        state => (state.metadata.widgetStates.errors[widgetId]?.length || 0) > 0
-    );
+    
+    // Get widget states from context
+    const hasUnsavedChanges = widgetStates.unsavedChanges[widgetId] || false;
+    const hasErrors = Boolean(widgetStates.errors[widgetId]);
 
     // Operations
     const updateConfig = useCallback(async (config: Partial<WidgetConfig>) => {

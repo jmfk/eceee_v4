@@ -50,11 +50,14 @@ export function useAPIIntegration(): UseAPIIntegrationResult {
         };
     }, []);
 
+    // Get state from context
+    const { errors: contextErrors } = useUnifiedData();
+
     // Monitor API errors from operations
     useEffect(() => {
         return subscribeToOperations((operation) => {
             // Check if operation resulted in error
-            const operationError = state.metadata.errors[operation.type];
+            const operationError = contextErrors[operation.type];
             if (operationError) {
                 setAPIErrors(prev => ({
                     ...prev,
@@ -62,7 +65,7 @@ export function useAPIIntegration(): UseAPIIntegrationResult {
                 }));
             }
         });
-    }, [subscribeToOperations, state.metadata.errors]);
+    }, [subscribeToOperations, contextErrors]);
 
     // Auto-sync when coming back online
     useEffect(() => {

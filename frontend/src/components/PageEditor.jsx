@@ -168,8 +168,19 @@ const PageEditor = () => {
         return path
     }
 
-    // Use unified data context for tracking unsaved changes and data loading
-    const { hasUnsavedChanges, isDirty, setIsDirty } = useUnifiedData()
+    // Use unified data context for state management
+    const {
+        hasUnsavedChanges,
+        isDirty,
+        setIsDirty,
+        isLoading: isContextLoading,
+        setIsLoading,
+        errors: contextErrors,
+        setError,
+        markWidgetDirty,
+        markWidgetSaved,
+        setWidgetError
+    } = useUnifiedData()
     const pageOperations = usePageOperations(pageId || '')
     const dataLoader = useDataLoader()
     const widgetSync = useWidgetSync(pageId || '')
@@ -277,7 +288,12 @@ const PageEditor = () => {
     })
 
     // Combined loading state
-    const isLoading = isLoadingWebpage || isLoadingPageVersion
+    const isLoading = isLoadingWebpage || isLoadingPageVersion || isContextLoading
+
+    // Update context loading state
+    useEffect(() => {
+        setIsLoading(isLoadingWebpage || isLoadingPageVersion)
+    }, [isLoadingWebpage, isLoadingPageVersion, setIsLoading])
 
     // Add loading notifications for page data
     useEffect(() => {
@@ -328,18 +344,36 @@ const PageEditor = () => {
 
     // Load data into UnifiedDataContext when page data is available
     useEffect(() => {
-        if (webpage && pageVersion && layoutData && !isNewPage) {
-            console.log('🔄 PageEditor: Loading data into UnifiedDataContext');
+        // Track if the effect is still valid
+        let isValid = true;
 
-            dataLoader.loadPageData(webpage, pageVersion, layoutData)
-                .then(() => {
-                    console.log('✅ PageEditor: Data loaded into UnifiedDataContext successfully');
-                })
-                .catch(error => {
-                    console.error('❌ PageEditor: Failed to load data into UnifiedDataContext', error);
-                });
-        }
-    }, [webpage, pageVersion, layoutData, isNewPage, dataLoader])
+        const loadData = async () => {
+            if (webpage && pageVersion && layoutData && !isNewPage) {
+                console.log('🔄 PageEditor: Loading data into UnifiedDataContext');
+
+                try {
+                    await dataLoader.loadPageData(webpage, pageVersion, layoutData);
+                    if (isValid) {
+                        console.log('✅ PageEditor: Data loaded into UnifiedDataContext successfully');
+                        // Set primary source after successful load
+                        widgetSync.setContextAsPrimary(true);
+                    }
+                } catch (error) {
+                    if (isValid) {
+                        console.error('❌ PageEditor: Failed to load data into UnifiedDataContext', error);
+                        widgetSync.setContextAsPrimary(false);
+                    }
+                }
+            }
+        };
+
+        loadData();
+
+        // Cleanup function to prevent updates after unmount/re-render
+        return () => {
+            isValid = false;
+        };
+    }, [webpage?.id, pageVersion?.id, layoutData?.id, isNewPage])
 
     // Fetch layout data when page has a codeLayout, with fallback support
     useEffect(() => {
@@ -962,30 +996,39 @@ const PageEditor = () => {
             // Use UPDATE action for real-time preview updates
             renderer.executeWidgetDataCallback(WIDGET_ACTIONS.UPDATE, updatedWidget.slotName, updatedWidget)
             renderer.updateSlot(updatedWidget.slotName, renderer.getSlotWidgetData(updatedWidget.slotName))
+
+            // Mark widget as dirty in UnifiedDataContext
+            markWidgetDirty(updatedWidget.id)
         }
-    }, [])
+    }, [markWidgetDirty])
 
     const handleSaveWidget = useCallback(async (updatedWidget) => {
-        // With validation-driven sync, widget data is already in canonical state
-        // Just need to update the visual representation and show success
+        try {
+            if (contentEditorRef.current && contentEditorRef.current.layoutRenderer) {
+                // Update the visual representation via LayoutRenderer
+                const renderer = contentEditorRef.current.layoutRenderer
+                renderer.executeWidgetDataCallback(WIDGET_ACTIONS.EDIT, updatedWidget.slotName, updatedWidget)
+                renderer.updateSlot(updatedWidget.slotName, renderer.getSlotWidgetData(updatedWidget.slotName))
+            }
 
-        if (contentEditorRef.current && contentEditorRef.current.layoutRenderer) {
-            // Update the visual representation via LayoutRenderer
-            const renderer = contentEditorRef.current.layoutRenderer
-            renderer.executeWidgetDataCallback(WIDGET_ACTIONS.EDIT, updatedWidget.slotName, updatedWidget)
-            renderer.updateSlot(updatedWidget.slotName, renderer.getSlotWidgetData(updatedWidget.slotName))
+            // Mark widget as saved in UnifiedDataContext
+            markWidgetSaved(updatedWidget.id)
+            setWidgetError(updatedWidget.id, null)
+
+            addNotification({
+                type: 'success',
+                message: `Widget "${updatedWidget.name}" saved successfully`
+            })
+
+            handleCloseWidgetEditor()
+        } catch (error) {
+            setWidgetError(updatedWidget.id, error)
+            addNotification({
+                type: 'error',
+                message: `Failed to save widget: ${error.message}`
+            })
         }
-
-        addNotification({
-            type: 'success',
-            message: `Widget "${updatedWidget.name}" saved successfully`
-        })
-
-        // Clear unsaved changes flag since save is complete
-        //setWidgetHasUnsavedChanges(false)
-
-        handleCloseWidgetEditor()
-    }, [addNotification, handleCloseWidgetEditor])
+    }, [addNotification, handleCloseWidgetEditor, markWidgetSaved, setWidgetError])
 
     // Memoized callback to prevent ContentEditor re-renders
     const handleDirtyChange = useCallback((isDirty, reason) => {

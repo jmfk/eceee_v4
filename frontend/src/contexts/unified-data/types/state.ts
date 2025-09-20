@@ -89,20 +89,6 @@ export interface AppState {
   widgets: Record<string, WidgetData>;
   layouts: Record<string, LayoutData>;
   versions: Record<string, VersionData>;
-  
-  // Metadata about the state itself
-  metadata: {
-    lastUpdated: string;
-    currentUser?: string;
-    isLoading: boolean;
-    isDirty: boolean;
-    errors: Record<string, Error>;
-    widgetStates: {
-      unsavedChanges: Record<string, boolean>;
-      errors: Record<string, ValidationError[]>;
-      activeEditors: string[];
-    };
-  };
 }
 
 /**

@@ -43,7 +43,11 @@ function YourComponent() {
 
 ## State Management
 
-The context maintains a centralized state for all application data:
+The context manages two types of state:
+
+### 1. Application Data State
+
+Core application data is managed through the DataManager:
 
 ```typescript
 interface AppState {
@@ -51,6 +55,88 @@ interface AppState {
   widgets: Record<string, WidgetData>;
   layouts: Record<string, LayoutData>;
   versions: Record<string, VersionData>;
+}
+```
+
+### 2. Metadata State
+
+UI-related metadata is managed directly in the UnifiedDataContext using React state:
+
+```typescript
+// Direct React state in UnifiedDataContext
+const [isDirtyState, setIsDirtyState] = useState(false);
+const [hasUnsavedChangesState, setHasUnsavedChangesState] = useState(false);
+const [isLoadingState, setIsLoadingState] = useState(false);
+const [errorsState, setErrorsState] = useState<Record<string, Error>>({});
+const [widgetStates, setWidgetStates] = useState({
+    unsavedChanges: {} as Record<string, boolean>,
+    errors: {} as Record<string, Error>,
+    activeEditors: [] as string[]
+});
+```
+
+#### Metadata Actions
+
+The context provides direct methods for managing metadata:
+
+```typescript
+interface UnifiedDataContextValue {
+    // Metadata state
+    isDirty: boolean;
+    hasUnsavedChanges: boolean;
+    isLoading: boolean;
+    errors: Record<string, Error>;
+    widgetStates: {
+        unsavedChanges: Record<string, boolean>;
+        errors: Record<string, Error>;
+        activeEditors: string[];
+    };
+
+    // Metadata actions
+    setIsDirty: (dirty: boolean) => void;
+    setIsLoading: (loading: boolean) => void;
+    setError: (key: string, error: Error | null) => void;
+    markWidgetDirty: (widgetId: string) => void;
+    markWidgetSaved: (widgetId: string) => void;
+    setWidgetError: (widgetId: string, error: Error | null) => void;
+    setWidgetStates: React.Dispatch<React.SetStateAction<{
+        unsavedChanges: Record<string, boolean>;
+        errors: Record<string, Error>;
+        activeEditors: string[];
+    }>>;
+}
+```
+
+#### Usage Example
+
+```jsx
+function WidgetEditor({ widgetId }) {
+    const { 
+        markWidgetDirty,
+        markWidgetSaved,
+        setWidgetError,
+        widgetStates
+    } = useUnifiedData();
+
+    const handleUpdate = async (config) => {
+        try {
+            // Mark widget as dirty during update
+            markWidgetDirty(widgetId);
+
+            // Perform update
+            await updateWidget(config);
+
+            // Mark as saved on success
+            markWidgetSaved(widgetId);
+            setWidgetError(widgetId, null);
+        } catch (error) {
+            setWidgetError(widgetId, error);
+        }
+    };
+
+    // Check widget state
+    const hasUnsavedChanges = widgetStates.unsavedChanges[widgetId];
+    const widgetError = widgetStates.errors[widgetId];
 }
 ```
 

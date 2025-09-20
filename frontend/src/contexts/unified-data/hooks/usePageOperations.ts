@@ -33,12 +33,15 @@ export interface UsePageOperationsResult {
 export function usePageOperations(pageId: string): UsePageOperationsResult {
     const { dispatch, useSelector } = useUnifiedData();
 
+    // Get state from context
+    const { widgetStates } = useUnifiedData();
+    
     // Selectors
     const page = useSelector(state => state.pages[pageId] || null);
     const metadata = useSelector(state => state.pages[pageId]?.metadata || null);
-    const hasUnsavedChanges = useSelector(state => 
-        Object.values(state.metadata.widgetStates.unsavedChanges).some(Boolean)
-    );
+    
+    // Check unsaved changes from widget states
+    const hasUnsavedChanges = Object.values(widgetStates.unsavedChanges).some(Boolean);
 
     // Derived state
     const isPublished = page?.status === 'published';

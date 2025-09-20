@@ -39,17 +39,6 @@ export class DataManager {
             widgets: {},
             layouts: {},
             versions: {},
-            metadata: {
-                lastUpdated: new Date().toISOString(),
-                isLoading: false,
-                isDirty: false,
-                errors: {},
-                widgetStates: {
-                    unsavedChanges: {},
-                    errors: {},
-                    activeEditors: []
-                }
-            },
             ...initialState
         };
 
@@ -404,12 +393,23 @@ export class DataManager {
                     break;
 
                 case OperationTypes.SET_DIRTY:
-                    this.setState(state => ({
-                        metadata: {
-                            ...state.metadata,
-                            isDirty: operation.payload.isDirty
-                        }
-                    }));
+                    this.setState(state => {
+                        // Create a dummy unsaved change to force isDirty state
+                        const updatedUnsavedChanges = operation.payload.isDirty
+                            ? { ...state.metadata.widgetStates.unsavedChanges, '_global': true }
+                            : {};
+
+                        return {
+                            metadata: {
+                                ...state.metadata,
+                                isDirty: operation.payload.isDirty,
+                                widgetStates: {
+                                    ...state.metadata.widgetStates,
+                                    unsavedChanges: updatedUnsavedChanges
+                                }
+                            }
+                        };
+                    });
                     break;
 
                 case OperationTypes.RESET_STATE:

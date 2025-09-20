@@ -449,14 +449,13 @@ function App() {
                   </Toaster>
                 </Router>
               </AuthProvider>
+              {/* DevTools trigger (development only) */}
+              <DevToolsTrigger />
             </UnifiedDataProvider>
 
           </AppStatusProvider>
         </GlobalNotificationProvider>
       </NotificationProvider>
-
-      {/* DevTools trigger (development only) */}
-      <DevToolsTrigger />
     </QueryClientProvider>
   )
 }

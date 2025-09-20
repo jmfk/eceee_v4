@@ -34,28 +34,29 @@ export function UnifiedDataProvider({
     }
     const manager = managerRef.current;
 
-    // Direct state management for isDirty to ensure React re-renders
+    // Metadata state management
     const [isDirtyState, setIsDirtyState] = React.useState(false);
     const [hasUnsavedChangesState, setHasUnsavedChangesState] = React.useState(false);
+    const [isLoadingState, setIsLoadingState] = React.useState(false);
+    const [errorsState, setErrorsState] = React.useState<Record<string, Error>>({});
+    const [widgetStates, setWidgetStates] = React.useState({
+        unsavedChanges: {} as Record<string, boolean>,
+        errors: {} as Record<string, Error>,
+        activeEditors: [] as string[]
+    });
 
-    // Subscribe to DataManager state changes and update React state
+    // Subscribe to widget changes to compute unsaved changes state
     useEffect(() => {
         return manager.subscribe(
-            state => state.metadata.isDirty,
-            (newIsDirty) => {
-                setIsDirtyState(newIsDirty);
+            state => state.widgets,
+            () => {
+                // Check if any widgets have unsaved changes
+                const hasChanges = Object.values(widgetStates.unsavedChanges).some(Boolean);
+                setHasUnsavedChangesState(hasChanges);
+                setIsDirtyState(hasChanges);
             }
         );
-    }, [manager]);
-
-    useEffect(() => {
-        return manager.subscribe(
-            state => Object.values(state.metadata.widgetStates.unsavedChanges).some(Boolean),
-            (newHasUnsavedChanges) => {
-                setHasUnsavedChangesState(newHasUnsavedChanges);
-            }
-        );
-    }, [manager]);
+    }, [manager, widgetStates.unsavedChanges]);
 
     // Error handling
     const handleError = useCallback((error: Error) => {
@@ -98,6 +99,39 @@ export function UnifiedDataProvider({
         }
     }, [manager, handleError]);
 
+    // Methods for managing widget states
+    const markWidgetDirty = useCallback((widgetId: string) => {
+        setWidgetStates(prev => ({
+            ...prev,
+            unsavedChanges: { ...prev.unsavedChanges, [widgetId]: true }
+        }));
+    }, []);
+
+    const markWidgetSaved = useCallback((widgetId: string) => {
+        setWidgetStates(prev => {
+            const { [widgetId]: _, ...remainingChanges } = prev.unsavedChanges;
+            return {
+                ...prev,
+                unsavedChanges: remainingChanges
+            };
+        });
+    }, []);
+
+    const setWidgetError = useCallback((widgetId: string, error: Error | null) => {
+        setWidgetStates(prev => {
+            const newErrors = { ...prev.errors };
+            if (error) {
+                newErrors[widgetId] = error;
+            } else {
+                delete newErrors[widgetId];
+            }
+            return {
+                ...prev,
+                errors: newErrors
+            };
+        });
+    }, []);
+
     // Create context value
     const contextValue = useMemo<UnifiedDataContextValue>(() => ({
         // State access
@@ -123,10 +157,36 @@ export function UnifiedDataProvider({
         useSelector,
         createSelector,
 
-        // React state values for reliable re-renders
-        isDirtyState,
-        hasUnsavedChangesState
-    }), [manager, batchDispatch, useSelector, createSelector, handleError, isDirtyState, hasUnsavedChangesState]);
+        // Metadata state
+        isDirty: isDirtyState,
+        hasUnsavedChanges: hasUnsavedChangesState,
+        isLoading: isLoadingState,
+        errors: errorsState,
+        widgetStates,
+
+        // Metadata actions
+        setIsDirty: setIsDirtyState,
+        setIsLoading: setIsLoadingState,
+        setError: (key: string, error: Error | null) => {
+            setErrorsState(prev => {
+                const newErrors = { ...prev };
+                if (error) {
+                    newErrors[key] = error;
+                } else {
+                    delete newErrors[key];
+                }
+                return newErrors;
+            });
+        },
+        markWidgetDirty,
+        markWidgetSaved,
+        setWidgetError,
+        setWidgetStates
+    }), [
+        manager, batchDispatch, useSelector, createSelector, handleError,
+        isDirtyState, hasUnsavedChangesState, isLoadingState, errorsState, widgetStates,
+        markWidgetDirty, markWidgetSaved, setWidgetError
+    ]);
 
     // Set up dev tools if enabled
     useEffect(() => {
@@ -190,10 +250,10 @@ export function useUnifiedData(): UseUnifiedDataResult {
         });
     }, [dispatch]);
 
-    // Derived state (using direct React state for reliable re-renders)
-    const isLoading = useSelector(state => state.metadata.isLoading);
-    const hasUnsavedChanges = context.hasUnsavedChangesState; // Use React state from context
-    const isDirty = context.isDirtyState; // Use React state from context
+    // Use React state from context for all metadata
+    const isLoading = context.isLoading;
+    const hasUnsavedChanges = context.hasUnsavedChanges;
+    const isDirty = context.isDirty;
 
     // setIsDirty method
     const setIsDirty = useCallback((dirty: boolean) => {

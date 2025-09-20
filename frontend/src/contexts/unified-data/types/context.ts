@@ -38,9 +38,29 @@ export interface UnifiedDataContextValue {
     useSelector: <T>(selector: StateSelector<T>) => T;
     createSelector: <T>(selector: StateSelector<T>) => StateSelector<T>;
     
-    // React state values for reliable re-renders
-    isDirtyState: boolean;
-    hasUnsavedChangesState: boolean;
+    // Metadata state
+    isDirty: boolean;
+    hasUnsavedChanges: boolean;
+    isLoading: boolean;
+    errors: Record<string, Error>;
+    widgetStates: {
+        unsavedChanges: Record<string, boolean>;
+        errors: Record<string, Error>;
+        activeEditors: string[];
+    };
+
+    // Metadata actions
+    setIsDirty: (dirty: boolean) => void;
+    setIsLoading: (loading: boolean) => void;
+    setError: (key: string, error: Error | null) => void;
+    markWidgetDirty: (widgetId: string) => void;
+    markWidgetSaved: (widgetId: string) => void;
+    setWidgetError: (widgetId: string, error: Error | null) => void;
+    setWidgetStates: React.Dispatch<React.SetStateAction<{
+        unsavedChanges: Record<string, boolean>;
+        errors: Record<string, Error>;
+        activeEditors: string[];
+    }>>;
 }
 
 /**
@@ -62,10 +82,6 @@ export interface UseUnifiedDataResult extends UnifiedDataContextValue {
     // Additional utility methods
     reset: () => void;
     clearErrors: () => void;
-    isLoading: boolean;
-    hasUnsavedChanges: boolean;
-    isDirty: boolean;
-    setIsDirty: (dirty: boolean) => void;
 }
 
 /**

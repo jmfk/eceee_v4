@@ -34,8 +34,8 @@ const StatusBar = ({
         warnings
     } = useAppStatus()
 
-    // Get dirty state from UnifiedDataContext
-    const { isDirty, hasUnsavedChanges } = useUnifiedData()
+    // Get metadata state from UnifiedDataContext
+    const { isDirty, hasUnsavedChanges, isLoading, errors: contextErrors } = useUnifiedData()
 
     return (
         <div className={`bg-white border-t border-gray-200 px-4 py-2 ${className}`}>
