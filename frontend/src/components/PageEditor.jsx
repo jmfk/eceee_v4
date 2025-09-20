@@ -145,6 +145,7 @@ function deriveTodoItemsFromError(errorString) {
  * - ContentEditor always uses pageData.widgets as single source of truth
  */
 const PageEditor = () => {
+    console.log("PageEditor")
     const { pageId, tab } = useParams()
     const navigate = useNavigate()
     const location = useLocation()

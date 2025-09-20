@@ -70,7 +70,6 @@ export function useAPIIntegration(): UseAPIIntegrationResult {
     // Auto-sync when coming back online
     useEffect(() => {
         if (isOnline && pendingOperations.length > 0) {
-            console.log('📡 Back online - syncing pending operations');
             syncOfflineOperations();
         }
     }, [isOnline]);
@@ -78,12 +77,10 @@ export function useAPIIntegration(): UseAPIIntegrationResult {
     // Configuration methods
     const enableOptimisticUpdates = useCallback((enabled: boolean) => {
         // This would configure the DataManager
-        console.log(`🔄 Optimistic updates ${enabled ? 'enabled' : 'disabled'}`);
     }, []);
 
     const enableAPIIntegration = useCallback((enabled: boolean) => {
         // This would configure the DataManager
-        console.log(`📡 API integration ${enabled ? 'enabled' : 'disabled'}`);
     }, []);
 
     // Retry failed operations
@@ -94,7 +91,6 @@ export function useAPIIntegration(): UseAPIIntegrationResult {
             try {
                 // Re-dispatch the operation
                 // Note: We'd need to store the original operation to retry it
-                console.log(`🔄 Retrying failed operation: ${operationType}`);
                 
                 // Clear the error if retry succeeds
                 setAPIErrors(prev => {
@@ -121,14 +117,12 @@ export function useAPIIntegration(): UseAPIIntegrationResult {
     // Queue operation for offline execution
     const queueOfflineOperation = useCallback((operation: Operation) => {
         setPendingOperations(prev => [...prev, operation]);
-        console.log(`📦 Queued offline operation: ${operation.type}`);
     }, []);
 
     // Sync offline operations when back online
     const syncOfflineOperations = useCallback(async () => {
         if (!isOnline || pendingOperations.length === 0) return;
 
-        console.log(`📡 Syncing ${pendingOperations.length} offline operations`);
 
         const operations = [...pendingOperations];
         setPendingOperations([]);
@@ -136,7 +130,6 @@ export function useAPIIntegration(): UseAPIIntegrationResult {
         for (const operation of operations) {
             try {
                 await dispatch(operation);
-                console.log(`✅ Synced offline operation: ${operation.type}`);
             } catch (error) {
                 console.error(`❌ Failed to sync operation: ${operation.type}`, error);
                 // Re-queue failed operations

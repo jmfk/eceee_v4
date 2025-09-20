@@ -78,11 +78,11 @@ export class AutoSaveManager {
         }
 
         this.saveTimer = setInterval(() => {
+            console.log("AutoSaveManager:startAutoSave");
             this.performAutoSave();
         }, this.config.interval);
 
         this.updateNextSaveTime();
-        console.log(`🔄 Auto-save started (interval: ${this.config.interval}ms)`);
     }
 
     /**
@@ -100,7 +100,6 @@ export class AutoSaveManager {
         }
 
         this.state.nextSaveTime = null;
-        console.log('⏹️ Auto-save stopped');
     }
 
     /**
@@ -136,7 +135,6 @@ export class AutoSaveManager {
         this.state.isAutoSaving = true;
 
         try {
-            console.log(`💾 Auto-save: Processing ${this.pendingOperations.length} operations`);
 
             // Batch similar operations if enabled
             const operationsToSave = this.config.batchSimilarOperations
@@ -156,7 +154,6 @@ export class AutoSaveManager {
             this.state.lastSaveTime = new Date().toISOString();
             this.state.lastError = null;
 
-            console.log(`✅ Auto-save completed (${operationsToSave.length} operations)`);
 
         } catch (error) {
             console.error('❌ Auto-save failed:', error);

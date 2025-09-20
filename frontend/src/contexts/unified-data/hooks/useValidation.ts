@@ -165,7 +165,6 @@ export function useValidation(): UseValidationResult {
 
     // Clear validation errors (placeholder - would integrate with error state)
     const clearValidationErrors = useCallback(() => {
-        console.log('🧹 Clearing validation errors');
         // This would clear validation-specific errors from the state
     }, []);
 

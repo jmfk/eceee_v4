@@ -64,10 +64,8 @@ export function useAutoSave(
             },
             {
                 onSave: async (operations: Operation[]) => {
-                    console.log('💾 Auto-save: Executing batch save', operations);
                     try {
                         await batchDispatch(operations);
-                        console.log('✅ Auto-save: Batch save completed');
                     } catch (error) {
                         console.error('❌ Auto-save: Batch save failed', error);
                         throw error;

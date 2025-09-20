@@ -31,9 +31,7 @@ export function useWidgetSync(pageId: string): UseWidgetSyncResult {
         pageId: string
     ) => {
         try {
-            console.log('🔄 syncWidgetsToContext:', { slotWidgets, pageId });
             await loadWidgets(slotWidgets, pageId);
-            console.log('✅ Widgets synced to UnifiedDataContext');
         } catch (error) {
             console.error('❌ Failed to sync widgets to context:', error);
             throw error;

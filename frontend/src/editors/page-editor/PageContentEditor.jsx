@@ -38,18 +38,15 @@ const PageContentEditor = forwardRef(({
     const currentWidgets = useMemo(() => {
         if (widgetSync.isContextPrimary) {
             // Use UnifiedDataContext as primary source
-            console.log('📊 PageContentEditor: Using UnifiedDataContext widgets (primary)');
             return widgetSync.syncWidgetsFromContext();
         } else {
             // Use pageVersionData as primary source
-            console.log('📊 PageContentEditor: Using pageVersionData widgets (primary)');
             return pageVersionData?.widgets || {};
         }
     }, [widgetSync, pageVersionData?.widgets]);
 
     // Handle widget changes - sync to both systems
     const handleWidgetChange = useCallback(async (updatedWidgets) => {
-        console.log('🔄 PageContentEditor: Widget change detected', updatedWidgets);
 
         // Always update PageEditor's local state (for saving)
         if (onUpdate) {

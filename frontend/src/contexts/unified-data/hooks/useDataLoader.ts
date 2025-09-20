@@ -37,7 +37,6 @@ export function useDataLoader(): UseDataLoaderResult {
         layoutData?: any
     ) => {
         try {
-            console.log('🔄 useDataLoader: Loading page data', { pageData, versionData, layoutData });
             
             const normalizedPage = normalizePageData(pageData);
             const normalizedVersion = normalizeVersionData(versionData);
@@ -59,7 +58,6 @@ export function useDataLoader(): UseDataLoaderResult {
                 }
             });
 
-            console.log('✅ useDataLoader: Page data loaded successfully');
         } catch (error) {
             console.error('❌ useDataLoader: Failed to load page data', error);
             throw error;

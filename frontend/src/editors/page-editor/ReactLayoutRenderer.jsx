@@ -113,7 +113,6 @@ const ReactLayoutRenderer = forwardRef(({
                             widgetId: newWidgetId
                         }
                     });
-                    console.log('✅ Widget added to UnifiedDataContext');
                 } catch (error) {
                     console.error('❌ Failed to sync widget add to UnifiedDataContext:', error);
                 }
@@ -160,7 +159,6 @@ const ReactLayoutRenderer = forwardRef(({
                             id: widget.id
                         }
                     });
-                    console.log('✅ Widget removed from UnifiedDataContext');
                 } catch (error) {
                     console.error('❌ Failed to sync widget removal to UnifiedDataContext:', error);
                 }
@@ -207,7 +205,6 @@ const ReactLayoutRenderer = forwardRef(({
                                     order: moveUpIndex - 1
                                 }
                             });
-                            console.log('✅ Widget move up synced to UnifiedDataContext');
                         } catch (error) {
                             console.error('❌ Failed to sync widget move to UnifiedDataContext:', error);
                         }
@@ -257,7 +254,6 @@ const ReactLayoutRenderer = forwardRef(({
                                     order: moveDownIndex + 1
                                 }
                             });
-                            console.log('✅ Widget move down synced to UnifiedDataContext');
                         } catch (error) {
                             console.error('❌ Failed to sync widget move to UnifiedDataContext:', error);
                         }
@@ -351,7 +347,6 @@ const ReactLayoutRenderer = forwardRef(({
                     }
                 });
             }
-            console.log(`✅ Slot ${slotName} cleared in UnifiedDataContext`);
         } catch (error) {
             console.error('❌ Failed to sync slot clear to UnifiedDataContext:', error);
         }
