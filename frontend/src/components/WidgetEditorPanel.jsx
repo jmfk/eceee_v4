@@ -3,8 +3,7 @@ import { X, RefreshCw } from 'lucide-react'
 import { getWidgetSchema } from '../api/widgetSchemas.js'
 import { validateWidgetType, clearWidgetTypesCache } from '../utils/widgetTypeValidation.js'
 import DeletedWidgetWarning from './DeletedWidgetWarning.jsx'
-import { useWidgetEvents } from '../contexts/WidgetEventContext'
-import { WIDGET_EVENTS } from '../types/widgetEvents'
+import { useWidgetOperations } from '../contexts/unified-data'
 import { SpecialEditorRenderer, hasSpecialEditor } from './special-editors'
 import IsolatedFormRenderer from './IsolatedFormRenderer.jsx'
 
@@ -29,7 +28,8 @@ const WidgetEditorPanel = forwardRef(({
     autoOpenSpecialEditor = false,
     namespace = null
 }, ref) => {
-    const [hasChanges, setHasChanges] = useState(false)
+    // Use unified context for unsaved changes tracking
+    // const [hasChanges, setHasChanges] = useState(false) // Replaced by hasUnsavedChanges from context
     const [widgetTypeName, setWidgetTypeName] = useState(null)
     const [widgetTypeSlug, setWidgetTypeSlug] = useState(null)
     const [fetchedSchema, setFetchedSchema] = useState(null)
@@ -51,27 +51,34 @@ const WidgetEditorPanel = forwardRef(({
     const rafRef = useRef(null)
     const updateTimeoutRef = useRef(null)
 
-    const { emit } = useWidgetEvents()
+    const { updateConfig, saveWidget, hasUnsavedChanges } = useWidgetOperations(widgetData?.id || '')
 
-    // Event emitter functions
-    const emitWidgetChanged = useCallback((widgetId, slotName, updatedWidget, changeType = 'config') => {
-        emit(WIDGET_EVENTS.CHANGED, {
-            widgetId,
-            slotName,
-            widget: updatedWidget,
-            changeType,
-            timestamp: Date.now()
-        })
-    }, [emit])
+    // Widget operation functions
+    const emitWidgetChanged = useCallback(async (widgetId, slotName, updatedWidget, changeType = 'config') => {
+        if (changeType === 'config' && updatedWidget.config) {
+            try {
+                await updateConfig(updatedWidget.config)
+                // Call the real-time update callback if provided
+                if (onRealTimeUpdate) {
+                    onRealTimeUpdate(updatedWidget)
+                }
+            } catch (error) {
+                console.error('Failed to update widget config:', error)
+            }
+        }
+    }, [updateConfig, onRealTimeUpdate])
 
-    const emitWidgetSaved = useCallback((widgetId, slotName, savedWidget) => {
-        emit(WIDGET_EVENTS.SAVED, {
-            widgetId,
-            slotName,
-            widget: savedWidget,
-            timestamp: Date.now()
-        })
-    }, [emit])
+    const emitWidgetSaved = useCallback(async (widgetId, slotName, savedWidget) => {
+        try {
+            await saveWidget()
+            // Call the save callback if provided
+            if (onSave) {
+                onSave(savedWidget)
+            }
+        } catch (error) {
+            console.error('Failed to save widget:', error)
+        }
+    }, [saveWidget, onSave])
 
     // Check if widget supports special editor mode
     const supportsSpecialEditor = useCallback(() => {
@@ -196,10 +203,11 @@ const WidgetEditorPanel = forwardRef(({
     }, [widgetData, schema, widgetTypeValidation])
 
     // Handle unsaved changes from isolated form
-    const handleUnsavedChanges = useCallback((hasUnsavedChanges) => {
-        setHasChanges(hasUnsavedChanges)
+    const handleUnsavedChanges = useCallback((hasChangesFromForm) => {
+        // The unified context now handles unsaved changes tracking
+        // We can still call the callback if provided
         // if (onUnsavedChanges) {
-        //     onUnsavedChanges(hasUnsavedChanges)
+        //     onUnsavedChanges(hasChangesFromForm)
         // }
     }, [])
 
@@ -284,18 +292,18 @@ const WidgetEditorPanel = forwardRef(({
             // This will be handled by the isolated form
             return widgetData?.config || {}
         },
-        hasUnsavedChanges: () => hasChanges,
+        hasUnsavedChanges: () => hasUnsavedChanges,
         resetToOriginal: () => {
-            setHasChanges(false)
+            // Reset handled by unified context
         }
-    }), [hasChanges, widgetData])
+    }), [hasUnsavedChanges, widgetData])
 
     // Handle config changes from special editor
     // const handleSpecialEditorConfigChange = useCallback((newConfig) => {
     //     // The special editor will handle its own state and trigger events
     //     // This is just for backward compatibility
     //     console.log("handleSpecialEditorConfigChange")
-    //     setHasChanges(true)
+    //     // Changes now tracked by unified context
     // }, [])
 
     // Handle close - revert changes if not saved

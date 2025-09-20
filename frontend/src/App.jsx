@@ -24,7 +24,7 @@ import SimpleFormDemo from '@components/demos/SimpleFormDemo'
 import { NotificationProvider } from '@components/NotificationManager'
 import { GlobalNotificationProvider } from './contexts/GlobalNotificationContext'
 import { AuthProvider } from './contexts/AuthContext'
-import { WidgetEventProvider } from './contexts/WidgetEventContext'
+import { UnifiedDataProvider } from './contexts/unified-data'
 import { AppStatusProvider } from './contexts/AppStatusContext'
 import PrivateRoute from './components/PrivateRoute'
 import LoginPage from './pages/LoginPage'
@@ -47,7 +47,7 @@ function App() {
       <NotificationProvider>
         <GlobalNotificationProvider>
           <AppStatusProvider>
-            <WidgetEventProvider>
+            <UnifiedDataProvider enableDevTools={process.env.NODE_ENV === 'development'}>
               <AuthProvider>
                 <Router>
                   <Routes>
@@ -366,10 +366,10 @@ function App() {
                     } />
 
                     {/* Page editor routes - fullscreen without navbar */}
-                    <Route path="/pages/:pageId/edit/:tab" element={<PrivateRoute><WidgetEventProvider><PageEditor /></WidgetEventProvider></PrivateRoute>} />
-                    <Route path="/pages/:pageId/edit" element={<PrivateRoute><WidgetEventProvider><PageEditor /></WidgetEventProvider></PrivateRoute>} />
-                    <Route path="/pages/new/:tab" element={<PrivateRoute><WidgetEventProvider><PageEditor /></WidgetEventProvider></PrivateRoute>} />
-                    <Route path="/pages/new" element={<PrivateRoute><WidgetEventProvider><PageEditor /></WidgetEventProvider></PrivateRoute>} />
+                    <Route path="/pages/:pageId/edit/:tab" element={<PrivateRoute><PageEditor /></PrivateRoute>} />
+                    <Route path="/pages/:pageId/edit" element={<PrivateRoute><PageEditor /></PrivateRoute>} />
+                    <Route path="/pages/new/:tab" element={<PrivateRoute><PageEditor /></PrivateRoute>} />
+                    <Route path="/pages/new" element={<PrivateRoute><PageEditor /></PrivateRoute>} />
 
                     {/* Version timeline page - fullscreen without navbar */}
                     <Route path="/pages/:pageId/versions" element={<PrivateRoute><VersionTimelinePage /></PrivateRoute>} />
@@ -445,7 +445,7 @@ function App() {
                   </Toaster>
                 </Router>
               </AuthProvider>
-            </WidgetEventProvider>
+            </UnifiedDataProvider>
 
           </AppStatusProvider>
         </GlobalNotificationProvider>
