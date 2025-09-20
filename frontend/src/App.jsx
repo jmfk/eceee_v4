@@ -24,7 +24,7 @@ import SimpleFormDemo from '@components/demos/SimpleFormDemo'
 import { NotificationProvider } from '@components/NotificationManager'
 import { GlobalNotificationProvider } from './contexts/GlobalNotificationContext'
 import { AuthProvider } from './contexts/AuthContext'
-import { UnifiedDataProvider } from './contexts/unified-data'
+import { UnifiedDataProvider, DevToolsTrigger } from './contexts/unified-data'
 import { AppStatusProvider } from './contexts/AppStatusContext'
 import PrivateRoute from './components/PrivateRoute'
 import LoginPage from './pages/LoginPage'
@@ -454,6 +454,9 @@ function App() {
           </AppStatusProvider>
         </GlobalNotificationProvider>
       </NotificationProvider>
+
+      {/* DevTools trigger (development only) */}
+      <DevToolsTrigger />
     </QueryClientProvider>
   )
 }

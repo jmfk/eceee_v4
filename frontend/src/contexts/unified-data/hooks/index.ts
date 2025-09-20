@@ -24,6 +24,7 @@ export { useAPIIntegration } from './useAPIIntegration';
 export { useAutoSave } from './useAutoSave';
 export { useValidation } from './useValidation';
 export { usePerformanceMonitor } from './usePerformanceMonitor';
+export { useDevTools } from './useDevTools';
 
 // Re-export types for convenience
 export type { UseWidgetOperationsResult } from './useWidgetOperations';
