@@ -369,4 +369,4 @@ export function PerformanceProfilerPanel({ report, onClose }) {
     );
 }
 
-export { StateInspector, PerformanceProfilerPanel };
+// StateInspector and PerformanceProfilerPanel are already exported above
