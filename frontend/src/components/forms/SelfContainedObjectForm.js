@@ -157,8 +157,12 @@ class SelfContainedObjectForm {
         // Registry integration
         this.registry = options.registry || new ObjectFormRegistry()
 
-        // UnifiedDataContext operations (write-only)
-        this.unifiedDataOperations = options.unifiedDataOperations || null
+        // Specialized operations for UnifiedDataContext
+        this.titleOperations = options.titleOperations || null
+        this.dataOperations = options.dataOperations || null
+        this.widgetOperations = options.widgetOperations || null
+        this.metadataOperations = options.metadataOperations || null
+        this.statusOperations = options.statusOperations || null
 
         // Event handlers for cleanup
         this.eventHandlers = new Map()
@@ -376,39 +380,70 @@ class SelfContainedObjectForm {
         if (this.isValidating) return
 
         this.isValidating = true
+        const errors = {}
 
         try {
-            // Basic validation based on schema
-            const errors = {}
+            // Validate title
+            if (this.titleOperations) {
+                const titleValidation = await this.titleOperations.validateTitle(this.currentData.title);
+                if (!titleValidation.success) {
+                    errors.title = titleValidation.validation?.errors?.map(e => e.message) || ['Title validation failed'];
+                }
+            }
 
-            if (this.schema?.required) {
-                for (const fieldName of this.schema.required) {
-                    const value = this.getFieldValue(['data', fieldName])
-                    if (!value || (typeof value === 'string' && value.trim() === '')) {
-                        errors[fieldName] = [`${fieldName} is required`]
+            // Validate status
+            if (this.statusOperations) {
+                const statusValidation = await this.statusOperations.validateStatusTransition(this.currentData.status);
+                if (!statusValidation.success) {
+                    errors.status = statusValidation.validation?.errors?.map(e => e.message) || ['Status validation failed'];
+                }
+            }
+
+            // Validate data fields
+            if (this.dataOperations && this.schema?.properties) {
+                for (const [fieldName, value] of Object.entries(this.currentData.data)) {
+                    const fieldValidation = await this.dataOperations.validateField(fieldName, value);
+                    if (!fieldValidation.success) {
+                        errors[fieldName] = fieldValidation.validation?.errors?.map(e => e.message) || [`${fieldName} validation failed`];
                     }
                 }
             }
 
-            // Check required title
-            if (!this.currentData.title || this.currentData.title.trim() === '') {
-                errors.title = ['Title is required']
+            // Validate widget slots
+            if (this.widgetOperations) {
+                for (const [slotName, widgets] of Object.entries(this.currentData.widgets)) {
+                    const slotValidation = await this.widgetOperations.validateWidgetSlot(slotName, widgets);
+                    if (!slotValidation.success) {
+                        errors[`widgets.${slotName}`] = slotValidation.validation?.errors?.map(e => e.message) || [`Widget slot ${slotName} validation failed`];
+                    }
+                }
             }
 
-            this.validationResults = errors
-            this.isValid = Object.keys(errors).length === 0
+            // Validate metadata
+            if (this.metadataOperations) {
+                const metadataValidation = await this.metadataOperations.validateMetadata(this.currentData.metadata);
+                if (!metadataValidation.success) {
+                    errors.metadata = metadataValidation.validation?.errors?.map(e => e.message) || ['Metadata validation failed'];
+                }
+            }
+
+            this.validationResults = errors;
+            this.isValid = Object.keys(errors).length === 0;
 
             this.emit('VALIDATION_COMPLETE', {
                 objectId: this.objectId,
                 isValid: this.isValid,
                 errors: { ...errors }
-            })
+            });
 
         } catch (error) {
-            console.error('SelfContainedObjectForm: Validation error:', error)
-            this.isValid = false
+            console.error('SelfContainedObjectForm: Validation error:', error);
+            this.isValid = false;
+            this.validationResults = {
+                form: [error instanceof Error ? error.message : 'Validation failed']
+            };
         } finally {
-            this.isValidating = false
+            this.isValidating = false;
         }
     }
 
@@ -416,35 +451,56 @@ class SelfContainedObjectForm {
      * Sync current data to UnifiedDataContext (write-only, no re-renders)
      */
     async syncToUnifiedContext(source = 'user') {
-        if (!this.unifiedDataOperations) return
-
         try {
-            // Update object fields
-            if (this.currentData.title !== this.originalData.title) {
-                await this.unifiedDataOperations.updateTitle(this.currentData.title, source)
-            }
-
-            if (this.currentData.status !== this.originalData.status) {
-                await this.unifiedDataOperations.updateStatus(this.currentData.status, source)
-            }
-
-            // Update data fields
-            for (const [fieldName, value] of Object.entries(this.currentData.data)) {
-                if (this.originalData.data[fieldName] !== value) {
-                    await this.unifiedDataOperations.updateField(fieldName, value, source)
+            // Update title if changed
+            if (this.titleOperations && this.currentData.title !== this.originalData.title) {
+                const result = await this.titleOperations.updateTitle(this.currentData.title, { source });
+                if (!result.success) {
+                    throw new Error(result.error || 'Failed to update title');
                 }
             }
 
-            // Update widget slots
-            for (const [slotName, widgets] of Object.entries(this.currentData.widgets)) {
-                if (JSON.stringify(this.originalData.widgets[slotName]) !== JSON.stringify(widgets)) {
-                    await this.unifiedDataOperations.updateWidgetSlot(slotName, widgets, source)
+            // Update status if changed
+            if (this.statusOperations && this.currentData.status !== this.originalData.status) {
+                const result = await this.statusOperations.updateStatus(this.currentData.status, {
+                    source,
+                    skipValidation: source === 'system' // Skip validation for system updates
+                });
+                if (!result.success) {
+                    throw new Error(result.error || 'Failed to update status');
                 }
             }
 
-            // Update metadata
-            if (JSON.stringify(this.currentData.metadata) !== JSON.stringify(this.originalData.metadata)) {
-                await this.unifiedDataOperations.updateMetadata(this.currentData.metadata, source)
+            // Update data fields if changed
+            if (this.dataOperations) {
+                for (const [fieldName, value] of Object.entries(this.currentData.data)) {
+                    if (this.originalData.data[fieldName] !== value) {
+                        const result = await this.dataOperations.updateField(fieldName, value, { source });
+                        if (!result.success) {
+                            throw new Error(result.error || `Failed to update field: ${fieldName}`);
+                        }
+                    }
+                }
+            }
+
+            // Update widget slots if changed
+            if (this.widgetOperations) {
+                for (const [slotName, widgets] of Object.entries(this.currentData.widgets)) {
+                    if (JSON.stringify(this.originalData.widgets[slotName]) !== JSON.stringify(widgets)) {
+                        const result = await this.widgetOperations.updateWidgetSlot(slotName, widgets, { source });
+                        if (!result.success) {
+                            throw new Error(result.error || `Failed to update widget slot: ${slotName}`);
+                        }
+                    }
+                }
+            }
+
+            // Update metadata if changed
+            if (this.metadataOperations && JSON.stringify(this.currentData.metadata) !== JSON.stringify(this.originalData.metadata)) {
+                const result = await this.metadataOperations.updateMetadata(this.currentData.metadata, { source });
+                if (!result.success) {
+                    throw new Error(result.error || 'Failed to update metadata');
+                }
             }
 
             this.emit('SYNCED_TO_CONTEXT', {

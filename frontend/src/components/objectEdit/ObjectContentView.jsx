@@ -12,6 +12,11 @@ import ObjectSchemaForm from '../ObjectSchemaForm'
 import WidgetEditorPanel from '../WidgetEditorPanel'
 import ObjectDataForm from './ObjectDataForm'
 import { useUnifiedData } from '../../contexts/unified-data'
+import { useObjectTitleOperations } from '../../contexts/unified-data/hooks/useObjectTitleOperations'
+import { useObjectDataOperations } from '../../contexts/unified-data/hooks/useObjectDataOperations'
+import { useObjectWidgetOperations } from '../../contexts/unified-data/hooks/useObjectWidgetOperations'
+import { useObjectMetadataOperations } from '../../contexts/unified-data/hooks/useObjectMetadataOperations'
+import { useObjectStatusOperations } from '../../contexts/unified-data/hooks/useObjectStatusOperations'
 import { WIDGET_EVENTS, WIDGET_CHANGE_TYPES } from '../../types/widgetEvents'
 import SelfContainedObjectEditor from '../forms/SelfContainedObjectEditor'
 
@@ -95,21 +100,39 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
     // Get current widgets for initial render
     const [localWidgets, setLocalWidgets] = useState(() => getCurrentWidgets())
 
-    // Handle real-time widget updates from WidgetEditorPanel (through buffer)
+    // Handle real-time widget updates from WidgetEditorPanel
     const handleRealTimeWidgetUpdate = useCallback(async (updatedWidget) => {
-        if (!updatedWidget || !updatedWidget.slotName || !objectFormBufferRef.current) return
+        if (!updatedWidget || !updatedWidget.slotName) return;
 
-        // Update widget through buffer (no re-renders!)
-        const slotName = updatedWidget.slotName
-        const currentWidgets = objectFormBufferRef.current.getCurrentData()?.widgets || {}
-        const currentSlotWidgets = currentWidgets[slotName] || []
-        const updatedSlotWidgets = currentSlotWidgets.map(widget =>
-            widget.id === updatedWidget.id ? updatedWidget : widget
-        )
+        try {
+            if (objectFormBufferRef.current) {
+                // Update through buffer (no re-renders!)
+                const slotName = updatedWidget.slotName;
+                const currentWidgets = objectFormBufferRef.current.getCurrentData()?.widgets || {};
+                const currentSlotWidgets = currentWidgets[slotName] || [];
+                const updatedSlotWidgets = currentSlotWidgets.map(widget =>
+                    widget.id === updatedWidget.id ? updatedWidget : widget
+                );
 
-        // Update the slot through buffer
-        objectFormBufferRef.current.updateWidgetSlot(slotName, updatedSlotWidgets, { source: 'user' })
-    }, [])
+                // Update the slot through buffer
+                objectFormBufferRef.current.updateWidgetSlot(slotName, updatedSlotWidgets, { source: 'user' });
+            } else {
+                // Use widget operations hook directly
+                const currentWidgets = widgetOperations.getCurrentSlotWidgets(updatedWidget.slotName);
+                const updatedSlotWidgets = currentWidgets.map(widget =>
+                    widget.id === updatedWidget.id ? updatedWidget : widget
+                );
+
+                await widgetOperations.updateWidgetSlot(
+                    updatedWidget.slotName,
+                    updatedSlotWidgets,
+                    { source: 'user' }
+                );
+            }
+        } catch (error) {
+            console.error('Failed to update widget:', error);
+        }
+    }, [widgetOperations])
 
     // Widget editor state management - direct callback approach instead of polling
     const handleWidgetEditorStateChange = useCallback((newState) => {
@@ -278,40 +301,60 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
     }, [isNewInstance, instance?.id, instance?.version, queryClient, addNotification, navigate])
 
 
-    // Update form field through buffer (no re-renders)
-    const handleInputChange = useCallback((field, value) => {
-        if (!objectFormBufferRef.current) return
+    // Get specialized operations for direct updates (when buffer not available)
+    const titleOperations = useObjectTitleOperations(objectId);
+    const dataOperations = useObjectDataOperations(objectId);
+    const widgetOperations = useObjectWidgetOperations(objectId);
+    const metadataOperations = useObjectMetadataOperations(objectId);
+    const statusOperations = useObjectStatusOperations(objectId);
 
+    // Update form field through buffer or specialized hooks
+    const handleInputChange = useCallback((field, value) => {
         try {
-            // Update through buffer - no re-renders!
-            objectFormBufferRef.current.updateField(field, value, { source: 'user' })
+            if (objectFormBufferRef.current) {
+                // Update through buffer - no re-renders!
+                objectFormBufferRef.current.updateField(field, value, { source: 'user' });
+            } else {
+                // Use specialized operations based on field type
+                if (field === 'title') {
+                    titleOperations.updateTitle(value, { source: 'user' });
+                } else if (field === 'status') {
+                    statusOperations.updateStatus(value, { source: 'user' });
+                } else if (field.startsWith('metadata.')) {
+                    const metadataField = field.replace('metadata.', '');
+                    metadataOperations.updateMetadata({ [metadataField]: value }, { source: 'user' });
+                }
+            }
 
             // Clear error when user starts typing
             if (errors[field]) {
-                setErrors(prev => ({ ...prev, [field]: null }))
+                setErrors(prev => ({ ...prev, [field]: null }));
             }
         } catch (error) {
-            console.error('Failed to update field:', field, error)
+            console.error('Failed to update field:', field, error);
         }
-    }, [errors])
+    }, [errors, titleOperations, statusOperations, metadataOperations]);
 
-    // Update nested data field through buffer (no re-renders)
+    // Update nested data field through buffer or specialized hooks
     const handleDataFieldChange = useCallback((fieldName, value) => {
-        if (!objectFormBufferRef.current) return
-
         try {
-            // Update data field through buffer - no re-renders!
-            objectFormBufferRef.current.updateField(`data.${fieldName}`, value, { source: 'user' })
+            if (objectFormBufferRef.current) {
+                // Update data field through buffer - no re-renders!
+                objectFormBufferRef.current.updateField(`data.${fieldName}`, value, { source: 'user' });
+            } else {
+                // Use data operations hook directly
+                dataOperations.updateField(fieldName, value, { source: 'user' });
+            }
 
             // Clear error when user starts typing
-            const errorKey = `data_${fieldName}`
+            const errorKey = `data_${fieldName}`;
             if (errors[errorKey]) {
-                setErrors(prev => ({ ...prev, [errorKey]: null }))
+                setErrors(prev => ({ ...prev, [errorKey]: null }));
             }
         } catch (error) {
-            console.error('Failed to update data field:', fieldName, error)
+            console.error('Failed to update data field:', fieldName, error);
         }
-    }, [errors])
+    }, [errors, dataOperations]);
 
     // hasUnsavedChanges is already defined above using unified context
 

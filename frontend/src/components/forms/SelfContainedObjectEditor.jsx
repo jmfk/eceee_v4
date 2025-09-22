@@ -9,7 +9,11 @@
 
 import React, { useRef, useEffect, useState, useCallback, forwardRef, useImperativeHandle } from 'react'
 import { SelfContainedObjectForm } from './SelfContainedObjectForm.js'
-import { useObjectOperations } from '../../contexts/unified-data/hooks/useObjectOperations'
+import { useObjectTitleOperations } from '../../contexts/unified-data/hooks/useObjectTitleOperations'
+import { useObjectDataOperations } from '../../contexts/unified-data/hooks/useObjectDataOperations'
+import { useObjectWidgetOperations } from '../../contexts/unified-data/hooks/useObjectWidgetOperations'
+import { useObjectMetadataOperations } from '../../contexts/unified-data/hooks/useObjectMetadataOperations'
+import { useObjectStatusOperations } from '../../contexts/unified-data/hooks/useObjectStatusOperations'
 
 /**
  * Self-Contained Object Editor Component
@@ -40,8 +44,13 @@ const SelfContainedObjectEditor = forwardRef(({
     const [isValid, setIsValid] = useState(true)
     const [validationErrors, setValidationErrors] = useState({})
 
-    // Get write-only UnifiedDataContext operations
-    const unifiedDataOperations = useObjectOperations(objectData?.id)
+    // Get specialized operations for each data type
+    const objectId = objectData?.id;
+    const titleOperations = useObjectTitleOperations(objectId);
+    const dataOperations = useObjectDataOperations(objectId);
+    const widgetOperations = useObjectWidgetOperations(objectId);
+    const metadataOperations = useObjectMetadataOperations(objectId);
+    const statusOperations = useObjectStatusOperations(objectId);
 
     // Initialize form instance
     const initializeForm = useCallback(async () => {
@@ -54,7 +63,12 @@ const SelfContainedObjectEditor = forwardRef(({
             const formInstance = new SelfContainedObjectForm(objectData, {
                 showValidationInline,
                 showSaveStatus,
-                unifiedDataOperations // Pass write-only operations
+                // Pass specialized operations
+                titleOperations,
+                dataOperations,
+                widgetOperations,
+                metadataOperations,
+                statusOperations
             })
 
             // Initialize the form

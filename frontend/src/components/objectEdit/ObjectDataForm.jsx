@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react'
 import { AlertCircle } from 'lucide-react'
 import { namespacesApi } from '../../api'
 import ObjectSchemaForm from '../ObjectSchemaForm'
+import { useObjectTitleOperations } from '../../contexts/unified-data/hooks/useObjectTitleOperations'
+import { useObjectDataOperations } from '../../contexts/unified-data/hooks/useObjectDataOperations'
 
 /**
  * Reusable component for rendering object data form fields
@@ -16,10 +18,13 @@ const ObjectDataForm = ({
     handleInputChange,
     handleDataFieldChange,
     getSchemaFromObjectType,
-    objectFormBuffer = null,
-    enableUnifiedData = false
+    objectFormBuffer = null
 }) => {
     const [namespace, setNamespace] = useState(null)
+
+    // Get specialized operations for direct updates (when buffer not available)
+    const titleOperations = useObjectTitleOperations(formData?.id)
+    const dataOperations = useObjectDataOperations(formData?.id)
 
     // Load namespace for media operations (object type's namespace or default)
     useEffect(() => {
@@ -82,10 +87,11 @@ const ObjectDataForm = ({
                     value={formData.title || ''}
                     onChange={(e) => {
                         // Use buffer if available, fallback to handleInputChange
-                        if (enableUnifiedData && objectFormBuffer) {
+                        if (objectFormBuffer) {
                             objectFormBuffer.updateField('title', e.target.value, { source: 'user' })
                         } else {
-                            handleInputChange('title', e.target.value)
+                            // Use specialized hook for direct updates
+                            titleOperations.updateTitle(e.target.value, { source: 'user' })
                         }
                     }}
                     className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.title ? 'border-red-300' : 'border-gray-300'
@@ -115,7 +121,6 @@ const ObjectDataForm = ({
                         onChange={handleDataFieldChange}
                         namespace={namespace}
                         objectFormBuffer={objectFormBuffer}
-                        enableUnifiedData={enableUnifiedData}
                     />
                 </div>
             )}

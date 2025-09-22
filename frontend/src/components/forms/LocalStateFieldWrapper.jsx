@@ -26,7 +26,6 @@ const LocalStateFieldWrapper = React.memo(({
     validateOnChange = true,
     validateOnBlur = true,
     formId = null, // Optional form ID for buffer integration
-    enableUnifiedData = false, // Enable buffer integration
     objectFormBuffer = null, // Direct reference to SelfContainedObjectForm instance
     ...wrapperProps
 }) => {
@@ -54,7 +53,7 @@ const LocalStateFieldWrapper = React.memo(({
             setIsDirty(false)
             lastSentValueRef.current = initialValue
             initializedRef.current = true
-        } else if (enableUnifiedData && bufferRef.current) {
+        } else if (bufferRef.current) {
             // When using buffer, only update if the initialValue change came from buffer
             // (not from user typing which would create a feedback loop)
             if (initialValue !== lastSentValueRef.current && localValue !== initialValue) {
@@ -89,7 +88,7 @@ const LocalStateFieldWrapper = React.memo(({
                 }
 
                 // Update buffer if enabled (no re-renders!)
-                if (enableUnifiedData && bufferRef.current) {
+                if (bufferRef.current) {
                     try {
                         // Use buffer's updateField method - no reactive state!
                         bufferRef.current.updateField(fieldName, value, { source: 'user' })

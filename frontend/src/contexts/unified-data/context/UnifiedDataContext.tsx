@@ -199,7 +199,37 @@ export function UnifiedDataProvider({
         // Operations
         dispatch: async (operation, options) => {
             try {
+                // Auto-manage dirty state based on operation type and source
+                const shouldSetDirty = (
+                    // User-initiated changes
+                    operation.metadata?.source === 'user' &&
+                    // Update operations
+                    (operation.type.startsWith('UPDATE_') ||
+                        operation.type.startsWith('CREATE_') ||
+                        operation.type.startsWith('DELETE_'))
+                );
+
+                const shouldClearDirty = (
+                    // Save/submit operations
+                    operation.type.includes('SAVE') ||
+                    operation.type === 'SUBMIT_FORM' ||
+                    // Or explicit clean operations
+                    operation.type === 'MARK_CLEAN' ||
+                    operation.type === 'RESET_STATE'
+                );
+
+                // Dispatch the operation
                 await manager.dispatch(operation, options);
+
+                // Update dirty state after operation succeeds
+                if (shouldSetDirty) {
+                    setIsDirtyState(true);
+                    setHasUnsavedChangesState(true);
+                } else if (shouldClearDirty) {
+                    setIsDirtyState(false);
+                    setHasUnsavedChangesState(false);
+                }
+
             } catch (error) {
                 // Update error state in context
                 setErrorsState(prev => ({
