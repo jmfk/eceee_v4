@@ -7,7 +7,10 @@
 
 import React, { forwardRef, useMemo, useCallback } from 'react';
 import ReactLayoutRenderer from './ReactLayoutRenderer';
-import { useUnifiedData, useDataLoader, useWidgetSync } from '../../contexts/unified-data';
+import { useUnifiedData } from '../../contexts/unified-data/v2/context/UnifiedDataContext';
+import { useDataLoader } from '../../contexts/unified-data/v2/hooks/useDataLoader';
+import { useWidgetSync } from '../../contexts/unified-data/v2/hooks/useWidgetSync';
+import { usePageOperations } from '../../contexts/unified-data/v2/hooks/usePageOperations';
 
 const PageContentEditor = forwardRef(({
     layoutJson,
@@ -23,10 +26,11 @@ const PageContentEditor = forwardRef(({
     onVersionChange,
     ...otherProps
 }, ref) => {
-    // Use UnifiedDataContext as primary data source with sync capabilities
-    const { state } = useUnifiedData();
-    const { getWidgetsAsSlots } = useDataLoader();
-    const widgetSync = useWidgetSync(webpageData?.id?.toString() || '');
+    // Use v2 context hooks for state management
+    const unifiedDataContext = useUnifiedData();
+    const { getWidgetsAsSlots, validateWidgets } = useDataLoader();
+    const { syncWidgets, isContextPrimary, syncWidgetsFromContext } = useWidgetSync();
+    const { updatePageData, validatePageData } = usePageOperations(webpageData?.id?.toString() || '');
 
     // Extract layout name from multiple sources
     const layoutName = layoutJson?.layout?.name ||
@@ -34,37 +38,50 @@ const PageContentEditor = forwardRef(({
         pageVersionData?.codeLayout ||
         'single_column';
 
-    // Get current widgets - prefer UnifiedDataContext, fallback to pageVersionData
+    // Get current widgets - prefer v2 context, fallback to pageVersionData
     const currentWidgets = useMemo(() => {
-        if (widgetSync.isContextPrimary) {
-            // Use UnifiedDataContext as primary source
-            return widgetSync.syncWidgetsFromContext();
-        } else {
-            // Use pageVersionData as primary source
-            return pageVersionData?.widgets || {};
+        if (isContextPrimary()) {
+            // Use v2 context as primary source - for now, get from unifiedDataContext
+            const pageId = webpageData?.id?.toString();
+            if (pageId) {
+                return unifiedDataContext.get(`pages.${pageId}.widgets`) || {};
+            }
         }
-    }, [widgetSync, pageVersionData?.widgets]);
+        // Use pageVersionData as primary source
+        return pageVersionData?.widgets || {};
+    }, [isContextPrimary, unifiedDataContext, webpageData?.id, pageVersionData?.widgets]);
 
     // Handle widget changes - sync to both systems
     const handleWidgetChange = useCallback(async (updatedWidgets) => {
+        try {
+            // Validate widgets before updating
+            const isValid = await validateWidgets(updatedWidgets);
+            if (!isValid) {
+                throw new Error('Invalid widget configuration');
+            }
 
-        // Always update PageEditor's local state (for saving)
-        if (onUpdate) {
-            onUpdate({ widgets: updatedWidgets });
-        }
+            // Always update PageEditor's local state (for saving)
+            if (onUpdate) {
+                onUpdate({ widgets: updatedWidgets });
+            }
 
-        // Sync to UnifiedDataContext if it's the primary source
-        if (widgetSync.isContextPrimary) {
-            try {
+            // Sync to v2 context if it's the primary source
+            if (isContextPrimary()) {
                 const pageId = webpageData?.id?.toString();
                 if (pageId) {
-                    await widgetSync.syncWidgetsToContext(updatedWidgets, pageId);
+                    // Use the context directly to update widgets
+                    unifiedDataContext.set({
+                        path: `pages.${pageId}.widgets`,
+                        value: updatedWidgets
+                    });
+                    await updatePageData({ widgets: updatedWidgets });
                 }
-            } catch (error) {
-                console.error('❌ Failed to sync widgets to context:', error);
             }
+        } catch (error) {
+            console.error('❌ Failed to update widgets:', error);
+            throw error;
         }
-    }, [onUpdate, widgetSync, webpageData?.id]);
+    }, [onUpdate, isContextPrimary, validateWidgets, unifiedDataContext, updatePageData, webpageData?.id]);
 
     return (
         <ReactLayoutRenderer

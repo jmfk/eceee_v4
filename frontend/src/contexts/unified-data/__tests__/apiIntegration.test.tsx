@@ -1,9 +1,9 @@
 import React from 'react';
 import { renderHook, act } from '@testing-library/react';
-import { UnifiedDataProvider } from '../context/UnifiedDataContext';
-import { useAPIIntegration } from '../hooks/useAPIIntegration';
-import { usePageOperations } from '../hooks/usePageOperations';
-import { OperationTypes } from '../types/operations';
+import { UnifiedDataProvider } from '../v2/context/UnifiedDataContext';
+import { useAPIIntegration } from '../v2/hooks/useAPIIntegration';
+import { usePageOperations } from '../v2/hooks/usePageOperations';
+import { OperationTypes } from '../v2/types/operations';
 
 // Mock the API modules
 jest.mock('../../../api', () => ({
@@ -36,14 +36,17 @@ const TestWrapper: React.FC<{
     enableOptimisticUpdates = true
 }) => (
         <UnifiedDataProvider
-            enableAPIIntegration={enableAPIIntegration}
-            enableOptimisticUpdates={enableOptimisticUpdates}
+            initialState={{}}
+            options={{
+                enableAPIIntegration,
+                enableOptimisticUpdates
+            }}
         >
             {children}
         </UnifiedDataProvider>
     );
 
-describe('API Integration', () => {
+describe('API Integration v2', () => {
     beforeEach(() => {
         jest.clearAllMocks();
         // Mock navigator.onLine
@@ -90,7 +93,7 @@ describe('API Integration', () => {
                 result.current.queueOfflineOperation(operation);
             });
 
-            expect(result.current.pendingOperations).toHaveLength(1);
+            expect(result.current.getPendingOperations()).toHaveLength(1);
             expect(result.current.getAPIStatus().pending).toBe(1);
         });
 
@@ -123,7 +126,7 @@ describe('API Integration', () => {
             });
 
             // Local state should be updated immediately
-            expect(result.current.page?.title).toBe('Test Page');
+            expect(result.current.getPageData()?.title).toBe('Test Page');
         });
 
         it('should rollback on API failure', async () => {
@@ -152,7 +155,13 @@ describe('API Integration', () => {
                         {...props}
                         enableOptimisticUpdates={true}
                     >
-                        <UnifiedDataProvider initialState={initialState}>
+                        <UnifiedDataProvider
+                            initialState={initialState}
+                            options={{
+                                enableAPIIntegration: true,
+                                enableOptimisticUpdates: true
+                            }}
+                        >
                             {props.children}
                         </UnifiedDataProvider>
                     </TestWrapper>
@@ -168,7 +177,7 @@ describe('API Integration', () => {
             });
 
             // Should rollback to original title
-            expect(result.current.page?.title).toBe('Original Title');
+            expect(result.current.getPageData()?.title).toBe('Original Title');
         });
     });
 
@@ -218,7 +227,7 @@ describe('API Integration', () => {
                 result.current.queueOfflineOperation(operation);
             });
 
-            expect(result.current.pendingOperations).toHaveLength(1);
+            expect(result.current.getPendingOperations()).toHaveLength(1);
         });
 
         it('should sync operations when back online', async () => {
@@ -238,14 +247,52 @@ describe('API Integration', () => {
                 });
             });
 
-            expect(result.current.pendingOperations).toHaveLength(2);
+            expect(result.current.getPendingOperations()).toHaveLength(2);
 
             // Sync operations
             await act(async () => {
                 await result.current.syncOfflineOperations();
             });
 
-            expect(result.current.pendingOperations).toHaveLength(0);
+            expect(result.current.getPendingOperations()).toHaveLength(0);
+        });
+
+        it('should handle sync conflicts', async () => {
+            const { result } = renderHook(() => useAPIIntegration(), {
+                wrapper: TestWrapper
+            });
+
+            // Queue conflicting operations
+            act(() => {
+                result.current.queueOfflineOperation({
+                    type: OperationTypes.UPDATE_PAGE,
+                    payload: { pageId: 'page1', updates: { title: 'Local Update' } }
+                });
+            });
+
+            // Mock server having newer version
+            const { pagesApi } = require('../../../api');
+            pagesApi.update.mockRejectedValue({
+                response: {
+                    status: 409,
+                    data: {
+                        message: 'Conflict',
+                        serverVersion: {
+                            title: 'Server Update',
+                            updated_at: new Date().toISOString()
+                        }
+                    }
+                }
+            });
+
+            // Attempt sync
+            await act(async () => {
+                await result.current.syncOfflineOperations();
+            });
+
+            // Should handle conflict and merge changes
+            expect(result.current.getConflicts()).toHaveLength(1);
+            expect(result.current.getConflicts()[0].type).toBe('UPDATE_PAGE');
         });
     });
 });

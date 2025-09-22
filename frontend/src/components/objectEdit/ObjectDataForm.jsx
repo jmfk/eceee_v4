@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { AlertCircle } from 'lucide-react'
 import { namespacesApi } from '../../api'
 import ObjectSchemaForm from '../ObjectSchemaForm'
-import { useObjectTitleOperations } from '../../contexts/unified-data/hooks/useObjectTitleOperations'
-import { useObjectDataOperations } from '../../contexts/unified-data/hooks/useObjectDataOperations'
+import { useObjectOperations } from '../../contexts/unified-data/v2/hooks/useObjectOperations'
 
 /**
  * Reusable component for rendering object data form fields
@@ -23,8 +22,7 @@ const ObjectDataForm = ({
     const [namespace, setNamespace] = useState(null)
 
     // Get specialized operations for direct updates (when buffer not available)
-    const titleOperations = useObjectTitleOperations(formData?.id)
-    const dataOperations = useObjectDataOperations(formData?.id)
+    const { titleOperations, dataOperations } = useObjectOperations(formData?.id)
 
     // Load namespace for media operations (object type's namespace or default)
     useEffect(() => {

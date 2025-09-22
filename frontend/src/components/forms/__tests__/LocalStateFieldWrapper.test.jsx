@@ -2,6 +2,16 @@ import React from 'react'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { vi } from 'vitest'
 import LocalStateFieldWrapper from '../LocalStateFieldWrapper'
+import { UnifiedDataProvider } from '../../../contexts/unified-data/v2/context/UnifiedDataContext'
+import { FormCoordinationProvider } from '../../../contexts/unified-data/v2/context/FormCoordinationContext'
+
+const TestWrapper = ({ children }) => (
+    <UnifiedDataProvider>
+        <FormCoordinationProvider>
+            {children}
+        </FormCoordinationProvider>
+    </UnifiedDataProvider>
+)
 
 // Mock field component
 const MockFieldComponent = React.memo(({ value, onChange, label, validation, ...props }) => (
@@ -39,7 +49,11 @@ describe('LocalStateFieldWrapper', () => {
     })
 
     test('renders field component with initial value', () => {
-        render(<LocalStateFieldWrapper {...defaultProps} />)
+        render(
+            <TestWrapper>
+                <LocalStateFieldWrapper {...defaultProps} />
+            </TestWrapper>
+        )
 
         expect(screen.getByTestId('mock-field')).toBeInTheDocument()
         expect(screen.getByTestId('field-input')).toHaveValue('initial value')
@@ -47,7 +61,11 @@ describe('LocalStateFieldWrapper', () => {
     })
 
     test('manages local state independently', async () => {
-        render(<LocalStateFieldWrapper {...defaultProps} />)
+        render(
+            <TestWrapper>
+                <LocalStateFieldWrapper {...defaultProps} />
+            </TestWrapper>
+        )
 
         const input = screen.getByTestId('field-input')
 
@@ -67,13 +85,21 @@ describe('LocalStateFieldWrapper', () => {
     })
 
     test('updates when initialValue prop changes', async () => {
-        const { rerender } = render(<LocalStateFieldWrapper {...defaultProps} />)
+        const { rerender } = render(
+            <TestWrapper>
+                <LocalStateFieldWrapper {...defaultProps} />
+            </TestWrapper>
+        )
 
         const input = screen.getByTestId('field-input')
         expect(input).toHaveValue('initial value')
 
         // Change initialValue prop
-        rerender(<LocalStateFieldWrapper {...defaultProps} initialValue="updated value" />)
+        rerender(
+            <TestWrapper>
+                <LocalStateFieldWrapper {...defaultProps} initialValue="updated value" />
+            </TestWrapper>
+        )
 
         await waitFor(() => {
             expect(input).toHaveValue('updated value')
@@ -88,11 +114,13 @@ describe('LocalStateFieldWrapper', () => {
         })
 
         render(
-            <LocalStateFieldWrapper
-                {...defaultProps}
-                onFieldValidation={mockValidation}
-                validateOnChange={true}
-            />
+            <TestWrapper>
+                <LocalStateFieldWrapper
+                    {...defaultProps}
+                    onFieldValidation={mockValidation}
+                    validateOnChange={true}
+                />
+            </TestWrapper>
         )
 
         const input = screen.getByTestId('field-input')
@@ -115,7 +143,9 @@ describe('LocalStateFieldWrapper', () => {
 
         render(
             <ParentComponent>
-                <LocalStateFieldWrapper {...defaultProps} />
+                <TestWrapper>
+                    <LocalStateFieldWrapper {...defaultProps} />
+                </TestWrapper>
             </ParentComponent>
         )
 
@@ -132,14 +162,22 @@ describe('LocalStateFieldWrapper', () => {
     })
 
     test('shows error when FieldComponent is not provided', () => {
-        render(<LocalStateFieldWrapper {...defaultProps} FieldComponent={null} />)
+        render(
+            <TestWrapper>
+                <LocalStateFieldWrapper {...defaultProps} FieldComponent={null} />
+            </TestWrapper>
+        )
 
         expect(screen.getByText(/Field component not provided/)).toBeInTheDocument()
         expect(screen.getByText(/testField/)).toBeInTheDocument()
     })
 
     test('filters out non-DOM props to prevent React warnings', () => {
-        render(<LocalStateFieldWrapper {...defaultProps} />)
+        render(
+            <TestWrapper>
+                <LocalStateFieldWrapper {...defaultProps} />
+            </TestWrapper>
+        )
 
         const input = screen.getByTestId('field-input')
         // These props should be filtered out to avoid React DOM warnings

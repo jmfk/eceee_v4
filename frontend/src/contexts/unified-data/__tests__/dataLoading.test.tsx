@@ -1,17 +1,23 @@
 import React from 'react';
 import { renderHook, act } from '@testing-library/react';
-import { UnifiedDataProvider } from '../context/UnifiedDataContext';
-import { useDataLoader } from '../hooks/useDataLoader';
-import { useWidgetSync } from '../hooks/useWidgetSync';
-import { normalizeSlotWidgets, denormalizeWidgetsToSlots } from '../utils/dataLoaders';
+import { UnifiedDataProvider } from '../v2/context/UnifiedDataContext';
+import { useDataLoader } from '../v2/hooks/useDataLoader';
+import { useWidgetSync } from '../v2/hooks/useWidgetSync';
+import { normalizePageData, normalizeSlotWidgets, denormalizeWidgetsToSlots } from '../v2/utils/dataLoaders';
 
 const TestWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-    <UnifiedDataProvider>
+    <UnifiedDataProvider
+        initialState={{}}
+        options={{
+            enableDataLoading: true,
+            enableWidgetSync: true
+        }}
+    >
         {children}
     </UnifiedDataProvider>
 );
 
-describe('Data Loading Integration', () => {
+describe('Data Loading Integration v2', () => {
     const mockPageData = {
         id: 'page-123',
         title: 'Test Page',
@@ -124,6 +130,32 @@ describe('Data Loading Integration', () => {
                 ])
             }));
         });
+
+        it('should handle loading errors gracefully', async () => {
+            const { result } = renderHook(() => useDataLoader(), {
+                wrapper: TestWrapper
+            });
+
+            const invalidData = {
+                ...mockPageData,
+                id: undefined // Invalid data
+            };
+
+            await act(async () => {
+                try {
+                    await result.current.loadPageData(
+                        invalidData,
+                        mockVersionData,
+                        mockLayoutData
+                    );
+                } catch (error) {
+                    expect(error.code).toBe('INVALID_PAGE_DATA');
+                }
+            });
+
+            expect(result.current.getLoadingState().hasError).toBe(true);
+            expect(result.current.getLoadingState().errorCode).toBe('INVALID_PAGE_DATA');
+        });
     });
 
     describe('useWidgetSync', () => {
@@ -137,8 +169,8 @@ describe('Data Loading Integration', () => {
             });
 
             // Initially, context should not be primary (empty)
-            expect(result.current.widgetSync.isContextPrimary).toBe(false);
-            expect(result.current.widgetSync.getWidgetSource()).toBe('local');
+            expect(result.current.widgetSync.isPrimary()).toBe(false);
+            expect(result.current.widgetSync.getDataSource()).toBe('local');
 
             // Load data into context
             await act(async () => {
@@ -150,8 +182,8 @@ describe('Data Loading Integration', () => {
             });
 
             // Now context should be primary
-            expect(result.current.widgetSync.isContextPrimary).toBe(true);
-            expect(result.current.widgetSync.getWidgetSource()).toBe('context');
+            expect(result.current.widgetSync.isPrimary()).toBe(true);
+            expect(result.current.widgetSync.getDataSource()).toBe('context');
         });
 
         it('should sync widgets between formats', async () => {
@@ -161,36 +193,85 @@ describe('Data Loading Integration', () => {
 
             // Sync slot widgets to context
             await act(async () => {
-                await result.current.syncWidgetsToContext(
+                await result.current.syncToContext(
                     mockVersionData.widgets,
                     'page-123'
                 );
             });
 
             // Get widgets back from context
-            const slotWidgets = result.current.syncWidgetsFromContext();
+            const slotWidgets = result.current.syncFromContext();
 
             expect(slotWidgets.main).toHaveLength(2);
             expect(slotWidgets.sidebar).toHaveLength(1);
             expect(slotWidgets.main[0].id).toBe('widget-1');
         });
+
+        it('should handle sync conflicts', async () => {
+            const { result } = renderHook(() => useWidgetSync('page-123'), {
+                wrapper: TestWrapper
+            });
+
+            // Load initial data
+            await act(async () => {
+                await result.current.syncToContext(
+                    mockVersionData.widgets,
+                    'page-123'
+                );
+            });
+
+            // Simulate local changes
+            const localChanges = {
+                ...mockVersionData.widgets,
+                main: [
+                    {
+                        id: 'widget-1',
+                        type: 'core_widgets.ContentWidget',
+                        config: { content: 'Local change' }
+                    }
+                ]
+            };
+
+            // Sync local changes
+            await act(async () => {
+                await result.current.syncToContext(
+                    localChanges,
+                    'page-123',
+                    { detectConflicts: true }
+                );
+            });
+
+            expect(result.current.getSyncState().hasConflicts).toBe(false);
+            expect(result.current.getSyncState().lastSyncTime).toBeDefined();
+        });
     });
 
     describe('Data Normalization', () => {
+        it('should normalize page data correctly', () => {
+            const normalized = normalizePageData(mockPageData);
+
+            expect(normalized).toEqual(expect.objectContaining({
+                id: 'page-123',
+                title: 'Test Page',
+                slug: 'test-page',
+                metadata: expect.any(Object)
+            }));
+        });
+
         it('should normalize slot widgets correctly', () => {
             const normalized = normalizeSlotWidgets(mockVersionData.widgets, 'page-123');
 
             expect(normalized['widget-1']).toEqual(expect.objectContaining({
                 id: 'widget-1',
                 type: 'core_widgets.ContentWidget',
-                slot: 'main',
+                slotName: 'main',
                 pageId: 'page-123',
                 config: { content: 'Hello World' }
             }));
 
             expect(normalized['widget-3']).toEqual(expect.objectContaining({
                 id: 'widget-3',
-                slot: 'sidebar',
+                slotName: 'sidebar',
                 pageId: 'page-123'
             }));
         });
@@ -249,10 +330,10 @@ describe('Data Loading Integration', () => {
             });
 
             // 2. Verify UnifiedDataContext is now primary
-            expect(result.current.widgetSync.isContextPrimary).toBe(true);
+            expect(result.current.widgetSync.isPrimary()).toBe(true);
 
             // 3. Get widgets in PageEditor format
-            const slotWidgets = result.current.widgetSync.syncWidgetsFromContext();
+            const slotWidgets = result.current.widgetSync.syncFromContext();
             expect(slotWidgets.main).toHaveLength(2);
 
             // 4. Simulate widget change in PageEditor
@@ -270,16 +351,24 @@ describe('Data Loading Integration', () => {
 
             // 5. Sync back to context
             await act(async () => {
-                await result.current.widgetSync.syncWidgetsToContext(
+                await result.current.widgetSync.syncToContext(
                     updatedSlotWidgets,
                     'page-123'
                 );
             });
 
             // 6. Verify sync worked
-            const finalSlotWidgets = result.current.widgetSync.syncWidgetsFromContext();
+            const finalSlotWidgets = result.current.widgetSync.syncFromContext();
             expect(finalSlotWidgets.main).toHaveLength(3);
             expect(finalSlotWidgets.main.find(w => w.id === 'new-widget')).toBeDefined();
+
+            // 7. Verify loading state
+            expect(result.current.dataLoader.getLoadingState().isLoading).toBe(false);
+            expect(result.current.dataLoader.getLoadingState().hasError).toBe(false);
+
+            // 8. Verify sync state
+            expect(result.current.widgetSync.getSyncState().hasConflicts).toBe(false);
+            expect(result.current.widgetSync.getSyncState().lastSyncTime).toBeDefined();
         });
     });
 });

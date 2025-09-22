@@ -10,7 +10,8 @@ import {
 } from '../widgets'
 
 import WidgetEditorPanel from './WidgetEditorPanel'
-import { useUnifiedData, useWidgetOperations } from '../contexts/unified-data'
+import { useUnifiedData } from '../contexts/unified-data/v2/context/UnifiedDataContext'
+import { useWidgetOperations } from '../contexts/unified-data/v2/hooks/useWidgetOperations'
 
 // WidgetSelectionModal component that replicates the PageEditor widget selection modal
 const WidgetSelectionModal = ({ isOpen, onClose, onSelectWidget, slot, availableWidgetTypes, isFilteringTypes }) => {
@@ -277,7 +278,7 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
         markWidgetDirty,
         markWidgetSaved,
         setWidgetError
-    } = useUnifiedData();
+    } = useWidgetOperations();
 
     // Create a simple base event system for ObjectEditor
     const baseEventSystem = useMemo(() => {
@@ -423,13 +424,13 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
         };
     }, [objectEventSystem, notifyWidgetChange])
 
-    // Use the shared widget hook (but we'll override widgetTypes with object type's configuration)
+    // Use the shared widget operations hook
     const {
         widgetTypes,
         addWidget,
         updateWidget,
         deleteWidget
-    } = useWidgets(normalizedWidgets)
+    } = useWidgetOperations()
 
     // State for filtered widget types
     const [filteredWidgetTypes, setFilteredWidgetTypes] = useState([])
@@ -540,38 +541,33 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
 
     // Remove redundant function - use the shared one from useWidgets hook
 
-    // Widget editor handlers
-    const handleOpenWidgetEditor = useCallback((widgetData) => {
-        // Toggle functionality: check if the same widget is already being edited
-        // Use widget ID as primary identifier, only if both widgets have IDs
-        const isSameWidget = editingWidget &&
-            widgetData.id &&
-            editingWidget.id &&
-            editingWidget.id === widgetData.id;
+    // Widget editor handlers using v2 context
+    const {
+        openWidgetEditor,
+        closeWidgetEditor,
+        saveWidget,
+        isEditorOpen,
+        currentEditingWidget
+    } = useWidgetOperations();
 
-        if (isSameWidget) {
-            setWidgetEditorOpen(false)
-            setEditingWidget(null)
-            // Unsaved changes now tracked by UnifiedDataContext
-        } else {
-            // Open panel with new widget
-            setEditingWidget(widgetData)
-            setWidgetEditorOpen(true)
-            // Unsaved changes now tracked by UnifiedDataContext
-        }
-    }, [editingWidget])
+    const handleOpenWidgetEditor = useCallback((widgetData) => {
+        openWidgetEditor(widgetData);
+    }, [openWidgetEditor]);
 
     const handleCloseWidgetEditor = useCallback(() => {
-        setWidgetEditorOpen(false)
-        setEditingWidget(null)
-        // Note: Unsaved changes now tracked by UnifiedDataContext
-    }, [])
+        closeWidgetEditor();
+    }, [closeWidgetEditor]);
 
     const handleSaveWidget = useCallback((updatedWidget) => {
-        if (!editingWidget) return
+        if (!currentEditingWidget) return;
 
-        const slotName = editingWidget.slotName || 'main'
-        const slot = objectType?.slotConfiguration?.slots?.find(s => s.name === slotName)
+        const slotName = currentEditingWidget.slotName || 'main';
+        const slot = objectType?.slotConfiguration?.slots?.find(s => s.name === slotName);
+
+        saveWidget(updatedWidget, {
+            objectType: objectType?.name,
+            slotConfig: slot
+        });
 
         // Emit ObjectEditor-specific widget saved event
         objectEventSystem.emitWidgetSaved(
@@ -582,28 +578,22 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
                 objectType: objectType?.name,
                 slotConfig: slot
             }
-        )
-
-        // Mark widget as saved in UnifiedDataContext
-        markWidgetSaved(updatedWidget.id);
-
-        // Note: Unsaved changes now tracked by UnifiedDataContext
-        handleCloseWidgetEditor()
-    }, [editingWidget, handleCloseWidgetEditor, objectEventSystem, objectType, markWidgetSaved])
+        );
+    }, [currentEditingWidget, objectEventSystem, objectType, saveWidget]);
 
     // Notify parent of widget editor state changes
     useEffect(() => {
         if (onWidgetEditorStateChange) {
             onWidgetEditorStateChange({
-                isOpen: widgetEditorOpen,
-                editingWidget,
-                hasUnsavedChanges: hasUnsavedChanges,
+                isOpen: isEditorOpen,
+                editingWidget: currentEditingWidget,
+                hasUnsavedChanges,
                 widgetEditorRef,
                 handleCloseWidgetEditor,
                 handleSaveWidget
             })
         }
-    }, [widgetEditorOpen, editingWidget, hasUnsavedChanges, onWidgetEditorStateChange, handleCloseWidgetEditor, handleSaveWidget])
+    }, [isEditorOpen, currentEditingWidget, hasUnsavedChanges, onWidgetEditorStateChange, handleCloseWidgetEditor, handleSaveWidget])
 
     const handleEditWidget = (slotName, widgetIndex, widget) => {
         // Add slotName to widget data for editor
@@ -969,15 +959,15 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
     // Expose widget editor functionality to parent
     useImperativeHandle(ref, () => ({
         // Widget editor state
-        widgetEditorOpen,
-        editingWidget,
+        widgetEditorOpen: isEditorOpen,
+        editingWidget: currentEditingWidget,
         hasUnsavedChanges,
         widgetEditorRef,
         // Widget editor handlers
         handleOpenWidgetEditor,
         handleCloseWidgetEditor,
         handleSaveWidget
-    }), [widgetEditorOpen, editingWidget, hasUnsavedChanges, handleOpenWidgetEditor, handleCloseWidgetEditor, handleSaveWidget])
+    }), [isEditorOpen, currentEditingWidget, hasUnsavedChanges, handleOpenWidgetEditor, handleCloseWidgetEditor, handleSaveWidget])
 
     return (
         <div ref={ref} className="space-y-4">

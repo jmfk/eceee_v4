@@ -1,16 +1,16 @@
 import React from 'react';
 import { renderHook, act } from '@testing-library/react';
-import { UnifiedDataProvider, useUnifiedData } from '../context/UnifiedDataContext';
-import { OperationTypes } from '../types/operations';
+import { UnifiedDataProvider, useUnifiedData } from '../v2/context/UnifiedDataContext';
+import { OperationTypes } from '../v2/types/operations';
 
 // Test wrapper component
 const TestWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-    <UnifiedDataProvider>
+    <UnifiedDataProvider initialState={{}}>
         {children}
     </UnifiedDataProvider>
 );
 
-describe('UnifiedDataContext', () => {
+describe('UnifiedDataContext v2', () => {
     describe('Provider', () => {
         it('should provide context to children', () => {
             const { result } = renderHook(() => useUnifiedData(), {
@@ -20,8 +20,8 @@ describe('UnifiedDataContext', () => {
             expect(result.current).toBeDefined();
             expect(result.current.state).toBeDefined();
             expect(result.current.dispatch).toBeInstanceOf(Function);
-            expect(result.current.isDirty).toBe(false);
-            expect(result.current.hasUnsavedChanges).toBe(false);
+            expect(result.current.getState().metadata.isDirty).toBe(false);
+            expect(result.current.getState().metadata.hasUnsavedChanges).toBe(false);
         });
 
         it('should throw error when used outside provider', () => {
@@ -39,20 +39,20 @@ describe('UnifiedDataContext', () => {
                 wrapper: TestWrapper
             });
 
-            expect(result.current.isDirty).toBe(false);
+            expect(result.current.getState().metadata.isDirty).toBe(false);
 
             await act(async () => {
                 await result.current.dispatch({
                     type: OperationTypes.UPDATE_WIDGET_CONFIG,
                     payload: {
-                        id: 'test-widget',
+                        widgetId: 'test-widget',
                         config: { title: 'Test Widget' }
                     }
                 });
             });
 
-            expect(result.current.isDirty).toBe(true);
-            expect(result.current.hasUnsavedChanges).toBe(true);
+            expect(result.current.getState().metadata.isDirty).toBe(true);
+            expect(result.current.getState().metadata.hasUnsavedChanges).toBe(true);
         });
 
         it('should reset isDirty when widgets are saved', async () => {
@@ -65,13 +65,13 @@ describe('UnifiedDataContext', () => {
                 await result.current.dispatch({
                     type: OperationTypes.UPDATE_WIDGET_CONFIG,
                     payload: {
-                        id: 'test-widget',
+                        widgetId: 'test-widget',
                         config: { title: 'Test Widget' }
                     }
                 });
             });
 
-            expect(result.current.isDirty).toBe(true);
+            expect(result.current.getState().metadata.isDirty).toBe(true);
 
             // Mark as saved
             await act(async () => {
@@ -81,8 +81,8 @@ describe('UnifiedDataContext', () => {
                 });
             });
 
-            expect(result.current.isDirty).toBe(false);
-            expect(result.current.hasUnsavedChanges).toBe(false);
+            expect(result.current.getState().metadata.isDirty).toBe(false);
+            expect(result.current.getState().metadata.hasUnsavedChanges).toBe(false);
         });
 
         it('should handle manual dirty state setting', async () => {
@@ -91,16 +91,22 @@ describe('UnifiedDataContext', () => {
             });
 
             await act(async () => {
-                result.current.setIsDirty(true);
+                await result.current.dispatch({
+                    type: OperationTypes.SET_METADATA,
+                    payload: { isDirty: true }
+                });
             });
 
-            expect(result.current.isDirty).toBe(true);
+            expect(result.current.getState().metadata.isDirty).toBe(true);
 
             await act(async () => {
-                result.current.setIsDirty(false);
+                await result.current.dispatch({
+                    type: OperationTypes.SET_METADATA,
+                    payload: { isDirty: false }
+                });
             });
 
-            expect(result.current.isDirty).toBe(false);
+            expect(result.current.getState().metadata.isDirty).toBe(false);
         });
     });
 
@@ -118,7 +124,7 @@ describe('UnifiedDataContext', () => {
                     type: OperationTypes.ADD_WIDGET,
                     payload: {
                         pageId: 'test-page',
-                        slotId: 'main',
+                        slotName: 'main',
                         widgetType: 'core_widgets.ContentWidget',
                         config: { content: 'Hello' },
                         widgetId
@@ -126,32 +132,32 @@ describe('UnifiedDataContext', () => {
                 });
             });
 
-            expect(result.current.state.widgets[widgetId]).toBeDefined();
-            expect(result.current.isDirty).toBe(true);
+            expect(result.current.getState().widgets[widgetId]).toBeDefined();
+            expect(result.current.getState().metadata.isDirty).toBe(true);
 
             // Update widget
             await act(async () => {
                 await result.current.dispatch({
                     type: OperationTypes.UPDATE_WIDGET_CONFIG,
                     payload: {
-                        id: widgetId,
+                        widgetId,
                         config: { content: 'Updated Hello' }
                     }
                 });
             });
 
-            expect(result.current.state.widgets[widgetId].config.content).toBe('Updated Hello');
+            expect(result.current.getState().widgets[widgetId].config.content).toBe('Updated Hello');
 
             // Remove widget
             await act(async () => {
                 await result.current.dispatch({
                     type: OperationTypes.REMOVE_WIDGET,
-                    payload: { id: widgetId }
+                    payload: { widgetId }
                 });
             });
 
-            expect(result.current.state.widgets[widgetId]).toBeUndefined();
-            expect(result.current.isDirty).toBe(false);
+            expect(result.current.getState().widgets[widgetId]).toBeUndefined();
+            expect(result.current.getState().metadata.isDirty).toBe(false);
         });
 
         it('should handle batch operations', async () => {
@@ -163,47 +169,54 @@ describe('UnifiedDataContext', () => {
                 await result.current.batchDispatch([
                     {
                         type: OperationTypes.UPDATE_WIDGET_CONFIG,
-                        payload: { id: 'widget1', config: { title: 'Widget 1' } }
+                        payload: { widgetId: 'widget1', config: { title: 'Widget 1' } }
                     },
                     {
                         type: OperationTypes.UPDATE_WIDGET_CONFIG,
-                        payload: { id: 'widget2', config: { title: 'Widget 2' } }
+                        payload: { widgetId: 'widget2', config: { title: 'Widget 2' } }
                     }
                 ]);
             });
 
-            expect(result.current.isDirty).toBe(true);
-            expect(result.current.hasUnsavedChanges).toBe(true);
+            expect(result.current.getState().metadata.isDirty).toBe(true);
+            expect(result.current.getState().metadata.hasUnsavedChanges).toBe(true);
         });
     });
 
     describe('Subscriptions', () => {
-        it('should provide working useSelector', async () => {
+        it('should handle state subscriptions', async () => {
+            const stateCallback = vi.fn();
+
             const { result } = renderHook(() => {
-                const { useSelector, dispatch } = useUnifiedData();
-                const isDirty = useUnifiedData().isDirty; // Use context metadata instead
-                return { isDirty, dispatch };
+                const { subscribe, dispatch } = useUnifiedData();
+
+                React.useEffect(() => {
+                    return subscribe(
+                        state => state.metadata.isDirty,
+                        stateCallback
+                    );
+                }, [subscribe]);
+
+                return { dispatch };
             }, {
                 wrapper: TestWrapper
             });
-
-            expect(result.current.isDirty).toBe(false);
 
             await act(async () => {
                 await result.current.dispatch({
                     type: OperationTypes.UPDATE_WIDGET_CONFIG,
                     payload: {
-                        id: 'test-widget',
+                        widgetId: 'test-widget',
                         config: { title: 'Test' }
                     }
                 });
             });
 
-            expect(result.current.isDirty).toBe(true);
+            expect(stateCallback).toHaveBeenCalledWith(true, false);
         });
 
         it('should handle operation subscriptions', async () => {
-            const operationCallback = jest.fn();
+            const operationCallback = vi.fn();
 
             const { result } = renderHook(() => {
                 const { subscribeToOperations, dispatch } = useUnifiedData();
@@ -221,7 +234,7 @@ describe('UnifiedDataContext', () => {
                 await result.current.dispatch({
                     type: OperationTypes.UPDATE_WIDGET_CONFIG,
                     payload: {
-                        id: 'test-widget',
+                        widgetId: 'test-widget',
                         config: { title: 'Test' }
                     }
                 });
@@ -237,9 +250,9 @@ describe('UnifiedDataContext', () => {
 
     describe('Error Handling', () => {
         it('should handle operation errors', async () => {
-            const onError = jest.fn();
+            const onError = vi.fn();
             const TestWrapperWithError: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-                <UnifiedDataProvider onError={onError}>
+                <UnifiedDataProvider initialState={{}} onError={onError}>
                     {children}
                 </UnifiedDataProvider>
             );
@@ -274,21 +287,24 @@ describe('UnifiedDataContext', () => {
                 await result.current.dispatch({
                     type: OperationTypes.UPDATE_WIDGET_CONFIG,
                     payload: {
-                        id: 'test-widget',
+                        widgetId: 'test-widget',
                         config: { title: 'Test' }
                     }
                 });
             });
 
-            expect(result.current.isDirty).toBe(true);
+            expect(result.current.getState().metadata.isDirty).toBe(true);
 
             // Reset
             await act(async () => {
-                result.current.reset();
+                await result.current.dispatch({
+                    type: OperationTypes.RESET_STATE,
+                    payload: undefined
+                });
             });
 
-            expect(result.current.isDirty).toBe(false);
-            expect(result.current.hasUnsavedChanges).toBe(false);
+            expect(result.current.getState().metadata.isDirty).toBe(false);
+            expect(result.current.getState().metadata.hasUnsavedChanges).toBe(false);
         });
 
         it('should clear errors', async () => {
@@ -297,10 +313,13 @@ describe('UnifiedDataContext', () => {
             });
 
             await act(async () => {
-                result.current.clearErrors();
+                await result.current.dispatch({
+                    type: OperationTypes.SET_METADATA,
+                    payload: { errors: {} }
+                });
             });
 
-            expect(result.current.errors).toEqual({}); // Use context errors instead
+            expect(result.current.getState().metadata.errors).toEqual({});
         });
     });
 });

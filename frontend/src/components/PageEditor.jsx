@@ -25,7 +25,11 @@ import { smartSave, analyzeChanges, determineSaveStrategy, generateChangeSummary
 import { WIDGET_ACTIONS } from '../utils/widgetConstants'
 import { useNotificationContext } from './NotificationManager'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
-import { useUnifiedData, usePageOperations, useDataLoader, useWidgetSync } from '../contexts/unified-data'
+import { useUnifiedData } from '../contexts/unified-data/v2/context/UnifiedDataContext'
+import { usePageOperations } from '../contexts/unified-data/v2/hooks/usePageOperations'
+import { useDataLoader } from '../contexts/unified-data/v2/hooks/useDataLoader'
+import { useWidgetSync } from '../contexts/unified-data/v2/hooks/useWidgetSync'
+import { useStatusOperations } from '../contexts/unified-data/v2/hooks/useStatusOperations'
 import ContentEditor from './ContentEditor'
 import PageContentEditor from '../editors/page-editor/PageContentEditor'
 import ErrorTodoSidebar from './ErrorTodoSidebar'
@@ -168,22 +172,43 @@ const PageEditor = () => {
         return path
     }
 
-    // Use unified data context for state management
+    // Use v2 context hooks for state management
+    const unifiedDataContext = useUnifiedData()
+
+    // Use status operations for state management
     const {
-        hasUnsavedChanges,
-        isDirty,
-        setIsDirty,
-        isLoading: isContextLoading,
-        setIsLoading,
-        errors: contextErrors,
-        setError,
+        getSaveState,
+        getValidationState,
+        setLoading,
+        setDirty,
+        setError
+    } = useStatusOperations()
+
+    // Get current state values
+    const saveState = getSaveState()
+    const validationState = getValidationState()
+
+    // Extract state values
+    const isDirty = saveState.isDirty
+    const hasUnsavedChanges = saveState.hasUnsavedChanges
+    const isContextLoading = saveState.isLoading
+    const contextErrors = validationState.errors
+
+    // Use specialized operation hooks
+    const {
         markWidgetDirty,
         markWidgetSaved,
-        setWidgetError
-    } = useUnifiedData()
-    const pageOperations = usePageOperations(pageId || '')
-    const dataLoader = useDataLoader()
-    const widgetSync = useWidgetSync(pageId || '')
+        setWidgetError,
+        updatePageData: updatePageState,
+        loadPageData,
+        syncWidgetsFromContext,
+        isContextPrimary,
+        setContextAsPrimary
+    } = usePageOperations(pageId || '')
+
+    // Use data loader and widget sync hooks
+    const { loadPageData: loadPageDataToContext } = useDataLoader()
+    const { syncWidgets, subscribeToWidgets, isContextPrimary: isWidgetSyncPrimary } = useWidgetSync()
 
     // Redirect to content tab if no tab is specified
     useEffect(() => {
@@ -292,8 +317,8 @@ const PageEditor = () => {
 
     // Update context loading state
     useEffect(() => {
-        setIsLoading(isLoadingWebpage || isLoadingPageVersion)
-    }, [isLoadingWebpage, isLoadingPageVersion, setIsLoading])
+        setLoading(isLoadingWebpage || isLoadingPageVersion)
+    }, [isLoadingWebpage, isLoadingPageVersion, setLoading])
 
     // Add loading notifications for page data
     useEffect(() => {
@@ -342,24 +367,28 @@ const PageEditor = () => {
         }
     }, [pageVersion, isNewPage])
 
-    // Load data into UnifiedDataContext when page data is available
+    // Load data into v2 context when page data is available
     useEffect(() => {
         // Track if the effect is still valid
         let isValid = true;
 
         const loadData = async () => {
             if (webpage && pageVersion && layoutData && !isNewPage) {
-
                 try {
-                    await dataLoader.loadPageData(webpage, pageVersion, layoutData);
+                    // Load data into context
+                    await loadPageDataToContext(webpage, pageVersion, layoutData);
+
+                    // Load data into page operations
+                    await loadPageData(webpage, pageVersion, layoutData);
+
                     if (isValid) {
                         // Set primary source after successful load
-                        widgetSync.setContextAsPrimary(true);
+                        setContextAsPrimary(true);
                     }
                 } catch (error) {
                     if (isValid) {
-                        console.error('❌ PageEditor: Failed to load data into UnifiedDataContext', error);
-                        widgetSync.setContextAsPrimary(false);
+                        console.error('❌ PageEditor: Failed to load data into v2 context', error);
+                        setContextAsPrimary(false);
                     }
                 }
             }
@@ -371,7 +400,7 @@ const PageEditor = () => {
         return () => {
             isValid = false;
         };
-    }, [webpage?.id, pageVersion?.id, layoutData?.id, isNewPage])
+    }, [webpage?.id, pageVersion?.id, layoutData?.id, isNewPage, loadPageDataToContext, loadPageData, setContextAsPrimary])
 
     // Fetch layout data when page has a codeLayout, with fallback support
     useEffect(() => {
@@ -626,7 +655,7 @@ const PageEditor = () => {
         }
     }, [webpageData, availableVersions, showError, addNotification, location.pathname, buildUrlWithVersion, previousView]);
 
-    // Handle page data updates - route to appropriate data structure
+    // Handle page data updates using v2 context
     const updatePageData = useCallback((updates) => {
         // Handle version changes from LayoutRenderer
         if (updates.versionChanged && updates.pageVersionData) {
@@ -636,39 +665,22 @@ const PageEditor = () => {
             return; // Don't set dirty for version switches
         }
 
-        // Define fields that belong to WebPage model (sync with PAGE_FIELDS in smartSaveUtils.js)
-        const webpageFields = [
-            'title', 'slug', 'description', 'parent', 'parentId', 'sortOrder',
-            'hostnames', 'enableCssInjection', 'pageCssVariables', 'pageCustomCss'
-        ]
+        // Update page data in context
+        updatePageState(updates);
 
-        // Separate updates into webpage and version updates
-        const webpageUpdates = {}
-        const versionUpdates = {}
-
-        Object.entries(updates).forEach(([key, value]) => {
-            if (webpageFields.includes(key)) {
-                webpageUpdates[key] = value
-            } else if (key === 'metaTitle') {
-                // Special case: metaTitle should update both webpage title and version metaTitle
-                webpageUpdates.title = value
-                versionUpdates.metaTitle = value
-            } else {
-                // Everything else goes to version data (widgets, codeLayout, pageData, etc.)
-                versionUpdates[key] = value
-            }
-        })
+        // Update local state for UI
+        const { webpageUpdates, versionUpdates } = updatePageState(updates);
 
         // Apply updates to appropriate state
         if (Object.keys(webpageUpdates).length > 0) {
-            setWebpageData(prev => ({ ...prev, ...webpageUpdates }))
+            setWebpageData(prev => ({ ...prev, ...webpageUpdates }));
         }
         if (Object.keys(versionUpdates).length > 0) {
-            setPageVersionData(prev => ({ ...prev, ...versionUpdates }))
+            setPageVersionData(prev => ({ ...prev, ...versionUpdates }));
         }
 
-        setIsDirty(true)
-    }, [switchToVersion])
+        setDirty(true);
+    }, [switchToVersion, updatePageState]);
 
     // NEW: Validation-driven sync handlers
     const handleValidatedPageDataSync = useCallback((validatedData) => {
@@ -680,7 +692,7 @@ const PageEditor = () => {
                 ...validatedData
             }
         }))
-        setIsDirty(true) // Mark as dirty since we have new validated data
+        setDirty(true) // Mark as dirty since we have new validated data
     }, [])
 
 
@@ -781,7 +793,7 @@ const PageEditor = () => {
             setPageVersionData(updatedVersionData);
             setOriginalWebpageData(updatedWebpageData); // Update original for next comparison
             setOriginalPageVersionData(updatedVersionData); // Update original for next comparison
-            setIsDirty(false);
+            setDirty(false);
 
             // Clear To-Do items on success
             setErrorTodoItems([])
@@ -1029,21 +1041,17 @@ const PageEditor = () => {
 
     // Memoized callback to prevent ContentEditor re-renders
     const handleDirtyChange = useCallback((isDirty, reason) => {
-        setIsDirty(isDirty);
+        setDirty(isDirty);
     }, [])
 
-    // Subscribe to widget operations using unified data context
-    const { subscribeToOperations } = useUnifiedData()
-
+    // Subscribe to widget operations using v2 context
     useEffect(() => {
-        // Handler for widget operations - sync UnifiedDataContext changes to PageEditor
+        // Handler for widget operations - sync v2 context changes to PageEditor
         const handleWidgetOperation = (operation) => {
-
-            // If UnifiedDataContext is primary, sync changes to PageEditor's local state
-            if (widgetSync.isContextPrimary) {
-
-                // Get updated widgets from UnifiedDataContext
-                const updatedSlotWidgets = widgetSync.syncWidgetsFromContext();
+            // If context is primary, sync changes to PageEditor's local state
+            if (isContextPrimary) {
+                // Get updated widgets from context
+                const updatedSlotWidgets = syncWidgetsFromContext();
 
                 // Update PageEditor's local state
                 setPageVersionData(prev => ({
@@ -1052,58 +1060,22 @@ const PageEditor = () => {
                 }));
 
                 // Update visual representation
-                if (contentEditorRef.current && contentEditorRef.current.layoutRenderer) {
-                    const renderer = contentEditorRef.current.layoutRenderer;
-                    // Force update to reflect UnifiedDataContext changes
-                    renderer.forceUpdate?.();
+                if (contentEditorRef.current?.layoutRenderer) {
+                    contentEditorRef.current.layoutRenderer.forceUpdate?.();
                 }
-
-                return;
             }
-
-            // Legacy handling for when PageEditor is primary (backward compatibility)
-            if (operation.type === 'UPDATE_WIDGET_CONFIG') {
-                const { id: widgetId, config } = operation.payload
-
-                setPageVersionData(prev => {
-                    const widgets = prev?.widgets || {}
-                    const updatedWidgets = { ...widgets }
-
-                    for (const [slotName, slotWidgets] of Object.entries(widgets)) {
-                        const updatedSlotWidgets = slotWidgets.map(widget =>
-                            widget.id === widgetId
-                                ? { ...widget, config: { ...widget.config, ...config } }
-                                : widget
-                        )
-                        if (updatedSlotWidgets.some(w => w.id === widgetId)) {
-                            updatedWidgets[slotName] = updatedSlotWidgets
-
-                            if (contentEditorRef.current && contentEditorRef.current.layoutRenderer) {
-                                const renderer = contentEditorRef.current.layoutRenderer
-                                const updatedWidget = updatedSlotWidgets.find(w => w.id === widgetId)
-                                renderer.executeWidgetDataCallback(WIDGET_ACTIONS.UPDATE, slotName, updatedWidget)
-                                renderer.updateSlot(slotName, renderer.getSlotWidgetData(slotName))
-                            }
-                            break
-                        }
-                    }
-
-                    return { ...prev, widgets: updatedWidgets }
-                })
-            }
-        }
+        };
 
         // Subscribe to widget operations
-        const unsubscribeOperations = subscribeToOperations(
-            handleWidgetOperation,
-            ['UPDATE_WIDGET_CONFIG', 'MOVE_WIDGET', 'ADD_WIDGET', 'REMOVE_WIDGET']
-        )
+        const unsubscribe = subscribeToWidgets(pageId || '', handleWidgetOperation);
 
-        // Cleanup subscriptions
+        // Cleanup subscription
         return () => {
-            unsubscribeOperations()
-        }
-    }, [subscribeToOperations, addNotification, widgetSync])
+            if (typeof unsubscribe === 'function') {
+                unsubscribe();
+            }
+        };
+    }, [isContextPrimary, subscribeToWidgets, syncWidgetsFromContext, pageId]);
 
     // Tab navigation (main tabs)
     const tabs = [

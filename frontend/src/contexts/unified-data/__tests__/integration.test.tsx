@@ -1,14 +1,25 @@
 import React from 'react';
 import { render, renderHook, act, screen } from '@testing-library/react';
-import { UnifiedDataProvider, useUnifiedData } from '../context/UnifiedDataContext';
-import { useWidgetOperations } from '../hooks/useWidgetOperations';
-import { useBatchOperations } from '../hooks/useBatchOperations';
-import { OperationTypes } from '../types/operations';
+import { UnifiedDataProvider, useUnifiedData } from '../v2/context/UnifiedDataContext';
+import { useWidgetOperations } from '../v2/hooks/useWidgetOperations';
+import { useBatchOperations } from '../v2/hooks/useBatchOperations';
+import { OperationTypes } from '../v2/types/operations';
+import { UnifiedState } from '../v2/types/state';
 
 // Test component that uses UnifiedDataContext
 const TestComponent: React.FC = () => {
-    const { isDirty, hasUnsavedChanges, setIsDirty } = useUnifiedData();
+    const { getState, dispatch } = useUnifiedData();
     const widgetOps = useWidgetOperations('test-widget');
+
+    const isDirty = getState().metadata.isDirty;
+    const hasUnsavedChanges = getState().metadata.hasUnsavedChanges;
+
+    const setIsDirty = (value: boolean) => {
+        dispatch({
+            type: OperationTypes.SET_METADATA,
+            payload: { isDirty: value }
+        });
+    };
 
     return (
         <div>
@@ -36,11 +47,11 @@ const TestComponent: React.FC = () => {
     );
 };
 
-describe('UnifiedDataContext Integration', () => {
+describe('UnifiedDataContext v2 Integration', () => {
     describe('Complete Widget Workflow', () => {
         it('should handle full widget editing workflow', async () => {
             render(
-                <UnifiedDataProvider>
+                <UnifiedDataProvider initialState={{}}>
                     <TestComponent />
                 </UnifiedDataProvider>
             );
@@ -70,7 +81,7 @@ describe('UnifiedDataContext Integration', () => {
 
         it('should handle manual dirty state setting', async () => {
             render(
-                <UnifiedDataProvider>
+                <UnifiedDataProvider initialState={{}}>
                     <TestComponent />
                 </UnifiedDataProvider>
             );
@@ -88,13 +99,13 @@ describe('UnifiedDataContext Integration', () => {
     describe('Multiple Widget Management', () => {
         it('should handle multiple widgets correctly', async () => {
             const { result } = renderHook(() => {
-                const context = useUnifiedData();
+                const { getState } = useUnifiedData();
                 const widget1 = useWidgetOperations('widget1');
                 const widget2 = useWidgetOperations('widget2');
-                return { context, widget1, widget2 };
+                return { getState, widget1, widget2 };
             }, {
                 wrapper: ({ children }) => (
-                    <UnifiedDataProvider>{children}</UnifiedDataProvider>
+                    <UnifiedDataProvider initialState={{}}>{children}</UnifiedDataProvider>
                 )
             });
 
@@ -103,40 +114,40 @@ describe('UnifiedDataContext Integration', () => {
                 await result.current.widget1.updateConfig({ title: 'Widget 1' });
             });
 
-            expect(result.current.context.isDirty).toBe(true);
+            expect(result.current.getState().metadata.isDirty).toBe(true);
 
             // Update second widget
             await act(async () => {
                 await result.current.widget2.updateConfig({ title: 'Widget 2' });
             });
 
-            expect(result.current.context.isDirty).toBe(true);
+            expect(result.current.getState().metadata.isDirty).toBe(true);
 
             // Save first widget
             await act(async () => {
                 await result.current.widget1.saveWidget();
             });
 
-            expect(result.current.context.isDirty).toBe(true); // Still dirty (widget2 unsaved)
+            expect(result.current.getState().metadata.isDirty).toBe(true); // Still dirty (widget2 unsaved)
 
             // Save second widget
             await act(async () => {
                 await result.current.widget2.saveWidget();
             });
 
-            expect(result.current.context.isDirty).toBe(false); // Now clean
+            expect(result.current.getState().metadata.isDirty).toBe(false); // Now clean
         });
     });
 
     describe('Batch Operations Integration', () => {
         it('should integrate batch operations with context', async () => {
             const { result } = renderHook(() => {
-                const context = useUnifiedData();
+                const { getState } = useUnifiedData();
                 const batch = useBatchOperations();
-                return { context, batch };
+                return { getState, batch };
             }, {
                 wrapper: ({ children }) => (
-                    <UnifiedDataProvider>{children}</UnifiedDataProvider>
+                    <UnifiedDataProvider initialState={{}}>{children}</UnifiedDataProvider>
                 )
             });
 
@@ -144,46 +155,41 @@ describe('UnifiedDataContext Integration', () => {
                 // Add operations to batch
                 result.current.batch.addOperation({
                     type: OperationTypes.UPDATE_WIDGET_CONFIG,
-                    payload: { id: 'widget1', config: { title: 'Widget 1' } }
+                    payload: { widgetId: 'widget1', config: { title: 'Widget 1' } }
                 });
                 result.current.batch.addOperation({
                     type: OperationTypes.UPDATE_WIDGET_CONFIG,
-                    payload: { id: 'widget2', config: { title: 'Widget 2' } }
+                    payload: { widgetId: 'widget2', config: { title: 'Widget 2' } }
                 });
 
                 // Execute batch
                 await result.current.batch.executeBatch();
             });
 
-            expect(result.current.context.isDirty).toBe(true);
-            expect(result.current.batch.completedCount).toBe(2);
-            expect(result.current.batch.errorCount).toBe(0);
+            expect(result.current.getState().metadata.isDirty).toBe(true);
+            expect(result.current.batch.getStats().completedOperations).toBe(2);
+            expect(result.current.batch.getStats().failedOperations).toBe(0);
         });
     });
 
     describe('Provider with Initial State', () => {
         it('should initialize with provided state', () => {
-            const initialState = {
+            const initialState: Partial<UnifiedState> = {
                 widgets: {
                     'existing-widget': {
                         id: 'existing-widget',
                         type: 'core_widgets.ContentWidget',
-                        slot: 'main',
+                        slotName: 'main',
                         config: { content: 'Existing content' },
-                        order: 0,
-                        created_at: new Date().toISOString(),
-                        updated_at: new Date().toISOString()
+                        pageId: 'test-page',
+                        order: 0
                     }
                 },
                 metadata: {
                     isDirty: true,
-                    widgetStates: {
-                        unsavedChanges: {
-                            'existing-widget': true
-                        },
-                        errors: {},
-                        activeEditors: []
-                    }
+                    hasUnsavedChanges: true,
+                    isLoading: false,
+                    errors: {}
                 }
             };
 
@@ -195,9 +201,9 @@ describe('UnifiedDataContext Integration', () => {
                 )
             });
 
-            expect(result.current.isDirty).toBe(true);
-            expect(result.current.hasUnsavedChanges).toBe(true);
-            expect(result.current.state.widgets['existing-widget']).toBeDefined();
+            expect(result.current.getState().metadata.isDirty).toBe(true);
+            expect(result.current.getState().metadata.hasUnsavedChanges).toBe(true);
+            expect(result.current.getState().widgets['existing-widget']).toBeDefined();
         });
     });
 
@@ -208,15 +214,18 @@ describe('UnifiedDataContext Integration', () => {
 
             const { result } = renderHook(() => useUnifiedData(), {
                 wrapper: ({ children }) => (
-                    <UnifiedDataProvider onError={onError}>
+                    <UnifiedDataProvider
+                        initialState={{}}
+                        options={{ onError }}
+                    >
                         {children}
                     </UnifiedDataProvider>
                 )
             });
 
-            act(async () => {
+            act(() => {
                 try {
-                    await result.current.dispatch({
+                    result.current.dispatch({
                         type: 'INVALID_OPERATION' as any,
                         payload: {}
                     });
@@ -236,7 +245,7 @@ describe('UnifiedDataContext Integration', () => {
         it('should handle many operations efficiently', async () => {
             const { result } = renderHook(() => useUnifiedData(), {
                 wrapper: ({ children }) => (
-                    <UnifiedDataProvider>{children}</UnifiedDataProvider>
+                    <UnifiedDataProvider initialState={{}}>{children}</UnifiedDataProvider>
                 )
             });
 
@@ -245,10 +254,13 @@ describe('UnifiedDataContext Integration', () => {
             await act(async () => {
                 const operations = Array.from({ length: 100 }, (_, i) => ({
                     type: OperationTypes.UPDATE_WIDGET_CONFIG,
-                    payload: { id: `widget${i}`, config: { title: `Widget ${i}` } }
+                    payload: { widgetId: `widget${i}`, config: { title: `Widget ${i}` } }
                 }));
 
-                await result.current.batchDispatch(operations);
+                await result.current.dispatch({
+                    type: OperationTypes.BATCH,
+                    payload: operations
+                });
             });
 
             const endTime = performance.now();
@@ -256,7 +268,7 @@ describe('UnifiedDataContext Integration', () => {
 
             // Should complete within reasonable time (adjust threshold as needed)
             expect(duration).toBeLessThan(1000); // 1 second
-            expect(result.current.isDirty).toBe(true);
+            expect(result.current.getState().metadata.isDirty).toBe(true);
         });
     });
 });

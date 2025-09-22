@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import { objectInstancesApi, objectTypesApi, objectVersionsApi } from '../api/objectStorage'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
-import { useUnifiedData } from '../contexts/unified-data'
+import { useUnifiedData } from '../contexts/unified-data/v2/context/UnifiedDataContext'
 import StatusBar from '../components/StatusBar'
 
 // Import individual tab components

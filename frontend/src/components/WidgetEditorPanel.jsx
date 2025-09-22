@@ -3,7 +3,8 @@ import { X, RefreshCw } from 'lucide-react'
 import { getWidgetSchema } from '../api/widgetSchemas.js'
 import { validateWidgetType, clearWidgetTypesCache } from '../utils/widgetTypeValidation.js'
 import DeletedWidgetWarning from './DeletedWidgetWarning.jsx'
-import { useWidgetOperations } from '../contexts/unified-data'
+import { useWidgetOperations } from '../contexts/unified-data/v2/hooks/useWidgetOperations'
+import { useEditorOperations } from '../contexts/unified-data/v2/hooks/useEditorOperations'
 import { SpecialEditorRenderer, hasSpecialEditor } from './special-editors'
 import IsolatedFormRenderer from './IsolatedFormRenderer.jsx'
 
@@ -51,34 +52,64 @@ const WidgetEditorPanel = forwardRef(({
     const rafRef = useRef(null)
     const updateTimeoutRef = useRef(null)
 
-    const { updateConfig, saveWidget, hasUnsavedChanges } = useWidgetOperations(widgetData?.id || '')
+    // Use widget operations from v2 context
+    const {
+        updateConfig,
+        saveWidget,
+        validateConfig,
+        hasUnsavedChanges,
+        getWidgetState
+    } = useWidgetOperations(widgetData?.id || '')
+
+    // Use editor operations from v2 context
+    const {
+        openEditor,
+        closeEditor,
+        saveEditor,
+        isEditorOpen,
+        currentEditingWidget,
+        getEditorState
+    } = useEditorOperations()
 
     // Widget operation functions
     const emitWidgetChanged = useCallback(async (widgetId, slotName, updatedWidget, changeType = 'config') => {
         if (changeType === 'config' && updatedWidget.config) {
             try {
+                // Validate config before updating
+                const isValid = await validateConfig(updatedWidget.config)
+                if (!isValid) {
+                    throw new Error('Invalid widget configuration')
+                }
+
+                // Update config if valid
                 await updateConfig(updatedWidget.config)
+
                 // Call the real-time update callback if provided
                 if (onRealTimeUpdate) {
                     onRealTimeUpdate(updatedWidget)
                 }
             } catch (error) {
                 console.error('Failed to update widget config:', error)
+                throw error
             }
         }
-    }, [updateConfig, onRealTimeUpdate])
+    }, [updateConfig, validateConfig, onRealTimeUpdate])
 
     const emitWidgetSaved = useCallback(async (widgetId, slotName, savedWidget) => {
         try {
+            // Save widget and editor state
             await saveWidget()
+            await saveEditor()
+
             // Call the save callback if provided
             if (onSave) {
                 onSave(savedWidget)
             }
         } catch (error) {
             console.error('Failed to save widget:', error)
+            throw error
         }
-    }, [saveWidget, onSave])
+    }, [saveWidget, saveEditor, onSave])
 
     // Check if widget supports special editor mode
     const supportsSpecialEditor = useCallback(() => {
@@ -289,14 +320,16 @@ const WidgetEditorPanel = forwardRef(({
     // Expose methods to parent component
     useImperativeHandle(ref, () => ({
         getCurrentConfig: () => {
-            // This will be handled by the isolated form
-            return widgetData?.config || {}
+            return getWidgetState().config || {}
         },
         hasUnsavedChanges: () => hasUnsavedChanges,
         resetToOriginal: () => {
-            // Reset handled by unified context
-        }
-    }), [hasUnsavedChanges, widgetData])
+            // Reset handled by v2 context
+            return getEditorState().resetToOriginal()
+        },
+        getEditorState: () => getEditorState(),
+        getWidgetState: () => getWidgetState()
+    }), [hasUnsavedChanges, getEditorState, getWidgetState])
 
     // Handle config changes from special editor
     // const handleSpecialEditorConfigChange = useCallback((newConfig) => {
@@ -307,7 +340,7 @@ const WidgetEditorPanel = forwardRef(({
     // }, [])
 
     // Handle close - revert changes if not saved
-    const handleClose = () => {
+    const handleClose = async () => {
         // Clear any pending real-time update
         if (updateTimeoutRef.current) {
             clearTimeout(updateTimeoutRef.current)
@@ -317,14 +350,16 @@ const WidgetEditorPanel = forwardRef(({
         if (showSpecialEditor) {
             setIsClosingSpecialEditor(true)
             // Wait for exit animation, then close the panel
-            setTimeout(() => {
+            setTimeout(async () => {
                 setShowSpecialEditor(false)
                 setIsClosingSpecialEditor(false)
                 setIsAnimatingSpecialEditor(false)
+                await closeEditor()
                 onClose()
             }, 500)
         } else {
             // Close immediately if special editor is not open
+            await closeEditor()
             onClose()
         }
     }

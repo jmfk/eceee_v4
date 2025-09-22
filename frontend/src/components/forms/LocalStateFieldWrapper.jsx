@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { useFormData } from '../../contexts/unified-data'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import { useField } from '../../contexts/unified-data/v2/hooks/useField'
 
 /**
  * LocalStateFieldWrapper Component
@@ -25,157 +25,69 @@ const LocalStateFieldWrapper = React.memo(({
     debounceMs = 300,
     validateOnChange = true,
     validateOnBlur = true,
-    formId = null, // Optional form ID for buffer integration
-    objectFormBuffer = null, // Direct reference to SelfContainedObjectForm instance
+    formId = null,
     ...wrapperProps
 }) => {
-    // Local state for this field only
+    // Use unified field hook
+    const {
+        value: contextValue,
+        setValue,
+        isDirty,
+        isTouched,
+        isValid,
+        errors,
+        isValidating,
+        validate,
+        handleBlur: handleFieldBlur,
+        reset
+    } = useField(formId ? `form.${formId}.${fieldName}` : fieldName, {
+        debounceTime: debounceMs,
+        validateOnChange,
+        validate: onFieldValidation,
+        transformValue: wrapperProps.transformValue
+    })
+
+    // Local state for immediate updates
     const [localValue, setLocalValue] = useState(initialValue)
-    const [validation, setValidation] = useState(null)
-    const [isValidating, setIsValidating] = useState(false)
-    const [isDirty, setIsDirty] = useState(false)
-    const [isTouched, setIsTouched] = useState(false)
 
-    // Optional buffer integration (no reactive hooks - prevents re-renders)
-    const bufferRef = useRef(objectFormBuffer)
-
-    // Refs to prevent re-renders and manage timeouts
-    const debounceTimeoutRef = useRef(null)
-    const validationTimeoutRef = useRef(null)
-    const initializedRef = useRef(false)
-    const lastSentValueRef = useRef(initialValue)
-
-    // Initialize local value and handle updates intelligently
+    // Sync with context value
     useEffect(() => {
-        if (!initializedRef.current) {
-            // First initialization
-            setLocalValue(initialValue)
-            setIsDirty(false)
-            lastSentValueRef.current = initialValue
-            initializedRef.current = true
-        } else if (bufferRef.current) {
-            // When using buffer, only update if the initialValue change came from buffer
-            // (not from user typing which would create a feedback loop)
-            if (initialValue !== lastSentValueRef.current && localValue !== initialValue) {
-                // This is an external update (from buffer), update the field
-                setLocalValue(initialValue)
-                setIsDirty(false) // Don't mark as dirty for external updates
-                lastSentValueRef.current = initialValue
-            }
-        } else if (initialValue !== lastSentValueRef.current) {
-            // Standard behavior for non-buffer usage
-            setLocalValue(initialValue)
-            setIsDirty(false)
-            lastSentValueRef.current = initialValue
+        if (contextValue !== undefined && contextValue !== localValue) {
+            setLocalValue(contextValue)
         }
-    }, [initialValue, enableUnifiedData, localValue])
+    }, [contextValue])
 
-    // Update buffer reference when it changes
+    // Initialize with initial value
     useEffect(() => {
-        bufferRef.current = objectFormBuffer
-    }, [objectFormBuffer])
-
-    // Debounced function to notify parent and buffer of changes
-    const notifyParentChange = useCallback((value) => {
-        if (debounceTimeoutRef.current) {
-            clearTimeout(debounceTimeoutRef.current)
+        if (initialValue !== undefined && initialValue !== contextValue) {
+            setValue(initialValue)
         }
-        debounceTimeoutRef.current = setTimeout(async () => {
-            if (value !== lastSentValueRef.current) {
-                // Update parent form if callback provided
-                if (onFieldChange) {
-                    onFieldChange(fieldName, value)
-                }
+    }, [initialValue, contextValue, setValue]) // Add proper dependencies
 
-                // Update buffer if enabled (no re-renders!)
-                if (bufferRef.current) {
-                    try {
-                        // Use buffer's updateField method - no reactive state!
-                        bufferRef.current.updateField(fieldName, value, { source: 'user' })
-                    } catch (error) {
-                        console.error('Failed to update field in buffer:', error)
-                    }
-                }
-
-                lastSentValueRef.current = value
-            }
-        }, debounceMs)
-    }, [fieldName, onFieldChange, debounceMs, enableUnifiedData])
-
-    // Debounced validation function
-    const validateField = useCallback(async (value) => {
-        if (!validateOnChange && !validateOnBlur) return
-
-        if (validationTimeoutRef.current) {
-            clearTimeout(validationTimeoutRef.current)
-        }
-
-        setIsValidating(true)
-
-        validationTimeoutRef.current = setTimeout(async () => {
-            try {
-                // If parent provides validation function, use it
-                if (onFieldValidation) {
-                    const result = await onFieldValidation(fieldName, value)
-                    setValidation(result)
-                } else {
-                    // Basic client-side validation
-                    const isRequired = fieldProps.required || wrapperProps.required
-                    const isEmpty = !value || (typeof value === 'string' && value.trim() === '')
-
-                    if (isRequired && isEmpty) {
-                        setValidation({
-                            isValid: false,
-                            errors: [`${fieldProps.label || fieldName} is required`],
-                            warnings: []
-                        })
-                    } else {
-                        setValidation({
-                            isValid: true,
-                            errors: [],
-                            warnings: []
-                        })
-                    }
-                }
-            } catch (error) {
-                console.error(`Validation error for field ${fieldName}:`, error)
-                setValidation({
-                    isValid: false,
-                    errors: ['Validation failed'],
-                    warnings: []
-                })
-            } finally {
-                setIsValidating(false)
-            }
-        }, 150) // Shorter timeout for validation
-    }, [fieldName, onFieldValidation, validateOnChange, validateOnBlur, fieldProps, wrapperProps])
-
-    // Handle field value changes
+    // Handle value changes
     const handleChange = useCallback((newValue) => {
+        // Update local state immediately
         setLocalValue(newValue)
-        setIsDirty(true)
-        // Immediately notify parent for real-time updates
-        notifyParentChange(newValue)
 
-        // Validate if enabled
-        if (validateOnChange) {
-            validateField(newValue)
+        // Update context (debounced)
+        setValue(newValue)
+
+        // Notify parent if needed
+        if (onFieldChange) {
+            onFieldChange(fieldName, newValue)
         }
-    }, [notifyParentChange, validateOnChange, validateField])
+    }, [fieldName, setValue, onFieldChange])
 
-    // Handle field blur events
+    // Handle blur
     const handleBlur = useCallback((e) => {
-        setIsTouched(true)
-        // Validate on blur if enabled
-        if (validateOnBlur && !validateOnChange) {
-            validateField(localValue)
-        }
+        // Handle context blur
+        handleFieldBlur()
 
         // Call original onBlur if provided
         if (fieldProps.onBlur) {
             fieldProps.onBlur(e)
         }
-    }, [validateOnBlur, validateOnChange, validateField, localValue, fieldProps])
+    }, [handleFieldBlur, fieldProps])
 
     // Handle field focus events
     const handleFocus = useCallback((e) => {
@@ -204,7 +116,11 @@ const LocalStateFieldWrapper = React.memo(({
             onChange: handleChange,
             onBlur: handleBlur,
             onFocus: handleFocus,
-            validation,
+            validation: {
+                isValid,
+                errors,
+                warnings: []
+            },
             isValidating,
             isDirty,
             isTouched,
@@ -220,22 +136,18 @@ const LocalStateFieldWrapper = React.memo(({
         handleChange,
         handleBlur,
         handleFocus,
-        validation,
+        isValid,
+        errors,
         isValidating,
         isDirty,
         isTouched,
         fieldName
     ])
 
-    // Cleanup timeouts on unmount
+    // Cleanup on unmount
     useEffect(() => {
         return () => {
-            if (debounceTimeoutRef.current) {
-                clearTimeout(debounceTimeoutRef.current)
-            }
-            if (validationTimeoutRef.current) {
-                clearTimeout(validationTimeoutRef.current)
-            }
+            // Cleanup is now handled by useField hook
         }
     }, [])
     // Render the field component with enhanced props

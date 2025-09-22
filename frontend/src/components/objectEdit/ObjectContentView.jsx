@@ -11,12 +11,9 @@ import ObjectContentEditor from '../ObjectContentEditor'
 import ObjectSchemaForm from '../ObjectSchemaForm'
 import WidgetEditorPanel from '../WidgetEditorPanel'
 import ObjectDataForm from './ObjectDataForm'
-import { useUnifiedData } from '../../contexts/unified-data'
-import { useObjectTitleOperations } from '../../contexts/unified-data/hooks/useObjectTitleOperations'
-import { useObjectDataOperations } from '../../contexts/unified-data/hooks/useObjectDataOperations'
-import { useObjectWidgetOperations } from '../../contexts/unified-data/hooks/useObjectWidgetOperations'
-import { useObjectMetadataOperations } from '../../contexts/unified-data/hooks/useObjectMetadataOperations'
-import { useObjectStatusOperations } from '../../contexts/unified-data/hooks/useObjectStatusOperations'
+import { useUnifiedData } from '../../contexts/unified-data/v2/context/UnifiedDataContext'
+import { useObjectOperations } from '../../contexts/unified-data/v2/hooks/useObjectOperations'
+import { useObjectRegistration } from '../../contexts/unified-data/v2/hooks/useObjectRegistration'
 import { WIDGET_EVENTS, WIDGET_CHANGE_TYPES } from '../../types/widgetEvents'
 import SelfContainedObjectEditor from '../forms/SelfContainedObjectEditor'
 
@@ -25,21 +22,35 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
     const navigate = useNavigate()
     const { instanceId, objectTypeId, tab } = useParams()
 
-    // Use buffer-based data management (no reactive hooks - no re-renders!)
+    // Use unified data management
     const objectId = instance?.id || instanceId || 'new'
 
-    // Refs for buffer instances (no re-renders)
-    const objectFormBufferRef = useRef(null)
+    // Register object in context
+    const { isRegistered } = useObjectRegistration(objectId, {
+        initialData: instance,
+        preserveLocalChanges: true,
+        validateOnRegister: true
+    })
 
-    // Get dirty state directly from buffer (no local state needed)
-    const isDirty = objectFormBufferRef.current?.isDirty || false
-    const hasUnsavedChanges = objectFormBufferRef.current?.hasUnsavedChanges || false
+    // Get unified operations
+    const {
+        titleOperations,
+        dataOperations,
+        widgetOperations,
+        metadataOperations,
+        statusOperations,
+        getCurrentData,
+        isDirty,
+        hasUnsavedChanges
+    } = useObjectOperations(objectId, instance)
 
     const [namespace, setNamespace] = useState(null)
 
-
-    // Widget editor ref and state
+    // Refs
     const objectContentEditorRef = useRef(null)
+    const objectFormBufferRef = useRef(null)
+
+    // Widget editor state
     const [widgetEditorUI, setWidgetEditorUI] = useState({
         isOpen: false,
         editingWidget: null,
@@ -67,6 +78,14 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
         },
         staleTime: 5 * 60 * 1000, // 5 minutes
     })
+
+    // Sync with context data when available
+    useEffect(() => {
+        const contextData = getCurrentData();
+        if (contextData) {
+            setCurrentFormData(contextData);
+        }
+    }, [getCurrentData]);
 
     // Load namespace for media operations (object type's namespace or default)
     useEffect(() => {
@@ -98,41 +117,34 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
     }, [instance])
 
     // Get current widgets for initial render
-    const [localWidgets, setLocalWidgets] = useState(() => getCurrentWidgets())
+    const [localWidgets, setLocalWidgets] = useState(() => instance?.widgets || {})
 
     // Handle real-time widget updates from WidgetEditorPanel
     const handleRealTimeWidgetUpdate = useCallback(async (updatedWidget) => {
-        if (!updatedWidget || !updatedWidget.slotName) return;
+        if (!updatedWidget?.slotName) return
 
         try {
-            if (objectFormBufferRef.current) {
-                // Update through buffer (no re-renders!)
-                const slotName = updatedWidget.slotName;
-                const currentWidgets = objectFormBufferRef.current.getCurrentData()?.widgets || {};
-                const currentSlotWidgets = currentWidgets[slotName] || [];
-                const updatedSlotWidgets = currentSlotWidgets.map(widget =>
-                    widget.id === updatedWidget.id ? updatedWidget : widget
-                );
+            const currentWidgets = getCurrentData()?.widgets || {}
+            const currentSlotWidgets = currentWidgets[updatedWidget.slotName] || []
+            const updatedSlotWidgets = currentSlotWidgets.map(widget =>
+                widget.id === updatedWidget.id ? updatedWidget : widget
+            )
 
-                // Update the slot through buffer
-                objectFormBufferRef.current.updateWidgetSlot(slotName, updatedSlotWidgets, { source: 'user' });
-            } else {
-                // Use widget operations hook directly
-                const currentWidgets = widgetOperations.getCurrentSlotWidgets(updatedWidget.slotName);
-                const updatedSlotWidgets = currentWidgets.map(widget =>
-                    widget.id === updatedWidget.id ? updatedWidget : widget
-                );
+            await widgetOperations.updateWidgetSlot(
+                updatedWidget.slotName,
+                updatedSlotWidgets,
+                { source: 'user' }
+            )
 
-                await widgetOperations.updateWidgetSlot(
-                    updatedWidget.slotName,
-                    updatedSlotWidgets,
-                    { source: 'user' }
-                );
-            }
+            // Update local state for UI
+            setLocalWidgets(prev => ({
+                ...prev,
+                [updatedWidget.slotName]: updatedSlotWidgets
+            }))
         } catch (error) {
-            console.error('Failed to update widget:', error);
+            console.error('Failed to update widget:', error)
         }
-    }, [widgetOperations])
+    }, [getCurrentData, widgetOperations])
 
     // Widget editor state management - direct callback approach instead of polling
     const handleWidgetEditorStateChange = useCallback((newState) => {
@@ -189,34 +201,18 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
     const queryClient = useQueryClient()
     const { addNotification } = useGlobalNotifications()
 
-    // Form data is now managed through buffer (no reactive state)
-    const getCurrentFormData = useCallback(() => {
-        if (objectFormBufferRef.current) {
-            const bufferData = objectFormBufferRef.current.getCurrentData()
-            return {
-                objectTypeId: objectType?.id || '',
-                title: bufferData.title || '',
-                data: bufferData.data || {},
-                status: bufferData.status || 'draft',
-                widgets: bufferData.widgets || {},
-                metadata: bufferData.metadata || {}
-            }
-        }
-        return {
+    // Initialize form data from instance or context
+    const [currentFormData, setCurrentFormData] = useState(() => {
+        const contextData = getCurrentData();
+        return contextData || {
             objectTypeId: objectType?.id || '',
             title: instance?.title || '',
             data: instance?.data || {},
             status: instance?.status || 'draft',
             widgets: instance?.widgets || {},
             metadata: instance?.metadata || {}
-        }
-    }, [objectType, instance])
-
-    // Initialize form data from instance or defaults
-    const formData = useMemo(() => getCurrentFormData(), [objectType, instance])
-
-    // State for current form data (updated by buffer events)
-    const [currentFormData, setCurrentFormData] = useState(formData)
+        };
+    });
 
     // Fetch available object types for selection (when creating)
     const { data: typesResponse } = useQuery({
@@ -301,58 +297,38 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
     }, [isNewInstance, instance?.id, instance?.version, queryClient, addNotification, navigate])
 
 
-    // Get specialized operations for direct updates (when buffer not available)
-    const titleOperations = useObjectTitleOperations(objectId);
-    const dataOperations = useObjectDataOperations(objectId);
-    const widgetOperations = useObjectWidgetOperations(objectId);
-    const metadataOperations = useObjectMetadataOperations(objectId);
-    const statusOperations = useObjectStatusOperations(objectId);
-
-    // Update form field through buffer or specialized hooks
+    // Field change handlers
     const handleInputChange = useCallback((field, value) => {
         try {
-            if (objectFormBufferRef.current) {
-                // Update through buffer - no re-renders!
-                objectFormBufferRef.current.updateField(field, value, { source: 'user' });
-            } else {
-                // Use specialized operations based on field type
-                if (field === 'title') {
-                    titleOperations.updateTitle(value, { source: 'user' });
-                } else if (field === 'status') {
-                    statusOperations.updateStatus(value, { source: 'user' });
-                } else if (field.startsWith('metadata.')) {
-                    const metadataField = field.replace('metadata.', '');
-                    metadataOperations.updateMetadata({ [metadataField]: value }, { source: 'user' });
-                }
+            if (field === 'title') {
+                titleOperations.updateTitle(value, { source: 'user' })
+            } else if (field === 'status') {
+                statusOperations.updateStatus(value, { source: 'user' })
+            } else if (field.startsWith('metadata.')) {
+                const metadataField = field.replace('metadata.', '')
+                metadataOperations.updateMetadata({ [metadataField]: value }, { source: 'user' })
             }
 
-            // Clear error when user starts typing
+            // Clear error
             if (errors[field]) {
-                setErrors(prev => ({ ...prev, [field]: null }));
+                setErrors(prev => ({ ...prev, [field]: null }))
             }
         } catch (error) {
-            console.error('Failed to update field:', field, error);
+            console.error('Failed to update field:', field, error)
         }
     }, [errors, titleOperations, statusOperations, metadataOperations]);
 
-    // Update nested data field through buffer or specialized hooks
     const handleDataFieldChange = useCallback((fieldName, value) => {
         try {
-            if (objectFormBufferRef.current) {
-                // Update data field through buffer - no re-renders!
-                objectFormBufferRef.current.updateField(`data.${fieldName}`, value, { source: 'user' });
-            } else {
-                // Use data operations hook directly
-                dataOperations.updateField(fieldName, value, { source: 'user' });
-            }
+            dataOperations.updateField(fieldName, value, { source: 'user' })
 
-            // Clear error when user starts typing
-            const errorKey = `data_${fieldName}`;
+            // Clear error
+            const errorKey = `data_${fieldName}`
             if (errors[errorKey]) {
-                setErrors(prev => ({ ...prev, [errorKey]: null }));
+                setErrors(prev => ({ ...prev, [errorKey]: null }))
             }
         } catch (error) {
-            console.error('Failed to update data field:', fieldName, error);
+            console.error('Failed to update data field:', fieldName, error)
         }
     }, [errors, dataOperations]);
 
@@ -395,38 +371,18 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
             return
         }
 
-        // Get current data from buffer (this contains all the latest changes!)
-        let saveData
-        if (objectFormBufferRef.current) {
-            const bufferData = objectFormBufferRef.current.getCurrentData()
-            saveData = {
-                objectTypeId: objectType?.id || '',
-                title: bufferData.title,
-                data: bufferData.data,
-                status: bufferData.status,
-                widgets: bufferData.widgets,
-                metadata: bufferData.metadata,
-                // Set parent if creating new instance and parentId is provided
-                ...(isNewInstance && parentId && { parent: parentId })
-            }
-        } else {
-            // Fallback to current form data if buffer not available
-            saveData = {
-                ...formData,
-                widgets: localWidgets,
-                // Set parent if creating new instance and parentId is provided
-                ...(isNewInstance && parentId && { parent: parentId })
-            }
+        const saveData = {
+            objectTypeId: objectType?.id || '',
+            ...getCurrentData(),
+            ...(isNewInstance && parentId && { parent: parentId })
         }
 
         try {
             await handleSaveInternal(saveData, mode)
-            // Form dirty state is now managed by UnifiedDataContext
         } catch (error) {
-            // Error handling is done in handleSaveInternal
             console.error('Save failed:', error)
         }
-    }, [validateForm, addNotification, formData, localWidgets, isNewInstance, parentId, handleSaveInternal, saveMode])
+    }, [validateForm, addNotification, getCurrentData, objectType?.id, isNewInstance, parentId, handleSaveInternal, saveMode])
 
     // Expose methods to parent component
     useImperativeHandle(ref, () => ({
@@ -574,22 +530,20 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
             )}
 
             {/* Widget Editor Panel - positioned at top level for full-screen slide-out */}
-            {widgetEditorUI && (
-                <WidgetEditorPanel
-                    ref={widgetEditorUI.widgetEditorRef}
-                    isOpen={widgetEditorUI.isOpen}
-                    onClose={widgetEditorUI.handleCloseWidgetEditor}
-                    onSave={widgetEditorUI.handleSaveWidget}
-                    onRealTimeUpdate={handleRealTimeWidgetUpdate}
-                    onUnsavedChanges={(hasChanges) => {
-                        setWidgetEditorUI(prev => ({ ...prev, hasUnsavedChanges: hasChanges }))
-                    }}
-                    widgetData={widgetEditorUI.editingWidget}
-                    title={widgetEditorUI.editingWidget ? `Edit ${getWidgetDisplayName(widgetEditorUI.editingWidget.type, widgetTypes)}` : 'Edit Widget'}
-                    autoOpenSpecialEditor={widgetEditorUI.editingWidget?.type === 'core_widgets.ImageWidget'}
-                    namespace={namespace}
-                />
-            )}
+            <WidgetEditorPanel
+                ref={widgetEditorUI.widgetEditorRef}
+                isOpen={widgetEditorUI.isOpen}
+                onClose={() => setWidgetEditorUI(prev => ({ ...prev, isOpen: false }))}
+                onSave={widgetEditorUI.handleSaveWidget}
+                onRealTimeUpdate={handleRealTimeWidgetUpdate}
+                onUnsavedChanges={(hasChanges) => {
+                    setWidgetEditorUI(prev => ({ ...prev, hasUnsavedChanges: hasChanges }))
+                }}
+                widgetData={widgetEditorUI.editingWidget}
+                title={widgetEditorUI.editingWidget ? `Edit ${getWidgetDisplayName(widgetEditorUI.editingWidget.type, widgetTypes)}` : 'Edit Widget'}
+                autoOpenSpecialEditor={widgetEditorUI.editingWidget?.type === 'core_widgets.ImageWidget'}
+                namespace={namespace}
+            />
         </div>
     )
 })

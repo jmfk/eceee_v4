@@ -1,7 +1,25 @@
-import { defaultEqualityFn, shallowEqual, deepEqual } from '../utils/equality';
-import { OperationError, ValidationError, StateError, ErrorCodes, isRetryableError } from '../utils/errors';
+import {
+    defaultEqualityFn,
+    shallowEqual,
+    deepEqual,
+    arrayEqual,
+    memoizedEqualityFn
+} from '../v2/utils/equality';
+import {
+    UnifiedDataError,
+    OperationError,
+    ValidationError,
+    StateError,
+    FormError,
+    FieldError,
+    ErrorCodes,
+    isRetryableError,
+    createRetryStrategy,
+    withErrorBoundary
+} from '../v2/utils/errors';
+import { Operation } from '../v2/types/operations';
 
-describe('Utility Functions', () => {
+describe('Utility Functions v2', () => {
     describe('Equality Functions', () => {
         describe('defaultEqualityFn', () => {
             it('should handle primitive values', () => {
@@ -75,62 +93,147 @@ describe('Utility Functions', () => {
                 expect(shallowEqual(obj1, obj2)).toBe(false);
             });
         });
+
+        describe('arrayEqual', () => {
+            it('should compare arrays with custom comparison', () => {
+                const arr1 = [{ id: 1 }, { id: 2 }];
+                const arr2 = [{ id: 1 }, { id: 2 }];
+                const arr3 = [{ id: 1 }, { id: 3 }];
+
+                const compareById = (a: any, b: any) => a.id === b.id;
+
+                expect(arrayEqual(arr1, arr2, compareById)).toBe(true);
+                expect(arrayEqual(arr1, arr3, compareById)).toBe(false);
+            });
+        });
+
+        describe('memoizedEqualityFn', () => {
+            it('should cache comparison results', () => {
+                const compare = memoizedEqualityFn();
+                const obj1 = { a: 1, b: { c: 2 } };
+                const obj2 = { a: 1, b: { c: 2 } };
+
+                // First comparison
+                expect(compare(obj1, obj2)).toBe(true);
+
+                // Should use cached result
+                expect(compare(obj1, obj2)).toBe(true);
+            });
+        });
     });
 
     describe('Error Classes', () => {
+        describe('UnifiedDataError', () => {
+            it('should create base error with metadata', () => {
+                const error = new UnifiedDataError(
+                    ErrorCodes.SYSTEM_ERROR,
+                    'System error occurred',
+                    { detail: 'test' }
+                );
+
+                expect(error.name).toBe('UnifiedDataError');
+                expect(error.code).toBe(ErrorCodes.SYSTEM_ERROR);
+                expect(error.message).toBe('System error occurred');
+                expect(error.details).toEqual({ detail: 'test' });
+
+                const json = error.toJSON();
+                expect(json.name).toBe('UnifiedDataError');
+                expect(json.code).toBe(ErrorCodes.SYSTEM_ERROR);
+            });
+        });
+
         describe('OperationError', () => {
             it('should create operation error with details', () => {
-                const operation = {
+                const operation: Operation = {
                     type: 'UPDATE_WIDGET_CONFIG',
-                    payload: { id: 'widget1', config: {} }
+                    payload: { widgetId: 'widget1', config: {} }
                 };
 
                 const error = new OperationError(
                     operation,
-                    'TEST_ERROR',
-                    'Test error message',
+                    ErrorCodes.OPERATION_FAILED,
+                    'Operation failed',
                     { detail: 'test' }
                 );
 
                 expect(error.name).toBe('OperationError');
                 expect(error.operation).toBe(operation);
-                expect(error.code).toBe('TEST_ERROR');
-                expect(error.message).toBe('Test error message');
-                expect(error.details).toEqual({ detail: 'test' });
+                expect(error.code).toBe(ErrorCodes.OPERATION_FAILED);
+
+                const json = error.toJSON();
+                expect(json.operation).toBe(operation);
             });
         });
 
         describe('ValidationError', () => {
-            it('should create validation error', () => {
-                const operation = {
+            it('should create validation error with field errors', () => {
+                const operation: Operation = {
                     type: 'UPDATE_WIDGET_CONFIG',
-                    payload: { id: null, config: null }
+                    payload: { widgetId: null, config: null }
+                };
+
+                const validationErrors = {
+                    widgetId: ['Widget ID is required'],
+                    config: ['Config is required']
                 };
 
                 const error = new ValidationError(
                     operation,
-                    'Invalid payload',
-                    { field: 'id' }
+                    'Validation failed',
+                    validationErrors,
+                    { detail: 'test' }
                 );
 
                 expect(error.name).toBe('ValidationError');
-                expect(error.code).toBe('VALIDATION_ERROR');
-                expect(error.message).toBe('Invalid payload');
+                expect(error.validationErrors).toBe(validationErrors);
+
+                const json = error.toJSON();
+                expect(json.validationErrors).toBe(validationErrors);
             });
         });
 
-        describe('StateError', () => {
-            it('should create state error', () => {
-                const error = new StateError(
-                    'INVALID_STATE',
-                    'State is invalid',
-                    { reason: 'missing field' }
+        describe('FormError', () => {
+            it('should create form error with field errors', () => {
+                const fieldErrors = {
+                    title: ['Title is required'],
+                    content: ['Content is too short']
+                };
+
+                const error = new FormError(
+                    'form1',
+                    ErrorCodes.FORM_VALIDATION_ERROR,
+                    'Form validation failed',
+                    fieldErrors,
+                    { detail: 'test' }
                 );
 
-                expect(error.name).toBe('StateError');
-                expect(error.code).toBe('INVALID_STATE');
-                expect(error.message).toBe('State is invalid');
-                expect(error.details).toEqual({ reason: 'missing field' });
+                expect(error.name).toBe('FormError');
+                expect(error.formId).toBe('form1');
+                expect(error.fieldErrors).toBe(fieldErrors);
+
+                const json = error.toJSON();
+                expect(json.formId).toBe('form1');
+                expect(json.fieldErrors).toBe(fieldErrors);
+            });
+        });
+
+        describe('FieldError', () => {
+            it('should create field error with path', () => {
+                const error = new FieldError(
+                    'field1',
+                    'form.section.field1',
+                    ErrorCodes.FIELD_VALIDATION_ERROR,
+                    'Field validation failed',
+                    { detail: 'test' }
+                );
+
+                expect(error.name).toBe('FieldError');
+                expect(error.fieldId).toBe('field1');
+                expect(error.fieldPath).toBe('form.section.field1');
+
+                const json = error.toJSON();
+                expect(json.fieldId).toBe('field1');
+                expect(json.fieldPath).toBe('form.section.field1');
             });
         });
     });
@@ -155,6 +258,63 @@ describe('Utility Functions', () => {
                 expect(isRetryableError(new Error('Regular error'))).toBe(false);
             });
         });
+
+        describe('createRetryStrategy', () => {
+            it('should retry operations with exponential backoff', async () => {
+                const retryStrategy = createRetryStrategy(3, 100, 500);
+                let attempts = 0;
+
+                const operation = async () => {
+                    attempts++;
+                    if (attempts < 3) {
+                        throw new OperationError(
+                            { type: 'TEST', payload: {} },
+                            ErrorCodes.OPERATION_TIMEOUT,
+                            'Timeout'
+                        );
+                    }
+                    return 'success';
+                };
+
+                const result = await retryStrategy(operation);
+                expect(result).toBe('success');
+                expect(attempts).toBe(3);
+            });
+
+            it('should respect max retries', async () => {
+                const retryStrategy = createRetryStrategy(2, 100, 500);
+                let attempts = 0;
+
+                const operation = async () => {
+                    attempts++;
+                    throw new OperationError(
+                        { type: 'TEST', payload: {} },
+                        ErrorCodes.OPERATION_TIMEOUT,
+                        'Timeout'
+                    );
+                };
+
+                await expect(retryStrategy(operation)).rejects.toThrow('Timeout');
+                expect(attempts).toBe(2);
+            });
+        });
+
+        describe('withErrorBoundary', () => {
+            it('should handle errors with custom handler', async () => {
+                const errorHandler = vi.fn();
+
+                await expect(
+                    withErrorBoundary(
+                        async () => {
+                            throw new Error('Test error');
+                        },
+                        errorHandler
+                    )
+                ).rejects.toThrow('Test error');
+
+                expect(errorHandler).toHaveBeenCalled();
+            });
+        });
     });
 
     describe('Error Codes', () => {
@@ -166,7 +326,13 @@ describe('Utility Functions', () => {
             expect(ErrorCodes.OPERATION_CONFLICT).toBeDefined();
             expect(ErrorCodes.INVALID_INITIAL_STATE).toBeDefined();
             expect(ErrorCodes.SUBSCRIPTION_ERROR).toBeDefined();
+            expect(ErrorCodes.SUBSCRIPTION_TIMEOUT).toBeDefined();
+            expect(ErrorCodes.FORM_VALIDATION_ERROR).toBeDefined();
+            expect(ErrorCodes.FORM_SUBMISSION_ERROR).toBeDefined();
+            expect(ErrorCodes.FIELD_VALIDATION_ERROR).toBeDefined();
+            expect(ErrorCodes.FIELD_TYPE_ERROR).toBeDefined();
             expect(ErrorCodes.SYSTEM_ERROR).toBeDefined();
+            expect(ErrorCodes.NETWORK_ERROR).toBeDefined();
         });
     });
 });

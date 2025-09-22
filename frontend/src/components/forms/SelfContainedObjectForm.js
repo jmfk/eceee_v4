@@ -192,7 +192,7 @@ class SelfContainedObjectForm {
         }
 
         // Initialize UnifiedDataContext with current data (without dirty flag)
-        if (this.unifiedDataOperations) {
+        if (this.hasUnifiedDataOperations()) {
             try {
                 await this.syncToUnifiedContext('system') // Mark as system operation
             } catch (error) {
@@ -451,6 +451,11 @@ class SelfContainedObjectForm {
      * Sync current data to UnifiedDataContext (write-only, no re-renders)
      */
     async syncToUnifiedContext(source = 'user') {
+        if (!this.hasUnifiedDataOperations()) {
+            console.warn('SelfContainedObjectForm: No unified data operations available for sync');
+            return;
+        }
+
         try {
             // Update title if changed
             if (this.titleOperations && this.currentData.title !== this.originalData.title) {
@@ -620,6 +625,19 @@ class SelfContainedObjectForm {
      */
     getCurrentData() {
         return { ...this.currentData }
+    }
+
+    /**
+     * Check if unified data operations are available
+     */
+    hasUnifiedDataOperations() {
+        return !!(
+            this.titleOperations ||
+            this.dataOperations ||
+            this.widgetOperations ||
+            this.metadataOperations ||
+            this.statusOperations
+        );
     }
 
     /**

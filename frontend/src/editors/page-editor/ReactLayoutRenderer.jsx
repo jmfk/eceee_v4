@@ -9,7 +9,10 @@ import React, { useState, useEffect, useRef, useCallback, useMemo, forwardRef, u
 import { Layout } from 'lucide-react';
 import { getLayoutComponent, getLayoutMetadata, layoutExists, LAYOUT_REGISTRY } from './layouts/LayoutRegistry';
 // Removed PageEditorEventSystem - now using unified data operations
-import { useUnifiedData, useWidgetSync } from '../../contexts/unified-data';
+import { useUnifiedData } from '../../contexts/unified-data/v2/context/UnifiedDataContext';
+import { useWidgetSync } from '../../contexts/unified-data/v2/hooks/useWidgetSync';
+import { useLayoutOperations } from '../../contexts/unified-data/v2/hooks/useLayoutOperations';
+import { useWidgetOperations } from '../../contexts/unified-data/v2/hooks/useWidgetOperations';
 import { createDefaultWidgetConfig } from '../../hooks/useWidgets';
 import PageWidgetSelectionModal from './PageWidgetSelectionModal';
 
@@ -26,13 +29,33 @@ const ReactLayoutRenderer = forwardRef(({
     onOpenWidgetEditor
 }, ref) => {
 
-    // Use unified data operations for isDirty tracking and widget sync
-    const { dispatch } = useUnifiedData();
-    const widgetSync = useWidgetSync(
+    // Use v2 context hooks for state management
+    const { state } = useUnifiedData();
+    const {
+        syncWidgets,
+        isContextPrimary,
+        syncWidgetsFromContext,
+        syncWidgetsToContext
+    } = useWidgetSync(
         currentVersion?.page_id?.toString() ||
         pageVersionData?.pageId?.toString() ||
         ''
     );
+
+    // Use specialized operation hooks
+    const {
+        addWidget,
+        removeWidget,
+        moveWidget,
+        updateWidgetConfig,
+        validateWidget
+    } = useWidgetOperations();
+
+    const {
+        updateLayout,
+        validateLayout,
+        getLayoutState
+    } = useLayoutOperations();
 
     // Get version context
     const versionId = currentVersion?.id || pageVersionData?.versionId;
@@ -66,236 +89,161 @@ const ReactLayoutRenderer = forwardRef(({
         }
     }), [versionId, isPublished, onVersionChange]);
 
-    // Handle widget actions
+
+    // Handle widget actions using v2 context
     const handleWidgetAction = useCallback(async (action, slotName, widget, ...args) => {
+        try {
+            switch (action) {
+                case 'add': {
+                    const widgetType = args[0] || 'core_widgets.ContentWidget';
+                    const widgetConfig = createDefaultWidgetConfig(widgetType);
 
-        switch (action) {
-            case 'add':
-                const widgetType = args[0] || 'core_widgets.ContentWidget';
-
-
-                const widgetConfig = createDefaultWidgetConfig(widgetType);
-
-                // Create new widget with generated ID
-                const newWidgetId = `widget-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-                const newWidget = {
-                    id: newWidgetId,
-                    type: widgetType,
-                    config: widgetConfig,
-                    order: (widgets[slotName] || []).length
-                };
-
-                // Update local widgets state (this is what gets saved)
-                const addedWidgets = { ...widgets };
-                if (!addedWidgets[slotName]) addedWidgets[slotName] = [];
-                addedWidgets[slotName].push(newWidget);
-
-                if (onWidgetChange) {
-                    onWidgetChange(addedWidgets);
-                }
-
-                if (onDirtyChange) {
-                    onDirtyChange(true, `added widget to ${slotName}`);
-                }
-
-                // Sync to UnifiedDataContext using proper ADD_WIDGET operation
-                try {
-                    const pageId = currentVersion?.page_id?.toString() ||
-                        pageVersionData?.pageId?.toString() || '';
-
-                    await dispatch({
-                        type: 'ADD_WIDGET',
-                        payload: {
-                            pageId: pageId,
-                            slotId: slotName,
-                            widgetType: widgetType,
-                            config: widgetConfig,
-                            widgetId: newWidgetId
-                        }
-                    });
-                } catch (error) {
-                    console.error('❌ Failed to sync widget add to UnifiedDataContext:', error);
-                }
-                break;
-
-            case 'edit':
-                const widgetIndex = args[0];
-                if (onOpenWidgetEditor) {
-                    onOpenWidgetEditor({ ...widget, slotName });
-                }
-                break;
-
-            case 'delete':
-                const deleteIndex = args[0];
-
-                const updatedWidgetsDelete = { ...widgets };
-                if (updatedWidgetsDelete[slotName]) {
-                    updatedWidgetsDelete[slotName] = updatedWidgetsDelete[slotName].filter((_, i) => i !== deleteIndex);
-                }
-
-                if (onWidgetChange) {
-                    onWidgetChange(updatedWidgetsDelete);
-                }
-
-                if (onDirtyChange) {
-                    onDirtyChange(true, `removed widget from ${slotName}`);
-                }
-
-                // Update local widgets state (this is what gets saved)
-                const removedWidgets = { ...widgets };
-                if (removedWidgets[slotName]) {
-                    removedWidgets[slotName] = removedWidgets[slotName].filter(w => w.id !== widget.id);
-                }
-
-                if (onWidgetChange) {
-                    onWidgetChange(removedWidgets);
-                }
-
-                // Sync to UnifiedDataContext using proper REMOVE_WIDGET operation
-                try {
-                    await dispatch({
-                        type: 'REMOVE_WIDGET',
-                        payload: {
-                            id: widget.id
-                        }
-                    });
-                } catch (error) {
-                    console.error('❌ Failed to sync widget removal to UnifiedDataContext:', error);
-                }
-                break;
-
-            case 'moveUp':
-                const moveUpIndex = args[0];
-                if (moveUpIndex > 0) {
-                    const updatedWidgetsUp = { ...widgets };
-                    if (updatedWidgetsUp[slotName]) {
-                        const slotWidgets = [...updatedWidgetsUp[slotName]];
-                        [slotWidgets[moveUpIndex - 1], slotWidgets[moveUpIndex]] =
-                            [slotWidgets[moveUpIndex], slotWidgets[moveUpIndex - 1]];
-                        updatedWidgetsUp[slotName] = slotWidgets;
+                    // Validate widget before adding
+                    const isValid = await validateWidget({ type: widgetType, config: widgetConfig });
+                    if (!isValid) {
+                        throw new Error('Invalid widget configuration');
                     }
 
+                    // Add widget using v2 context
+                    const newWidget = await addWidget({
+                        type: widgetType,
+                        config: widgetConfig,
+                        slotName,
+                        order: (widgets[slotName] || []).length
+                    });
+
+                    // Update local state
+                    const updatedWidgets = { ...widgets };
+                    if (!updatedWidgets[slotName]) updatedWidgets[slotName] = [];
+                    updatedWidgets[slotName].push(newWidget);
+
+                    // Notify parent
                     if (onWidgetChange) {
-                        onWidgetChange(updatedWidgetsUp);
+                        onWidgetChange(updatedWidgets);
                     }
-
                     if (onDirtyChange) {
-                        onDirtyChange(true, `moved widget up in ${slotName}`);
+                        onDirtyChange(true, `added widget to ${slotName}`);
                     }
-
-                    // Update local widgets state (this is what gets saved)
-                    const movedUpWidgets = { ...widgets };
-                    if (movedUpWidgets[slotName]) {
-                        const slotWidgets = [...movedUpWidgets[slotName]];
-                        [slotWidgets[moveUpIndex], slotWidgets[moveUpIndex - 1]] =
-                            [slotWidgets[moveUpIndex - 1], slotWidgets[moveUpIndex]];
-                        movedUpWidgets[slotName] = slotWidgets;
-
-                        if (onWidgetChange) {
-                            onWidgetChange(movedUpWidgets);
-                        }
-
-                        // Sync to UnifiedDataContext using proper MOVE_WIDGET operation
-                        try {
-                            await dispatch({
-                                type: 'MOVE_WIDGET',
-                                payload: {
-                                    id: widget.id,
-                                    slot: slotName,
-                                    order: moveUpIndex - 1
-                                }
-                            });
-                        } catch (error) {
-                            console.error('❌ Failed to sync widget move to UnifiedDataContext:', error);
-                        }
-                    }
+                    break;
                 }
-                break;
 
-            case 'moveDown':
-                const moveDownIndex = args[0];
-                const slotWidgets = widgets[slotName] || [];
-                if (moveDownIndex < slotWidgets.length - 1) {
-                    const updatedWidgetsDown = { ...widgets };
-                    if (updatedWidgetsDown[slotName]) {
-                        const slotWidgetsCopy = [...updatedWidgetsDown[slotName]];
-                        [slotWidgetsCopy[moveDownIndex], slotWidgetsCopy[moveDownIndex + 1]] =
-                            [slotWidgetsCopy[moveDownIndex + 1], slotWidgetsCopy[moveDownIndex]];
-                        updatedWidgetsDown[slotName] = slotWidgetsCopy;
+                case 'edit':
+                    if (onOpenWidgetEditor) {
+                        onOpenWidgetEditor({ ...widget, slotName });
+                    }
+                    break;
+
+                case 'delete': {
+                    // Remove widget using v2 context
+                    await removeWidget(widget.id);
+
+                    // Update local state
+                    const updatedWidgets = { ...widgets };
+                    if (updatedWidgets[slotName]) {
+                        updatedWidgets[slotName] = updatedWidgets[slotName].filter(w => w.id !== widget.id);
                     }
 
+                    // Notify parent
                     if (onWidgetChange) {
-                        onWidgetChange(updatedWidgetsDown);
+                        onWidgetChange(updatedWidgets);
                     }
-
                     if (onDirtyChange) {
-                        onDirtyChange(true, `moved widget down in ${slotName}`);
+                        onDirtyChange(true, `removed widget from ${slotName}`);
                     }
+                    break;
+                }
 
-                    // Update local widgets state (this is what gets saved)
-                    const movedDownWidgets = { ...widgets };
-                    if (movedDownWidgets[slotName]) {
-                        const slotWidgets = [...movedDownWidgets[slotName]];
-                        [slotWidgets[moveDownIndex], slotWidgets[moveDownIndex + 1]] =
-                            [slotWidgets[moveDownIndex + 1], slotWidgets[moveDownIndex]];
-                        movedDownWidgets[slotName] = slotWidgets;
+                case 'moveUp': {
+                    const moveUpIndex = args[0];
+                    if (moveUpIndex > 0) {
+                        // Move widget using v2 context
+                        await moveWidget(widget.id, slotName, moveUpIndex - 1);
 
+                        // Update local state
+                        const updatedWidgets = { ...widgets };
+                        if (updatedWidgets[slotName]) {
+                            const slotWidgets = [...updatedWidgets[slotName]];
+                            [slotWidgets[moveUpIndex - 1], slotWidgets[moveUpIndex]] =
+                                [slotWidgets[moveUpIndex], slotWidgets[moveUpIndex - 1]];
+                            updatedWidgets[slotName] = slotWidgets;
+                        }
+
+                        // Notify parent
                         if (onWidgetChange) {
-                            onWidgetChange(movedDownWidgets);
+                            onWidgetChange(updatedWidgets);
                         }
-
-                        // Sync to UnifiedDataContext using proper MOVE_WIDGET operation
-                        try {
-                            await dispatch({
-                                type: 'MOVE_WIDGET',
-                                payload: {
-                                    id: widget.id,
-                                    slot: slotName,
-                                    order: moveDownIndex + 1
-                                }
-                            });
-                        } catch (error) {
-                            console.error('❌ Failed to sync widget move to UnifiedDataContext:', error);
+                        if (onDirtyChange) {
+                            onDirtyChange(true, `moved widget up in ${slotName}`);
                         }
                     }
-                }
-                break;
-
-            case 'configChange':
-                const newConfig = args[0];
-                const updatedWidgetsConfig = { ...widgets };
-                if (updatedWidgetsConfig[slotName]) {
-                    updatedWidgetsConfig[slotName] = updatedWidgetsConfig[slotName].map(w =>
-                        w.id === widget.id ? { ...w, config: newConfig } : w
-                    );
+                    break;
                 }
 
-                if (onWidgetChange) {
-                    onWidgetChange(updatedWidgetsConfig);
-                }
+                case 'moveDown': {
+                    const moveDownIndex = args[0];
+                    const slotWidgets = widgets[slotName] || [];
+                    if (moveDownIndex < slotWidgets.length - 1) {
+                        // Move widget using v2 context
+                        await moveWidget(widget.id, slotName, moveDownIndex + 1);
 
-                if (onDirtyChange) {
-                    onDirtyChange(true, `updated widget config in ${slotName}`);
-                }
-
-                // Dispatch widget config update operation
-                try {
-                    await dispatch({
-                        type: 'UPDATE_WIDGET_CONFIG',
-                        payload: {
-                            id: widget.id,
-                            config: newConfig
+                        // Update local state
+                        const updatedWidgets = { ...widgets };
+                        if (updatedWidgets[slotName]) {
+                            const slotWidgets = [...updatedWidgets[slotName]];
+                            [slotWidgets[moveDownIndex], slotWidgets[moveDownIndex + 1]] =
+                                [slotWidgets[moveDownIndex + 1], slotWidgets[moveDownIndex]];
+                            updatedWidgets[slotName] = slotWidgets;
                         }
-                    });
-                } catch (error) {
-                    console.error('Failed to update widget config:', error);
-                }
-                break;
 
-            default:
-                break;
+                        // Notify parent
+                        if (onWidgetChange) {
+                            onWidgetChange(updatedWidgets);
+                        }
+                        if (onDirtyChange) {
+                            onDirtyChange(true, `moved widget down in ${slotName}`);
+                        }
+                    }
+                    break;
+                }
+
+                case 'configChange': {
+                    const newConfig = args[0];
+
+                    // Validate config before updating
+                    const isValid = await validateWidget({ ...widget, config: newConfig });
+                    if (!isValid) {
+                        throw new Error('Invalid widget configuration');
+                    }
+
+                    // Update config using v2 context
+                    await updateWidgetConfig(widget.id, newConfig);
+
+                    // Update local state
+                    const updatedWidgets = { ...widgets };
+                    if (updatedWidgets[slotName]) {
+                        updatedWidgets[slotName] = updatedWidgets[slotName].map(w =>
+                            w.id === widget.id ? { ...w, config: newConfig } : w
+                        );
+                    }
+
+                    // Notify parent
+                    if (onWidgetChange) {
+                        onWidgetChange(updatedWidgets);
+                    }
+                    if (onDirtyChange) {
+                        onDirtyChange(true, `updated widget config in ${slotName}`);
+                    }
+                    break;
+                }
+
+                default:
+                    break;
+            }
+        } catch (error) {
+            console.error('❌ Failed to handle widget action:', error);
+            throw error;
         }
-    }, [widgets, onWidgetChange, onDirtyChange, onOpenWidgetEditor, dispatch, versionId, isPublished, onVersionChange]);
+    }, [widgets, onWidgetChange, onDirtyChange, onOpenWidgetEditor, addWidget, removeWidget, moveWidget, updateWidgetConfig, validateWidget]);
 
     // Widget modal handlers
     const handleShowWidgetModal = useCallback((slotName) => {
@@ -315,42 +263,33 @@ const ReactLayoutRenderer = forwardRef(({
         handleCloseWidgetModal();
     }, [selectedSlotForModal, handleWidgetAction, handleCloseWidgetModal]);
 
-    // Clear slot handler
+    // Clear slot handler using v2 context
     const handleClearSlot = useCallback(async (slotName) => {
-        const updatedWidgets = { ...widgets };
-        updatedWidgets[slotName] = [];
-
-        if (onWidgetChange) {
-            onWidgetChange(updatedWidgets);
-        }
-
-        if (onDirtyChange) {
-            onDirtyChange(true, `cleared slot ${slotName}`);
-        }
-
-        // Update local widgets state (this is what gets saved)
-        const clearedSlotWidgets = { ...widgets };
-        const clearedWidgets = clearedSlotWidgets[slotName] || [];
-        clearedSlotWidgets[slotName] = [];
-
-        if (onWidgetChange) {
-            onWidgetChange(clearedSlotWidgets);
-        }
-
-        // Sync to UnifiedDataContext using proper REMOVE_WIDGET operations
         try {
-            for (const widget of clearedWidgets) {
-                await dispatch({
-                    type: 'REMOVE_WIDGET',
-                    payload: {
-                        id: widget.id
-                    }
-                });
+            // Get widgets to clear
+            const widgetsToRemove = widgets[slotName] || [];
+
+            // Remove each widget using v2 context
+            for (const widget of widgetsToRemove) {
+                await removeWidget(widget.id);
+            }
+
+            // Update local state
+            const updatedWidgets = { ...widgets };
+            updatedWidgets[slotName] = [];
+
+            // Notify parent
+            if (onWidgetChange) {
+                onWidgetChange(updatedWidgets);
+            }
+            if (onDirtyChange) {
+                onDirtyChange(true, `cleared slot ${slotName}`);
             }
         } catch (error) {
-            console.error('❌ Failed to sync slot clear to UnifiedDataContext:', error);
+            console.error('❌ Failed to clear slot:', error);
+            throw error;
         }
-    }, [widgets, onWidgetChange, onDirtyChange, versionId, isPublished, dispatch]);
+    }, [widgets, onWidgetChange, onDirtyChange, removeWidget]);
 
     // Get layout component
     const LayoutComponent = getLayoutComponent(layoutName);
@@ -368,12 +307,20 @@ const ReactLayoutRenderer = forwardRef(({
         );
     }
 
-    // Expose methods to parent
+    // Expose methods to parent using v2 context
     useImperativeHandle(ref, () => ({
         saveWidgets: async () => {
             try {
-                // Page save is handled by the unified context automatically
+                // Validate layout before saving
+                const isValid = await validateLayout(layoutName);
+                if (!isValid) {
+                    throw new Error('Invalid layout configuration');
+                }
 
+                // Update layout in v2 context
+                await updateLayout(layoutName);
+
+                // Return success result
                 return {
                     success: true,
                     data: widgets,
@@ -386,16 +333,13 @@ const ReactLayoutRenderer = forwardRef(({
             }
         },
 
-        enableAutoSave: (enabled, interval = 10000) => {
-            // Auto-save functionality can be implemented here if needed
-        },
-
         // Layout-specific methods
         getLayoutName: () => layoutName,
         getLayoutMetadata: () => getLayoutMetadata(layoutName),
         getCurrentWidgets: () => widgets,
-        // Removed pageEventSystem - now using unified data operations
-    }), [widgets, layoutName, versionId, isPublished]);
+        getLayoutState: () => getLayoutState(),
+        validateLayout: () => validateLayout(layoutName)
+    }), [widgets, layoutName, updateLayout, validateLayout, getLayoutState]);
 
     // Render the layout component
     return (

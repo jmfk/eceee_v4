@@ -6,7 +6,7 @@
  */
 import React, { useCallback } from 'react'
 import MediaSpecialEditor from './MediaSpecialEditor'
-import { useWidgetOperations } from '../../contexts/unified-data'
+import { useWidgetOperations } from '../../contexts/unified-data/v2/hooks/useWidgetOperations'
 
 
 // Registry of special editors mapped to widget types
@@ -45,15 +45,23 @@ const SpecialEditorRenderer = ({
         return null
     }
 
-    const { updateConfig } = useWidgetOperations(widgetData?.id || '')
+    const { updateConfig, validateConfig } = useWidgetOperations(widgetData?.id || '')
 
     const onConfigChange = useCallback(async (newConfig) => {
         try {
+            // Validate config before updating
+            const isValid = await validateConfig(newConfig)
+            if (!isValid) {
+                throw new Error('Invalid widget configuration')
+            }
+
+            // Update config if valid
             await updateConfig(newConfig)
         } catch (error) {
             console.error('Failed to update widget config from special editor:', error)
+            throw error
         }
-    }, [updateConfig])
+    }, [updateConfig, validateConfig])
 
 
 

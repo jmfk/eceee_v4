@@ -2,7 +2,8 @@ import React, { useEffect } from 'react'
 import { ChevronLeft, ChevronRight, Trash2, Save, AlertCircle } from 'lucide-react'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import { useAppStatus } from '../contexts/AppStatusContext'
-import { useUnifiedData } from '../contexts/unified-data'
+import { useUnifiedData } from '../contexts/unified-data/v2/context/UnifiedDataContext'
+import { useStatusOperations } from '../contexts/unified-data/v2/hooks/useStatusOperations'
 import VersionSelector from './VersionSelector'
 
 const StatusBar = ({
@@ -34,8 +35,17 @@ const StatusBar = ({
         warnings
     } = useAppStatus()
 
-    // Get metadata state from UnifiedDataContext
+    // Get metadata state from v2 context
     const { isDirty, hasUnsavedChanges, isLoading, errors: contextErrors } = useUnifiedData()
+
+    // Get status operations from v2 context
+    const {
+        getValidationState,
+        getSaveState,
+        getVersionState,
+        handleSave,
+        handleSaveNew
+    } = useStatusOperations()
     return (
         <div className={`bg-white border-t border-gray-200 px-4 py-2 ${className}`}>
             <div className="flex items-center justify-between text-sm">
@@ -137,12 +147,17 @@ const StatusBar = ({
                             {!isNewPage && (
                                 <>
                                     <button
-                                        onClick={() => onSaveClick && onSaveClick()}
-                                        disabled={isSaving}
+                                        onClick={async () => {
+                                            const result = await handleSave();
+                                            if (result.success && onSaveClick) {
+                                                onSaveClick();
+                                            }
+                                        }}
+                                        disabled={isSaving || !getSaveState().canSave}
                                         className="font-medium px-3 py-1 text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 rounded transition-colors flex items-center space-x-1"
-                                        title={validationState.hasErrors ? "Save changes (validation errors will be handled)" : "Update current version"}
+                                        title={getValidationState().hasErrors ? "Save changes (validation errors will be handled)" : "Update current version"}
                                     >
-                                        {isSaving ? (
+                                        {getSaveState().isSaving ? (
                                             <>
                                                 <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
                                                 <span className="text-xs">Saving...</span>
@@ -155,12 +170,17 @@ const StatusBar = ({
                                         )}
                                     </button>
                                     <button
-                                        onClick={() => onSaveNewClick && onSaveNewClick()}
-                                        disabled={isSaving}
+                                        onClick={async () => {
+                                            const result = await handleSaveNew();
+                                            if (result.success && onSaveNewClick) {
+                                                onSaveNewClick();
+                                            }
+                                        }}
+                                        disabled={isSaving || !getSaveState().canSaveNew}
                                         className="font-medium px-3 py-1 text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-green-500 rounded transition-colors flex items-center space-x-1"
                                         title="Create new version"
                                     >
-                                        {isSaving ? (
+                                        {getSaveState().isSaving ? (
                                             <>
                                                 <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
                                                 <span className="text-xs">Saving...</span>
@@ -176,12 +196,17 @@ const StatusBar = ({
                             )}
                             {isNewPage && (
                                 <button
-                                    onClick={() => onSaveClick && onSaveClick()}
-                                    disabled={isSaving}
+                                    onClick={async () => {
+                                        const result = await handleSave();
+                                        if (result.success && onSaveClick) {
+                                            onSaveClick();
+                                        }
+                                    }}
+                                    disabled={isSaving || !getSaveState().canSave}
                                     className="font-medium px-3 py-1 text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-green-500 rounded transition-colors flex items-center space-x-1"
                                     title="Create new page"
                                 >
-                                    {isSaving ? (
+                                    {getSaveState().isSaving ? (
                                         <>
                                             <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
                                             <span className="text-xs">Creating...</span>

@@ -1,10 +1,10 @@
-import { SubscriptionManager } from '../core/SubscriptionManager';
-import { AppState } from '../types/state';
-import { Operation } from '../types/operations';
+import { SubscriptionManager } from '../v2/core/SubscriptionManager';
+import { UnifiedState } from '../v2/types/state';
+import { Operation, OperationTypes } from '../v2/types/operations';
 
-describe('SubscriptionManager', () => {
+describe('SubscriptionManager v2', () => {
     let subscriptionManager: SubscriptionManager;
-    let mockState: AppState;
+    let mockState: UnifiedState;
 
     beforeEach(() => {
         subscriptionManager = new SubscriptionManager();
@@ -14,15 +14,10 @@ describe('SubscriptionManager', () => {
             layouts: {},
             versions: {},
             metadata: {
-                lastUpdated: new Date().toISOString(),
-                isLoading: false,
                 isDirty: false,
-                errors: {},
-                widgetStates: {
-                    unsavedChanges: {},
-                    errors: {},
-                    activeEditors: []
-                }
+                hasUnsavedChanges: false,
+                isLoading: false,
+                errors: {}
             }
         };
     });
@@ -34,7 +29,7 @@ describe('SubscriptionManager', () => {
     describe('State Subscriptions', () => {
         it('should subscribe to state changes', () => {
             const callback = jest.fn();
-            const selector = (state: AppState) => Object.keys(state.widgets).length > 0;
+            const selector = (state: UnifiedState) => Object.keys(state.widgets).length > 0;
 
             const unsubscribe = subscriptionManager.subscribe(selector, callback);
 
@@ -48,7 +43,7 @@ describe('SubscriptionManager', () => {
 
         it('should not call callback when value unchanged', () => {
             const callback = jest.fn();
-            const selector = (state: AppState) => Object.keys(state.widgets).length > 0;
+            const selector = (state: UnifiedState) => Object.keys(state.widgets).length > 0;
 
             subscriptionManager.subscribe(selector, callback);
 
@@ -63,7 +58,7 @@ describe('SubscriptionManager', () => {
 
         it('should call callback when value changes', () => {
             const callback = jest.fn();
-            const selector = (state: AppState) => Object.keys(state.widgets).length > 0;
+            const selector = (state: UnifiedState) => state.metadata.isDirty;
 
             subscriptionManager.subscribe(selector, callback);
 
@@ -83,7 +78,7 @@ describe('SubscriptionManager', () => {
 
         it('should unsubscribe correctly', () => {
             const callback = jest.fn();
-            const selector = (state: AppState) => Object.keys(state.widgets).length > 0;
+            const selector = (state: UnifiedState) => Object.keys(state.widgets).length > 0;
 
             const unsubscribe = subscriptionManager.subscribe(selector, callback);
             unsubscribe();
@@ -92,14 +87,42 @@ describe('SubscriptionManager', () => {
             subscriptionManager.notifyStateUpdate(mockState);
             expect(callback).not.toHaveBeenCalled();
         });
+
+        it('should handle subscription options', () => {
+            const callback = jest.fn();
+            const selector = (state: UnifiedState) => state.metadata.isDirty;
+
+            subscriptionManager.subscribe(selector, callback, {
+                skipInitial: true,
+                debounceMs: 100
+            });
+
+            // Initial notification should be skipped
+            subscriptionManager.notifyStateUpdate(mockState);
+            expect(callback).not.toHaveBeenCalled();
+
+            // Change the state
+            const changedState = {
+                ...mockState,
+                metadata: { ...mockState.metadata, isDirty: true }
+            };
+
+            // Should be debounced
+            subscriptionManager.notifyStateUpdate(changedState);
+            expect(callback).not.toHaveBeenCalled();
+
+            // Wait for debounce
+            jest.advanceTimersByTime(150);
+            expect(callback).toHaveBeenCalledWith(true, false);
+        });
     });
 
     describe('Operation Subscriptions', () => {
         it('should subscribe to all operations', () => {
             const callback = jest.fn();
             const operation: Operation = {
-                type: 'UPDATE_WIDGET_CONFIG',
-                payload: { id: 'widget1', config: {} }
+                type: OperationTypes.UPDATE_WIDGET_CONFIG,
+                payload: { widgetId: 'widget1', config: {} }
             };
 
             subscriptionManager.subscribeToOperations(callback);
@@ -111,15 +134,15 @@ describe('SubscriptionManager', () => {
         it('should subscribe to specific operation types', () => {
             const callback = jest.fn();
             const updateOperation: Operation = {
-                type: 'UPDATE_WIDGET_CONFIG',
-                payload: { id: 'widget1', config: {} }
+                type: OperationTypes.UPDATE_WIDGET_CONFIG,
+                payload: { widgetId: 'widget1', config: {} }
             };
             const moveOperation: Operation = {
-                type: 'MOVE_WIDGET',
-                payload: { id: 'widget1', slot: 'main', order: 1 }
+                type: OperationTypes.MOVE_WIDGET,
+                payload: { widgetId: 'widget1', slotName: 'main', order: 1 }
             };
 
-            subscriptionManager.subscribeToOperations(callback, ['UPDATE_WIDGET_CONFIG']);
+            subscriptionManager.subscribeToOperations(callback, [OperationTypes.UPDATE_WIDGET_CONFIG]);
 
             // Should call for UPDATE_WIDGET_CONFIG
             subscriptionManager.notifyOperation(updateOperation);
@@ -133,23 +156,43 @@ describe('SubscriptionManager', () => {
         it('should handle multiple operation types', () => {
             const callback = jest.fn();
             const updateOperation: Operation = {
-                type: 'UPDATE_WIDGET_CONFIG',
-                payload: { id: 'widget1', config: {} }
+                type: OperationTypes.UPDATE_WIDGET_CONFIG,
+                payload: { widgetId: 'widget1', config: {} }
             };
             const moveOperation: Operation = {
-                type: 'MOVE_WIDGET',
-                payload: { id: 'widget1', slot: 'main', order: 1 }
+                type: OperationTypes.MOVE_WIDGET,
+                payload: { widgetId: 'widget1', slotName: 'main', order: 1 }
             };
 
             subscriptionManager.subscribeToOperations(
                 callback, 
-                ['UPDATE_WIDGET_CONFIG', 'MOVE_WIDGET']
+                [OperationTypes.UPDATE_WIDGET_CONFIG, OperationTypes.MOVE_WIDGET]
             );
 
             subscriptionManager.notifyOperation(updateOperation);
             subscriptionManager.notifyOperation(moveOperation);
 
             expect(callback).toHaveBeenCalledTimes(2);
+        });
+
+        it('should handle operation metadata', () => {
+            const callback = jest.fn();
+            const operation: Operation = {
+                type: OperationTypes.UPDATE_WIDGET_CONFIG,
+                payload: { widgetId: 'widget1', config: {} }
+            };
+
+            subscriptionManager.subscribeToOperations(callback);
+            subscriptionManager.notifyOperation(operation);
+
+            expect(callback).toHaveBeenCalledWith(expect.objectContaining({
+                metadata: expect.objectContaining({
+                    timestamp: expect.any(Number),
+                    validation: expect.objectContaining({
+                        isValid: true
+                    })
+                })
+            }));
         });
     });
 
@@ -187,6 +230,20 @@ describe('SubscriptionManager', () => {
             expect(counts.state).toBe(0);
             expect(counts.operations).toBe(0);
         });
+
+        it('should handle subscription cleanup', () => {
+            const callback = jest.fn();
+            const cleanup = jest.fn();
+            
+            subscriptionManager.subscribe(
+                state => Object.keys(state.widgets).length > 0,
+                callback,
+                { cleanup }
+            );
+
+            subscriptionManager.clearAllSubscriptions();
+            expect(cleanup).toHaveBeenCalled();
+        });
     });
 
     describe('Error Handling', () => {
@@ -215,8 +272,8 @@ describe('SubscriptionManager', () => {
 
             subscriptionManager.subscribeToOperations(errorCallback);
             subscriptionManager.notifyOperation({
-                type: 'UPDATE_WIDGET_CONFIG',
-                payload: { id: 'widget1', config: {} }
+                type: OperationTypes.UPDATE_WIDGET_CONFIG,
+                payload: { widgetId: 'widget1', config: {} }
             });
 
             expect(consoleErrorSpy).toHaveBeenCalledWith(
@@ -225,6 +282,18 @@ describe('SubscriptionManager', () => {
             );
 
             consoleErrorSpy.mockRestore();
+        });
+
+        it('should handle invalid subscription options', () => {
+            const callback = jest.fn();
+            
+            expect(() => {
+                subscriptionManager.subscribe(
+                    state => Object.keys(state.widgets).length > 0,
+                    callback,
+                    { debounceMs: -1 }
+                );
+            }).toThrow('Invalid debounce time');
         });
     });
 });

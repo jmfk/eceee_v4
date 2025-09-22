@@ -6,6 +6,82 @@
 
 import { api } from './client.js'
 
+// Request throttling to prevent race conditions
+class ValidationRequestManager {
+    constructor() {
+        this.activeRequests = new Map()
+        this.requestQueue = []
+        this.maxConcurrent = 3
+        this.currentActive = 0
+    }
+
+    async validateWidget(widgetType, widgetData) {
+        // Create a unique key for this validation request
+        const requestKey = `${widgetType}-${JSON.stringify(widgetData)}`
+
+        // If we already have this exact request in progress, return the existing promise
+        if (this.activeRequests.has(requestKey)) {
+            return await this.activeRequests.get(requestKey)
+        }
+
+        // Create the validation promise
+        const validationPromise = this._executeValidation(widgetType, widgetData, requestKey)
+
+        // Store the promise so duplicate requests can reuse it
+        this.activeRequests.set(requestKey, validationPromise)
+
+        // Clean up after completion
+        validationPromise.finally(() => {
+            this.activeRequests.delete(requestKey)
+            this.currentActive--
+            this._processQueue()
+        })
+
+        return await validationPromise
+    }
+
+    async _executeValidation(widgetType, widgetData, requestKey) {
+        // Wait for available slot if at max capacity
+        if (this.currentActive >= this.maxConcurrent) {
+            await this._waitForSlot()
+        }
+
+        this.currentActive++
+
+        try {
+            const encodedWidgetType = encodeURIComponent(widgetType)
+            const response = await api.post(`/api/v1/webpages/widget-types/${encodedWidgetType}/validate/`, {
+                widgetData: widgetData
+            })
+            return response.data
+        } catch (error) {
+            console.error(`Failed to validate configuration for widget type "${widgetType}":`, error)
+            return {
+                isValid: false,
+                errors: {
+                    _general: [error.response?.data?.error || error.message || 'Validation service unavailable']
+                },
+                warnings: {}
+            }
+        }
+    }
+
+    _waitForSlot() {
+        return new Promise((resolve) => {
+            this.requestQueue.push(resolve)
+        })
+    }
+
+    _processQueue() {
+        if (this.requestQueue.length > 0 && this.currentActive < this.maxConcurrent) {
+            const resolve = this.requestQueue.shift()
+            resolve()
+        }
+    }
+}
+
+const validationManager = new ValidationRequestManager()
+
 /**
  * Get JSON schema for a specific widget type
  * @param {string} widgetType - The widget type name
@@ -64,25 +140,7 @@ export const getWidgetConfigurationDefaults = async (widgetType) => {
  * @returns {Promise<Object>} Validation result with isValid, errors, and warnings properties
  */
 export const validateWidgetConfiguration = async (widgetType, widgetData) => {
-    try {
-        // Properly encode the widget type to handle dots and spaces
-        const encodedWidgetType = encodeURIComponent(widgetType)
-        const response = await api.post(`/api/v1/webpages/widget-types/${encodedWidgetType}/validate/`, {
-            widgetData: widgetData
-        })
-        return response.data
-    } catch (error) {
-        console.error(`Failed to validate configuration for widget type "${widgetType}":`, error)
-
-        // Return error in consistent format
-        return {
-            isValid: false,
-            errors: {
-                _general: [error.response?.data?.error || error.message || 'Validation service unavailable']
-            },
-            warnings: {}
-        }
-    }
+    return await validationManager.validateWidget(widgetType, widgetData)
 }
 
 /**

@@ -9,11 +9,7 @@
 
 import React, { useRef, useEffect, useState, useCallback, forwardRef, useImperativeHandle } from 'react'
 import { SelfContainedObjectForm } from './SelfContainedObjectForm.js'
-import { useObjectTitleOperations } from '../../contexts/unified-data/hooks/useObjectTitleOperations'
-import { useObjectDataOperations } from '../../contexts/unified-data/hooks/useObjectDataOperations'
-import { useObjectWidgetOperations } from '../../contexts/unified-data/hooks/useObjectWidgetOperations'
-import { useObjectMetadataOperations } from '../../contexts/unified-data/hooks/useObjectMetadataOperations'
-import { useObjectStatusOperations } from '../../contexts/unified-data/hooks/useObjectStatusOperations'
+import { useObjectOperations } from '../../contexts/unified-data/v2/hooks/useObjectOperations'
 
 /**
  * Self-Contained Object Editor Component
@@ -44,13 +40,16 @@ const SelfContainedObjectEditor = forwardRef(({
     const [isValid, setIsValid] = useState(true)
     const [validationErrors, setValidationErrors] = useState({})
 
-    // Get specialized operations for each data type
+    // Get unified operations for object
     const objectId = objectData?.id;
-    const titleOperations = useObjectTitleOperations(objectId);
-    const dataOperations = useObjectDataOperations(objectId);
-    const widgetOperations = useObjectWidgetOperations(objectId);
-    const metadataOperations = useObjectMetadataOperations(objectId);
-    const statusOperations = useObjectStatusOperations(objectId);
+    const {
+        titleOperations,
+        dataOperations,
+        widgetOperations,
+        metadataOperations,
+        statusOperations,
+        isRegistered
+    } = useObjectOperations(objectId, objectData);
 
     // Initialize form instance
     const initializeForm = useCallback(async () => {
@@ -87,7 +86,7 @@ const SelfContainedObjectEditor = forwardRef(({
         } finally {
             isInitializingRef.current = false
         }
-    }, [objectData, showValidationInline, showSaveStatus, unifiedDataOperations, onError])
+    }, [objectData, showValidationInline, showSaveStatus, titleOperations, dataOperations, widgetOperations, metadataOperations, statusOperations, onError])
 
     // Cleanup form instance
     const cleanupForm = useCallback(() => {

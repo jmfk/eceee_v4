@@ -1,18 +1,24 @@
 import React from 'react';
 import { renderHook, act } from '@testing-library/react';
-import { UnifiedDataProvider } from '../context/UnifiedDataContext';
-import { useAutoSave } from '../hooks/useAutoSave';
-import { useValidation } from '../hooks/useValidation';
-// usePerformanceMonitor removed with DevTools
-import { OperationTypes } from '../types/operations';
+import { UnifiedDataProvider } from '../v2/context/UnifiedDataContext';
+import { useAutoSave } from '../v2/hooks/useAutoSave';
+import { useValidation } from '../v2/hooks/useValidation';
+import { OperationTypes } from '../v2/types/operations';
 
 const TestWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-    <UnifiedDataProvider enableAPIIntegration={false}>
+    <UnifiedDataProvider
+        initialState={{}}
+        options={{
+            enableAPIIntegration: false,
+            enableAutoSave: true,
+            enableValidation: true
+        }}
+    >
         {children}
     </UnifiedDataProvider>
 );
 
-describe('Auto-save and Validation Features', () => {
+describe('Auto-save and Validation Features v2', () => {
     describe('useAutoSave', () => {
         it('should initialize with default configuration', () => {
             const { result } = renderHook(() => useAutoSave(), {
@@ -20,8 +26,8 @@ describe('Auto-save and Validation Features', () => {
             });
 
             expect(result.current.isEnabled).toBe(true);
-            expect(result.current.config.interval).toBe(30000);
-            expect(result.current.saveCount).toBe(0);
+            expect(result.current.getConfig().interval).toBe(30000);
+            expect(result.current.getSaveStats().totalSaves).toBe(0);
         });
 
         it('should update configuration', () => {
@@ -36,7 +42,7 @@ describe('Auto-save and Validation Features', () => {
                 });
             });
 
-            expect(result.current.config.interval).toBe(60000);
+            expect(result.current.getConfig().interval).toBe(60000);
             expect(result.current.isEnabled).toBe(false);
         });
 
@@ -48,15 +54,16 @@ describe('Auto-save and Validation Features', () => {
             expect(result.current.isEnabled).toBe(false);
 
             act(() => {
-                result.current.startAutoSave();
+                result.current.start();
             });
 
-            // Note: isEnabled reflects config, not runtime state
-            // Would need to check if timer is active
+            expect(result.current.isEnabled).toBe(true);
 
             act(() => {
-                result.current.stopAutoSave();
+                result.current.stop();
             });
+
+            expect(result.current.isEnabled).toBe(false);
         });
 
         it('should force save immediately', async () => {
@@ -68,8 +75,8 @@ describe('Auto-save and Validation Features', () => {
                 await result.current.forceSave();
             });
 
-            // Should complete without error
-            expect(result.current.lastError).toBeNull();
+            expect(result.current.getLastError()).toBeNull();
+            expect(result.current.getSaveStats().lastSaveTime).toBeDefined();
         });
     });
 
@@ -116,7 +123,7 @@ describe('Auto-save and Validation Features', () => {
             const validWidget = {
                 id: 'widget-1',
                 type: 'core_widgets.ContentWidget',
-                slot: 'main',
+                slotName: 'main',
                 config: { content: 'Test content' },
                 order: 0,
                 created_at: new Date().toISOString(),
@@ -129,7 +136,7 @@ describe('Auto-save and Validation Features', () => {
             const invalidWidget = {
                 ...validWidget,
                 type: '', // Empty type
-                slot: ''  // Empty slot
+                slotName: ''  // Empty slot
             };
 
             const invalidResult = result.current.validateWidget(invalidWidget);
@@ -145,7 +152,7 @@ describe('Auto-save and Validation Features', () => {
             const validOperation = {
                 type: OperationTypes.UPDATE_WIDGET_CONFIG,
                 payload: {
-                    id: 'widget-1',
+                    widgetId: 'widget-1',
                     config: { title: 'Valid Config' }
                 }
             };
@@ -209,57 +216,69 @@ describe('Auto-save and Validation Features', () => {
             const result2 = result.current.validatePage(pageWithLongTitle);
             expect(result2.warnings.length).toBe(0);
         });
-    });
 
-    describe('usePerformanceMonitor', () => {
-        it('should initialize monitoring', () => {
-            const { result } = renderHook(() => usePerformanceMonitor(), {
+        it('should validate field values', () => {
+            const { result } = renderHook(() => useValidation(), {
                 wrapper: TestWrapper
             });
 
-            expect(result.current.isMonitoring).toBe(false);
-            expect(result.current.metrics.totalOperations).toBe(0);
-            expect(result.current.performanceScore).toBe(100);
+            const validField = {
+                type: 'text',
+                value: 'Valid text',
+                required: true
+            };
+
+            const validResult = result.current.validateField(validField);
+            expect(validResult.isValid).toBe(true);
+
+            const invalidField = {
+                ...validField,
+                value: '' // Empty required field
+            };
+
+            const invalidResult = result.current.validateField(invalidField);
+            expect(invalidResult.isValid).toBe(false);
+            expect(invalidResult.errors[0].code).toBe('REQUIRED_FIELD');
         });
 
-        it('should start and stop monitoring', () => {
-            const { result } = renderHook(() => usePerformanceMonitor(), {
+        it('should validate form data', () => {
+            const { result } = renderHook(() => useValidation(), {
                 wrapper: TestWrapper
             });
 
-            act(() => {
-                result.current.startMonitoring();
-            });
+            const validForm = {
+                id: 'form-1',
+                fields: {
+                    title: {
+                        type: 'text',
+                        value: 'Valid Title',
+                        required: true
+                    },
+                    description: {
+                        type: 'textarea',
+                        value: 'Valid Description',
+                        required: false
+                    }
+                }
+            };
 
-            expect(result.current.isMonitoring).toBe(true);
+            const validResult = result.current.validateForm(validForm);
+            expect(validResult.isValid).toBe(true);
 
-            act(() => {
-                result.current.stopMonitoring();
-            });
+            const invalidForm = {
+                ...validForm,
+                fields: {
+                    ...validForm.fields,
+                    title: {
+                        ...validForm.fields.title,
+                        value: '' // Empty required field
+                    }
+                }
+            };
 
-            expect(result.current.isMonitoring).toBe(false);
-        });
-
-        it('should reset metrics', () => {
-            const { result } = renderHook(() => usePerformanceMonitor(), {
-                wrapper: TestWrapper
-            });
-
-            act(() => {
-                result.current.resetMetrics();
-            });
-
-            expect(result.current.metrics.totalOperations).toBe(0);
-            expect(result.current.metrics.slowestOperations).toHaveLength(0);
-        });
-
-        it('should provide optimization suggestions', () => {
-            const { result } = renderHook(() => usePerformanceMonitor(), {
-                wrapper: TestWrapper
-            });
-
-            const suggestions = result.current.getOptimizationSuggestions();
-            expect(Array.isArray(suggestions)).toBe(true);
+            const invalidResult = result.current.validateForm(invalidForm);
+            expect(invalidResult.isValid).toBe(false);
+            expect(invalidResult.errors[0].field).toBe('title');
         });
     });
 
@@ -268,7 +287,6 @@ describe('Auto-save and Validation Features', () => {
             const { result } = renderHook(() => {
                 const autoSave = useAutoSave({ interval: 5000 });
                 const validation = useValidation();
-                // performance monitoring removed with DevTools
 
                 return { autoSave, validation };
             }, {
@@ -278,11 +296,39 @@ describe('Auto-save and Validation Features', () => {
             // All systems should be available
             expect(result.current.autoSave).toBeDefined();
             expect(result.current.validation).toBeDefined();
-            expect(result.current.performance).toBeDefined();
 
             // Should have consistent state
-            expect(result.current.validation.isStateValid).toBe(true);
-            expect(result.current.performance.performanceScore).toBe(100);
+            expect(result.current.validation.isStateValid()).toBe(true);
+            expect(result.current.autoSave.getSaveStats().totalSaves).toBe(0);
+        });
+
+        it('should validate before auto-saving', async () => {
+            const { result } = renderHook(() => {
+                const autoSave = useAutoSave({ interval: 5000 });
+                const validation = useValidation();
+
+                return { autoSave, validation };
+            }, {
+                wrapper: TestWrapper
+            });
+
+            // Add invalid data
+            act(() => {
+                result.current.validation.addValidationError({
+                    field: 'title',
+                    message: 'Title is required',
+                    code: 'REQUIRED_FIELD'
+                });
+            });
+
+            // Try to auto-save
+            await act(async () => {
+                await result.current.autoSave.forceSave();
+            });
+
+            // Should not have saved due to validation error
+            expect(result.current.autoSave.getLastError()?.code).toBe('VALIDATION_ERROR');
+            expect(result.current.validation.getErrors()).toHaveLength(1);
         });
     });
 });

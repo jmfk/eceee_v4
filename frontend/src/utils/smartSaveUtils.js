@@ -300,7 +300,7 @@ export async function smartSave(originalWebpageData, currentWebpageData, origina
             const versionDataForSave = prepareVersionDataForSave(currentPageVersionData);
 
             if (options.forceNewVersion) {
-                results.versionResult = await versionsApi.create(versionId, versionDataForSave);
+                results.versionResult = await versionsApi.create(pageId, versionDataForSave);
             } else {
                 results.versionResult = await versionsApi.update(versionId, versionDataForSave);
             }
@@ -314,7 +314,7 @@ export async function smartSave(originalWebpageData, currentWebpageData, origina
             const versionDataForSave = prepareVersionDataForSave(currentPageVersionData);
 
             if (options.forceNewVersion) {
-                results.versionResult = await versionsApi.create(versionId, versionDataForSave);
+                results.versionResult = await versionsApi.create(pageId, versionDataForSave);
             } else {
                 results.versionResult = await versionsApi.update(versionId, versionDataForSave);
             }
