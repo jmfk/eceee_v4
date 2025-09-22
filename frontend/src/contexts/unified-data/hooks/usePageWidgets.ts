@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useUnifiedData } from '../context/UnifiedDataContext';
 import { WidgetData } from '../types/state';
 import { OperationTypes } from '../types/operations';
@@ -8,7 +8,7 @@ export interface UsePageWidgetsResult {
     widgets: WidgetData[];
     widgetsBySlot: Record<string, WidgetData[]>;
     widgetCount: number;
-    hasUnsavedChanges: boolean;
+    isDirty: boolean;
     
     // Operations
     addWidget: (slotId: string, widgetType: string, config?: any) => Promise<string>;
@@ -27,28 +27,31 @@ export interface UsePageWidgetsResult {
 }
 
 export function usePageWidgets(pageId: string): UsePageWidgetsResult {
-    const { dispatch, useSelector } = useUnifiedData();
+    const { dispatch, useExternalChanges } = useUnifiedData();
 
-    // Selectors
-    const widgets = useSelector(state => 
-        Object.values(state.widgets).filter(widget => widget.pageId === pageId)
-    );
+    // State
+    const [widgets, setWidgets] = useState<WidgetData[]>([]);
+    const [widgetsBySlot, setWidgetsBySlot] = useState<Record<string, WidgetData[]>>({});
+    const [isDirty, setIsDirty] = useState(false);
 
-    const widgetsBySlot = useSelector(state => {
-        const pageWidgets = Object.values(state.widgets).filter(w => w.pageId === pageId);
-        return pageWidgets.reduce((acc, widget) => {
+    // Subscribe to external changes
+    useExternalChanges(`page-widgets-${pageId}`, state => {
+        const pageWidgets = Object.values(state.widgets).filter(widget => widget.pageId === pageId);
+        setWidgets(pageWidgets);
+        
+        const bySlot = pageWidgets.reduce((acc, widget) => {
             if (!acc[widget.slot]) {
                 acc[widget.slot] = [];
             }
             acc[widget.slot].push(widget);
             return acc;
         }, {} as Record<string, WidgetData[]>);
+        setWidgetsBySlot(bySlot);
+        
+        setIsDirty(state.metadata.isDirty);
     });
 
     const widgetCount = widgets.length;
-    const hasUnsavedChanges = useSelector(state => 
-        widgets.some(widget => state.metadata.widgetStates.unsavedChanges[widget.id])
-    );
 
     // Operations
     const addWidget = useCallback(async (
@@ -58,6 +61,7 @@ export function usePageWidgets(pageId: string): UsePageWidgetsResult {
     ): Promise<string> => {
         const result = await dispatch({
             type: OperationTypes.ADD_WIDGET,
+            sourceId: pageId,
             payload: {
                 pageId,
                 slotId,
@@ -71,6 +75,7 @@ export function usePageWidgets(pageId: string): UsePageWidgetsResult {
     const removeWidget = useCallback(async (widgetId: string) => {
         await dispatch({
             type: OperationTypes.REMOVE_WIDGET,
+            sourceId: pageId,
             payload: {
                 id: widgetId
             }
@@ -84,6 +89,7 @@ export function usePageWidgets(pageId: string): UsePageWidgetsResult {
     ) => {
         await dispatch({
             type: OperationTypes.MOVE_WIDGET,
+            sourceId: targetSlotId,
             payload: {
                 id: widgetId,
                 slot: targetSlotId,
@@ -95,6 +101,7 @@ export function usePageWidgets(pageId: string): UsePageWidgetsResult {
     const reorderWidgets = useCallback(async (slotId: string, widgetIds: string[]) => {
         await dispatch({
             type: OperationTypes.REORDER_WIDGETS,
+            sourceId: slotId,
             payload: {
                 slotId,
                 widgetIds
@@ -111,29 +118,13 @@ export function usePageWidgets(pageId: string): UsePageWidgetsResult {
 
         const result = await dispatch({
             type: OperationTypes.DUPLICATE_WIDGET,
+            sourceId: targetSlotId || widget.slot,
             payload: {
                 id: widgetId,
                 targetSlotId: targetSlotId || widget.slot
             }
         });
         return result.newWidgetId;
-    }, [dispatch]);
-
-    const bulkUpdateWidgets = useCallback(async (
-        updates: Record<string, Partial<WidgetData>>
-    ) => {
-        const operations = Object.entries(updates).map(([widgetId, widgetUpdates]) => ({
-            type: OperationTypes.UPDATE_WIDGET,
-            payload: {
-                id: widgetId,
-                updates: widgetUpdates
-            }
-        }));
-
-        await dispatch({
-            type: OperationTypes.BATCH,
-            payload: operations
-        });
     }, [dispatch]);
 
     // Utilities
@@ -168,7 +159,7 @@ export function usePageWidgets(pageId: string): UsePageWidgetsResult {
         widgets,
         widgetsBySlot,
         widgetCount,
-        hasUnsavedChanges,
+        isDirty,
         addWidget,
         removeWidget,
         moveWidget,
@@ -184,7 +175,7 @@ export function usePageWidgets(pageId: string): UsePageWidgetsResult {
         widgets,
         widgetsBySlot,
         widgetCount,
-        hasUnsavedChanges,
+        isDirty,
         addWidget,
         removeWidget,
         moveWidget,

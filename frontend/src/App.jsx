@@ -25,7 +25,7 @@ import { NotificationProvider } from '@components/NotificationManager'
 import { GlobalNotificationProvider } from './contexts/GlobalNotificationContext'
 import { AuthProvider } from './contexts/AuthContext'
 import { WidgetEventProvider } from './contexts/WidgetEventContext'
-import { AppStatusProvider } from './contexts/AppStatusContext'
+import { UnifiedDataProvider } from './contexts/unified-data'
 import PrivateRoute from './components/PrivateRoute'
 import LoginPage from './pages/LoginPage'
 import StatusBar from './components/StatusBar'
@@ -46,7 +46,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <NotificationProvider>
         <GlobalNotificationProvider>
-          <AppStatusProvider>
+          <UnifiedDataProvider>
             <WidgetEventProvider>
               <AuthProvider>
                 <Router>
@@ -446,8 +446,7 @@ function App() {
                 </Router>
               </AuthProvider>
             </WidgetEventProvider>
-
-          </AppStatusProvider>
+          </UnifiedDataProvider>
         </GlobalNotificationProvider>
       </NotificationProvider>
     </QueryClientProvider>

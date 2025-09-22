@@ -94,7 +94,6 @@ class MediaUploadView(APIView):
                 uploaded_files.extend(upload_result.files)
                 if upload_result.errors:
                     errors.extend(upload_result.errors)
-                console.log("errors", errors)
             except Exception as e:
                 logger.error(f"Error processing file {uploaded_file.name}: {e}")
                 errors.append(

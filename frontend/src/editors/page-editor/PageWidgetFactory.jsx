@@ -8,7 +8,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { Layout, Settings, Trash2, ChevronUp, ChevronDown, Eye, ChevronLeft, ChevronRight, X, EyeOff } from 'lucide-react'
 import { getCoreWidgetComponent, getCoreWidgetDisplayName } from '../../widgets'
 import { renderWidgetPreview } from '../../utils/widgetPreview'
-import WidgetHeader from './PageWidgetHeader'
+import PageWidgetHeader from './PageWidgetHeader'
 import DeleteConfirmationModal from '../../components/DeleteConfirmationModal'
 
 /**
@@ -226,7 +226,7 @@ const PageWidgetFactory = ({
             >
                 {/* PageEditor-specific Widget Header */}
                 {!isPreviewMode && (
-                    <WidgetHeader
+                    <PageWidgetHeader
                         widgetType={getCoreWidgetDisplayName(widget.type)}
                         onEdit={onEdit ? handleEdit : undefined}
                         onDelete={onDelete ? handleDelete : undefined}

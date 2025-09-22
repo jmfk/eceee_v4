@@ -25,8 +25,7 @@ import { smartSave, analyzeChanges, determineSaveStrategy, generateChangeSummary
 import { WIDGET_ACTIONS } from '../utils/widgetConstants'
 import { useNotificationContext } from './NotificationManager'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
-import { useWidgetEvents } from '../contexts/WidgetEventContext'
-import { WIDGET_EVENTS, WIDGET_CHANGE_TYPES } from '../types/widgetEvents'
+import { useUnifiedData } from '../contexts/unified-data'
 import ContentEditor from './ContentEditor'
 import PageContentEditor from '../editors/page-editor/PageContentEditor'
 import ErrorTodoSidebar from './ErrorTodoSidebar'
@@ -169,8 +168,6 @@ const PageEditor = () => {
         return path
     }
 
-    // Use widget event context for tracking unsaved changes
-    const { widgetHasUnsavedChanges, setWidgetHasUnsavedChanges } = useWidgetEvents()
 
     // Redirect to content tab if no tab is specified
     useEffect(() => {
@@ -185,7 +182,16 @@ const PageEditor = () => {
     const [pageVersionData, setPageVersionData] = useState(null)
     const [originalWebpageData, setOriginalWebpageData] = useState(null) // Track original for smart saving
     const [originalPageVersionData, setOriginalPageVersionData] = useState(null) // Track original for smart saving
-    const [isDirty, setIsDirty] = useState(false)
+
+    // Use global isDirty from UnifiedDataContext
+    const { useExternalChanges, setIsDirty, resetState } = useUnifiedData()
+
+    // Get current dirty state from global context
+    const componentId = 'page-editor';
+    const [isDirty, setIsDirtyState] = useState(false);
+    useExternalChanges(componentId, state => {
+        setIsDirtyState(state.metadata.isDirty);
+    });
     const [layoutData, setLayoutData] = useState(null)
     const [isLoadingLayout, setIsLoadingLayout] = useState(false)
 
@@ -406,10 +412,10 @@ const PageEditor = () => {
     // Handle close with unsaved changes check
     const handleClose = async () => {
         // Check for widget unsaved changes first
-        if (widgetHasUnsavedChanges) {
+        if (isDirty && widgetEditorOpen) {
             const confirmed = await showConfirm({
-                title: 'Unsaved Widget Changes',
-                message: 'You have unsaved widget changes. What would you like to do?',
+                title: 'Unsaved Changes',
+                message: 'You have unsaved changes. What would you like to do?',
                 confirmText: 'Save Changes',
                 cancelText: 'Discard Changes',
                 confirmButtonStyle: 'primary'
@@ -578,13 +584,12 @@ const PageEditor = () => {
     }, [webpageData, availableVersions, showError, addNotification, location.pathname, buildUrlWithVersion, previousView]);
 
     // Handle page data updates - route to appropriate data structure
-    const updatePageData = useCallback((updates) => {
-        console.log("updatePageData", updates)
+    const updatePageData = useCallback(async (updates) => {
         // Handle version changes from LayoutRenderer
         if (updates.versionChanged && updates.pageVersionData) {
             // This is a version switch from LayoutRenderer, use switchToVersion
             const versionId = updates.pageVersionData.id || updates.pageVersionData.versionId;
-            switchToVersion(versionId);
+            await switchToVersion(versionId);
             return; // Don't set dirty for version switches
         }
 
@@ -623,7 +628,7 @@ const PageEditor = () => {
     }, [switchToVersion])
 
     // NEW: Validation-driven sync handlers
-    const handleValidatedPageDataSync = useCallback((validatedData) => {
+    const handleValidatedPageDataSync = useCallback(async (validatedData) => {
         logValidationSync('pageData', validatedData, 'SchemaDrivenForm')
         setPageVersionData(prev => ({
             ...prev,
@@ -923,18 +928,15 @@ const PageEditor = () => {
         if (currentEditingWidget && widgetData && currentEditingWidget.id === widgetData.id) {
             setWidgetEditorOpen(false)
             setEditingWidget(null)
-            //setWidgetHasUnsavedChanges(false)
         } else {
             setEditingWidget(widgetData)
             setWidgetEditorOpen(true)
-            //setWidgetHasUnsavedChanges(false)
         }
     }, [])
 
     const handleCloseWidgetEditor = useCallback(() => {
         setWidgetEditorOpen(false)
         setEditingWidget(null)
-        //setWidgetHasUnsavedChanges(false)
     }, [])
 
     const handleRealTimeWidgetUpdate = useCallback((updatedWidget) => {
@@ -964,24 +966,22 @@ const PageEditor = () => {
             message: `Widget "${updatedWidget.name}" saved successfully`
         })
 
-        // Clear unsaved changes flag since save is complete
-        //setWidgetHasUnsavedChanges(false)
-
+        // Reset dirty state and close editor
+        setIsDirty(false)
         handleCloseWidgetEditor()
     }, [addNotification, handleCloseWidgetEditor])
 
     // Memoized callback to prevent ContentEditor re-renders
     const handleDirtyChange = useCallback((isDirty, reason) => {
         setIsDirty(isDirty);
-    }, [])
+    }, [setIsDirty])
 
     // Subscribe to widget events using direct subscription
-    const { subscribe } = useWidgetEvents()
+    // Widget events now handled through UnifiedDataContext
 
     useEffect(() => {
         // Handler for widget changes
         const handleWidgetChanged = (payload) => {
-            console.log("handleWidgetChanged", payload)
             if (payload.changeType === WIDGET_CHANGE_TYPES.CONFIG) {
                 // CRITICAL FIX: Config changes must update persistent data, not just mark as dirty
                 // This fixes the split-brain issue where config changes were only preview-only
@@ -1032,16 +1032,13 @@ const PageEditor = () => {
             })
         }
 
-        // Subscribe to events
-        const unsubscribeChanged = subscribe(WIDGET_EVENTS.CHANGED, handleWidgetChanged)
-        const unsubscribeError = subscribe(WIDGET_EVENTS.ERROR, handleWidgetError)
+        // Widget events now handled through UnifiedDataContext - no subscriptions needed
 
-        // Cleanup subscriptions
+        // No cleanup needed since we're not subscribing to widget events anymore
         return () => {
-            unsubscribeChanged()
-            unsubscribeError()
+            // Widget events now handled through UnifiedDataContext
         }
-    }, [subscribe, addNotification])
+    }, [addNotification])
 
     // Tab navigation (main tabs)
     const tabs = [
@@ -1093,12 +1090,12 @@ const PageEditor = () => {
             }
 
             // Check for unsaved changes before closing
-            if (widgetHasUnsavedChanges) {
+            if (isDirty) {
                 // Show confirmation modal for unsaved changes
                 const handleUnsavedChanges = async () => {
                     const confirmed = await showConfirm({
-                        title: 'Unsaved Widget Changes',
-                        message: 'You have unsaved changes to the widget. What would you like to do?',
+                        title: 'Unsaved Changes',
+                        message: 'You have unsaved changes. What would you like to do?',
                         confirmText: 'Save Changes',
                         cancelText: 'Discard Changes',
                         confirmButtonStyle: 'primary'
@@ -1133,7 +1130,7 @@ const PageEditor = () => {
                 handleCloseWidgetEditor()
             }
         }
-    }, [activeTab, widgetEditorOpen, widgetHasUnsavedChanges, editingWidget, handleCloseWidgetEditor, handleSaveWidget, showConfirm, addNotification])
+    }, [activeTab, widgetEditorOpen, isDirty, editingWidget, handleCloseWidgetEditor, handleSaveWidget, showConfirm, addNotification])
 
     if (isLoading && !isNewPage) {
         return (
@@ -1315,6 +1312,11 @@ const PageEditor = () => {
                                                     currentVersion={currentVersion}
                                                     availableVersions={availableVersions}
                                                     onVersionChange={switchToVersion}
+                                                    // Editor context
+                                                    context={{
+                                                        pageId: webpageData?.id,
+                                                        mode: 'edit'
+                                                    }}
                                                 />
                                             </div>
                                         )}

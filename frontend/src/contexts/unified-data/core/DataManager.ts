@@ -1,20 +1,9 @@
 import { AppState, StateUpdate, StateSelector } from '../types/state';
 import { Operation, ValidationResult, OperationTypes } from '../types/operations';
-import { SubscriptionManager, StateUpdateCallback, SubscriptionOptions } from '../types/subscriptions';
+import { SubscriptionManager } from './SubscriptionManager';
+import { StateUpdateCallback, SubscriptionOptions } from '../types/subscriptions';
 import { defaultEqualityFn } from '../utils/equality';
 import { OperationError, ValidationError, StateError, ErrorCodes, isRetryableError } from '../utils/errors';
-
-interface PrioritizedOperation extends Operation {
-    priority?: 'high' | 'normal' | 'low';
-    timeoutId?: NodeJS.Timeout;
-}
-
-interface DebouncedOperation {
-    operation: Operation;
-    timeoutId: NodeJS.Timeout;
-    resolve: (value: void | PromiseLike<void>) => void;
-    reject: (reason?: any) => void;
-}
 
 /**
  * Core DataManager class responsible for state management, operations, and subscriptions
@@ -22,12 +11,7 @@ interface DebouncedOperation {
 export class DataManager {
     private state: AppState;
     private subscriptionManager: SubscriptionManager;
-    private operationQueue: PrioritizedOperation[] = [];
-    private isProcessing: boolean = false;
     private selectorCache = new Map<string, any>();
-    private debouncedOperations = new Map<string, DebouncedOperation>();
-    private batchedNotifications = new Set<string>();
-    private batchTimeout: NodeJS.Timeout | null = null;
 
     constructor(initialState?: Partial<AppState>) {
         this.validateInitialState(initialState);
@@ -38,12 +22,14 @@ export class DataManager {
             widgets: {},
             layouts: {},
             versions: {},
+            content: {},
             metadata: {
                 lastUpdated: new Date().toISOString(),
                 isLoading: false,
-                errors: {},
+                isDirty: false,
+                errors: [],
+                warnings: [],
                 widgetStates: {
-                    unsavedChanges: {},
                     errors: {},
                     activeEditors: []
                 }
@@ -62,14 +48,14 @@ export class DataManager {
         if (!state) return;
 
         try {
-            // Validate widget-page relationships
-            if (state.widgets && state.pages) {
+            // Basic state validation
+            if (state.widgets) {
                 Object.values(state.widgets).forEach(widget => {
-                    if (widget.pageId && !state.pages?.[widget.pageId]) {
+                    if (!widget.id || !widget.type) {
                         throw new StateError(
                             ErrorCodes.INVALID_INITIAL_STATE,
-                            `Widget ${widget.id} references non-existent page ${widget.pageId}`,
-                            { widgetId: widget.id, pageId: widget.pageId }
+                            `Widget missing required fields: id or type`,
+                            { widget }
                         );
                     }
                 });
@@ -110,45 +96,39 @@ export class DataManager {
     /**
      * Update state with new values
      */
-    private setState(update: StateUpdate): void {
+    private setState(operation: Operation, update: StateUpdate): void {
         const prevState = this.state;
         
-        // Handle function updates
         const newState = typeof update === 'function' 
             ? { ...prevState, ...update(prevState) }
             : { ...prevState, ...update };
 
+        const hasDataChanged = this.hasDataChanged(prevState, newState);
+
         this.state = newState;
         
-        // Update metadata
         this.state.metadata.lastUpdated = new Date().toISOString();
         
-        // Clear selector cache
+        if (hasDataChanged && !this.state.metadata.isDirty) {
+            this.state.metadata.isDirty = true;
+        }
+        
         this.selectorCache.clear();
         
-        // Schedule notification
-        this.scheduleStateNotification();
+        // Notify subscribers immediately
+        this.subscriptionManager.notifyStateUpdate(this.state, operation);
     }
 
     /**
-     * Schedule batched state notifications
+     * Check if actual data has changed (not just metadata)
      */
-    private scheduleStateNotification(): void {
-        if (this.batchTimeout) {
-            clearTimeout(this.batchTimeout);
-        }
-
-        this.batchTimeout = setTimeout(() => {
-            this.processBatchedNotifications();
-        }, 0);
-    }
-
-    /**
-     * Process batched notifications
-     */
-    private processBatchedNotifications(): void {
-        this.batchTimeout = null;
-        this.subscriptionManager.notifyStateUpdate(this.state);
+    private hasDataChanged(prevState: AppState, newState: AppState): boolean {
+        return (
+            prevState.pages !== newState.pages ||
+            prevState.widgets !== newState.widgets ||
+            prevState.layouts !== newState.layouts ||
+            prevState.versions !== newState.versions
+        );
     }
 
     /**
@@ -170,7 +150,7 @@ export class DataManager {
     private validateOperation(operation: Operation): ValidationResult {
         try {
             // Basic validation
-            if (!operation.type || !Object.values(OperationTypes).includes(operation.type)) {
+            if (!operation.type || !Object.values(OperationTypes).includes(operation.type as any)) {
                 throw new ValidationError(operation, 
                     `Invalid operation type: ${operation.type}`,
                     { type: operation.type }
@@ -180,7 +160,8 @@ export class DataManager {
             // Payload validation based on operation type
             switch (operation.type) {
                 case OperationTypes.UPDATE_WIDGET_CONFIG:
-                    if (!operation.payload?.id || !operation.payload?.config) {
+                    if (!operation.payload?.id || !operation.payload?.config) {  
+
                         throw new ValidationError(operation,
                             'Widget ID and config are required',
                             { payload: operation.payload }
@@ -225,7 +206,7 @@ export class DataManager {
     /**
      * Process a single operation with rollback support
      */
-    private async processOperation(operation: Operation): Promise<void> {
+    private processOperation(operation: Operation): void {
         const previousState = { ...this.state };
         
         try {
@@ -238,7 +219,7 @@ export class DataManager {
                 );
             }
 
-            // Add validation result to operation metadata
+            // Add validation result and timestamp to operation metadata
             operation.metadata = {
                 ...operation.metadata,
                 timestamp: Date.now(),
@@ -247,33 +228,55 @@ export class DataManager {
 
             // Process based on operation type
             switch (operation.type) {
+                case OperationTypes.ADD_WIDGET:
+            this.setState(operation, state => ({
+                widgets: {
+                    ...state.widgets,
+                    [operation.payload.id]: {
+                        id: operation.payload.id,
+                        type: operation.payload.type,
+                        config: operation.payload.config || {},
+                        slot: operation.payload.slot || 'main',
+                        order: operation.payload.order || 0,
+                        created_at: new Date().toISOString(),
+                        updated_at: new Date().toISOString()
+                    }
+                },
+                metadata: {
+                    ...state.metadata,
+                    isDirty: true
+                }
+            }));
+                    break;
+
                 case OperationTypes.UPDATE_WIDGET_CONFIG:
-                    this.setState(state => ({
-                        widgets: {
-                            ...state.widgets,
-                            [operation.payload.id]: {
-                                ...state.widgets[operation.payload.id],
-                                config: {
-                                    ...state.widgets[operation.payload.id].config,
-                                    ...operation.payload.config
-                                }
-                            }
-                        },
-                        metadata: {
-                            ...state.metadata,
-                            widgetStates: {
-                                ...state.metadata.widgetStates,
-                                unsavedChanges: {
-                                    ...state.metadata.widgetStates.unsavedChanges,
-                                    [operation.payload.id]: true
-                                }
-                            }
+                    this.setState(operation, state => {
+                        const widget = state.widgets[operation.payload.id];
+                        if (!widget) {
+                            throw new Error(`Widget ${operation.payload.id} not found. state: ${state}`);
                         }
-                    }));
+                        return {
+                            widgets: {
+                                ...state.widgets,
+                                [operation.payload.id]: {
+                                    ...widget,
+                                    config: {
+                                        ...widget.config,
+                                        ...operation.payload.config
+                                    },
+                                    updated_at: new Date().toISOString()
+                                }
+                            },
+                            metadata: {
+                                ...state.metadata,
+                                isDirty: true
+                            }
+                        };
+                    });
                     break;
 
                 case OperationTypes.MOVE_WIDGET:
-                    this.setState(state => {
+                    this.setState(operation, state => {
                         const widget = state.widgets[operation.payload.id];
                         if (!widget) return state;
 
@@ -290,12 +293,133 @@ export class DataManager {
                     });
                     break;
 
-                case OperationTypes.BATCH:
-                    if (Array.isArray(operation.payload)) {
-                        for (const op of operation.payload) {
-                            await this.processOperation(op);
+                // Metadata operations
+                case OperationTypes.SET_DIRTY:
+                    this.setState(operation, state => ({
+                        metadata: {
+                            ...state.metadata,
+                            isDirty: operation.payload.isDirty
                         }
-                    }
+                    }));
+                    break;
+
+                case OperationTypes.SET_LOADING:
+                    this.setState(operation, state => ({
+                        metadata: {
+                            ...state.metadata,
+                            isLoading: operation.payload.isLoading
+                        }
+                    }));
+                    break;
+
+
+                case OperationTypes.MARK_WIDGET_DIRTY:
+                    // Widget dirty state is now handled by global isDirty
+                    this.setState(operation, state => ({
+                        metadata: {
+                            ...state.metadata,
+                            isDirty: true
+                        }
+                    }));
+                    break;
+
+                case OperationTypes.MARK_WIDGET_SAVED:
+                    this.setState(operation, state => ({
+                        metadata: {
+                            ...state.metadata,
+                            widgetStates: {
+                                ...state.metadata.widgetStates,
+                                errors: {
+                                    ...state.metadata.widgetStates.errors,
+                                    [operation.payload.widgetId]: undefined
+                                }
+                            }
+                        }
+                    }));
+                    break;
+
+                case OperationTypes.SET_WIDGET_ERROR:
+                    this.setState(operation, state => ({
+                        metadata: {
+                            ...state.metadata,
+                            widgetStates: {
+                                ...state.metadata.widgetStates,
+                                errors: {
+                                    ...state.metadata.widgetStates.errors,
+                                    [operation.payload.widgetId]: operation.payload.error
+                                }
+                            }
+                        }
+                    }));
+                    break;
+
+                case OperationTypes.ADD_ERROR:
+                    this.setState(operation, state => ({
+                        metadata: {
+                            ...state.metadata,
+                            errors: [
+                                ...state.metadata.errors,
+                                {
+                                    message: operation.payload.message,
+                                    category: operation.payload.category || 'general',
+                                    timestamp: Date.now()
+                                }
+                            ]
+                        }
+                    }));
+                    break;
+
+                case OperationTypes.ADD_WARNING:
+                    this.setState(operation, state => ({
+                        metadata: {
+                            ...state.metadata,
+                            warnings: [
+                                ...state.metadata.warnings,
+                                {
+                                    message: operation.payload.message,
+                                    category: operation.payload.category || 'general',
+                                    timestamp: Date.now()
+                                }
+                            ]
+                        }
+                    }));
+                    break;
+
+                case OperationTypes.CLEAR_ERRORS:
+                    this.setState(operation, state => ({
+                        metadata: {
+                            ...state.metadata,
+                            errors: operation.payload.category
+                                ? state.metadata.errors.filter(error => error.category !== operation.payload.category)
+                                : []
+                        }
+                    }));
+                    break;
+
+                case OperationTypes.CLEAR_WARNINGS:
+                    this.setState(operation, state => ({
+                        metadata: {
+                            ...state.metadata,
+                            warnings: operation.payload.category
+                                ? state.metadata.warnings.filter(warning => warning.category !== operation.payload.category)
+                                : []
+                        }
+                    }));
+                    break;
+
+                case OperationTypes.RESET_STATE:
+                    this.setState(operation, state => ({
+                        metadata: {
+                            ...state.metadata,
+                            isDirty: false,
+                            errors: [],
+                            warnings: [],
+                            widgetStates: {
+                                errors: {},
+                                activeEditors: []
+                            }
+                        }
+                    }));
                     break;
             }
 
@@ -307,7 +431,7 @@ export class DataManager {
             this.state = previousState;
             
             // Update error state
-            this.setState(state => ({
+            this.setState(operation, state => ({
                 metadata: {
                     ...state.metadata,
                     errors: {
@@ -322,104 +446,24 @@ export class DataManager {
     }
 
     /**
-     * Process operation with retry logic
+     * Dispatch an operation
      */
-    private async executeOperation(
-        operation: Operation,
-        retries = 3,
-        delay = 1000
-    ): Promise<void> {
+    dispatch(operation: Operation): void {
         try {
-            await this.processOperation(operation);
+            this.processOperation(operation);
         } catch (error) {
-            if (retries > 0 && isRetryableError(error)) {
-                await new Promise(resolve => setTimeout(resolve, delay));
-                await this.executeOperation(operation, retries - 1, delay * 2);
-            } else {
-                throw error;
-            }
-        }
-    }
-
-    /**
-     * Process operation queue with priority handling
-     */
-    private async processQueue(): Promise<void> {
-        if (this.isProcessing || this.operationQueue.length === 0) return;
-
-        this.isProcessing = true;
-        
-        try {
-            // Sort by priority
-            this.operationQueue.sort((a, b) => {
-                const priorityMap = { high: 0, normal: 1, low: 2 };
-                return priorityMap[a.priority || 'normal'] - priorityMap[b.priority || 'normal'];
-            });
-
-            while (this.operationQueue.length > 0) {
-                const operation = this.operationQueue.shift()!;
-                await this.executeOperation(operation);
-            }
-        } finally {
-            this.isProcessing = false;
-        }
-    }
-
-    /**
-     * Dispatch an operation with optional debouncing
-     */
-    async dispatch(
-        operation: Operation,
-        options: { 
-            priority?: 'high' | 'normal' | 'low';
-            debounce?: number;
-        } = {}
-    ): Promise<void> {
-        const { priority = 'normal', debounce } = options;
-
-        if (debounce) {
-            return this.debounceOperation(operation, debounce);
-        }
-
-        // Queue the operation with priority
-        this.operationQueue.push({ ...operation, priority });
-        
-        // Process queue
-        await this.processQueue();
-    }
-
-    /**
-     * Debounce an operation
-     */
-    private debounceOperation(operation: Operation, delay: number): Promise<void> {
-        const key = `${operation.type}_${operation.payload?.id}`;
-        
-        // Clear existing debounced operation
-        if (this.debouncedOperations.has(key)) {
-            const existing = this.debouncedOperations.get(key)!;
-            clearTimeout(existing.timeoutId);
-            existing.reject(new Error('Operation superseded'));
-            this.debouncedOperations.delete(key);
-        }
-
-        return new Promise<void>((resolve, reject) => {
-            const timeoutId = setTimeout(async () => {
-                try {
-                    await this.processOperation(operation);
-                    this.debouncedOperations.delete(key);
-                    resolve();
-                } catch (error) {
-                    reject(error);
+            // Update error state
+            this.setState(operation, state => ({
+                metadata: {
+                    ...state.metadata,
+                    errors: {
+                        ...state.metadata.errors,
+                        [operation.type]: error
+                    }
                 }
-            }, delay);
-
-            this.debouncedOperations.set(key, {
-                operation,
-                timeoutId,
-                resolve,
-                reject
-            });
-        });
+            }));
+            throw error;
+        }
     }
 
     /**
@@ -431,7 +475,7 @@ export class DataManager {
         options: SubscriptionOptions = {}
     ) {
         return this.subscriptionManager.subscribe(
-            (state) => this.getMemoizedSelector(() => selector(state)),
+            (state) => this.getMemoizedSelector(selector),
             callback,
             {
                 equalityFn: defaultEqualityFn,
@@ -459,11 +503,5 @@ export class DataManager {
     clear(): void {
         this.subscriptionManager.clearAllSubscriptions();
         this.selectorCache.clear();
-        this.debouncedOperations.forEach(({ timeoutId }) => clearTimeout(timeoutId));
-        this.debouncedOperations.clear();
-        if (this.batchTimeout) {
-            clearTimeout(this.batchTimeout);
-            this.batchTimeout = null;
-        }
     }
 }

@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useUnifiedData } from '../context/UnifiedDataContext';
 import { LayoutData, LayoutSlot } from '../types/state';
 import { OperationTypes } from '../types/operations';
@@ -26,17 +26,25 @@ export interface UseLayoutOperationsResult {
 }
 
 export function useLayoutOperations(layoutId: string): UseLayoutOperationsResult {
-    const { dispatch, useSelector } = useUnifiedData();
+    const { dispatch, useExternalChanges } = useUnifiedData();
 
-    // Selectors
-    const layout = useSelector(state => state.layouts[layoutId] || null);
-    const slots = useSelector(state => state.layouts[layoutId]?.slots || []);
-    const theme = useSelector(state => state.layouts[layoutId]?.theme || null);
+    // State
+    const [layout, setLayout] = useState<LayoutData | null>(null);
+    const [slots, setSlots] = useState<LayoutSlot[]>([]);
+    const [theme, setTheme] = useState<string | null>(null);
+
+    // Subscribe to external changes
+    useExternalChanges(`layout-ops-${layoutId}`, state => {
+        setLayout(state.layouts[layoutId] || null);
+        setSlots(state.layouts[layoutId]?.slots || []);
+        setTheme(state.layouts[layoutId]?.theme || null);
+    });
 
     // Operations
     const updateLayout = useCallback(async (updates: Partial<LayoutData>) => {
         await dispatch({
             type: OperationTypes.UPDATE_LAYOUT,
+            sourceId: `layout-ops-${layoutId}`,
             payload: {
                 id: layoutId,
                 updates
@@ -47,6 +55,7 @@ export function useLayoutOperations(layoutId: string): UseLayoutOperationsResult
     const updateTheme = useCallback(async (newTheme: string) => {
         await dispatch({
             type: OperationTypes.UPDATE_LAYOUT_THEME,
+            sourceId: `layout-ops-${layoutId}`,
             payload: {
                 id: layoutId,
                 theme: newTheme
@@ -57,6 +66,7 @@ export function useLayoutOperations(layoutId: string): UseLayoutOperationsResult
     const addSlot = useCallback(async (slot: LayoutSlot) => {
         await dispatch({
             type: OperationTypes.ADD_LAYOUT_SLOT,
+            sourceId: `layout-ops-${layoutId}`,
             payload: {
                 layoutId,
                 slot
@@ -67,6 +77,7 @@ export function useLayoutOperations(layoutId: string): UseLayoutOperationsResult
     const removeSlot = useCallback(async (slotId: string) => {
         await dispatch({
             type: OperationTypes.REMOVE_LAYOUT_SLOT,
+            sourceId: `layout-ops-${layoutId}`,
             payload: {
                 layoutId,
                 slotId
@@ -77,6 +88,7 @@ export function useLayoutOperations(layoutId: string): UseLayoutOperationsResult
     const updateSlot = useCallback(async (slotId: string, updates: Partial<LayoutSlot>) => {
         await dispatch({
             type: OperationTypes.UPDATE_LAYOUT_SLOT,
+            sourceId: `layout-ops-${layoutId}`,
             payload: {
                 layoutId,
                 slotId,
@@ -88,6 +100,7 @@ export function useLayoutOperations(layoutId: string): UseLayoutOperationsResult
     const reorderSlots = useCallback(async (slotIds: string[]) => {
         await dispatch({
             type: OperationTypes.REORDER_LAYOUT_SLOTS,
+            sourceId: `layout-ops-${layoutId}`,
             payload: {
                 layoutId,
                 slotIds
@@ -98,6 +111,7 @@ export function useLayoutOperations(layoutId: string): UseLayoutOperationsResult
     const duplicateLayout = useCallback(async (newName?: string): Promise<string> => {
         const result = await dispatch({
             type: OperationTypes.DUPLICATE_LAYOUT,
+            sourceId: `layout-ops-${layoutId}`,            
             payload: {
                 id: layoutId,
                 newName
@@ -109,6 +123,7 @@ export function useLayoutOperations(layoutId: string): UseLayoutOperationsResult
     const deleteLayout = useCallback(async () => {
         await dispatch({
             type: OperationTypes.DELETE_LAYOUT,
+            sourceId: `layout-ops-${layoutId}`,            
             payload: {
                 id: layoutId
             }
@@ -132,11 +147,22 @@ export function useLayoutOperations(layoutId: string): UseLayoutOperationsResult
         return slot.allowedWidgets.includes(widgetType);
     }, [getSlot]);
 
-    const getSlotWidgets = useSelector(state => {
-        return useCallback((slotId: string) => {
-            return Object.values(state.widgets).filter(widget => widget.slot === slotId);
-        }, [state.widgets]);
+    const [slotWidgets, setSlotWidgets] = useState<Record<string, any[]>>({});
+
+    // Subscribe to slot widgets changes
+    useExternalChanges(`layout-slot-widgets-${layoutId}`, state => {
+        const widgetsBySlot = Object.values(state.widgets)
+            .reduce((acc, widget) => {
+                if (!acc[widget.slot]) acc[widget.slot] = [];
+                acc[widget.slot].push(widget);
+                return acc;
+            }, {} as Record<string, any[]>);
+        setSlotWidgets(widgetsBySlot);
     });
+
+    const getSlotWidgets = useCallback((slotId: string) => {
+        return slotWidgets[slotId] || [];
+    }, [slotWidgets]);
 
     return useMemo(() => ({
         layout,

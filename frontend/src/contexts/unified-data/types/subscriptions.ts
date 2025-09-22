@@ -8,7 +8,7 @@ import { Operation } from './operations';
 /**
  * Callback types for different subscription scenarios
  */
-export type StateUpdateCallback<T = any> = (newValue: T, prevValue: T) => void;
+export type StateUpdateCallback<T = any> = (newValue: T, operation: Operation) => void;
 export type OperationCallback = (operation: Operation) => void;
 export type ErrorCallback = (error: Error) => void;
 
@@ -22,6 +22,8 @@ export interface SubscriptionOptions {
   equalityFn?: (a: any, b: any) => boolean;
   // Error handling
   onError?: ErrorCallback;
+  // Component ID for filtering updates
+  componentId?: string;
 }
 
 /**
@@ -57,7 +59,7 @@ export interface SubscriptionManager {
   // State subscriptions
   subscribe: <T>(
     selector: StateSelector<T>,
-    callback: StateUpdateCallback<T>,
+    callback: (value: T, operation?: Operation) => void,
     options?: SubscriptionOptions
   ) => Unsubscribe;
   
@@ -69,7 +71,7 @@ export interface SubscriptionManager {
   ) => Unsubscribe;
   
   // Notify subscribers
-  notifyStateUpdate: (state: AppState) => void;
+  notifyStateUpdate: (state: AppState, operation?: Operation) => void;
   notifyOperation: (operation: Operation) => void;
   
   // Cleanup

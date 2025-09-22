@@ -76,10 +76,13 @@ export class SubscriptionManager {
     /**
      * Notify subscribers of state updates
      */
-    notifyStateUpdate(state: AppState): void {
+    notifyStateUpdate(state: AppState, operation: Operation): void {
         for (const subscription of this.stateSubscriptions.values()) {
             try {
-                const newValue = subscription.selector(state);
+                let newValue = state;
+                if (subscription.selector) {
+                    newValue = subscription.selector(state);
+                }
                 
                 // Skip if value hasn't changed according to equality function
                 if (
@@ -91,11 +94,10 @@ export class SubscriptionManager {
 
                 const prevValue = subscription.lastValue;
                 subscription.lastValue = newValue;
-                
-                subscription.callback(newValue, prevValue);
+                subscription.callback(newValue, operation);
             } catch (error) {
-                console.error('Error in subscription callback:', error);
-                subscription.options.onError?.(error as Error);
+                console.error('❌ Error in subscription callback:', error);
+                subscription.options?.onError?.(error as Error);
             }
         }
     }
@@ -117,7 +119,7 @@ export class SubscriptionManager {
                 subscription.callback(operation);
             } catch (error) {
                 console.error('Error in operation subscription callback:', error);
-                subscription.options.onError?.(error as Error);
+                subscription.options?.onError?.(error as Error);
             }
         }
     }

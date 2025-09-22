@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useCallback, useRef, useEffect, useState } from 'react'
-import { useAppStatus } from './AppStatusContext'
+import { useUnifiedData } from './unified-data'
 
 /**
  * Widget Event Context - Centralized event system for widget communication
@@ -32,8 +32,8 @@ export const WidgetEventProvider = ({ children }) => {
     // Create event bus
     const listenersRef = useRef(new Map())
 
-    // Get app status context
-    const { setIsDirty } = useAppStatus()
+    // Get UnifiedDataContext
+    const { setIsDirty } = useUnifiedData()
 
     // Global dirty state tracking
     const [widgetHasUnsavedChanges, setWidgetHasUnsavedChanges] = useState(false)
@@ -41,7 +41,6 @@ export const WidgetEventProvider = ({ children }) => {
     // Emit an event to all subscribers
     const emit = useCallback((eventType, payload = {}) => {
         if (DEBUG_ENABLED) {
-            console.log(`🔔 Widget Event: ${eventType}`, payload)
         }
 
         const listeners = listenersRef.current.get(eventType) || []
@@ -73,7 +72,6 @@ export const WidgetEventProvider = ({ children }) => {
         listeners.push(callback)
 
         if (DEBUG_ENABLED) {
-            console.log(`📡 Subscribed to widget event: ${eventType} (${listeners.length} total listeners)`)
         }
 
         // Return unsubscribe function

@@ -12,6 +12,7 @@ import { createPageEditorEventSystem } from './PageEditorEventSystem';
 import { useWidgetEvents } from '../../contexts/WidgetEventContext';
 import { useWidgets, createDefaultWidgetConfig } from '../../hooks/useWidgets';
 import PageWidgetSelectionModal from './PageWidgetSelectionModal';
+import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext';
 
 const ReactLayoutRenderer = forwardRef(({
     layoutName = 'single_column',
@@ -23,7 +24,8 @@ const ReactLayoutRenderer = forwardRef(({
     currentVersion,
     pageVersionData,
     onVersionChange,
-    onOpenWidgetEditor
+    onOpenWidgetEditor,
+    context
 }, ref) => {
 
     // Create PageEditor event system
@@ -32,6 +34,9 @@ const ReactLayoutRenderer = forwardRef(({
         createPageEditorEventSystem(baseWidgetEvents),
         [baseWidgetEvents]
     );
+
+    // Get update lock and UnifiedData context
+    const { useExternalChanges } = useUnifiedData();
 
     // Get version context
     const versionId = currentVersion?.id || pageVersionData?.versionId;
@@ -71,12 +76,10 @@ const ReactLayoutRenderer = forwardRef(({
     }), [versionId, isPublished, onVersionChange]);
 
     // Handle widget actions
-    const handleWidgetAction = useCallback((action, slotName, widget, ...args) => {
-
+    const handleWidgetAction = useCallback(async (action, slotName, widget, ...args) => {
         switch (action) {
-            case 'add':
+            case 'add': {
                 const widgetType = args[0] || 'core_widgets.ContentWidget';
-
 
                 const widgetConfig = createDefaultWidgetConfig(widgetType);
                 const newWidget = addWidget(slotName, widgetType, widgetConfig);
@@ -87,7 +90,7 @@ const ReactLayoutRenderer = forwardRef(({
                 updatedWidgets[slotName].push(newWidget);
 
                 if (onWidgetChange) {
-                    onWidgetChange(updatedWidgets);
+                    onWidgetChange(updatedWidgets, { sourceId: newWidget.id });
                 }
 
                 if (onDirtyChange) {
@@ -97,15 +100,17 @@ const ReactLayoutRenderer = forwardRef(({
                 // Emit event
                 pageEventSystem.emitWidgetAdded(slotName, newWidget, { versionId, isPublished });
                 break;
+            }
 
-            case 'edit':
+            case 'edit': {
                 const widgetIndex = args[0];
                 if (onOpenWidgetEditor) {
-                    onOpenWidgetEditor({ ...widget, slotName });
+                    onOpenWidgetEditor({ ...widget, slotName, context: { ...context, widgetId: widget.id } });
                 }
                 break;
+            }
 
-            case 'delete':
+            case 'delete': {
                 const deleteIndex = args[0];
 
                 const updatedWidgetsDelete = { ...widgets };
@@ -114,7 +119,7 @@ const ReactLayoutRenderer = forwardRef(({
                 }
 
                 if (onWidgetChange) {
-                    onWidgetChange(updatedWidgetsDelete);
+                    onWidgetChange(updatedWidgetsDelete, { sourceId: widget.id });
                 }
 
                 if (onDirtyChange) {
@@ -124,8 +129,9 @@ const ReactLayoutRenderer = forwardRef(({
                 // Emit event
                 pageEventSystem.emitWidgetRemoved(slotName, widget.id, { versionId, isPublished });
                 break;
+            }
 
-            case 'moveUp':
+            case 'moveUp': {
                 const moveUpIndex = args[0];
                 if (moveUpIndex > 0) {
                     const updatedWidgetsUp = { ...widgets };
@@ -137,7 +143,7 @@ const ReactLayoutRenderer = forwardRef(({
                     }
 
                     if (onWidgetChange) {
-                        onWidgetChange(updatedWidgetsUp);
+                        onWidgetChange(updatedWidgetsUp, { sourceId: widget.id });
                     }
 
                     if (onDirtyChange) {
@@ -148,8 +154,9 @@ const ReactLayoutRenderer = forwardRef(({
                     pageEventSystem.emitWidgetMoved(slotName, widget.id, moveUpIndex, moveUpIndex - 1, { versionId, isPublished });
                 }
                 break;
+            }
 
-            case 'moveDown':
+            case 'moveDown': {
                 const moveDownIndex = args[0];
                 const slotWidgets = widgets[slotName] || [];
                 if (moveDownIndex < slotWidgets.length - 1) {
@@ -162,7 +169,7 @@ const ReactLayoutRenderer = forwardRef(({
                     }
 
                     if (onWidgetChange) {
-                        onWidgetChange(updatedWidgetsDown);
+                        onWidgetChange(updatedWidgetsDown, { sourceId: widget.id });
                     }
 
                     if (onDirtyChange) {
@@ -173,8 +180,9 @@ const ReactLayoutRenderer = forwardRef(({
                     pageEventSystem.emitWidgetMoved(slotName, widget.id, moveDownIndex, moveDownIndex + 1, { versionId, isPublished });
                 }
                 break;
+            }
 
-            case 'configChange':
+            case 'configChange': {
                 const newConfig = args[0];
                 const updatedWidgetsConfig = { ...widgets };
                 if (updatedWidgetsConfig[slotName]) {
@@ -184,7 +192,7 @@ const ReactLayoutRenderer = forwardRef(({
                 }
 
                 if (onWidgetChange) {
-                    onWidgetChange(updatedWidgetsConfig);
+                    onWidgetChange(updatedWidgetsConfig, { sourceId: widget.id });
                 }
 
                 if (onDirtyChange) {
@@ -194,6 +202,7 @@ const ReactLayoutRenderer = forwardRef(({
                 // Emit event
                 pageEventSystem.emitWidgetChanged(widget.id, slotName, { ...widget, config: newConfig }, 'config', { versionId, isPublished });
                 break;
+            }
 
             default:
                 break;
@@ -219,12 +228,13 @@ const ReactLayoutRenderer = forwardRef(({
     }, [selectedSlotForModal, handleWidgetAction, handleCloseWidgetModal]);
 
     // Clear slot handler
-    const handleClearSlot = useCallback((slotName) => {
+    const handleClearSlot = useCallback(async (slotName) => {
+
         const updatedWidgets = { ...widgets };
         updatedWidgets[slotName] = [];
 
         if (onWidgetChange) {
-            onWidgetChange(updatedWidgets);
+            onWidgetChange(updatedWidgets, { sourceId: `slot-${slotName}` });
         }
 
         if (onDirtyChange) {

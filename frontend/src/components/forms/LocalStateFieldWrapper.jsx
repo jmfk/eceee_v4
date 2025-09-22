@@ -24,6 +24,7 @@ const LocalStateFieldWrapper = React.memo(({
     debounceMs = 300,
     validateOnChange = true,
     validateOnBlur = true,
+    context = null,
     ...wrapperProps
 }) => {
     // Local state for this field only
@@ -156,6 +157,8 @@ const LocalStateFieldWrapper = React.memo(({
             isDirty: removedIsDirty,
             isTouched: removedIsTouched,
             isValidating: removedIsValidating,
+            // Preserve context
+            context,
             // Keep the rest
             ...componentProps
         } = {
@@ -173,7 +176,7 @@ const LocalStateFieldWrapper = React.memo(({
             'data-local-state': true
         }
 
-        return componentProps
+        return { ...componentProps, context }
     }, [
         fieldProps,
         localValue,
@@ -184,7 +187,8 @@ const LocalStateFieldWrapper = React.memo(({
         isValidating,
         isDirty,
         isTouched,
-        fieldName
+        fieldName,
+        context
     ])
 
     // Cleanup timeouts on unmount

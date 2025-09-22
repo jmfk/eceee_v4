@@ -17,7 +17,7 @@ export { UnifiedDataProvider, useUnifiedData } from './context/UnifiedDataContex
 export * from './hooks';
 
 // Core types
-export type { AppState, StateSelector, StateUpdate } from './types/state';
+export type { AppState, StateChangeCallback, StateUpdate } from './types/state';
 export type { Operation, OperationTypes } from './types/operations';
 export type { SubscriptionOptions, StateUpdateCallback } from './types/subscriptions';
 export type { UnifiedDataContextValue, UnifiedDataProviderProps } from './types/context';

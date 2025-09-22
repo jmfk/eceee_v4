@@ -13,6 +13,7 @@
  */
 
 import { validateWidgetConfiguration } from '../../api/widgetSchemas.js'
+import { OperationTypes } from '../../contexts/unified-data/types/operations'
 
 /**
  * Central Widget Registry (Singleton)
@@ -32,7 +33,7 @@ class WidgetRegistry {
     register(widgetForm) {
         this.widgets.set(widgetForm.widgetId, widgetForm)
         this.broadcast({
-            type: 'WIDGET_FORM_REGISTERED',
+            type: OperationTypes.WIDGET_FORM_REGISTERED,
             widgetId: widgetForm.widgetId,
             slotName: widgetForm.slotName
         })
@@ -43,7 +44,7 @@ class WidgetRegistry {
         if (form) {
             this.widgets.delete(widgetId)
             this.broadcast({
-                type: 'WIDGET_FORM_UNREGISTERED',
+                type: OperationTypes.WIDGET_FORM_UNREGISTERED,
                 widgetId,
                 slotName: form.slotName
             })
@@ -86,6 +87,14 @@ class WidgetRegistry {
         const listeners = this.listeners.get(event.type) || new Set()
         listeners.forEach(listener => {
             try {
+                // Get the form instance for the widget
+                const form = this.widgets.get(event.widgetId)
+
+                // Skip if the event is from the same widget and it's locked
+                if (form && event.sourceId === event.widgetId && form.isUpdateLocked()) {
+                    return;
+                }
+
                 listener(event)
             } catch (error) {
                 console.error('Registry listener error:', error)
@@ -208,6 +217,11 @@ class SelfContainedWidgetForm {
             // Load schema first
             await this.loadSchema()
 
+            // Set initial state before rendering to prevent dirty state during load
+            this.isDirty = false
+            this.hasUnsavedChanges = false
+            this.isInitializing = true
+
             // Render the form
             this.render()
 
@@ -222,8 +236,9 @@ class SelfContainedWidgetForm {
                 this.setupAutoSave()
             }
 
-            // Mark as initialized
+            // Mark as initialized and complete initialization
             this.isInitialized = true
+            this.isInitializing = false
 
             // Initial validation
             this.validateConfiguration()
@@ -740,25 +755,29 @@ class SelfContainedWidgetForm {
         const oldValue = this.currentConfig[fieldName]
         if (oldValue === value) return // No change
 
+        // Execute update with lock
         // Update config
         this.currentConfig[fieldName] = value
 
-        // Update dirty state
-        this.updateDirtyState()
+        // Only update dirty state if not initializing
+        if (!this.isInitializing) {
+            // Update dirty state
+            this.updateDirtyState()
 
-        // Clear existing validation for this field
-        this.clearFieldValidation(fieldName)
+            // Clear existing validation for this field
+            this.clearFieldValidation(fieldName)
 
-        // Debounced operations
-        this.debounceValidation()
+            // Debounced operations
+            this.debounceValidation()
 
-        if (this.autoSaveEnabled) {
-            this.debounceServerSync()
+            if (this.autoSaveEnabled) {
+                this.debounceServerSync()
+            }
         }
 
         // Immediate registry notification (for real-time preview)
         this.notifyRegistry({
-            type: 'CONFIG_CHANGE',
+            type: OperationTypes.CONFIG_CHANGE,
             widgetId: this.widgetId,
             slotName: this.slotName,
             config: { ...this.currentConfig },
@@ -779,7 +798,7 @@ class SelfContainedWidgetForm {
         if (wasDirty !== this.isDirty) {
             this.updateSaveStatus()
             this.notifyRegistry({
-                type: 'DIRTY_STATE_CHANGED',
+                type: OperationTypes.DIRTY_STATE_CHANGED,
                 widgetId: this.widgetId,
                 slotName: this.slotName,
                 isDirty: this.isDirty
@@ -895,7 +914,7 @@ class SelfContainedWidgetForm {
 
         // Notify registry of successful sync (not actual server save)
         this.notifyRegistry({
-            type: 'SAVED_TO_SERVER',
+            type: OperationTypes.SAVED_TO_SERVER,
             widgetId: this.widgetId,
             slotName: this.slotName,
             config: { ...this.currentConfig }
@@ -946,7 +965,7 @@ class SelfContainedWidgetForm {
 
             // Notify registry
             this.notifyRegistry({
-                type: 'VALIDATION_COMPLETE',
+                type: OperationTypes.VALIDATION_COMPLETE,
                 widgetId: this.widgetId,
                 slotName: this.slotName,
                 isValid: this.isValid,
@@ -962,7 +981,7 @@ class SelfContainedWidgetForm {
             this.updateValidationDisplay()
 
             this.notifyRegistry({
-                type: 'VALIDATION_COMPLETE',
+                type: OperationTypes.VALIDATION_COMPLETE,
                 widgetId: this.widgetId,
                 slotName: this.slotName,
                 isValid: true,
@@ -1043,7 +1062,11 @@ class SelfContainedWidgetForm {
      */
     notifyRegistry(event) {
         if (this.registry && !this.isDestroyed) {
-            this.registry.broadcast(event)
+            // Add sourceId to event
+            this.registry.broadcast({
+                ...event,
+                sourceId: this.widgetId
+            })
         }
     }
 
@@ -1091,7 +1114,7 @@ class SelfContainedWidgetForm {
         this.updateSaveStatus()
 
         this.notifyRegistry({
-            type: 'FORM_RESET',
+            type: OperationTypes.FORM_RESET,
             widgetId: this.widgetId,
             slotName: this.slotName
         })
@@ -1137,7 +1160,7 @@ class SelfContainedWidgetForm {
         this.statusElement = null
 
         this.notifyRegistry({
-            type: 'FORM_DESTROYED',
+            type: OperationTypes.FORM_DESTROYED,
             widgetId: this.widgetId,
             slotName: this.slotName
         })

@@ -1,6 +1,8 @@
-import React, { useRef, useEffect, useCallback, memo } from 'react'
+import React, { useRef, useEffect, useCallback, memo, useState } from 'react'
 import { FileText, Type, Eraser } from 'lucide-react'
 import ContentWidgetEditorRenderer from './ContentWidgetEditorRenderer.js'
+import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
+import { OperationTypes } from '../../contexts/unified-data/types/operations';
 
 /**
  * Clean up HTML content by removing unsupported tags and attributes
@@ -92,41 +94,54 @@ const ContentWidget = memo(({
     slotName = null,
     widgetType = null
 }) => {
-    // Store current content in ref for save collection (without triggering re-renders)
-    const currentContentRef = useRef(config.content || '')
+    const { useExternalChanges, publishUpdate } = useUnifiedData();
+    const [content, setContent] = useState(config.content || 'Content will appear here...');
+    const componentId = `widget-${widgetId}`;
 
-    const {
-        content = 'Content will appear here...',
-        allow_scripts = false,
-        sanitize_html = true
-    } = config
-
-    // Debounced config update to prevent focus loss during typing
-    const debouncedConfigUpdate = useRef(null)
-
-    // Cleanup timeout on unmount
+    // Initialize widget in UnifiedDataContext when component mounts
     useEffect(() => {
-        return () => {
-            if (debouncedConfigUpdate.current) {
-                clearTimeout(debouncedConfigUpdate.current)
-            }
+        if (widgetId) {
+            // First add the widget to the state
+            const initialConfig = {
+                content: config.content || ContentWidget.defaultConfig.content,
+                allow_scripts: config.allow_scripts ?? ContentWidget.defaultConfig.allow_scripts,
+                sanitize_html: config.sanitize_html ?? ContentWidget.defaultConfig.sanitize_html
+            };
+            // Add the widget first
+            publishUpdate(componentId, OperationTypes.ADD_WIDGET, {
+                id: widgetId,
+                type: ContentWidget.widgetType,
+                config: initialConfig,
+                slot: slotName || 'main'
+            });
         }
-    }, [])
+    }, [widgetId, slotName]);
 
-    // Enhanced content change handler
-    const handleContentChange = useCallback((newContent) => {
+    // Subscribe to external changes
+    useExternalChanges(componentId, (state) => {
+        const newContent = state.widgets[widgetId]?.config?.content;
         if (newContent !== content) {
-            // Update current content ref immediately (no re-renders)
-            currentContentRef.current = newContent
+            setContent(newContent);
+        }
+    });
 
-            const updatedConfig = {
-                ...config,
-                content: newContent
-            }
-
-            // Call onConfigChange if provided
+    // Enhanced content change handler with update lock
+    const handleContentChange = useCallback(async (newContent) => {
+        if (newContent !== content) {
+            setContent(newContent);
+            publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
+                id: widgetId,
+                config: {
+                    ...config,
+                    content: newContent
+                }
+            });
             if (onConfigChange) {
-                onConfigChange(updatedConfig)
+                const updatedConfig = {
+                    ...config,
+                    content: newContent
+                };
+                onConfigChange(updatedConfig);
             }
         }
     }, [config, content, onConfigChange])

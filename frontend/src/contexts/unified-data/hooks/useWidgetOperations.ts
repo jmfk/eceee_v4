@@ -1,12 +1,12 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useUnifiedData } from '../context/UnifiedDataContext';
 import { WidgetData, WidgetConfig } from '../types/state';
-import { OperationTypes } from '../types/operations';
+import { OperationTypes, DispatchOptions } from '../types/operations';
 
 export interface UseWidgetOperationsResult {
     // Widget data
     widget: WidgetData | null;
-    hasUnsavedChanges: boolean;
+    isDirty: boolean;
     hasErrors: boolean;
     
     // Operations
@@ -21,31 +21,54 @@ export interface UseWidgetOperationsResult {
 }
 
 export function useWidgetOperations(widgetId: string): UseWidgetOperationsResult {
-    const { dispatch, useSelector } = useUnifiedData();
+    const { dispatch, useExternalChanges, getState } = useUnifiedData();
+    
+    // Initialize widget from current state
+    const initialWidget = getState().widgets[widgetId] || null;
 
-    // Selectors
-    const widget = useSelector(state => state.widgets[widgetId] || null);
-    const hasUnsavedChanges = useSelector(
-        state => state.metadata.widgetStates.unsavedChanges[widgetId] || false
-    );
-    const hasErrors = useSelector(
-        state => (state.metadata.widgetStates.errors[widgetId]?.length || 0) > 0
-    );
+    // State
+    const [widget, setWidget] = useState<WidgetData | null>(initialWidget);
+    const [isDirty, setIsDirty] = useState(getState().metadata.isDirty ?? false);
+    const [hasErrors, setHasErrors] = useState(Boolean(getState().metadata.widgetStates.errors[widgetId]));
+
+    // Subscribe to external changes
+    useExternalChanges(widgetId, state => {
+        const widget: WidgetData = state.widgets[widgetId];
+        if (widget) {
+            setWidget(widget);            
+            setIsDirty(state.metadata.isDirty ?? false);
+            setHasErrors(Boolean(state.metadata.widgetStates.errors[widgetId]));
+        }
+    });
 
     // Operations
     const updateConfig = useCallback(async (config: Partial<WidgetConfig>) => {
-        await dispatch({
-            type: OperationTypes.UPDATE_WIDGET_CONFIG,
-            payload: {
-                id: widgetId,
-                config
-            }
-        });
-    }, [dispatch, widgetId]);
+        // First ensure the widget exists in state
+        if (!widget) {
+            await dispatch({
+                type: OperationTypes.ADD_WIDGET,
+                sourceId: widgetId,            
+                payload: {
+                    id: widgetId,
+                    config: config
+                }
+            });
+        } else {
+            await dispatch({
+                type: OperationTypes.UPDATE_WIDGET_CONFIG,
+                sourceId: widgetId,            
+                payload: {
+                    id: widgetId,
+                    config
+                }
+            });
+        }
+    }, [dispatch, widgetId, widget]);
 
     const moveWidget = useCallback(async (slotId: string, order: number) => {
         await dispatch({
             type: OperationTypes.MOVE_WIDGET,
+            sourceId: slotId,
             payload: {
                 id: widgetId,
                 slot: slotId,
@@ -56,7 +79,8 @@ export function useWidgetOperations(widgetId: string): UseWidgetOperationsResult
 
     const saveWidget = useCallback(async () => {
         await dispatch({
-            type: OperationTypes.SAVE_WIDGET,
+            type: OperationTypes.MARK_WIDGET_SAVED,
+            sourceId: widgetId,
             payload: {
                 id: widgetId
             }
@@ -66,6 +90,7 @@ export function useWidgetOperations(widgetId: string): UseWidgetOperationsResult
     const deleteWidget = useCallback(async () => {
         await dispatch({
             type: OperationTypes.REMOVE_WIDGET,
+            sourceId: widgetId,
             payload: {
                 id: widgetId
             }
@@ -76,6 +101,7 @@ export function useWidgetOperations(widgetId: string): UseWidgetOperationsResult
         if (widget) {
             await dispatch({
                 type: OperationTypes.UPDATE_WIDGET_CONFIG,
+                sourceId: widgetId,
                 payload: {
                     id: widgetId,
                     config: widget.config
@@ -86,7 +112,8 @@ export function useWidgetOperations(widgetId: string): UseWidgetOperationsResult
 
     const validate = useCallback(async () => {
         const result = await dispatch({
-            type: OperationTypes.VALIDATE_WIDGET,
+            type: OperationTypes.UPDATE_WIDGET,
+            sourceId: widgetId,
             payload: {
                 id: widgetId
             }
@@ -96,7 +123,7 @@ export function useWidgetOperations(widgetId: string): UseWidgetOperationsResult
 
     return useMemo(() => ({
         widget,
-        hasUnsavedChanges,
+        isDirty,
         hasErrors,
         updateConfig,
         moveWidget,
@@ -106,7 +133,7 @@ export function useWidgetOperations(widgetId: string): UseWidgetOperationsResult
         validate
     }), [
         widget,
-        hasUnsavedChanges,
+        isDirty,
         hasErrors,
         updateConfig,
         moveWidget,

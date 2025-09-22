@@ -1,6 +1,7 @@
+import { useState } from 'react'
 import { ChevronLeft, ChevronRight, Trash2, Save, AlertCircle } from 'lucide-react'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
-import { useAppStatus } from '../contexts/AppStatusContext'
+import { useUnifiedData } from '../contexts/unified-data'
 import VersionSelector from './VersionSelector'
 
 const StatusBar = ({
@@ -26,13 +27,22 @@ const StatusBar = ({
         navigateNotifications
     } = useGlobalNotifications()
 
-    // Get global app status
-    const {
-        isDirty,
-        hasUnsavedChanges,
-        errors,
-        warnings
-    } = useAppStatus()
+    // Get global app status from UnifiedDataContext
+    const { useExternalChanges } = useUnifiedData()
+    const componentId = 'status-bar'
+    const [isDirty, setIsDirty] = useState(false);
+    const [errors, setErrors] = useState([]);
+    const [warnings, setWarnings] = useState([]);
+
+    useExternalChanges(componentId, state => {
+        console.log("StatusBar")
+        console.log(state)
+        setIsDirty(state.metadata.isDirty);
+        setErrors(state.metadata.errors);
+        setWarnings(state.metadata.warnings);
+    });
+
+    console.log("isDirty", isDirty)
 
     return (
         <div className={`bg-white border-t border-gray-200 px-4 py-2 ${className}`}>

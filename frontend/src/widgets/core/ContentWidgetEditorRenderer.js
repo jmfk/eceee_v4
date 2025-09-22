@@ -594,14 +594,8 @@ class ContentWidgetEditorRenderer {
                 this.content = currentContent
 
                 // Call onChange to notify parent of changes
+                // The parent component (ContentWidget) will handle the update lock
                 this.onChange(currentContent)
-
-                // Dispatch event for HTML editor
-                const event = new CustomEvent('content-changed', {
-                    detail: currentContent,
-                    bubbles: true
-                });
-                window.dispatchEvent(event);
             }
         }
 
@@ -1047,8 +1041,14 @@ class ContentWidgetEditorRenderer {
 
         // First set the raw content to ensure editor is usable
         if (content !== this.editorElement.innerHTML) {
+            const oldContent = this.content;
             this.content = content;
             this.editorElement.innerHTML = content;
+
+            // Only trigger onChange if this is not the initial content
+            if (oldContent !== undefined && oldContent !== content) {
+                this.onChange(content);
+            }
         }
 
         // Then schedule the HTML cleaning for the next tick

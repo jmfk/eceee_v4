@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useUnifiedData } from '../context/UnifiedDataContext';
 import { VersionData } from '../types/state';
 import { OperationTypes } from '../types/operations';
@@ -26,19 +26,21 @@ export interface UseVersionOperationsResult {
 }
 
 export function useVersionOperations(pageId: string): UseVersionOperationsResult {
-    const { dispatch, useSelector } = useUnifiedData();
+    const { dispatch, useExternalChanges } = useUnifiedData();
 
-    // Selectors
-    const versions = useSelector(state => 
-        Object.values(state.versions)
+    // State
+    const [versions, setVersions] = useState<VersionData[]>([]);
+    const [currentVersion, setCurrentVersion] = useState<VersionData | null>(null);
+
+    // Subscribe to external changes
+    useExternalChanges(`version-ops-${pageId}`, state => {
+        const pageVersions = Object.values(state.versions)
             .filter(version => version.page_id === pageId)
-            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-    );
+            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        setVersions(pageVersions);
 
-    const currentVersion = useSelector(state => {
         const page = state.pages[pageId];
-        if (!page) return null;
-        return state.versions[page.version] || null;
+        setCurrentVersion(page ? state.versions[page.version] || null : null);
     });
 
     const latestVersion = versions[0] || null;
@@ -48,6 +50,7 @@ export function useVersionOperations(pageId: string): UseVersionOperationsResult
     const createVersion = useCallback(async (data?: any): Promise<string> => {
         const result = await dispatch({
             type: OperationTypes.CREATE_VERSION,
+            sourceId: pageId,            
             payload: {
                 pageId,
                 data
@@ -59,6 +62,7 @@ export function useVersionOperations(pageId: string): UseVersionOperationsResult
     const publishVersion = useCallback(async (versionId: string) => {
         await dispatch({
             type: OperationTypes.PUBLISH_VERSION,
+            sourceId: pageId,            
             payload: {
                 pageId,
                 versionId,
@@ -70,6 +74,7 @@ export function useVersionOperations(pageId: string): UseVersionOperationsResult
     const revertToVersion = useCallback(async (versionId: string) => {
         await dispatch({
             type: OperationTypes.REVERT_VERSION,
+            sourceId: pageId,            
             payload: {
                 pageId,
                 versionId
@@ -80,6 +85,7 @@ export function useVersionOperations(pageId: string): UseVersionOperationsResult
     const deleteVersion = useCallback(async (versionId: string) => {
         await dispatch({
             type: OperationTypes.DELETE_VERSION,
+            sourceId: pageId,            
             payload: {
                 pageId,
                 versionId
@@ -90,6 +96,7 @@ export function useVersionOperations(pageId: string): UseVersionOperationsResult
     const compareVersions = useCallback(async (versionId1: string, versionId2: string) => {
         const result = await dispatch({
             type: OperationTypes.COMPARE_VERSIONS,
+            sourceId: pageId,            
             payload: {
                 pageId,
                 versionId1,

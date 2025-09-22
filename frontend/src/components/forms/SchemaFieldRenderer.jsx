@@ -124,6 +124,7 @@ const SchemaFieldRenderer = ({
     required = false,
     disabled = false,
     namespace = null,
+    context = null,
     ...props
 }) => {
     // Map JSON Schema type/format to our field type system
@@ -210,6 +211,7 @@ const SchemaFieldRenderer = ({
             disabled,
             placeholder: fieldSchema.placeholder,
             namespace: namespace,
+            context: context,
             ...componentProps
         }
         return (

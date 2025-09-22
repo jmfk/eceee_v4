@@ -8,6 +8,7 @@ import {
     getCoreWidgetCategory as getWidgetCategory,
     getCoreWidgetDescription as getWidgetDescription
 } from '../widgets'
+import { useUnifiedData } from '../contexts/unified-data/context/UnifiedDataContext'
 
 import WidgetEditorPanel from './WidgetEditorPanel'
 import { useWidgetEvents } from '../contexts/WidgetEventContext'
@@ -277,14 +278,17 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
         [baseWidgetEvents]
     );
 
+    // Get update lock and UnifiedData context
+    const { useExternalChanges } = useUnifiedData();
+
     // Keep onWidgetChange reference for potential external API compatibility
     const stableOnWidgetChange = useRef(onWidgetChange)
     stableOnWidgetChange.current = onWidgetChange
 
     // Centralized function to notify parent of widget changes
-    const notifyWidgetChange = useCallback((updatedWidgets) => {
+    const notifyWidgetChange = useCallback((updatedWidgets, widgetId) => {
         if (stableOnWidgetChange.current) {
-            stableOnWidgetChange.current(updatedWidgets)
+            stableOnWidgetChange.current(updatedWidgets, { sourceId: widgetId })
         }
     }, [])
 
@@ -337,7 +341,7 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
                 ...currentWidgets,
                 [payload.slotName]: [...currentSlotWidgets, payload.widget]
             }
-            notifyWidgetChange(updatedWidgets)
+            notifyWidgetChange(updatedWidgets, payload.widget.id)
         });
 
         const unsubscribeRemoved = objectEventSystem.onWidgetRemoved((payload) => {
@@ -347,7 +351,7 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
                 updatedWidgets[payload.slotName] = updatedWidgets[payload.slotName].filter(
                     w => w.id !== payload.widgetId
                 )
-                notifyWidgetChange(updatedWidgets)
+                notifyWidgetChange(updatedWidgets, payload.widgetId)
             }
         });
 
@@ -357,7 +361,7 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
                 ...currentWidgets,
                 [payload.slotName]: []
             }
-            notifyWidgetChange(updatedWidgets)
+            notifyWidgetChange(updatedWidgets, `slot-${payload.slotName}`)
         });
 
         const unsubscribeWidgetMoved = objectEventSystem.onWidgetMoved((payload) => {
@@ -378,7 +382,7 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
                     ...currentWidgets,
                     [slotName]: slotWidgets
                 }
-                notifyWidgetChange(updatedWidgets)
+                notifyWidgetChange(updatedWidgets, widgetId)
             }
         });
 
@@ -644,7 +648,7 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
                 ...currentWidgets,
                 [slotName]: currentSlotWidgets
             }
-            notifyWidgetChange(updatedWidgets)
+            notifyWidgetChange(updatedWidgets, widget.id)
         }
     }
 
@@ -686,7 +690,7 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
         setSelectedWidgets({})
 
         // Notify parent component via event system
-        notifyWidgetChange(updatedWidgets)
+        notifyWidgetChange(updatedWidgets, 'bulk-delete')
     }
 
     // Widget modal handlers
@@ -735,7 +739,7 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
         })
 
         // Notify parent component via callback
-        notifyWidgetChange(updatedWidgets)
+        notifyWidgetChange(updatedWidgets, `slot-${slotName}`)
     }
 
     // Handle ObjectEditor-specific slot actions
@@ -773,7 +777,7 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
     }, [objectType, addWidget, objectEventSystem])
 
     // Stable config change handler that doesn't depend on widget.config
-    const stableConfigChangeHandler = useCallback((widgetId, slotName, newConfig) => {
+    const stableConfigChangeHandler = useCallback(async (widgetId, slotName, newConfig) => {
         // Get the current widget from the store to avoid stale closure
         const currentWidgets = normalizedWidgets[slotName] || [];
         const widgetIndex = currentWidgets.findIndex(w => w.id === widgetId);
@@ -798,7 +802,7 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
             updatedWidgets[slotName] = [...currentWidgets];
             updatedWidgets[slotName][widgetIndex] = updatedWidget;
 
-            notifyWidgetChange(updatedWidgets);
+            await notifyWidgetChange(updatedWidgets);
         }
     }, [normalizedWidgets, updateWidget, editingWidget, notifyWidgetChange]);
 

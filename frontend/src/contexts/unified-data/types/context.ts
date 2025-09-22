@@ -1,5 +1,5 @@
-import { AppState, StateSelector } from './state';
-import { Operation } from './operations';
+import { AppState, StateChangeCallback, StateSelector } from './state';
+import { Operation, OperationTypes } from './operations';
 import { StateUpdateCallback, SubscriptionOptions } from './subscriptions';
 
 /**
@@ -19,8 +19,12 @@ export interface UnifiedDataContextValue {
     getState: () => AppState;
     
     // Operations
-    dispatch: (operation: Operation, options?: DispatchOptions) => Promise<void>;
-    batchDispatch: (operations: Operation[]) => Promise<void>;
+    dispatch: (operation: Operation) => void;
+    publishUpdate: <T extends object>(
+        componentId: string,
+        type: keyof typeof OperationTypes,
+        data: T & { id?: string }
+    ) => Promise<void>;
     
     // Subscriptions
     subscribe: <T>(
@@ -35,8 +39,19 @@ export interface UnifiedDataContextValue {
     ) => () => void;
     
     // Utilities
-    useSelector: <T>(selector: StateSelector<T>) => T;
-    createSelector: <T>(selector: StateSelector<T>) => StateSelector<T>;
+    useExternalChanges: <T>(componentId: string, callback: StateChangeCallback<T>) => void;
+    
+    // Metadata operations
+    setIsDirty: (isDirty: boolean) => void;
+    setIsLoading: (isLoading: boolean) => void;
+    markWidgetDirty: (widgetId: string) => void;
+    markWidgetSaved: (widgetId: string) => void;
+    addError: (message: string, category?: string) => void;
+    addWarning: (message: string, category?: string) => void;
+    resetErrors: () => void;
+    clearErrors: () => void;
+    clearWarnings: () => void;
+    resetState: () => void;
 }
 
 /**
@@ -47,17 +62,6 @@ export interface UnifiedDataProviderProps {
     initialState?: Partial<AppState>;
     enableDevTools?: boolean;
     onError?: (error: Error) => void;
-}
-
-/**
- * Hook result types
- */
-export interface UseUnifiedDataResult extends UnifiedDataContextValue {
-    // Additional utility methods
-    reset: () => void;
-    clearErrors: () => void;
-    isLoading: boolean;
-    hasUnsavedChanges: boolean;
 }
 
 /**

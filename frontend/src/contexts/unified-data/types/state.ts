@@ -73,25 +73,60 @@ export interface PageVersionData {
 /**
  * Complete application state interface
  */
+export interface ContentData {
+  id: string;
+  value: string;
+  type: string;
+  metadata?: Record<string, any>;
+}
+
 export interface AppState {
   pages: Record<string, PageData>;
   widgets: Record<string, WidgetData>;
   layouts: Record<string, LayoutData>;
   versions: Record<string, VersionData>;
+  content: Record<string, ContentData>;
   
   // Metadata about the state itself
   metadata: {
     lastUpdated: string;
     currentUser?: string;
     isLoading: boolean;
-    errors: Record<string, Error>;
+    isDirty: boolean;
+    // Track last operation for update source filtering
+    lastOperation?: {
+      type: string;
+      sourceId?: string;
+      timestamp: number;
+    };
+    // Global errors and warnings with categories
+    errors: Array<{
+      message: string;
+      category: string;
+      timestamp: number;
+    }>;
+    warnings: Array<{
+      message: string;
+      category: string;
+      timestamp: number;
+    }>;
+    // Widget-specific metadata
+    widgetStates: {
+      errors: Record<string, Error>;
+      activeEditors: string[];
+    };
   };
 }
 
 /**
- * State selector type
+ * State selector type - used by DataManager for internal state selection
  */
 export type StateSelector<T = any> = (state: AppState) => T;
+
+/**
+ * State change callback type - used by components to handle external changes
+ */
+export type StateChangeCallback<T = any> = (state: AppState) => void;
 
 /**
  * State update type

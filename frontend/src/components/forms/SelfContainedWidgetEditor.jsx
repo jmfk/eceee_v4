@@ -8,6 +8,7 @@
 import React, { useRef, useEffect, useState, useCallback, forwardRef, useImperativeHandle } from 'react'
 import { X, Save, RotateCcw, RefreshCw } from 'lucide-react'
 import { SelfContainedWidgetForm } from './SelfContainedWidgetForm.js'
+import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
 import '../../styles/self-contained-form.css'
 
 /**
@@ -44,6 +45,9 @@ const SelfContainedWidgetEditor = forwardRef(({
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
     const [isResizing, setIsResizing] = useState(false)
     const [currentPanelWidth, setCurrentPanelWidth] = useState(panelWidth)
+
+    // Update lock for preventing feedback loops
+    const { useExternalChanges } = useUnifiedData()
 
     // Registry event subscription cleanup
     const registryUnsubscribeRef = useRef(null)
@@ -125,14 +129,19 @@ const SelfContainedWidgetEditor = forwardRef(({
         const unsubscribers = []
 
         // Listen for config changes
-        const configChangeUnsubscribe = window.widgetRegistry.subscribe('CONFIG_CHANGE', (event) => {
+        const configChangeUnsubscribe = window.widgetRegistry.subscribe('CONFIG_CHANGE', async (event) => {
             if (event.widgetId === widgetData.id) {
+                // Update form instance if it's not the source of the change
+                if (!formInstanceRef.current.isUpdateLocked()) {
+                    formInstanceRef.current.updateConfig(event.config);
+                }
+
                 // Notify parent of real-time updates
                 if (onRealTimeUpdate) {
                     onRealTimeUpdate({
                         ...widgetData,
                         config: event.config
-                    })
+                    });
                 }
             }
         })

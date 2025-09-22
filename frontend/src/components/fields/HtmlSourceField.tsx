@@ -1,13 +1,17 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useId } from 'react';
 import { Button } from '../ui/Button';
 import { IconCode } from '../icons/IconCode';
 import { HtmlEditor } from './HtmlEditor';
+import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext';
+import { OperationTypes } from '../../contexts/unified-data/types/operations';
 
-// Generate a unique ID for the field
-const generateFieldId = (label?: string) => {
-    if (!label) return '';
-    return `field-${label.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Math.random().toString(36).substr(2, 9)}`;
-};
+
+interface EditorContext {
+    pageId: string;
+    widgetId: string;
+    slotId: string;
+    mode: 'edit' | 'preview';
+}
 
 interface HtmlSourceFieldProps {
     value: string;
@@ -15,6 +19,7 @@ interface HtmlSourceFieldProps {
     label?: string;
     error?: string;
     required?: boolean;
+    context: EditorContext;
 }
 
 const HtmlSourceField: React.FC<HtmlSourceFieldProps> = ({
@@ -23,54 +28,43 @@ const HtmlSourceField: React.FC<HtmlSourceFieldProps> = ({
     label,
     error,
     required,
+    context,
 }) => {
     const [isEditorOpen, setIsEditorOpen] = useState(false);
     const [currentValue, setCurrentValue] = useState(value);
-    const isEditorFocused = useRef(false);
+    const { useExternalChanges, publishUpdate } = useUnifiedData();
+    const fieldId = `field-${context.widgetId}`;
 
-    // Subscribe to content changes from ContentWidgetEditor
-    useEffect(() => {
-        const handleContentChange = (event: CustomEvent) => {
-            if (!isEditorFocused.current) {
-                setCurrentValue(event.detail);
-            }
-        };
-
-        // Listen for content changes from the WYSIWYG editor
-        window.addEventListener('content-changed', handleContentChange as EventListener);
-        return () => {
-            window.removeEventListener('content-changed', handleContentChange as EventListener);
-        };
-    }, []);
-
-    // Keep currentValue in sync with prop when not focused
-    useEffect(() => {
-        if (!isEditorFocused.current) {
-            setCurrentValue(value);
+    useExternalChanges(fieldId, state => {
+        const newContent = state.widgets[context.widgetId]?.config?.content;
+        if (newContent !== currentValue) {
+            setCurrentValue(newContent);
         }
-    }, [value]);
-
-    const fieldId = generateFieldId(label);
-
+    });
     const handleOpenEditor = () => {
         setIsEditorOpen(true);
     };
 
     const handleCloseEditor = () => {
-        isEditorFocused.current = false;
         setIsEditorOpen(false);
     };
 
     const handleEditorFocus = () => {
-        isEditorFocused.current = true;
+        // Focus handling is now managed by the update lock
     };
 
     const handleEditorBlur = () => {
-        isEditorFocused.current = false;
+        // Blur handling is now managed by the update lock
     };
 
     const handleChange = (newValue: string) => {
         setCurrentValue(newValue);
+        publishUpdate(fieldId, OperationTypes.UPDATE_WIDGET_CONFIG, {
+            id: context.widgetId,
+            config: {
+                content: newValue
+            }
+        });
         onChange(newValue);
     };
 

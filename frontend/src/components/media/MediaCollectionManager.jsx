@@ -323,7 +323,6 @@ const CollectionFilesView = ({ collection, namespace, onBack }) => {
 
     // Handle removing a single file from collection
     const handleRemoveFile = async (fileId) => {
-        console.log("handleRemoveFile Collection")
         try {
             // Remove file from collection using the collection API
             await mediaCollectionsApi.removeFiles(collection.id, [fileId])();

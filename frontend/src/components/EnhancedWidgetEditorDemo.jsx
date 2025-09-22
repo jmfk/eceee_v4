@@ -117,7 +117,6 @@ const EnhancedWidgetEditorDemo = ({
     }
 
     const handleSave = () => {
-        console.log('Saving widget config:', config)
         setHasChanges(false)
         // In real implementation, this would call the onSave prop
     }

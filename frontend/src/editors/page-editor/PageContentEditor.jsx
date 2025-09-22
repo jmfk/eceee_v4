@@ -5,8 +5,9 @@
  * layout protocol. Simple, flexible, and maintainable.
  */
 
-import React, { forwardRef } from 'react';
+import React, { forwardRef, useState } from 'react';
 import ReactLayoutRenderer from './ReactLayoutRenderer';
+import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext';
 
 const PageContentEditor = forwardRef(({
     layoutJson,
@@ -20,6 +21,7 @@ const PageContentEditor = forwardRef(({
     currentVersion,
     availableVersions,
     onVersionChange,
+    context,
     ...otherProps
 }, ref) => {
     // Extract layout name from layoutJson or use default
@@ -31,10 +33,31 @@ const PageContentEditor = forwardRef(({
     // Get current widgets from pageVersionData
     const currentWidgets = pageVersionData?.widgets || {};
 
+    // Get update lock and UnifiedData context
+    const { useExternalChanges } = useUnifiedData();
+
+    // Subscribe to widget changes and update source from UnifiedDataContext
+    const componentId = 'page-content-editor';
+    const [widgets, setWidgets] = useState({});
+    //const [updateSourceId, setUpdateSourceId] = useState(null);
+
+    useExternalChanges(componentId, state => {
+        setWidgets(state.widgets);
+    });
+    // useExternalChanges(componentId, state => {
+    //     const widget: WidgetData = state.widgets[widgetId];
+    //     if (widget) {
+    //         setWidget(widget);
+    //         setIsDirty(state.metadata.isDirty ?? false);
+    //         setHasErrors(Boolean(state.metadata.widgetStates.errors[widgetId]));
+    //     }
+    // });
+
+
     // Handle widget changes
-    const handleWidgetChange = (updatedWidgets) => {
+    const handleWidgetChange = async (updatedWidgets, widgetId) => {
         if (onUpdate) {
-            onUpdate({ widgets: updatedWidgets });
+            onUpdate({ widgets: updatedWidgets }, { sourceId: widgetId });
         }
     };
 
@@ -51,6 +74,7 @@ const PageContentEditor = forwardRef(({
             currentVersion={currentVersion}
             pageVersionData={pageVersionData}
             onVersionChange={onVersionChange}
+            context={context}
             {...otherProps}
         />
     );

@@ -8,6 +8,8 @@ import { WIDGET_EVENTS } from '../types/widgetEvents'
 import { SpecialEditorRenderer, hasSpecialEditor } from './special-editors'
 import IsolatedFormRenderer from './IsolatedFormRenderer.jsx'
 
+import { useUnifiedData } from '../contexts/unified-data/context/UnifiedDataContext'
+
 /**
  * WidgetEditorPanel - Slide-out panel for editing widgets
  * 
@@ -52,6 +54,7 @@ const WidgetEditorPanel = forwardRef(({
     const updateTimeoutRef = useRef(null)
 
     const { emit } = useWidgetEvents()
+    const { useExternalChanges } = useUnifiedData()
 
     // Event emitter functions
     const emitWidgetChanged = useCallback((widgetId, slotName, updatedWidget, changeType = 'config') => {
@@ -60,7 +63,8 @@ const WidgetEditorPanel = forwardRef(({
             slotName,
             widget: updatedWidget,
             changeType,
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            sourceId: widgetId
         })
     }, [emit])
 
@@ -69,7 +73,8 @@ const WidgetEditorPanel = forwardRef(({
             widgetId,
             slotName,
             widget: savedWidget,
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            sourceId: widgetId
         })
     }, [emit])
 
@@ -196,8 +201,8 @@ const WidgetEditorPanel = forwardRef(({
     }, [widgetData, schema, widgetTypeValidation])
 
     // Handle unsaved changes from isolated form
-    const handleUnsavedChanges = useCallback((hasUnsavedChanges) => {
-        setHasChanges(hasUnsavedChanges)
+    const handleUnsavedChanges = useCallback(async (hasUnsavedChanges) => {
+        setHasChanges(hasUnsavedChanges);
         // if (onUnsavedChanges) {
         //     onUnsavedChanges(hasUnsavedChanges)
         // }
@@ -290,16 +295,8 @@ const WidgetEditorPanel = forwardRef(({
         }
     }), [hasChanges, widgetData])
 
-    // Handle config changes from special editor
-    // const handleSpecialEditorConfigChange = useCallback((newConfig) => {
-    //     // The special editor will handle its own state and trigger events
-    //     // This is just for backward compatibility
-    //     console.log("handleSpecialEditorConfigChange")
-    //     setHasChanges(true)
-    // }, [])
-
     // Handle close - revert changes if not saved
-    const handleClose = () => {
+    const handleClose = async () => {
         // Clear any pending real-time update
         if (updateTimeoutRef.current) {
             clearTimeout(updateTimeoutRef.current)
@@ -461,6 +458,7 @@ const WidgetEditorPanel = forwardRef(({
                                 onUnsavedChanges={handleUnsavedChanges}
                                 emitWidgetChanged={emitWidgetChanged}
                                 namespace={namespace}
+                                context={widgetData.context}
                             />
                         ) : (
                             <div className="text-center text-gray-500 py-8 p-4">
