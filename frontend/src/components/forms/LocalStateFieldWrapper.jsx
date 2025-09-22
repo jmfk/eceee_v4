@@ -25,8 +25,9 @@ const LocalStateFieldWrapper = React.memo(({
     debounceMs = 300,
     validateOnChange = true,
     validateOnBlur = true,
-    formId = null, // Optional form ID for UnifiedDataContext integration
-    enableUnifiedData = false, // Enable UnifiedDataContext integration
+    formId = null, // Optional form ID for buffer integration
+    enableUnifiedData = false, // Enable buffer integration
+    objectFormBuffer = null, // Direct reference to SelfContainedObjectForm instance
     ...wrapperProps
 }) => {
     // Local state for this field only
@@ -36,10 +37,8 @@ const LocalStateFieldWrapper = React.memo(({
     const [isDirty, setIsDirty] = useState(false)
     const [isTouched, setIsTouched] = useState(false)
 
-    // Optional UnifiedDataContext integration
-    const unifiedFormData = enableUnifiedData && formId ?
-        useFormData(formId) :
-        { updateField: null, updateFieldData: null }
+    // Optional buffer integration (no reactive hooks - prevents re-renders)
+    const bufferRef = useRef(objectFormBuffer)
 
     // Refs to prevent re-renders and manage timeouts
     const debounceTimeoutRef = useRef(null)
@@ -47,17 +46,37 @@ const LocalStateFieldWrapper = React.memo(({
     const initializedRef = useRef(false)
     const lastSentValueRef = useRef(initialValue)
 
-    // Initialize local value when initialValue changes (e.g., form reset)
+    // Initialize local value and handle updates intelligently
     useEffect(() => {
-        if (!initializedRef.current || initialValue !== lastSentValueRef.current) {
+        if (!initializedRef.current) {
+            // First initialization
             setLocalValue(initialValue)
             setIsDirty(false)
             lastSentValueRef.current = initialValue
             initializedRef.current = true
+        } else if (enableUnifiedData && bufferRef.current) {
+            // When using buffer, only update if the initialValue change came from buffer
+            // (not from user typing which would create a feedback loop)
+            if (initialValue !== lastSentValueRef.current && localValue !== initialValue) {
+                // This is an external update (from buffer), update the field
+                setLocalValue(initialValue)
+                setIsDirty(false) // Don't mark as dirty for external updates
+                lastSentValueRef.current = initialValue
+            }
+        } else if (initialValue !== lastSentValueRef.current) {
+            // Standard behavior for non-buffer usage
+            setLocalValue(initialValue)
+            setIsDirty(false)
+            lastSentValueRef.current = initialValue
         }
-    }, [initialValue])
+    }, [initialValue, enableUnifiedData, localValue])
 
-    // Debounced function to notify parent and unified context of changes
+    // Update buffer reference when it changes
+    useEffect(() => {
+        bufferRef.current = objectFormBuffer
+    }, [objectFormBuffer])
+
+    // Debounced function to notify parent and buffer of changes
     const notifyParentChange = useCallback((value) => {
         if (debounceTimeoutRef.current) {
             clearTimeout(debounceTimeoutRef.current)
@@ -69,19 +88,20 @@ const LocalStateFieldWrapper = React.memo(({
                     onFieldChange(fieldName, value)
                 }
 
-                // Update UnifiedDataContext if enabled
-                if (enableUnifiedData && unifiedFormData.updateField) {
+                // Update buffer if enabled (no re-renders!)
+                if (enableUnifiedData && bufferRef.current) {
                     try {
-                        await unifiedFormData.updateField(fieldName, value)
+                        // Use buffer's updateField method - no reactive state!
+                        bufferRef.current.updateField(fieldName, value, { source: 'user' })
                     } catch (error) {
-                        console.error('Failed to update field in UnifiedDataContext:', error)
+                        console.error('Failed to update field in buffer:', error)
                     }
                 }
 
                 lastSentValueRef.current = value
             }
         }, debounceMs)
-    }, [fieldName, onFieldChange, debounceMs, enableUnifiedData, unifiedFormData.updateField])
+    }, [fieldName, onFieldChange, debounceMs, enableUnifiedData])
 
     // Debounced validation function
     const validateField = useCallback(async (value) => {

@@ -16,7 +16,7 @@ const ObjectDataForm = ({
     handleInputChange,
     handleDataFieldChange,
     getSchemaFromObjectType,
-    formId = null,
+    objectFormBuffer = null,
     enableUnifiedData = false
 }) => {
     const [namespace, setNamespace] = useState(null)
@@ -80,7 +80,14 @@ const ObjectDataForm = ({
                 <input
                     type="text"
                     value={formData.title || ''}
-                    onChange={(e) => handleInputChange('title', e.target.value)}
+                    onChange={(e) => {
+                        // Use buffer if available, fallback to handleInputChange
+                        if (enableUnifiedData && objectFormBuffer) {
+                            objectFormBuffer.updateField('title', e.target.value, { source: 'user' })
+                        } else {
+                            handleInputChange('title', e.target.value)
+                        }
+                    }}
                     className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.title ? 'border-red-300' : 'border-gray-300'
                         }`}
                     placeholder="Enter object title..."
@@ -107,7 +114,7 @@ const ObjectDataForm = ({
                         data={formData.data || {}}
                         onChange={handleDataFieldChange}
                         namespace={namespace}
-                        formId={formId}
+                        objectFormBuffer={objectFormBuffer}
                         enableUnifiedData={enableUnifiedData}
                     />
                 </div>

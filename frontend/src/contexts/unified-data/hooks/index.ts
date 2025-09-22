@@ -16,6 +16,7 @@ export { useVersionOperations } from './useVersionOperations';
 export { usePageWidgets } from './usePageWidgets';
 export { useObjectData } from './useObjectData';
 export { useFormData } from './useFormData';
+export { useObjectOperations } from './useObjectOperations';
 
 // Utility hooks
 export { useBatchOperations } from './useBatchOperations';
@@ -36,5 +37,6 @@ export type { UseVersionOperationsResult } from './useVersionOperations';
 export type { UsePageWidgetsResult } from './usePageWidgets';
 export type { UseObjectDataResult } from './useObjectData';
 export type { UseFormDataResult } from './useFormData';
+export type { UseObjectOperationsResult } from './useObjectOperations';
 export type { UseBatchOperationsResult } from './useBatchOperations';
 export type { UseDataSubscriptionsResult } from './useDataSubscriptions';
