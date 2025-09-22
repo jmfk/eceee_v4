@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { objectInstancesApi, objectTypesApi, objectVersionsApi } from '../api/objectStorage'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
+import { useUnifiedData } from '../contexts/unified-data'
 import StatusBar from '../components/StatusBar'
 
 // Import individual tab components
@@ -23,7 +24,10 @@ const ObjectInstanceEditPage = () => {
     const { addNotification } = useGlobalNotifications()
     const queryClient = useQueryClient()
 
-    // Save state management
+    // Get unified data context for dirty state tracking
+    const { isDirty, hasUnsavedChanges: contextHasUnsavedChanges, setIsDirty } = useUnifiedData()
+
+    // Save state management (keep for backward compatibility with other tabs)
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
 
     // Version management state
@@ -58,6 +62,7 @@ const ObjectInstanceEditPage = () => {
 
             addNotification(message, 'success')
             setHasUnsavedChanges(false)
+            setIsDirty(false) // Clear unified data context dirty state
         },
         onError: (error) => {
             console.error('Failed to save object:', error)
@@ -361,7 +366,6 @@ const ObjectInstanceEditPage = () => {
 
             {/* Status bar with notifications and save buttons */}
             <StatusBar
-                isDirty={hasUnsavedChanges}
                 currentVersion={currentVersion}
                 availableVersions={availableVersions}
                 onVersionChange={switchToVersion}

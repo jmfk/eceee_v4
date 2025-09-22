@@ -49,6 +49,7 @@ export function UnifiedDataProvider({
     useEffect(() => {
         return manager.subscribeToOperations((operation) => {
             // Update metadata state based on operations
+            console.log("operation.type", operation.type, operation.payload)
             switch (operation.type) {
                 case 'UPDATE_WIDGET_CONFIG':
                 case 'MOVE_WIDGET':
@@ -85,6 +86,7 @@ export function UnifiedDataProvider({
                     }
                     break;
                 case 'SET_DIRTY':
+                    console.log("SET_DIRTY", operation.payload.isDirty)
                     setIsDirtyState(operation.payload.isDirty);
                     setHasUnsavedChangesState(operation.payload.isDirty);
                     break;

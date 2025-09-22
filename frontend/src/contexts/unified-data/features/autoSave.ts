@@ -78,7 +78,6 @@ export class AutoSaveManager {
         }
 
         this.saveTimer = setInterval(() => {
-            console.log("AutoSaveManager:startAutoSave");
             this.performAutoSave();
         }, this.config.interval);
 

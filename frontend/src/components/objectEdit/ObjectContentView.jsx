@@ -95,11 +95,11 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
                 // Update local widgets for live preview
                 setLocalWidgets(prevWidgets => {
                     const newWidgets = { ...prevWidgets }
-                    const slotName = payload.slotName
+                    const slotName = operation.slotName
 
                     if (newWidgets[slotName]) {
                         newWidgets[slotName] = newWidgets[slotName].map(widget =>
-                            widget.id === payload.widgetId ? payload.widget : widget
+                            widget.id === operation.widgetId ? operation.widget : widget
                         )
                     }
 

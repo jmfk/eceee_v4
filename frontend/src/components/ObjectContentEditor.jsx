@@ -270,7 +270,45 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
     const [selectedWidgets, setSelectedWidgets] = useState({}) // For bulk operations
 
     // Use unified data operations
-    const { hasUnsavedChanges } = useUnifiedData();
+    const {
+        hasUnsavedChanges,
+        isDirty,
+        setIsDirty,
+        markWidgetDirty,
+        markWidgetSaved,
+        setWidgetError
+    } = useUnifiedData();
+
+    // Create a simple base event system for ObjectEditor
+    const baseEventSystem = useMemo(() => {
+        const listeners = new Map();
+        return {
+            emit: (event, payload) => {
+                const eventListeners = listeners.get(event) || [];
+                eventListeners.forEach(callback => callback(payload));
+            },
+            subscribe: (event, callback) => {
+                if (!listeners.has(event)) {
+                    listeners.set(event, []);
+                }
+                listeners.get(event).push(callback);
+
+                // Return unsubscribe function
+                return () => {
+                    const eventListeners = listeners.get(event) || [];
+                    const index = eventListeners.indexOf(callback);
+                    if (index > -1) {
+                        eventListeners.splice(index, 1);
+                    }
+                };
+            }
+        };
+    }, []);
+
+    // Create ObjectEditor event system
+    const objectEventSystem = useMemo(() => {
+        return createObjectEditorEventSystem(baseEventSystem);
+    }, [baseEventSystem]);
 
     // Keep onWidgetChange reference for potential external API compatibility
     const stableOnWidgetChange = useRef(onWidgetChange)
@@ -487,6 +525,9 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
         // Use the shared addWidget function
         const newWidget = addWidget(slotName, widgetType, widgetConfig)
 
+        // Mark as dirty since we added a widget
+        setIsDirty(true);
+
         // Emit ObjectEditor-specific widget added event
         objectEventSystem.emitWidgetAdded(slotName, newWidget, {
             objectType: objectType?.name,
@@ -523,7 +564,7 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
     const handleCloseWidgetEditor = useCallback(() => {
         setWidgetEditorOpen(false)
         setEditingWidget(null)
-        setWidgetHasUnsavedChanges(false)
+        // Note: Unsaved changes now tracked by UnifiedDataContext
     }, [])
 
     const handleSaveWidget = useCallback((updatedWidget) => {
@@ -543,9 +584,12 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
             }
         )
 
-        setWidgetHasUnsavedChanges(false)
+        // Mark widget as saved in UnifiedDataContext
+        markWidgetSaved(updatedWidget.id);
+
+        // Note: Unsaved changes now tracked by UnifiedDataContext
         handleCloseWidgetEditor()
-    }, [editingWidget, handleCloseWidgetEditor, objectEventSystem, objectType])
+    }, [editingWidget, handleCloseWidgetEditor, objectEventSystem, objectType, markWidgetSaved])
 
     // Notify parent of widget editor state changes
     useEffect(() => {
@@ -581,6 +625,9 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
 
         // Use the shared deleteWidget function
         deleteWidget(slotName, widgetIndex)
+
+        // Mark as dirty since we deleted a widget
+        setIsDirty(true);
 
         // Remove from selection if selected
         const widgetKey = `${slotName}-${widgetIndex}`
@@ -748,6 +795,9 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
                     // Add the duplicated widget
                     const newWidget = addWidget(slotName, widget.type, duplicatedWidget.config)
 
+                    // Mark as dirty since we duplicated a widget
+                    setIsDirty(true);
+
                     // Emit duplication event
                     objectEventSystem.emitWidgetDuplicated(slotName, widget.id, newWidget, {
                         objectType: objectType?.name,
@@ -764,7 +814,7 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
             default:
                 console.warn('Unknown slot action:', action)
         }
-    }, [objectType, addWidget, objectEventSystem])
+    }, [objectType, addWidget, objectEventSystem, setIsDirty])
 
     // Stable config change handler that doesn't depend on widget.config
     const stableConfigChangeHandler = useCallback((widgetId, slotName, newConfig) => {
@@ -778,6 +828,10 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
                 config: newConfig
             };
             updateWidget(slotName, widgetIndex, updatedWidget);
+
+            // Mark widget as dirty and set global dirty state
+            markWidgetDirty(widgetId);
+            setIsDirty(true);
 
             // Update editingWidget if this is the widget being edited
             if (editingWidget && editingWidget.id === widgetId) {
@@ -794,7 +848,7 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
 
             notifyWidgetChange(updatedWidgets);
         }
-    }, [normalizedWidgets, updateWidget, editingWidget, notifyWidgetChange]);
+    }, [normalizedWidgets, updateWidget, editingWidget, notifyWidgetChange, markWidgetDirty, setIsDirty]);
 
     const renderWidget = (widget, slotName, index) => {
         const widgetKey = `${slotName}-${index}`

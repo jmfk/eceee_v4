@@ -7,7 +7,7 @@ import { useTheme } from '../../hooks/useTheme'
  * Image Widget Component
  * Renders images, galleries, and videos with multiple display modes
  */
-const ImageWidget = ({ config = {}, mode = 'preview' }) => {
+const ImageWidget = ({ config = {}, mode = 'preview', onConfigChange }) => {
     const {
         mediaItems = [],
         collectionId = null,
