@@ -94,7 +94,7 @@ const SelfContainedWidgetEditor = forwardRef(({
                 showSaveStatus,
                 registry: window.widgetRegistry
             }
-
+            console.log("SelfContainedWidgetEditor")
             const form = new SelfContainedWidgetForm(widgetData, formOptions)
 
             // Initialize the form

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useFormData } from '../../contexts/unified-data'
 
 /**
  * LocalStateFieldWrapper Component
@@ -24,6 +25,8 @@ const LocalStateFieldWrapper = React.memo(({
     debounceMs = 300,
     validateOnChange = true,
     validateOnBlur = true,
+    formId = null, // Optional form ID for UnifiedDataContext integration
+    enableUnifiedData = false, // Enable UnifiedDataContext integration
     ...wrapperProps
 }) => {
     // Local state for this field only
@@ -32,6 +35,11 @@ const LocalStateFieldWrapper = React.memo(({
     const [isValidating, setIsValidating] = useState(false)
     const [isDirty, setIsDirty] = useState(false)
     const [isTouched, setIsTouched] = useState(false)
+
+    // Optional UnifiedDataContext integration
+    const unifiedFormData = enableUnifiedData && formId ?
+        useFormData(formId) :
+        { updateField: null, updateFieldData: null }
 
     // Refs to prevent re-renders and manage timeouts
     const debounceTimeoutRef = useRef(null)
@@ -49,18 +57,31 @@ const LocalStateFieldWrapper = React.memo(({
         }
     }, [initialValue])
 
-    // Debounced function to notify parent of changes
+    // Debounced function to notify parent and unified context of changes
     const notifyParentChange = useCallback((value) => {
         if (debounceTimeoutRef.current) {
             clearTimeout(debounceTimeoutRef.current)
         }
-        debounceTimeoutRef.current = setTimeout(() => {
-            if (onFieldChange && value !== lastSentValueRef.current) {
-                onFieldChange(fieldName, value)
+        debounceTimeoutRef.current = setTimeout(async () => {
+            if (value !== lastSentValueRef.current) {
+                // Update parent form if callback provided
+                if (onFieldChange) {
+                    onFieldChange(fieldName, value)
+                }
+
+                // Update UnifiedDataContext if enabled
+                if (enableUnifiedData && unifiedFormData.updateField) {
+                    try {
+                        await unifiedFormData.updateField(fieldName, value)
+                    } catch (error) {
+                        console.error('Failed to update field in UnifiedDataContext:', error)
+                    }
+                }
+
                 lastSentValueRef.current = value
             }
         }, debounceMs)
-    }, [fieldName, onFieldChange, debounceMs])
+    }, [fieldName, onFieldChange, debounceMs, enableUnifiedData, unifiedFormData.updateField])
 
     // Debounced validation function
     const validateField = useCallback(async (value) => {

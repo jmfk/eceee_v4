@@ -660,6 +660,7 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
         return () => window.removeEventListener('beforeunload', handleBeforeUnload)
     }, [activeTab, hasUnsavedSchemaChanges, hasUnsavedBasicChanges, hasUnsavedSlotsChanges, hasUnsavedRelationshipsChanges])
 
+    console.log("ObjectTypeForm")
     return (
         <form onSubmit={handleSubmit} className="space-y-6">
             {/* Tab Navigation */}
@@ -1191,6 +1192,8 @@ const SlotEditor = ({ slots = [], onChange, errors }) => {
     const removeSlot = (index) => {
         onChange(slots.filter((_, i) => i !== index))
     }
+
+    console.log("SlotEditor")
 
     return (
         <div className="space-y-4">

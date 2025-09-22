@@ -91,7 +91,7 @@ const WidgetSelectionModal = ({ isOpen, onClose, onSelectWidget, slot, available
     }
 
     if (!isOpen) return null
-
+    console.log("WidgetSelectionModal")
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div

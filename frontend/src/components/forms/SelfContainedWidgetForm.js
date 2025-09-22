@@ -144,6 +144,7 @@ class WidgetRegistry {
  */
 class SelfContainedWidgetForm {
     constructor(widgetData, options = {}) {
+        console.log("SelfContainedWidgetForm")
         // Core data
         this.widgetId = widgetData.id
         this.widgetType = widgetData.type
@@ -792,7 +793,7 @@ class SelfContainedWidgetForm {
      */
     updateSaveStatus() {
         if (!this.isInitialized || !this.statusElement) return
-
+        console.log("isDirty", this.isDirty)
         if (this.isDirty) {
             this.displaySaveStatus('unsaved', 'Unsaved changes')
         } else {

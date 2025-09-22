@@ -2,7 +2,7 @@
  * Operation types for the Unified Data Context
  */
 
-import { PageData, WidgetData, LayoutData, VersionData, PageMetadata, WidgetConfig } from './state';
+import { PageData, WidgetData, LayoutData, VersionData, PageMetadata, WidgetConfig, ObjectData, FormData, FormFieldData } from './state';
 
 /**
  * Base operation interface
@@ -62,6 +62,29 @@ export type VersionOperation =
   | Operation<{ pageId: string; versionId: string; action: 'publish' | 'revert' }>;
 
 /**
+ * Object Operations
+ */
+export type ObjectOperation =
+  | Operation<{ id: string; updates: Partial<ObjectData> }>
+  | Operation<{ id: string; fieldName: string; value: any }>
+  | Operation<{ id: string; widgets: Record<string, WidgetData[]> }>
+  | Operation<{ id: string; slotName: string; widgets: WidgetData[] }>
+  | Operation<{ id: string; title: string }>
+  | Operation<{ id: string; status: 'draft' | 'published' | 'scheduled' }>
+  | Operation<{ id: string; metadata: Record<string, any> }>;
+
+/**
+ * Form Operations
+ */
+export type FormOperation =
+  | Operation<{ formId: string; fieldName: string; value: any }>
+  | Operation<{ formId: string; fieldName: string; fieldData: FormFieldData }>
+  | Operation<{ formId: string; fields: Record<string, FormFieldData> }>
+  | Operation<{ formId: string; errors: ValidationError[] }>
+  | Operation<{ formId: string }>
+  | Operation<{ formId: string; formData: FormData }>;
+
+/**
  * Batch Operation
  */
 export interface BatchOperation extends Operation<Operation[]> {
@@ -76,6 +99,8 @@ export type DataOperation =
   | WidgetOperation
   | LayoutOperation
   | VersionOperation
+  | ObjectOperation
+  | FormOperation
   | BatchOperation;
 
 /**
@@ -122,6 +147,30 @@ export const OperationTypes = {
   DELETE_VERSION: 'DELETE_VERSION',
   COMPARE_VERSIONS: 'COMPARE_VERSIONS',
   
+  // Object operations
+  CREATE_OBJECT: 'CREATE_OBJECT',
+  UPDATE_OBJECT: 'UPDATE_OBJECT',
+  UPDATE_OBJECT_FIELD: 'UPDATE_OBJECT_FIELD',
+  UPDATE_OBJECT_WIDGETS: 'UPDATE_OBJECT_WIDGETS',
+  UPDATE_OBJECT_SLOT: 'UPDATE_OBJECT_SLOT',
+  UPDATE_OBJECT_TITLE: 'UPDATE_OBJECT_TITLE',
+  UPDATE_OBJECT_STATUS: 'UPDATE_OBJECT_STATUS',
+  UPDATE_OBJECT_METADATA: 'UPDATE_OBJECT_METADATA',
+  DELETE_OBJECT: 'DELETE_OBJECT',
+  DUPLICATE_OBJECT: 'DUPLICATE_OBJECT',
+  
+  // Form operations
+  CREATE_FORM: 'CREATE_FORM',
+  UPDATE_FORM_FIELD: 'UPDATE_FORM_FIELD',
+  UPDATE_FORM_FIELD_DATA: 'UPDATE_FORM_FIELD_DATA',
+  UPDATE_FORM_FIELDS: 'UPDATE_FORM_FIELDS',
+  VALIDATE_FORM: 'VALIDATE_FORM',
+  VALIDATE_FORM_FIELD: 'VALIDATE_FORM_FIELD',
+  SET_FORM_ERRORS: 'SET_FORM_ERRORS',
+  CLEAR_FORM_ERRORS: 'CLEAR_FORM_ERRORS',
+  RESET_FORM: 'RESET_FORM',
+  SUBMIT_FORM: 'SUBMIT_FORM',
+  
   // Batch operations
   BATCH: 'BATCH',
   
@@ -135,5 +184,7 @@ export const OperationTypes = {
   LOAD_PAGE_DATA: 'LOAD_PAGE_DATA',
   LOAD_WIDGET_DATA: 'LOAD_WIDGET_DATA',
   LOAD_LAYOUT_DATA: 'LOAD_LAYOUT_DATA',
+  LOAD_OBJECT_DATA: 'LOAD_OBJECT_DATA',
+  LOAD_FORM_DATA: 'LOAD_FORM_DATA',
   SYNC_FROM_API: 'SYNC_FROM_API'
 } as const;

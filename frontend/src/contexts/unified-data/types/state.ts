@@ -82,6 +82,54 @@ export interface PageVersionData {
 }
 
 /**
+ * Object Instance Data
+ */
+export interface ObjectData {
+  id: string;
+  objectType: {
+    id: string;
+    name: string;
+    label: string;
+    schema?: any;
+    slotConfiguration?: any;
+  };
+  title: string;
+  data: Record<string, any>; // Schema-based field data
+  status: 'draft' | 'published' | 'scheduled';
+  widgets: Record<string, WidgetData[]>; // Slot name -> widgets array
+  metadata: Record<string, any>;
+  version?: number;
+  parent?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Form Field Data
+ */
+export interface FormFieldData {
+  fieldName: string;
+  value: any;
+  isValid: boolean;
+  errors: ValidationError[];
+  isDirty: boolean;
+  lastUpdated: string;
+}
+
+/**
+ * Form Data Collection
+ */
+export interface FormData {
+  id: string; // Form instance ID (could be object ID, page ID, etc.)
+  type: 'object' | 'page' | 'widget' | 'layout'; // Form type
+  fields: Record<string, FormFieldData>;
+  isValid: boolean;
+  isDirty: boolean;
+  errors: ValidationError[];
+  metadata?: Record<string, any>;
+}
+
+/**
  * Complete application state interface
  */
 export interface AppState {
@@ -89,6 +137,8 @@ export interface AppState {
   widgets: Record<string, WidgetData>;
   layouts: Record<string, LayoutData>;
   versions: Record<string, VersionData>;
+  objects: Record<string, ObjectData>;
+  forms: Record<string, FormData>;
   // Note: Metadata state is now managed in UnifiedDataContext
 }
 

@@ -39,6 +39,8 @@ export class DataManager {
             widgets: {},
             layouts: {},
             versions: {},
+            objects: {},
+            forms: {},
             ...(initialState || {})
         };
 
@@ -880,6 +882,153 @@ export class DataManager {
                 case OperationTypes.COMPARE_VERSIONS:
                     // This operation doesn't modify state, just returns comparison data
                     // The comparison logic would be handled in the hook
+                    break;
+
+                // Object operations
+                case OperationTypes.UPDATE_OBJECT:
+                    this.setState(state => {
+                        const object = state.objects[operationWithValidation.payload.id];
+                        if (!object) return state;
+
+                        return {
+                            ...state,
+                            objects: {
+                                ...state.objects,
+                                [operationWithValidation.payload.id]: {
+                                    ...object,
+                                    ...operationWithValidation.payload.updates,
+                                    updated_at: new Date().toISOString()
+                                }
+                            }
+                        };
+                    });
+                    break;
+
+                case OperationTypes.UPDATE_OBJECT_FIELD:
+                    this.setState(state => {
+                        const object = state.objects[operationWithValidation.payload.id];
+                        if (!object) return state;
+
+                        return {
+                            ...state,
+                            objects: {
+                                ...state.objects,
+                                [operationWithValidation.payload.id]: {
+                                    ...object,
+                                    data: {
+                                        ...object.data,
+                                        [operationWithValidation.payload.fieldName]: operationWithValidation.payload.value
+                                    },
+                                    updated_at: new Date().toISOString()
+                                }
+                            }
+                        };
+                    });
+                    break;
+
+                case OperationTypes.UPDATE_OBJECT_TITLE:
+                    this.setState(state => {
+                        const object = state.objects[operationWithValidation.payload.id];
+                        if (!object) return state;
+
+                        return {
+                            ...state,
+                            objects: {
+                                ...state.objects,
+                                [operationWithValidation.payload.id]: {
+                                    ...object,
+                                    title: operationWithValidation.payload.title,
+                                    updated_at: new Date().toISOString()
+                                }
+                            }
+                        };
+                    });
+                    break;
+
+                case OperationTypes.UPDATE_OBJECT_WIDGETS:
+                    this.setState(state => {
+                        const object = state.objects[operationWithValidation.payload.id];
+                        if (!object) return state;
+
+                        return {
+                            ...state,
+                            objects: {
+                                ...state.objects,
+                                [operationWithValidation.payload.id]: {
+                                    ...object,
+                                    widgets: operationWithValidation.payload.widgets,
+                                    updated_at: new Date().toISOString()
+                                }
+                            }
+                        };
+                    });
+                    break;
+
+                case OperationTypes.UPDATE_OBJECT_SLOT:
+                    this.setState(state => {
+                        const object = state.objects[operationWithValidation.payload.id];
+                        if (!object) return state;
+
+                        return {
+                            ...state,
+                            objects: {
+                                ...state.objects,
+                                [operationWithValidation.payload.id]: {
+                                    ...object,
+                                    widgets: {
+                                        ...object.widgets,
+                                        [operationWithValidation.payload.slotName]: operationWithValidation.payload.widgets
+                                    },
+                                    updated_at: new Date().toISOString()
+                                }
+                            }
+                        };
+                    });
+                    break;
+
+                // Form operations
+                case OperationTypes.CREATE_FORM:
+                    this.setState(state => ({
+                        ...state,
+                        forms: {
+                            ...state.forms,
+                            [operationWithValidation.payload.formId]: operationWithValidation.payload.formData
+                        }
+                    }));
+                    break;
+
+                case OperationTypes.UPDATE_FORM_FIELD:
+                    this.setState(state => {
+                        const form = state.forms[operationWithValidation.payload.formId];
+                        if (!form) return state;
+
+                        // Only mark as dirty if this is a user operation, not system initialization
+                        const isUserOperation = operationWithValidation.metadata?.source === 'user';
+
+                        const fieldData = {
+                            fieldName: operationWithValidation.payload.fieldName,
+                            value: operationWithValidation.payload.value,
+                            isValid: true,
+                            errors: [],
+                            isDirty: isUserOperation,
+                            lastUpdated: new Date().toISOString()
+                        };
+
+                        return {
+                            ...state,
+                            forms: {
+                                ...state.forms,
+                                [operationWithValidation.payload.formId]: {
+                                    ...form,
+                                    fields: {
+                                        ...form.fields,
+                                        [operationWithValidation.payload.fieldName]: fieldData
+                                    },
+                                    isDirty: isUserOperation ? true : form.isDirty
+                                }
+                            }
+                        };
+                    });
                     break;
             }
 

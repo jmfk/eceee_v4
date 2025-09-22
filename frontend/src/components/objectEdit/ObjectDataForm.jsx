@@ -15,7 +15,9 @@ const ObjectDataForm = ({
     errors,
     handleInputChange,
     handleDataFieldChange,
-    getSchemaFromObjectType
+    getSchemaFromObjectType,
+    formId = null,
+    enableUnifiedData = false
 }) => {
     const [namespace, setNamespace] = useState(null)
 
@@ -105,6 +107,8 @@ const ObjectDataForm = ({
                         data={formData.data || {}}
                         onChange={handleDataFieldChange}
                         namespace={namespace}
+                        formId={formId}
+                        enableUnifiedData={enableUnifiedData}
                     />
                 </div>
             )}

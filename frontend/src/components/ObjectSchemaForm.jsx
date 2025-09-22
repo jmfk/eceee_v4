@@ -4,7 +4,7 @@ import { fieldTypeRegistry } from '../utils/fieldTypeRegistry'
 import { getFieldComponent } from './form-fields'
 import LocalStateFieldWrapper from './forms/LocalStateFieldWrapper'
 
-const ObjectSchemaForm = React.memo(forwardRef(({ schema, data = {}, onChange, namespace }, ref) => {
+const ObjectSchemaForm = React.memo(forwardRef(({ schema, data = {}, onChange, namespace, formId = null, enableUnifiedData = false }, ref) => {
     const [fieldComponents, setFieldComponents] = useState({})
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
@@ -146,6 +146,8 @@ const ObjectSchemaForm = React.memo(forwardRef(({ schema, data = {}, onChange, n
                         onFieldChange={handleFieldChange}
                         debounceMs={300}
                         validateOnChange={true}
+                        formId={formId}
+                        enableUnifiedData={enableUnifiedData}
                     />
                 </Suspense>
             </div>

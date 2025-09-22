@@ -86,7 +86,6 @@ export function UnifiedDataProvider({
                     }
                     break;
                 case 'SET_DIRTY':
-                    console.log("SET_DIRTY", operation.payload.isDirty)
                     setIsDirtyState(operation.payload.isDirty);
                     setHasUnsavedChangesState(operation.payload.isDirty);
                     break;

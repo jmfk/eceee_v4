@@ -129,6 +129,8 @@ const EnhancedWidgetEditorDemo = ({
 
     if (!isOpen) return null
 
+    console.log("hasChanges")
+
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl h-5/6 flex flex-col">

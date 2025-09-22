@@ -11,7 +11,7 @@ import ObjectContentEditor from '../ObjectContentEditor'
 import ObjectSchemaForm from '../ObjectSchemaForm'
 import WidgetEditorPanel from '../WidgetEditorPanel'
 import ObjectDataForm from './ObjectDataForm'
-import { useUnifiedData } from '../../contexts/unified-data'
+import { useUnifiedData, useObjectData, useFormData } from '../../contexts/unified-data'
 import { WIDGET_EVENTS, WIDGET_CHANGE_TYPES } from '../../types/widgetEvents'
 
 // Internal component that uses widget event hooks
@@ -19,8 +19,30 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
     const navigate = useNavigate()
     const { instanceId, objectTypeId, tab } = useParams()
 
-    // Track widget changes locally (don't auto-save)
-    const [localWidgets, setLocalWidgets] = useState(instance?.widgets || {})
+    // Use UnifiedDataContext for all data management
+    const objectId = instance?.id || instanceId || 'new'
+    const formId = `object-${objectId}`
+
+    // Use specialized hooks for object and form data
+    const {
+        object: unifiedObject,
+        updateField: updateObjectField,
+        updateTitle: updateObjectTitle,
+        updateStatus: updateObjectStatus,
+        updateSlot: updateObjectSlot,
+        updateWidgets: updateObjectWidgets,
+        hasUnsavedChanges: objectHasUnsavedChanges,
+        isDirty: objectIsDirty
+    } = useObjectData(objectId)
+
+    const {
+        initializeField: initializeFormField,
+        updateField: updateFormField,
+        hasUnsavedChanges: formHasUnsavedChanges,
+        isDirty: formIsDirty,
+        getFieldValue
+    } = useFormData(formId, 'object')
+
     const [namespace, setNamespace] = useState(null)
 
 
@@ -31,14 +53,16 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
         editingWidget: null,
         hasUnsavedChanges: false
     })
-    const [hasWidgetChanges, setHasWidgetChanges] = useState(false)
+
+    // Combine unsaved changes from object and form data
+    const hasUnsavedChanges = objectHasUnsavedChanges || formHasUnsavedChanges || objectIsDirty || formIsDirty
 
     // Notify parent about unsaved changes
     useEffect(() => {
         if (onUnsavedChanges) {
-            onUnsavedChanges(hasWidgetChanges)
+            onUnsavedChanges(hasUnsavedChanges)
         }
-    }, [hasWidgetChanges, onUnsavedChanges])
+    }, [hasUnsavedChanges, onUnsavedChanges])
 
     // Fetch widget types for display names
     const { data: widgetTypes = [] } = useQuery({
@@ -76,11 +100,8 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
         loadNamespace()
     }, [objectType?.namespace])
 
-    // Update local widgets when instance changes
-    useEffect(() => {
-        setLocalWidgets(instance?.widgets || {})
-        setHasWidgetChanges(false)
-    }, [instance])
+    // Get widget data from unified context or fallback to instance
+    const localWidgets = unifiedObject?.widgets || instance?.widgets || {}
 
     // Subscribe to widget events for real-time updates and dirty state management
     const { subscribeToOperations } = useUnifiedData()
@@ -89,22 +110,9 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
         // Handler for widget operations
         const handleWidgetOperation = (operation) => {
             if (operation.type === 'UPDATE_WIDGET_CONFIG') {
-                // Handle real-time config changes - mark as dirty but don't auto-save
-                setHasWidgetChanges(true)
-
-                // Update local widgets for live preview
-                setLocalWidgets(prevWidgets => {
-                    const newWidgets = { ...prevWidgets }
-                    const slotName = operation.slotName
-
-                    if (newWidgets[slotName]) {
-                        newWidgets[slotName] = newWidgets[slotName].map(widget =>
-                            widget.id === operation.widgetId ? operation.widget : widget
-                        )
-                    }
-
-                    return newWidgets
-                })
+                // Widget changes are now handled by UnifiedDataContext
+                // The unifiedObject will automatically update
+                console.log('Widget config updated via UnifiedDataContext:', operation)
             }
         }
 
@@ -118,26 +126,19 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
     }, [subscribeToOperations])
 
     // Handle real-time widget updates from WidgetEditorPanel
-    const handleRealTimeWidgetUpdate = useCallback((updatedWidget) => {
+    const handleRealTimeWidgetUpdate = useCallback(async (updatedWidget) => {
         if (!updatedWidget || !updatedWidget.slotName) return
 
-        // Update local widgets state for real-time preview
-        setLocalWidgets(prevWidgets => {
-            const newWidgets = { ...prevWidgets }
-            const slotName = updatedWidget.slotName
+        // Update widget through unified context
+        const slotName = updatedWidget.slotName
+        const currentSlotWidgets = localWidgets[slotName] || []
+        const updatedSlotWidgets = currentSlotWidgets.map(widget =>
+            widget.id === updatedWidget.id ? updatedWidget : widget
+        )
 
-            if (newWidgets[slotName]) {
-                newWidgets[slotName] = newWidgets[slotName].map(widget =>
-                    widget.id === updatedWidget.id ? updatedWidget : widget
-                )
-            }
-
-            return newWidgets
-        })
-
-        // Mark as having changes but don't auto-save
-        setHasWidgetChanges(true)
-    }, [])
+        // Update the slot through UnifiedDataContext
+        await updateObjectSlot(slotName, updatedSlotWidgets)
+    }, [localWidgets, updateObjectSlot])
 
     // Widget editor state management - direct callback approach instead of polling
     const handleWidgetEditorStateChange = useCallback((newState) => {
@@ -194,18 +195,15 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
     const queryClient = useQueryClient()
     const { addNotification } = useGlobalNotifications()
 
-    // Simple form state management
-    const [formData, setFormData] = useState({
-        objectTypeId: objectType?.id || '',
-        title: instance?.title || '',
-        data: instance?.data || {},
-        status: instance?.status || 'draft',
-        widgets: instance?.widgets || {},
-        metadata: instance?.metadata || {}
-    })
-
-    // Track if form has been modified
-    const [isFormDirty, setIsFormDirty] = useState(false)
+    // Form data is now managed through UnifiedDataContext
+    const formData = {
+        objectTypeId: getFieldValue('objectTypeId') || objectType?.id || '',
+        title: getFieldValue('title') || unifiedObject?.title || instance?.title || '',
+        data: getFieldValue('data') || unifiedObject?.data || instance?.data || {},
+        status: getFieldValue('status') || unifiedObject?.status || instance?.status || 'draft',
+        widgets: localWidgets,
+        metadata: getFieldValue('metadata') || unifiedObject?.metadata || instance?.metadata || {}
+    }
 
     // Fetch available object types for selection (when creating)
     const { data: typesResponse } = useQuery({
@@ -217,26 +215,17 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
     const availableTypes = typesResponse?.data || []
 
 
-    // Update form data when instance changes
+    // Initialize form data when instance changes (without setting dirty flag)
     useEffect(() => {
-        if (instance) {
-            const newFormData = {
-                objectTypeId: instance.objectType?.id || '',
-                title: instance.title || '',
-                data: instance.data || {},
-                status: instance.status || 'draft',
-                widgets: instance.widgets || {},
-                metadata: instance.metadata || {}
-            }
-
-            setFormData(newFormData)
-            setIsFormDirty(false)
-
-            // Sync local widgets with instance
-            setLocalWidgets(instance.widgets || {})
-            setHasWidgetChanges(false)
+        if (instance && !isNewInstance) {
+            // Initialize form fields with instance data (won't set dirty flag)
+            initializeFormField('objectTypeId', instance.objectType?.id || '');
+            initializeFormField('title', instance.title || '');
+            initializeFormField('data', instance.data || {});
+            initializeFormField('status', instance.status || 'draft');
+            initializeFormField('metadata', instance.metadata || {});
         }
-    }, [instance])
+    }, [instance, isNewInstance, initializeFormField])
 
     // Internal save handler used by form buffer and direct saves
     const handleSaveInternal = useCallback(async (data, mode) => {
@@ -255,7 +244,7 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
             // Invalidate queries
             queryClient.invalidateQueries(['objectInstances'])
             queryClient.invalidateQueries(['objectInstance', instance?.id])
-            setHasWidgetChanges(false)
+            // Widget changes are now tracked by UnifiedDataContext
 
             // Show success message based on save mode
             let successMessage
@@ -286,44 +275,49 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
             }
             throw error
         }
-    }, [isNewInstance, instance?.id, instance?.version, queryClient, addNotification, navigate, setHasWidgetChanges])
+    }, [isNewInstance, instance?.id, instance?.version, queryClient, addNotification, navigate])
 
 
-    // Update form field and mark as dirty
-    const handleInputChange = useCallback((field, value) => {
-        setFormData(prev => ({ ...prev, [field]: value }))
-        setIsFormDirty(true)
+    // Update form field through unified context
+    const handleInputChange = useCallback(async (field, value) => {
+        try {
+            if (field === 'title') {
+                // Update object title directly
+                await updateObjectTitle(value)
+            } else if (field === 'status') {
+                // Update object status directly
+                await updateObjectStatus(value)
+            } else {
+                // Update form field
+                await updateFormField(field, value)
+            }
 
-        // Clear error when user starts typing
-        if (errors[field]) {
-            setErrors(prev => ({ ...prev, [field]: null }))
+            // Clear error when user starts typing
+            if (errors[field]) {
+                setErrors(prev => ({ ...prev, [field]: null }))
+            }
+        } catch (error) {
+            console.error('Failed to update field:', field, error)
         }
-    }, [errors])
+    }, [errors, updateObjectTitle, updateObjectStatus, updateFormField])
 
-    // Update nested data field
-    const handleDataFieldChange = useCallback((fieldName, value) => {
-        setFormData(prev => ({
-            ...prev,
-            data: { ...prev.data, [fieldName]: value }
-        }))
-        setIsFormDirty(true)
+    // Update nested data field through unified context
+    const handleDataFieldChange = useCallback(async (fieldName, value) => {
+        try {
+            // Update object field directly
+            await updateObjectField(fieldName, value)
 
-        // Clear error when user starts typing
-        const errorKey = `data_${fieldName}`
-        if (errors[errorKey]) {
-            setErrors(prev => ({ ...prev, [errorKey]: null }))
+            // Clear error when user starts typing
+            const errorKey = `data_${fieldName}`
+            if (errors[errorKey]) {
+                setErrors(prev => ({ ...prev, [errorKey]: null }))
+            }
+        } catch (error) {
+            console.error('Failed to update data field:', fieldName, error)
         }
-    }, [errors])
+    }, [errors, updateObjectField])
 
-    // Check if there are any unsaved changes (form data or widgets)
-    const hasUnsavedChanges = isFormDirty || hasWidgetChanges
-
-    // Notify parent about unsaved changes
-    useEffect(() => {
-        if (onUnsavedChanges) {
-            onUnsavedChanges(hasUnsavedChanges)
-        }
-    }, [hasUnsavedChanges, onUnsavedChanges])
+    // hasUnsavedChanges is already defined above using unified context
 
     const validateForm = useCallback(() => {
         const newErrors = {}
@@ -366,7 +360,7 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
 
         try {
             await handleSaveInternal(saveData, mode)
-            setIsFormDirty(false)
+            // Form dirty state is now managed by UnifiedDataContext
         } catch (error) {
             // Error handling is done in handleSaveInternal
             console.error('Save failed:', error)
@@ -390,6 +384,8 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
 
     // Get widget editor state directly from local state
     const isWidgetEditorOpen = widgetEditorUI.isOpen
+
+    // Debug: console.log("ObjectContentViewInternal", isWidgetEditorOpen)
 
     return (
         <div className="h-full flex flex-col relative">
@@ -429,9 +425,9 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
                                         ref={objectContentEditorRef}
                                         objectType={objectType}
                                         widgets={localWidgets}
-                                        onWidgetChange={(newWidgets) => {
-                                            setLocalWidgets(newWidgets)
-                                            setHasWidgetChanges(true)
+                                        onWidgetChange={async (newWidgets) => {
+                                            // Update widgets through unified context
+                                            await updateObjectWidgets(newWidgets)
                                         }}
                                         onWidgetEditorStateChange={handleWidgetEditorStateChange}
                                         mode="object"
@@ -450,6 +446,8 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
                                     handleInputChange={handleInputChange}
                                     handleDataFieldChange={handleDataFieldChange}
                                     getSchemaFromObjectType={getSchemaFromObjectType}
+                                    formId={formId}
+                                    enableUnifiedData={true}
                                 />
                             </div>
                         </div>
@@ -472,6 +470,8 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
                                 handleInputChange={handleInputChange}
                                 handleDataFieldChange={handleDataFieldChange}
                                 getSchemaFromObjectType={getSchemaFromObjectType}
+                                formId={formId}
+                                enableUnifiedData={true}
                             />
                         </div>
                     )}
