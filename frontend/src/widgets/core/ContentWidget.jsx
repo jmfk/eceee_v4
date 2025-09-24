@@ -3,7 +3,7 @@ import { FileText, Type, Eraser } from 'lucide-react'
 import ContentWidgetEditorRenderer from './ContentWidgetEditorRenderer.js'
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
 import { OperationTypes } from '../../contexts/unified-data/types/operations';
-
+import { getWidgetContent, hasWidgetContentChanged } from '../../utils/widgetUtils';
 /**
  * Clean up HTML content by removing unsupported tags and attributes
  */
@@ -112,9 +112,8 @@ const ContentWidget = memo(({
 
     // Subscribe to external changes
     useExternalChanges(componentId, (state) => {
-        const version = state.versions[state.metadata.currentVersionId]
-        const newContent = version.widgets[widgetId]?.config?.content;
-        if (newContent !== content) {
+        const { content: newContent } = getWidgetContent(state, widgetId, slotName);
+        if (hasWidgetContentChanged(content, newContent)) {
             setContent(newContent);
         }
     });
@@ -125,6 +124,7 @@ const ContentWidget = memo(({
             setContent(newContent);
             publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
                 id: widgetId,
+                slotName: slotName,
                 config: {
                     ...config,
                     content: newContent

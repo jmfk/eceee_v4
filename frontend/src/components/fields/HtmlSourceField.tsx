@@ -4,12 +4,14 @@ import { IconCode } from '../icons/IconCode';
 import { HtmlEditor } from './HtmlEditor';
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext';
 import { OperationTypes } from '../../contexts/unified-data/types/operations';
+import { getWidgetContent, hasWidgetContentChanged } from '../../utils/widgetUtils';
 
 
 interface EditorContext {
     pageId: string;
     widgetId: string;
     slotId: string;
+    slotName: string;
     mode: 'edit' | 'preview';
 }
 
@@ -33,11 +35,12 @@ const HtmlSourceField: React.FC<HtmlSourceFieldProps> = ({
     const [isEditorOpen, setIsEditorOpen] = useState(false);
     const [currentValue, setCurrentValue] = useState(value);
     const { useExternalChanges, publishUpdate } = useUnifiedData();
+    const slotName = context?.slotName;
     const fieldId = `field-${context.widgetId}`;
 
     useExternalChanges(fieldId, state => {
-        const newContent = state.widgets[context.widgetId]?.config?.content;
-        if (newContent !== currentValue) {
+        const { content: newContent } = getWidgetContent(state, context.widgetId, slotName);
+        if (hasWidgetContentChanged(currentValue, newContent)) {
             setCurrentValue(newContent);
         }
     });
@@ -61,6 +64,7 @@ const HtmlSourceField: React.FC<HtmlSourceFieldProps> = ({
         setCurrentValue(newValue);
         publishUpdate(fieldId, OperationTypes.UPDATE_WIDGET_CONFIG, {
             id: context.widgetId,
+            slotName: slotName,
             config: {
                 content: newValue
             }
