@@ -8,11 +8,10 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react';
 import { Layout } from 'lucide-react';
 import { getLayoutComponent, getLayoutMetadata, layoutExists, LAYOUT_REGISTRY } from './layouts/LayoutRegistry';
-import { createPageEditorEventSystem } from './PageEditorEventSystem';
-import { useWidgetEvents } from '../../contexts/WidgetEventContext';
 import { useWidgets, createDefaultWidgetConfig } from '../../hooks/useWidgets';
 import PageWidgetSelectionModal from './PageWidgetSelectionModal';
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext';
+import { OperationTypes } from '../../contexts/unified-data/types/operations';
 
 const ReactLayoutRenderer = forwardRef(({
     layoutName = 'single_column',
@@ -28,19 +27,15 @@ const ReactLayoutRenderer = forwardRef(({
     context
 }, ref) => {
 
-    // Create PageEditor event system
-    const baseWidgetEvents = useWidgetEvents();
-    const pageEventSystem = useMemo(() =>
-        createPageEditorEventSystem(baseWidgetEvents),
-        [baseWidgetEvents]
-    );
-
     // Get update lock and UnifiedData context
-    const { useExternalChanges } = useUnifiedData();
+    const { useExternalChanges, publishUpdate } = useUnifiedData();
 
     // Get version context
     const versionId = currentVersion?.id || pageVersionData?.versionId;
     const isPublished = pageVersionData?.publicationStatus === 'published';
+
+    // Define a stable component ID for UDC source tracking
+    const componentId = `react-layout-renderer-${versionId || 'unknown'}`;
 
     // Use shared widget hook
     const {
@@ -97,8 +92,14 @@ const ReactLayoutRenderer = forwardRef(({
                     onDirtyChange(true, `added widget to ${slotName}`);
                 }
 
-                // Emit event
-                pageEventSystem.emitWidgetAdded(slotName, newWidget, { versionId, isPublished });
+                // Publish to Unified Data Context
+                await publishUpdate(componentId, OperationTypes.ADD_WIDGET, {
+                    id: newWidget.id,
+                    type: newWidget.type,
+                    config: newWidget.config,
+                    slot: slotName,
+                    order: (updatedWidgets[slotName]?.length || 1) - 1
+                });
                 break;
             }
 
@@ -126,8 +127,10 @@ const ReactLayoutRenderer = forwardRef(({
                     onDirtyChange(true, `removed widget from ${slotName}`);
                 }
 
-                // Emit event
-                pageEventSystem.emitWidgetRemoved(slotName, widget.id, { versionId, isPublished });
+                // Publish to Unified Data Context
+                await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, {
+                    id: widget.id
+                });
                 break;
             }
 
@@ -150,8 +153,12 @@ const ReactLayoutRenderer = forwardRef(({
                         onDirtyChange(true, `moved widget up in ${slotName}`);
                     }
 
-                    // Emit event
-                    pageEventSystem.emitWidgetMoved(slotName, widget.id, moveUpIndex, moveUpIndex - 1, { versionId, isPublished });
+                    // Publish to Unified Data Context
+                    await publishUpdate(componentId, OperationTypes.MOVE_WIDGET, {
+                        id: widget.id,
+                        slot: slotName,
+                        order: moveUpIndex - 1
+                    });
                 }
                 break;
             }
@@ -176,8 +183,12 @@ const ReactLayoutRenderer = forwardRef(({
                         onDirtyChange(true, `moved widget down in ${slotName}`);
                     }
 
-                    // Emit event
-                    pageEventSystem.emitWidgetMoved(slotName, widget.id, moveDownIndex, moveDownIndex + 1, { versionId, isPublished });
+                    // Publish to Unified Data Context
+                    await publishUpdate(componentId, OperationTypes.MOVE_WIDGET, {
+                        id: widget.id,
+                        slot: slotName,
+                        order: moveDownIndex + 1
+                    });
                 }
                 break;
             }
@@ -199,15 +210,19 @@ const ReactLayoutRenderer = forwardRef(({
                     onDirtyChange(true, `updated widget config in ${slotName}`);
                 }
 
-                // Emit event
-                pageEventSystem.emitWidgetChanged(widget.id, slotName, { ...widget, config: newConfig }, 'config', { versionId, isPublished });
+                // Publish to Unified Data Context
+                await publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
+                    id: widget.id,
+                    slotName,
+                    config: newConfig
+                });
                 break;
             }
 
             default:
                 break;
         }
-    }, [widgets, onWidgetChange, onDirtyChange, onOpenWidgetEditor, addWidget, pageEventSystem, versionId, isPublished, onVersionChange]);
+    }, [widgets, onWidgetChange, onDirtyChange, onOpenWidgetEditor, addWidget, publishUpdate, componentId, versionId, isPublished, onVersionChange]);
 
     // Widget modal handlers
     const handleShowWidgetModal = useCallback((slotName) => {
@@ -241,9 +256,12 @@ const ReactLayoutRenderer = forwardRef(({
             onDirtyChange(true, `cleared slot ${slotName}`);
         }
 
-        // Emit event
-        pageEventSystem.emitSlotCleared(slotName, { versionId, isPublished });
-    }, [widgets, onWidgetChange, onDirtyChange, pageEventSystem, versionId, isPublished]);
+        // Publish removals to Unified Data Context for all widgets in this slot
+        const existingWidgetsInSlot = widgets[slotName] || [];
+        for (const w of existingWidgetsInSlot) {
+            await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, { id: w.id });
+        }
+    }, [widgets, onWidgetChange, onDirtyChange, publishUpdate, componentId, versionId, isPublished]);
 
     // Get layout component
     const LayoutComponent = getLayoutComponent(layoutName);
@@ -265,8 +283,12 @@ const ReactLayoutRenderer = forwardRef(({
     useImperativeHandle(ref, () => ({
         saveWidgets: async () => {
             try {
-                // Emit save event
-                pageEventSystem.emitPageSaved({ widgets }, { versionId, isPublished });
+                // Publish save event to Unified Data Context
+                await publishUpdate(componentId, OperationTypes.SAVED_TO_SERVER, {
+                    versionId,
+                    isPublished,
+                    widgets
+                });
 
                 return {
                     success: true,
@@ -288,8 +310,7 @@ const ReactLayoutRenderer = forwardRef(({
         getLayoutName: () => layoutName,
         getLayoutMetadata: () => getLayoutMetadata(layoutName),
         getCurrentWidgets: () => widgets,
-        pageEventSystem
-    }), [widgets, layoutName, pageEventSystem, versionId, isPublished]);
+    }), [widgets, layoutName, versionId, isPublished]);
 
     // Render the layout component
     return (
