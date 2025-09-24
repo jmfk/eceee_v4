@@ -89,6 +89,45 @@ export interface VersionData {
 }
 
 /**
+ * Object Data and Versions
+ */
+export interface ObjectData {
+  id: string;
+  type: string; // object type identifier/name
+  slug?: string;
+  name?: string;
+  url?: string;
+  status: 'draft' | 'published' | 'scheduled';
+  currentVersionId: string;
+  availableVersions: string[];
+  metadata?: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+  created_by?: string;
+  published_at?: string;
+  scheduled_for?: string;
+  // Optional relationship context
+  parentId?: string | null;
+}
+
+export interface ObjectVersionData {
+  id: string;
+  objectId: string;
+  number: number;
+  status: 'draft' | 'published';
+  widgets: Record<string, WidgetData[]>; // slotName -> widgets
+  layoutId?: string;
+  themeId?: string;
+  content?: Record<string, ContentData>;
+  metadata?: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+  created_by?: string;
+  published_at?: string;
+  changesDescription?: string;
+}
+
+/**
  * Complete application state interface
  */
 export interface ContentData {
@@ -101,6 +140,9 @@ export interface ContentData {
 export interface AppState {
   pages: Record<string, PageData>;
   versions: Record<string, VersionData>;
+  // Objects and their versions (object storage)
+  objects: Record<string, ObjectData>;
+  objectVersions: Record<string, ObjectVersionData>;
   layouts: Record<string, LayoutData>;
   themes: Record<string, ThemeData>;
   
@@ -110,10 +152,15 @@ export interface AppState {
     currentUser?: string;
     isLoading: boolean;
     isDirty: boolean;
+    // Object editing flags (parallel to page/version flags)
+    isObjectLoading: boolean;
+    isObjectDirty: boolean;
     
     // Current editing context
     currentPageId?: string;
     currentVersionId?: string;
+    currentObjectId?: string;
+    currentObjectVersionId?: string;
     
     // Track last operation for update source filtering
     lastOperation?: {
