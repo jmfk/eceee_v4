@@ -3,12 +3,12 @@ import { X, RefreshCw } from 'lucide-react'
 import { getWidgetSchema } from '../api/widgetSchemas.js'
 import { validateWidgetType, clearWidgetTypesCache } from '../utils/widgetTypeValidation.js'
 import DeletedWidgetWarning from './DeletedWidgetWarning.jsx'
-import { useWidgetEvents } from '../contexts/WidgetEventContext'
-import { WIDGET_EVENTS } from '../types/widgetEvents'
+
 import { SpecialEditorRenderer, hasSpecialEditor } from './special-editors'
 import IsolatedFormRenderer from './IsolatedFormRenderer.jsx'
 
 import { useUnifiedData } from '../contexts/unified-data/context/UnifiedDataContext'
+import { OperationTypes } from '../contexts/unified-data/types/operations'
 
 /**
  * WidgetEditorPanel - Slide-out panel for editing widgets
@@ -53,30 +53,41 @@ const WidgetEditorPanel = forwardRef(({
     const rafRef = useRef(null)
     const updateTimeoutRef = useRef(null)
 
-    const { emit } = useWidgetEvents()
-    const { useExternalChanges } = useUnifiedData()
+    const { publishUpdate } = useUnifiedData()
 
-    // Event emitter functions
-    const emitWidgetChanged = useCallback((widgetId, slotName, updatedWidget, changeType = 'config') => {
-        emit(WIDGET_EVENTS.CHANGED, {
-            widgetId,
-            slotName,
-            widget: updatedWidget,
-            changeType,
-            timestamp: Date.now(),
-            sourceId: widgetId
-        })
-    }, [emit])
 
-    const emitWidgetSaved = useCallback((widgetId, slotName, savedWidget) => {
-        emit(WIDGET_EVENTS.SAVED, {
-            widgetId,
-            slotName,
-            widget: savedWidget,
-            timestamp: Date.now(),
-            sourceId: widgetId
+
+    // Unified Data Context update function (replaces event emitter)
+    const emitWidgetChanged = useCallback((arg1, arg2, arg3, _changeType = 'config') => {
+        // Supports both signatures:
+        // 1) (data, changeType)
+        // 2) (widgetId, slotName, updatedWidget, changeType)
+        let widgetId
+        let slotName
+        let updatedWidget
+
+        if (typeof arg1 === 'object' && arg1 !== null && !arg3) {
+            const data = arg1
+            widgetId = data?.id
+            slotName = data?.slotName || data?.slot
+            updatedWidget = data
+        } else {
+            widgetId = arg1
+            slotName = arg2
+            updatedWidget = arg3
+        }
+
+        if (!widgetId || !slotName || !updatedWidget) {
+            return
+        }
+
+        const config = updatedWidget.config || {}
+        publishUpdate(String(widgetId), OperationTypes.UPDATE_WIDGET_CONFIG, {
+            id: widgetId,
+            slotName: slotName,
+            config: config
         })
-    }, [emit])
+    }, [publishUpdate])
 
     // Check if widget supports special editor mode
     const supportsSpecialEditor = useCallback(() => {

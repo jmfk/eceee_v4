@@ -154,7 +154,7 @@ const PageEditor = () => {
     const location = useLocation()
 
     // Use global isDirty from UnifiedDataContext
-    const { useExternalChanges, setIsDirty, publishUpdate } = useUnifiedData()
+    const { useExternalChanges, setIsDirty, publishUpdate, saveCurrentVersion } = useUnifiedData()
 
     // Extract version from URL search parameters
     const urlParams = new URLSearchParams(location.search)
@@ -685,7 +685,6 @@ const PageEditor = () => {
 
     // NEW: Validation-driven sync handlers
     const handleValidatedPageDataSync = useCallback(async (validatedData) => {
-        console.log("handleValidatedPageDataSync", validatedData)
         logValidationSync('pageData', validatedData, 'SchemaDrivenForm')
 
         // Update local state
@@ -986,13 +985,22 @@ const PageEditor = () => {
     const handleSave = useCallback(async () => {
         setIsSaving(true);
         try {
-            await handleActualSave({ description: 'Page updated', option: 'update' });
+            await saveCurrentVersion();
+            setIsDirty(false);
+            addNotification({
+                type: 'success',
+                message: 'Current version saved'
+            });
         } catch (error) {
             console.error('Save failed:', error);
+            addNotification({
+                type: 'error',
+                message: `Save failed: ${error?.message || 'Unknown error'}`
+            });
         } finally {
             setIsSaving(false);
         }
-    }, [handleActualSave]);
+    }, [saveCurrentVersion, setIsDirty, addNotification]);
 
     const handleSaveNew = useCallback(async () => {
         setIsSaving(true);
@@ -1078,7 +1086,7 @@ const PageEditor = () => {
                     const updatedSlotWidgets = slotWidgets.map(widget =>
                         widget.id === payload.widgetId ? payload.widget : widget
                     )
-                    console.log("handleWidgetChanged", payload)
+
                     // await publishUpdate(componentId, OperationTypes.UPDATE_PAGE_VERSION_DATA, {
                     //     id: pageVersionData?.id,
                     //     updates: {

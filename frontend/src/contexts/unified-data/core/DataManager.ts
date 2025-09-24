@@ -15,7 +15,6 @@ export class DataManager {
 
     constructor(initialState?: Partial<AppState>) {
         this.validateInitialState(initialState);
-
         // Initialize with default state structure
         this.state = {
             pages: {},
@@ -35,14 +34,10 @@ export class DataManager {
             },
             ...initialState
         };
-
         // Initialize subscription manager
         this.subscriptionManager = new SubscriptionManager();
     }
 
-    /**
-     * Validate initial state
-     */
     /**
      * Get and validate the current editing context
      */
@@ -317,7 +312,7 @@ export class DataManager {
                 timestamp: Date.now(),
                 validation
             };
-
+            
             // Process based on operation type
             switch (operation.type) {
                 case OperationTypes.INIT_VERSION:
