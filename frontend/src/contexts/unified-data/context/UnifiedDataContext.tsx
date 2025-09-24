@@ -2,7 +2,9 @@ import React, { createContext, useContext, useRef, useCallback, useEffect } from
 import { DataManager } from '../core/DataManager';
 import { UnifiedDataContextValue, UnifiedDataProviderProps } from '../types/context';
 import { Operation, OperationTypes } from '../types/operations';
-import { StateChangeCallback } from '../types/state';
+import { versionsApi } from '../../../api/versions';
+import { processLoadedVersionData } from '../../../utils/smartSaveUtils';
+import { StateChangeCallback, VersionData } from '../types/state';
 import { defaultEqualityFn } from '../utils/equality';
 
 // Create the context
@@ -142,6 +144,32 @@ export function UnifiedDataProvider({
         });
     }, [manager]);
 
+    // Save to current version using granular smart save API
+    const saveCurrentVersion = useCallback(async () => {
+        const state = manager.getState();
+        const versionId = state.metadata.currentVersionId;
+        if (!versionId) {
+            throw new Error('No current version selected in UDC');
+        }
+
+        const version = state.versions[String(versionId)] as VersionData;
+        if (!version) {
+            throw new Error(`Version ${versionId} not found in UDC state`);
+        }
+
+        const result = await versionsApi.update(versionId, version);
+        // Update versions state with processed data if available
+        if (result) {
+            manager.dispatch({
+                type: OperationTypes.SET_DIRTY,
+                sourceId: 'udc-save-current-version',
+                payload: { isDirty: false }
+            });
+        }
+
+        return result;
+    }, [manager]);
+
     // Create context value
     const contextValue: UnifiedDataContextValue = {
         state: manager.getState(),
@@ -167,7 +195,8 @@ export function UnifiedDataProvider({
         clearWarnings,
         resetState,
         resetErrors,
-        publishUpdate
+        publishUpdate,
+        saveCurrentVersion
     };
 
     // Set up dev tools if enabled

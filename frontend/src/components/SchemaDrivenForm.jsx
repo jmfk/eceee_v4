@@ -19,8 +19,6 @@ export default function SchemaDrivenForm({ pageVersionData, onChange, onValidati
     const [isValidationValid, setIsValidationValid] = useState(true) // Start optimistic for server-only validation
     const validatorRef = useRef(null)
 
-    console.log("SchemaDrivenForm")
-
     useEffect(() => {
         let mounted = true
         setLoading(true)

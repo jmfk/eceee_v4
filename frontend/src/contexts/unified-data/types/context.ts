@@ -26,6 +26,9 @@ export interface UnifiedDataContextValue {
         data: T & { id?: string }
     ) => Promise<void>;
     
+    // Persistence
+    saveCurrentVersion: () => Promise<any>;
+    
     // Subscriptions
     subscribe: <T>(
         selector: StateSelector<T>,
