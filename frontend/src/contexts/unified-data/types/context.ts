@@ -47,6 +47,8 @@ export interface UnifiedDataContextValue {
     // Metadata operations
     setIsDirty: (isDirty: boolean) => void;
     setIsLoading: (isLoading: boolean) => void;
+    setIsObjectDirty: (isDirty: boolean) => void;
+    setIsObjectLoading: (isLoading: boolean) => void;
     markWidgetDirty: (widgetId: string) => void;
     markWidgetSaved: (widgetId: string) => void;
     addError: (message: string, category?: string) => void;
