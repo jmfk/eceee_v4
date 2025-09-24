@@ -64,7 +64,6 @@ class PropertyTypeRegistry {
       })
 
       this.initialized = true
-      console.log(`Initialized property registry with ${fieldTypes.length} types`)
     } catch (error) {
       console.error('Failed to initialize property registry:', error)
       throw error

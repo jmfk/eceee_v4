@@ -103,14 +103,24 @@ export class DataManager {
                     }
                     
                     // Validate widgets in version
-                    Object.values(version.widgets || {}).forEach(widget => {
-                        if (!widget.id || !widget.type) {
+                    // Validate widgets in each slot
+                    Object.entries(version.widgets || {}).forEach(([slotName, widgets]) => {
+                        if (!Array.isArray(widgets)) {
                             throw new StateError(
                                 ErrorCodes.INVALID_INITIAL_STATE,
-                                `Widget missing required fields: id or type`,
-                                { widget, versionId: version.id }
+                                `Widgets for slot ${slotName} must be an array`,
+                                { slotName, widgets, versionId: version.id }
                             );
                         }
+                        widgets.forEach(widget => {
+                            if (!widget.id || !widget.type) {
+                                throw new StateError(
+                                    ErrorCodes.INVALID_INITIAL_STATE,
+                                    `Widget in slot ${slotName} missing required fields: id or type`,
+                                    { widget, slotName, versionId: version.id }
+                                );
+                            }
+                        });
                     });
                 });
             }
@@ -224,7 +234,7 @@ export class DataManager {
                     break;
 
                 case OperationTypes.UPDATE_WIDGET_CONFIG:
-                    if (!operation.payload?.id || !operation.payload?.config) {  
+                    if (!operation.payload?.id || !operation.payload?.slotName|| !operation.payload?.config) {  
 
                         throw new ValidationError(operation,
                             'Widget ID and config are required',
@@ -322,9 +332,17 @@ export class DataManager {
                         }
 
                         // Validate version data has required fields
-                        if (!data.versionNumber) {
+                        if (!data.versionNumber || !data.pageId) {
                             throw new ValidationError(operation,
-                                'Version data must include versionNumber',
+                                'Version data must include versionNumber and pageId',
+                                { payload: operation.payload }
+                            );
+                        }
+
+                        // Ensure pageId exists in pages collection
+                        if (!state.pages[data.pageId]) {
+                            throw new ValidationError(operation,
+                                `Referenced page ${data.pageId} does not exist`,
                                 { payload: operation.payload }
                             );
                         }
@@ -335,12 +353,14 @@ export class DataManager {
                                 [id]: {
                                     ...data,
                                     id: id, // Ensure ID is set
+                                    pageId: data.pageId, // Ensure pageId is set
                                     updated_at: data.updated_at || new Date().toISOString()
                                 }
                             },
                             metadata: {
                                 ...state.metadata,
                                 currentVersionId: id,
+                                currentPageId: data.pageId, // Set current page ID to match version
                                 isDirty: false // Reset dirty state when initializing version
                             }
                         };
@@ -375,35 +395,6 @@ export class DataManager {
                         };
                     });
                     break;
-
-                // case OperationTypes.INIT_WIDGET:
-                //     // Initialize widget without side effects (no dirty state change)
-                //     this.setState(operation, state => {
-                //         const { versionId } = this.getCurrentContext();
-                //         const version = state.versions[versionId];
-                        
-                //         return {
-                //             versions: {
-                //                 ...state.versions,
-                //                 [versionId]: {
-                //                     ...version,
-                //                     widgets: {
-                //                         ...version.widgets,
-                //                         [operation.payload.id]: {
-                //                             id: operation.payload.id,
-                //                             type: operation.payload.type,
-                //                             config: operation.payload.config || {},
-                //                             slot: operation.payload.slot || 'main',
-                //                             order: operation.payload.order || 0,
-                //                             created_at: new Date().toISOString(),
-                //                             updated_at: new Date().toISOString()
-                //                         }
-                //                     }
-                //                 }
-                //             }
-                //         };
-                //     });
-                //     break;
 
                 case OperationTypes.ADD_WIDGET:
                     this.setState(operation, state => {
@@ -441,11 +432,27 @@ export class DataManager {
                     this.setState(operation, state => {
                         const { versionId } = this.getCurrentContext();
                         const version = state.versions[versionId];
-                        const widget = version.widgets[operation.payload.id];
+                        const slotName = operation.payload.slotName;
+                        const widgetId = operation.payload.id;
+                        // Get widgets array for the slot
+                        const slotWidgets = version.widgets[slotName] || [];
                         
-                        if (!widget) {
-                            throw new Error(`Widget ${operation.payload.id} not found in version ${versionId}`);
+                        // Find widget in the slot
+                        const widgetIndex = slotWidgets.findIndex(w => w.id === widgetId);
+                        if (widgetIndex === -1) {
+                            throw new Error(`Widget ${widgetId} not found in slot ${slotName} of version ${versionId}`);
                         }
+                        
+                        // Update widget config
+                        const updatedWidgets = [...slotWidgets];
+                        updatedWidgets[widgetIndex] = {
+                            ...updatedWidgets[widgetIndex],
+                            config: {
+                                ...updatedWidgets[widgetIndex].config,
+                                ...operation.payload.config
+                            },
+                            updated_at: new Date().toISOString()
+                        };
                         
                         return {
                             versions: {
@@ -454,14 +461,7 @@ export class DataManager {
                                     ...version,
                                     widgets: {
                                         ...version.widgets,
-                                        [operation.payload.id]: {
-                                            ...widget,
-                                            config: {
-                                                ...widget.config,
-                                                ...operation.payload.config
-                                            },
-                                            updated_at: new Date().toISOString()
-                                        }
+                                        [slotName]: updatedWidgets
                                     }
                                 }
                             },

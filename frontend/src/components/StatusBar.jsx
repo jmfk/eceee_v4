@@ -40,7 +40,6 @@ const StatusBar = ({
         setWarnings(state.metadata.warnings);
     });
 
-    console.log("isDirty", isDirty)
 
     return (
         <div className={`bg-white border-t border-gray-200 px-4 py-2 ${className}`}>

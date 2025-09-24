@@ -76,7 +76,7 @@ export interface VersionData {
   pageId: string;
   number: number;
   status: 'draft' | 'published';
-  widgets: Record<string, WidgetData>;
+  widgets: Record<string, WidgetData[]>;
   layoutId: string;  // Reference to layout in layouts collection
   themeId?: string;  // Reference to theme in themes collection
   content: Record<string, ContentData>;

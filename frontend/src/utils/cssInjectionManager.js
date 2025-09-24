@@ -412,7 +412,6 @@ class CSSInjectionManager {
         // Log all CSS injections
         const originalInject = this.injectCSS.bind(this);
         this.injectCSS = (options) => {
-            // console.log('[CSS Injection]', options);
             return originalInject(options);
         };
 

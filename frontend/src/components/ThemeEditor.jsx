@@ -815,12 +815,9 @@ const ThemeInitialSetup = ({ onComplete, onCancel }) => {
     // Mutation for creating the theme
     const mutation = useMutation({
         mutationFn: async (data) => {
-            console.log('Creating theme with data:', data)
-            console.log('Selected image:', selectedImage)
 
             // If there's an image, create FormData for multipart upload
             if (selectedImage) {
-                console.log('Creating FormData for image upload')
                 const formData = new FormData()
                 formData.append('image', selectedImage)
 
@@ -829,14 +826,11 @@ const ThemeInitialSetup = ({ onComplete, onCancel }) => {
                     if (key !== 'image') {
                         const value = typeof data[key] === 'object' ? JSON.stringify(data[key]) : data[key]
                         formData.append(key, value)
-                        console.log(`Added to FormData: ${key} =`, value)
                     }
                 })
 
-                console.log('Calling themesApi.createWithImage')
                 return await themesApi.createWithImage(formData)
             } else {
-                console.log('No image, calling regular create')
                 return await themesApi.create(data)
             }
         },
@@ -1246,13 +1240,9 @@ const ThemeForm = ({ theme = null, onSave, onCancel }) => {
 
     const mutation = useMutation({
         mutationFn: async (data) => {
-            console.log('ThemeForm mutation - data:', data)
-            console.log('ThemeForm mutation - selectedImage:', selectedImage)
-            console.log('ThemeForm mutation - theme:', theme)
 
             // Handle image uploads for both create and update
             if (selectedImage) {
-                console.log('Creating FormData for image upload')
                 const formData = new FormData()
                 formData.append('image', selectedImage)
 
@@ -1261,23 +1251,18 @@ const ThemeForm = ({ theme = null, onSave, onCancel }) => {
                     if (key !== 'image') {
                         const value = typeof data[key] === 'object' ? JSON.stringify(data[key]) : data[key]
                         formData.append(key, value)
-                        console.log(`Added to FormData: ${key} =`, value)
                     }
                 })
 
                 if (theme) {
-                    console.log('Calling updateWithImage for theme ID:', theme.id)
                     return await themesApi.updateWithImage(theme.id, formData)
                 } else {
-                    console.log('Calling createWithImage')
                     return await themesApi.createWithImage(formData)
                 }
             } else {
                 if (theme) {
-                    console.log('No image, calling regular update for theme ID:', theme.id)
                     return await themesApi.update(theme.id, data)
                 } else {
-                    console.log('No image, calling regular create')
                     return await themesApi.create(data)
                 }
             }
@@ -1756,7 +1741,6 @@ const ThemeForm = ({ theme = null, onSave, onCancel }) => {
                                                     className="inline-flex items-center px-3 py-2 text-sm bg-red-100 text-red-700 rounded-md hover:bg-red-200 transition-colors"
                                                     onClick={() => {
                                                         // TODO: Implement image removal from server
-                                                        console.log('Remove theme image from server')
                                                     }}
                                                 >
                                                     <Trash2 className="w-4 h-4 mr-2" />

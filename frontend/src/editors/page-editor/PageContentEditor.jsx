@@ -30,8 +30,7 @@ const PageContentEditor = forwardRef(({
         layoutJson?.name ||
         pageVersionData?.codeLayout ||
         'single_column';
-    console.log("webpageData", webpageData)
-    console.log("pageVersionData", pageVersionData)
+
     // Get current widgets from pageVersionData
     const currentWidgets = pageVersionData?.widgets || {};
 
@@ -46,15 +45,6 @@ const PageContentEditor = forwardRef(({
     useExternalChanges(componentId, state => {
         setWidgets(state.widgets);
     });
-    // useExternalChanges(componentId, state => {
-    //     const widget: WidgetData = state.widgets[widgetId];
-    //     if (widget) {
-    //         setWidget(widget);
-    //         setIsDirty(state.metadata.isDirty ?? false);
-    //         setHasErrors(Boolean(state.metadata.widgetStates.errors[widgetId]));
-    //     }
-    // });
-
 
     // Handle widget changes
     const handleWidgetChange = async (updatedWidgets, widgetId) => {

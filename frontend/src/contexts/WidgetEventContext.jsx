@@ -7,14 +7,21 @@ import { useUnifiedData } from './unified-data'
  * This eliminates prop drilling by allowing any component to emit and listen
  * to widget-related events directly.
  * 
- * Event Types:
+ * Event Types and Required Payload:
  * - widget:changed - When widget config changes (real-time updates)
+ *   Required: { widgetId, changeType, slotName }
  * - widget:saved - When widget is saved
+ *   Required: { widgetId, slotName }
  * - widget:added - When widget is added to slot
+ *   Required: { widgetId, slotName }
  * - widget:removed - When widget is removed from slot
+ *   Required: { widgetId, slotName }
  * - widget:moved - When widget is reordered
+ *   Required: { widgetId, slotName, newIndex }
  * - widget:validated - When widget passes validation
+ *   Required: { widgetId, slotName }
  * - widget:error - When widget has validation errors
+ *   Required: { widgetId, slotName, error }
  * 
  * TO TURN OFF DEBUG LOGGING:
  * Set DEBUG_ENABLED to false below to disable all console output from widget events
@@ -40,6 +47,11 @@ export const WidgetEventProvider = ({ children }) => {
 
     // Emit an event to all subscribers
     const emit = useCallback((eventType, payload = {}) => {
+        // Validate required payload fields
+        if (eventType.startsWith('widget:') && !payload.slotName) {
+            console.warn(`Widget event ${eventType} missing required slotName in payload:`, payload)
+        }
+
         if (DEBUG_ENABLED) {
         }
 
@@ -93,6 +105,10 @@ export const WidgetEventProvider = ({ children }) => {
         const handleWidgetChanged = (payload) => {
             if (payload.changeType === 'config') {
                 setIsDirty(true)
+                // Ensure slot information is preserved
+                if (!payload.slotName) {
+                    console.warn('Widget changed event missing slotName:', payload)
+                }
             }
         }
 

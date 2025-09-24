@@ -41,7 +41,6 @@ export default function SchemaEditor({
         // Validate the initial schema
         validateProperties(internalProperties)
 
-        console.log(`Schema editor initialized with ${internalProperties.length} properties`)
       } catch (error) {
         console.error('Failed to initialize schema editor:', error)
         setInitError(error.message)

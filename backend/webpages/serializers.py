@@ -456,6 +456,8 @@ class PageVersionSerializer(serializers.ModelSerializer):
     is_published = serializers.SerializerMethodField()
     is_current_published = serializers.SerializerMethodField()
     publication_status = serializers.SerializerMethodField()
+    version_id = serializers.SerializerMethodField()
+    page_id = serializers.SerializerMethodField()
 
     # Tags as array of strings
     tags = serializers.ListField(
@@ -470,6 +472,8 @@ class PageVersionSerializer(serializers.ModelSerializer):
         model = PageVersion
         fields = [
             "id",
+            "version_id",
+            "page_id",
             "version_number",
             "version_title",
             "meta_title",
@@ -497,6 +501,7 @@ class PageVersionSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "id",
             "version_id",
+            "page_id",
             "version_number",
             "is_published",
             "is_current_published",
@@ -504,6 +509,12 @@ class PageVersionSerializer(serializers.ModelSerializer):
             "created_at",
             "created_by",
         ]
+
+    def get_version_id(self, obj):
+        return obj.id
+
+    def get_page_id(self, obj):
+        return obj.page.id
 
     def get_is_published(self, obj):
         """Check if this version is currently published based on dates"""

@@ -154,7 +154,6 @@ const ImageUploadSection = ({
 
                         if (fileIds.length > 0) {
                             await mediaApi.collections.addFiles(defaultCollection.id, fileIds)()
-                            console.log(`Added ${fileIds.length} image(s) to collection: ${defaultCollection.title}`)
                         }
                     } catch (error) {
                         console.warn(`Failed to add images to collection ${defaultCollection.title}:`, error)
@@ -289,7 +288,6 @@ const ImageUploadSection = ({
 
                         if (fileIds.length > 0) {
                             await mediaApi.collections.addFiles(defaultCollection.id, fileIds)()
-                            console.log(`Added ${fileIds.length} force uploaded image(s) to collection: ${defaultCollection.title}`)
                         }
                     } catch (error) {
                         console.warn(`Failed to add force uploaded images to collection ${defaultCollection.title}:`, error)

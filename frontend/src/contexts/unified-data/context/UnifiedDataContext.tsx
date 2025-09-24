@@ -40,7 +40,6 @@ export function UnifiedDataProvider({
                 () => manager.getState(),
                 (_, operation: Operation) => {
                     if (operation && operation?.sourceId && operation?.sourceId !== componentId) {
-                        //console.log("stableCallback", componentId)
                         stableCallback(manager.getState());
                     }
                 },

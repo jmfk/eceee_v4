@@ -105,7 +105,7 @@ const ReactLayoutRenderer = forwardRef(({
             case 'edit': {
                 const widgetIndex = args[0];
                 if (onOpenWidgetEditor) {
-                    onOpenWidgetEditor({ ...widget, slotName, context: { ...context, widgetId: widget.id } });
+                    onOpenWidgetEditor({ ...widget, slotName, context: { ...context, slotName: slotName, widgetId: widget.id } });
                 }
                 break;
             }

@@ -54,7 +54,6 @@ export function containFixedElements(container, options = {}) {
             element.style.maxHeight = '100%';
 
             if (logConversions) {
-                // console.log('layoutContainment: Converted fixed positioned element', element);
             }
         }
     });

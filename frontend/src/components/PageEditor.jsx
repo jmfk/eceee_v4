@@ -489,7 +489,6 @@ const PageEditor = () => {
         try {
             const versionsData = await versionsApi.getPageVersionsList(webpageData.id || pageId);
             setAvailableVersions(versionsData.results || []);
-
             let targetVersion = null;
             // First priority: Use version from URL if specified and valid
             if (versionFromUrl && versionsData.results) {

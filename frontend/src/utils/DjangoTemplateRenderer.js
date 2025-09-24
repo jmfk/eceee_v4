@@ -1204,9 +1204,6 @@ class DjangoTemplateRenderer {
                     name: error?.name
                 });
                 if (window.TEMPLATE_DEBUG_VERBOSE) {
-                    console.log('Template Structure:', structure);
-                    console.log('Widget Config:', config);
-                    console.log('Timestamp:', new Date().toISOString());
                 }
                 console.groupEnd();
             });
@@ -1237,8 +1234,6 @@ class DjangoTemplateRenderer {
         if (typeof window !== 'undefined') {
             window.TEMPLATE_DEBUG_MODE = enabled;
             if (window.TEMPLATE_DEBUG_VERBOSE) {
-                console.log(`🐛 Global Template Debug Mode ${enabled ? 'enabled' : 'disabled'}`);
-                console.log('This affects new renderer instances. Call renderer.setDebugMode() for existing instances.');
             }
         }
     }

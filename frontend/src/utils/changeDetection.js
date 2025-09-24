@@ -219,21 +219,10 @@ export function logChanges(currentState, originalState, context = 'Editor') {
     // Debug information available in changes object
     if (changes.hasChanges && window.DEBUG_MODE) {
         console.group(`🔍 ${context} Change Detection`)
-        console.log('Has changes:', changes.hasChanges)
-        console.log('Summary:', changes.summary)
-        console.log('Changed fields:', changes.changedFields)
-        console.log('Detailed changes:', changes.changes)
-
-        if (changes.hasPageChanges) {
-            console.log('📄 Page changes:', changes.changes.pageFields)
-        }
-
-        if (changes.hasVersionChanges) {
-            console.log('📝 Version changes:', changes.changes.versionFields)
-        }
-
-        console.groupEnd()
     }
 
-    return changes
+    console.groupEnd()
+}
+
+return changes
 }
