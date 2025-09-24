@@ -340,6 +340,7 @@ class ObjectTypeDefinitionListSerializer(serializers.ModelSerializer):
 class ObjectInstanceSerializer(serializers.ModelSerializer):
     """Serializer for Object Instances"""
 
+    object_id = serializers.SerializerMethodField()
     object_type = ObjectTypeDefinitionSerializer(read_only=True)
     object_type_id = serializers.IntegerField(write_only=True)
     created_by = UserSerializer(read_only=True)
@@ -358,6 +359,7 @@ class ObjectInstanceSerializer(serializers.ModelSerializer):
         model = ObjectInstance
         fields = [
             "id",
+            "object_id",
             "object_type",
             "object_type_id",
             "title",
@@ -381,12 +383,17 @@ class ObjectInstanceSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             "id",
+            "object_id",
             "slug",
             "version",
             "created_at",
             "updated_at",
             "created_by",
         ]
+
+    def get_object_id(self, obj):
+        """Return publication status"""
+        return obj.id
 
     def get_is_published(self, obj):
         """Return publication status"""
@@ -584,6 +591,8 @@ class ObjectInstanceListSerializer(serializers.ModelSerializer):
 class ObjectVersionSerializer(serializers.ModelSerializer):
     """Serializer for Object Versions with enhanced publication support"""
 
+    object_id = serializers.SerializerMethodField()
+    version_id = serializers.SerializerMethodField()
     object_instance = ObjectInstanceListSerializer(read_only=True)
     created_by = UserSerializer(read_only=True)
     is_published = serializers.SerializerMethodField()
@@ -594,6 +603,8 @@ class ObjectVersionSerializer(serializers.ModelSerializer):
         model = ObjectVersion
         fields = [
             "id",
+            "object_id",
+            "version_id",
             "object_instance",
             "version_number",
             "data",
@@ -610,6 +621,8 @@ class ObjectVersionSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             "id",
+            "object_id",
+            "version_id",
             "object_instance",
             "version_number",
             "data",
@@ -620,6 +633,14 @@ class ObjectVersionSerializer(serializers.ModelSerializer):
             "is_current_published",
             "publication_status",
         ]
+
+    def get_object_id(self, obj):
+        """Return publication status"""
+        return obj.object_instance.id
+
+    def get_version_id(self, obj):
+        """Return publication status"""
+        return obj.id
 
     def get_is_published(self, obj):
         """Check if this version is currently published based on dates"""
