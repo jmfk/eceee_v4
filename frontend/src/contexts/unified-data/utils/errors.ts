@@ -54,7 +54,11 @@ export const ErrorCodes = {
     SUBSCRIPTION_ERROR: 'SUBSCRIPTION_ERROR',
     
     // System errors
-    SYSTEM_ERROR: 'SYSTEM_ERROR'
+    SYSTEM_ERROR: 'SYSTEM_ERROR',
+    
+    // Context errors
+    NO_ACTIVE_CONTEXT: 'NO_ACTIVE_CONTEXT',
+    INVALID_CONTEXT: 'INVALID_CONTEXT'
 } as const;
 
 export type ErrorCode = keyof typeof ErrorCodes;

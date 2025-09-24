@@ -26,6 +26,7 @@ import { WIDGET_ACTIONS } from '../utils/widgetConstants'
 import { useNotificationContext } from './NotificationManager'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import { useUnifiedData } from '../contexts/unified-data'
+import { OperationTypes } from '../contexts/unified-data/types/operations'
 import ContentEditor from './ContentEditor'
 import PageContentEditor from '../editors/page-editor/PageContentEditor'
 import ErrorTodoSidebar from './ErrorTodoSidebar'
@@ -171,7 +172,6 @@ const PageEditor = () => {
         return path
     }
 
-
     // Redirect to content tab if no tab is specified
     useEffect(() => {
         if (!tab) {
@@ -193,6 +193,7 @@ const PageEditor = () => {
     useExternalChanges(componentId, state => {
         setIsDirtyState(state.metadata.isDirty);
     });
+
     const [layoutData, setLayoutData] = useState(null)
     const [isLoadingLayout, setIsLoadingLayout] = useState(false)
 
@@ -239,8 +240,7 @@ const PageEditor = () => {
     // Initialize data for new page
     useEffect(() => {
         if (isNewPage && !webpageData && !pageVersionData) {
-            // Initialize WebPage data
-            setWebpageData({
+            const initialWebpageData = {
                 title: '',
                 slug: '',
                 description: '',
@@ -248,25 +248,39 @@ const PageEditor = () => {
                 enableCssInjection: false,
                 pageCssVariables: {},
                 pageCustomCss: ''
-            })
+            };
 
-            // Initialize PageVersion data
-            setPageVersionData({
+            const initialPageVersionData = {
                 pageData: {},
                 widgets: {},
                 codeLayout: '',
                 theme: null,
                 versionTitle: 'Initial version',
                 publicationStatus: 'unpublished'
-            })
+            };
+
+            // // Initialize WebPage data
+            // setWebpageData(initialWebpageData);
+            // publishUpdate(componentId, OperationTypes.INIT_PAGE, {
+            //     id: 'new',
+            //     data: initialWebpageData
+            // });
+
+            // Initialize PageVersion data
+            setPageVersionData(initialPageVersionData);
+            publishUpdate(componentId, OperationTypes.INIT_VERSION, {
+                id: 'new',
+                data: initialPageVersionData
+            });
         }
-    }, [isNewPage, webpageData, pageVersionData])
+    }, [isNewPage, webpageData, pageVersionData, publishUpdate, componentId])
 
     // Fetch webpage data (WebPage model data)
     const { data: webpage, isLoading: isLoadingWebpage } = useQuery({
         queryKey: ['webpage', pageId],
         queryFn: async () => {
-            return await pagesApi.get(pageId)
+            const result = await pagesApi.get(pageId)
+            return result
         },
         enabled: !isNewPage
     })
@@ -317,19 +331,31 @@ const PageEditor = () => {
     // Process webpage data (WebPage model fields)
     useEffect(() => {
         if (webpage && !isNewPage) {
-            setWebpageData(webpage)
-            setOriginalWebpageData(webpage) // Track original for smart saving
+            setWebpageData(webpage);
+            setOriginalWebpageData(webpage); // Track original for smart saving
+
+            // Publish webpage data to UDC
+            publishUpdate(componentId, OperationTypes.INIT_PAGE, {
+                id: webpage.id,
+                data: webpage
+            });
         }
-    }, [webpage, isNewPage])
+    }, [webpage, isNewPage, publishUpdate, componentId])
 
     // Process page version data (PageVersion model fields)
     useEffect(() => {
         if (pageVersion && !isNewPage) {
             const processedVersionData = processLoadedVersionData({ ...pageVersion });
-            setPageVersionData(processedVersionData)
-            setOriginalPageVersionData(processedVersionData) // Track original for smart saving
+            setPageVersionData(processedVersionData);
+            setOriginalPageVersionData(processedVersionData); // Track original for smart saving
+
+            // Publish version data to UDC
+            publishUpdate(componentId, OperationTypes.INIT_PAGE, {
+                id: processedVersionData.id,
+                data: processedVersionData
+            });
         }
-    }, [pageVersion, isNewPage])
+    }, [pageVersion, isNewPage, publishUpdate, componentId])
 
     // Fetch layout data when page has a codeLayout, with fallback support
     useEffect(() => {
@@ -481,6 +507,16 @@ const PageEditor = () => {
                 });
             }
             if (targetVersion) {
+                // First initialize the version data in UnifiedDataContext
+                await publishUpdate(componentId, OperationTypes.INIT_PAGE, {
+                    id: webpageData.id,
+                    data: webpageData
+                });
+                await publishUpdate(componentId, OperationTypes.INIT_VERSION, {
+                    id: targetVersion.id,
+                    data: targetVersion
+                });
+
                 setCurrentVersion(targetVersion);
 
                 const changes = analyzeChanges(
@@ -499,7 +535,7 @@ const PageEditor = () => {
             console.error('PageEditor: Error loading versions', error);
             showError('Failed to load page versions');
         }
-    }, [webpageData?.id, isNewPage, versionFromUrl, location.pathname, previousView, showError]);
+    }, [webpageData?.id, isNewPage, versionFromUrl, location.pathname, previousView, showError, publishUpdate, componentId]);
 
     // Load versions but preserve current version selection
     const loadVersionsPreserveCurrent = useCallback(async () => {
@@ -554,6 +590,13 @@ const PageEditor = () => {
             const response = await api.get(endpoints.versions.pageVersionDetail(webpageData.id || pageId, versionId));
             const versionPageData = response.data || response;
             const versionData = availableVersions.find(version => version.id === versionId);
+
+            // Then switch to the version
+            await publishUpdate(componentId, OperationTypes.SWITCH_VERSION, {
+                pageId: webpageData.id,
+                versionId: versionId
+            });
+
             setCurrentVersion(versionData);
 
             // Set pageVersionData with processed data (meta fields flattened)
@@ -582,7 +625,7 @@ const PageEditor = () => {
             console.error('PageEditor: Error switching to version', error);
             showError(`Failed to load version: ${error.message}`);
         }
-    }, [webpageData, availableVersions, showError, addNotification, location.pathname, buildUrlWithVersion, previousView]);
+    }, [webpageData, availableVersions, showError, addNotification, location.pathname, buildUrlWithVersion, previousView, publishUpdate, componentId]);
 
     // Handle page data updates - route to appropriate data structure
     const updatePageData = useCallback(async (updates) => {
@@ -616,21 +659,33 @@ const PageEditor = () => {
                 versionUpdates[key] = value
             }
         })
-
         // Apply updates to appropriate state
         if (Object.keys(webpageUpdates).length > 0) {
             setWebpageData(prev => ({ ...prev, ...webpageUpdates }))
+            // Publish webpage updates to UDC
+            await publishUpdate(componentId, OperationTypes.UPDATE_WEBPAGE_DATA, {
+                id: webpageData?.id,
+                updates: webpageUpdates
+            });
         }
         if (Object.keys(versionUpdates).length > 0) {
             setPageVersionData(prev => ({ ...prev, ...versionUpdates }))
+            // Publish version updates to UDC
+            await publishUpdate(componentId, OperationTypes.UPDATE_PAGE_VERSION_DATA, {
+                id: pageVersionData?.id,
+                updates: versionUpdates
+            });
         }
 
+        // Mark as dirty in UDC
         setIsDirty(true)
-    }, [switchToVersion])
+    }, [switchToVersion, publishUpdate, componentId, webpageData?.id, pageVersionData?.id, setIsDirty])
 
     // NEW: Validation-driven sync handlers
     const handleValidatedPageDataSync = useCallback(async (validatedData) => {
         logValidationSync('pageData', validatedData, 'SchemaDrivenForm')
+
+        // Update local state
         setPageVersionData(prev => ({
             ...prev,
             pageData: {
@@ -638,8 +693,20 @@ const PageEditor = () => {
                 ...validatedData
             }
         }))
+
+        // Publish version updates to UDC
+        await publishUpdate(componentId, OperationTypes.UPDATE_PAGE_VERSION_DATA, {
+            id: pageVersionData?.id,
+            updates: {
+                pageData: {
+                    ...(pageVersionData?.pageData || {}),
+                    ...validatedData
+                }
+            }
+        });
+
         setIsDirty(true) // Mark as dirty since we have new validated data
-    }, [])
+    }, [publishUpdate, componentId, pageVersionData?.id, pageVersionData?.pageData])
 
 
     // Load versions when page data is available
@@ -841,7 +908,6 @@ const PageEditor = () => {
                 }
             }
 
-
             // Prepare data for save analysis
             const currentWebpageDataForSave = {
                 ...webpageData,
@@ -854,7 +920,6 @@ const PageEditor = () => {
             };
 
             // Analyze what changed using separated data
-
             const changes = analyzeChanges(
                 originalWebpageData || {},
                 currentWebpageDataForSave,
@@ -864,10 +929,24 @@ const PageEditor = () => {
 
             const strategy = determineSaveStrategy(changes);
 
+            // Publish changes to UDC before saving
+            if (changes.hasPageChanges) {
+                await publishUpdate(componentId, OperationTypes.UPDATE_WEBPAGE_DATA, {
+                    id: webpageData?.id,
+                    updates: changes.pageChanges
+                });
+            }
+
+            if (changes.hasVersionChanges) {
+                await publishUpdate(componentId, OperationTypes.UPDATE_PAGE_VERSION_DATA, {
+                    id: pageVersionData?.id,
+                    updates: changes.versionChanges
+                });
+            }
+
             // Decision logic: Show modal only if version changes detected
             if (strategy.strategy === 'page-only') {
                 // Only page changes - save directly without modal
-
                 await handleActualSave({ description: 'Page attributes updated' });
             } else if (strategy.strategy === 'none') {
                 // No changes - just show notification
@@ -875,6 +954,7 @@ const PageEditor = () => {
                     type: 'info',
                     message: 'No changes detected'
                 });
+                setIsDirty(false); // Reset dirty state since no changes
             } else {
                 // Version changes detected - save as new version directly
                 await handleActualSave({ description: 'Version changes detected', option: 'new' });
@@ -887,7 +967,7 @@ const PageEditor = () => {
                 message: `Save analysis failed: ${error.message}`
             });
         }
-    }, [errorTodoItems, schemaValidationState, addNotification, webpageData, pageVersionData, originalWebpageData, originalPageVersionData, contentEditorRef, settingsEditorRef, handleActualSave]);
+    }, [errorTodoItems, schemaValidationState, addNotification, webpageData, pageVersionData, originalWebpageData, originalPageVersionData, contentEditorRef, settingsEditorRef, handleActualSave, publishUpdate, componentId, setIsDirty]);
 
     // Handle save options from modal
     const handleSaveOptions = useCallback(async (saveOptions) => {

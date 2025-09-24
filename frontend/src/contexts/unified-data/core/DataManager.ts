@@ -19,10 +19,9 @@ export class DataManager {
         // Initialize with default state structure
         this.state = {
             pages: {},
-            widgets: {},
             layouts: {},
             versions: {},
-            content: {},
+            themes: {},
             metadata: {
                 lastUpdated: new Date().toISOString(),
                 isLoading: false,
@@ -44,20 +43,75 @@ export class DataManager {
     /**
      * Validate initial state
      */
+    /**
+     * Get and validate the current editing context
+     */
+    private getCurrentContext(): { pageId: string; versionId: string } {
+        const { currentPageId, currentVersionId } = this.state.metadata;
+        
+        if (!currentPageId || !currentVersionId) {
+            throw new StateError(
+                ErrorCodes.NO_ACTIVE_CONTEXT,
+                'No active editing context. Use SWITCH_VERSION to select a version first.',
+                { currentPageId, currentVersionId }
+            );
+        }
+
+        // Validate that the referenced page and version exist
+        if (!this.state.pages[currentPageId]) {
+            throw new StateError(
+                ErrorCodes.INVALID_CONTEXT,
+                `Current page ${currentPageId} not found`,
+                { currentPageId }
+            );
+        }
+
+        if (!this.state.versions[currentVersionId]) {
+            throw new StateError(
+                ErrorCodes.INVALID_CONTEXT,
+                `Current version ${currentVersionId} not found`,
+                { currentVersionId }
+            );
+        }
+
+        // Validate that the version belongs to the current page
+        const version = this.state.versions[currentVersionId];
+        if (version.pageId !== currentPageId) {
+            throw new StateError(
+                ErrorCodes.INVALID_CONTEXT,
+                `Version ${currentVersionId} does not belong to current page ${currentPageId}`,
+                { currentPageId, currentVersionId, versionPageId: version.pageId }
+            );
+        }
+
+        return { pageId: currentPageId, versionId: currentVersionId };
+    }
+
     private validateInitialState(state?: Partial<AppState>): void {
         if (!state) return;
 
         try {
             // Basic state validation
-            if (state.widgets) {
-                Object.values(state.widgets).forEach(widget => {
-                    if (!widget.id || !widget.type) {
+            if (state.versions) {
+                Object.values(state.versions).forEach(version => {
+                    if (!version.id || !version.pageId) {
                         throw new StateError(
                             ErrorCodes.INVALID_INITIAL_STATE,
-                            `Widget missing required fields: id or type`,
-                            { widget }
+                            `Version missing required fields: id or pageId`,
+                            { version }
                         );
                     }
+                    
+                    // Validate widgets in version
+                    Object.values(version.widgets || {}).forEach(widget => {
+                        if (!widget.id || !widget.type) {
+                            throw new StateError(
+                                ErrorCodes.INVALID_INITIAL_STATE,
+                                `Widget missing required fields: id or type`,
+                                { widget, versionId: version.id }
+                            );
+                        }
+                    });
                 });
             }
 
@@ -126,7 +180,6 @@ export class DataManager {
     private hasDataChanged(prevState: AppState, newState: AppState): boolean {
         return (
             prevState.pages !== newState.pages ||
-            prevState.widgets !== newState.widgets ||
             prevState.layouts !== newState.layouts ||
             prevState.versions !== newState.versions
         );
@@ -188,6 +241,24 @@ export class DataManager {
                         );
                     }
                     break;
+
+                case OperationTypes.UPDATE_WEBPAGE_DATA:
+                    if (!operation.payload?.id || !operation.payload?.updates) {
+                        throw new ValidationError(operation,
+                            'Page ID and updates are required',
+                            { payload: operation.payload }
+                        );
+                    }
+                    break;
+
+                case OperationTypes.UPDATE_PAGE_VERSION_DATA:
+                    if (!operation.payload?.id || !operation.payload?.updates) {
+                        throw new ValidationError(operation,
+                            'Version ID and updates are required',
+                            { payload: operation.payload }
+                        );
+                    }
+                    break;
             }
 
             return { isValid: true };
@@ -238,63 +309,160 @@ export class DataManager {
             };
 
             // Process based on operation type
-            console.log(operation.type)
             switch (operation.type) {
-                case OperationTypes.INIT_WIDGET:
-                    // Initialize widget without side effects (no dirty state change)
-                    this.setState(operation, state => ({
-                        widgets: {
-                            ...state.widgets,
-                            [operation.payload.id]: {
-                                id: operation.payload.id,
-                                type: operation.payload.type,
-                                config: operation.payload.config || {},
-                                slot: operation.payload.slot || 'main',
-                                order: operation.payload.order || 0,
-                                created_at: new Date().toISOString(),
-                                updated_at: new Date().toISOString()
-                            }
+                case OperationTypes.INIT_VERSION:
+                    // Initialize version data without side effects
+                    this.setState(operation, state => {
+                        const { id, data } = operation.payload;
+                        if (!id || !data) {
+                            throw new ValidationError(operation,
+                                'ID and data are required for INIT_VERSION',
+                                { payload: operation.payload }
+                            );
                         }
-                    }));
+
+                        // Validate version data has required fields
+                        if (!data.versionNumber) {
+                            throw new ValidationError(operation,
+                                'Version data must include versionNumber',
+                                { payload: operation.payload }
+                            );
+                        }
+
+                        return {
+                            versions: {
+                                ...state.versions,
+                                [id]: {
+                                    ...data,
+                                    id: id, // Ensure ID is set
+                                    updated_at: data.updated_at || new Date().toISOString()
+                                }
+                            },
+                            metadata: {
+                                ...state.metadata,
+                                currentVersionId: id,
+                                isDirty: false // Reset dirty state when initializing version
+                            }
+                        };
+                    });
                     break;
 
-                case OperationTypes.ADD_WIDGET:
-                    this.setState(operation, state => ({
-                        widgets: {
-                            ...state.widgets,
-                            [operation.payload.id]: {
-                                id: operation.payload.id,
-                                type: operation.payload.type,
-                                config: operation.payload.config || {},
-                                slot: operation.payload.slot || 'main',
-                                order: operation.payload.order || 0,
-                                created_at: new Date().toISOString(),
-                                updated_at: new Date().toISOString()
-                            }
-                        },
-                        metadata: {
-                            ...state.metadata,
-                            isDirty: true
+                case OperationTypes.INIT_PAGE:
+                    // Initialize page data without side effects
+                    this.setState(operation, state => {
+                        const { id, data } = operation.payload;
+                        if (!id || !data) {
+                            throw new ValidationError(operation,
+                                'ID and data are required for INIT_PAGE',
+                                { payload: operation.payload }
+                            );
                         }
-                    }));
+
+                        return {
+                            pages: {
+                                ...state.pages,
+                                [id]: {
+                                    ...data,
+                                    id: id, // Ensure ID is set
+                                    updated_at: data.updated_at || new Date().toISOString()
+                                }
+                            },
+                            metadata: {
+                                ...state.metadata,
+                                currentPageId: id,
+                                isDirty: false // Reset dirty state when initializing version
+                            }                            
+                        };
+                    });
+                    break;
+
+                // case OperationTypes.INIT_WIDGET:
+                //     // Initialize widget without side effects (no dirty state change)
+                //     this.setState(operation, state => {
+                //         const { versionId } = this.getCurrentContext();
+                //         const version = state.versions[versionId];
+                        
+                //         return {
+                //             versions: {
+                //                 ...state.versions,
+                //                 [versionId]: {
+                //                     ...version,
+                //                     widgets: {
+                //                         ...version.widgets,
+                //                         [operation.payload.id]: {
+                //                             id: operation.payload.id,
+                //                             type: operation.payload.type,
+                //                             config: operation.payload.config || {},
+                //                             slot: operation.payload.slot || 'main',
+                //                             order: operation.payload.order || 0,
+                //                             created_at: new Date().toISOString(),
+                //                             updated_at: new Date().toISOString()
+                //                         }
+                //                     }
+                //                 }
+                //             }
+                //         };
+                //     });
+                //     break;
+
+                case OperationTypes.ADD_WIDGET:
+                    this.setState(operation, state => {
+                        const { versionId } = this.getCurrentContext();
+                        const version = state.versions[versionId];
+                        
+                        return {
+                            versions: {
+                                ...state.versions,
+                                [versionId]: {
+                                    ...version,
+                                    widgets: {
+                                        ...version.widgets,
+                                        [operation.payload.id]: {
+                                            id: operation.payload.id,
+                                            type: operation.payload.type,
+                                            config: operation.payload.config || {},
+                                            slot: operation.payload.slot || 'main',
+                                            order: operation.payload.order || 0,
+                                            created_at: new Date().toISOString(),
+                                            updated_at: new Date().toISOString()
+                                        }
+                                    }
+                                }
+                            },
+                            metadata: {
+                                ...state.metadata,
+                                isDirty: true
+                            }
+                        };
+                    });
                     break;
 
                 case OperationTypes.UPDATE_WIDGET_CONFIG:
                     this.setState(operation, state => {
-                        const widget = state.widgets[operation.payload.id];
+                        const { versionId } = this.getCurrentContext();
+                        const version = state.versions[versionId];
+                        const widget = version.widgets[operation.payload.id];
+                        
                         if (!widget) {
-                            throw new Error(`Widget ${operation.payload.id} not found. state: ${state}`);
+                            throw new Error(`Widget ${operation.payload.id} not found in version ${versionId}`);
                         }
+                        
                         return {
-                            widgets: {
-                                ...state.widgets,
-                                [operation.payload.id]: {
-                                    ...widget,
-                                    config: {
-                                        ...widget.config,
-                                        ...operation.payload.config
-                                    },
-                                    updated_at: new Date().toISOString()
+                            versions: {
+                                ...state.versions,
+                                [versionId]: {
+                                    ...version,
+                                    widgets: {
+                                        ...version.widgets,
+                                        [operation.payload.id]: {
+                                            ...widget,
+                                            config: {
+                                                ...widget.config,
+                                                ...operation.payload.config
+                                            },
+                                            updated_at: new Date().toISOString()
+                                        }
+                                    }
                                 }
                             },
                             metadata: {
@@ -307,16 +475,71 @@ export class DataManager {
 
                 case OperationTypes.MOVE_WIDGET:
                     this.setState(operation, state => {
-                        const widget = state.widgets[operation.payload.id];
-                        if (!widget) return state;
+                        const { versionId } = this.getCurrentContext();
+                        const version = state.versions[versionId];
+                        const widget = version.widgets[operation.payload.id];
+                        
+                        if (!widget) {
+                            throw new Error(`Widget ${operation.payload.id} not found in version ${versionId}`);
+                        }
 
                         return {
-                            widgets: {
-                                ...state.widgets,
-                                [operation.payload.id]: {
-                                    ...widget,
-                                    slot: operation.payload.slot,
-                                    order: operation.payload.order,
+                            versions: {
+                                ...state.versions,
+                                [versionId]: {
+                                    ...version,
+                                    widgets: {
+                                        ...version.widgets,
+                                        [operation.payload.id]: {
+                                            ...widget,
+                                            slot: operation.payload.slot,
+                                            order: operation.payload.order,
+                                            updated_at: new Date().toISOString()
+                                        }
+                                    }
+                                }
+                            },
+                            metadata: {
+                                ...state.metadata,
+                                isDirty: true
+                            }
+                        };
+                    });
+                    break;
+
+                case OperationTypes.UPDATE_WEBPAGE_DATA:
+                    this.setState(operation, state => {
+                        const pageId = operation.payload.id;
+                        if (!pageId) return state;
+
+                        return {
+                            pages: {
+                                ...state.pages,
+                                [pageId]: {
+                                    ...(state.pages[pageId] || {}),
+                                    ...operation.payload.updates,
+                                    updated_at: new Date().toISOString()
+                                }
+                            },
+                            metadata: {
+                                ...state.metadata,
+                                isDirty: true
+                            }
+                        };
+                    });
+                    break;
+
+                case OperationTypes.UPDATE_PAGE_VERSION_DATA:
+                    this.setState(operation, state => {
+                        const versionId = operation.payload.id;
+                        if (!versionId) return state;
+
+                        return {
+                            versions: {
+                                ...state.versions,
+                                [versionId]: {
+                                    ...(state.versions[versionId] || {}),
+                                    ...operation.payload.updates,
                                     updated_at: new Date().toISOString()
                                 }
                             },
@@ -440,6 +663,29 @@ export class DataManager {
                                 : []
                         }
                     }));
+                    break;
+
+                case OperationTypes.SWITCH_VERSION:
+                    this.setState(operation, state => {
+                        const { versionId, pageId } = operation.payload;
+                        // Validate version exists and belongs to page
+                        const version = state.versions[versionId];
+                        if (!version) {
+                            throw new Error(`Version ${versionId} not found`);
+                        }
+                        if (version.pageId !== pageId) {
+                            throw new Error(`Version ${versionId} does not belong to page ${pageId}`);
+                        }
+                        
+                        return {
+                            metadata: {
+                                ...state.metadata,
+                                currentPageId: pageId,
+                                currentVersionId: versionId,
+                                isDirty: false  // Reset dirty state when switching versions
+                            }
+                        };
+                    });
                     break;
 
                 case OperationTypes.RESET_STATE:

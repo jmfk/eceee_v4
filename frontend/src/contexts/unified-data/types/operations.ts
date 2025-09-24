@@ -100,6 +100,8 @@ export const OperationTypes = {
   // Page operations
   UPDATE_PAGE: 'UPDATE_PAGE',
   UPDATE_PAGE_METADATA: 'UPDATE_PAGE_METADATA',
+  UPDATE_WEBPAGE_DATA: 'UPDATE_WEBPAGE_DATA',
+  UPDATE_PAGE_VERSION_DATA: 'UPDATE_PAGE_VERSION_DATA',
   PUBLISH_PAGE: 'PUBLISH_PAGE',
   UNPUBLISH_PAGE: 'UNPUBLISH_PAGE',
   SCHEDULE_PAGE: 'SCHEDULE_PAGE',
@@ -130,6 +132,7 @@ export const OperationTypes = {
   CREATE_VERSION: 'CREATE_VERSION',
   DELETE_VERSION: 'DELETE_VERSION',
   COMPARE_VERSIONS: 'COMPARE_VERSIONS',
+  SWITCH_VERSION: 'SWITCH_VERSION',
   
   // Metadata operations
   SET_DIRTY: 'SET_DIRTY',
@@ -157,8 +160,9 @@ export const OperationTypes = {
   FORM_DESTROYED: 'FORM_DESTROYED',
 
   // Initialization operations
-  INIT_WIDGET: 'INIT_WIDGET',  // For initializing widget data without side effects
+  INIT_WIDGET: 'INIT_WIDGET',  // For initializing widget data without side effects Deprecated?
   INIT_PAGE: 'INIT_PAGE',      // For initializing page data without side effects
+  INIT_VERSION: 'INIT_VERSION',// For initializing version data without side effects
   INIT_LAYOUT: 'INIT_LAYOUT',  // For initializing layout data without side effects
   
 } as const;

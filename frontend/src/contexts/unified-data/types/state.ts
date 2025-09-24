@@ -6,12 +6,16 @@ export interface PageData {
   id: string;
   title: string;
   slug: string;
-  metadata: PageMetadata;
-  layout: string; // Layout ID
-  version: string; // Current version ID
+  url: string;
   status: 'draft' | 'published' | 'scheduled';
+  currentVersionId: string;
+  availableVersions: string[];
+  metadata: PageMetadata;
   created_at: string;
   updated_at: string;
+  created_by?: string;
+  published_at?: string;
+  scheduled_for?: string;
 }
 
 export interface PageMetadata {
@@ -37,11 +41,24 @@ export interface WidgetConfig {
   [key: string]: any;
 }
 
+export interface ThemeData {
+  id: string;
+  name: string;
+  description?: string;
+  variables: Record<string, string>;  // CSS variables/tokens
+  styles: Record<string, any>;        // Component-specific styles
+  parentTheme?: string;               // For theme inheritance
+  metadata?: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+  created_by?: string;
+}
+
 export interface LayoutData {
   id: string;
   name: string;
   slots: LayoutSlot[];
-  theme?: string;
+  defaultThemeId?: string;  // Default theme for this layout
   metadata?: Record<string, any>;
   created_at: string;
   updated_at: string;
@@ -56,18 +73,19 @@ export interface LayoutSlot {
 
 export interface VersionData {
   id: string;
-  page_id: string;
+  pageId: string;
   number: number;
-  data: PageVersionData;
-  created_at: string;
-  created_by: string;
   status: 'draft' | 'published';
-}
-
-export interface PageVersionData {
-  layout: string;
   widgets: Record<string, WidgetData>;
+  layoutId: string;  // Reference to layout in layouts collection
+  themeId?: string;  // Reference to theme in themes collection
+  content: Record<string, ContentData>;
   metadata: PageMetadata;
+  created_at: string;
+  updated_at: string;
+  created_by: string;
+  published_at?: string;
+  changesDescription?: string;
 }
 
 /**
@@ -82,10 +100,9 @@ export interface ContentData {
 
 export interface AppState {
   pages: Record<string, PageData>;
-  widgets: Record<string, WidgetData>;
-  layouts: Record<string, LayoutData>;
   versions: Record<string, VersionData>;
-  content: Record<string, ContentData>;
+  layouts: Record<string, LayoutData>;
+  themes: Record<string, ThemeData>;
   
   // Metadata about the state itself
   metadata: {
@@ -93,12 +110,18 @@ export interface AppState {
     currentUser?: string;
     isLoading: boolean;
     isDirty: boolean;
+    
+    // Current editing context
+    currentPageId?: string;
+    currentVersionId?: string;
+    
     // Track last operation for update source filtering
     lastOperation?: {
       type: string;
       sourceId?: string;
       timestamp: number;
     };
+    
     // Global errors and warnings with categories
     errors: Array<{
       message: string;
@@ -110,6 +133,7 @@ export interface AppState {
       category: string;
       timestamp: number;
     }>;
+    
     // Widget-specific metadata
     widgetStates: {
       errors: Record<string, Error>;

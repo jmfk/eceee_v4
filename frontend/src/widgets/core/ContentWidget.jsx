@@ -107,19 +107,13 @@ const ContentWidget = memo(({
                 allow_scripts: config.allow_scripts ?? ContentWidget.defaultConfig.allow_scripts,
                 sanitize_html: config.sanitize_html ?? ContentWidget.defaultConfig.sanitize_html
             };
-            // Add the widget first
-            publishUpdate(componentId, OperationTypes.INIT_WIDGET, {
-                id: widgetId,
-                type: ContentWidget.widgetType,
-                config: initialConfig,
-                slot: slotName || 'main'
-            });
         }
-    }, [widgetId, slotName]);
+    }, [widgetId]);
 
     // Subscribe to external changes
     useExternalChanges(componentId, (state) => {
-        const newContent = state.widgets[widgetId]?.config?.content;
+        const version = state.versions[state.metadata.currentVersionId]
+        const newContent = version.widgets[widgetId]?.config?.content;
         if (newContent !== content) {
             setContent(newContent);
         }
