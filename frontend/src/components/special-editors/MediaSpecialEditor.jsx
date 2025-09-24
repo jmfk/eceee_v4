@@ -65,11 +65,11 @@ const MediaSpecialEditor = ({
     const [showCreateCollectionForm, setShowCreateCollectionForm] = useState(false)
     const [createCollectionName, setCreateCollectionName] = useState('')
     const [tempSelectedImages, setTempSelectedImages] = useState([])
-    const [localConfig, setLocalConfig] = useState({ mediaItems: [], searchTerms: [] })
+    const [localConfig, setLocalConfig] = useState({})
 
     // Use local config that updates immediately, fallback to widgetData config
     const currentConfig = useMemo(() => {
-        const baseConfig = widgetData?.config || {}
+        const baseConfig = { ...(widgetData?.config || {}) }
         // Ensure mediaItems is always an array
         if (!baseConfig.mediaItems) {
             baseConfig.mediaItems = []
@@ -136,9 +136,7 @@ const MediaSpecialEditor = ({
 
     // Reset local config when widgetData changes
     useEffect(() => {
-        setLocalConfig({
-            mediaItems: []
-        })
+        setLocalConfig({})
     }, [widgetData])
 
     // Load namespace and initial data (use provided namespace or default)
