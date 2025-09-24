@@ -6,8 +6,8 @@
  */
 import React, { useCallback } from 'react'
 import MediaSpecialEditor from './MediaSpecialEditor'
-import { useWidgetEvents } from '../../contexts/WidgetEventContext'
-import { WIDGET_EVENTS } from '../../types/widgetEvents'
+import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
+import { OperationTypes } from '../../contexts/unified-data/types/operations'
 
 
 // Registry of special editors mapped to widget types
@@ -46,17 +46,17 @@ const SpecialEditorRenderer = ({
         return null
     }
 
-    const { emit } = useWidgetEvents()
+    const { publishUpdate } = useUnifiedData()
+    const componentId = `special-editor-${widgetData?.id || 'unknown'}`
 
     const onConfigChange = useCallback((newConfig) => {
-        emit(WIDGET_EVENTS.CHANGED, {
-            widgetId: widgetData.id,
+        if (!widgetData?.id) return
+        publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
+            id: widgetData.id,
             slotName: widgetData.slotName,
-            widget: newConfig,
-            changeType: 'config',
-            timestamp: Date.now()
+            config: newConfig
         })
-    }, [])
+    }, [publishUpdate, componentId, widgetData?.id, widgetData?.slotName])
 
 
 
