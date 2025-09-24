@@ -109,7 +109,8 @@ export class DataManager {
         
         this.state.metadata.lastUpdated = new Date().toISOString();
         
-        if (hasDataChanged && !this.state.metadata.isDirty) {
+        // Only mark as dirty if data changed AND it's not an initialization operation
+        if (hasDataChanged && !operation.type.startsWith('INIT_')) {
             this.state.metadata.isDirty = true;
         }
         
@@ -159,6 +160,16 @@ export class DataManager {
 
             // Payload validation based on operation type
             switch (operation.type) {
+                case OperationTypes.INIT_WIDGET:
+                case OperationTypes.ADD_WIDGET:
+                    if (!operation.payload?.id || !operation.payload?.type) {
+                        throw new ValidationError(operation,
+                            'Widget ID and type are required',
+                            { payload: operation.payload }
+                        );
+                    }
+                    break;
+
                 case OperationTypes.UPDATE_WIDGET_CONFIG:
                     if (!operation.payload?.id || !operation.payload?.config) {  
 
@@ -228,25 +239,43 @@ export class DataManager {
 
             // Process based on operation type
             switch (operation.type) {
+                case OperationTypes.INIT_WIDGET:
+                    // Initialize widget without side effects (no dirty state change)
+                    this.setState(operation, state => ({
+                        widgets: {
+                            ...state.widgets,
+                            [operation.payload.id]: {
+                                id: operation.payload.id,
+                                type: operation.payload.type,
+                                config: operation.payload.config || {},
+                                slot: operation.payload.slot || 'main',
+                                order: operation.payload.order || 0,
+                                created_at: new Date().toISOString(),
+                                updated_at: new Date().toISOString()
+                            }
+                        }
+                    }));
+                    break;
+
                 case OperationTypes.ADD_WIDGET:
-            this.setState(operation, state => ({
-                widgets: {
-                    ...state.widgets,
-                    [operation.payload.id]: {
-                        id: operation.payload.id,
-                        type: operation.payload.type,
-                        config: operation.payload.config || {},
-                        slot: operation.payload.slot || 'main',
-                        order: operation.payload.order || 0,
-                        created_at: new Date().toISOString(),
-                        updated_at: new Date().toISOString()
-                    }
-                },
-                metadata: {
-                    ...state.metadata,
-                    isDirty: true
-                }
-            }));
+                    this.setState(operation, state => ({
+                        widgets: {
+                            ...state.widgets,
+                            [operation.payload.id]: {
+                                id: operation.payload.id,
+                                type: operation.payload.type,
+                                config: operation.payload.config || {},
+                                slot: operation.payload.slot || 'main',
+                                order: operation.payload.order || 0,
+                                created_at: new Date().toISOString(),
+                                updated_at: new Date().toISOString()
+                            }
+                        },
+                        metadata: {
+                            ...state.metadata,
+                            isDirty: true
+                        }
+                    }));
                     break;
 
                 case OperationTypes.UPDATE_WIDGET_CONFIG:

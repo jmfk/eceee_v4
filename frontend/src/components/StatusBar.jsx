@@ -35,8 +35,6 @@ const StatusBar = ({
     const [warnings, setWarnings] = useState([]);
 
     useExternalChanges(componentId, state => {
-        console.log("StatusBar")
-        console.log(state)
         setIsDirty(state.metadata.isDirty);
         setErrors(state.metadata.errors);
         setWarnings(state.metadata.warnings);
