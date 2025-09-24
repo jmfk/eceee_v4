@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useUnifiedData } from '../context/UnifiedDataContext';
-import { WidgetData, WidgetConfig } from '../types/state';
+import { WidgetData, WidgetConfig, AppState } from '../types/state';
 import { OperationTypes, DispatchOptions } from '../types/operations';
 
 export interface UseWidgetOperationsResult {
@@ -22,9 +22,32 @@ export interface UseWidgetOperationsResult {
 
 export function useWidgetOperations(widgetId: string): UseWidgetOperationsResult {
     const { dispatch, useExternalChanges, getState } = useUnifiedData();
-    
-    // Initialize widget from current state
-    const initialWidget = getState().widgets[widgetId] || null;
+
+    const findWidgetById = (state: AppState, id: string): WidgetData | null => {
+        const { currentVersionId, currentObjectVersionId } = state.metadata as any;
+        if (currentVersionId) {
+            const version = state.versions[currentVersionId];
+            if (version?.widgets) {
+                for (const slotName of Object.keys(version.widgets)) {
+                    const found = (version.widgets[slotName] || []).find(w => w.id === id);
+                    if (found) return found;
+                }
+            }
+        }
+        if (currentObjectVersionId && (state as any).objectVersions) {
+            const objVersion = (state as any).objectVersions[currentObjectVersionId];
+            if (objVersion?.widgets) {
+                for (const slotName of Object.keys(objVersion.widgets)) {
+                    const found = (objVersion.widgets[slotName] || []).find((w: any) => w.id === id);
+                    if (found) return found as WidgetData;
+                }
+            }
+        }
+        return null;
+    };
+
+    // Initialize widget from current context
+    const initialWidget = findWidgetById(getState(), widgetId);
 
     // State
     const [widget, setWidget] = useState<WidgetData | null>(initialWidget);
@@ -33,12 +56,10 @@ export function useWidgetOperations(widgetId: string): UseWidgetOperationsResult
 
     // Subscribe to external changes
     useExternalChanges(widgetId, state => {
-        const widget: WidgetData = state.widgets[widgetId];
-        if (widget) {
-            setWidget(widget);            
-            setIsDirty(state.metadata.isDirty ?? false);
-            setHasErrors(Boolean(state.metadata.widgetStates.errors[widgetId]));
-        }
+        const w = findWidgetById(state as AppState, widgetId);
+        if (w) setWidget(w);
+        setIsDirty(state.metadata.isDirty ?? false);
+        setHasErrors(Boolean(state.metadata.widgetStates.errors[widgetId]));
     });
 
     // Operations
