@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams, useNavigate, Link, Navigate, useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
@@ -6,6 +6,8 @@ import {
     Eye
 } from 'lucide-react'
 import { objectInstancesApi, objectTypesApi, objectVersionsApi } from '../api/objectStorage'
+import { useUnifiedData } from '../contexts/unified-data/context/UnifiedDataContext'
+import { OperationTypes } from '../contexts/unified-data/types/operations'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import StatusBar from '../components/StatusBar'
 
@@ -32,6 +34,11 @@ const ObjectInstanceEditPage = () => {
 
     // Refs for tab components
     const contentTabRef = useRef(null)
+
+    // UDC
+    const { publishUpdate, setIsObjectLoading, setIsObjectDirty } = useUnifiedData()
+    const udcInitRef = useRef(null)
+    const componentId = useMemo(() => `object-instance-editor-${instanceId || 'new'}`, [instanceId])
 
     // Save mutation
     const saveMutation = useMutation({
@@ -98,7 +105,7 @@ const ObjectInstanceEditPage = () => {
     const instance = instanceResponse?.data
 
     // Load versions for existing instances
-    const { data: versionsResponse } = useQuery({
+    const { data: versionsResponse, isLoading: versionsLoading } = useQuery({
         queryKey: ['objectInstance', instanceId, 'versions'],
         queryFn: () => objectInstancesApi.getVersions(instanceId),
         enabled: !!instanceId && !isNewInstance
@@ -106,6 +113,9 @@ const ObjectInstanceEditPage = () => {
 
     // Update available versions when data loads
     useEffect(() => {
+        // Update object-level loading state in UDC
+        setIsObjectLoading(Boolean(instanceLoading || versionsLoading))
+
         if (versionsResponse?.data) {
             setAvailableVersions(versionsResponse.data)
             // Set current version if not already set
@@ -116,7 +126,72 @@ const ObjectInstanceEditPage = () => {
                 setCurrentVersion(current)
             }
         }
-    }, [versionsResponse, instance, currentVersion])
+    }, [versionsResponse, instance, currentVersion, instanceLoading, versionsLoading, setIsObjectLoading])
+
+    // Initialize UDC objects and versions once data is loaded
+    useEffect(() => {
+        if (!instanceId || !instance || !versionsResponse?.data) return
+        if (udcInitRef.current === instanceId) return
+
+        try {
+            // Determine current version id and version ids list
+            const allVersions = Array.isArray(versionsResponse.data) ? versionsResponse.data : []
+            const currentVersionEntry = allVersions.find(v => v.versionNumber === instance.version) || allVersions[0]
+            const currentVersionId = currentVersionEntry ? String(currentVersionEntry.id) : undefined
+            const versionIds = allVersions.map(v => String(v.id))
+
+            // INIT_OBJECT including availableVersions and currentVersionId to avoid separate update
+            publishUpdate(componentId, OperationTypes.INIT_OBJECT, {
+                id: String(instance.id),
+                data: {
+                    id: String(instance.id),
+                    type: instance?.objectType?.name || instance?.objectType?.id || 'unknown',
+                    status: instance?.status || 'draft',
+                    metadata: instance?.metadata || {},
+                    created_at: instance?.createdAt || new Date().toISOString(),
+                    updated_at: instance?.updatedAt || new Date().toISOString(),
+                    parentId: instance?.parent?.id || instance?.parent || null,
+                    currentVersionId: currentVersionId,
+                    availableVersions: versionIds
+                }
+            })
+
+            // INIT_OBJECT_VERSION for each version, ensure current version is initialized last
+            const ordered = [
+                ...allVersions.filter(v => String(v.id) !== currentVersionId),
+                ...allVersions.filter(v => String(v.id) === currentVersionId)
+            ]
+            ordered.forEach(v => {
+                const versionId = String(v.id)
+                publishUpdate(componentId, OperationTypes.INIT_OBJECT_VERSION, {
+                    id: versionId,
+                    data: {
+                        id: versionId,
+                        objectId: String(instance.id),
+                        number: v.versionNumber || v.number || 0,
+                        status: v.status || 'draft',
+                        widgets: v.widgets || {},
+                        layoutId: v.layoutId,
+                        themeId: v.themeId,
+                        content: v.content || {},
+                        metadata: v.metadata || {},
+                        created_at: v.createdAt || new Date().toISOString(),
+                        updated_at: v.updatedAt || new Date().toISOString(),
+                        created_by: v.createdBy,
+                        published_at: v.publishedAt,
+                        changesDescription: v.changesDescription
+                    }
+                })
+            })
+
+            // Clear object dirty flag after initialization
+            setIsObjectDirty(false)
+
+            udcInitRef.current = instanceId
+        } catch (e) {
+            console.error('UDC init (objects) failed', e)
+        }
+    }, [instanceId, instance, versionsResponse, setIsObjectDirty, publishUpdate, componentId])
 
     // Switch to a different version
     const switchToVersion = async (versionId) => {
@@ -269,6 +344,8 @@ const ObjectInstanceEditPage = () => {
             </div>
         )
     }
+
+    console.log("ObjectInstanceEditPage")
 
     if (!objectType) {
         return (
