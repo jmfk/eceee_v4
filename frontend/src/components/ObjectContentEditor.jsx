@@ -3,283 +3,20 @@ import { Layout, Plus, Settings, Trash2, Eye, Check, X, MoreHorizontal } from 'l
 import { ObjectWidgetFactory, createObjectEditorEventSystem } from '../editors/object-editor'
 import { useWidgets, getWidgetDisplayName, createDefaultWidgetConfig } from '../hooks/useWidgets'
 import { filterAvailableWidgetTypes } from '../utils/widgetTypeValidation'
-import {
-    getCoreWidgetIcon as getWidgetIcon,
-    getCoreWidgetCategory as getWidgetCategory,
-    getCoreWidgetDescription as getWidgetDescription
-} from '../widgets'
 import { useUnifiedData } from '../contexts/unified-data/context/UnifiedDataContext'
-
-import WidgetEditorPanel from './WidgetEditorPanel'
+import { OperationTypes } from '../contexts/unified-data/types/operations'
+import WidgetSelectionModal from './WidgetSelectionModal'
+import SlotIconMenu from './SlotIconMenu'
 import { useWidgetEvents } from '../contexts/WidgetEventContext'
-import { WIDGET_EVENTS, WIDGET_CHANGE_TYPES } from '../types/widgetEvents'
-
-// WidgetSelectionModal component that replicates the PageEditor widget selection modal
-const WidgetSelectionModal = ({ isOpen, onClose, onSelectWidget, slot, availableWidgetTypes, isFilteringTypes }) => {
-    const [searchTerm, setSearchTerm] = useState('')
-    const modalRef = useRef(null)
-
-    // Filter available widget types based on slot configuration and search term
-    const filteredWidgets = useMemo(() => {
-        if (!slot?.widgetControls || !availableWidgetTypes) return []
-
-        let widgets = slot.widgetControls
-            .filter(control => {
-                // Only show widget controls that are available on the server
-                return availableWidgetTypes.some(available =>
-                    available.type === control.widgetType ||
-                    available.widgetType === control.widgetType
-                )
-            })
-            .map(control => {
-                const widgetType = availableWidgetTypes.find(available =>
-                    available.type === control.widgetType ||
-                    available.widgetType === control.widgetType
-                )
-                return {
-                    type: control.widgetType,
-                    name: control.label || getWidgetDisplayName(control.widgetType),
-                    description: getWidgetDescription(control.widgetType) || widgetType?.description || 'No description available',
-                    category: getWidgetCategory(control.widgetType) || widgetType?.category || 'General',
-                    icon: getWidgetIcon(control.widgetType) || widgetType?.icon || '🧩'
-                }
-            })
-
-        // Filter by search term
-        if (searchTerm.trim()) {
-            const term = searchTerm.toLowerCase()
-            widgets = widgets.filter(widget =>
-                widget.name.toLowerCase().includes(term) ||
-                widget.description.toLowerCase().includes(term) ||
-                widget.category.toLowerCase().includes(term) ||
-                widget.type.toLowerCase().includes(term)
-            )
-        }
-
-        return widgets
-    }, [slot, availableWidgetTypes, searchTerm])
-
-    // Close modal when clicking outside
-    useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (modalRef.current && !modalRef.current.contains(event.target)) {
-                onClose()
-            }
-        }
-
-        if (isOpen) {
-            document.addEventListener('mousedown', handleClickOutside)
-            return () => document.removeEventListener('mousedown', handleClickOutside)
-        }
-    }, [isOpen, onClose])
-
-    // Close modal on Escape key
-    useEffect(() => {
-        const handleEscape = (event) => {
-            if (event.key === 'Escape') {
-                onClose()
-            }
-        }
-
-        if (isOpen) {
-            document.addEventListener('keydown', handleEscape)
-            return () => document.removeEventListener('keydown', handleEscape)
-        }
-    }, [isOpen, onClose])
-
-    const handleWidgetSelect = (widgetType) => {
-        onSelectWidget(widgetType)
-        onClose()
-    }
-
-    if (!isOpen) return null
-
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div
-                ref={modalRef}
-                className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-hidden"
-            >
-                <div className="p-6">
-                    {/* Header */}
-                    <div className="flex items-center justify-between mb-4">
-                        <div>
-                            <h3 className="text-lg font-semibold text-gray-900">Add Widget to Slot</h3>
-                            <p className="text-sm text-gray-600">{slot?.label || slot?.name}</p>
-                        </div>
-                        <button
-                            onClick={onClose}
-                            className="text-gray-400 hover:text-gray-600 transition-colors"
-                        >
-                            <X className="h-6 w-6" />
-                        </button>
-                    </div>
-
-                    {/* Search */}
-                    <div className="mb-4">
-                        <input
-                            type="text"
-                            placeholder="Search widgets..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                    </div>
-
-                    {/* Widget Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto">
-                        {isFilteringTypes ? (
-                            <div className="col-span-full flex items-center justify-center py-12">
-                                <div className="text-center">
-                                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                                    <p className="mt-2 text-sm text-gray-600">Loading widgets...</p>
-                                </div>
-                            </div>
-                        ) : filteredWidgets.length === 0 ? (
-                            <div className="col-span-full text-center py-12 text-gray-500">
-                                <div className="text-4xl mb-2">🔍</div>
-                                <p className="text-sm">No widgets found</p>
-                                {searchTerm && (
-                                    <p className="text-xs mt-1">Try adjusting your search terms</p>
-                                )}
-                            </div>
-                        ) : (
-                            filteredWidgets.map((widget, index) => (
-                                <div
-                                    key={widget.type + index}
-                                    onClick={() => handleWidgetSelect(widget.type)}
-                                    className="border border-gray-200 rounded-lg p-4 cursor-pointer hover:border-blue-300 hover:bg-blue-50 transition-all duration-200"
-                                >
-                                    <div className="flex items-start space-x-3">
-                                        <div className="bg-gray-100 rounded-lg w-12 h-12 flex items-center justify-center text-gray-600">
-                                            {widget.icon && typeof widget.icon === 'function' ? (
-                                                React.createElement(widget.icon, { className: "h-6 w-6" })
-                                            ) : React.isValidElement(widget.icon) ? (
-                                                React.cloneElement(widget.icon, { className: "h-6 w-6" })
-                                            ) : widget.icon && typeof widget.icon === 'object' ? (
-                                                // Handle case where icon is an object (like a React component)
-                                                React.createElement(widget.icon, { className: "h-6 w-6" })
-                                            ) : (
-                                                <span className="text-xl font-bold">{typeof widget.icon === 'string' ? widget.icon : '🧩'}</span>
-                                            )}
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <h4 className="text-sm font-semibold text-gray-900 mb-1">{widget.name}</h4>
-                                            <p className="text-xs text-gray-600 leading-relaxed">{widget.description}</p>
-                                            <div className="mt-2">
-                                                <span className="inline-block px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded-full">
-                                                    {widget.category}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))
-                        )}
-                    </div>
-
-                    {/* Footer */}
-                    <div className="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-200">
-                        <button
-                            onClick={onClose}
-                            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
-                        >
-                            Cancel
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    )
-}
-
-// SlotIconMenu component that replicates the PageEditor three-dot menu
-const SlotIconMenu = ({ slotName, slot, availableWidgetTypes, isFilteringTypes, onAddWidget, onClearSlot, onShowWidgetModal }) => {
-    const [isOpen, setIsOpen] = useState(false)
-    const menuRef = useRef(null)
-
-    // Close menu when clicking outside
-    useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (menuRef.current && !menuRef.current.contains(event.target)) {
-                setIsOpen(false)
-            }
-        }
-
-        if (isOpen) {
-            document.addEventListener('mousedown', handleClickOutside)
-            return () => document.removeEventListener('mousedown', handleClickOutside)
-        }
-    }, [isOpen])
-
-    const handleMenuToggle = () => {
-        setIsOpen(!isOpen)
-    }
-
-    const handleAddWidgetClick = () => {
-        onShowWidgetModal(slot)
-        setIsOpen(false)
-    }
-
-    const handleClearSlotClick = () => {
-        onClearSlot(slotName)
-        setIsOpen(false)
-    }
-
-    return (
-        <div className="absolute top-2 right-2 z-20 opacity-80 hover:opacity-100 transition-opacity" ref={menuRef}>
-            {/* Menu Button (3 dots icon) */}
-            <button
-                onClick={handleMenuToggle}
-                className="bg-gray-300 hover:bg-gray-500 text-black hover:text-white p-1 rounded-lg transition-colors"
-                title={`Slot: ${slotName}`}
-            >
-                <MoreHorizontal className="h-4 w-4" />
-            </button>
-
-            {/* Menu Dropdown */}
-            {isOpen && (
-                <div className="absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg min-w-48">
-                    {/* Add Widget */}
-                    {!isFilteringTypes && slot.widgetControls && slot.widgetControls.length > 0 && (
-                        <>
-                            <button
-                                onClick={handleAddWidgetClick}
-                                className="flex items-center w-full px-3 py-2 text-sm text-left hover:bg-gray-100 transition-colors text-green-700 hover:bg-green-50"
-                            >
-                                <Plus className="h-4 w-4 mr-3 text-gray-600" />
-                                <span className="text-gray-900">Add Widget</span>
-                            </button>
-                            <div className="border-t border-gray-200 my-1"></div>
-                        </>
-                    )}
-
-                    {/* Clear Slot */}
-                    <button
-                        onClick={handleClearSlotClick}
-                        className="flex items-center w-full px-3 py-2 text-sm text-left hover:bg-gray-100 transition-colors text-red-700 hover:bg-red-50"
-                    >
-                        <Trash2 className="h-4 w-4 mr-3 text-gray-600" />
-                        <span className="text-gray-900">Clear Slot</span>
-                    </button>
-                </div>
-            )}
-        </div>
-    )
-}
 
 const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange, mode = 'object', onWidgetEditorStateChange }, ref) => {
     const [selectedWidgets, setSelectedWidgets] = useState({}) // For bulk operations
 
-    // Create ObjectEditor-specific event system
-    const baseWidgetEvents = useWidgetEvents();
-    const objectEventSystem = useMemo(() =>
-        createObjectEditorEventSystem(baseWidgetEvents),
-        [baseWidgetEvents]
-    );
-
     // Get update lock and UnifiedData context
-    const { useExternalChanges } = useUnifiedData();
+    const { useExternalChanges, publishUpdate } = useUnifiedData();
+
+    // Stable component identifier for UDC source tracking
+    const componentId = useMemo(() => `object-content-editor-${objectType?.name || 'unknown'}`, [objectType?.name])
 
     // Keep onWidgetChange reference for potential external API compatibility
     const stableOnWidgetChange = useRef(onWidgetChange)
@@ -316,84 +53,11 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
         normalizedWidgetsRef.current = normalizedWidgets
     }, [normalizedWidgets])
 
-    // Listen to ObjectEditor-specific widget events
-    useEffect(() => {
-        const unsubscribeChanged = objectEventSystem.onWidgetChanged((payload) => {
-            // For real-time config changes, update the save state
-            if (payload.changeType === 'config') {
-                const currentWidgets = normalizedWidgetsRef.current
-                const updatedWidgets = { ...currentWidgets }
-                const slotName = payload.slotName
-
-                if (updatedWidgets[slotName]) {
-                    updatedWidgets[slotName] = updatedWidgets[slotName].map(w =>
-                        w.id === payload.widgetId ? payload.widget : w
-                    )
-                    notifyWidgetChange(updatedWidgets)
-                }
-            }
-        });
-
-        const unsubscribeAdded = objectEventSystem.onWidgetAdded((payload) => {
-            const currentWidgets = normalizedWidgetsRef.current
-            const currentSlotWidgets = currentWidgets[payload.slotName] || []
-            const updatedWidgets = {
-                ...currentWidgets,
-                [payload.slotName]: [...currentSlotWidgets, payload.widget]
-            }
-            notifyWidgetChange(updatedWidgets, payload.widget.id)
-        });
-
-        const unsubscribeRemoved = objectEventSystem.onWidgetRemoved((payload) => {
-            const currentWidgets = normalizedWidgetsRef.current
-            const updatedWidgets = { ...currentWidgets }
-            if (updatedWidgets[payload.slotName]) {
-                updatedWidgets[payload.slotName] = updatedWidgets[payload.slotName].filter(
-                    w => w.id !== payload.widgetId
-                )
-                notifyWidgetChange(updatedWidgets, payload.widgetId)
-            }
-        });
-
-        const unsubscribeSlotCleared = objectEventSystem.onSlotCleared((payload) => {
-            const currentWidgets = normalizedWidgetsRef.current
-            const updatedWidgets = {
-                ...currentWidgets,
-                [payload.slotName]: []
-            }
-            notifyWidgetChange(updatedWidgets, `slot-${payload.slotName}`)
-        });
-
-        const unsubscribeWidgetMoved = objectEventSystem.onWidgetMoved((payload) => {
-            const currentWidgets = normalizedWidgetsRef.current
-            const { slotName, widgetId, fromIndex, toIndex } = payload
-
-            // Use moveWidget function to actually reorder the widgets
-            const slotWidgets = [...(currentWidgets[slotName] || [])]
-            if (fromIndex >= 0 && fromIndex < slotWidgets.length &&
-                toIndex >= 0 && toIndex < slotWidgets.length) {
-
-                // Remove widget from source position
-                const [movedWidget] = slotWidgets.splice(fromIndex, 1)
-                // Insert widget at target position
-                slotWidgets.splice(toIndex, 0, movedWidget)
-
-                const updatedWidgets = {
-                    ...currentWidgets,
-                    [slotName]: slotWidgets
-                }
-                notifyWidgetChange(updatedWidgets, widgetId)
-            }
-        });
-
-        return () => {
-            unsubscribeChanged();
-            unsubscribeAdded();
-            unsubscribeRemoved();
-            unsubscribeSlotCleared();
-            unsubscribeWidgetMoved();
-        };
-    }, [objectEventSystem, notifyWidgetChange])
+    // Subscribe to external changes via Unified Data Context
+    useExternalChanges(componentId, (state) => {
+        // External updates can be handled here if needed
+        console.log("useExternalChanges::UPDATE", componentId)
+    })
 
     // Use the shared widget hook (but we'll override widgetTypes with object type's configuration)
     const {
@@ -468,7 +132,7 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
         )
     }
 
-    const handleAddWidget = (slotName, widgetTypeToAdd = null) => {
+    const handleAddWidget = async (slotName, widgetTypeToAdd = null) => {
         const slot = objectType.slotConfiguration.slots.find(s => s.name === slotName)
         if (!slot) return
 
@@ -497,11 +161,22 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
         // Use the shared addWidget function
         const newWidget = addWidget(slotName, widgetType, widgetConfig)
 
-        // Emit ObjectEditor-specific widget added event
-        objectEventSystem.emitWidgetAdded(slotName, newWidget, {
-            objectType: objectType?.name,
-            slotConfig: slot,
-            widgetCount: (normalizedWidgets[slotName] || []).length + 1
+        // Compute updated widgets and notify parent
+        const currentWidgets = normalizedWidgets
+        const currentSlotWidgets = currentWidgets[slotName] || []
+        const updatedWidgets = {
+            ...currentWidgets,
+            [slotName]: [...currentSlotWidgets, newWidget]
+        }
+        notifyWidgetChange(updatedWidgets, newWidget.id)
+
+        // Publish to Unified Data Context
+        await publishUpdate(componentId, OperationTypes.ADD_WIDGET, {
+            id: newWidget.id,
+            type: newWidget.type,
+            config: newWidget.config,
+            slot: slotName,
+            order: (updatedWidgets[slotName]?.length || 1) - 1
         })
     }
 
@@ -536,26 +211,22 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
         setWidgetHasUnsavedChanges(false)
     }, [])
 
-    const handleSaveWidget = useCallback((updatedWidget) => {
+    const handleSaveWidget = useCallback(async (updatedWidget) => {
         if (!editingWidget) return
 
         const slotName = editingWidget.slotName || 'main'
         const slot = objectType?.slotConfiguration?.slots?.find(s => s.name === slotName)
 
-        // Emit ObjectEditor-specific widget saved event
-        objectEventSystem.emitWidgetSaved(
-            updatedWidget.id,
+        // Publish config update to Unified Data Context
+        await publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
+            id: updatedWidget.id,
             slotName,
-            updatedWidget,
-            {
-                objectType: objectType?.name,
-                slotConfig: slot
-            }
-        )
+            config: updatedWidget.config
+        })
 
         setWidgetHasUnsavedChanges(false)
         handleCloseWidgetEditor()
-    }, [editingWidget, handleCloseWidgetEditor, objectEventSystem, objectType])
+    }, [editingWidget, handleCloseWidgetEditor, objectType, publishUpdate, componentId])
 
     // Notify parent of widget editor state changes
     useEffect(() => {
@@ -577,15 +248,21 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
         handleOpenWidgetEditor(widgetWithSlot)
     }
 
-    const handleDeleteWidget = (slotName, widgetIndex, widget) => {
+    const handleDeleteWidget = async (slotName, widgetIndex, widget) => {
         const slot = objectType?.slotConfiguration?.slots?.find(s => s.name === slotName)
 
-        // Emit ObjectEditor-specific widget removed event
+        // Compute updated widgets and notify parent
+        const currentWidgets = normalizedWidgets
+        const updatedWidgets = { ...currentWidgets }
+        if (updatedWidgets[slotName]) {
+            updatedWidgets[slotName] = updatedWidgets[slotName].filter((_, i) => i !== widgetIndex)
+        }
+        notifyWidgetChange(updatedWidgets, widget?.id)
+
+        // Publish removal to Unified Data Context
         if (widget?.id) {
-            objectEventSystem.emitWidgetRemoved(slotName, widget.id, {
-                objectType: objectType?.name,
-                slotConfig: slot,
-                widgetCount: (normalizedWidgets[slotName] || []).length - 1
+            await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, {
+                id: widget.id
             })
         }
 
@@ -711,7 +388,7 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
     }
 
     // Clear all widgets in a slot
-    const handleClearSlot = (slotName) => {
+    const handleClearSlot = async (slotName) => {
         const slot = objectType?.slotConfiguration?.slots?.find(s => s.name === slotName)
         const previousWidgetCount = (normalizedWidgets[slotName] || []).length
 
@@ -720,12 +397,11 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
             [slotName]: []
         }
 
-        // Emit ObjectEditor-specific slot cleared event
-        objectEventSystem.emitSlotCleared(slotName, {
-            objectType: objectType?.name,
-            slotConfig: slot,
-            previousWidgetCount
-        })
+        // Publish removal of all widgets in the slot to Unified Data Context
+        const existingWidgetsInSlot = normalizedWidgets[slotName] || []
+        for (const w of existingWidgetsInSlot) {
+            await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, { id: w.id })
+        }
 
         // Clear any selections for this slot
         setSelectedWidgets(prev => {
@@ -743,7 +419,7 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
     }
 
     // Handle ObjectEditor-specific slot actions
-    const handleSlotAction = useCallback((action, slotName, widget) => {
+    const handleSlotAction = useCallback(async (action, slotName, widget) => {
         const slot = objectType?.slotConfiguration?.slots?.find(s => s.name === slotName)
 
         switch (action) {
@@ -758,10 +434,22 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
                     // Add the duplicated widget
                     const newWidget = addWidget(slotName, widget.type, duplicatedWidget.config)
 
-                    // Emit duplication event
-                    objectEventSystem.emitWidgetDuplicated(slotName, widget.id, newWidget, {
-                        objectType: objectType?.name,
-                        slotConfig: slot
+                    // Compute updated widgets and notify parent
+                    const currentWidgets = normalizedWidgets
+                    const currentSlotWidgets = currentWidgets[slotName] || []
+                    const updatedWidgets = {
+                        ...currentWidgets,
+                        [slotName]: [...currentSlotWidgets, newWidget]
+                    }
+                    notifyWidgetChange(updatedWidgets, newWidget.id)
+
+                    // Publish duplication as add operation to UDC
+                    await publishUpdate(componentId, OperationTypes.ADD_WIDGET, {
+                        id: newWidget.id,
+                        type: newWidget.type,
+                        config: newWidget.config,
+                        slot: slotName,
+                        order: (updatedWidgets[slotName]?.length || 1) - 1
                     })
                 }
                 break;
@@ -774,7 +462,7 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
             default:
                 console.warn('Unknown slot action:', action)
         }
-    }, [objectType, addWidget, objectEventSystem])
+    }, [objectType, addWidget, publishUpdate, componentId, normalizedWidgets, notifyWidgetChange])
 
     // Stable config change handler that doesn't depend on widget.config
     const stableConfigChangeHandler = useCallback(async (widgetId, slotName, newConfig) => {
