@@ -2,7 +2,7 @@
  * Operation types for the Unified Data Context
  */
 
-import { PageData, WidgetData, LayoutData, VersionData, PageMetadata, WidgetConfig } from './state';
+import { PageData, WidgetData, LayoutData, VersionData, PageMetadata, WidgetConfig, ObjectData, ObjectVersionData } from './state';
 
 /**
  * Base operation interface
@@ -69,6 +69,19 @@ export type VersionOperation =
   | Operation<{ id: string; updates: Partial<VersionData> }>
   | Operation<{ pageId: string; versionId: string; action: 'publish' | 'revert' }>;
 
+/**
+ * Object Operations
+ */
+export type ObjectOperation =
+  | Operation<{ id: string; updates: Partial<ObjectData> }>
+  | Operation<{ id: string; metadata: Record<string, any> }>;
+
+/**
+ * Object Version Operations
+ */
+export type ObjectVersionOperation =
+  | Operation<{ id: string; updates: Partial<ObjectVersionData> }>
+  | Operation<{ objectId: string; versionId: string; action: 'publish' | 'revert' }>;
 
 /**
  * Metadata Operations
@@ -91,6 +104,8 @@ export type DataOperation =
   | WidgetOperation
   | LayoutOperation
   | VersionOperation
+  | ObjectOperation
+  | ObjectVersionOperation
   | MetadataOperation;
 
 /**
@@ -133,10 +148,22 @@ export const OperationTypes = {
   DELETE_VERSION: 'DELETE_VERSION',
   COMPARE_VERSIONS: 'COMPARE_VERSIONS',
   SWITCH_VERSION: 'SWITCH_VERSION',
+
+  // Object operations
+  INIT_OBJECT: 'INIT_OBJECT',
+  UPDATE_OBJECT: 'UPDATE_OBJECT',
+  SWITCH_OBJECT: 'SWITCH_OBJECT',
+
+  // Object version operations
+  INIT_OBJECT_VERSION: 'INIT_OBJECT_VERSION',
+  UPDATE_OBJECT_VERSION: 'UPDATE_OBJECT_VERSION',
+  SWITCH_OBJECT_VERSION: 'SWITCH_OBJECT_VERSION',
   
   // Metadata operations
   SET_DIRTY: 'SET_DIRTY',
   SET_LOADING: 'SET_LOADING',
+  SET_OBJECT_DIRTY: 'SET_OBJECT_DIRTY',
+  SET_OBJECT_LOADING: 'SET_OBJECT_LOADING',
   MARK_WIDGET_DIRTY: 'MARK_WIDGET_DIRTY',
   MARK_WIDGET_SAVED: 'MARK_WIDGET_SAVED',
   SET_WIDGET_ERROR: 'SET_WIDGET_ERROR',
