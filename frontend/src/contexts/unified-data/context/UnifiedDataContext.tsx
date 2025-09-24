@@ -68,6 +68,22 @@ export function UnifiedDataProvider({
         });
     }, [manager]);
 
+    const setIsObjectDirty = useCallback((isDirty: boolean) => {
+        manager.dispatch({
+            type: OperationTypes.SET_OBJECT_DIRTY,
+            sourceId: undefined,
+            payload: { isDirty }
+        });
+    }, [manager]);
+
+    const setIsObjectLoading = useCallback((isLoading: boolean) => {
+        manager.dispatch({
+            type: OperationTypes.SET_OBJECT_LOADING,
+            sourceId: undefined,
+            payload: { isLoading }
+        });
+    }, [manager]);
+
     const markWidgetDirty = useCallback((widgetId: string) => {
         manager.dispatch({
             type: OperationTypes.MARK_WIDGET_DIRTY,
@@ -187,6 +203,8 @@ export function UnifiedDataProvider({
         useExternalChanges,
         setIsDirty,
         setIsLoading,
+        setIsObjectDirty,
+        setIsObjectLoading,
         markWidgetDirty,
         markWidgetSaved,
         addError,
