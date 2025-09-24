@@ -155,5 +155,10 @@ export const OperationTypes = {
   VALIDATION_COMPLETE: 'VALIDATION_COMPLETE',
   FORM_RESET: 'FORM_RESET',
   FORM_DESTROYED: 'FORM_DESTROYED',
+
+  // Initialization operations
+  INIT_WIDGET: 'INIT_WIDGET',  // For initializing widget data without side effects
+  INIT_PAGE: 'INIT_PAGE',      // For initializing page data without side effects
+  INIT_LAYOUT: 'INIT_LAYOUT',  // For initializing layout data without side effects
   
 } as const;

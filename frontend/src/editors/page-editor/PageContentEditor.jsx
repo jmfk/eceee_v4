@@ -25,11 +25,13 @@ const PageContentEditor = forwardRef(({
     ...otherProps
 }, ref) => {
     // Extract layout name from layoutJson or use default
+    const pageId = webpageData.id;
     const layoutName = layoutJson?.layout?.name ||
         layoutJson?.name ||
         pageVersionData?.codeLayout ||
         'single_column';
-
+    console.log("webpageData", webpageData)
+    console.log("pageVersionData", pageVersionData)
     // Get current widgets from pageVersionData
     const currentWidgets = pageVersionData?.widgets || {};
 
@@ -37,7 +39,7 @@ const PageContentEditor = forwardRef(({
     const { useExternalChanges } = useUnifiedData();
 
     // Subscribe to widget changes and update source from UnifiedDataContext
-    const componentId = 'page-content-editor';
+    const componentId = `page-editor-${pageId}`;
     const [widgets, setWidgets] = useState({});
     //const [updateSourceId, setUpdateSourceId] = useState(null);
 

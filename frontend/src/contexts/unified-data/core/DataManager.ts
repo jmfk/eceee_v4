@@ -238,6 +238,7 @@ export class DataManager {
             };
 
             // Process based on operation type
+            console.log(operation.type)
             switch (operation.type) {
                 case OperationTypes.INIT_WIDGET:
                     // Initialize widget without side effects (no dirty state change)
@@ -315,8 +316,13 @@ export class DataManager {
                                 [operation.payload.id]: {
                                     ...widget,
                                     slot: operation.payload.slot,
-                                    order: operation.payload.order
+                                    order: operation.payload.order,
+                                    updated_at: new Date().toISOString()
                                 }
+                            },
+                            metadata: {
+                                ...state.metadata,
+                                isDirty: true
                             }
                         };
                     });

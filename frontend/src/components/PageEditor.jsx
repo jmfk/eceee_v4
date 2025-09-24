@@ -149,6 +149,9 @@ const PageEditor = () => {
     const navigate = useNavigate()
     const location = useLocation()
 
+    // Use global isDirty from UnifiedDataContext
+    const { useExternalChanges, setIsDirty, publishUpdate } = useUnifiedData()
+
     // Extract version from URL search parameters
     const urlParams = new URLSearchParams(location.search)
     const versionFromUrl = urlParams.get('version')
@@ -183,11 +186,9 @@ const PageEditor = () => {
     const [originalWebpageData, setOriginalWebpageData] = useState(null) // Track original for smart saving
     const [originalPageVersionData, setOriginalPageVersionData] = useState(null) // Track original for smart saving
 
-    // Use global isDirty from UnifiedDataContext
-    const { useExternalChanges, setIsDirty, resetState } = useUnifiedData()
 
     // Get current dirty state from global context
-    const componentId = 'page-editor';
+    const componentId = `page-editor-${pageId}`;
     const [isDirty, setIsDirtyState] = useState(false);
     useExternalChanges(componentId, state => {
         setIsDirtyState(state.metadata.isDirty);

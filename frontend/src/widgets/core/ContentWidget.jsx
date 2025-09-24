@@ -108,7 +108,7 @@ const ContentWidget = memo(({
                 sanitize_html: config.sanitize_html ?? ContentWidget.defaultConfig.sanitize_html
             };
             // Add the widget first
-            publishUpdate(componentId, OperationTypes.ADD_WIDGET, {
+            publishUpdate(componentId, OperationTypes.INIT_WIDGET, {
                 id: widgetId,
                 type: ContentWidget.widgetType,
                 config: initialConfig,

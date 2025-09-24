@@ -46,7 +46,7 @@ export function useWidgetOperations(widgetId: string): UseWidgetOperationsResult
         // First ensure the widget exists in state
         if (!widget) {
             await dispatch({
-                type: OperationTypes.ADD_WIDGET,
+                type: OperationTypes.INIT_WIDGET,
                 sourceId: widgetId,            
                 payload: {
                     id: widgetId,
