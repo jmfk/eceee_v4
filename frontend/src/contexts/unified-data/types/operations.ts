@@ -2,7 +2,7 @@
  * Operation types for the Unified Data Context
  */
 
-import { PageData, WidgetData, LayoutData, VersionData, PageMetadata, WidgetConfig, ObjectData, ObjectVersionData } from './state';
+import { PageData, WidgetData, LayoutData, VersionData, PageMetadata, WidgetConfig, ObjectData } from './state';
 
 /**
  * Base operation interface
@@ -48,12 +48,53 @@ export type PageOperation =
   | Operation<{ id: string; metadata: Partial<PageMetadata> }>;
 
 /**
- * Widget Operations
+ * Widget operation payloads with explicit TypeScript types
  */
+export type WidgetContext =
+  | { contextType: 'page'; pageId: string }
+  | { contextType: 'object'; objectId: string };
+
+export type AddWidgetPayload = WidgetContext & {
+  id: string;
+  type: string; // widget type
+  config?: Partial<WidgetConfig>;
+  slot?: string;
+  order?: number;
+};
+
+export type UpdateWidgetConfigPayload = WidgetContext & {
+  id: string;
+  slotName: string;
+  config: Partial<WidgetConfig>;
+};
+
+export type MoveWidgetPayload = WidgetContext & {
+  id: string;
+  slot: string;
+  order: number;
+};
+
+export type RemoveWidgetPayload = WidgetContext & {
+  id: string;
+};
+
+export type AnyWidgetPayload =
+  | AddWidgetPayload
+  | UpdateWidgetConfigPayload
+  | MoveWidgetPayload
+  | RemoveWidgetPayload;
+
+// Narrowed operation types for better type inference at call sites
+export type AddWidgetOperation = Operation<AddWidgetPayload> & { type: typeof OperationTypes.ADD_WIDGET };
+export type UpdateWidgetConfigOperation = Operation<UpdateWidgetConfigPayload> & { type: typeof OperationTypes.UPDATE_WIDGET_CONFIG };
+export type MoveWidgetOperation = Operation<MoveWidgetPayload> & { type: typeof OperationTypes.MOVE_WIDGET };
+export type RemoveWidgetOperation = Operation<RemoveWidgetPayload> & { type: typeof OperationTypes.REMOVE_WIDGET };
+
 export type WidgetOperation =
-  | Operation<{ id: string; updates: Partial<WidgetData> }>
-  | Operation<{ id: string; config: Partial<WidgetConfig> }>
-  | Operation<{ id: string; slot: string; order: number }>;
+  | AddWidgetOperation
+  | UpdateWidgetConfigOperation
+  | MoveWidgetOperation
+  | RemoveWidgetOperation;
 
 /**
  * Layout Operations
@@ -80,7 +121,7 @@ export type ObjectOperation =
  * Object Version Operations
  */
 export type ObjectVersionOperation =
-  | Operation<{ id: string; updates: Partial<ObjectVersionData> }>
+  | Operation<{ id: string; updates: Record<string, any> }>
   | Operation<{ objectId: string; versionId: string; action: 'publish' | 'revert' }>;
 
 /**

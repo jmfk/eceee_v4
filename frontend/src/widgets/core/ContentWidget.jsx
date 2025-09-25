@@ -4,6 +4,7 @@ import ContentWidgetEditorRenderer from './ContentWidgetEditorRenderer.js'
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
 import { OperationTypes } from '../../contexts/unified-data/types/operations';
 import { getWidgetContent, hasWidgetContentChanged } from '../../utils/widgetUtils';
+
 /**
  * Clean up HTML content by removing unsupported tags and attributes
  */
@@ -92,11 +93,16 @@ const ContentWidget = memo(({
     themeId = null,
     widgetId = null,
     slotName = null,
-    widgetType = null
+    widgetType = null,
+    context = {}
 }) => {
     const { useExternalChanges, publishUpdate } = useUnifiedData();
     const [content, setContent] = useState(config.content || 'Content will appear here...');
     const componentId = `widget-${widgetId}`;
+
+    console.log("ContentWidget", widgetType)
+    console.log(config)
+    const contextType = config.contextType;
 
     // Initialize widget in UnifiedDataContext when component mounts
     useEffect(() => {
@@ -125,6 +131,7 @@ const ContentWidget = memo(({
             publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
                 id: widgetId,
                 slotName: slotName,
+                contextType: contextType,
                 config: {
                     ...config,
                     content: newContent

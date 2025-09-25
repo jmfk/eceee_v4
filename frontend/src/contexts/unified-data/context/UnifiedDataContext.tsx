@@ -149,13 +149,41 @@ export function UnifiedDataProvider({
     }, [manager]);
 
     // Generic publish update function for pub/sub system
-    const publishUpdate = useCallback(async <T,>(componentId: string, type: string, data: T) => {
+    const publishUpdate = useCallback(async <T,>(componentId: string, type: keyof typeof OperationTypes, data: T) => {
+        // Auto-attach context for widget operations so widgets know if they are on a page or object
+        const WIDGET_OPS: Set<keyof typeof OperationTypes> = new Set([
+            OperationTypes.ADD_WIDGET,
+            OperationTypes.UPDATE_WIDGET_CONFIG,
+            OperationTypes.MOVE_WIDGET,
+            OperationTypes.REMOVE_WIDGET
+        ] as unknown as Array<keyof typeof OperationTypes>);
+
+        const state = manager.getState();
+        let augmentedData: any = { ...data };
+
+        if (WIDGET_OPS.has(type)) {
+            const { currentPageId, currentVersionId, currentObjectId, currentObjectVersionId } = (state as any).metadata || {};
+            if (currentPageId && currentVersionId) {
+                augmentedData = {
+                    ...augmentedData,
+                    contextType: 'page',
+                    pageId: String(currentPageId)
+                };
+            } else if (currentObjectId && currentObjectVersionId) {
+                augmentedData = {
+                    ...augmentedData,
+                    contextType: 'object',
+                    objectId: String(currentObjectId)
+                };
+            }
+        }
+
         await manager.dispatch({
             type,
             sourceId: componentId,
             payload: {
                 id: componentId,
-                ...data
+                ...augmentedData
             }
         });
     }, [manager]);

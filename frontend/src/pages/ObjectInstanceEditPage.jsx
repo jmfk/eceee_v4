@@ -144,6 +144,7 @@ const ObjectInstanceEditPage = () => {
             publishUpdate(componentId, OperationTypes.INIT_OBJECT, {
                 id: String(instance.id),
                 data: {
+                    ...instance,
                     id: String(instance.id),
                     type: instance?.objectType?.name || instance?.objectType?.id || 'unknown',
                     status: instance?.status || 'draft',
@@ -156,36 +157,36 @@ const ObjectInstanceEditPage = () => {
                 }
             })
 
-            // INIT_OBJECT_VERSION for each version, ensure current version is initialized last
-            const ordered = [
-                ...allVersions.filter(v => String(v.id) !== currentVersionId),
-                ...allVersions.filter(v => String(v.id) === currentVersionId)
-            ]
-            ordered.forEach(v => {
-                const versionId = String(v.id)
-                publishUpdate(componentId, OperationTypes.INIT_OBJECT_VERSION, {
-                    id: versionId,
-                    data: {
-                        id: versionId,
-                        objectId: String(instance.id),
-                        number: v.versionNumber || v.number || 0,
-                        status: v.status || 'draft',
-                        widgets: v.widgets || {},
-                        layoutId: v.layoutId,
-                        themeId: v.themeId,
-                        content: v.content || {},
-                        metadata: v.metadata || {},
-                        created_at: v.createdAt || new Date().toISOString(),
-                        updated_at: v.updatedAt || new Date().toISOString(),
-                        created_by: v.createdBy,
-                        published_at: v.publishedAt,
-                        changesDescription: v.changesDescription
-                    }
-                })
-            })
+            // // INIT_OBJECT_VERSION for each version, ensure current version is initialized last
+            // const ordered = [
+            //     ...allVersions.filter(v => String(v.id) !== currentVersionId),
+            //     ...allVersions.filter(v => String(v.id) === currentVersionId)
+            // ]
+            // ordered.forEach(v => {
+            //     const versionId = String(v.id)
+            //     publishUpdate(componentId, OperationTypes.INIT_OBJECT_VERSION, {
+            //         id: versionId,
+            //         data: {
+            //             id: versionId,
+            //             objectId: String(instance.id),
+            //             number: v.versionNumber || v.number || 0,
+            //             status: v.status || 'draft',
+            //             widgets: v.widgets || {},
+            //             layoutId: v.layoutId,
+            //             themeId: v.themeId,
+            //             content: v.content || {},
+            //             metadata: v.metadata || {},
+            //             created_at: v.createdAt || new Date().toISOString(),
+            //             updated_at: v.updatedAt || new Date().toISOString(),
+            //             created_by: v.createdBy,
+            //             published_at: v.publishedAt,
+            //             changesDescription: v.changesDescription
+            //         }
+            //     })
+            // })
 
             // Clear object dirty flag after initialization
-            setIsObjectDirty(false)
+            // setIsObjectDirty(false)
 
             udcInitRef.current = instanceId
         } catch (e) {

@@ -1,9 +1,12 @@
 import { AppState, StateUpdate, StateSelector } from '../types/state';
-import { Operation, ValidationResult, OperationTypes } from '../types/operations';
+import { Operation, ValidationResult, OperationTypes, AddWidgetPayload, UpdateWidgetConfigPayload, MoveWidgetPayload, RemoveWidgetPayload, WidgetContext } from '../types/operations';
 import { SubscriptionManager } from './SubscriptionManager';
 import { StateUpdateCallback, SubscriptionOptions } from '../types/subscriptions';
 import { defaultEqualityFn } from '../utils/equality';
 import { OperationError, ValidationError, StateError, ErrorCodes, isRetryableError } from '../utils/errors';
+
+
+type WidgetTarget = { versionId?: string; objectVersionId?: string };
 
 /**
  * Core DataManager class responsible for state management, operations, and subscriptions
@@ -21,7 +24,6 @@ export class DataManager {
             objects: {},
             layouts: {},
             versions: {},
-            objectVersions: {},
             themes: {},
             metadata: {
                 lastUpdated: new Date().toISOString(),
@@ -42,6 +44,59 @@ export class DataManager {
         };
         // Initialize subscription manager
         this.subscriptionManager = new SubscriptionManager();
+    }
+
+    /**
+     * Resolve the widget target (page version or object version) from payload context
+     */
+    private resolveWidgetTargetFromPayload(payload: WidgetContext): WidgetTarget {
+        if (payload.contextType === 'page') {
+            const pageId = String(payload.pageId);
+            const currentVersionId = this.state.metadata.currentVersionId as any;
+            if (!currentVersionId) {
+                throw new StateError(
+                    ErrorCodes.INVALID_CONTEXT,
+                    'No current page version selected for page widget operation',
+                    { pageId }
+                );
+            }
+            const version = this.state.versions[currentVersionId];
+            if (!version) {
+                throw new StateError(
+                    ErrorCodes.INVALID_CONTEXT,
+                    `Version ${currentVersionId} not found`,
+                    { currentVersionId }
+                );
+            }
+            if (String(version.pageId) !== pageId) {
+                throw new StateError(
+                    ErrorCodes.INVALID_CONTEXT,
+                    `Current version ${currentVersionId} does not belong to provided page ${pageId}`,
+                    { currentVersionId, versionPageId: version.pageId, pageId }
+                );
+            }
+            return { versionId: currentVersionId };
+        }
+
+        if (payload.contextType === 'object') {
+            const objectId = String(payload.objectId);
+            const currentObjectVersionId = this.state.metadata.currentObjectVersionId as any;
+            if (!currentObjectVersionId) {
+                throw new StateError(
+                    ErrorCodes.INVALID_CONTEXT,
+                    'No current object version selected for object widget operation',
+                    { objectId }
+                );
+            }
+            return { objectVersionId: currentObjectVersionId } as any;
+        }
+
+        const ctxType = (payload as any)?.contextType;
+        throw new StateError(
+            ErrorCodes.INVALID_CONTEXT,
+            `Unknown contextType for widget operation: ${ctxType}`,
+            { contextType: ctxType }
+        );
     }
 
     /**
@@ -89,23 +144,6 @@ export class DataManager {
                     ErrorCodes.INVALID_CONTEXT,
                     `Current object ${currentObjectId} not found`,
                     { currentObjectId }
-                );
-            }
-
-            if (!this.state.objectVersions[currentObjectVersionId]) {
-                throw new StateError(
-                    ErrorCodes.INVALID_CONTEXT,
-                    `Current object version ${currentObjectVersionId} not found`,
-                    { currentObjectVersionId }
-                );
-            }
-
-            const objVersion = this.state.objectVersions[currentObjectVersionId];
-            if (objVersion.objectId !== currentObjectId) {
-                throw new StateError(
-                    ErrorCodes.INVALID_CONTEXT,
-                    `Object version ${currentObjectVersionId} does not belong to object ${currentObjectId}`,
-                    { currentObjectId, currentObjectVersionId, versionObjectId: objVersion.objectId }
                 );
             }
 
@@ -224,8 +262,7 @@ export class DataManager {
             prevState.pages !== newState.pages ||
             prevState.layouts !== newState.layouts ||
             prevState.versions !== newState.versions ||
-            (prevState as any).objects !== (newState as any).objects ||
-            (prevState as any).objectVersions !== (newState as any).objectVersions
+            (prevState as any).objects !== (newState as any).objects
         );
     }
 
@@ -264,13 +301,49 @@ export class DataManager {
                             { payload: operation.payload }
                         );
                     }
+                    // Context requirements for widget ops
+                    if (!operation.payload?.contextType || !['page', 'object'].includes(operation.payload.contextType)) {
+                        throw new ValidationError(operation,
+                            'contextType is required for widget operations and must be "page" or "object"',
+                            { payload: operation.payload }
+                        );
+                    }
+                    if (operation.payload.contextType === 'page' && !operation.payload?.pageId) {
+                        throw new ValidationError(operation,
+                            'pageId is required when contextType is "page"',
+                            { payload: operation.payload }
+                        );
+                    }
+                    if (operation.payload.contextType === 'object' && !operation.payload?.objectId) {
+                        throw new ValidationError(operation,
+                            'objectId is required when contextType is "object"',
+                            { payload: operation.payload }
+                        );
+                    }
                     break;
 
                 case OperationTypes.UPDATE_WIDGET_CONFIG:
                     if (!operation.payload?.id || !operation.payload?.slotName|| !operation.payload?.config) {  
-
                         throw new ValidationError(operation,
                             'Widget ID and config are required',
+                            { payload: operation.payload }
+                        );
+                    }
+                    if (!operation.payload?.contextType || !['page', 'object'].includes(operation.payload.contextType)) {
+                        throw new ValidationError(operation,
+                            'contextType is required for widget operations and must be "page" or "object"',
+                            { payload: operation.payload }
+                        );
+                    }
+                    if (operation.payload.contextType === 'page' && !operation.payload?.pageId) {
+                        throw new ValidationError(operation,
+                            'pageId is required when contextType is "page"',
+                            { payload: operation.payload }
+                        );
+                    }
+                    if (operation.payload.contextType === 'object' && !operation.payload?.objectId) {
+                        throw new ValidationError(operation,
+                            'objectId is required when contextType is "object"',
                             { payload: operation.payload }
                         );
                     }
@@ -280,6 +353,51 @@ export class DataManager {
                     if (!operation.payload?.id || !operation.payload?.slot) {
                         throw new ValidationError(operation,
                             'Widget ID and slot are required',
+                            { payload: operation.payload }
+                        );
+                    }
+                    if (!operation.payload?.contextType || !['page', 'object'].includes(operation.payload.contextType)) {
+                        throw new ValidationError(operation,
+                            'contextType is required for widget operations and must be "page" or "object"',
+                            { payload: operation.payload }
+                        );
+                    }
+                    if (operation.payload.contextType === 'page' && !operation.payload?.pageId) {
+                        throw new ValidationError(operation,
+                            'pageId is required when contextType is "page"',
+                            { payload: operation.payload }
+                        );
+                    }
+                    if (operation.payload.contextType === 'object' && !operation.payload?.objectId) {
+                        throw new ValidationError(operation,
+                            'objectId is required when contextType is "object"',
+                            { payload: operation.payload }
+                        );
+                    }
+                    break;
+
+                case OperationTypes.REMOVE_WIDGET:
+                    if (!operation.payload?.id) {
+                        throw new ValidationError(operation,
+                            'Widget ID is required',
+                            { payload: operation.payload }
+                        );
+                    }
+                    if (!operation.payload?.contextType || !['page', 'object'].includes(operation.payload.contextType)) {
+                        throw new ValidationError(operation,
+                            'contextType is required for widget operations and must be "page" or "object"',
+                            { payload: operation.payload }
+                        );
+                    }
+                    if (operation.payload.contextType === 'page' && !operation.payload?.pageId) {
+                        throw new ValidationError(operation,
+                            'pageId is required when contextType is "page"',
+                            { payload: operation.payload }
+                        );
+                    }
+                    if (operation.payload.contextType === 'object' && !operation.payload?.objectId) {
+                        throw new ValidationError(operation,
+                            'objectId is required when contextType is "object"',
                             { payload: operation.payload }
                         );
                     }
@@ -369,7 +487,7 @@ export class DataManager {
                 validation
             };
 
-            console.log("OP", operation.type);
+            
             
             // Process based on operation type
             switch (operation.type) {
@@ -451,26 +569,28 @@ export class DataManager {
 
                 case OperationTypes.ADD_WIDGET:
                     this.setState(operation, state => {
-                        const ctx = this.getCurrentContext();
+                        const payload = operation.payload as AddWidgetPayload;
+                        const target = this.resolveWidgetTargetFromPayload(payload);
                         const now = new Date().toISOString();
                         const newWidget = {
-                            id: operation.payload.id,
-                            type: operation.payload.type,
-                            config: operation.payload.config || {},
-                            slot: operation.payload.slot || 'main',
-                            order: operation.payload.order || 0,
+                            id: payload.id,
+                            type: payload.type,
+                            config: payload.config || {},
+                            slot: payload.slot || 'main',
+                            order: payload.order || 0,
                             created_at: now,
                             updated_at: now
                         };
 
-                        if (ctx.versionId) {
-                            const version = state.versions[ctx.versionId];
+                        if (operation.payload.contextType === "page") {
+                            const versionId = target.versionId as string;
+                            const version = state.versions[versionId];
                             const slotName = newWidget.slot;
                             const slotWidgets = version.widgets[slotName] || [];
                             return {
                                 versions: {
                                     ...state.versions,
-                                    [ctx.versionId]: {
+                                    [versionId]: {
                                         ...version,
                                         widgets: {
                                             ...version.widgets,
@@ -480,19 +600,18 @@ export class DataManager {
                                 },
                                 metadata: { ...state.metadata, isDirty: true }
                             };
-                        }
-
-                        if (ctx.objectVersionId) {
-                            const objVersion = (state as any).objectVersions[ctx.objectVersionId];
+                        } else if (operation.payload.contextType === "object") {
+                            const objectId = (target as any).objectId as string;
+                            const objValue = (state as any).objects[objectId];
                             const slotName = newWidget.slot;
-                            const slotWidgets = (objVersion.widgets?.[slotName] || []);
+                            const slotWidgets = (objValue.widgets?.[slotName] || []);
                             return {
                                 objectVersions: {
                                     ...(state as any).objectVersions,
-                                    [ctx.objectVersionId]: {
-                                        ...objVersion,
+                                    [objectId]: {
+                                        ...objValue,
                                         widgets: {
-                                            ...(objVersion.widgets || {}),
+                                            ...(objValue.widgets || {}),
                                             [slotName]: [...slotWidgets, newWidget]
                                         }
                                     }
@@ -507,31 +626,32 @@ export class DataManager {
 
                 case OperationTypes.UPDATE_WIDGET_CONFIG:
                     this.setState(operation, state => {
-                        const ctx = this.getCurrentContext();
-                        const slotName = operation.payload.slotName;
-                        const widgetId = operation.payload.id;
+                        const payload = operation.payload as UpdateWidgetConfigPayload;
+                        const target = this.resolveWidgetTargetFromPayload(payload);
+                        const slotName = payload.slotName;
+                        const widgetId = payload.id;
                         const now = new Date().toISOString();
 
-                        if (ctx.versionId) {
-                            const version = state.versions[ctx.versionId];
+                        if (target.versionId) {
+                            const version = state.versions[target.versionId];
                             const slotWidgets = version.widgets[slotName] || [];
                             const widgetIndex = slotWidgets.findIndex(w => w.id === widgetId);
                             if (widgetIndex === -1) {
-                                throw new Error(`Widget ${widgetId} not found in slot ${slotName} of version ${ctx.versionId}`);
+                                throw new Error(`Widget ${widgetId} not found in slot ${slotName} of version ${target.versionId}`);
                             }
                             const updatedWidgets = [...slotWidgets];
                             updatedWidgets[widgetIndex] = {
                                 ...updatedWidgets[widgetIndex],
                                 config: {
                                     ...updatedWidgets[widgetIndex].config,
-                                    ...operation.payload.config
+                                    ...payload.config
                                 },
                                 updated_at: now
                             };
                             return {
                                 versions: {
                                     ...state.versions,
-                                    [ctx.versionId]: {
+                                    [target.versionId]: {
                                         ...version,
                                         widgets: {
                                             ...version.widgets,
@@ -543,26 +663,27 @@ export class DataManager {
                             };
                         }
 
-                        if (ctx.objectVersionId) {
-                            const objVersion = (state as any).objectVersions[ctx.objectVersionId];
+                        if ((target as any).objectVersionId) {
+                            const objectVersionId = (target as any).objectVersionId as string;
+                            const objVersion = (state as any).objectVersions[objectVersionId];
                             const slotWidgets = (objVersion.widgets?.[slotName] || []);
                             const widgetIndex = slotWidgets.findIndex((w: any) => w.id === widgetId);
                             if (widgetIndex === -1) {
-                                throw new Error(`Widget ${widgetId} not found in slot ${slotName} of object version ${ctx.objectVersionId}`);
+                                throw new Error(`Widget ${widgetId} not found in slot ${slotName} of object version ${objectVersionId}`);
                             }
                             const updatedWidgets = [...slotWidgets];
                             updatedWidgets[widgetIndex] = {
                                 ...updatedWidgets[widgetIndex],
                                 config: {
                                     ...updatedWidgets[widgetIndex].config,
-                                    ...operation.payload.config
+                                    ...payload.config
                                 },
                                 updated_at: now
                             };
                             return {
                                 objectVersions: {
                                     ...(state as any).objectVersions,
-                                    [ctx.objectVersionId]: {
+                                    [objectVersionId]: {
                                         ...objVersion,
                                         widgets: {
                                             ...(objVersion.widgets || {}),
@@ -580,26 +701,27 @@ export class DataManager {
 
                 case OperationTypes.MOVE_WIDGET:
                     this.setState(operation, state => {
-                        const ctx = this.getCurrentContext();
-                        const targetOrder = operation.payload.order;
-                        const targetSlot = operation.payload.slot;
+                        const payload = operation.payload as MoveWidgetPayload;
+                        const target = this.resolveWidgetTargetFromPayload(payload);
+                        const targetOrder = payload.order;
+                        const targetSlot = payload.slot;
                         const now = new Date().toISOString();
 
-                        if (ctx.versionId) {
-                            const version = state.versions[ctx.versionId];
+                        if (target.versionId) {
+                            const version = state.versions[target.versionId];
                             // Remove from any slot it exists in, then insert into target slot at order
                             const widgetsBySlot = { ...version.widgets };
                             let foundWidget: any = null;
                             Object.keys(widgetsBySlot).forEach(slotName => {
                                 const arr = widgetsBySlot[slotName] || [];
-                                const index = arr.findIndex(w => w.id === operation.payload.id);
+                                const index = arr.findIndex(w => w.id === payload.id);
                                 if (index !== -1) {
                                     [foundWidget] = arr.splice(index, 1);
                                     widgetsBySlot[slotName] = [...arr];
                                 }
                             });
                             if (!foundWidget) {
-                                throw new Error(`Widget ${operation.payload.id} not found in any slot of version ${ctx.versionId}`);
+                                throw new Error(`Widget ${payload.id} not found in any slot of version ${target.versionId}`);
                             }
                             foundWidget = { ...foundWidget, slot: targetSlot, order: targetOrder, updated_at: now };
                             const targetArr = widgetsBySlot[targetSlot] ? [...widgetsBySlot[targetSlot]] : [];
@@ -611,7 +733,7 @@ export class DataManager {
                             return {
                                 versions: {
                                     ...state.versions,
-                                    [ctx.versionId]: {
+                                    [target.versionId]: {
                                         ...version,
                                         widgets: widgetsBySlot
                                     }
@@ -620,20 +742,21 @@ export class DataManager {
                             };
                         }
 
-                        if (ctx.objectVersionId) {
-                            const objVersion = (state as any).objectVersions[ctx.objectVersionId];
+                        if ((target as any).objectVersionId) {
+                            const objectVersionId = (target as any).objectVersionId as string;
+                            const objVersion = (state as any).objectVersions[objectVersionId];
                             const widgetsBySlot = { ...(objVersion.widgets || {}) } as any;
                             let foundWidget: any = null;
                             Object.keys(widgetsBySlot).forEach(slotName => {
                                 const arr = widgetsBySlot[slotName] || [];
-                                const index = arr.findIndex((w: any) => w.id === operation.payload.id);
+                                const index = arr.findIndex((w: any) => w.id === payload.id);
                                 if (index !== -1) {
                                     [foundWidget] = arr.splice(index, 1);
                                     widgetsBySlot[slotName] = [...arr];
                                 }
                             });
                             if (!foundWidget) {
-                                throw new Error(`Widget ${operation.payload.id} not found in any slot of object version ${ctx.objectVersionId}`);
+                                throw new Error(`Widget ${payload.id} not found in any slot of object version ${objectVersionId}`);
                             }
                             foundWidget = { ...foundWidget, slot: targetSlot, order: targetOrder, updated_at: now };
                             const targetArr = widgetsBySlot[targetSlot] ? [...widgetsBySlot[targetSlot]] : [];
@@ -644,7 +767,7 @@ export class DataManager {
                             return {
                                 objectVersions: {
                                     ...(state as any).objectVersions,
-                                    [ctx.objectVersionId]: {
+                                    [objectVersionId]: {
                                         ...objVersion,
                                         widgets: widgetsBySlot
                                     }
@@ -659,11 +782,12 @@ export class DataManager {
 
                 case OperationTypes.REMOVE_WIDGET:
                     this.setState(operation, state => {
-                        const ctx = this.getCurrentContext();
-                        const widgetId = operation.payload.id;
+                        const payload = operation.payload as RemoveWidgetPayload;
+                        const target = this.resolveWidgetTargetFromPayload(payload);
+                        const widgetId = payload.id;
 
-                        if (ctx.versionId) {
-                            const version = state.versions[ctx.versionId];
+                        if (target.versionId) {
+                            const version = state.versions[target.versionId];
                             const widgetsBySlot = { ...version.widgets };
                             Object.keys(widgetsBySlot).forEach(slotName => {
                                 const arr = widgetsBySlot[slotName] || [];
@@ -674,14 +798,15 @@ export class DataManager {
                             return {
                                 versions: {
                                     ...state.versions,
-                                    [ctx.versionId]: { ...version, widgets: widgetsBySlot }
+                                    [target.versionId]: { ...version, widgets: widgetsBySlot }
                                 },
                                 metadata: { ...state.metadata, isDirty: true }
                             };
                         }
 
-                        if (ctx.objectVersionId) {
-                            const objVersion = (state as any).objectVersions[ctx.objectVersionId];
+                        if ((target as any).objectVersionId) {
+                            const objectVersionId = (target as any).objectVersionId as string;
+                            const objVersion = (state as any).objectVersions[objectVersionId];
                             const widgetsBySlot = { ...(objVersion.widgets || {}) } as any;
                             Object.keys(widgetsBySlot).forEach(slotName => {
                                 const arr = widgetsBySlot[slotName] || [];
@@ -692,7 +817,7 @@ export class DataManager {
                             return {
                                 objectVersions: {
                                     ...(state as any).objectVersions,
-                                    [ctx.objectVersionId]: { ...objVersion, widgets: widgetsBySlot }
+                                    [objectVersionId]: { ...objVersion, widgets: widgetsBySlot }
                                 },
                                 metadata: { ...state.metadata, isDirty: true }
                             } as any;
@@ -805,41 +930,45 @@ export class DataManager {
                     });
                     break;
 
-                case OperationTypes.INIT_OBJECT_VERSION:
-                    this.setState(operation, state => {
-                        const { id, data } = operation.payload as any;
-                        if (!id || !data) {
-                            throw new ValidationError(operation,
-                                'ID and data are required for INIT_OBJECT_VERSION',
-                                { payload: operation.payload }
-                            );
-                        }
-                        if (!data.objectId) {
-                            throw new ValidationError(operation,
-                                'Object version must include objectId',
-                                { payload: operation.payload }
-                            );
-                        }
-                        if (!(state as any).objects[data.objectId]) {
-                            throw new ValidationError(operation,
-                                `Referenced object ${data.objectId} does not exist`,
-                                { payload: operation.payload }
-                            );
-                        }
-                        return {
-                            objectVersions: {
-                                ...(state as any).objectVersions,
-                                [id]: { ...data, id, objectId: data.objectId, updated_at: data.updated_at || new Date().toISOString() }
-                            },
-                            metadata: {
-                                ...state.metadata,
-                                currentObjectVersionId: id,
-                                currentObjectId: data.objectId,
-                                isDirty: false
-                            }
-                        } as any;
-                    });
-                    break;
+                // case OperationTypes.INIT_OBJECT_VERSION:
+                //     this.setState(operation, state => {
+                //         const { id, data } = operation.payload as any;
+                //         if (!id || !data) {
+                //             throw new ValidationError(operation,
+                //                 'ID and data are required for INIT_OBJECT_VERSION',
+                //                 { payload: operation.payload }
+                //             );
+                //         }
+                //         if (!data.objectId) {
+                //             throw new ValidationError(operation,
+                //                 'Object version must include objectId',
+                //                 { payload: operation.payload }
+                //             );
+                //         }
+                //         if (!(state as any).objects[data.objectId]) {
+                //             throw new ValidationError(operation,
+                //                 `Referenced object ${data.objectId} does not exist`,
+                //                 { payload: operation.payload }
+                //             );
+                //         }
+                //         console.log("INIT_OBJECT_VERSION")
+                //         console.log("id, data")
+                //         console.log(id)
+                //         console.log(data)
+                //         return {
+                //             objectVersions: {
+                //                 ...(state as any).objectVersions,
+                //                 [id]: { ...data, id, objectId: data.objectId, updated_at: data.updated_at || new Date().toISOString() }
+                //             },
+                //             metadata: {
+                //                 ...state.metadata,
+                //                 currentObjectVersionId: id,
+                //                 currentObjectId: data.objectId,
+                //                 isDirty: false
+                //             }
+                //         } as any;
+                //     });
+                //     break;
 
                 case OperationTypes.SWITCH_OBJECT_VERSION:
                     this.setState(operation, state => {

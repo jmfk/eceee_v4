@@ -1,5 +1,5 @@
 import { AppState, StateUpdate, StateSelector } from '../types/state';
-import { Operation, ValidationResult, OperationTypes } from '../types/operations';
+import { Operation, ValidationResult, OperationTypes, AddWidgetPayload, UpdateWidgetConfigPayload, MoveWidgetPayload, RemoveWidgetPayload } from '../types/operations';
 import { SubscriptionManager } from './SubscriptionManager';
 import { StateUpdateCallback, SubscriptionOptions } from '../types/subscriptions';
 import { defaultEqualityFn } from '../utils/equality';
@@ -15,14 +15,17 @@ export class DataManager {
 
         this.state = {
             pages: {},
-            widgets: {},
+            objects: {},
             layouts: {},
             versions: {},
-            content: {},
+            objectVersions: {},
+            themes: {},
             metadata: {
                 lastUpdated: new Date().toISOString(),
                 isLoading: false,
                 isDirty: false,
+                isObjectLoading: false,
+                isObjectDirty: false,
                 errors: [],
                 warnings: [],
                 widgetStates: {
@@ -31,7 +34,7 @@ export class DataManager {
                 }
             },
             ...initialState
-        };
+        } as any;
 
         this.subscriptionManager = new SubscriptionManager();
     }
@@ -71,9 +74,10 @@ export class DataManager {
     private hasDataChanged(prevState: AppState, newState: AppState): boolean {
         return (
             prevState.pages !== newState.pages ||
-            prevState.widgets !== newState.widgets ||
             prevState.layouts !== newState.layouts ||
-            prevState.versions !== newState.versions
+            prevState.versions !== newState.versions ||
+            (prevState as any).objects !== (newState as any).objects ||
+            (prevState as any).objectVersions !== (newState as any).objectVersions
         );
     }
 
@@ -87,19 +91,109 @@ export class DataManager {
 
         // Basic payload validation
         switch (operation.type) {
+            case OperationTypes.ADD_WIDGET:
+                if (!operation.payload?.id || !(operation.payload as any)?.type) {
+                    throw new ValidationError(operation,
+                        'Widget ID and type are required',
+                        { payload: operation.payload }
+                    );
+                }
+                if (!(operation.payload as any)?.contextType || !['page', 'object'].includes((operation.payload as any).contextType)) {
+                    throw new ValidationError(operation,
+                        'contextType is required for widget operations and must be "page" or "object"',
+                        { payload: operation.payload }
+                    );
+                }
+                if ((operation.payload as any).contextType === 'page' && !(operation.payload as any)?.pageId) {
+                    throw new ValidationError(operation,
+                        'pageId is required when contextType is "page"',
+                        { payload: operation.payload }
+                    );
+                }
+                if ((operation.payload as any).contextType === 'object' && !(operation.payload as any)?.objectId) {
+                    throw new ValidationError(operation,
+                        'objectId is required when contextType is "object"',
+                        { payload: operation.payload }
+                    );
+                }
+                break;
+
             case OperationTypes.UPDATE_WIDGET_CONFIG:
-                if (!operation.payload?.id || !operation.payload?.config) {
+                if (!operation.payload?.id || !(operation.payload as any)?.config) {
                     throw new ValidationError(operation,
                         'Widget ID and config are required',
+                        { payload: operation.payload }
+                    );
+                }
+                if (!(operation.payload as any)?.contextType || !['page', 'object'].includes((operation.payload as any).contextType)) {
+                    throw new ValidationError(operation,
+                        'contextType is required for widget operations and must be "page" or "object"',
+                        { payload: operation.payload }
+                    );
+                }
+                if ((operation.payload as any).contextType === 'page' && !(operation.payload as any)?.pageId) {
+                    throw new ValidationError(operation,
+                        'pageId is required when contextType is "page"',
+                        { payload: operation.payload }
+                    );
+                }
+                if ((operation.payload as any).contextType === 'object' && !(operation.payload as any)?.objectId) {
+                    throw new ValidationError(operation,
+                        'objectId is required when contextType is "object"',
                         { payload: operation.payload }
                     );
                 }
                 break;
             
             case OperationTypes.MOVE_WIDGET:
-                if (!operation.payload?.id || !operation.payload?.slot) {
+                if (!operation.payload?.id || !(operation.payload as any)?.slot) {
                     throw new ValidationError(operation,
                         'Widget ID and slot are required',
+                        { payload: operation.payload }
+                    );
+                }
+                if (!(operation.payload as any)?.contextType || !['page', 'object'].includes((operation.payload as any).contextType)) {
+                    throw new ValidationError(operation,
+                        'contextType is required for widget operations and must be "page" or "object"',
+                        { payload: operation.payload }
+                    );
+                }
+                if ((operation.payload as any).contextType === 'page' && !(operation.payload as any)?.pageId) {
+                    throw new ValidationError(operation,
+                        'pageId is required when contextType is "page"',
+                        { payload: operation.payload }
+                    );
+                }
+                if ((operation.payload as any).contextType === 'object' && !(operation.payload as any)?.objectId) {
+                    throw new ValidationError(operation,
+                        'objectId is required when contextType is "object"',
+                        { payload: operation.payload }
+                    );
+                }
+                break;
+
+            case OperationTypes.REMOVE_WIDGET:
+                if (!operation.payload?.id) {
+                    throw new ValidationError(operation,
+                        'Widget ID is required',
+                        { payload: operation.payload }
+                    );
+                }
+                if (!(operation.payload as any)?.contextType || !['page', 'object'].includes((operation.payload as any).contextType)) {
+                    throw new ValidationError(operation,
+                        'contextType is required for widget operations and must be "page" or "object"',
+                        { payload: operation.payload }
+                    );
+                }
+                if ((operation.payload as any).contextType === 'page' && !(operation.payload as any)?.pageId) {
+                    throw new ValidationError(operation,
+                        'pageId is required when contextType is "page"',
+                        { payload: operation.payload }
+                    );
+                }
+                if ((operation.payload as any).contextType === 'object' && !(operation.payload as any)?.objectId) {
+                    throw new ValidationError(operation,
+                        'objectId is required when contextType is "object"',
                         { payload: operation.payload }
                     );
                 }

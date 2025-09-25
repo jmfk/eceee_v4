@@ -75,11 +75,19 @@ export function useWidgetOperations(widgetId: string): UseWidgetOperationsResult
                 }
             });
         } else {
+            // Determine context for payload
+            const state = getState();
+            const { currentPageId, currentVersionId, currentObjectId, currentObjectVersionId } = (state as any).metadata || {};
+            const contextFields = currentPageId && currentVersionId
+                ? { contextType: 'page' as const, pageId: String(currentPageId) }
+                : { contextType: 'object' as const, objectId: String(currentObjectId) };
+
             await dispatch({
                 type: OperationTypes.UPDATE_WIDGET_CONFIG,
                 sourceId: widgetId,            
                 payload: {
                     id: widgetId,
+                    ...contextFields,
                     config
                 }
             });
@@ -87,12 +95,19 @@ export function useWidgetOperations(widgetId: string): UseWidgetOperationsResult
     }, [dispatch, widgetId, widget]);
 
     const moveWidget = useCallback(async (slotId: string, order: number) => {
+        const state = getState();
+        const { currentPageId, currentVersionId, currentObjectId, currentObjectVersionId } = (state as any).metadata || {};
+        const contextFields = currentPageId && currentVersionId
+            ? { contextType: 'page' as const, pageId: String(currentPageId) }
+            : { contextType: 'object' as const, objectId: String(currentObjectId) };
+
         await dispatch({
             type: OperationTypes.MOVE_WIDGET,
             sourceId: slotId,
             payload: {
                 id: widgetId,
                 slot: slotId,
+                ...contextFields,
                 order
             }
         });
