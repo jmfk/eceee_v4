@@ -6,7 +6,7 @@ import { defaultEqualityFn } from '../utils/equality';
 import { OperationError, ValidationError, StateError, ErrorCodes, isRetryableError } from '../utils/errors';
 
 
-type WidgetTarget = { versionId?: string; objectVersionId?: string };
+type WidgetTarget = { versionId?: string; objectId?: string };
 
 /**
  * Core DataManager class responsible for state management, operations, and subscriptions
@@ -32,7 +32,6 @@ export class DataManager {
                 isObjectLoading: false,
                 isObjectDirty: false,
                 currentObjectId: undefined,
-                currentObjectVersionId: undefined,
                 errors: [],
                 warnings: [],
                 widgetStates: {
@@ -80,15 +79,15 @@ export class DataManager {
 
         if (payload.contextType === 'object') {
             const objectId = String(payload.objectId);
-            const currentObjectVersionId = this.state.metadata.currentObjectVersionId as any;
-            if (!currentObjectVersionId) {
+            const currentObjectId = this.state.metadata.currentObjectId as any;
+            if (!currentObjectId) {
                 throw new StateError(
                     ErrorCodes.INVALID_CONTEXT,
                     'No current object version selected for object widget operation',
                     { objectId }
                 );
             }
-            return { objectVersionId: currentObjectVersionId } as any;
+            return { objectId: currentObjectId } as any;
         }
 
         const ctxType = (payload as any)?.contextType;
@@ -103,7 +102,7 @@ export class DataManager {
      * Get and validate the current editing context
      */
     private getCurrentContext(): { pageId?: string; versionId?: string; objectId?: string; objectVersionId?: string } {
-        const { currentPageId, currentVersionId, currentObjectId, currentObjectVersionId } = this.state.metadata;
+        const { currentPageId, currentVersionId, currentObjectId } = this.state.metadata;
         
         // Prefer page context if present
         if (currentPageId && currentVersionId) {
@@ -138,7 +137,7 @@ export class DataManager {
         }
 
         // Fallback to object context
-        if (currentObjectId && currentObjectVersionId) {
+        if (currentObjectId) {
             if (!this.state.objects[currentObjectId]) {
                 throw new StateError(
                     ErrorCodes.INVALID_CONTEXT,
@@ -147,13 +146,13 @@ export class DataManager {
                 );
             }
 
-            return { objectId: currentObjectId, objectVersionId: currentObjectVersionId };
+            return { objectId: currentObjectId };
         }
 
         throw new StateError(
             ErrorCodes.NO_ACTIVE_CONTEXT,
             'No active editing context. Use SWITCH_VERSION or SWITCH_OBJECT_VERSION to select a version first.',
-            { currentPageId, currentVersionId, currentObjectId, currentObjectVersionId }
+            { currentPageId, currentVersionId, currentObjectId }
         );
     }
 
@@ -292,6 +291,8 @@ export class DataManager {
                 );
             }
 
+            //console.log("validateOperation", operation.payload)
+
             // Payload validation based on operation type
             switch (operation.type) {
                 case OperationTypes.ADD_WIDGET:
@@ -314,12 +315,12 @@ export class DataManager {
                             { payload: operation.payload }
                         );
                     }
-                    if (operation.payload.contextType === 'object' && !operation.payload?.objectId) {
-                        throw new ValidationError(operation,
-                            'objectId is required when contextType is "object"',
-                            { payload: operation.payload }
-                        );
-                    }
+                    // if (operation.payload.contextType === 'object') {
+                    //     throw new ValidationError(operation,
+                    //         'objectId is required when contextType is "object"',
+                    //         { payload: operation.payload }
+                    //     );
+                    // }
                     break;
 
                 case OperationTypes.UPDATE_WIDGET_CONFIG:
@@ -341,12 +342,12 @@ export class DataManager {
                             { payload: operation.payload }
                         );
                     }
-                    if (operation.payload.contextType === 'object' && !operation.payload?.objectId) {
-                        throw new ValidationError(operation,
-                            'objectId is required when contextType is "object"',
-                            { payload: operation.payload }
-                        );
-                    }
+                    // if (operation.payload.contextType === 'object') {
+                    //     throw new ValidationError(operation,
+                    //         'objectId is required when contextType is "object"',
+                    //         { payload: operation.payload }
+                    //     );
+                    // }
                     break;
                 
                 case OperationTypes.MOVE_WIDGET:
@@ -368,12 +369,12 @@ export class DataManager {
                             { payload: operation.payload }
                         );
                     }
-                    if (operation.payload.contextType === 'object' && !operation.payload?.objectId) {
-                        throw new ValidationError(operation,
-                            'objectId is required when contextType is "object"',
-                            { payload: operation.payload }
-                        );
-                    }
+                    // if (operation.payload.contextType === 'object') {
+                    //     throw new ValidationError(operation,
+                    //         'objectId is required when contextType is "object"',
+                    //         { payload: operation.payload }
+                    //     );
+                    // }
                     break;
 
                 case OperationTypes.REMOVE_WIDGET:
@@ -395,12 +396,12 @@ export class DataManager {
                             { payload: operation.payload }
                         );
                     }
-                    if (operation.payload.contextType === 'object' && !operation.payload?.objectId) {
-                        throw new ValidationError(operation,
-                            'objectId is required when contextType is "object"',
-                            { payload: operation.payload }
-                        );
-                    }
+                    // if (operation.payload.contextType === 'object') {
+                    //     throw new ValidationError(operation,
+                    //         'objectId is required when contextType is "object"',
+                    //         { payload: operation.payload }
+                    //     );
+                    // }
                     break;
 
                 case OperationTypes.UPDATE_WEBPAGE_DATA:
@@ -487,8 +488,8 @@ export class DataManager {
                 validation
             };
 
-            
-            
+            // console.log("processOperation", operation.type)
+                
             // Process based on operation type
             switch (operation.type) {
                 case OperationTypes.INIT_VERSION:
@@ -930,46 +931,6 @@ export class DataManager {
                     });
                     break;
 
-                // case OperationTypes.INIT_OBJECT_VERSION:
-                //     this.setState(operation, state => {
-                //         const { id, data } = operation.payload as any;
-                //         if (!id || !data) {
-                //             throw new ValidationError(operation,
-                //                 'ID and data are required for INIT_OBJECT_VERSION',
-                //                 { payload: operation.payload }
-                //             );
-                //         }
-                //         if (!data.objectId) {
-                //             throw new ValidationError(operation,
-                //                 'Object version must include objectId',
-                //                 { payload: operation.payload }
-                //             );
-                //         }
-                //         if (!(state as any).objects[data.objectId]) {
-                //             throw new ValidationError(operation,
-                //                 `Referenced object ${data.objectId} does not exist`,
-                //                 { payload: operation.payload }
-                //             );
-                //         }
-                //         console.log("INIT_OBJECT_VERSION")
-                //         console.log("id, data")
-                //         console.log(id)
-                //         console.log(data)
-                //         return {
-                //             objectVersions: {
-                //                 ...(state as any).objectVersions,
-                //                 [id]: { ...data, id, objectId: data.objectId, updated_at: data.updated_at || new Date().toISOString() }
-                //             },
-                //             metadata: {
-                //                 ...state.metadata,
-                //                 currentObjectVersionId: id,
-                //                 currentObjectId: data.objectId,
-                //                 isDirty: false
-                //             }
-                //         } as any;
-                //     });
-                //     break;
-
                 case OperationTypes.SWITCH_OBJECT_VERSION:
                     this.setState(operation, state => {
                         const { objectId, versionId } = operation.payload as any;
@@ -984,7 +945,6 @@ export class DataManager {
                             metadata: {
                                 ...state.metadata,
                                 currentObjectId: objectId,
-                                currentObjectVersionId: versionId,
                                 isDirty: false
                             }
                         } as any;

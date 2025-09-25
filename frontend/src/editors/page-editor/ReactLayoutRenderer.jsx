@@ -36,6 +36,8 @@ const ReactLayoutRenderer = forwardRef(({
 
     // Define a stable component ID for UDC source tracking
     const componentId = `react-layout-renderer-${versionId || 'unknown'}`;
+    // Page editor always uses page context
+    const contextType = 'page'
 
     // Use shared widget hook
     const {
@@ -98,6 +100,7 @@ const ReactLayoutRenderer = forwardRef(({
                     type: newWidget.type,
                     config: newWidget.config,
                     slot: slotName,
+                    contextType: contextType,
                     order: (updatedWidgets[slotName]?.length || 1) - 1
                 });
                 break;
@@ -106,7 +109,17 @@ const ReactLayoutRenderer = forwardRef(({
             case 'edit': {
                 const widgetIndex = args[0];
                 if (onOpenWidgetEditor) {
-                    onOpenWidgetEditor({ ...widget, slotName, context: { ...context, slotName: slotName, widgetId: widget.id } });
+                    onOpenWidgetEditor({
+                        ...widget,
+                        slotName,
+                        context: {
+                            ...(context || {}),
+                            slotName,
+                            widgetId: widget.id,
+                            mode: 'edit',
+                            contextType
+                        }
+                    });
                 }
                 break;
             }
@@ -129,7 +142,8 @@ const ReactLayoutRenderer = forwardRef(({
 
                 // Publish to Unified Data Context
                 await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, {
-                    id: widget.id
+                    id: widget.id,
+                    contextType: contextType
                 });
                 break;
             }
@@ -157,6 +171,7 @@ const ReactLayoutRenderer = forwardRef(({
                     await publishUpdate(componentId, OperationTypes.MOVE_WIDGET, {
                         id: widget.id,
                         slot: slotName,
+                        contextType: contextType,
                         order: moveUpIndex - 1
                     });
                 }
@@ -187,6 +202,7 @@ const ReactLayoutRenderer = forwardRef(({
                     await publishUpdate(componentId, OperationTypes.MOVE_WIDGET, {
                         id: widget.id,
                         slot: slotName,
+                        contextType: contextType,
                         order: moveDownIndex + 1
                     });
                 }
@@ -214,6 +230,7 @@ const ReactLayoutRenderer = forwardRef(({
                 await publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
                     id: widget.id,
                     slotName,
+                    contextType: contextType,
                     config: newConfig
                 });
                 break;

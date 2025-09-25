@@ -8,7 +8,7 @@ import React, { useCallback } from 'react'
 import MediaSpecialEditor from './MediaSpecialEditor'
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
 import { OperationTypes } from '../../contexts/unified-data/types/operations'
-
+import { useEditorContext } from '../../contexts/unified-data/hooks'
 
 // Registry of special editors mapped to widget types
 const SPECIAL_EDITORS = {
@@ -36,6 +36,9 @@ const SpecialEditorRenderer = ({
     isClosing = false,
     namespace = null
 }) => {
+
+    const contextType = useEditorContext();
+
     if (!widgetData?.type || !hasSpecialEditor(widgetData.type)) {
         return null
     }
@@ -54,6 +57,7 @@ const SpecialEditorRenderer = ({
         publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
             id: widgetData.id,
             slotName: widgetData.slotName,
+            contextType: contextType,
             config: newConfig
         })
     }, [publishUpdate, componentId, widgetData?.id, widgetData?.slotName])

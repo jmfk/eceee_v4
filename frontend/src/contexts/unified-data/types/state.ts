@@ -110,22 +110,6 @@ export interface ObjectData {
   parentId?: string | null;
 }
 
-export interface ObjectVersionData {
-  id: string;
-  objectId: string;
-  number: number;
-  status: 'draft' | 'published';
-  widgets: Record<string, WidgetData[]>; // slotName -> widgets
-  layoutId?: string;
-  themeId?: string;
-  content?: Record<string, ContentData>;
-  metadata?: Record<string, any>;
-  created_at: string;
-  updated_at: string;
-  created_by?: string;
-  published_at?: string;
-  changesDescription?: string;
-}
 
 /**
  * Complete application state interface
@@ -142,7 +126,6 @@ export interface AppState {
   versions: Record<string, VersionData>;
   // Objects and their versions (object storage)
   objects: Record<string, ObjectData>;
-  objectVersions: Record<string, ObjectVersionData>;
   layouts: Record<string, LayoutData>;
   themes: Record<string, ThemeData>;
   
