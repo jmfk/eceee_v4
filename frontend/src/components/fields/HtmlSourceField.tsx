@@ -43,6 +43,7 @@ const HtmlSourceField: React.FC<HtmlSourceFieldProps> = ({
             setCurrentValue(newContent);
         }
     });
+
     const handleOpenEditor = () => {
         setIsEditorOpen(true);
     };

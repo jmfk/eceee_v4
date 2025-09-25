@@ -19,6 +19,27 @@ const ObjectContentView = forwardRef(({ objectType, instance, parentId, isNewIns
     const [localWidgets, setLocalWidgets] = useState(instance?.widgets || {})
     const [namespace, setNamespace] = useState(null)
 
+    const { useExternalChanges, publishUpdate } = useUnifiedData()
+
+    const componentId = useMemo(() => `object-instance-editor-${instanceId || 'new'}`, [instanceId])
+
+
+    useExternalChanges(componentId, state => {
+        console.log("useExternalChanges::ObjectContentView")
+        console.log(state)
+        // setLocalWidgets(prevWidgets => {
+        //     const newWidgets = { ...prevWidgets }
+        //     const slotName = payload.slotName
+
+        //     if (newWidgets[slotName]) {
+        //         newWidgets[slotName] = newWidgets[slotName].map(widget =>
+        //             widget.id === payload.widgetId ? payload.widget : widget
+        //         )
+        //     }
+
+        //     return newWidgets
+        // })
+    });
 
     // Widget editor state
     const [widgetEditorUI, setWidgetEditorUI] = useState({
@@ -27,13 +48,6 @@ const ObjectContentView = forwardRef(({ objectType, instance, parentId, isNewIns
         hasUnsavedChanges: false
     })
     //const [hasWidgetChanges, setHasWidgetChanges] = useState(false)
-
-    // Notify parent about unsaved changes
-    // useEffect(() => {
-    //     if (onUnsavedChanges) {
-    //         onUnsavedChanges(hasWidgetChanges)
-    //     }
-    // }, [hasWidgetChanges, onUnsavedChanges])
 
     // Fetch widget types for display names
     const { data: widgetTypes = [] } = useQuery({
@@ -71,48 +85,6 @@ const ObjectContentView = forwardRef(({ objectType, instance, parentId, isNewIns
         loadNamespace()
     }, [objectType?.namespace])
 
-    // Update local widgets when instance changes
-    useEffect(() => {
-        console.log("instance has changed")
-        //setLocalWidgets(instance?.widgets || {})
-        ////setHasWidgetChanges(false)
-    }, [instance])
-
-    // Subscribe to widget events for real-time updates and dirty state management
-    // const { subscribe } = useWidgetEvents()
-
-    // useEffect(() => {
-    //     // Handler for widget changes
-    //     const handleWidgetChanged = (payload) => {
-    //         if (payload.changeType === WIDGET_CHANGE_TYPES.CONFIG) {
-    //             // Handle real-time config changes - mark as dirty but don't auto-save
-    //             //setHasWidgetChanges(true)
-
-    //             // Update local widgets for live preview
-    //             setLocalWidgets(prevWidgets => {
-    //                 const newWidgets = { ...prevWidgets }
-    //                 const slotName = payload.slotName
-
-    //                 if (newWidgets[slotName]) {
-    //                     newWidgets[slotName] = newWidgets[slotName].map(widget =>
-    //                         widget.id === payload.widgetId ? payload.widget : widget
-    //                     )
-    //                 }
-
-    //                 return newWidgets
-    //             })
-    //         }
-    //     }
-
-    //     // Subscribe to widget change events
-    //     const unsubscribe = subscribe(WIDGET_EVENTS.CHANGED, handleWidgetChanged)
-
-    //     // Cleanup subscription
-    //     return () => {
-    //         unsubscribe()
-    //     }
-    // }, [subscribe])
-
     // Handle real-time widget updates from WidgetEditorPanel
     const handleRealTimeWidgetUpdate = useCallback((updatedWidget) => {
         if (!updatedWidget || !updatedWidget.slotName) return
@@ -131,8 +103,6 @@ const ObjectContentView = forwardRef(({ objectType, instance, parentId, isNewIns
             return newWidgets
         })
 
-        // Mark as having changes but don't auto-save
-        //setHasWidgetChanges(true)
     }, [])
 
     // Widget editor state management - direct callback approach instead of polling

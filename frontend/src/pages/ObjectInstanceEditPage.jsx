@@ -109,10 +109,6 @@ const ObjectInstanceEditPage = () => {
     const objectType = objectTypeResponse?.data
     const instance = instanceResponse?.data
 
-    useEffect(() => {
-        console.log("instance change here too")
-    }, [instance])
-
     // Update available versions when data loads
     useEffect(() => {
         if (versionsResponse?.data) {
