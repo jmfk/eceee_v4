@@ -5,20 +5,41 @@ import { isEqual } from 'lodash';
  * @param {Object} state - The unified data state object
  * @param {string} widgetId - The ID of the widget to find
  * @param {string} slotName - slot where the widget is located
+ * @param {string} contextType - 'page' or 'object' context type
  * @returns {Object} Object containing content and optionally the widget
  */
-export const getWidgetContent = (state, widgetId, slotName) => {
+export const getWidgetContent = (state, widgetId, slotName, contextType = 'page') => {
     if (!state || !widgetId || !slotName) {
         return { content: null, slotName: null };
     }
 
-    const version = state.versions[state.metadata.currentVersionId];
-    if (!version) {
+    let widgets = null;
+    let widget = null;
+
+    if (contextType === 'page') {
+        // Look up widget in page version
+        const version = state.versions[state.metadata.currentVersionId];
+        if (!version) {
+            return { content: null, widget: null };
+        }
+        widgets = version.widgets[slotName];
+    } else if (contextType === 'object') {
+        // Look up widget in object
+        const objectId = state.metadata.currentObjectId;
+        if (!objectId) {
+            return { content: null, widget: null };
+        }
+        const objectData = state.objects[objectId];
+        if (!objectData) {
+            return { content: null, widget: null };
+        }
+        widgets = objectData.widgets?.[slotName];
+    } else {
+        // Unknown context type
         return { content: null, widget: null };
     }
 
-    const widgets = version.widgets[slotName];
-    const widget = widgets?.find(w => w.id === widgetId);
+    widget = widgets?.find(w => w.id === widgetId);
     const newContent = widget?.config?.content;
     return {
         content: newContent,
