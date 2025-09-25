@@ -35,20 +35,25 @@ export function UnifiedDataProvider({
     const useExternalChanges = useCallback(<T,>(componentId: string, callback: StateChangeCallback<T>): void => {
         const stableCallback = React.useMemo(
             () => (state: any) => callback(state),
-            [callback.toString(), componentId]
+            [callback, componentId]
         );
         useEffect(() => {
-            manager.subscribe(
+            const unsubscribe = manager.subscribe(
                 () => manager.getState(),
                 (_, operation: Operation) => {
-                    console.log("useExternalChanges:recieve")
+                    console.log("useExternalChanges:recieve", operation)
                     if (operation && operation?.sourceId && operation?.sourceId !== componentId) {
                         stableCallback(manager.getState());
                     }
                 },
                 { equalityFn: defaultEqualityFn, componentId }
             );
-        }, [stableCallback, componentId]);
+            return () => {
+                if (typeof unsubscribe === 'function') {
+                    unsubscribe();
+                }
+            };
+        }, [manager, stableCallback, componentId]);
     }, [manager]);
 
 
@@ -164,14 +169,14 @@ export function UnifiedDataProvider({
 
         console.log("publishUpdate")
         if (WIDGET_OPS.has(type)) {
-            const { currentPageId, currentVersionId, currentObjectId, currentObjectVersionId } = (state as any).metadata || {};
+            const { currentPageId, currentVersionId, currentObjectId } = (state as any).metadata || {};
             if (currentPageId && currentVersionId) {
                 augmentedData = {
                     ...augmentedData,
                     contextType: 'page',
                     pageId: String(currentPageId)
                 };
-            } else if (currentObjectId && currentObjectVersionId) {
+            } else if (currentObjectId) {
                 augmentedData = {
                     ...augmentedData,
                     contextType: 'object',

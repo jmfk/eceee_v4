@@ -24,7 +24,7 @@ export function useWidgetOperations(widgetId: string): UseWidgetOperationsResult
     const { dispatch, useExternalChanges, getState } = useUnifiedData();
 
     const findWidgetById = (state: AppState, id: string): WidgetData | null => {
-        const { currentVersionId, currentObjectVersionId } = state.metadata as any;
+        const { currentVersionId, currentObjectId } = state.metadata as any;
         if (currentVersionId) {
             const version = state.versions[currentVersionId];
             if (version?.widgets) {
@@ -34,13 +34,12 @@ export function useWidgetOperations(widgetId: string): UseWidgetOperationsResult
                 }
             }
         }
-        if (currentObjectVersionId && (state as any).objectVersions) {
-            const objVersion = (state as any).objectVersions[currentObjectVersionId];
-            if (objVersion?.widgets) {
-                for (const slotName of Object.keys(objVersion.widgets)) {
-                    const found = (objVersion.widgets[slotName] || []).find((w: any) => w.id === id);
-                    if (found) return found as WidgetData;
-                }
+        if (currentObjectId && (state as any).objects) {
+            const objValue = (state as any).objects[currentObjectId];
+            const widgets = (objValue?.widgets || {}) as Record<string, any[]>;
+            for (const slotName of Object.keys(widgets)) {
+                const found = (widgets[slotName] || []).find((w: any) => w.id === id);
+                if (found) return found as WidgetData;
             }
         }
         return null;
@@ -77,7 +76,7 @@ export function useWidgetOperations(widgetId: string): UseWidgetOperationsResult
         } else {
             // Determine context for payload
             const state = getState();
-            const { currentPageId, currentVersionId, currentObjectId, currentObjectVersionId } = (state as any).metadata || {};
+            const { currentPageId, currentVersionId, currentObjectId } = (state as any).metadata || {};
             const contextFields = currentPageId && currentVersionId
                 ? { contextType: 'page' as const, pageId: String(currentPageId) }
                 : { contextType: 'object' as const, objectId: String(currentObjectId) };
@@ -96,7 +95,7 @@ export function useWidgetOperations(widgetId: string): UseWidgetOperationsResult
 
     const moveWidget = useCallback(async (slotId: string, order: number) => {
         const state = getState();
-        const { currentPageId, currentVersionId, currentObjectId, currentObjectVersionId } = (state as any).metadata || {};
+        const { currentPageId, currentVersionId, currentObjectId } = (state as any).metadata || {};
         const contextFields = currentPageId && currentVersionId
             ? { contextType: 'page' as const, pageId: String(currentPageId) }
             : { contextType: 'object' as const, objectId: String(currentObjectId) };

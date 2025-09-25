@@ -35,9 +35,7 @@ const ObjectInstanceEditPage = () => {
     // Refs for tab components
     const contentTabRef = useRef(null)
 
-    // UDC
-    const { publishUpdate, setIsObjectLoading, setIsObjectDirty } = useUnifiedData()
-    const udcInitRef = useRef(null)
+    const { useExternalChanges, publishUpdate } = useUnifiedData()
     const componentId = useMemo(() => `object-instance-editor-${instanceId || 'new'}`, [instanceId])
 
     // Save mutation
@@ -101,9 +99,6 @@ const ObjectInstanceEditPage = () => {
         enabled: !!actualObjectTypeId
     })
 
-    const objectType = objectTypeResponse?.data
-    const instance = instanceResponse?.data
-
     // Load versions for existing instances
     const { data: versionsResponse, isLoading: versionsLoading } = useQuery({
         queryKey: ['objectInstance', instanceId, 'versions'],
@@ -111,14 +106,13 @@ const ObjectInstanceEditPage = () => {
         enabled: !!instanceId && !isNewInstance
     })
 
+    const objectType = objectTypeResponse?.data
+    const instance = instanceResponse?.data
+
     // Update available versions when data loads
     useEffect(() => {
-        // Update object-level loading state in UDC
-        setIsObjectLoading(Boolean(instanceLoading || versionsLoading))
-
         if (versionsResponse?.data) {
             setAvailableVersions(versionsResponse.data)
-            // Set current version if not already set
             if (!currentVersion && instance) {
                 // Find the version that matches the instance's current version number
                 const current = versionsResponse.data.find(v => v.versionNumber === instance.version)
@@ -126,12 +120,11 @@ const ObjectInstanceEditPage = () => {
                 setCurrentVersion(current)
             }
         }
-    }, [versionsResponse, instance, currentVersion, instanceLoading, versionsLoading, setIsObjectLoading])
+    }, [versionsResponse, instance, instanceLoading, versionsLoading])
 
     // Initialize UDC objects and versions once data is loaded
     useEffect(() => {
         if (!instanceId || !instance || !versionsResponse?.data) return
-        if (udcInitRef.current === instanceId) return
 
         try {
             // Determine current version id and version ids list
@@ -139,8 +132,8 @@ const ObjectInstanceEditPage = () => {
             const currentVersionEntry = allVersions.find(v => v.versionNumber === instance.version) || allVersions[0]
             const currentVersionId = currentVersionEntry ? String(currentVersionEntry.id) : undefined
             const versionIds = allVersions.map(v => String(v.id))
-
             // INIT_OBJECT including availableVersions and currentVersionId to avoid separate update
+            console.log("SHOULD ONLY RUN ONCE")
             publishUpdate(componentId, OperationTypes.INIT_OBJECT, {
                 id: String(instance.id),
                 data: {
@@ -156,43 +149,10 @@ const ObjectInstanceEditPage = () => {
                     availableVersions: versionIds
                 }
             })
-
-            // // INIT_OBJECT_VERSION for each version, ensure current version is initialized last
-            // const ordered = [
-            //     ...allVersions.filter(v => String(v.id) !== currentVersionId),
-            //     ...allVersions.filter(v => String(v.id) === currentVersionId)
-            // ]
-            // ordered.forEach(v => {
-            //     const versionId = String(v.id)
-            //     publishUpdate(componentId, OperationTypes.INIT_OBJECT_VERSION, {
-            //         id: versionId,
-            //         data: {
-            //             id: versionId,
-            //             objectId: String(instance.id),
-            //             number: v.versionNumber || v.number || 0,
-            //             status: v.status || 'draft',
-            //             widgets: v.widgets || {},
-            //             layoutId: v.layoutId,
-            //             themeId: v.themeId,
-            //             content: v.content || {},
-            //             metadata: v.metadata || {},
-            //             created_at: v.createdAt || new Date().toISOString(),
-            //             updated_at: v.updatedAt || new Date().toISOString(),
-            //             created_by: v.createdBy,
-            //             published_at: v.publishedAt,
-            //             changesDescription: v.changesDescription
-            //         }
-            //     })
-            // })
-
-            // Clear object dirty flag after initialization
-            // setIsObjectDirty(false)
-
-            udcInitRef.current = instanceId
         } catch (e) {
             console.error('UDC init (objects) failed', e)
         }
-    }, [instanceId, instance, versionsResponse, setIsObjectDirty, publishUpdate, componentId])
+    }, [instanceId, instance, versionsResponse, publishUpdate, componentId])
 
     // Switch to a different version
     const switchToVersion = async (versionId) => {
@@ -264,6 +224,7 @@ const ObjectInstanceEditPage = () => {
     const handleSave = async (saveType = 'update_current') => {
         // If we're on the content tab, delegate to the child component's save method
         // which has access to the current localWidgets and formData state
+        console.log("handleSave")
         if (tab === 'content' && contentTabRef.current?.handleSave) {
             contentTabRef.current.handleSave(saveType)
         } else {
