@@ -5,6 +5,7 @@ import { HtmlEditor } from './HtmlEditor';
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext';
 import { OperationTypes } from '../../contexts/unified-data/types/operations';
 import { getWidgetContent, hasWidgetContentChanged } from '../../utils/widgetUtils';
+import { useEditorContext } from '../../contexts/unified-data/hooks'
 
 
 interface EditorContext {
@@ -38,6 +39,8 @@ const HtmlSourceField: React.FC<HtmlSourceFieldProps> = ({
     const slotName = context?.slotName;
     const fieldId = `field-${context.widgetId}`;
 
+    const contextType = useEditorContext();
+
     useExternalChanges(fieldId, state => {
         const { content: newContent } = getWidgetContent(state, context.widgetId, slotName);
         if (hasWidgetContentChanged(currentValue, newContent)) {
@@ -65,6 +68,7 @@ const HtmlSourceField: React.FC<HtmlSourceFieldProps> = ({
         publishUpdate(fieldId, OperationTypes.UPDATE_WIDGET_CONFIG, {
             id: context.widgetId,
             slotName: slotName,
+            contextType,
             config: {
                 content: newValue
             }

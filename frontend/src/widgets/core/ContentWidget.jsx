@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useCallback, memo, useState } from 'react'
 import { FileText, Type, Eraser } from 'lucide-react'
 import ContentWidgetEditorRenderer from './ContentWidgetEditorRenderer.js'
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
+import { useEditorContext } from '../../contexts/unified-data/hooks'
 import { OperationTypes } from '../../contexts/unified-data/types/operations';
 import { getWidgetContent, hasWidgetContentChanged } from '../../utils/widgetUtils';
 
@@ -99,10 +100,7 @@ const ContentWidget = memo(({
     const { useExternalChanges, publishUpdate } = useUnifiedData();
     const [content, setContent] = useState(config.content || 'Content will appear here...');
     const componentId = `widget-${widgetId}`;
-
-    console.log("ContentWidget", widgetType)
-    console.log(config)
-    const contextType = config.contextType;
+    const contextType = useEditorContext();
 
     // Initialize widget in UnifiedDataContext when component mounts
     useEffect(() => {

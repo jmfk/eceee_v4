@@ -18,6 +18,7 @@ export { usePageWidgets } from './usePageWidgets';
 // Utility hooks
 export { useBatchOperations } from './useBatchOperations';
 export { useDataSubscriptions } from './useDataSubscriptions';
+export { useEditorContext } from './useEditorContext';
 
 // Re-export types for convenience
 export type { UseWidgetOperationsResult } from './useWidgetOperations';
