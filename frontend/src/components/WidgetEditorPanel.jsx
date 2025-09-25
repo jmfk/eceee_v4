@@ -9,6 +9,7 @@ import IsolatedFormRenderer from './IsolatedFormRenderer.jsx'
 
 import { useUnifiedData } from '../contexts/unified-data/context/UnifiedDataContext'
 import { OperationTypes } from '../contexts/unified-data/types/operations'
+import { useEditorContext } from '../contexts/unified-data/hooks'
 
 /**
  * WidgetEditorPanel - Slide-out panel for editing widgets
@@ -55,7 +56,7 @@ const WidgetEditorPanel = forwardRef(({
 
     const { publishUpdate } = useUnifiedData()
 
-
+    const contextType = useEditorContext();
 
     // Unified Data Context update function (replaces event emitter)
     const emitWidgetChanged = useCallback((arg1, arg2, arg3, _changeType = 'config') => {
@@ -85,6 +86,7 @@ const WidgetEditorPanel = forwardRef(({
         publishUpdate(String(widgetId), OperationTypes.UPDATE_WIDGET_CONFIG, {
             id: widgetId,
             slotName: slotName,
+            contextType: contextType,
             config: config
         })
     }, [publishUpdate])
@@ -469,7 +471,12 @@ const WidgetEditorPanel = forwardRef(({
                                 onUnsavedChanges={handleUnsavedChanges}
                                 emitWidgetChanged={emitWidgetChanged}
                                 namespace={namespace}
-                                context={widgetData.context}
+                                context={widgetData?.context || {
+                                    widgetId: widgetData?.id,
+                                    slotName: widgetData?.slotName || widgetData?.slot,
+                                    mode: 'edit',
+                                    contextType
+                                }}
                             />
                         ) : (
                             <div className="text-center text-gray-500 py-8 p-4">

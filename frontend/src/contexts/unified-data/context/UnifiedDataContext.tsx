@@ -41,6 +41,7 @@ export function UnifiedDataProvider({
             manager.subscribe(
                 () => manager.getState(),
                 (_, operation: Operation) => {
+                    console.log("useExternalChanges:recieve")
                     if (operation && operation?.sourceId && operation?.sourceId !== componentId) {
                         stableCallback(manager.getState());
                     }
@@ -161,6 +162,7 @@ export function UnifiedDataProvider({
         const state = manager.getState();
         let augmentedData: any = { ...data };
 
+        console.log("publishUpdate")
         if (WIDGET_OPS.has(type)) {
             const { currentPageId, currentVersionId, currentObjectId, currentObjectVersionId } = (state as any).metadata || {};
             if (currentPageId && currentVersionId) {

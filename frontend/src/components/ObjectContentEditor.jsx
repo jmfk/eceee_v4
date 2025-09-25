@@ -248,8 +248,18 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
     }, [widgetEditorOpen, editingWidget, widgetHasUnsavedChanges, onWidgetEditorStateChange, handleCloseWidgetEditor, handleSaveWidget])
 
     const handleEditWidget = (slotName, widgetIndex, widget) => {
-        // Add slotName to widget data for editor
-        const widgetWithSlot = { ...widget, slotName }
+        // Add slotName and computed editor context to widget data for editor
+        const widgetWithSlot = {
+            ...widget,
+            slotName,
+            context: {
+                slotName,
+                widgetId: widget?.id,
+                objectId: (normalizedWidgetsRef.current && (Object.keys(normalizedWidgetsRef.current)[0] || undefined)),
+                mode: 'edit',
+                contextType: contextType
+            }
+        }
         handleOpenWidgetEditor(widgetWithSlot)
     }
 

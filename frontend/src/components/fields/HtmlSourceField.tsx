@@ -6,15 +6,10 @@ import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataC
 import { OperationTypes } from '../../contexts/unified-data/types/operations';
 import { getWidgetContent, hasWidgetContentChanged } from '../../utils/widgetUtils';
 import { useEditorContext } from '../../contexts/unified-data/hooks'
+import type EditorContext from '../../contexts/unified-data/types/editorContext'
 
 
-interface EditorContext {
-    pageId: string;
-    widgetId: string;
-    slotId: string;
-    slotName: string;
-    mode: 'edit' | 'preview';
-}
+// Use shared EditorContext type
 
 interface HtmlSourceFieldProps {
     value: string;
@@ -36,13 +31,14 @@ const HtmlSourceField: React.FC<HtmlSourceFieldProps> = ({
     const [isEditorOpen, setIsEditorOpen] = useState(false);
     const [currentValue, setCurrentValue] = useState(value);
     const { useExternalChanges, publishUpdate } = useUnifiedData();
-    const slotName = context?.slotName;
-    const fieldId = `field-${context.widgetId}`;
+    const slotName: string = context?.slotName ?? 'main';
+    const widgetId: string = String(context?.widgetId ?? '');
+    const fieldId = `field-${widgetId}`;
 
     const contextType = useEditorContext();
 
     useExternalChanges(fieldId, state => {
-        const { content: newContent } = getWidgetContent(state, context.widgetId, slotName);
+        const { content: newContent } = getWidgetContent(state, widgetId, slotName);
         if (hasWidgetContentChanged(currentValue, newContent)) {
             setCurrentValue(newContent);
         }
@@ -66,7 +62,7 @@ const HtmlSourceField: React.FC<HtmlSourceFieldProps> = ({
     const handleChange = (newValue: string) => {
         setCurrentValue(newValue);
         publishUpdate(fieldId, OperationTypes.UPDATE_WIDGET_CONFIG, {
-            id: context.widgetId,
+            id: widgetId,
             slotName: slotName,
             contextType,
             config: {

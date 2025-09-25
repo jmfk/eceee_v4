@@ -283,6 +283,7 @@ const SchemaFieldRenderer = ({
         disabled,
         placeholder: fieldSchema.placeholder,
         namespace: namespace,
+        context: context,
         // Map schema properties to field-specific props
         ...(fieldType === 'textarea' && {
             rows: fieldSchema.rows || 3,
