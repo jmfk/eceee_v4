@@ -4,7 +4,7 @@ import { Save, Calendar, Eye, EyeOff, Archive, Clock, CheckCircle } from 'lucide
 import { objectInstancesApi, objectVersionsApi } from '../../api/objectStorage'
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext'
 
-const ObjectPublishingView = ({ objectType, instance, isNewInstance, onSave, onCancel, onUnsavedChanges }) => {
+const ObjectPublishingView = ({ objectType, instance, isNewInstance, onSave, onCancel, onUnsavedChanges, context }) => {
     const [formData, setFormData] = useState({
         effectiveDate: '',
         expiryDate: ''

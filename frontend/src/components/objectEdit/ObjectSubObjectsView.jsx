@@ -7,7 +7,7 @@ import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext
 import ObjectTypeSelector from '../ObjectTypeSelector'
 import DeleteConfirmationModal from '../DeleteConfirmationModal'
 
-const ObjectSubObjectsView = ({ objectType, instance, isNewInstance, onSave, onCancel }) => {
+const ObjectSubObjectsView = ({ objectType, instance, isNewInstance, onSave, onCancel, context }) => {
 
     const navigate = useNavigate()
     const { addNotification } = useGlobalNotifications()

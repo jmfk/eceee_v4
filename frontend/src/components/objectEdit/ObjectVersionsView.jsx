@@ -5,7 +5,7 @@ import { objectInstancesApi } from '../../api/objectStorage'
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext'
 import Modal from '../Modal'
 
-const ObjectVersionsView = ({ objectType, instance, isNewInstance, onSave, onCancel }) => {
+const ObjectVersionsView = ({ objectType, instance, isNewInstance, onSave, onCancel, context }) => {
     const [selectedVersion, setSelectedVersion] = useState(null)
     const [showVersionDetails, setShowVersionDetails] = useState(false)
 

@@ -7,7 +7,7 @@ import {
     getCoreWidgetCategory as getWidgetCategory,
     getCoreWidgetDescription as getWidgetDescription
 } from '../widgets'
-const WidgetSelectionModal = ({ isOpen, onClose, onSelectWidget, slot, availableWidgetTypes, isFilteringTypes }) => {
+const WidgetSelectionModal = ({ isOpen, onClose, onSelectWidget, slot, availableWidgetTypes, isFilteringTypes, context }) => {
     const [searchTerm, setSearchTerm] = useState('')
     const modalRef = useRef<HTMLDivElement | null>(null)
 

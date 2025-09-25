@@ -38,7 +38,8 @@ const ObjectWidgetFactory = ({
     slotConfig,
     onSlotAction,
     allowedWidgetTypes = [],
-    maxWidgets = null
+    maxWidgets = null,
+    context
 }) => {
     // Use passed props or extract from widget
     const actualWidgetId = widgetId || widget?.id

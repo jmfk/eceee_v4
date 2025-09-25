@@ -132,8 +132,7 @@ const ObjectInstanceEditPage = () => {
             const currentVersionEntry = allVersions.find(v => v.versionNumber === instance.version) || allVersions[0]
             const currentVersionId = currentVersionEntry ? String(currentVersionEntry.id) : undefined
             const versionIds = allVersions.map(v => String(v.id))
-            // INIT_OBJECT including availableVersions and currentVersionId to avoid separate update
-            console.log("SHOULD ONLY RUN ONCE")
+
             publishUpdate(componentId, OperationTypes.INIT_OBJECT, {
                 id: String(instance.id),
                 data: {
@@ -278,7 +277,8 @@ const ObjectInstanceEditPage = () => {
                 // This is now handled by the footer buttons
                 // Individual tabs can still trigger saves if needed
             },
-            onCancel: handleBack
+            onCancel: handleBack,
+            context: { contextType: 'object' }
         }
 
         switch (tab) {

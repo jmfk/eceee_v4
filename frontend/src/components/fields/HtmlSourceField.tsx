@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useId } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '../ui/Button';
 import { IconCode } from '../icons/IconCode';
 import { HtmlEditor } from './HtmlEditor';
@@ -30,15 +30,27 @@ const HtmlSourceField: React.FC<HtmlSourceFieldProps> = ({
 }) => {
     const [isEditorOpen, setIsEditorOpen] = useState(false);
     const [currentValue, setCurrentValue] = useState(value);
-    const { useExternalChanges, publishUpdate } = useUnifiedData();
+    const { useExternalChanges, publishUpdate, getState } = useUnifiedData();
     const slotName: string = context?.slotName ?? 'main';
     const widgetId: string = String(context?.widgetId ?? '');
     const fieldId = `field-${widgetId}`;
 
     const contextType = useEditorContext();
 
+    // Run initialization only once on mount
+    useEffect(() => {
+        if (!widgetId || !slotName) {
+            return;
+        }
+        const currentState = getState();
+        const { content: udcContent } = getWidgetContent(currentState, widgetId, slotName, contextType);
+        if (udcContent !== undefined && udcContent !== value) {
+            setCurrentValue(udcContent);
+        }
+    }, []);
+
     useExternalChanges(fieldId, state => {
-        const { content: newContent } = getWidgetContent(state, widgetId, slotName);
+        const { content: newContent } = getWidgetContent(state, widgetId, slotName, contextType);
         if (hasWidgetContentChanged(currentValue, newContent)) {
             setCurrentValue(newContent);
         }

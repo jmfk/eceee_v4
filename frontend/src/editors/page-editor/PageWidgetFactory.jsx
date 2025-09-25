@@ -60,7 +60,6 @@ const PageWidgetFactory = ({
                 const updatedWidget = { ...widget, config: newConfig }
                 layoutRenderer.updateWidget(actualSlotName, index, updatedWidget)
             }
-
             onConfigChange(widget.id, slotName, newConfig)
         } : undefined
     }, [onConfigChange, widget.id, slotName, layoutRenderer, actualSlotName, index, widget])
