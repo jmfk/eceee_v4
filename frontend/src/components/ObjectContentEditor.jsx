@@ -133,6 +133,7 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, mode = 
     }
 
     const handleAddWidget = async (slotName, widgetTypeToAdd = null) => {
+        console.log("handleAddWidget", slotName)
         const slot = objectType.slotConfiguration.slots.find(s => s.name === slotName)
         if (!slot) return
 
