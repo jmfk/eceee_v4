@@ -95,36 +95,41 @@ const ContentWidget = memo(({
     widgetId = null,
     slotName = null,
     widgetType = null,
-    context = {}
+    //context = {}
 }) => {
-    const { useExternalChanges, publishUpdate } = useUnifiedData();
-    const [content, setContent] = useState(config.content || 'Content will appear here...');
+    const { useExternalChanges, publishUpdate, getState } = useUnifiedData();
+    const contentRef = useRef(config.content);
+    const [, forceRerender] = useState({});
+    const setContent = (content) => {
+        contentRef.current = content;
+    }
     const componentId = `widget-${widgetId}`;
     const contextType = useEditorContext();
 
-    // Initialize widget in UnifiedDataContext when component mounts
     useEffect(() => {
-        if (widgetId) {
-            // First add the widget to the state
-            const initialConfig = {
-                content: config.content || ContentWidget.defaultConfig.content,
-                allow_scripts: config.allow_scripts ?? ContentWidget.defaultConfig.allow_scripts,
-                sanitize_html: config.sanitize_html ?? ContentWidget.defaultConfig.sanitize_html
-            };
+        if (!widgetId || !slotName) {
+            return;
         }
-    }, [widgetId]);
+        const currentState = getState();
+        const { content: udcContent } = getWidgetContent(currentState, widgetId, slotName, contextType);
+        if (udcContent !== undefined && udcContent !== config.content) {
+            setContent(udcContent);
+            forceRerender({});
+        }
+    }, []);
 
     // Subscribe to external changes
     useExternalChanges(componentId, (state) => {
-        const { content: newContent } = getWidgetContent(state, widgetId, slotName);
-        if (hasWidgetContentChanged(content, newContent)) {
+        const { content: newContent } = getWidgetContent(state, widgetId, slotName, contextType);
+        if (hasWidgetContentChanged(contentRef.current, newContent)) {
             setContent(newContent);
+            forceRerender({});
         }
     });
 
-    // Enhanced content change handler with update lock
+    // Enhanced content change handler with stable references
     const handleContentChange = useCallback(async (newContent) => {
-        if (newContent !== content) {
+        if (newContent !== contentRef.current) {
             setContent(newContent);
             publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
                 id: widgetId,
@@ -135,20 +140,13 @@ const ContentWidget = memo(({
                     content: newContent
                 }
             });
-            if (onConfigChange) {
-                const updatedConfig = {
-                    ...config,
-                    content: newContent
-                };
-                onConfigChange(updatedConfig);
-            }
         }
-    }, [config, content, onConfigChange])
+    }, [componentId, widgetId, slotName, contextType, publishUpdate, onConfigChange])
 
     if (mode === 'editor') {
         return (
             <ContentWidgetEditor
-                content={content}
+                content={contentRef.current}
                 onChange={handleContentChange}
                 className=""
             />
@@ -157,9 +155,20 @@ const ContentWidget = memo(({
 
     return (
         <div className="content-widget min-h-32 theme-content widget-content">
-            {content && <div dangerouslySetInnerHTML={{ __html: content }} />}
+            {contentRef.current && <div dangerouslySetInnerHTML={{ __html: contentRef.current }} />}
         </div>
     )
+}, (prevProps, nextProps) => {
+    // Custom comparison to prevent re-renders when only object references change
+    return (
+        prevProps.config?.content === nextProps.config?.content &&
+        prevProps.mode === nextProps.mode &&
+        prevProps.themeId === nextProps.themeId &&
+        prevProps.widgetId === nextProps.widgetId &&
+        prevProps.slotName === nextProps.slotName &&
+        prevProps.widgetType === nextProps.widgetType
+        // Note: onConfigChange is intentionally not compared to allow function updates
+    );
 })
 
 // === COLOCATED METADATA ===
