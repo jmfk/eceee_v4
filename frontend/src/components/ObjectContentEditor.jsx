@@ -8,6 +8,8 @@ import { OperationTypes } from '../contexts/unified-data/types/operations'
 import WidgetSelectionModal from './WidgetSelectionModal'
 import SlotIconMenu from './SlotIconMenu'
 import { useWidgetEvents } from '../contexts/WidgetEventContext'
+import { useEditorContext } from '../contexts/unified-data/hooks'
+
 
 const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange, mode = 'object', onWidgetEditorStateChange }, ref) => {
     const [selectedWidgets, setSelectedWidgets] = useState({}) // For bulk operations
@@ -39,6 +41,8 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
     const [widgetModalOpen, setWidgetModalOpen] = useState(false)
     const [selectedSlotForModal, setSelectedSlotForModal] = useState(null)
 
+    const contextType = useEditorContext()
+
     // Use widgets directly since migration is complete
     const normalizedWidgets = useMemo(() => {
         return widgets
@@ -56,7 +60,6 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
     // Subscribe to external changes via Unified Data Context
     useExternalChanges(componentId, (state) => {
         // External updates can be handled here if needed
-        console.log("useExternalChanges::UPDATE", componentId)
     })
 
     // Use the shared widget hook (but we'll override widgetTypes with object type's configuration)
@@ -176,6 +179,7 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
             type: newWidget.type,
             config: newWidget.config,
             slot: slotName,
+            contextType: contextType,
             order: (updatedWidgets[slotName]?.length || 1) - 1
         })
     }
@@ -221,6 +225,7 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
         await publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
             id: updatedWidget.id,
             slotName,
+            contextType: contextType,
             config: updatedWidget.config
         })
 
@@ -262,7 +267,8 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
         // Publish removal to Unified Data Context
         if (widget?.id) {
             await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, {
-                id: widget.id
+                id: widget.id,
+                contextType: contextType
             })
         }
 
@@ -400,7 +406,9 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
         // Publish removal of all widgets in the slot to Unified Data Context
         const existingWidgetsInSlot = normalizedWidgets[slotName] || []
         for (const w of existingWidgetsInSlot) {
-            await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, { id: w.id })
+            await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, {
+                id: w.id, contextType: contextType,
+            })
         }
 
         // Clear any selections for this slot
@@ -449,6 +457,7 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
                         type: newWidget.type,
                         config: newWidget.config,
                         slot: slotName,
+                        contextType: contextType,
                         order: (updatedWidgets[slotName]?.length || 1) - 1
                     })
                 }
