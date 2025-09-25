@@ -11,14 +11,15 @@ import { useWidgetEvents } from '../contexts/WidgetEventContext'
 import { useEditorContext } from '../contexts/unified-data/hooks'
 
 
-const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, mode = 'object', onWidgetEditorStateChange }) => {
+const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, mode = 'object', onWidgetEditorStateChange, context }) => {
     const [selectedWidgets, setSelectedWidgets] = useState({}) // For bulk operations
 
     // Get update lock and UnifiedData context
     const { useExternalChanges, publishUpdate } = useUnifiedData();
 
     // Stable component identifier for UDC source tracking
-    const componentId = useMemo(() => `object-content-editor-${objectType?.name || 'unknown'}`, [objectType?.name])
+    const instanceId = context.instanceId
+    const componentId = useMemo(() => `object-instance-editor-${instanceId || 'new'}`, [instanceId])
 
     // Centralized function to notify parent of widget changes
     const notifyWidgetChange = useCallback((updatedWidgets, widgetId) => {
@@ -38,6 +39,9 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, mode = 
     const [selectedSlotForModal, setSelectedSlotForModal] = useState(null)
 
     const contextType = useEditorContext()
+
+    // console.log("widgets2")
+    // console.log(widgets)
 
     // Use widgets directly since migration is complete
     const normalizedWidgets = useMemo(() => {
@@ -133,7 +137,7 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, mode = 
     }
 
     const handleAddWidget = async (slotName, widgetTypeToAdd = null) => {
-        console.log("handleAddWidget", slotName)
+        console.log("handleAddWidget", slotName, widgetTypeToAdd)
         const slot = objectType.slotConfiguration.slots.find(s => s.name === slotName)
         if (!slot) return
 
@@ -181,10 +185,6 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, mode = 
             order: (updatedWidgets[slotName]?.length || 1) - 1
         })
     }
-
-
-
-    // Remove redundant function - use the shared one from useWidgets hook
 
     // Widget editor handlers
     const handleOpenWidgetEditor = useCallback((widgetData) => {
@@ -234,6 +234,7 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, mode = 
     // Notify parent of widget editor state changes
     useEffect(() => {
         if (onWidgetEditorStateChange) {
+            //console.log("onWidgetEditorStateChange changed")
             onWidgetEditorStateChange({
                 isOpen: widgetEditorOpen,
                 editingWidget,
@@ -247,10 +248,12 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, mode = 
 
     const handleEditWidget = (slotName, widgetIndex, widget) => {
         // Add slotName and computed editor context to widget data for editor
+        //console.log("handleEditWidget")
         const widgetWithSlot = {
             ...widget,
             slotName,
             context: {
+                ...context,
                 slotName,
                 widgetId: widget?.id,
                 objectId: (normalizedWidgetsRef.current && (Object.keys(normalizedWidgetsRef.current)[0] || undefined)),
@@ -296,16 +299,13 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, mode = 
 
     // Move widget up in the slot
     const handleMoveWidgetUp = (slotName, widgetIndex, widget) => {
+        console.log("handleMoveWidgetUp", slotName, widgetIndex, widget)
         if (widgetIndex <= 0) return // Can't move the first widget up
-
         const slot = objectType?.slotConfiguration?.slots?.find(s => s.name === slotName)
-
-        // Directly perform the widget move operation
         const currentWidgets = normalizedWidgets
         const slotWidgets = [...(currentWidgets[slotName] || [])]
 
         if (widgetIndex < slotWidgets.length) {
-            // Swap widgets
             const [movedWidget] = slotWidgets.splice(widgetIndex, 1)
             slotWidgets.splice(widgetIndex - 1, 0, movedWidget)
 
@@ -313,25 +313,22 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, mode = 
                 ...currentWidgets,
                 [slotName]: slotWidgets
             }
-            //notifyWidgetChange(updatedWidgets)
+            onWidgetChange(updatedWidgets)
         }
     }
 
     // Move widget down in the slot
     const handleMoveWidgetDown = (slotName, widgetIndex, widget) => {
+        console.log("handleMoveWidgetDown", slotName, widgetIndex, widget)
         const slotWidgets = normalizedWidgets[slotName] || []
         if (widgetIndex >= slotWidgets.length - 1) {
             return // Can't move the last widget down
         }
-
         const slot = objectType?.slotConfiguration?.slots?.find(s => s.name === slotName)
-
-        // Directly perform the widget move operation
         const currentWidgets = normalizedWidgets
         const currentSlotWidgets = [...(currentWidgets[slotName] || [])]
 
         if (widgetIndex >= 0 && widgetIndex < currentSlotWidgets.length - 1) {
-            // Swap widgets
             const [movedWidget] = currentSlotWidgets.splice(widgetIndex, 1)
             currentSlotWidgets.splice(widgetIndex + 1, 0, movedWidget)
 
@@ -339,49 +336,8 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, mode = 
                 ...currentWidgets,
                 [slotName]: currentSlotWidgets
             }
-            //notifyWidgetChange(updatedWidgets, widget.id)
+            onWidgetChange(updatedWidgets)
         }
-    }
-
-    // Toggle widget selection for bulk operations
-    const handleToggleWidgetSelection = (slotName, widgetIndex, widget) => {
-        const widgetKey = `${slotName}-${widgetIndex}`
-        setSelectedWidgets(prev => ({
-            ...prev,
-            [widgetKey]: prev[widgetKey] ? undefined : { slotName, widgetIndex, widget }
-        }))
-    }
-
-    // Delete selected widgets
-    const handleDeleteSelectedWidgets = () => {
-        const updatedWidgets = { ...normalizedWidgets }
-
-        // Group deletions by slot to handle index changes
-        const deletionsBySlot = {}
-        Object.values(selectedWidgets).forEach(({ slotName, widgetIndex }) => {
-            if (!deletionsBySlot[slotName]) {
-                deletionsBySlot[slotName] = []
-            }
-            deletionsBySlot[slotName].push(widgetIndex)
-        })
-
-        // Delete widgets from each slot (in reverse order to maintain indices)
-        Object.entries(deletionsBySlot).forEach(([slotName, indices]) => {
-            const sortedIndices = indices.sort((a, b) => b - a)
-            let slotWidgets = [...(updatedWidgets[slotName] || [])]
-
-            sortedIndices.forEach(index => {
-                slotWidgets.splice(index, 1)
-            })
-
-            updatedWidgets[slotName] = slotWidgets
-        })
-
-        // Clear selection
-        setSelectedWidgets({})
-
-        // Notify parent component via event system
-        //notifyWidgetChange(updatedWidgets, 'bulk-delete')
     }
 
     // Widget modal handlers
@@ -516,7 +472,7 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, mode = 
         const isSelected = !!selectedWidgets[widgetKey]
         const slotWidgets = normalizedWidgets[slotName] || []
         const slot = objectType?.slotConfiguration?.slots?.find(s => s.name === slotName)
-
+        //console.log("widget", widget)
         return (
             <div key={widget.id || index} className="relative">
                 <ObjectWidgetFactory
@@ -541,6 +497,7 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, mode = 
                     // Pass widget identity for event system
                     widgetId={widget.id}
                     className={`mb-2 ${isSelected ? 'ring-2 ring-blue-500' : ''}`}
+                    context={context}
                 />
             </div>
         )
@@ -567,6 +524,7 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, mode = 
                     onAddWidget={handleAddWidget}
                     onClearSlot={handleClearSlot}
                     onShowWidgetModal={handleShowWidgetModal}
+                    context={context}
                 />
 
                 {/* Slot Header */}
@@ -651,6 +609,7 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, mode = 
                 slot={selectedSlotForModal}
                 availableWidgetTypes={availableWidgetTypes}
                 isFilteringTypes={isFilteringTypes}
+                context={context}
             />
         </div>
     )

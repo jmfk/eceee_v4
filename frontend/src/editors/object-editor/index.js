@@ -9,8 +9,6 @@
 export { default as ObjectWidgetFactory } from './ObjectWidgetFactory'
 export { default as ObjectWidgetHeader } from './ObjectWidgetHeader'
 
-// Export test component for development
-export { default as ObjectEditorMigrationTest } from './ObjectEditorMigrationTest'
 
 // Export ObjectEditor event system
 export {

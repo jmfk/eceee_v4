@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react'
+import React, { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle, useMemo } from 'react'
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Save, AlertCircle } from 'lucide-react'
@@ -10,23 +10,21 @@ import { widgetsApi } from '../../api'
 import ObjectContentEditor from '../ObjectContentEditor'
 import WidgetEditorPanel from '../WidgetEditorPanel'
 import ObjectDataForm from './ObjectDataForm'
+import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext';
+import { OperationTypes } from '../../contexts/unified-data/types/operations';
 
-const ObjectContentView = forwardRef(({ objectType, instance, parentId, isNewInstance, onSave, onCancel, onUnsavedChanges }, ref) => {
+const ObjectContentView = forwardRef(({ objectType, instance, parentId, isNewInstance, onSave, onCancel, onUnsavedChanges, context }, ref) => {
     const navigate = useNavigate()
     const { instanceId, objectTypeId, tab } = useParams()
-
-    // Track widget changes locally (don't auto-save)
     const [localWidgets, setLocalWidgets] = useState(instance?.widgets || {})
     const [namespace, setNamespace] = useState(null)
-
     const { useExternalChanges, publishUpdate } = useUnifiedData()
 
     const componentId = useMemo(() => `object-instance-editor-${instanceId || 'new'}`, [instanceId])
 
-
     useExternalChanges(componentId, state => {
-        console.log("useExternalChanges::ObjectContentView")
-        console.log(state)
+        //console.log("useExternalChanges::ObjectContentView")
+        //console.log(state)
         // setLocalWidgets(prevWidgets => {
         //     const newWidgets = { ...prevWidgets }
         //     const slotName = payload.slotName
@@ -47,7 +45,6 @@ const ObjectContentView = forwardRef(({ objectType, instance, parentId, isNewIns
         editingWidget: null,
         hasUnsavedChanges: false
     })
-    //const [hasWidgetChanges, setHasWidgetChanges] = useState(false)
 
     // Fetch widget types for display names
     const { data: widgetTypes = [] } = useQuery({
@@ -103,6 +100,17 @@ const ObjectContentView = forwardRef(({ objectType, instance, parentId, isNewIns
             return newWidgets
         })
 
+    }, [])
+
+    const handleWidgetChange = useCallback(async (widgets, widgetId) => {
+        setLocalWidgets(widgets)
+
+        await publishUpdate(componentId, OperationTypes.MOVE_WIDGET, {
+            //id: instanceId,
+            //slot: slotName,
+            contextType: 'object',
+            widgets: widgets
+        });
     }, [])
 
     // Widget editor state management - direct callback approach instead of polling
@@ -282,15 +290,7 @@ const ObjectContentView = forwardRef(({ objectType, instance, parentId, isNewIns
     }, [errors])
 
     // Check if there are any unsaved changes (form data or widgets)
-    // const hasUnsavedChanges = isFormDirty || hasWidgetChanges
     const hasUnsavedChanges = false;
-
-    // // Notify parent about unsaved changes
-    // useEffect(() => {
-    //     if (onUnsavedChanges) {
-    //         onUnsavedChanges(hasUnsavedChanges)
-    //     }
-    // }, [hasUnsavedChanges, onUnsavedChanges])
 
     const validateForm = useCallback(() => {
         const newErrors = {}
@@ -316,45 +316,6 @@ const ObjectContentView = forwardRef(({ objectType, instance, parentId, isNewIns
         setErrors(newErrors)
         return Object.keys(newErrors).length === 0
     }, [formData, objectType])
-
-    // const handleSave = useCallback(async (mode = saveMode) => {
-    //     console.log("handleSave")
-    //     if (!validateForm()) {
-    //         addNotification('Please fix the validation errors', 'error')
-    //         return
-    //     }
-
-    //     // Prepare save data
-    //     const saveData = {
-    //         ...formData,
-    //         widgets: localWidgets,
-    //         // Set parent if creating new instance and parentId is provided
-    //         ...(isNewInstance && parentId && { parent: parentId })
-    //     }
-
-    //     try {
-    //         await handleSaveInternal(saveData, mode)
-    //         //setIsFormDirty(false)
-    //     } catch (error) {
-    //         // Error handling is done in handleSaveInternal
-    //         console.error('Save failed:', error)
-    //     }
-    // }, [validateForm, addNotification, formData, localWidgets, isNewInstance, parentId, handleSaveInternal, saveMode])
-
-    // Expose methods to parent component
-    // useImperativeHandle(ref, () => ({
-    //     handleSave: (mode) => {
-    //         // Map parent's save types to child's save modes
-    //         let saveMode = 'update_current'
-    //         if (mode === 'create_new') {
-    //             saveMode = 'create_new'
-    //         } else if (mode === 'create' || mode === 'update_current') {
-    //             saveMode = 'update_current'
-    //         }
-
-    //         handleSave(saveMode)
-    //     }
-    // }), [handleSave])
 
     // Get widget editor state directly from local state
     const isWidgetEditorOpen = widgetEditorUI.isOpen
@@ -396,11 +357,10 @@ const ObjectContentView = forwardRef(({ objectType, instance, parentId, isNewIns
                                     <ObjectContentEditor
                                         objectType={objectType}
                                         widgets={localWidgets}
-                                        onWidgetChange={(newWidgets) => {
-                                            setLocalWidgets(newWidgets)
-                                        }}
+                                        onWidgetChange={handleWidgetChange}
                                         onWidgetEditorStateChange={handleWidgetEditorStateChange}
                                         mode="object"
+                                        context={{ ...context, instanceId }}
                                     />
                                 </div>
                             </div>
@@ -416,6 +376,7 @@ const ObjectContentView = forwardRef(({ objectType, instance, parentId, isNewIns
                                     handleInputChange={handleInputChange}
                                     handleDataFieldChange={handleDataFieldChange}
                                     getSchemaFromObjectType={getSchemaFromObjectType}
+                                    context={{ ...context, instanceId }}
                                 />
                             </div>
                         </div>
@@ -438,6 +399,7 @@ const ObjectContentView = forwardRef(({ objectType, instance, parentId, isNewIns
                                 handleInputChange={handleInputChange}
                                 handleDataFieldChange={handleDataFieldChange}
                                 getSchemaFromObjectType={getSchemaFromObjectType}
+                                context={{ ...context, instanceId }}
                             />
                         </div>
                     )}
@@ -459,6 +421,7 @@ const ObjectContentView = forwardRef(({ objectType, instance, parentId, isNewIns
                     title={widgetEditorUI.editingWidget ? `Edit ${getWidgetDisplayName(widgetEditorUI.editingWidget.type, widgetTypes)}` : 'Edit Widget'}
                     autoOpenSpecialEditor={widgetEditorUI.editingWidget?.type === 'core_widgets.ImageWidget'}
                     namespace={namespace}
+                    context={{ ...context, instanceId }}
                 />
             )}
         </div>

@@ -20,11 +20,9 @@ import VersionTimelinePage from '@pages/VersionTimelinePage'
 import NotFoundPage from '@pages/NotFoundPage'
 import SelfContainedFormDemo from '@components/demos/SelfContainedFormDemo'
 import SimpleFormDemo from '@components/demos/SimpleFormDemo'
-// import RenderInvestigation from '@pages/RenderInvestigation' // DISABLED
 import { NotificationProvider } from '@components/NotificationManager'
 import { GlobalNotificationProvider } from './contexts/GlobalNotificationContext'
 import { AuthProvider } from './contexts/AuthContext'
-//import { WidgetEventProvider } from './contexts/WidgetEventContext'
 import { UnifiedDataProvider } from './contexts/unified-data'
 import PrivateRoute from './components/PrivateRoute'
 import LoginPage from './pages/LoginPage'
@@ -69,22 +67,6 @@ function App() {
                       </div>
                     </PrivateRoute>
                   } />
-
-                  {/* RENDER INVESTIGATION ROUTE - DISABLED
-                  <Route path="/render-investigation" element={
-                    <PrivateRoute>
-                      <div className="fixed inset-0 bg-gray-50 flex flex-col">
-                        <Navbar />
-                        <main className="flex-1 overflow-hidden">
-                          <div className="h-full overflow-y-auto">
-                            <RenderInvestigation />
-                          </div>
-                        </main>
-                        <StatusBar customStatusContent={<span>Render Investigation - Active</span>} />
-                      </div>
-                    </PrivateRoute>
-                  } />
-                  */}
 
                   {/* Self-Contained Form Demo Routes */}
                   <Route path="/demo/self-contained-form" element={

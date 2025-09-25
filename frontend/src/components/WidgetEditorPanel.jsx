@@ -30,7 +30,8 @@ const WidgetEditorPanel = forwardRef(({
     schema,
     title = "Edit Widget",
     autoOpenSpecialEditor = false,
-    namespace = null
+    namespace = null,
+    context
 }, ref) => {
     const [hasChanges, setHasChanges] = useState(false)
     const [widgetTypeName, setWidgetTypeName] = useState(null)

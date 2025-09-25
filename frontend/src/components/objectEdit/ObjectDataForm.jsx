@@ -15,7 +15,8 @@ const ObjectDataForm = ({
     errors,
     handleInputChange,
     handleDataFieldChange,
-    getSchemaFromObjectType
+    getSchemaFromObjectType,
+    context
 }) => {
     const [namespace, setNamespace] = useState(null)
 

@@ -5,7 +5,7 @@ import { objectInstancesApi } from '../../api/objectStorage'
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext'
 import ParentObjectSelector from '../ParentObjectSelector'
 
-const ObjectSettingsView = ({ objectType, instance, isNewInstance, parentId, onSave, onCancel, onUnsavedChanges }) => {
+const ObjectSettingsView = ({ objectType, instance, isNewInstance, parentId, onSave, onCancel, onUnsavedChanges, context }) => {
     const [formData, setFormData] = useState({
         parent: instance?.parent?.id || parentId || null,
         metadata: instance?.metadata || {}

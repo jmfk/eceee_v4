@@ -169,8 +169,7 @@ const ReactLayoutRenderer = forwardRef(({
                     }
                     // Publish to Unified Data Context
                     await publishUpdate(componentId, OperationTypes.MOVE_WIDGET, {
-                        id: widget.id,
-                        slot: slotName,
+                        //id: widget.id,
                         contextType: contextType,
                         widgets: updatedWidgetsUp
                     });
@@ -200,8 +199,7 @@ const ReactLayoutRenderer = forwardRef(({
 
                     // Publish to Unified Data Context
                     await publishUpdate(componentId, OperationTypes.MOVE_WIDGET, {
-                        id: widget.id,
-                        slot: slotName,
+                        //id: widget.id,
                         contextType: contextType,
                         widgets: updatedWidgetsDown
                     });

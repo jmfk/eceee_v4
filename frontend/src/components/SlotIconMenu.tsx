@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { MoreHorizontal, Plus, Trash2 } from 'lucide-react'
 
 // SlotIconMenu component that replicates the PageEditor three-dot menu
-const SlotIconMenu = ({ slotName, slot, availableWidgetTypes, isFilteringTypes, onAddWidget, onClearSlot, onShowWidgetModal }) => {
+const SlotIconMenu = ({ slotName, slot, availableWidgetTypes, isFilteringTypes, onAddWidget, onClearSlot, onShowWidgetModal, context }) => {
     const menuRef = useRef<HTMLDivElement | null>(null)
     const [isOpen, setIsOpen] = useState(false)
 

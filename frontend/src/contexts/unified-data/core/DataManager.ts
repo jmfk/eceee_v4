@@ -342,21 +342,9 @@ export class DataManager {
                             { payload: operation.payload }
                         );
                     }
-                    // if (operation.payload.contextType === 'object') {
-                    //     throw new ValidationError(operation,
-                    //         'objectId is required when contextType is "object"',
-                    //         { payload: operation.payload }
-                    //     );
-                    // }
                     break;
                 
                 case OperationTypes.MOVE_WIDGET:
-                    if (!operation.payload?.id || !operation.payload?.slot) {
-                        throw new ValidationError(operation,
-                            'Widget ID and slot are required',
-                            { payload: operation.payload }
-                        );
-                    }
                     if (!operation.payload?.contextType || !['page', 'object'].includes(operation.payload.contextType)) {
                         throw new ValidationError(operation,
                             'contextType is required for widget operations and must be "page" or "object"',
@@ -369,12 +357,6 @@ export class DataManager {
                             { payload: operation.payload }
                         );
                     }
-                    // if (operation.payload.contextType === 'object') {
-                    //     throw new ValidationError(operation,
-                    //         'objectId is required when contextType is "object"',
-                    //         { payload: operation.payload }
-                    //     );
-                    // }
                     break;
 
                 case OperationTypes.REMOVE_WIDGET:
@@ -705,7 +687,6 @@ export class DataManager {
                         const payload = operation.payload as MoveWidgetPayload;
                         const target = this.resolveWidgetTargetFromPayload(payload);
                         const widgets = payload.widgets;
-                        const targetSlot = payload.slot;
                         const now = new Date().toISOString();
 
 
