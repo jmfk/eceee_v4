@@ -704,73 +704,34 @@ export class DataManager {
                     this.setState(operation, state => {
                         const payload = operation.payload as MoveWidgetPayload;
                         const target = this.resolveWidgetTargetFromPayload(payload);
-                        const targetOrder = payload.order;
+                        const widgets = payload.widgets;
                         const targetSlot = payload.slot;
                         const now = new Date().toISOString();
 
-                        if (target.versionId) {
+
+                        if (payload.contextType === "page" && target.versionId) {
                             const version = state.versions[target.versionId];
-                            // Remove from any slot it exists in, then insert into target slot at order
-                            const widgetsBySlot = { ...version.widgets };
-                            let foundWidget: any = null;
-                            Object.keys(widgetsBySlot).forEach(slotName => {
-                                const arr = widgetsBySlot[slotName] || [];
-                                const index = arr.findIndex(w => w.id === payload.id);
-                                if (index !== -1) {
-                                    [foundWidget] = arr.splice(index, 1);
-                                    widgetsBySlot[slotName] = [...arr];
-                                }
-                            });
-                            if (!foundWidget) {
-                                throw new Error(`Widget ${payload.id} not found in any slot of version ${target.versionId}`);
-                            }
-                            foundWidget = { ...foundWidget, slot: targetSlot, order: targetOrder, updated_at: now };
-                            const targetArr = widgetsBySlot[targetSlot] ? [...widgetsBySlot[targetSlot]] : [];
-                            const insertIndex = Math.max(0, Math.min(targetOrder, targetArr.length));
-                            targetArr.splice(insertIndex, 0, foundWidget);
-                            // Re-number orders
-                            const normalized = targetArr.map((w, idx) => ({ ...w, order: idx }));
-                            widgetsBySlot[targetSlot] = normalized;
                             return {
                                 versions: {
                                     ...state.versions,
                                     [target.versionId]: {
                                         ...version,
-                                        widgets: widgetsBySlot
+                                        widgets: widgets
                                     }
                                 },
                                 metadata: { ...state.metadata, isDirty: true }
                             };
                         }
 
-                        if ((target as any).objectId) {
+                        if (payload.contextType === "object") {
                             const objectId = (target as any).objectId as string;
                             const objValue = (state as any).objects[objectId];
-                            const widgetsBySlot = { ...(objValue.widgets || {}) } as any;
-                            let foundWidget: any = null;
-                            Object.keys(widgetsBySlot).forEach(slotName => {
-                                const arr = widgetsBySlot[slotName] || [];
-                                const index = arr.findIndex((w: any) => w.id === payload.id);
-                                if (index !== -1) {
-                                    [foundWidget] = arr.splice(index, 1);
-                                    widgetsBySlot[slotName] = [...arr];
-                                }
-                            });
-                            if (!foundWidget) {
-                                throw new Error(`Widget ${payload.id} not found in any slot of object version ${objectId}`);
-                            }
-                            foundWidget = { ...foundWidget, slot: targetSlot, order: targetOrder, updated_at: now };
-                            const targetArr = widgetsBySlot[targetSlot] ? [...widgetsBySlot[targetSlot]] : [];
-                            const insertIndex = Math.max(0, Math.min(targetOrder, targetArr.length));
-                            targetArr.splice(insertIndex, 0, foundWidget);
-                            const normalized = targetArr.map((w: any, idx: number) => ({ ...w, order: idx }));
-                            widgetsBySlot[targetSlot] = normalized;
                             return {
                                 objects: {
                                     ...(state as any).objects,
                                     [objectId]: {
                                         ...objValue,
-                                        widgets: widgetsBySlot
+                                        widgets: widgets
                                     }
                                 },
                                 metadata: { ...state.metadata, isDirty: true }

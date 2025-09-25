@@ -47,9 +47,9 @@ const PageContentEditor = forwardRef(({
     });
 
     // Handle widget changes
-    const handleWidgetChange = async (updatedWidgets, widgetId) => {
+    const handleWidgetChange = async (updatedWidgets, data) => {
         if (onUpdate) {
-            onUpdate({ widgets: updatedWidgets }, { sourceId: widgetId });
+            onUpdate({ widgets: updatedWidgets }, data);
         }
     };
 

@@ -8,14 +8,10 @@ import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext
 import { getWidgetDisplayName } from '../../hooks/useWidgets'
 import { widgetsApi } from '../../api'
 import ObjectContentEditor from '../ObjectContentEditor'
-import ObjectSchemaForm from '../ObjectSchemaForm'
 import WidgetEditorPanel from '../WidgetEditorPanel'
 import ObjectDataForm from './ObjectDataForm'
-import { WidgetEventProvider, useWidgetEvents } from '../../contexts/WidgetEventContext'
-import { WIDGET_EVENTS, WIDGET_CHANGE_TYPES } from '../../types/widgetEvents'
 
-// Internal component that uses widget event hooks
-const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, isNewInstance, onSave, onCancel, onUnsavedChanges }, ref) => {
+const ObjectContentView = forwardRef(({ objectType, instance, parentId, isNewInstance, onSave, onCancel, onUnsavedChanges }, ref) => {
     const navigate = useNavigate()
     const { instanceId, objectTypeId, tab } = useParams()
 
@@ -24,21 +20,20 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
     const [namespace, setNamespace] = useState(null)
 
 
-    // Widget editor ref and state
-    const objectContentEditorRef = useRef(null)
+    // Widget editor state
     const [widgetEditorUI, setWidgetEditorUI] = useState({
         isOpen: false,
         editingWidget: null,
         hasUnsavedChanges: false
     })
-    const [hasWidgetChanges, setHasWidgetChanges] = useState(false)
+    //const [hasWidgetChanges, setHasWidgetChanges] = useState(false)
 
     // Notify parent about unsaved changes
-    useEffect(() => {
-        if (onUnsavedChanges) {
-            onUnsavedChanges(hasWidgetChanges)
-        }
-    }, [hasWidgetChanges, onUnsavedChanges])
+    // useEffect(() => {
+    //     if (onUnsavedChanges) {
+    //         onUnsavedChanges(hasWidgetChanges)
+    //     }
+    // }, [hasWidgetChanges, onUnsavedChanges])
 
     // Fetch widget types for display names
     const { data: widgetTypes = [] } = useQuery({
@@ -78,44 +73,45 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
 
     // Update local widgets when instance changes
     useEffect(() => {
-        setLocalWidgets(instance?.widgets || {})
-        setHasWidgetChanges(false)
+        console.log("instance has changed")
+        //setLocalWidgets(instance?.widgets || {})
+        ////setHasWidgetChanges(false)
     }, [instance])
 
     // Subscribe to widget events for real-time updates and dirty state management
-    const { subscribe } = useWidgetEvents()
+    // const { subscribe } = useWidgetEvents()
 
-    useEffect(() => {
-        // Handler for widget changes
-        const handleWidgetChanged = (payload) => {
-            if (payload.changeType === WIDGET_CHANGE_TYPES.CONFIG) {
-                // Handle real-time config changes - mark as dirty but don't auto-save
-                setHasWidgetChanges(true)
+    // useEffect(() => {
+    //     // Handler for widget changes
+    //     const handleWidgetChanged = (payload) => {
+    //         if (payload.changeType === WIDGET_CHANGE_TYPES.CONFIG) {
+    //             // Handle real-time config changes - mark as dirty but don't auto-save
+    //             //setHasWidgetChanges(true)
 
-                // Update local widgets for live preview
-                setLocalWidgets(prevWidgets => {
-                    const newWidgets = { ...prevWidgets }
-                    const slotName = payload.slotName
+    //             // Update local widgets for live preview
+    //             setLocalWidgets(prevWidgets => {
+    //                 const newWidgets = { ...prevWidgets }
+    //                 const slotName = payload.slotName
 
-                    if (newWidgets[slotName]) {
-                        newWidgets[slotName] = newWidgets[slotName].map(widget =>
-                            widget.id === payload.widgetId ? payload.widget : widget
-                        )
-                    }
+    //                 if (newWidgets[slotName]) {
+    //                     newWidgets[slotName] = newWidgets[slotName].map(widget =>
+    //                         widget.id === payload.widgetId ? payload.widget : widget
+    //                     )
+    //                 }
 
-                    return newWidgets
-                })
-            }
-        }
+    //                 return newWidgets
+    //             })
+    //         }
+    //     }
 
-        // Subscribe to widget change events
-        const unsubscribe = subscribe(WIDGET_EVENTS.CHANGED, handleWidgetChanged)
+    //     // Subscribe to widget change events
+    //     const unsubscribe = subscribe(WIDGET_EVENTS.CHANGED, handleWidgetChanged)
 
-        // Cleanup subscription
-        return () => {
-            unsubscribe()
-        }
-    }, [subscribe])
+    //     // Cleanup subscription
+    //     return () => {
+    //         unsubscribe()
+    //     }
+    // }, [subscribe])
 
     // Handle real-time widget updates from WidgetEditorPanel
     const handleRealTimeWidgetUpdate = useCallback((updatedWidget) => {
@@ -136,7 +132,7 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
         })
 
         // Mark as having changes but don't auto-save
-        setHasWidgetChanges(true)
+        //setHasWidgetChanges(true)
     }, [])
 
     // Widget editor state management - direct callback approach instead of polling
@@ -205,7 +201,7 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
     })
 
     // Track if form has been modified
-    const [isFormDirty, setIsFormDirty] = useState(false)
+    // const [isFormDirty, setIsFormDirty] = useState(false)
 
     // Fetch available object types for selection (when creating)
     const { data: typesResponse } = useQuery({
@@ -230,11 +226,11 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
             }
 
             setFormData(newFormData)
-            setIsFormDirty(false)
+            //setIsFormDirty(false)
 
             // Sync local widgets with instance
             setLocalWidgets(instance.widgets || {})
-            setHasWidgetChanges(false)
+            //setHasWidgetChanges(false)
         }
     }, [instance])
 
@@ -255,7 +251,7 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
             // Invalidate queries
             queryClient.invalidateQueries(['objectInstances'])
             queryClient.invalidateQueries(['objectInstance', instance?.id])
-            setHasWidgetChanges(false)
+            //setHasWidgetChanges(false)
 
             // Show success message based on save mode
             let successMessage
@@ -286,13 +282,13 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
             }
             throw error
         }
-    }, [isNewInstance, instance?.id, instance?.version, queryClient, addNotification, navigate, setHasWidgetChanges])
+    }, [isNewInstance, instance?.id, instance?.version, queryClient, addNotification, navigate])
 
 
     // Update form field and mark as dirty
     const handleInputChange = useCallback((field, value) => {
         setFormData(prev => ({ ...prev, [field]: value }))
-        setIsFormDirty(true)
+        //setIsFormDirty(true)
 
         // Clear error when user starts typing
         if (errors[field]) {
@@ -306,7 +302,7 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
             ...prev,
             data: { ...prev.data, [fieldName]: value }
         }))
-        setIsFormDirty(true)
+        // setIsFormDirty(true)
 
         // Clear error when user starts typing
         const errorKey = `data_${fieldName}`
@@ -316,14 +312,15 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
     }, [errors])
 
     // Check if there are any unsaved changes (form data or widgets)
-    const hasUnsavedChanges = isFormDirty || hasWidgetChanges
+    // const hasUnsavedChanges = isFormDirty || hasWidgetChanges
+    const hasUnsavedChanges = false;
 
-    // Notify parent about unsaved changes
-    useEffect(() => {
-        if (onUnsavedChanges) {
-            onUnsavedChanges(hasUnsavedChanges)
-        }
-    }, [hasUnsavedChanges, onUnsavedChanges])
+    // // Notify parent about unsaved changes
+    // useEffect(() => {
+    //     if (onUnsavedChanges) {
+    //         onUnsavedChanges(hasUnsavedChanges)
+    //     }
+    // }, [hasUnsavedChanges, onUnsavedChanges])
 
     const validateForm = useCallback(() => {
         const newErrors = {}
@@ -350,43 +347,44 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
         return Object.keys(newErrors).length === 0
     }, [formData, objectType])
 
-    const handleSave = useCallback(async (mode = saveMode) => {
-        if (!validateForm()) {
-            addNotification('Please fix the validation errors', 'error')
-            return
-        }
+    // const handleSave = useCallback(async (mode = saveMode) => {
+    //     console.log("handleSave")
+    //     if (!validateForm()) {
+    //         addNotification('Please fix the validation errors', 'error')
+    //         return
+    //     }
 
-        // Prepare save data
-        const saveData = {
-            ...formData,
-            widgets: localWidgets,
-            // Set parent if creating new instance and parentId is provided
-            ...(isNewInstance && parentId && { parent: parentId })
-        }
+    //     // Prepare save data
+    //     const saveData = {
+    //         ...formData,
+    //         widgets: localWidgets,
+    //         // Set parent if creating new instance and parentId is provided
+    //         ...(isNewInstance && parentId && { parent: parentId })
+    //     }
 
-        try {
-            await handleSaveInternal(saveData, mode)
-            setIsFormDirty(false)
-        } catch (error) {
-            // Error handling is done in handleSaveInternal
-            console.error('Save failed:', error)
-        }
-    }, [validateForm, addNotification, formData, localWidgets, isNewInstance, parentId, handleSaveInternal, saveMode])
+    //     try {
+    //         await handleSaveInternal(saveData, mode)
+    //         //setIsFormDirty(false)
+    //     } catch (error) {
+    //         // Error handling is done in handleSaveInternal
+    //         console.error('Save failed:', error)
+    //     }
+    // }, [validateForm, addNotification, formData, localWidgets, isNewInstance, parentId, handleSaveInternal, saveMode])
 
     // Expose methods to parent component
-    useImperativeHandle(ref, () => ({
-        handleSave: (mode) => {
-            // Map parent's save types to child's save modes
-            let saveMode = 'update_current'
-            if (mode === 'create_new') {
-                saveMode = 'create_new'
-            } else if (mode === 'create' || mode === 'update_current') {
-                saveMode = 'update_current'
-            }
+    // useImperativeHandle(ref, () => ({
+    //     handleSave: (mode) => {
+    //         // Map parent's save types to child's save modes
+    //         let saveMode = 'update_current'
+    //         if (mode === 'create_new') {
+    //             saveMode = 'create_new'
+    //         } else if (mode === 'create' || mode === 'update_current') {
+    //             saveMode = 'update_current'
+    //         }
 
-            handleSave(saveMode)
-        }
-    }), [handleSave])
+    //         handleSave(saveMode)
+    //     }
+    // }), [handleSave])
 
     // Get widget editor state directly from local state
     const isWidgetEditorOpen = widgetEditorUI.isOpen
@@ -426,12 +424,10 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
                             <div className="space-y-6 border-r pr-6 border-gray-200">
                                 <div>
                                     <ObjectContentEditor
-                                        ref={objectContentEditorRef}
                                         objectType={objectType}
                                         widgets={localWidgets}
                                         onWidgetChange={(newWidgets) => {
                                             setLocalWidgets(newWidgets)
-                                            setHasWidgetChanges(true)
                                         }}
                                         onWidgetEditorStateChange={handleWidgetEditorStateChange}
                                         mode="object"
@@ -496,17 +492,6 @@ const ObjectContentViewInternal = forwardRef(({ objectType, instance, parentId, 
                 />
             )}
         </div>
-    )
-})
-
-ObjectContentViewInternal.displayName = 'ObjectContentViewInternal'
-
-// Main component that provides the WidgetEventContext
-const ObjectContentView = forwardRef((props, ref) => {
-    return (
-        <WidgetEventProvider>
-            <ObjectContentViewInternal {...props} ref={ref} />
-        </WidgetEventProvider>
     )
 })
 
