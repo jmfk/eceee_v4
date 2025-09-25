@@ -101,7 +101,7 @@ export class DataManager {
     /**
      * Get and validate the current editing context
      */
-    private getCurrentContext(): { pageId?: string; versionId?: string; objectId?: string; objectVersionId?: string } {
+    private getCurrentContext(): { pageId?: string; versionId?: string; objectId?: string; } {
         const { currentPageId, currentVersionId, currentObjectId } = this.state.metadata;
         
         // Prefer page context if present
@@ -607,8 +607,8 @@ export class DataManager {
                             const slotName = newWidget.slot;
                             const slotWidgets = (objValue.widgets?.[slotName] || []);
                             return {
-                                objectVersions: {
-                                    ...(state as any).objectVersions,
+                                objects: {
+                                    ...(state as any).objects,
                                     [objectId]: {
                                         ...objValue,
                                         widgets: {
@@ -664,13 +664,13 @@ export class DataManager {
                             };
                         }
 
-                        if ((target as any).objectVersionId) {
-                            const objectVersionId = (target as any).objectVersionId as string;
-                            const objVersion = (state as any).objectVersions[objectVersionId];
-                            const slotWidgets = (objVersion.widgets?.[slotName] || []);
+                        if ((target as any).objectId) {
+                            const objectId = (target as any).objectId as string;
+                            const objValue = (state as any).objects[objectId];
+                            const slotWidgets = (objValue.widgets?.[slotName] || []);
                             const widgetIndex = slotWidgets.findIndex((w: any) => w.id === widgetId);
                             if (widgetIndex === -1) {
-                                throw new Error(`Widget ${widgetId} not found in slot ${slotName} of object version ${objectVersionId}`);
+                                throw new Error(`Widget ${widgetId} not found in slot ${slotName} of object version ${objectId}`);
                             }
                             const updatedWidgets = [...slotWidgets];
                             updatedWidgets[widgetIndex] = {
@@ -682,12 +682,12 @@ export class DataManager {
                                 updated_at: now
                             };
                             return {
-                                objectVersions: {
-                                    ...(state as any).objectVersions,
-                                    [objectVersionId]: {
-                                        ...objVersion,
+                                objects: {
+                                    ...(state as any).objects,
+                                    [objectId]: {
+                                        ...objValue,
                                         widgets: {
-                                            ...(objVersion.widgets || {}),
+                                            ...(objValue.widgets || {}),
                                             [slotName]: updatedWidgets
                                         }
                                     }
@@ -743,10 +743,10 @@ export class DataManager {
                             };
                         }
 
-                        if ((target as any).objectVersionId) {
-                            const objectVersionId = (target as any).objectVersionId as string;
-                            const objVersion = (state as any).objectVersions[objectVersionId];
-                            const widgetsBySlot = { ...(objVersion.widgets || {}) } as any;
+                        if ((target as any).objectId) {
+                            const objectId = (target as any).objectId as string;
+                            const objValue = (state as any).objects[objectId];
+                            const widgetsBySlot = { ...(objValue.widgets || {}) } as any;
                             let foundWidget: any = null;
                             Object.keys(widgetsBySlot).forEach(slotName => {
                                 const arr = widgetsBySlot[slotName] || [];
@@ -757,7 +757,7 @@ export class DataManager {
                                 }
                             });
                             if (!foundWidget) {
-                                throw new Error(`Widget ${payload.id} not found in any slot of object version ${objectVersionId}`);
+                                throw new Error(`Widget ${payload.id} not found in any slot of object version ${objectId}`);
                             }
                             foundWidget = { ...foundWidget, slot: targetSlot, order: targetOrder, updated_at: now };
                             const targetArr = widgetsBySlot[targetSlot] ? [...widgetsBySlot[targetSlot]] : [];
@@ -766,10 +766,10 @@ export class DataManager {
                             const normalized = targetArr.map((w: any, idx: number) => ({ ...w, order: idx }));
                             widgetsBySlot[targetSlot] = normalized;
                             return {
-                                objectVersions: {
-                                    ...(state as any).objectVersions,
-                                    [objectVersionId]: {
-                                        ...objVersion,
+                                objects: {
+                                    ...(state as any).objects,
+                                    [objectId]: {
+                                        ...objValue,
                                         widgets: widgetsBySlot
                                     }
                                 },
@@ -805,10 +805,10 @@ export class DataManager {
                             };
                         }
 
-                        if ((target as any).objectVersionId) {
-                            const objectVersionId = (target as any).objectVersionId as string;
-                            const objVersion = (state as any).objectVersions[objectVersionId];
-                            const widgetsBySlot = { ...(objVersion.widgets || {}) } as any;
+                        if ((target as any).objectId) {
+                            const objectId = (target as any).objectId as string;
+                            const objValue = (state as any).objects[objectId];
+                            const widgetsBySlot = { ...(objValue.widgets || {}) } as any;
                             Object.keys(widgetsBySlot).forEach(slotName => {
                                 const arr = widgetsBySlot[slotName] || [];
                                 const filtered = arr.filter((w: any) => w.id !== widgetId)
@@ -816,9 +816,9 @@ export class DataManager {
                                 widgetsBySlot[slotName] = filtered;
                             });
                             return {
-                                objectVersions: {
-                                    ...(state as any).objectVersions,
-                                    [objectVersionId]: { ...objVersion, widgets: widgetsBySlot }
+                                objects: {
+                                    ...(state as any).objects,
+                                    [objectId]: { ...objValue, widgets: widgetsBySlot }
                                 },
                                 metadata: { ...state.metadata, isDirty: true }
                             } as any;
@@ -891,13 +891,13 @@ export class DataManager {
 
                 case OperationTypes.UPDATE_OBJECT_VERSION:
                     this.setState(operation, state => {
-                        const versionId = (operation.payload as any).id;
-                        if (!versionId) return state;
+                        const objectId = (operation.payload as any).id;
+                        if (!objectId) return state;
                         return {
-                            objectVersions: {
-                                ...(state as any).objectVersions,
-                                [versionId]: {
-                                    ...((state as any).objectVersions?.[versionId] || {}),
+                            objects: {
+                                ...(state as any).objects,
+                                [objectId]: {
+                                    ...((state as any).objects?.[objectId] || {}),
                                     ...(operation.payload as any).updates,
                                     updated_at: new Date().toISOString()
                                 }
@@ -934,11 +934,11 @@ export class DataManager {
                 case OperationTypes.SWITCH_OBJECT_VERSION:
                     this.setState(operation, state => {
                         const { objectId, versionId } = operation.payload as any;
-                        const objVersion = (state as any).objectVersions?.[versionId];
-                        if (!objVersion) {
+                        const objects = (state as any).objectVersions?.[versionId];
+                        if (!objects) {
                             throw new Error(`Object version ${versionId} not found`);
                         }
-                        if (objVersion.objectId !== objectId) {
+                        if (objects.objectId !== objectId) {
                             throw new Error(`Object version ${versionId} does not belong to object ${objectId}`);
                         }
                         return {
