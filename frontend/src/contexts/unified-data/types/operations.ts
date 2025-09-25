@@ -71,7 +71,7 @@ export type UpdateWidgetConfigPayload = WidgetContext & {
 export type MoveWidgetPayload = WidgetContext & {
   id: string;
   slot: string;
-  order: number;
+  widgets: Record<string, WidgetData[]>;
 };
 
 export type RemoveWidgetPayload = WidgetContext & {

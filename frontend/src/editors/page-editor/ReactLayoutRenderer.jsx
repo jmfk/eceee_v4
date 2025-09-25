@@ -151,6 +151,7 @@ const ReactLayoutRenderer = forwardRef(({
             case 'moveUp': {
                 const moveUpIndex = args[0];
                 if (moveUpIndex > 0) {
+                    // First: Update local state for immediate UI feedback
                     const updatedWidgetsUp = { ...widgets };
                     if (updatedWidgetsUp[slotName]) {
                         const slotWidgets = [...updatedWidgetsUp[slotName]];
@@ -166,13 +167,12 @@ const ReactLayoutRenderer = forwardRef(({
                     if (onDirtyChange) {
                         onDirtyChange(true, `moved widget up in ${slotName}`);
                     }
-
                     // Publish to Unified Data Context
                     await publishUpdate(componentId, OperationTypes.MOVE_WIDGET, {
                         id: widget.id,
                         slot: slotName,
                         contextType: contextType,
-                        order: moveUpIndex - 1
+                        widgets: updatedWidgetsUp
                     });
                 }
                 break;
@@ -203,7 +203,7 @@ const ReactLayoutRenderer = forwardRef(({
                         id: widget.id,
                         slot: slotName,
                         contextType: contextType,
-                        order: moveDownIndex + 1
+                        widgets: updatedWidgetsDown
                     });
                 }
                 break;

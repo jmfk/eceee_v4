@@ -1,4 +1,4 @@
-import React, { forwardRef, useState, useMemo, useRef, useCallback, useImperativeHandle, useEffect } from 'react'
+import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react'
 import { Layout, Plus, Settings, Trash2, Eye, Check, X, MoreHorizontal } from 'lucide-react'
 import { ObjectWidgetFactory, createObjectEditorEventSystem } from '../editors/object-editor'
 import { useWidgets, getWidgetDisplayName, createDefaultWidgetConfig } from '../hooks/useWidgets'
@@ -11,7 +11,7 @@ import { useWidgetEvents } from '../contexts/WidgetEventContext'
 import { useEditorContext } from '../contexts/unified-data/hooks'
 
 
-const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange, mode = 'object', onWidgetEditorStateChange }, ref) => {
+const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, mode = 'object', onWidgetEditorStateChange }) => {
     const [selectedWidgets, setSelectedWidgets] = useState({}) // For bulk operations
 
     // Get update lock and UnifiedData context
@@ -20,21 +20,17 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
     // Stable component identifier for UDC source tracking
     const componentId = useMemo(() => `object-content-editor-${objectType?.name || 'unknown'}`, [objectType?.name])
 
-    // Keep onWidgetChange reference for potential external API compatibility
-    const stableOnWidgetChange = useRef(onWidgetChange)
-    stableOnWidgetChange.current = onWidgetChange
-
     // Centralized function to notify parent of widget changes
     const notifyWidgetChange = useCallback((updatedWidgets, widgetId) => {
-        if (stableOnWidgetChange.current) {
-            stableOnWidgetChange.current(updatedWidgets, { sourceId: widgetId })
+        if (onWidgetChange) {
+            onWidgetChange(updatedWidgets, { sourceId: widgetId })
         }
     }, [])
 
     // Widget editor panel state
     const [widgetEditorOpen, setWidgetEditorOpen] = useState(false)
     const [editingWidget, setEditingWidget] = useState(null)
-    const { widgetHasUnsavedChanges, setWidgetHasUnsavedChanges } = useWidgetEvents()
+    //const { widgetHasUnsavedChanges, setWidgetHasUnsavedChanges } = useWidgetEvents()
     const widgetEditorRef = useRef(null)
 
     // Widget selection modal state
@@ -60,6 +56,7 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
     // Subscribe to external changes via Unified Data Context
     useExternalChanges(componentId, (state) => {
         // External updates can be handled here if needed
+        //console.log("useExternalChanges::ObjectContentEditor")
     })
 
     // Use the shared widget hook (but we'll override widgetTypes with object type's configuration)
@@ -171,7 +168,7 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
             ...currentWidgets,
             [slotName]: [...currentSlotWidgets, newWidget]
         }
-        notifyWidgetChange(updatedWidgets, newWidget.id)
+        //notifyWidgetChange(updatedWidgets, newWidget.id)
 
         // Publish to Unified Data Context
         await publishUpdate(componentId, OperationTypes.ADD_WIDGET, {
@@ -200,19 +197,19 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
         if (isSameWidget) {
             setWidgetEditorOpen(false)
             setEditingWidget(null)
-            setWidgetHasUnsavedChanges(false)
+            //setWidgetHasUnsavedChanges(false)
         } else {
             // Open panel with new widget
             setEditingWidget(widgetData)
             setWidgetEditorOpen(true)
-            setWidgetHasUnsavedChanges(false)
+            //setWidgetHasUnsavedChanges(false)
         }
     }, [editingWidget])
 
     const handleCloseWidgetEditor = useCallback(() => {
         setWidgetEditorOpen(false)
         setEditingWidget(null)
-        setWidgetHasUnsavedChanges(false)
+        //setWidgetHasUnsavedChanges(false)
     }, [])
 
     const handleSaveWidget = useCallback(async (updatedWidget) => {
@@ -229,7 +226,7 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
             config: updatedWidget.config
         })
 
-        setWidgetHasUnsavedChanges(false)
+        //setWidgetHasUnsavedChanges(false)
         handleCloseWidgetEditor()
     }, [editingWidget, handleCloseWidgetEditor, objectType, publishUpdate, componentId])
 
@@ -239,13 +236,13 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
             onWidgetEditorStateChange({
                 isOpen: widgetEditorOpen,
                 editingWidget,
-                hasUnsavedChanges: widgetHasUnsavedChanges,
+                //hasUnsavedChanges: widgetHasUnsavedChanges,
                 widgetEditorRef,
                 handleCloseWidgetEditor,
                 handleSaveWidget
             })
         }
-    }, [widgetEditorOpen, editingWidget, widgetHasUnsavedChanges, onWidgetEditorStateChange, handleCloseWidgetEditor, handleSaveWidget])
+    }, [widgetEditorOpen, editingWidget, onWidgetEditorStateChange, handleCloseWidgetEditor, handleSaveWidget])
 
     const handleEditWidget = (slotName, widgetIndex, widget) => {
         // Add slotName and computed editor context to widget data for editor
@@ -272,7 +269,7 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
         if (updatedWidgets[slotName]) {
             updatedWidgets[slotName] = updatedWidgets[slotName].filter((_, i) => i !== widgetIndex)
         }
-        notifyWidgetChange(updatedWidgets, widget?.id)
+        //notifyWidgetChange(updatedWidgets, widget?.id)
 
         // Publish removal to Unified Data Context
         if (widget?.id) {
@@ -315,7 +312,7 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
                 ...currentWidgets,
                 [slotName]: slotWidgets
             }
-            notifyWidgetChange(updatedWidgets)
+            //notifyWidgetChange(updatedWidgets)
         }
     }
 
@@ -341,7 +338,7 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
                 ...currentWidgets,
                 [slotName]: currentSlotWidgets
             }
-            notifyWidgetChange(updatedWidgets, widget.id)
+            //notifyWidgetChange(updatedWidgets, widget.id)
         }
     }
 
@@ -383,7 +380,7 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
         setSelectedWidgets({})
 
         // Notify parent component via event system
-        notifyWidgetChange(updatedWidgets, 'bulk-delete')
+        //notifyWidgetChange(updatedWidgets, 'bulk-delete')
     }
 
     // Widget modal handlers
@@ -433,7 +430,7 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
         })
 
         // Notify parent component via callback
-        notifyWidgetChange(updatedWidgets, `slot-${slotName}`)
+        //notifyWidgetChange(updatedWidgets, `slot-${slotName}`)
     }
 
     // Handle ObjectEditor-specific slot actions
@@ -459,7 +456,7 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
                         ...currentWidgets,
                         [slotName]: [...currentSlotWidgets, newWidget]
                     }
-                    notifyWidgetChange(updatedWidgets, newWidget.id)
+                    //notifyWidgetChange(updatedWidgets, newWidget.id)
 
                     // Publish duplication as add operation to UDC
                     await publishUpdate(componentId, OperationTypes.ADD_WIDGET, {
@@ -481,7 +478,7 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
             default:
                 console.warn('Unknown slot action:', action)
         }
-    }, [objectType, addWidget, publishUpdate, componentId, normalizedWidgets, notifyWidgetChange])
+    }, [objectType, addWidget, publishUpdate, componentId, normalizedWidgets])
 
     // Stable config change handler that doesn't depend on widget.config
     const stableConfigChangeHandler = useCallback(async (widgetId, slotName, newConfig) => {
@@ -509,9 +506,9 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
             updatedWidgets[slotName] = [...currentWidgets];
             updatedWidgets[slotName][widgetIndex] = updatedWidget;
 
-            await notifyWidgetChange(updatedWidgets);
+            //await notifyWidgetChange(updatedWidgets);
         }
-    }, [normalizedWidgets, updateWidget, editingWidget, notifyWidgetChange]);
+    }, [normalizedWidgets, updateWidget, editingWidget]);
 
     const renderWidget = (widget, slotName, index) => {
         const widgetKey = `${slotName}-${index}`
@@ -629,21 +626,9 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
         }, 0)
     }, [normalizedWidgets, objectType?.slotConfiguration?.slots])
 
-    // Expose widget editor functionality to parent
-    useImperativeHandle(ref, () => ({
-        // Widget editor state
-        widgetEditorOpen,
-        editingWidget,
-        widgetHasUnsavedChanges,
-        widgetEditorRef,
-        // Widget editor handlers
-        handleOpenWidgetEditor,
-        handleCloseWidgetEditor,
-        handleSaveWidget
-    }), [widgetEditorOpen, editingWidget, widgetHasUnsavedChanges, handleOpenWidgetEditor, handleCloseWidgetEditor, handleSaveWidget])
 
     return (
-        <div ref={ref} className="space-y-4">
+        <div className="space-y-4">
             {/* Slots */}
             <div className="space-y-4">
                 {objectType.slotConfiguration.slots.map(renderSlot)}
@@ -669,20 +654,6 @@ const ObjectContentEditorComponent = ({ objectType, widgets = {}, onWidgetChange
         </div>
     )
 }
-
-// Create the forwardRef component
-const ObjectContentEditorWithRef = forwardRef(ObjectContentEditorComponent)
-
-// Wrap with memo and custom comparison
-const ObjectContentEditor = React.memo(ObjectContentEditorWithRef, (prevProps, nextProps) => {
-    // Custom comparison function for React.memo
-    // Note: We don't compare onWidgetChange or onWidgetEditorStateChange since we handle them internally with stable references
-    return (
-        prevProps.objectType === nextProps.objectType &&
-        prevProps.widgets === nextProps.widgets &&
-        prevProps.mode === nextProps.mode
-    )
-})
 
 ObjectContentEditor.displayName = 'ObjectContentEditor'
 
