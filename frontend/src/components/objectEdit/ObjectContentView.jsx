@@ -84,26 +84,6 @@ const ObjectContentView = forwardRef(({ objectType, instance, parentId, isNewIns
         loadNamespace()
     }, [objectType?.namespace])
 
-    // Handle real-time widget updates from WidgetEditorPanel
-    const handleRealTimeWidgetUpdate = useCallback((updatedWidget) => {
-        if (!updatedWidget || !updatedWidget.slotName) return
-
-        // Update local widgets state for real-time preview
-        setLocalWidgets(prevWidgets => {
-            const newWidgets = { ...prevWidgets }
-            const slotName = updatedWidget.slotName
-
-            if (newWidgets[slotName]) {
-                newWidgets[slotName] = newWidgets[slotName].map(widget =>
-                    widget.id === updatedWidget.id ? updatedWidget : widget
-                )
-            }
-
-            return newWidgets
-        })
-
-    }, [])
-
     const handleWidgetChange = useCallback(async (widgets, widgetId) => {
         setLocalWidgets(widgets)
 
@@ -130,194 +110,35 @@ const ObjectContentView = forwardRef(({ objectType, instance, parentId, isNewIns
         })
     }, [])
 
-    // Helper function to convert object type schema to ObjectSchemaForm format
-    const getSchemaFromObjectType = (objectType) => {
-        if (!objectType?.schema?.properties) {
-            return { fields: [] }
-        }
+    // Form validation callback - track validation state
+    const handleValidationChange = useCallback((isValid, errors) => {
+        console.log("handleValidationChange")
+        setFormValidationState({ isValid, errors })
+    }, [])
 
-        const properties = objectType.schema.properties
-        const required = objectType.schema.required || []
-        const propertyOrder = objectType.schema.propertyOrder || []
 
-        // Use propertyOrder if available, otherwise use object keys
-        const keysToProcess = propertyOrder.length > 0 ? propertyOrder : Object.keys(properties)
-
-        const fields = keysToProcess.map(propName => {
-            // Skip 'title' field as it's handled by the model, not schema data
-            if (propName === 'title') {
-                return null
-            }
-
-            if (properties[propName]) {
-                const property = properties[propName]
-                return {
-                    name: propName,
-                    required: required.includes(propName),
-                    ...property,
-                    // Map title to label for ObjectSchemaForm compatibility
-                    label: property.title || property.label || propName
-                }
-            }
-            return null
-        }).filter(Boolean)
-
-        return { fields }
-    }
-    const [errors, setErrors] = useState({})
-    const [saveMode, setSaveMode] = useState('update_current') // 'update_current' or 'create_new'
+    const [currentFormData, setCurrentFormData] = useState(null)
 
     const queryClient = useQueryClient()
     const { addNotification } = useGlobalNotifications()
+    const formRef = useRef(null)
 
-    // Simple form state management
-    const [formData, setFormData] = useState({
-        objectTypeId: objectType?.id || '',
-        title: instance?.title || '',
-        data: instance?.data || {},
-        status: instance?.status || 'draft',
-        widgets: instance?.widgets || {},
-        metadata: instance?.metadata || {}
-    })
-
-    // Track if form has been modified
-    // const [isFormDirty, setIsFormDirty] = useState(false)
-
-    // Fetch available object types for selection (when creating)
-    const { data: typesResponse } = useQuery({
-        queryKey: ['objectTypes'],
-        queryFn: () => objectTypesApi.getActive(),
-        enabled: Boolean(isNewInstance)
-    })
-
-    const availableTypes = typesResponse?.data || []
-
-
-    // Update form data when instance changes
+    // Sync local widgets with instance
     useEffect(() => {
         if (instance) {
-            const newFormData = {
-                objectTypeId: instance.objectType?.id || '',
-                title: instance.title || '',
-                data: instance.data || {},
-                status: instance.status || 'draft',
-                widgets: instance.widgets || {},
-                metadata: instance.metadata || {}
-            }
-
-            setFormData(newFormData)
-            //setIsFormDirty(false)
-
-            // Sync local widgets with instance
             setLocalWidgets(instance.widgets || {})
-            //setHasWidgetChanges(false)
         }
     }, [instance])
 
-    // Internal save handler used by form buffer and direct saves
-    const handleSaveInternal = useCallback(async (data, mode) => {
-        let apiCall
-        if (isNewInstance) {
-            apiCall = objectInstancesApi.create(data)
-        } else if (mode === 'update_current') {
-            apiCall = objectInstancesApi.updateCurrentVersion(instance.id, data)
-        } else {
-            apiCall = objectInstancesApi.update(instance.id, data)
-        }
-
-        try {
-            const response = await apiCall
-
-            // Invalidate queries
-            queryClient.invalidateQueries(['objectInstances'])
-            queryClient.invalidateQueries(['objectInstance', instance?.id])
-            //setHasWidgetChanges(false)
-
-            // Show success message based on save mode
-            let successMessage
-            if (isNewInstance) {
-                successMessage = 'Object created successfully'
-            } else if (mode === 'update_current') {
-                successMessage = `Current version (v${instance?.version || 1}) updated successfully`
-            } else {
-                successMessage = `New version (v${(instance?.version || 1) + 1}) created successfully`
-            }
-
-            addNotification(successMessage, 'success')
-
-            // For new instances, update URL to edit mode but stay on content tab
-            if (isNewInstance && response?.data?.object?.id) {
-                navigate(`/objects/${response.data.object.id}/edit/content`, { replace: true })
-            }
-
-            return response
-        } catch (error) {
-            console.error('Save failed:', error)
-            const errorMessage = error.response?.data?.error || 'Failed to save object'
-            addNotification(errorMessage, 'error')
-
-            // Handle validation errors
-            if (error.response?.data?.errors) {
-                setErrors(error.response.data.errors)
-            }
-            throw error
-        }
-    }, [isNewInstance, instance?.id, instance?.version, queryClient, addNotification, navigate])
-
-
-    // Update form field and mark as dirty
-    const handleInputChange = useCallback((field, value) => {
-        setFormData(prev => ({ ...prev, [field]: value }))
-        //setIsFormDirty(true)
-
-        // Clear error when user starts typing
-        if (errors[field]) {
-            setErrors(prev => ({ ...prev, [field]: null }))
-        }
-    }, [errors])
-
-    // Update nested data field
-    const handleDataFieldChange = useCallback((fieldName, value) => {
-        setFormData(prev => ({
-            ...prev,
-            data: { ...prev.data, [fieldName]: value }
-        }))
-        // setIsFormDirty(true)
-
-        // Clear error when user starts typing
-        const errorKey = `data_${fieldName}`
-        if (errors[errorKey]) {
-            setErrors(prev => ({ ...prev, [errorKey]: null }))
-        }
-    }, [errors])
+    // Form change callback - track current form data
+    const handleFormChange = useCallback((newFormData) => {
+        console.log("handleFormChange", newFormData)
+        // setCurrentFormData(newFormData)
+        // onUnsavedChanges?.(true) // Mark as having unsaved changes
+    }, [onUnsavedChanges])
 
     // Check if there are any unsaved changes (form data or widgets)
-    const hasUnsavedChanges = false;
-
-    const validateForm = useCallback(() => {
-        const newErrors = {}
-
-        if (!formData.objectTypeId) {
-            newErrors.objectTypeId = 'Object type is required'
-        }
-
-        if (!formData.title?.trim()) {
-            newErrors.title = 'Title is required'
-        }
-
-        // Validate required schema fields
-        if (objectType?.schema?.properties) {
-            const required = objectType.schema.required || []
-            required.forEach(fieldName => {
-                if (!formData.data[fieldName] || formData.data[fieldName] === '') {
-                    newErrors[`data_${fieldName}`] = `${fieldName} is required`
-                }
-            })
-        }
-
-        setErrors(newErrors)
-        return Object.keys(newErrors).length === 0
-    }, [formData, objectType])
+    const hasUnsavedChanges = currentFormData !== null
 
     // Get widget editor state directly from local state
     const isWidgetEditorOpen = widgetEditorUI.isOpen
@@ -372,14 +193,12 @@ const ObjectContentView = forwardRef(({ objectType, instance, parentId, isNewIns
                             {/* Right Column - Object Data */}
                             <div className="space-y-6">
                                 <ObjectDataForm
+                                    ref={formRef}
                                     objectType={objectType}
+                                    instance={instance}
                                     isNewInstance={isNewInstance}
-                                    availableTypes={availableTypes}
-                                    formData={formData}
-                                    errors={errors}
-                                    handleInputChange={handleInputChange}
-                                    handleDataFieldChange={handleDataFieldChange}
-                                    getSchemaFromObjectType={getSchemaFromObjectType}
+                                    onFormChange={handleFormChange}
+                                    onValidationChange={handleValidationChange}
                                     context={{ ...context, instanceId }}
                                 />
                             </div>
@@ -394,14 +213,12 @@ const ObjectContentView = forwardRef(({ objectType, instance, parentId, isNewIns
                                 </h3>
                             </div>
                             <ObjectDataForm
+                                ref={formRef}
                                 objectType={objectType}
+                                instance={instance}
                                 isNewInstance={isNewInstance}
-                                availableTypes={availableTypes}
-                                formData={formData}
-                                errors={errors}
-                                handleInputChange={handleInputChange}
-                                handleDataFieldChange={handleDataFieldChange}
-                                getSchemaFromObjectType={getSchemaFromObjectType}
+                                onFormChange={handleFormChange}
+                                onValidationChange={handleValidationChange}
                                 context={{ ...context, instanceId }}
                             />
                         </div>
@@ -415,11 +232,6 @@ const ObjectContentView = forwardRef(({ objectType, instance, parentId, isNewIns
                     ref={widgetEditorUI.widgetEditorRef}
                     isOpen={widgetEditorUI.isOpen}
                     onClose={widgetEditorUI.handleCloseWidgetEditor}
-                    onSave={widgetEditorUI.handleSaveWidget}
-                    onRealTimeUpdate={handleRealTimeWidgetUpdate}
-                    onUnsavedChanges={(hasChanges) => {
-                        setWidgetEditorUI(prev => ({ ...prev, hasUnsavedChanges: hasChanges }))
-                    }}
                     widgetData={widgetEditorUI.editingWidget}
                     title={widgetEditorUI.editingWidget ? `Edit ${getWidgetDisplayName(widgetEditorUI.editingWidget.type, widgetTypes)}` : 'Edit Widget'}
                     autoOpenSpecialEditor={widgetEditorUI.editingWidget?.type === 'core_widgets.ImageWidget'}

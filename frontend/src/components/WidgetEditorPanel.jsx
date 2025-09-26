@@ -21,8 +21,6 @@ import IsolatedFormRenderer from './IsolatedFormRenderer.jsx'
 const WidgetEditorPanel = forwardRef(({
     isOpen,
     onClose,
-    onSave,
-    onRealTimeUpdate,
     widgetData,
     schema,
     title = "Edit Widget",
