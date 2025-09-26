@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react'
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useParams, useNavigate, Link, Navigate, useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
@@ -23,6 +23,7 @@ const ObjectInstanceEditPage = () => {
     const navigate = useNavigate()
     const location = useLocation()
     const { addNotification } = useGlobalNotifications()
+    const { useExternalChanges, setIsDirty, publishUpdate, saveCurrentVersion } = useUnifiedData()
     const queryClient = useQueryClient()
 
     // Save state management
@@ -35,7 +36,6 @@ const ObjectInstanceEditPage = () => {
     // Refs for tab components
     const contentTabRef = useRef(null)
 
-    const { useExternalChanges, publishUpdate } = useUnifiedData()
     const componentId = useMemo(() => `object-instance-editor-${instanceId || 'new'}`, [instanceId])
 
     // Save mutation
@@ -219,28 +219,38 @@ const ObjectInstanceEditPage = () => {
         return <Navigate to={redirectPath} replace />
     }
 
-    // Save handlers
-    const handleSave = async (saveType = 'update_current') => {
-        // If we're on the content tab, delegate to the child component's save method
-        // which has access to the current localWidgets and formData state
-        console.log("handleSave")
-        if (tab === 'content' && contentTabRef.current?.handleSave) {
-            contentTabRef.current.handleSave(saveType)
-        } else {
-            // Fallback to original logic for other tabs
-            const saveData = {
-                objectTypeId: actualObjectTypeId,
-                title: instance?.title || 'Untitled',
-                data: instance?.data || {},
-                widgets: instance?.widgets || {},
-                status: instance?.status || 'draft',
-                parent: parentIdFromUrl || instance?.parent?.id || instance?.parent,
-                createNew: saveType === 'create_new'
-            }
-
-            saveMutation.mutate(saveData)
+    const [isSaving, setIsSaving] = useState(false)
+    const handleSave = useCallback(async () => {
+        setIsSaving(true);
+        try {
+            await saveCurrentVersion();
+            setIsDirty(false);
+            addNotification({
+                type: 'success',
+                message: 'Current version saved'
+            });
+        } catch (error) {
+            console.error('Save failed:', error);
+            addNotification({
+                type: 'error',
+                message: `Save failed: ${error?.message || 'Unknown error'}`
+            });
+        } finally {
+            setIsSaving(false);
         }
-    }
+    }, [saveCurrentVersion, setIsDirty, addNotification]);
+
+    // const handleSaveNew = useCallback(async () => {
+    //     setIsSaving(true);
+    //     try {
+    //         await handleActualSave({ description: 'New version created', option: 'new' });
+    //     } catch (error) {
+    //         console.error('Save New failed:', error);
+    //     } finally {
+    //         setIsSaving(false);
+    //     }
+    // }, [handleActualSave]);
+
 
     const handleBack = () => {
         // If this object has a parent (either from URL param or instance data), 

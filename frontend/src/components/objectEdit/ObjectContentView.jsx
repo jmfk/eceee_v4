@@ -18,7 +18,9 @@ const ObjectContentView = forwardRef(({ objectType, instance, parentId, isNewIns
     const { instanceId, objectTypeId, tab } = useParams()
     const [localWidgets, setLocalWidgets] = useState(instance?.widgets || {})
     const [namespace, setNamespace] = useState(null)
+
     const { useExternalChanges, publishUpdate } = useUnifiedData()
+
 
     const componentId = useMemo(() => `object-instance-editor-${instanceId || 'new'}`, [instanceId])
 
