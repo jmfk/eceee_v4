@@ -41,6 +41,8 @@ const ObjectDataForm = ({
         loadNamespace()
     }, [objectType?.namespace])
 
+    console.log("ObjectDataForm")
+
     return (
         <>
             {/* Object Type Selection (only for new instances) */}

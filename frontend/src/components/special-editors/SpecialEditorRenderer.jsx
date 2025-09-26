@@ -9,7 +9,7 @@ import MediaSpecialEditor from './MediaSpecialEditor'
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
 import { OperationTypes } from '../../contexts/unified-data/types/operations'
 import { useEditorContext } from '../../contexts/unified-data/hooks'
-import { getWidgetConfig, hasWidgetContentChanged } from '../../utils/widgetUtils'
+import { lookupWidget, hasWidgetContentChanged } from '../../utils/widgetUtils'
 
 // Registry of special editors mapped to widget types
 const SPECIAL_EDITORS = {
@@ -60,7 +60,7 @@ const SpecialEditorRenderer = ({
         if (!widgetData?.id || !slotName || !contextType) return
 
         const currentState = getState()
-        const { widget } = getWidgetConfig(currentState, widgetData.id, slotName, contextType)
+        const widget = lookupWidget(currentState, widgetData.id, slotName, contextType)
         if (widget && widget.config) {
             console.log("SpecialEditorRenderer: Initialized from ODC state", {
                 widgetId: widgetData.id,
@@ -76,7 +76,7 @@ const SpecialEditorRenderer = ({
     useExternalChanges(componentId, (state) => {
         if (!widgetData?.id || !slotName || !contextType) return
 
-        const { widget } = getWidgetConfig(state, widgetData.id, slotName, contextType)
+        const widget = lookupWidget(state, widgetData.id, slotName, contextType)
         if (widget && widget.config) {
             console.log("SpecialEditorRenderer: Received external ODC update", {
                 widgetId: widgetData.id,
