@@ -40,12 +40,31 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, mode = 
 
     const contextType = useEditorContext()
 
-    // Widgets are used directly since migration is complete
+    // State for normalized widgets that can be updated from ODC
+    const [internalWidgets, setInternalWidgets] = useState(widgets)
 
     // Use widgets directly since migration is complete
     const normalizedWidgets = useMemo(() => {
-        return widgets
+        return internalWidgets
+    }, [internalWidgets])
+
+    // Update internal widgets when props change (for initial load)
+    useEffect(() => {
+        setInternalWidgets(widgets)
     }, [widgets])
+
+    // Subscribe to external changes via Unified Data Context
+    useExternalChanges(componentId, (state) => {
+        // When widgets are updated through ODC, extract widgets for this specific object
+        if (state && instanceId) {
+            // Objects store widgets under state.objects[objectId].widgets[slotName]
+            // For object editing, we want all slots, so we take the entire widgets object
+            const objectData = state.objects?.[instanceId]
+            if (objectData?.widgets) {
+                setInternalWidgets(objectData.widgets)
+            }
+        }
+    })
 
     // Listen to widget events (similar to PageEditor) - STABLE listeners that register once
     // Use refs to access current values without causing re-subscriptions
@@ -55,11 +74,6 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, mode = 
     useEffect(() => {
         normalizedWidgetsRef.current = normalizedWidgets
     }, [normalizedWidgets])
-
-    // Subscribe to external changes via Unified Data Context
-    useExternalChanges(componentId, (state) => {
-        // External updates can be handled here if needed
-    })
 
     // Use the shared widget hook (but we'll override widgetTypes with object type's configuration)
     const {

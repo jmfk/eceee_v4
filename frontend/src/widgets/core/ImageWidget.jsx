@@ -19,23 +19,7 @@ const ImageWidget = ({
     onConfigChange = null,
     context
 }) => {
-    const {
-        mediaItems = [],
-        collectionId = null,
-        collectionConfig = {},
-        displayType = 'gallery',
-        imageStyle = null,
-        enableLightbox = true,
-        autoPlay = false,
-        autoPlayInterval = 3,
-        showCaptions = true,
-        // Backward compatibility
-        imageUrl = '',
-        altText = 'Image',
-        caption = '',
-        alignment = 'center', // Legacy support
-        galleryColumns = 3 // Legacy support
-    } = config
+
 
     // Get current theme for image styles
     const { currentTheme } = useTheme()
@@ -45,8 +29,7 @@ const ImageWidget = ({
     const componentId = useMemo(() => `imagewidget-${widgetId || 'preview'}`, [widgetId])
     const contextType = useEditorContext()
 
-    // Ref to track current config for ODC synchronization
-    const configRef = useRef(config)
+    const [localConfig, setLocalConfig] = useState(config)
 
     // State for collection images
     const [collectionImages, setCollectionImages] = useState([])
@@ -54,17 +37,29 @@ const ImageWidget = ({
 
     // Carousel state - always initialized to avoid hook order issues
     const [currentIndex, setCurrentIndex] = useState(0)
-    const [isPlaying, setIsPlaying] = useState(autoPlay)
+    const [isPlaying, setIsPlaying] = useState(localConfig.autoPlay || false)
+
+    // ODC Config Synchronization - Initialize from ODC state if available
+    // useEffect(() => {
+    //     if (!widgetId || !slotName) return
+
+    //     const currentState = getState()
+    //     const widget = lookupWidget(currentState, widgetId, slotName, contextType)
+    //     if (widget && widget.config) {
+    //         setLocalConfig(widget.config)
+    //     }
+    // }, [])
 
     // ODC External Changes Subscription
     useExternalChanges(componentId, (state) => {
         if (!widgetId || !slotName) return
         const widget = lookupWidget(state, widgetId, slotName, contextType)
-        if (widget && widget.config && hasWidgetContentChanged(configRef.current, widget.config)) {
-            configRef.current = widget.config
+        if (widget && widget.config && hasWidgetContentChanged(localConfig, widget.config)) {
+            setLocalConfig(widget.config)
+
             // Trigger re-render if collection settings changed
             const newCollectionId = widget.config.collectionId
-            if (newCollectionId !== collectionId) {
+            if (newCollectionId !== (localConfig.collectionId || null)) {
                 // The useEffect above will handle reloading collection images
                 // when collectionId changes in the next render cycle
             }
@@ -73,16 +68,16 @@ const ImageWidget = ({
 
     // Resolve image style from theme
     const resolvedImageStyle = React.useMemo(() => {
-        if (!imageStyle || !currentTheme?.image_styles) {
+        if (!(localConfig.imageStyle) || !currentTheme?.image_styles) {
             // Fallback to legacy values or defaults
             return {
-                alignment: alignment || 'center',
-                galleryColumns: galleryColumns || 3,
+                alignment: (localConfig.alignment || 'center'),
+                galleryColumns: (localConfig.galleryColumns || 3),
                 spacing: 'normal'
             }
         }
 
-        const themeStyle = currentTheme.image_styles[imageStyle]
+        const themeStyle = currentTheme.image_styles[localConfig.imageStyle]
         if (!themeStyle) {
             // Style not found in theme, use default
             return {
@@ -99,29 +94,18 @@ const ImageWidget = ({
             borderRadius: themeStyle.borderRadius || 'normal',
             shadow: themeStyle.shadow || 'sm'
         }
-    }, [imageStyle, currentTheme, alignment, galleryColumns])
+    }, [localConfig.imageStyle, currentTheme, localConfig.alignment, localConfig.galleryColumns])
 
     // Memoize collection config to prevent unnecessary re-renders
     const stableCollectionConfig = React.useMemo(() => ({
-        randomize: collectionConfig?.randomize || false,
-        maxItems: collectionConfig?.maxItems || 0
-    }), [collectionConfig?.randomize, collectionConfig?.maxItems])
-
-    // ODC Config Synchronization - Initialize from ODC state if available
-    useEffect(() => {
-        if (!widgetId || !slotName) return
-
-        const currentState = getState()
-        const widget = lookupWidget(currentState, widgetId, slotName, contextType)
-        if (widget && widget.config) {
-            configRef.current = widget.config
-        }
-    }, [widgetId, slotName, contextType, getState])
+        randomize: localConfig.collectionConfig?.randomize || false,
+        maxItems: localConfig.collectionConfig?.maxItems || 0
+    }), [localConfig.collectionConfig?.randomize, localConfig.collectionConfig?.maxItems])
 
     // Load collection images when collectionId is present
     useEffect(() => {
         const loadCollectionImages = async () => {
-            if (!collectionId) {
+            if (!(localConfig.collectionId)) {
                 setCollectionImages([])
                 return
             }
@@ -134,7 +118,7 @@ const ImageWidget = ({
 
                 if (namespace) {
                     // Fetch collection images
-                    const result = await mediaCollectionsApi.getFiles(collectionId, {
+                    const result = await mediaCollectionsApi.getFiles(localConfig.collectionId, {
                         namespace,
                         pageSize: 100
                     })()
@@ -180,50 +164,33 @@ const ImageWidget = ({
         }
 
         loadCollectionImages()
-    }, [collectionId, stableCollectionConfig])
-
-    // ODC Configuration Update Handler
-    const handleConfigChange = useCallback(async (newConfig) => {
-        if (!widgetId || !slotName) {
-            // Fallback to prop-based callback if no ODC integration
-            onConfigChange?.(newConfig)
-            return
-        }
-
-        configRef.current = newConfig
-        await publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
-            id: widgetId,
-            slotName: slotName,
-            contextType: contextType,
-            config: newConfig
-        })
-    }, [componentId, widgetId, slotName, contextType, publishUpdate, onConfigChange])
+    }, [localConfig.collectionId, stableCollectionConfig])
 
     // Determine which images to use: collection images or individual media items
-    const effectiveMediaItems = collectionId ? collectionImages : mediaItems
+    const effectiveMediaItems = localConfig.collectionId ? collectionImages : (localConfig.mediaItems || [])
 
     // Handle backward compatibility
-    const items = effectiveMediaItems.length > 0 ? effectiveMediaItems : (imageUrl ? [{
-        url: imageUrl,
+    const items = effectiveMediaItems.length > 0 ? effectiveMediaItems : (localConfig.imageUrl ? [{
+        url: localConfig.imageUrl,
         type: 'image',
-        altText: altText,
-        caption: caption
+        altText: localConfig.altText || 'Image',
+        caption: localConfig.caption || ''
     }] : [])
 
     // Auto-play functionality for carousel
     useEffect(() => {
         // Only run if we're actually using carousel mode and have multiple items
-        if (displayType !== 'carousel' || !isPlaying || items.length <= 1) return
+        if ((localConfig.displayType || 'gallery') !== 'carousel' || !isPlaying || items.length <= 1) return
 
         const interval = setInterval(() => {
             setCurrentIndex(prev => prev < items.length - 1 ? prev + 1 : 0)
-        }, (autoPlayInterval || 3) * 1000)
+        }, ((localConfig.autoPlayInterval || 3) * 1000))
 
         return () => clearInterval(interval)
-    }, [displayType, isPlaying, items.length, autoPlayInterval])
+    }, [localConfig.displayType, isPlaying, items.length, localConfig.autoPlayInterval])
 
     // Show loading state when collection is being loaded
-    if (collectionId && loadingCollection) {
+    if (localConfig.collectionId && loadingCollection) {
         return (
             <div className={`image-widget ${mode === 'editor' ? 'p-4' : ''}`}>
                 <div className="bg-gray-100 h-32 rounded flex items-center justify-center text-gray-500">
@@ -282,7 +249,7 @@ const ImageWidget = ({
                 <video
                     key={index}
                     controls
-                    autoPlay={autoPlay}
+                    autoPlay={localConfig.autoPlay || false}
                     className="max-w-full h-auto rounded shadow-sm"
                     poster={item.thumbnail}
                 >
@@ -298,7 +265,7 @@ const ImageWidget = ({
                 src={item.url}
                 alt={item.altText || 'Image'}
                 className="max-w-full h-auto rounded shadow-sm cursor-pointer hover:opacity-90 transition-opacity"
-                onClick={enableLightbox ? () => {
+                onClick={(localConfig.enableLightbox !== false) ? () => {
                     // Lightbox functionality would be implemented here
                     // TODO: Implement lightbox modal
                 } : undefined}
@@ -341,12 +308,12 @@ const ImageWidget = ({
                                 src={item.url}
                                 alt={item.altText || `Gallery image ${index + 1}`}
                                 className="w-full h-48 object-cover rounded cursor-pointer hover:opacity-90 transition-opacity"
-                                onClick={enableLightbox ? () => {
+                                onClick={(localConfig.enableLightbox !== false) ? () => {
                                     // TODO: Implement lightbox modal
                                 } : undefined}
                             />
                         )}
-                        {showCaptions && item.caption && (
+                        {(localConfig.showCaptions !== false) && item.caption && (
                             <p className="text-sm text-gray-600 mt-1">{item.caption}</p>
                         )}
                     </div>
@@ -369,7 +336,7 @@ const ImageWidget = ({
                         {items.map((item, index) => (
                             <div key={index} className="w-full flex-shrink-0">
                                 {renderMediaItem(item, index)}
-                                {showCaptions && item.caption && (
+                                {(localConfig.showCaptions !== false) && item.caption && (
                                     <p className="text-sm text-gray-600 mt-2 text-center">{item.caption}</p>
                                 )}
                             </div>
@@ -435,13 +402,13 @@ const ImageWidget = ({
                             // Single image display regardless of displayType setting
                             <div>
                                 {renderMediaItem(items[0])}
-                                {showCaptions && items[0].caption && (
+                                {(localConfig.showCaptions !== false) && items[0].caption && (
                                     <p className="text-sm text-gray-600 mt-2 italic">{items[0].caption}</p>
                                 )}
                             </div>
                         ) : (
                             // Multiple images: use displayType setting
-                            displayType === 'carousel' ? renderCarousel() : renderGallery()
+                            (localConfig.displayType || 'gallery') === 'carousel' ? renderCarousel() : renderGallery()
                         )
                     ) : (
                         <div className="bg-gray-200 h-32 rounded flex items-center justify-center text-gray-500">
@@ -471,13 +438,13 @@ const ImageWidget = ({
                 // Single image display regardless of displayType setting
                 <div>
                     {renderMediaItem(items[0])}
-                    {showCaptions && items[0].caption && (
+                    {(localConfig.showCaptions !== false) && items[0].caption && (
                         <p className="text-sm text-gray-600 mt-2">{items[0].caption}</p>
                     )}
                 </div>
             ) : (
                 // Multiple images: use displayType setting
-                displayType === 'carousel' ? renderCarousel() : renderGallery()
+                (localConfig.displayType || 'gallery') === 'carousel' ? renderCarousel() : renderGallery()
             )}
         </div>
     )
