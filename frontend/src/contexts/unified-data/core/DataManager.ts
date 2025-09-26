@@ -615,6 +615,9 @@ export class DataManager {
                         const widgetId = payload.id;
                         const now = new Date().toISOString();
 
+                        // Guard against nested config objects
+                        payload.config = this.validateAndCleanConfig(payload.config, 'UPDATE_WIDGET_CONFIG');
+
                         if (target.versionId) {
                             const version = state.versions[target.versionId];
                             const slotWidgets = version.widgets[slotName] || [];
@@ -625,10 +628,7 @@ export class DataManager {
                             const updatedWidgets = [...slotWidgets];
                             updatedWidgets[widgetIndex] = {
                                 ...updatedWidgets[widgetIndex],
-                                config: {
-                                    ...updatedWidgets[widgetIndex].config,
-                                    ...payload.config
-                                },
+                                config: payload.config, // Replace config entirely instead of merging
                                 updated_at: now
                             };
                             return {
@@ -657,10 +657,7 @@ export class DataManager {
                             const updatedWidgets = [...slotWidgets];
                             updatedWidgets[widgetIndex] = {
                                 ...updatedWidgets[widgetIndex],
-                                config: {
-                                    ...updatedWidgets[widgetIndex].config,
-                                    ...payload.config
-                                },
+                                config: payload.config, // Replace config entirely instead of merging
                                 updated_at: now
                             };
                             return {
@@ -1144,5 +1141,61 @@ export class DataManager {
     clear(): void {
         this.subscriptionManager.clearAllSubscriptions();
         this.selectorCache.clear();
+    }
+
+    /**
+     * Validates and cleans config objects to prevent nesting issues
+     * @param config - The config object to validate
+     * @param operationName - Name of the operation for logging
+     * @returns Clean config object
+     */
+    private validateAndCleanConfig(config: any, operationName: string): any {
+        if (!config || typeof config !== 'object') {
+            return config;
+        }
+
+        // Recursively remove extra levels of config nesting
+        let cleanConfig = config;
+        let nestingLevel = 0;
+        const maxNestingLevels = 5; // Prevent infinite loops
+
+        while (cleanConfig?.config && nestingLevel < maxNestingLevels) {
+            console.warn(`[${operationName}] Removing config nesting level ${nestingLevel + 1}`);
+            console.warn('Before cleanup:', cleanConfig);
+            cleanConfig = cleanConfig.config;
+            nestingLevel++;
+        }
+
+        if (nestingLevel > 0) {
+            console.warn(`[${operationName}] Cleaned ${nestingLevel} levels of config nesting`);
+            console.warn('After cleanup:', cleanConfig);
+        }
+
+        // Additional check for widget properties that shouldn't be in config
+        if (cleanConfig && typeof cleanConfig === 'object') {
+            const widgetProperties = ['id', 'name', 'type', 'widget_type', 'order', 'created_at', 'updated_at', 'slotName'];
+            const foundWidgetProps = widgetProperties.filter(prop => cleanConfig.hasOwnProperty(prop));
+            
+            if (foundWidgetProps.length > 2) { // Allow some overlap but not full widget
+                console.warn(`[${operationName}] Config contains widget properties: ${foundWidgetProps.join(', ')}`);
+                console.warn('This suggests entire widget was passed as config');
+                
+                // If it has a config property, extract it
+                if (cleanConfig.config) {
+                    console.warn(`[${operationName}] Extracting inner config from widget-like object`);
+                    cleanConfig = cleanConfig.config;
+                } else {
+                    // Remove widget properties from config
+                    const purifiedConfig = { ...cleanConfig };
+                    widgetProperties.forEach(prop => {
+                        delete purifiedConfig[prop];
+                    });
+                    console.warn(`[${operationName}] Removed widget properties from config`);
+                    cleanConfig = purifiedConfig;
+                }
+            }
+        }
+
+        return cleanConfig;
     }
 }

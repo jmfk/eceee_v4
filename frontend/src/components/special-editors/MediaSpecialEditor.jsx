@@ -299,6 +299,11 @@ const MediaSpecialEditor = ({
                 }
 
                 setLocalConfig(updatedConfig)
+                console.log("MediaSpecialEditor: onConfigChange called (add to collection)", {
+                    displayType: updatedConfig?.displayType,
+                    collectionId: updatedConfig?.collectionId,
+                    collectionConfig: updatedConfig?.collectionConfig
+                })
                 onConfigChange(updatedConfig)
 
                 // Clear temporary selection and return to overview

@@ -4,11 +4,12 @@
  * Renders the appropriate special editor based on widget type.
  * This component serves as a registry and renderer for different special editors.
  */
-import React, { useCallback } from 'react'
+import React, { useCallback, useEffect, useMemo } from 'react'
 import MediaSpecialEditor from './MediaSpecialEditor'
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
 import { OperationTypes } from '../../contexts/unified-data/types/operations'
 import { useEditorContext } from '../../contexts/unified-data/hooks'
+import { getWidgetConfig, hasWidgetContentChanged } from '../../utils/widgetUtils'
 
 // Registry of special editors mapped to widget types
 const SPECIAL_EDITORS = {
@@ -34,10 +35,11 @@ const SpecialEditorRenderer = ({
     specialEditorWidth = 60,
     isAnimating = false,
     isClosing = false,
-    namespace = null
+    namespace = null,
+    contextType = null,
+    widgetId = null,
+    slotName = null
 }) => {
-
-    const contextType = useEditorContext();
 
     if (!widgetData?.type || !hasSpecialEditor(widgetData.type)) {
         return null
@@ -49,18 +51,68 @@ const SpecialEditorRenderer = ({
         return null
     }
 
-    const { publishUpdate } = useUnifiedData()
-    const componentId = `special-editor-${widgetData?.id || 'unknown'}`
+    // Pure ODC integration
+    const { publishUpdate, useExternalChanges, getState } = useUnifiedData()
+    const componentId = useMemo(() => `special-editor-${widgetData?.id || 'unknown'}`, [widgetData?.id])
 
-    const onConfigChange = useCallback((newConfig) => {
-        if (!widgetData?.id) return
+    // ODC Config Synchronization - Initialize from ODC state if available
+    useEffect(() => {
+        if (!widgetData?.id || !slotName || !contextType) return
+
+        const currentState = getState()
+        const { widget } = getWidgetConfig(currentState, widgetData.id, slotName, contextType)
+        if (widget && widget.config) {
+            console.log("SpecialEditorRenderer: Initialized from ODC state", {
+                widgetId: widgetData.id,
+                slotName,
+                contextType,
+                displayType: widget.config?.displayType,
+                collectionConfig: widget.config?.collectionConfig
+            })
+        }
+    }, [widgetData?.id, slotName, contextType, getState])
+
+    // ODC External Changes Subscription - Listen for updates from other components
+    useExternalChanges(componentId, (state) => {
+        if (!widgetData?.id || !slotName || !contextType) return
+
+        const { widget } = getWidgetConfig(state, widgetData.id, slotName, contextType)
+        if (widget && widget.config) {
+            console.log("SpecialEditorRenderer: Received external ODC update", {
+                widgetId: widgetData.id,
+                slotName,
+                contextType,
+                displayType: widget.config?.displayType,
+                collectionConfig: widget.config?.collectionConfig
+            })
+
+            // Note: Special editors manage their own state internally
+            // This subscription is mainly for logging and potential future synchronization needs
+        }
+    })
+
+    // Direct ODC integration for special editors
+    const handleConfigChange = useCallback((newConfig) => {
+        console.log("SpecialEditorRenderer: Publishing ODC update", {
+            widgetId: widgetData?.id,
+            slotName: widgetData?.slotName || slotName,
+            contextType,
+            displayType: newConfig?.displayType,
+            collectionConfig: newConfig?.collectionConfig
+        })
+
+        if (!widgetData?.id) {
+            console.warn("SpecialEditorRenderer: Missing widgetId, cannot publish update")
+            return
+        }
+
         publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
             id: widgetData.id,
-            slotName: widgetData.slotName,
+            slotName: widgetData.slotName || slotName,
             contextType: contextType,
             config: newConfig
         })
-    }, [publishUpdate, componentId, widgetData?.id, widgetData?.slotName])
+    }, [publishUpdate, componentId, widgetData?.id, widgetData?.slotName, slotName, contextType])
 
 
 
@@ -75,8 +127,11 @@ const SpecialEditorRenderer = ({
                 widgetData={widgetData}
                 isAnimating={isAnimating}
                 isClosing={isClosing}
-                onConfigChange={onConfigChange}
+                onConfigChange={handleConfigChange}
                 namespace={namespace}
+                contextType={contextType}
+                widgetId={widgetId}
+                slotName={slotName}
             />
         </div>
     )
