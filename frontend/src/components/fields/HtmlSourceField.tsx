@@ -4,7 +4,7 @@ import { IconCode } from '../icons/IconCode';
 import { HtmlEditor } from './HtmlEditor';
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext';
 import { OperationTypes } from '../../contexts/unified-data/types/operations';
-import { getWidgetContent, hasWidgetContentChanged } from '../../utils/widgetUtils';
+import { getWidgetConfig, hasWidgetContentChanged } from '../../utils/widgetUtils';
 import { useEditorContext } from '../../contexts/unified-data/hooks'
 import type EditorContext from '../../contexts/unified-data/types/editorContext'
 
@@ -43,16 +43,16 @@ const HtmlSourceField: React.FC<HtmlSourceFieldProps> = ({
             return;
         }
         const currentState = getState();
-        const { content: udcContent } = getWidgetContent(currentState, widgetId, slotName, contextType);
-        if (udcContent !== undefined && udcContent !== value) {
-            setCurrentValue(udcContent);
+        const { config: udcConfig } = getWidgetConfig(currentState, widgetId, slotName, contextType);
+        if (udcConfig?.content !== undefined && udcConfig.content !== value) {
+            setCurrentValue(udcConfig.content);
         }
     }, []);
 
     useExternalChanges(fieldId, state => {
-        const { content: newContent } = getWidgetContent(state, widgetId, slotName, contextType);
-        if (hasWidgetContentChanged(currentValue, newContent)) {
-            setCurrentValue(newContent);
+        const { config: newConfig } = getWidgetConfig(state, widgetId, slotName, contextType);
+        if (hasWidgetContentChanged(currentValue, newConfig?.content)) {
+            setCurrentValue(newConfig.content);
         }
     });
 

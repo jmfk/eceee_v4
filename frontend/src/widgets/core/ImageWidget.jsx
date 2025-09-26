@@ -5,7 +5,7 @@ import { useTheme } from '../../hooks/useTheme'
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
 import { useEditorContext } from '../../contexts/unified-data/hooks'
 import { OperationTypes } from '../../contexts/unified-data/types/operations'
-import { getWidgetContent, hasWidgetContentChanged } from '../../utils/widgetUtils'
+import { getWidgetConfig, hasWidgetContentChanged } from '../../utils/widgetUtils'
 
 /**
  * Image Widget Component
@@ -56,6 +56,24 @@ const ImageWidget = ({
     const [currentIndex, setCurrentIndex] = useState(0)
     const [isPlaying, setIsPlaying] = useState(autoPlay)
 
+    // ODC External Changes Subscription
+    useExternalChanges(componentId, (state) => {
+        if (!widgetId || !slotName) return
+        //console.log("useExternalChanges in ImageWidget")
+        const { widget } = getWidgetConfig(state, widgetId, slotName, contextType)
+        console.log(hasWidgetContentChanged(configRef.current, widget.config))
+        if (widget && widget.config && hasWidgetContentChanged(configRef.current, widget.config)) {
+            console.log("Update::ImageWidget", widget.config.collectionConfig.displayType, configRef.current.collectionConfig.displayType)
+            configRef.current = widget.config
+            // Trigger re-render if collection settings changed
+            const newCollectionId = widget.config.collectionId
+            if (newCollectionId !== collectionId) {
+                // The useEffect above will handle reloading collection images
+                // when collectionId changes in the next render cycle
+            }
+        }
+    })
+
     // Resolve image style from theme
     const resolvedImageStyle = React.useMemo(() => {
         if (!imageStyle || !currentTheme?.image_styles) {
@@ -97,7 +115,7 @@ const ImageWidget = ({
         if (!widgetId || !slotName) return
 
         const currentState = getState()
-        const { widget } = getWidgetContent(currentState, widgetId, slotName, contextType)
+        const { widget } = getWidgetConfig(currentState, widgetId, slotName, contextType)
         if (widget && widget.config) {
             configRef.current = widget.config
         }
@@ -166,23 +184,6 @@ const ImageWidget = ({
 
         loadCollectionImages()
     }, [collectionId, stableCollectionConfig])
-
-    // ODC External Changes Subscription
-    useExternalChanges(componentId, (state) => {
-        if (!widgetId || !slotName) return
-
-        const { widget } = getWidgetContent(state, widgetId, slotName, contextType)
-        if (widget && widget.config && hasWidgetContentChanged(configRef.current, widget.config)) {
-            console.log("Update::ImageWidget", widget.config.collectionConfig.displayType, configRef.current.collectionConfig.displayType)
-            configRef.current = widget.config
-            // Trigger re-render if collection settings changed
-            const newCollectionId = widget.config.collectionId
-            if (newCollectionId !== collectionId) {
-                // The useEffect above will handle reloading collection images
-                // when collectionId changes in the next render cycle
-            }
-        }
-    })
 
     // ODC Configuration Update Handler
     const handleConfigChange = useCallback(async (newConfig) => {

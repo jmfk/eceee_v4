@@ -7,9 +7,6 @@ import DeletedWidgetWarning from './DeletedWidgetWarning.jsx'
 import { SpecialEditorRenderer, hasSpecialEditor } from './special-editors'
 import IsolatedFormRenderer from './IsolatedFormRenderer.jsx'
 
-import { useUnifiedData } from '../contexts/unified-data/context/UnifiedDataContext'
-import { OperationTypes } from '../contexts/unified-data/types/operations'
-import { useEditorContext } from '../contexts/unified-data/hooks'
 
 /**
  * WidgetEditorPanel - Slide-out panel for editing widgets
@@ -55,42 +52,8 @@ const WidgetEditorPanel = forwardRef(({
     const rafRef = useRef(null)
     const updateTimeoutRef = useRef(null)
 
-    const { publishUpdate } = useUnifiedData()
-
-    const contextType = useEditorContext();
-
-    // Unified Data Context update function (replaces event emitter)
-    const emitWidgetChanged = useCallback((arg1, arg2, arg3, _changeType = 'config') => {
-        // Supports both signatures:
-        // 1) (data, changeType)
-        // 2) (widgetId, slotName, updatedWidget, changeType)
-        let widgetId
-        let slotName
-        let updatedWidget
-
-        if (typeof arg1 === 'object' && arg1 !== null && !arg3) {
-            const data = arg1
-            widgetId = data?.id
-            slotName = data?.slotName || data?.slot
-            updatedWidget = data
-        } else {
-            widgetId = arg1
-            slotName = arg2
-            updatedWidget = arg3
-        }
-
-        if (!widgetId || !slotName || !updatedWidget) {
-            return
-        }
-
-        const config = updatedWidget.config || {}
-        publishUpdate(String(widgetId), OperationTypes.UPDATE_WIDGET_CONFIG, {
-            id: widgetId,
-            slotName: slotName,
-            contextType: contextType,
-            config: config
-        })
-    }, [publishUpdate])
+    // Get contextType from widget context or parent context
+    const contextType = widgetData?.context?.contextType || context?.contextType
 
     // Check if widget supports special editor mode
     const supportsSpecialEditor = useCallback(() => {
@@ -214,13 +177,6 @@ const WidgetEditorPanel = forwardRef(({
         }
     }, [widgetData, schema, widgetTypeValidation])
 
-    // Handle unsaved changes from isolated form
-    const handleUnsavedChanges = useCallback(async (hasUnsavedChanges) => {
-        setHasChanges(hasUnsavedChanges);
-        // if (onUnsavedChanges) {
-        //     onUnsavedChanges(hasUnsavedChanges)
-        // }
-    }, [])
 
     // Handle resize drag with useCallback and RAF for smooth performance
     const handleResizeMove = useCallback((e) => {
@@ -411,6 +367,9 @@ const WidgetEditorPanel = forwardRef(({
                         isAnimating={isAnimatingSpecialEditor}
                         isClosing={isClosingSpecialEditor}
                         namespace={namespace}
+                        contextType={contextType}
+                        widgetId={widgetData?.id}
+                        slotName={widgetData?.slotName || widgetData?.slot}
                     />
                 )}
 
@@ -468,10 +427,10 @@ const WidgetEditorPanel = forwardRef(({
                             <IsolatedFormRenderer
                                 initWidgetData={widgetData}
                                 initschema={fetchedSchema || schema}
-                                onRealTimeUpdate={onRealTimeUpdate}
-                                onUnsavedChanges={handleUnsavedChanges}
-                                emitWidgetChanged={emitWidgetChanged}
                                 namespace={namespace}
+                                contextType={contextType}
+                                widgetId={widgetData?.id}
+                                slotName={widgetData?.slotName || widgetData?.slot}
                                 context={widgetData?.context || {
                                     widgetId: widgetData?.id,
                                     slotName: widgetData?.slotName || widgetData?.slot,

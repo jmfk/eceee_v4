@@ -1,8 +1,11 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { getWidgetSchema, validateWidgetConfiguration } from '../api/widgetSchemas.js'
 import { WIDGET_CHANGE_TYPES } from '../types/widgetEvents'
 import SchemaFieldRenderer from './forms/SchemaFieldRenderer.jsx'
 import { useFormDataBuffer } from '../hooks/useFormDataBuffer.js'
+import { useUnifiedData } from '../contexts/unified-data/context/UnifiedDataContext'
+import { OperationTypes } from '../contexts/unified-data/types/operations'
+import { getWidgetConfig, hasWidgetContentChanged } from '../utils/widgetUtils'
 
 /**
  * IsolatedFieldWrapper - Simplified wrapper that uses LocalStateFieldWrapper
@@ -15,9 +18,8 @@ const IsolatedFieldWrapper = React.memo(({
     widgetType,
     isRequired,
     onFieldChange,
-    onValidationChange,
     namespace = null,
-    context = null
+    context = {},
 }) => {
     // Get initial value from widget data
     const initialValue = widgetData?.config?.[fieldName] ?? ''
@@ -104,6 +106,7 @@ const IsolatedFieldWrapper = React.memo(({
             required={isRequired}
             disabled={false}
             namespace={namespace}
+            context={context}
         />
     )
 })
@@ -115,34 +118,32 @@ const IsolatedFieldWrapper = React.memo(({
 const IsolatedFormRenderer = React.memo(({
     initWidgetData,
     initschema,
-    onRealTimeUpdate,
-    onUnsavedChanges,
-    emitWidgetChanged,
     namespace = null,
-    context = null
+    contextType = null,
+    widgetId = null,
+    slotName = null,
+    context = {}
 }) => {
     const schemaRef = useRef(null)
     // Use refs for form state to prevent rerenders
-    const updateTimeoutRef = useRef(null)
     const fieldValidationsRef = useRef({})
 
+    // ODC Integration
+    const { useExternalChanges, publishUpdate, getState } = useUnifiedData()
+    const componentId = useMemo(() => `isolated-form-${widgetId || 'preview'}`, [widgetId])
+
+    // Ref to track current config for ODC synchronization
+    const configRef = useRef(initWidgetData?.config || {})
+
     // Use form data buffer to store changes without re-renders
-    const formBuffer = useFormDataBuffer(
-        initWidgetData,
-        {
-            onDirtyChange: onUnsavedChanges,
-            onRealTimeUpdate: (data) => {
-                // Trigger real-time updates for preview
-                onRealTimeUpdate?.(data)
-                emitWidgetChanged?.(data, WIDGET_CHANGE_TYPES.CONFIG_UPDATED)
-            }
-        }
-    )
+    const formBuffer = useFormDataBuffer(initWidgetData)
 
     // Keep original state for schema and type info (these don't change frequently)
     const [schema] = useState(initschema)
+
     // Store schema in ref
     useEffect(() => {
+        // console.log("getWidgetSchema")
         const currentData = formBuffer.getCurrentData()
         if (currentData && !schema) {
             const fetchSchema = async () => {
@@ -159,58 +160,49 @@ const IsolatedFormRenderer = React.memo(({
         }
     }, [schema, formBuffer])
 
-    // Immediate real-time update function
-    const triggerRealTimeUpdate = useCallback((newConfig) => {
-        const currentData = formBuffer.getCurrentData()
-        if (!currentData) return
+    // ODC External Changes Subscription - Listen for updates from other components
+    useExternalChanges(componentId, (state) => {
+        if (!widgetId || !slotName || !contextType) return
 
-        const updatedWidget = { ...currentData, config: newConfig }
+        const { widget } = getWidgetConfig(state, widgetId, slotName, contextType)
+        if (widget && widget.config && hasWidgetContentChanged(configRef.current, widget.config)) {
+            console.log("IsolatedFormRenderer: Received external ODC update", {
+                widgetId,
+                slotName,
+                contextType,
+                oldDisplayType: configRef.current?.displayType,
+                newDisplayType: widget.config?.displayType,
+                oldCollectionConfig: configRef.current?.collectionConfig,
+                newCollectionConfig: widget.config?.collectionConfig
+            })
 
-        // Emit event for real-time updates
-        if (emitWidgetChanged) {
-            emitWidgetChanged(
-                currentData.id,
-                currentData.slotName,
-                updatedWidget,
-                WIDGET_CHANGE_TYPES.CONFIG
-            )
+            configRef.current = widget.config
+            // Update form buffer with new config from ODC
+            formBuffer.resetTo({ ...initWidgetData, config: widget.config })
         }
-
-        // Fallback for components not using event system
-        if (onRealTimeUpdate && !emitWidgetChanged) {
-            onRealTimeUpdate(updatedWidget)
-        }
-    }, [formBuffer, emitWidgetChanged, onRealTimeUpdate])
+    })
 
     // Handle field changes from isolated fields
-    const handleFieldChange = useCallback((fieldName, value, triggerValidation) => {
+    const handleFieldChange = useCallback(async (fieldName, value, triggerValidation) => {
+        console.log("handleFieldChange", fieldName, value)
+        //console.log("formBuffer", formBuffer)
         // Update field in buffer without re-rendering
         const fieldPath = `config.${fieldName}`
         formBuffer.updateField(fieldPath, value)
 
         // Get updated config for real-time updates
         const currentData = formBuffer.getCurrentData()
-        triggerRealTimeUpdate(currentData.config)
-    }, [formBuffer, triggerRealTimeUpdate])
-
-    // Handle validation changes from individual fields
-    const handleValidationChange = useCallback((fieldName, validation) => {
-        fieldValidationsRef.current[fieldName] = validation
-
-        // Check overall validity and emit events
-        const hasErrors = Object.values(fieldValidationsRef.current).some(v => v && !v.isValid)
-        const isValid = !hasErrors
-
+        //console.log("widgetId", widgetId)
+        //console.log("slotName", slotName)
+        //console.log("contextType", contextType)
+        console.log("SEND currentData.config", currentData.config)
+        await publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
+            id: widgetId,
+            slotName: slotName,
+            contextType: contextType,
+            config: currentData.config
+        })
     }, [formBuffer])
-
-    // Cleanup timeouts
-    useEffect(() => {
-        return () => {
-            if (updateTimeoutRef.current) {
-                clearTimeout(updateTimeoutRef.current)
-            }
-        }
-    }, [])
 
     const activeSchema = schemaRef.current || schema
 
@@ -222,6 +214,7 @@ const IsolatedFormRenderer = React.memo(({
         )
     }
 
+    //console.log("IsolatedFormRenderer::render")
     // Render isolated fields - each field manages its own state and rerenders
     return (
         <div className="space-y-4 p-4">
@@ -237,7 +230,6 @@ const IsolatedFormRenderer = React.memo(({
                         widgetType={formBuffer.getCurrentData()?.type || ''}
                         isRequired={isRequired}
                         onFieldChange={handleFieldChange}
-                        onValidationChange={handleValidationChange}
                         namespace={namespace}
                         context={context}
                     />

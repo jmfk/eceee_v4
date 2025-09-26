@@ -4,7 +4,7 @@ import ContentWidgetEditorRenderer from './ContentWidgetEditorRenderer.js'
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
 import { useEditorContext } from '../../contexts/unified-data/hooks'
 import { OperationTypes } from '../../contexts/unified-data/types/operations';
-import { getWidgetContent, hasWidgetContentChanged } from '../../utils/widgetUtils';
+import { getWidgetConfig, hasWidgetContentChanged } from '../../utils/widgetUtils';
 
 /**
  * Clean up HTML content by removing unsupported tags and attributes
@@ -98,10 +98,10 @@ const ContentWidget = memo(({
     //context = {}
 }) => {
     const { useExternalChanges, publishUpdate, getState } = useUnifiedData();
-    const contentRef = useRef(config.content);
+    const configRef = useRef(config);
     const [, forceRerender] = useState({});
-    const setContent = (content) => {
-        contentRef.current = content;
+    const setConfig = (newConfig) => {
+        configRef.current = newConfig;
     }
     const componentId = `widget-${widgetId}`;
     const contextType = useEditorContext();
@@ -111,34 +111,40 @@ const ContentWidget = memo(({
             return;
         }
         const currentState = getState();
-        const { content: udcContent } = getWidgetContent(currentState, widgetId, slotName, contextType);
-        if (udcContent !== undefined && udcContent !== config.content) {
-            setContent(udcContent);
+        const { config: udcConfig } = getWidgetConfig(currentState, widgetId, slotName, contextType);
+        if (udcConfig && hasWidgetContentChanged(configRef.current, udcConfig)) {
+            setConfig(udcConfig);
             forceRerender({});
         }
     }, []);
 
     // Subscribe to external changes
     useExternalChanges(componentId, (state) => {
-        const { content: newContent } = getWidgetContent(state, widgetId, slotName, contextType);
-        if (hasWidgetContentChanged(contentRef.current, newContent)) {
-            setContent(newContent);
+        console.log("useExternalChanges in ContentWidget", componentId)
+        const { config: newConfig } = getWidgetConfig(state, widgetId, slotName, contextType);
+        console.log("state.metadata.currentVersionId", state.metadata.currentVersionId)
+        console.log("newConfig", widgetId, slotName, contextType)
+        console.log(state)
+        console.log(newConfig)
+        if (newConfig && hasWidgetContentChanged(configRef.current, newConfig)) {
+            setConfig(newConfig);
             forceRerender({});
         }
     });
 
     // Enhanced content change handler with stable references
     const handleContentChange = useCallback(async (newContent) => {
-        if (newContent !== contentRef.current) {
-            setContent(newContent);
+        if (newContent !== configRef.current.content) {
+            const updatedConfig = {
+                ...configRef.current,
+                content: newContent
+            };
+            setConfig(updatedConfig);
             publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
                 id: widgetId,
                 slotName: slotName,
                 contextType: contextType,
-                config: {
-                    ...config,
-                    content: newContent
-                }
+                config: updatedConfig
             });
         }
     }, [componentId, widgetId, slotName, contextType, publishUpdate, onConfigChange])
@@ -146,7 +152,7 @@ const ContentWidget = memo(({
     if (mode === 'editor') {
         return (
             <ContentWidgetEditor
-                content={contentRef.current}
+                content={configRef.current.content}
                 onChange={handleContentChange}
                 className=""
             />
@@ -155,7 +161,7 @@ const ContentWidget = memo(({
 
     return (
         <div className="content-widget min-h-32 theme-content widget-content">
-            {contentRef.current && <div dangerouslySetInnerHTML={{ __html: contentRef.current }} />}
+            {configRef.current.content && <div dangerouslySetInnerHTML={{ __html: configRef.current.content }} />}
         </div>
     )
 }, (prevProps, nextProps) => {

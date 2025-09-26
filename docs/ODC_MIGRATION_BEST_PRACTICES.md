@@ -2,6 +2,20 @@
 
 This guide provides step-by-step instructions for migrating components from older state management patterns to the Unified Data Context (ODC) system.
 
+## Understanding ODC Philosophy
+
+**ODC is NOT traditional props delegation.** Instead, ODC is a sophisticated data synchronization facility that allows components to manage their own data and rendering lifecycle while staying synchronized with a centralized truth.
+
+### ODC Solves Four Key Problems:
+
+1. **Storing the truth of the data** - Single source of truth for application state
+2. **Synchronizing data between parts** - Components stay in sync without tight coupling (real-time) 
+3. **Saving data to servers** - Centralized persistence with smart save strategies
+4. **Preventing unnecessary re-renders** - ComponentId-based update locking prevents sender components from re-rendering on their own updates
+
+### Key Principle: Components Own Their Rendering
+Each component maintains its own local state for immediate UI responsiveness, while ODC ensures all components eventually converge to the same truth. This prevents the cascading re-render problems of traditional prop drilling while maintaining data consistency.
+
 ## Core ODC Patterns
 
 ### 1. Import Required ODC Dependencies
@@ -160,7 +174,7 @@ echo "Add these imports to your component:
 grep -n "useState.*=" src/components/YourComponent.jsx
 ```
 
-**Prompt:** Replace `useState` declarations for data that needs to be shared across components with ODC patterns. Keep local UI state (like `isModalOpen`) as `useState`.
+**Prompt:** Replace `useState` declarations for data that needs to be shared across components with ODC patterns. **Keep local UI state (like `isModalOpen`) as `useState`.** Remember: ODC synchronizes data truth, but components still own their rendering and local UI state.
 
 ### Step 4: Add Component ID and Context
 ```bash
@@ -176,7 +190,7 @@ echo "Add componentId using useMemo with a descriptive name and ID"
 grep -n "set[A-Z]" src/components/YourComponent.jsx
 ```
 
-**Prompt:** Replace direct state updates with ODC `publishUpdate` calls using appropriate `OperationTypes`. Keep local state updates for immediate UI feedback.
+**Prompt:** Replace direct state updates with ODC `publishUpdate` calls using appropriate `OperationTypes`. **Keep local state updates for immediate UI feedback.** The component should update its own local state immediately, then notify ODC of the change. This ensures responsive UI while maintaining data synchronization.
 
 ### Step 6: Add External Changes Subscription  
 **Prompt:** Add `useExternalChanges(componentId, callback)` to listen for external state changes and update local state accordingly.
@@ -213,9 +227,10 @@ npm run test -- --testNamePattern="YourComponent"
 - Use `UPDATE_WIDGET_CONFIG` for configuration updates
 
 ### Form Components
-- Maintain local state for immediate UI feedback
-- Use ODC for data that needs to be shared
-- Implement debounced updates to ODC
+- **Maintain local state for immediate UI feedback** - Forms should be responsive to user input
+- **Use ODC for data that needs to be shared** - Only sync validated/confirmed data to ODC
+- **Implement debounced updates to ODC** - Avoid flooding ODC with every keystroke
+- **Remember**: The form owns its rendering, ODC owns the data truth
 
 ## Validation Checklist
 
@@ -247,5 +262,60 @@ grep -l "useUnifiedData\|publishUpdate" frontend/src/components/YourComponent.js
 # Check if widget components use editor context
 grep -l "useEditorContext\|contextType" frontend/src/components/widgets/
 ```
+
+## Pure ODC Implementation (Recommended)
+
+### Avoid Legacy Callback Props
+**CRITICAL**: Remove these legacy props from component interfaces:
+- `onRealTimeUpdate` - Replace with direct ODC integration
+- `emitWidgetChanged` - Replace with `publishUpdate` calls
+- `onConfigChange` - Use ODC `publishUpdate` directly
+
+### Pure ODC Widget Editor Pattern
+```javascript
+// WidgetEditorPanel (Pure UI Container)
+const WidgetEditorPanel = ({ widgetData, context, onSave, onClose }) => {
+    const contextType = widgetData?.context?.contextType || context?.contextType
+    
+    return (
+        <IsolatedFormRenderer
+            widgetId={widgetData?.id}
+            slotName={widgetData?.slotName}
+            contextType={contextType}
+            // NO onRealTimeUpdate or emitWidgetChanged props
+        />
+    )
+}
+
+// IsolatedFormRenderer (Direct ODC Integration)
+const IsolatedFormRenderer = ({ widgetId, slotName, contextType }) => {
+    const { publishUpdate, useExternalChanges } = useUnifiedData()
+    
+    // Publish changes directly to ODC
+    const handleConfigChange = async (newConfig) => {
+        await publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
+            id: widgetId,
+            slotName,
+            contextType,
+            config: newConfig
+        })
+    }
+    
+    // Subscribe to external changes
+    useExternalChanges(componentId, state => {
+        const { widget } = getWidgetContent(state, widgetId, slotName, contextType)
+        if (widget?.config) {
+            updateLocalFormState(widget.config)
+        }
+    })
+}
+```
+
+### Benefits of Pure ODC
+- ✅ Single source of truth (no callback confusion)
+- ✅ Better debugging (clear ODC flow)
+- ✅ Cleaner architecture (separation of concerns)
+- ✅ Proper external changes handling
+- ✅ No duplicate state management
 
 This guide ensures consistent ODC integration patterns across all components while maintaining performance and reliability.
