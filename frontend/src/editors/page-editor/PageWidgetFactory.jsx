@@ -264,7 +264,6 @@ const PageWidgetFactory = ({
                         widgetId={actualWidgetId}
                         slotName={actualSlotName}
                         widgetType={widget.type}
-                        // PageEditor-specific props
                         layoutRenderer={layoutRenderer}
                         versionId={versionId}
                         isPublished={isPublished}
