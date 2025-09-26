@@ -282,7 +282,6 @@ const ObjectWidgetFactory = ({
                         widgetId={actualWidgetId}
                         slotName={actualSlotName}
                         widgetType={widget.type}
-                        // ObjectEditor-specific props
                         objectType={objectType}
                         slotConfig={slotConfig}
                         isRequired={slotConfig?.required}
