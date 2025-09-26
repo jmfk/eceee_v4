@@ -1,13 +1,24 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { Image } from 'lucide-react'
 import { mediaCollectionsApi, namespacesApi } from '../../api'
 import { useTheme } from '../../hooks/useTheme'
+import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
+import { useEditorContext } from '../../contexts/unified-data/hooks'
+import { OperationTypes } from '../../contexts/unified-data/types/operations'
+import { getWidgetContent, hasWidgetContentChanged } from '../../utils/widgetUtils'
 
 /**
  * Image Widget Component
  * Renders images, galleries, and videos with multiple display modes
  */
-const ImageWidget = ({ config = {}, mode = 'preview' }) => {
+const ImageWidget = ({
+    config = {},
+    mode = 'preview',
+    widgetId = null,
+    slotName = null,
+    onConfigChange = null,
+    context
+}) => {
     const {
         mediaItems = [],
         collectionId = null,
@@ -28,6 +39,14 @@ const ImageWidget = ({ config = {}, mode = 'preview' }) => {
 
     // Get current theme for image styles
     const { currentTheme } = useTheme()
+
+    // ODC Integration
+    const { useExternalChanges, publishUpdate, getState } = useUnifiedData()
+    const componentId = useMemo(() => `imagewidget-${widgetId || 'preview'}`, [widgetId])
+    const contextType = useEditorContext()
+
+    // Ref to track current config for ODC synchronization
+    const configRef = useRef(config)
 
     // State for collection images
     const [collectionImages, setCollectionImages] = useState([])
@@ -72,6 +91,17 @@ const ImageWidget = ({ config = {}, mode = 'preview' }) => {
         randomize: collectionConfig?.randomize || false,
         maxItems: collectionConfig?.maxItems || 0
     }), [collectionConfig?.randomize, collectionConfig?.maxItems])
+
+    // ODC Config Synchronization - Initialize from ODC state if available
+    useEffect(() => {
+        if (!widgetId || !slotName) return
+
+        const currentState = getState()
+        const { widget } = getWidgetContent(currentState, widgetId, slotName, contextType)
+        if (widget && widget.config) {
+            configRef.current = widget.config
+        }
+    }, [widgetId, slotName, contextType, getState])
 
     // Load collection images when collectionId is present
     useEffect(() => {
@@ -136,6 +166,40 @@ const ImageWidget = ({ config = {}, mode = 'preview' }) => {
 
         loadCollectionImages()
     }, [collectionId, stableCollectionConfig])
+
+    // ODC External Changes Subscription
+    useExternalChanges(componentId, (state) => {
+        if (!widgetId || !slotName) return
+
+        const { widget } = getWidgetContent(state, widgetId, slotName, contextType)
+        if (widget && widget.config && hasWidgetContentChanged(configRef.current, widget.config)) {
+            console.log("Update::ImageWidget", widget.config.collectionConfig.displayType, configRef.current.collectionConfig.displayType)
+            configRef.current = widget.config
+            // Trigger re-render if collection settings changed
+            const newCollectionId = widget.config.collectionId
+            if (newCollectionId !== collectionId) {
+                // The useEffect above will handle reloading collection images
+                // when collectionId changes in the next render cycle
+            }
+        }
+    })
+
+    // ODC Configuration Update Handler
+    const handleConfigChange = useCallback(async (newConfig) => {
+        if (!widgetId || !slotName) {
+            // Fallback to prop-based callback if no ODC integration
+            onConfigChange?.(newConfig)
+            return
+        }
+
+        configRef.current = newConfig
+        await publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
+            id: widgetId,
+            slotName: slotName,
+            contextType: contextType,
+            config: newConfig
+        })
+    }, [componentId, widgetId, slotName, contextType, publishUpdate, onConfigChange])
 
     // Determine which images to use: collection images or individual media items
     const effectiveMediaItems = collectionId ? collectionImages : mediaItems
