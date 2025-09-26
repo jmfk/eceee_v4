@@ -59,14 +59,8 @@ const ImageWidget = ({
     // ODC External Changes Subscription
     useExternalChanges(componentId, (state) => {
         if (!widgetId || !slotName) return
-        console.log("useExternalChanges in ImageWidget")
-        console.log(widgetId, slotName, contextType)
         const widget = lookupWidget(state, widgetId, slotName, contextType)
-        console.log(config)
-        console.log(hasWidgetContentChanged(configRef.current, widget.config))
         if (widget && widget.config && hasWidgetContentChanged(configRef.current, widget.config)) {
-            console.log("widget.config", widget.config)
-            console.log("Update::ImageWidget", widget.config.displayType, configRef.current.displayType)
             configRef.current = widget.config
             // Trigger re-render if collection settings changed
             const newCollectionId = widget.config.collectionId

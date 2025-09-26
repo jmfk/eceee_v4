@@ -1069,8 +1069,6 @@ const PageEditor = () => {
         // Handler for widget changes
         const handleWidgetChanged = (payload) => {
             if (payload.changeType === WIDGET_CHANGE_TYPES.CONFIG) {
-                console.log("THIS NEEDS TO BE FIXED")
-
                 // CRITICAL FIX: Config changes must update persistent data, not just mark as dirty
                 // This fixes the split-brain issue where config changes were only preview-only
 
