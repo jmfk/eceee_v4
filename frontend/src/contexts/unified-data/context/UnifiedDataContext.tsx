@@ -3,7 +3,7 @@ import { DataManager } from '../core/DataManager';
 import { UnifiedDataContextValue, UnifiedDataProviderProps } from '../types/context';
 import { Operation, OperationTypes } from '../types/operations';
 import { versionsApi } from '../../../api/versions';
-import { processLoadedVersionData } from '../../../utils/smartSaveUtils';
+import { objectInstancesApi } from '../../../api/objectStorage';
 import { StateChangeCallback, VersionData } from '../types/state';
 import { defaultEqualityFn } from '../utils/equality';
 
@@ -199,27 +199,58 @@ export function UnifiedDataProvider({
     // Save to current version using granular smart save API
     const saveCurrentVersion = useCallback(async () => {
         const state = manager.getState();
-        const versionId = state.metadata.currentVersionId;
-        if (!versionId) {
-            throw new Error('No current version selected in UDC');
-        }
+        const { currentPageId, currentVersionId, currentObjectId } = state.metadata;
 
-        const version = state.versions[String(versionId)] as VersionData;
-        if (!version) {
-            throw new Error(`Version ${versionId} not found in UDC state`);
-        }
+        // Determine context type based on what's currently active
+        if (currentPageId && currentVersionId) {
+            // Page context - save using versionsApi
+            const version = state.versions[String(currentVersionId)] as VersionData;
+            if (!version) {
+                throw new Error(`Version ${currentVersionId} not found in UDC state`);
+            }
 
-        const result = await versionsApi.update(versionId, version);
-        // Update versions state with processed data if available
-        if (result) {
-            manager.dispatch({
-                type: OperationTypes.SET_DIRTY,
-                sourceId: 'udc-save-current-version',
-                payload: { isDirty: false }
-            });
-        }
+            const result = await versionsApi.update(currentVersionId, version);
+            // Update page dirty state
+            if (result) {
+                manager.dispatch({
+                    type: OperationTypes.SET_DIRTY,
+                    sourceId: 'udc-save-current-version',
+                    payload: { isDirty: false }
+                });
+            }
 
-        return result;
+            return result;
+        } else if (currentObjectId) {
+            // Object context - save using objectInstancesApi
+            const objectData = state.objects[String(currentObjectId)];
+            if (!objectData) {
+                throw new Error(`Object ${currentObjectId} not found in UDC state`);
+            }
+
+            const result = await objectInstancesApi.updateCurrentVersion(currentObjectId, objectData);
+            // Update object dirty state
+            if (result) {
+                manager.dispatch({
+                    type: OperationTypes.SET_OBJECT_DIRTY,
+                    sourceId: 'udc-save-current-version',
+                    payload: { isDirty: false }
+                });
+            }
+
+            // let apiCall
+            // if (isNewInstance) {
+            //     apiCall = objectInstancesApi.create(data)
+            // } else if (mode === 'update_current') {
+            //     apiCall = objectInstancesApi.updateCurrentVersion(instance.id, data)
+            // } else {
+            //     apiCall = objectInstancesApi.update(instance.id, data)
+            // }
+
+
+            return result;
+        } else {
+            throw new Error('No current page or object selected in UDC');
+        }
     }, [manager]);
 
     // Create context value
