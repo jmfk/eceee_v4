@@ -14,6 +14,8 @@ import { useEditorContext } from '../contexts/unified-data/hooks'
 const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, mode = 'object', onWidgetEditorStateChange, context }) => {
     const [selectedWidgets, setSelectedWidgets] = useState({}) // For bulk operations
 
+    console.log("ObjectContentEditor")
+
     // Get update lock and UnifiedData context
     const { useExternalChanges, publishUpdate } = useUnifiedData();
 

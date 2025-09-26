@@ -5,7 +5,7 @@ import { useTheme } from '../../hooks/useTheme'
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
 import { useEditorContext } from '../../contexts/unified-data/hooks'
 import { OperationTypes } from '../../contexts/unified-data/types/operations'
-import { getWidgetConfig, hasWidgetContentChanged } from '../../utils/widgetUtils'
+import { lookupWidget, hasWidgetContentChanged } from '../../utils/widgetUtils'
 
 /**
  * Image Widget Component
@@ -59,11 +59,14 @@ const ImageWidget = ({
     // ODC External Changes Subscription
     useExternalChanges(componentId, (state) => {
         if (!widgetId || !slotName) return
-        //console.log("useExternalChanges in ImageWidget")
-        const { widget } = getWidgetConfig(state, widgetId, slotName, contextType)
+        console.log("useExternalChanges in ImageWidget")
+        console.log(widgetId, slotName, contextType)
+        const widget = lookupWidget(state, widgetId, slotName, contextType)
+        console.log(config)
         console.log(hasWidgetContentChanged(configRef.current, widget.config))
         if (widget && widget.config && hasWidgetContentChanged(configRef.current, widget.config)) {
-            console.log("Update::ImageWidget", widget.config.collectionConfig.displayType, configRef.current.collectionConfig.displayType)
+            console.log("widget.config", widget.config)
+            console.log("Update::ImageWidget", widget.config.displayType, configRef.current.displayType)
             configRef.current = widget.config
             // Trigger re-render if collection settings changed
             const newCollectionId = widget.config.collectionId
@@ -115,7 +118,7 @@ const ImageWidget = ({
         if (!widgetId || !slotName) return
 
         const currentState = getState()
-        const { widget } = getWidgetConfig(currentState, widgetId, slotName, contextType)
+        const widget = lookupWidget(currentState, widgetId, slotName, contextType)
         if (widget && widget.config) {
             configRef.current = widget.config
         }

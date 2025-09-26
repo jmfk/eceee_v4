@@ -1,53 +1,54 @@
 import { isEqual } from 'lodash';
 
 /**
- * Gets widget config from state and widgets array
+ * Looks up a widget from state and widgets array
  * @param {Object} state - The unified data state object
  * @param {string} widgetId - The ID of the widget to find
  * @param {string} slotName - slot where the widget is located
  * @param {string} contextType - 'page' or 'object' context type
- * @returns {Object} Object containing config and optionally the widget
+ * @returns {Object|null} The widget object with cleaned config, or null if not found
  */
-export const getWidgetConfig = (state, widgetId, slotName, contextType = 'page') => {
+export const lookupWidget = (state, widgetId, slotName, contextType = 'page') => {
     if (!state || !widgetId || !slotName) {
-        return { config: null, widget: null };
+        return null;
     }
 
     let widgets = null;
-    let widget = null;
 
     if (contextType === 'page') {
         // Look up widget in page version
         const version = state.versions[state.metadata.currentVersionId];
         if (!version) {
-            return { config: null, widget: null };
+            return null;
         }
         widgets = version.widgets[slotName];
     } else if (contextType === 'object') {
         // Look up widget in object
         const objectId = state.metadata.currentObjectId;
         if (!objectId) {
-            return { config: null, widget: null };
+            return null;
         }
         const objectData = state.objects[objectId];
         if (!objectData) {
-            return { config: null, widget: null };
+            return null;
         }
         widgets = objectData.widgets?.[slotName];
     } else {
         // Unknown context type
-        return { config: null, widget: null };
+        return null;
     }
 
-    widget = widgets?.find(w => w.id === widgetId);
-    const config = widget?.config;
+    const widget = widgets?.find(w => w.id === widgetId);
+    if (!widget) {
+        return null;
+    }
 
-    // Clean any nested config objects
-    const cleanedConfig = cleanNestedConfig(config, 'getWidgetConfig');
+    // Clean any nested config objects and return widget with cleaned config
+    const cleanedConfig = cleanNestedConfig(widget.config, 'lookupWidget');
 
     return {
-        config: cleanedConfig,
-        widget
+        ...widget,
+        config: cleanedConfig
     };
 };
 

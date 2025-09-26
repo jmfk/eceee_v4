@@ -322,6 +322,8 @@ const ObjectContentView = forwardRef(({ objectType, instance, parentId, isNewIns
     // Get widget editor state directly from local state
     const isWidgetEditorOpen = widgetEditorUI.isOpen
 
+    console.log("ObjectContentView")
+
     return (
         <div className="h-full flex flex-col relative">
             {/* Content Header - Styled like PageEditor */}
@@ -391,7 +393,6 @@ const ObjectContentView = forwardRef(({ objectType, instance, parentId, isNewIns
                                     Object Data
                                 </h3>
                             </div>
-
                             <ObjectDataForm
                                 objectType={objectType}
                                 isNewInstance={isNewInstance}

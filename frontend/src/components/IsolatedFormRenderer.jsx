@@ -5,7 +5,7 @@ import SchemaFieldRenderer from './forms/SchemaFieldRenderer.jsx'
 import { useFormDataBuffer } from '../hooks/useFormDataBuffer.js'
 import { useUnifiedData } from '../contexts/unified-data/context/UnifiedDataContext'
 import { OperationTypes } from '../contexts/unified-data/types/operations'
-import { getWidgetConfig, hasWidgetContentChanged } from '../utils/widgetUtils'
+import { lookupWidget, hasWidgetContentChanged } from '../utils/widgetUtils'
 
 /**
  * IsolatedFieldWrapper - Simplified wrapper that uses LocalStateFieldWrapper
@@ -164,7 +164,7 @@ const IsolatedFormRenderer = React.memo(({
     useExternalChanges(componentId, (state) => {
         if (!widgetId || !slotName || !contextType) return
 
-        const { widget } = getWidgetConfig(state, widgetId, slotName, contextType)
+        const widget = lookupWidget(state, widgetId, slotName, contextType)
         if (widget && widget.config && hasWidgetContentChanged(configRef.current, widget.config)) {
             console.log("IsolatedFormRenderer: Received external ODC update", {
                 widgetId,

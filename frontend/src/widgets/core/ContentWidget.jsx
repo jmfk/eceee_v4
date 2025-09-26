@@ -4,7 +4,7 @@ import ContentWidgetEditorRenderer from './ContentWidgetEditorRenderer.js'
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
 import { useEditorContext } from '../../contexts/unified-data/hooks'
 import { OperationTypes } from '../../contexts/unified-data/types/operations';
-import { getWidgetConfig, hasWidgetContentChanged } from '../../utils/widgetUtils';
+import { lookupWidget, hasWidgetContentChanged } from '../../utils/widgetUtils';
 
 /**
  * Clean up HTML content by removing unsupported tags and attributes
@@ -111,7 +111,8 @@ const ContentWidget = memo(({
             return;
         }
         const currentState = getState();
-        const { config: udcConfig } = getWidgetConfig(currentState, widgetId, slotName, contextType);
+        const widget = lookupWidget(currentState, widgetId, slotName, contextType);
+        const udcConfig = widget?.config;
         if (udcConfig && hasWidgetContentChanged(configRef.current, udcConfig)) {
             setConfig(udcConfig);
             forceRerender({});
@@ -121,7 +122,8 @@ const ContentWidget = memo(({
     // Subscribe to external changes
     useExternalChanges(componentId, (state) => {
         console.log("useExternalChanges in ContentWidget", componentId)
-        const { config: newConfig } = getWidgetConfig(state, widgetId, slotName, contextType);
+        const widget = lookupWidget(state, widgetId, slotName, contextType);
+        const newConfig = widget?.config;
         console.log("state.metadata.currentVersionId", state.metadata.currentVersionId)
         console.log("newConfig", widgetId, slotName, contextType)
         console.log(state)
