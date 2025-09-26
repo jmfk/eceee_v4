@@ -121,13 +121,8 @@ const ContentWidget = memo(({
 
     // Subscribe to external changes
     useExternalChanges(componentId, (state) => {
-        console.log("useExternalChanges in ContentWidget", componentId)
         const widget = lookupWidget(state, widgetId, slotName, contextType);
         const newConfig = widget?.config;
-        console.log("state.metadata.currentVersionId", state.metadata.currentVersionId)
-        console.log("newConfig", widgetId, slotName, contextType)
-        console.log(state)
-        console.log(newConfig)
         if (newConfig && hasWidgetContentChanged(configRef.current, newConfig)) {
             setConfig(newConfig);
             forceRerender({});

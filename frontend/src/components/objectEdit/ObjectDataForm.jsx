@@ -1,9 +1,12 @@
-import React, { useState, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react'
+import React, { useState, useEffect, useCallback, forwardRef, useImperativeHandle, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { AlertCircle } from 'lucide-react'
 import { namespacesApi } from '../../api'
 import { objectTypesApi } from '../../api/objectStorage'
 import ObjectSchemaForm from '../ObjectSchemaForm'
+import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
+import { OperationTypes } from '../../contexts/unified-data/types/operations'
+import { useEditorContext } from '../../contexts/unified-data/hooks'
 
 /**
  * Self-contained form component for object data management
@@ -19,6 +22,11 @@ const ObjectDataForm = forwardRef(({
     context
 }, ref) => {
     const [namespace, setNamespace] = useState(null)
+
+    // ODC Integration
+    const { useExternalChanges, publishUpdate, getState } = useUnifiedData()
+    const componentId = useMemo(() => `object-data-form-${instance?.id || 'new'}`, [instance?.id])
+    const contextType = useEditorContext()
 
     // Form state management
     const [formData, setFormData] = useState({
@@ -41,6 +49,30 @@ const ObjectDataForm = forwardRef(({
 
     const availableTypes = typesResponse?.data || []
 
+    // Subscribe to external changes from ODC
+    useExternalChanges(componentId, (state) => {
+        if (!instance?.id) return;
+
+        const objectData = state.objects?.[String(instance.id)];
+        if (objectData) {
+            const newFormData = {
+                objectTypeId: objectData.objectType?.id || objectData.objectTypeId || '',
+                title: objectData.title || '',
+                data: objectData.data || {},
+                status: objectData.status || 'draft',
+                widgets: objectData.widgets || {},
+                metadata: objectData.metadata || {}
+            };
+
+            // Only update if data has actually changed to avoid unnecessary re-renders
+            const hasChanged = JSON.stringify(formData) !== JSON.stringify(newFormData);
+            if (hasChanged) {
+                setFormData(newFormData);
+                onFormChange?.(newFormData);
+            }
+        }
+    });
+
     // Load namespace for media operations (object type's namespace or default)
     useEffect(() => {
         const loadNamespace = async () => {
@@ -62,7 +94,25 @@ const ObjectDataForm = forwardRef(({
         loadNamespace()
     }, [objectType?.namespace])
 
-    // Update form data when instance changes
+    // Initialize ODC object data when instance changes
+    useEffect(() => {
+        if (instance && instance.id) {
+            // Initialize object in ODC
+            publishUpdate(componentId, OperationTypes.INIT_OBJECT, {
+                id: String(instance.id),
+                data: {
+                    ...instance,
+                    id: String(instance.id),
+                    type: instance?.objectType?.name || 'unknown',
+                    status: instance?.status || 'draft',
+                    metadata: instance?.metadata || {},
+                    widgets: instance?.widgets || {}
+                }
+            });
+        }
+    }, [instance, componentId, publishUpdate])
+
+    // Update form data when instance changes (keep local state for immediate UI feedback)
     useEffect(() => {
         if (instance) {
             const newFormData = {
@@ -146,7 +196,8 @@ const ObjectDataForm = forwardRef(({
     }, [formData, objectType, onValidationChange])
 
     // Update form field and mark as dirty
-    const handleInputChange = useCallback((field, value) => {
+    const handleInputChange = useCallback(async (field, value) => {
+        // Update local state immediately for UI responsiveness
         setFormData(prev => {
             const newData = { ...prev, [field]: value }
             onFormChange?.(newData)
@@ -157,10 +208,19 @@ const ObjectDataForm = forwardRef(({
         if (errors[field]) {
             setErrors(prev => ({ ...prev, [field]: null }))
         }
-    }, [errors, onFormChange])
+
+        // Publish update to ODC if we have an instance ID
+        if (instance?.id) {
+            await publishUpdate(componentId, OperationTypes.UPDATE_OBJECT, {
+                id: String(instance.id),
+                updates: { [field]: value }
+            });
+        }
+    }, [errors, onFormChange, instance?.id, componentId, publishUpdate])
 
     // Update nested data field
-    const handleDataFieldChange = useCallback((fieldName, value) => {
+    const handleDataFieldChange = useCallback(async (fieldName, value) => {
+        // Update local state immediately for UI responsiveness
         setFormData(prev => {
             const newData = {
                 ...prev,
@@ -175,7 +235,22 @@ const ObjectDataForm = forwardRef(({
         if (errors[errorKey]) {
             setErrors(prev => ({ ...prev, [errorKey]: null }))
         }
-    }, [errors, onFormChange])
+
+        // Publish update to ODC if we have an instance ID
+        if (instance?.id) {
+            await publishUpdate(componentId, OperationTypes.UPDATE_OBJECT, {
+                id: String(instance.id),
+                updates: {
+                    data: {
+                        ...formData.data,
+                        [fieldName]: value
+                    }
+                }
+            });
+        }
+    }, [errors, onFormChange, instance?.id, componentId, publishUpdate, formData.data])
+
+
 
     // Expose methods to parent component
     useImperativeHandle(ref, () => ({
@@ -184,8 +259,6 @@ const ObjectDataForm = forwardRef(({
         hasErrors: () => Object.keys(errors).length > 0,
         getErrors: () => errors
     }), [validateForm, formData, errors])
-
-    console.log("ObjectDataForm")
 
     return (
         <>

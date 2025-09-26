@@ -291,8 +291,6 @@ export class DataManager {
                 );
             }
 
-            //console.log("validateOperation", operation.payload)
-
             // Payload validation based on operation type
             switch (operation.type) {
                 case OperationTypes.ADD_WIDGET:
@@ -469,8 +467,6 @@ export class DataManager {
                 timestamp: Date.now(),
                 validation
             };
-
-            // console.log("processOperation", operation.type)
                 
             // Process based on operation type
             switch (operation.type) {

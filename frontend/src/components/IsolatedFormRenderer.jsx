@@ -143,7 +143,6 @@ const IsolatedFormRenderer = React.memo(({
 
     // Store schema in ref
     useEffect(() => {
-        // console.log("getWidgetSchema")
         const currentData = formBuffer.getCurrentData()
         if (currentData && !schema) {
             const fetchSchema = async () => {
@@ -166,15 +165,6 @@ const IsolatedFormRenderer = React.memo(({
 
         const widget = lookupWidget(state, widgetId, slotName, contextType)
         if (widget && widget.config && hasWidgetContentChanged(configRef.current, widget.config)) {
-            console.log("IsolatedFormRenderer: Received external ODC update", {
-                widgetId,
-                slotName,
-                contextType,
-                oldDisplayType: configRef.current?.displayType,
-                newDisplayType: widget.config?.displayType,
-                oldCollectionConfig: configRef.current?.collectionConfig,
-                newCollectionConfig: widget.config?.collectionConfig
-            })
 
             configRef.current = widget.config
             // Update form buffer with new config from ODC
@@ -184,18 +174,12 @@ const IsolatedFormRenderer = React.memo(({
 
     // Handle field changes from isolated fields
     const handleFieldChange = useCallback(async (fieldName, value, triggerValidation) => {
-        console.log("handleFieldChange", fieldName, value)
-        //console.log("formBuffer", formBuffer)
         // Update field in buffer without re-rendering
         const fieldPath = `config.${fieldName}`
         formBuffer.updateField(fieldPath, value)
 
         // Get updated config for real-time updates
         const currentData = formBuffer.getCurrentData()
-        //console.log("widgetId", widgetId)
-        //console.log("slotName", slotName)
-        //console.log("contextType", contextType)
-        console.log("SEND currentData.config", currentData.config)
         await publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
             id: widgetId,
             slotName: slotName,
@@ -213,8 +197,6 @@ const IsolatedFormRenderer = React.memo(({
             </div>
         )
     }
-
-    //console.log("IsolatedFormRenderer::render")
     // Render isolated fields - each field manages its own state and rerenders
     return (
         <div className="space-y-4 p-4">

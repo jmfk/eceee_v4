@@ -62,13 +62,7 @@ const SpecialEditorRenderer = ({
         const currentState = getState()
         const widget = lookupWidget(currentState, widgetData.id, slotName, contextType)
         if (widget && widget.config) {
-            console.log("SpecialEditorRenderer: Initialized from ODC state", {
-                widgetId: widgetData.id,
-                slotName,
-                contextType,
-                displayType: widget.config?.displayType,
-                collectionConfig: widget.config?.collectionConfig
-            })
+            // Initialize from ODC state
         }
     }, [widgetData?.id, slotName, contextType, getState])
 
@@ -78,14 +72,6 @@ const SpecialEditorRenderer = ({
 
         const widget = lookupWidget(state, widgetData.id, slotName, contextType)
         if (widget && widget.config) {
-            console.log("SpecialEditorRenderer: Received external ODC update", {
-                widgetId: widgetData.id,
-                slotName,
-                contextType,
-                displayType: widget.config?.displayType,
-                collectionConfig: widget.config?.collectionConfig
-            })
-
             // Note: Special editors manage their own state internally
             // This subscription is mainly for logging and potential future synchronization needs
         }
@@ -93,13 +79,6 @@ const SpecialEditorRenderer = ({
 
     // Direct ODC integration for special editors
     const handleConfigChange = useCallback((newConfig) => {
-        console.log("SpecialEditorRenderer: Publishing ODC update", {
-            widgetId: widgetData?.id,
-            slotName: widgetData?.slotName || slotName,
-            contextType,
-            displayType: newConfig?.displayType,
-            collectionConfig: newConfig?.collectionConfig
-        })
 
         if (!widgetData?.id) {
             console.warn("SpecialEditorRenderer: Missing widgetId, cannot publish update")

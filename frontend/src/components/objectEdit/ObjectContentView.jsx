@@ -25,20 +25,8 @@ const ObjectContentView = forwardRef(({ objectType, instance, parentId, isNewIns
     const componentId = useMemo(() => `object-instance-editor-${instanceId || 'new'}`, [instanceId])
 
     useExternalChanges(componentId, state => {
-        //console.log("useExternalChanges::ObjectContentView")
-        //console.log(state)
-        // setLocalWidgets(prevWidgets => {
-        //     const newWidgets = { ...prevWidgets }
-        //     const slotName = payload.slotName
-
-        //     if (newWidgets[slotName]) {
-        //         newWidgets[slotName] = newWidgets[slotName].map(widget =>
-        //             widget.id === payload.widgetId ? payload.widget : widget
-        //         )
-        //     }
-
-        //     return newWidgets
-        // })
+        // Handle external changes if needed
+        // Currently no specific handling required for ObjectContentView
     });
 
     // Widget editor state
@@ -112,7 +100,6 @@ const ObjectContentView = forwardRef(({ objectType, instance, parentId, isNewIns
 
     // Form validation callback - track validation state
     const handleValidationChange = useCallback((isValid, errors) => {
-        console.log("handleValidationChange")
         setFormValidationState({ isValid, errors })
     }, [])
 
@@ -132,7 +119,6 @@ const ObjectContentView = forwardRef(({ objectType, instance, parentId, isNewIns
 
     // Form change callback - track current form data
     const handleFormChange = useCallback((newFormData) => {
-        console.log("handleFormChange", newFormData)
         // setCurrentFormData(newFormData)
         // onUnsavedChanges?.(true) // Mark as having unsaved changes
     }, [onUnsavedChanges])
@@ -142,8 +128,6 @@ const ObjectContentView = forwardRef(({ objectType, instance, parentId, isNewIns
 
     // Get widget editor state directly from local state
     const isWidgetEditorOpen = widgetEditorUI.isOpen
-
-    console.log("ObjectContentView")
 
     return (
         <div className="h-full flex flex-col relative">

@@ -14,8 +14,6 @@ import { useEditorContext } from '../contexts/unified-data/hooks'
 const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, mode = 'object', onWidgetEditorStateChange, context }) => {
     const [selectedWidgets, setSelectedWidgets] = useState({}) // For bulk operations
 
-    console.log("ObjectContentEditor")
-
     // Get update lock and UnifiedData context
     const { useExternalChanges, publishUpdate } = useUnifiedData();
 
@@ -42,8 +40,7 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, mode = 
 
     const contextType = useEditorContext()
 
-    // console.log("widgets2")
-    // console.log(widgets)
+    // Widgets are used directly since migration is complete
 
     // Use widgets directly since migration is complete
     const normalizedWidgets = useMemo(() => {
@@ -62,7 +59,6 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, mode = 
     // Subscribe to external changes via Unified Data Context
     useExternalChanges(componentId, (state) => {
         // External updates can be handled here if needed
-        //console.log("useExternalChanges::ObjectContentEditor")
     })
 
     // Use the shared widget hook (but we'll override widgetTypes with object type's configuration)
@@ -139,7 +135,6 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, mode = 
     }
 
     const handleAddWidget = async (slotName, widgetTypeToAdd = null) => {
-        console.log("handleAddWidget", slotName, widgetTypeToAdd)
         const slot = objectType.slotConfiguration.slots.find(s => s.name === slotName)
         if (!slot) return
 
@@ -236,7 +231,6 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, mode = 
     // Notify parent of widget editor state changes
     useEffect(() => {
         if (onWidgetEditorStateChange) {
-            //console.log("onWidgetEditorStateChange changed")
             onWidgetEditorStateChange({
                 isOpen: widgetEditorOpen,
                 editingWidget,
@@ -250,7 +244,6 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, mode = 
 
     const handleEditWidget = (slotName, widgetIndex, widget) => {
         // Add slotName and computed editor context to widget data for editor
-        //console.log("handleEditWidget")
         const widgetWithSlot = {
             ...widget,
             slotName,
@@ -301,7 +294,6 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, mode = 
 
     // Move widget up in the slot
     const handleMoveWidgetUp = (slotName, widgetIndex, widget) => {
-        console.log("handleMoveWidgetUp", slotName, widgetIndex, widget)
         if (widgetIndex <= 0) return // Can't move the first widget up
         const slot = objectType?.slotConfiguration?.slots?.find(s => s.name === slotName)
         const currentWidgets = normalizedWidgets
@@ -321,7 +313,6 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, mode = 
 
     // Move widget down in the slot
     const handleMoveWidgetDown = (slotName, widgetIndex, widget) => {
-        console.log("handleMoveWidgetDown", slotName, widgetIndex, widget)
         const slotWidgets = normalizedWidgets[slotName] || []
         if (widgetIndex >= slotWidgets.length - 1) {
             return // Can't move the last widget down
@@ -474,7 +465,6 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, mode = 
         const isSelected = !!selectedWidgets[widgetKey]
         const slotWidgets = normalizedWidgets[slotName] || []
         const slot = objectType?.slotConfiguration?.slots?.find(s => s.name === slotName)
-        //console.log("widget", widget)
         return (
             <div key={widget.id || index} className="relative">
                 <ObjectWidgetFactory
