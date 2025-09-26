@@ -675,10 +675,7 @@ const PageEditor = () => {
                 updates: versionUpdates
             });
         }
-
-        // Mark as dirty in UDC
-        setIsDirty(true)
-    }, [switchToVersion, publishUpdate, componentId, webpageData?.id, pageVersionData?.id, setIsDirty])
+    }, [switchToVersion, publishUpdate, componentId, webpageData?.id, pageVersionData?.id])
 
     // NEW: Validation-driven sync handlers
     const handleValidatedPageDataSync = useCallback(async (validatedData) => {
@@ -704,7 +701,7 @@ const PageEditor = () => {
             }
         });
 
-        setIsDirty(true) // Mark as dirty since we have new validated data
+        // setIsDirty(true) // Mark as dirty since we have new validated data
     }, [publishUpdate, componentId, pageVersionData?.id, pageVersionData?.pageData])
 
 
@@ -1072,6 +1069,8 @@ const PageEditor = () => {
         // Handler for widget changes
         const handleWidgetChanged = (payload) => {
             if (payload.changeType === WIDGET_CHANGE_TYPES.CONFIG) {
+                console.log("THIS NEEDS TO BE FIXED")
+
                 // CRITICAL FIX: Config changes must update persistent data, not just mark as dirty
                 // This fixes the split-brain issue where config changes were only preview-only
 
@@ -1109,8 +1108,6 @@ const PageEditor = () => {
                     renderer.updateSlot(payload.slotName, renderer.getSlotWidgetData(payload.slotName))
                 }
 
-                // Mark page as dirty so user knows there are unsaved changes
-                setIsDirty(true)
                 return
             }
 
