@@ -34,12 +34,12 @@
 #### Widget System
 - `docs/WIDGET_SYSTEM_DOCUMENTATION_INDEX.md` - Widget-specific navigation
 - `backend/docs/CODE_BASED_WIDGET_SYSTEM.md` - Widget architecture
-- `docs/WIDGET_SYSTEM_MIGRATION_GUIDE.md` - Migration reference
+- `docs/WIDGET_SYSTEM_CURRENT_ARCHITECTURE.md` - Current widget system architecture
 - `docs/Widget_Types_API_Endpoint_Documentation.md` - API reference
 
 #### Layout System
+- `docs/LAYOUT_SYSTEM_INVESTIGATION.md` - Current layout system architecture
 - `docs/LAYOUT_CONTAINMENT_GUIDE.md` - Layout management
-- `docs/json-layout-markup-specification.md` - Layout specifications
 - `backend/docs/CODE_BASED_LAYOUT_SYSTEM.md` - Backend layout system
 
 #### Advanced Features

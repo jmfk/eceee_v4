@@ -21,7 +21,7 @@ The eceee_v4 project has transitioned from a database-based widget system to a c
   - Frontend integration
   - Security and performance considerations
 
-### 2. [Widget System Migration Guide](docs/WIDGET_SYSTEM_MIGRATION_GUIDE.md)
+### 2. [Widget System Current Architecture](docs/WIDGET_SYSTEM_CURRENT_ARCHITECTURE.md)
 **Detailed migration documentation from database-based to code-based system**
 
 - **Purpose**: Complete record of the migration process and changes made
@@ -181,7 +181,7 @@ class MyWidget(BaseWidget):
 
 ### For Developers
 1. **Read the core documentation** - Start with [CODE_BASED_WIDGET_SYSTEM.md](backend/docs/CODE_BASED_WIDGET_SYSTEM.md)
-2. **Review migration changes** - Understand what changed in [WIDGET_SYSTEM_MIGRATION_GUIDE.md](docs/WIDGET_SYSTEM_MIGRATION_GUIDE.md)
+2. **Review current architecture** - Understand the system in [WIDGET_SYSTEM_CURRENT_ARCHITECTURE.md](docs/WIDGET_SYSTEM_CURRENT_ARCHITECTURE.md)
 3. **Set up testing** - Follow patterns in [CODE_BASED_WIDGET_SYSTEM_TESTING.md](docs/CODE_BASED_WIDGET_SYSTEM_TESTING.md)
 4. **Create custom widgets** - Use the examples and patterns provided
 

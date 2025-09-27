@@ -9,7 +9,9 @@
 > **📋 For complete navigation see [COMPLETE DOCUMENTATION INDEX](../DOCUMENTATION_INDEX.md)**
 
 ### 🚀 Project Overview
-- [System Overview](SYSTEM_OVERVIEW.md) - Architecture and technology stack
+- [System Overview](SYSTEM_OVERVIEW.md) - ✅ **Updated** - Architecture and technology stack
+- [Layout System Architecture Guide](LAYOUT_SYSTEM_INVESTIGATION.md) - ✅ **Updated** - Authoritative dual layout system guide
+- [Widget System Current Architecture](WIDGET_SYSTEM_CURRENT_ARCHITECTURE.md) - ✅ **New** - Complete widget system documentation
 - [Frontend Refactoring Guide](FRONTEND_REFACTORING_GUIDE.md) - Component structure and patterns
 - [Complete Documentation Index](../DOCUMENTATION_INDEX.md) - **Master navigation for ALL project documentation**
 
