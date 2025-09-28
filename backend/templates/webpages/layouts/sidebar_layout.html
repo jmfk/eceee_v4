@@ -10,9 +10,6 @@
           data-slot-title="Page Header"
           data-slot-description="Site navigation, branding, and header content"
           data-slot-max-widgets="3">
-    {# default:[
-       {"type": "text", "config": {"content": "Header: Logo, Navigation Menu, Search", "style": "placeholder"}}
-    ] #}
     {% render_slot "header" %}
   </header>
 
@@ -20,9 +17,6 @@
         data-widget-slot="main"
         data-slot-title="Main Content"
         data-slot-description="Primary content area for articles, posts, and main page content">
-    {# default:[
-       {"type": "text", "config": {"content": "Main Content: Articles, Blog Posts, Page Content, Images", "style": "placeholder"}}
-    ] #}
     {% render_slot "main" %}
   </main>
 
@@ -32,9 +26,6 @@
          data-slot-title="Sidebar Top"
          data-slot-description="Top sidebar widgets like recent posts, categories, or featured content"
          data-slot-max-widgets="3">
-      {# default:[
-         {"type": "recent_posts", "config": {"count": 5, "show_date": true}}
-      ] #}
       {% render_slot "sidebar-top" %}
     </div>
 
@@ -43,9 +34,6 @@
          data-slot-title="Sidebar Middle" 
          data-slot-description="Middle sidebar area for ads, social media, or related content"
          data-slot-max-widgets="4">
-      {# default:[
-         {"type": "social_media", "config": {"platforms": ["twitter", "facebook", "linkedin"]}}
-      ] #}
       {% render_slot "sidebar-middle" %}
     </div>
 
@@ -54,10 +42,6 @@
          data-slot-title="Sidebar Bottom"
          data-slot-description="Bottom sidebar widgets for archives, tags, or supplementary content"
          data-slot-max-widgets="3">
-      {# default:[
-         {"type": "tag_cloud", "config": {"max_tags": 20}},
-         {"type": "newsletter", "config": {"title": "Subscribe to Updates"}}
-      ] #}
       {% render_slot "sidebar-bottom" %}
     </div>
   </aside>
@@ -67,10 +51,6 @@
           data-slot-title="Footer"
           data-slot-description="Site footer with links, copyright, and contact information"
           data-slot-max-widgets="2">
-    {# default:[
-       {"type": "copyright", "config": {"year": "2024", "company": "Your Company"}},
-       {"type": "footer_links", "config": {"links": ["Privacy", "Terms", "Contact"]}}
-    ] #}
     {% render_slot "footer" %}
   </footer>
 </div>

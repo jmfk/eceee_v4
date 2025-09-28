@@ -36,6 +36,23 @@ class SingleColumnLayout(BaseLayout):
                     "description": "Primary page content area",
                     "max_widgets": None,  # Unlimited widgets
                     "css_classes": "slot-main",
+                    "default_widgets": [
+                        {
+                            "type": "text",
+                            "config": {
+                                "content": "<h2>Welcome to Your Site</h2><p>This is the main content area. Add widgets to customize this space.</p>",
+                                "format": "html",
+                            },
+                        },
+                        {
+                            "type": "image",
+                            "config": {
+                                "url": "/static/images/placeholder.jpg",
+                                "alt": "Placeholder image",
+                                "caption": "Example image widget",
+                            },
+                        },
+                    ],
                 },
                 {
                     "name": "sidebar",
@@ -43,6 +60,16 @@ class SingleColumnLayout(BaseLayout):
                     "description": "Complementary content and widgets",
                     "max_widgets": 4,
                     "css_classes": "slot-sidebar",
+                    "default_widgets": [
+                        {
+                            "type": "recent_posts",
+                            "config": {"count": 3, "show_excerpt": True},
+                        },
+                        {
+                            "type": "social_media",
+                            "config": {"platforms": ["twitter", "facebook"]},
+                        },
+                    ],
                 },
                 {
                     "name": "footer",
@@ -74,6 +101,15 @@ class TwoColumnLayout(BaseLayout):
                     "description": "Page header spanning both columns",
                     "max_widgets": 2,
                     "css_classes": "slot-header col-span-2",
+                    "default_widgets": [
+                        {
+                            "type": "text",
+                            "config": {
+                                "content": "<h1>Welcome to Your Site</h1><p>Header content area for branding and navigation.</p>",
+                                "format": "html",
+                            },
+                        }
+                    ],
                 },
                 {
                     "name": "main",
@@ -81,6 +117,23 @@ class TwoColumnLayout(BaseLayout):
                     "description": "Primary content column",
                     "max_widgets": None,
                     "css_classes": "slot-main col-span-1",
+                    "default_widgets": [
+                        {
+                            "type": "text",
+                            "config": {
+                                "content": "<h2>Main Content Area</h2><p>This is the primary content area. Add widgets to customize this space with articles, images, and other content.</p>",
+                                "format": "html",
+                            },
+                        },
+                        {
+                            "type": "image",
+                            "config": {
+                                "url": "/static/images/placeholder.jpg",
+                                "alt": "Placeholder image",
+                                "caption": "Example image widget",
+                            },
+                        },
+                    ],
                 },
                 {
                     "name": "sidebar",
@@ -88,6 +141,23 @@ class TwoColumnLayout(BaseLayout):
                     "description": "Secondary content sidebar",
                     "max_widgets": 5,
                     "css_classes": "slot-sidebar col-span-1",
+                    "default_widgets": [
+                        {
+                            "type": "text",
+                            "config": {
+                                "content": "<h3>Sidebar</h3><p>Complementary content and widgets.</p>",
+                                "format": "html",
+                            },
+                        },
+                        {
+                            "type": "recent_posts",
+                            "config": {"count": 3, "show_excerpt": True},
+                        },
+                        {
+                            "type": "social_media",
+                            "config": {"platforms": ["twitter", "facebook"]},
+                        },
+                    ],
                 },
                 {
                     "name": "footer",
@@ -95,6 +165,15 @@ class TwoColumnLayout(BaseLayout):
                     "description": "Page footer spanning both columns",
                     "max_widgets": 2,
                     "css_classes": "slot-footer col-span-2",
+                    "default_widgets": [
+                        {
+                            "type": "text",
+                            "config": {
+                                "content": "<p>&copy; 2024 Your Website. All rights reserved.</p>",
+                                "format": "html",
+                            },
+                        }
+                    ],
                 },
             ]
         }
@@ -121,6 +200,15 @@ class ThreeColumnLayout(BaseLayout):
                     "description": "Page header spanning all columns",
                     "max_widgets": 1,
                     "css_classes": "slot-header col-span-3",
+                    "default_widgets": [
+                        {
+                            "type": "text",
+                            "config": {
+                                "content": "<h1>Welcome to Your Site</h1><p>Header content area for branding and navigation.</p>",
+                                "format": "html",
+                            },
+                        }
+                    ],
                 },
                 {
                     "name": "left_sidebar",
@@ -128,6 +216,15 @@ class ThreeColumnLayout(BaseLayout):
                     "description": "Left sidebar for navigation or secondary content",
                     "max_widgets": 4,
                     "css_classes": "slot-left-sidebar col-span-1",
+                    "default_widgets": [
+                        {
+                            "type": "text",
+                            "config": {
+                                "content": "<h3>Left Sidebar</h3><p>Navigation and secondary content.</p>",
+                                "format": "html",
+                            },
+                        }
+                    ],
                 },
                 {
                     "name": "main",
@@ -135,6 +232,23 @@ class ThreeColumnLayout(BaseLayout):
                     "description": "Primary content area",
                     "max_widgets": None,
                     "css_classes": "slot-main col-span-1",
+                    "default_widgets": [
+                        {
+                            "type": "text",
+                            "config": {
+                                "content": "<h2>Main Content Area</h2><p>This is the primary content area. Add widgets to customize this space with articles, images, and other content.</p>",
+                                "format": "html",
+                            },
+                        },
+                        {
+                            "type": "image",
+                            "config": {
+                                "url": "/static/images/placeholder.jpg",
+                                "alt": "Placeholder image",
+                                "caption": "Example image widget",
+                            },
+                        },
+                    ],
                 },
                 {
                     "name": "right_sidebar",
@@ -142,6 +256,19 @@ class ThreeColumnLayout(BaseLayout):
                     "description": "Right sidebar for complementary content",
                     "max_widgets": 4,
                     "css_classes": "slot-right-sidebar col-span-1",
+                    "default_widgets": [
+                        {
+                            "type": "text",
+                            "config": {
+                                "content": "<h3>Right Sidebar</h3><p>Widgets and additional content.</p>",
+                                "format": "html",
+                            },
+                        },
+                        {
+                            "type": "recent_posts",
+                            "config": {"count": 3, "show_excerpt": True},
+                        },
+                    ],
                 },
                 {
                     "name": "footer",
@@ -149,6 +276,15 @@ class ThreeColumnLayout(BaseLayout):
                     "description": "Page footer spanning all columns",
                     "max_widgets": 2,
                     "css_classes": "slot-footer col-span-3",
+                    "default_widgets": [
+                        {
+                            "type": "text",
+                            "config": {
+                                "content": "<p>&copy; 2024 Your Website. All rights reserved.</p>",
+                                "format": "html",
+                            },
+                        }
+                    ],
                 },
             ]
         }
@@ -170,16 +306,50 @@ class LandingPageLayout(BaseLayout):
         return {
             "slots": [
                 {
+                    "name": "navigation",
+                    "title": "Navigation Bar",
+                    "description": "Site navigation and branding",
+                    "max_widgets": 3,
+                    "css_classes": "slot-navigation",
+                    "default_widgets": [
+                        {
+                            "type": "text",
+                            "config": {
+                                "content": "<div class='flex items-center justify-between w-full'><div class='font-bold text-xl'>Your Brand</div><div class='hidden md:flex space-x-6'><a href='#' class='hover:text-indigo-600'>Home</a><a href='#' class='hover:text-indigo-600'>About</a><a href='#' class='hover:text-indigo-600'>Contact</a></div></div>",
+                                "format": "html",
+                            },
+                        }
+                    ],
+                },
+                {
                     "name": "hero",
                     "title": "Hero Section",
-                    "description": "Large hero banner at top of page",
-                    "max_widgets": 1,
+                    "description": "Main hero content with call-to-action",
+                    "max_widgets": 3,
                     "css_classes": "slot-hero",
+                    "default_widgets": [
+                        {
+                            "type": "text",
+                            "config": {
+                                "content": "<h1 class='text-5xl md:text-6xl font-bold mb-6 leading-tight'>Build Something Amazing</h1><p class='text-xl md:text-2xl mb-8 text-indigo-100'>Create beautiful, responsive websites with our powerful content management system.</p>",
+                                "format": "html",
+                            },
+                        },
+                        {
+                            "type": "button",
+                            "config": {
+                                "text": "Get Started",
+                                "url": "#features",
+                                "style": "primary",
+                                "size": "large",
+                            },
+                        },
+                    ],
                 },
                 {
                     "name": "features",
                     "title": "Features Section",
-                    "description": "Highlight key features or benefits",
+                    "description": "Product features, benefits, or service highlights",
                     "max_widgets": 6,
                     "css_classes": "slot-features",
                 },
@@ -292,6 +462,116 @@ class CustomLayout(BaseLayout):
                     "description": "Custom content area",
                     "max_widgets": None,
                     "css_classes": "slot-content",
+                },
+            ]
+        }
+
+
+@register_layout
+class SidebarLayout(BaseLayout):
+    """Sidebar layout matching sidebar_layout.html template"""
+
+    name = "sidebar_layout"
+    description = (
+        "Sidebar layout with header, main content, multi-section sidebar, and footer"
+    )
+    template_name = "webpages/layouts/sidebar_layout.html"
+    css_classes = "layout-sidebar"
+
+    @property
+    def slot_configuration(self):
+        return {
+            "slots": [
+                {
+                    "name": "header",
+                    "title": "Page Header",
+                    "description": "Site navigation, branding, and header content",
+                    "max_widgets": 3,
+                    "css_classes": "slot-header",
+                    "default_widgets": [
+                        {
+                            "type": "text",
+                            "config": {
+                                "content": "Header: Logo, Navigation Menu, Search",
+                                "style": "placeholder",
+                            },
+                        }
+                    ],
+                },
+                {
+                    "name": "main",
+                    "title": "Main Content",
+                    "description": "Primary content area for articles, posts, and main page content",
+                    "max_widgets": None,
+                    "css_classes": "slot-main",
+                    "default_widgets": [
+                        {
+                            "type": "text",
+                            "config": {
+                                "content": "Main Content: Articles, Blog Posts, Page Content, Images",
+                                "style": "placeholder",
+                            },
+                        }
+                    ],
+                },
+                {
+                    "name": "sidebar-top",
+                    "title": "Sidebar Top",
+                    "description": "Top sidebar widgets like recent posts, categories, or featured content",
+                    "max_widgets": 3,
+                    "css_classes": "slot-sidebar-top",
+                    "default_widgets": [
+                        {
+                            "type": "recent_posts",
+                            "config": {"count": 5, "show_date": True},
+                        }
+                    ],
+                },
+                {
+                    "name": "sidebar-middle",
+                    "title": "Sidebar Middle",
+                    "description": "Middle sidebar area for ads, social media, or related content",
+                    "max_widgets": 4,
+                    "css_classes": "slot-sidebar-middle",
+                    "default_widgets": [
+                        {
+                            "type": "social_media",
+                            "config": {
+                                "platforms": ["twitter", "facebook", "linkedin"]
+                            },
+                        }
+                    ],
+                },
+                {
+                    "name": "sidebar-bottom",
+                    "title": "Sidebar Bottom",
+                    "description": "Bottom sidebar widgets for archives, tags, or supplementary content",
+                    "max_widgets": 3,
+                    "css_classes": "slot-sidebar-bottom",
+                    "default_widgets": [
+                        {"type": "tag_cloud", "config": {"max_tags": 20}},
+                        {
+                            "type": "newsletter",
+                            "config": {"title": "Subscribe to Updates"},
+                        },
+                    ],
+                },
+                {
+                    "name": "footer",
+                    "title": "Footer",
+                    "description": "Site footer with links, copyright, and contact information",
+                    "max_widgets": 2,
+                    "css_classes": "slot-footer",
+                    "default_widgets": [
+                        {
+                            "type": "copyright",
+                            "config": {"year": "2024", "company": "Your Company"},
+                        },
+                        {
+                            "type": "footer_links",
+                            "config": {"links": ["Privacy", "Terms", "Contact"]},
+                        },
+                    ],
                 },
             ]
         }

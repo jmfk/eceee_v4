@@ -14,9 +14,6 @@
               data-slot-title="Header"
               data-slot-description="Page header spanning all columns"
               data-slot-max-widgets="2">
-        {# default:[
-           {"type": "text", "config": {"content": "<h1>Welcome to Your Site</h1><p>Header content area for branding and navigation.</p>", "format": "html"}}
-        ] #}
         {% render_slot "header" %}
       </header>
       
@@ -26,9 +23,6 @@
              data-slot-title="Left Sidebar"
              data-slot-description="Left sidebar for complementary content"
              data-slot-max-widgets="4">
-        {# default:[
-           {"type": "text", "config": {"content": "<h3>Left Sidebar</h3><p>Navigation and secondary content.</p>", "format": "html"}}
-        ] #}
         {% render_slot "left_sidebar" %}
       </aside>
       
@@ -38,10 +32,6 @@
             data-slot-title="Main Content"
             data-slot-description="Primary content area"
             data-slot-max-widgets="">
-        {# default:[
-           {"type": "text", "config": {"content": "<h2>Main Content Area</h2><p>This is the primary content area. Add widgets to customize this space with articles, images, and other content.</p>", "format": "html"}},
-           {"type": "image", "config": {"url": "/static/images/placeholder.jpg", "alt": "Placeholder image", "caption": "Example image widget"}}
-        ] #}
         {% render_slot "main" %}
       </main>
       
@@ -51,10 +41,6 @@
              data-slot-title="Right Sidebar"
              data-slot-description="Right sidebar for widgets and tools"
              data-slot-max-widgets="4">
-        {# default:[
-           {"type": "text", "config": {"content": "<h3>Right Sidebar</h3><p>Widgets and additional content.</p>", "format": "html"}},
-           {"type": "recent_posts", "config": {"count": 3, "show_excerpt": true}}
-        ] #}
         {% render_slot "right_sidebar" %}
       </aside>
       
@@ -64,9 +50,6 @@
               data-slot-title="Footer"
               data-slot-description="Page footer spanning all columns"
               data-slot-max-widgets="2">
-        {# default:[
-           {"type": "text", "config": {"content": "<p>&copy; 2024 Your Website. All rights reserved.</p>", "format": "html"}}
-        ] #}
         {% render_slot "footer" %}
       </footer>
       

@@ -11,7 +11,6 @@
          data-slot-title="Navigation Bar"
          data-slot-description="Site navigation and branding"
          data-slot-max-widgets="3">
-      {# default:[{"type": "text", "config": {"content": "<div class='flex items-center justify-between w-full'><div class='font-bold text-xl'>Your Brand</div><div class='hidden md:flex space-x-6'><a href='#' class='hover:text-indigo-600'>Home</a><a href='#' class='hover:text-indigo-600'>About</a><a href='#' class='hover:text-indigo-600'>Contact</a></div></div>", "format": "html"}}] #}
       {% render_slot "navigation" %}
     </div>
   </nav>
@@ -24,7 +23,6 @@
          data-slot-title="Hero Section"
          data-slot-description="Main hero content with call-to-action"
          data-slot-max-widgets="3">
-      {# default:[{"type": "text", "config": {"content": "<h1 class='text-5xl md:text-6xl font-bold mb-6 leading-tight'>Build Something Amazing</h1><p class='text-xl md:text-2xl mb-8 text-indigo-100'>Create beautiful, responsive websites with our powerful content management system.</p>", "format": "html"}}, {"type": "button", "config": {"text": "Get Started", "url": "#features", "style": "primary", "size": "large"}}] #}
       {% render_slot "hero" %}
     </div>
   </section>

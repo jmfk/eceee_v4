@@ -144,7 +144,8 @@ def sanitize_widget_content(widget_data: Dict[str, Any]) -> Dict[str, Any]:
 class TemplateParser:
     """Parse Django templates into JSON layout representation"""
 
-    def __init__(self):
+    def __init__(self, layout=None):
+        self.layout = layout  # Optional layout instance to get slot_configuration
         self.default_widgets_pattern = re.compile(
             r"{#\s*default:\s*(\[.*?\])\s*#}", re.DOTALL | re.MULTILINE
         )
@@ -302,8 +303,14 @@ class TemplateParser:
             node["attributes"] = attributes
 
         if slot_info:
-            # Extract default widgets from template comments with validation
-            default_widgets = self._extract_default_widgets(element, template_source)
+            # Get default widgets from layout slot_configuration if available
+            default_widgets = self._get_default_widgets_from_layout(slot_info["name"])
+            if not default_widgets:
+                # Fallback to template comments for backward compatibility
+                default_widgets = self._extract_default_widgets(
+                    element, template_source
+                )
+
             if default_widgets:
                 slot_info["defaultWidgets"] = default_widgets
 
@@ -322,6 +329,38 @@ class TemplateParser:
             node["children"] = children
 
         return node
+
+    def _get_default_widgets_from_layout(
+        self, slot_name: str
+    ) -> Optional[List[Dict[str, Any]]]:
+        """Get default widgets from layout slot_configuration for the given slot name"""
+        if not self.layout or not hasattr(self.layout, "slot_configuration"):
+            return None
+
+        try:
+            slot_config = self.layout.slot_configuration
+            if not isinstance(slot_config, dict) or "slots" not in slot_config:
+                return None
+
+            # Find the slot by name
+            for slot in slot_config["slots"]:
+                if isinstance(slot, dict) and slot.get("name") == slot_name:
+                    default_widgets = slot.get("default_widgets")
+                    if default_widgets and isinstance(default_widgets, list):
+                        # Validate and sanitize the widgets
+                        if validate_default_widgets_json(default_widgets):
+                            sanitized_widgets = []
+                            for widget in default_widgets:
+                                sanitized_widget = sanitize_widget_content(widget)
+                                sanitized_widgets.append(sanitized_widget)
+                            return sanitized_widgets
+                    break
+        except Exception as e:
+            logger.warning(
+                f"Error getting default widgets from layout for slot '{slot_name}': {e}"
+            )
+
+        return None
 
     def _extract_default_widgets(
         self, element, template_source: str
@@ -914,7 +953,7 @@ class LayoutSerializer:
     """Serialize PageLayout objects to JSON"""
 
     def __init__(self):
-        self.parser = TemplateParser()
+        self.parser = None  # Will be initialized per layout
 
     def serialize_layout(self, layout) -> Dict[str, Any]:
         """
@@ -927,6 +966,9 @@ class LayoutSerializer:
             Dict containing complete layout information
         """
         try:
+            # Initialize parser with layout for slot_configuration access
+            self.parser = TemplateParser(layout=layout)
+
             # Parse the template file
             template_name = f"webpages/layouts/{layout.template_name}"
             layout_json = self.parser.parse_template(template_name)

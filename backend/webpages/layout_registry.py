@@ -49,13 +49,24 @@ class BaseLayout(ABC):
                     "name": "header",
                     "title": "Header",
                     "description": "Main header content",
-                    "max_widgets": 1
+                    "max_widgets": 1,
+                    "css_classes": "slot-header",
+                    "default_widgets": [
+                        {
+                            "type": "text",
+                            "config": {
+                                "content": "<h1>Welcome</h1>",
+                                "format": "html"
+                            }
+                        }
+                    ]
                 },
                 {
                     "name": "content",
                     "title": "Main Content",
                     "description": "Primary page content",
-                    "max_widgets": None
+                    "max_widgets": None,
+                    "css_classes": "slot-content"
                 }
             ]
         }

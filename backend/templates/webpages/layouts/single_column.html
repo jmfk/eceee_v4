@@ -10,10 +10,6 @@
           data-slot-title="Main Content"
           data-slot-description="Primary content area for the page"
           data-slot-max-widgets="5">
-      {# default:[
-         {"type": "text", "config": {"content": "<h2>Welcome to Your Site</h2><p>This is the main content area. Add widgets to customize this space.</p>", "format": "html"}},
-         {"type": "image", "config": {"url": "/static/images/placeholder.jpg", "alt": "Placeholder image", "caption": "Example image widget"}}
-      ] #}
       {% render_slot "main" %}
     </main>
     
@@ -22,10 +18,6 @@
            data-slot-title="Sidebar"
            data-slot-description="Complementary content and widgets"
            data-slot-max-widgets="4">
-      {# default:[
-         {"type": "recent_posts", "config": {"count": 3, "show_excerpt": true}},
-         {"type": "social_media", "config": {"platforms": ["twitter", "facebook"]}}
-      ] #}
       {% render_slot "sidebar" %}
     </aside>
   </div>

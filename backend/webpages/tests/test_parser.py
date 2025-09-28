@@ -143,8 +143,11 @@ class TemplateParserTest(TestCase):
         soup = BeautifulSoup(test_html, "html.parser")
         script_tag = soup.find("script")
 
-        # Test widget element parsing
-        result = self.parser._parse_widget_element(script_tag, test_html)
+        # Test widget element parsing with WidgetTemplateParser
+        from webpages.utils.template_parser import WidgetTemplateParser
+
+        widget_parser = WidgetTemplateParser()
+        result = widget_parser._parse_widget_element(script_tag, test_html)
 
         # Verify script was replaced with error message
         self.assertEqual(result["type"], "element")
