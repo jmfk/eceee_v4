@@ -160,7 +160,6 @@ def render_slot(context, slot_name):
 
     # Get widgets for this specific slot
     slot_widgets = widgets_by_slot.get(slot_name, [])
-
     if not slot_widgets:
         # No widgets for this slot - return empty string or placeholder
         return mark_safe("")

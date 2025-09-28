@@ -285,7 +285,8 @@ class ImageWidget(BaseWidget):
         to modify their configuration or add additional context.
         """
         # Start with the base configuration
-        template_config = config.copy()
+        template_config = config.copy() if config else {}
+        context = context if context else {}
 
         # Check if we have a collection to resolve
         collection_id = config.get("collection_id") or config.get("collectionId")

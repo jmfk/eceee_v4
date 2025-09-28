@@ -100,32 +100,33 @@ class WebPageRenderer:
             return f'<!-- Widget type "{widget_type_name}" not found -->'
 
         # Get base configuration
-        base_config = widget_data.get("configuration", {})
+        base_config = widget_data.get("config", {})
 
         # Prepare template context with widget-specific logic (e.g., collection resolution)
+        # All widgets now have prepare_template_context (default implementation in BaseWidget)
         template_config = base_config
-        if hasattr(widget_type, "prepare_template_context"):
-            try:
-                template_config = widget_type.prepare_template_context(
-                    base_config, context
-                )
-            except Exception as e:
-                # Log error but continue with base config to prevent crashes
-                import logging
+        try:
+            template_config = widget_type.prepare_template_context(base_config, context)
+        except Exception as e:
+            # Log error but continue with base config to prevent crashes
+            import logging
 
-                logger = logging.getLogger(__name__)
-                logger.error(
-                    f"Error preparing template context for {widget_type.name}: {e}"
-                )
+            logger = logging.getLogger(__name__)
+            logger.error(
+                f"Error preparing template context for {widget_type.name}: {e}"
+            )
 
         # Create a mock widget object for template rendering
         class MockWidget:
-            def __init__(self, widget_type, configuration):
-                self.widget_type = widget_type
-                self.configuration = configuration
+            def __init__(self, widget_type, configuration, widget_data):
                 self.id = widget_data.get("id", "unknown")
+                self.widget_type = widget_type
+                self.widget_data = widget_data
+                self.config = template_config
+                self.sort_order = widget_data.get("sort_order", 0)
+                self.is_visible = widget_data.get("is_visible", True)
 
-        mock_widget = MockWidget(widget_type, template_config)
+        mock_widget = MockWidget(widget_type, template_config, widget_data)
 
         # Render using the widget's template
         try:
@@ -134,6 +135,9 @@ class WebPageRenderer:
                 {
                     "widget": mock_widget,
                     "config": template_config,
+                    "widget_id": widget_data.get("id", "unknown"),
+                    "widget_type": widget_type,
+                    "widget_data": widget_data,  # Full widget data access
                     **(context or {}),
                 },
                 request=self.request,
@@ -167,6 +171,44 @@ class WebPageRenderer:
         else:
             context["slots"] = []
 
+        # Check if this is an object page (based on linked object fields if they exist)
+        is_object_page = (
+            hasattr(page, "linked_object_type")
+            and hasattr(page, "linked_object_id")
+            and page.linked_object_type
+            and page.linked_object_id
+        )
+
+        if is_object_page:
+            # Add object context for object pages
+            context["is_object_page"] = True
+            context["linked_object"] = {
+                "type": page.linked_object_type,
+                "id": page.linked_object_id,
+            }
+
+            # Try to get object content if the method exists
+            if hasattr(page, "get_object_content"):
+                try:
+                    context["object_content"] = page.get_object_content()
+                except Exception:
+                    context["object_content"] = None
+
+            # For objects, ensure there's at least a "main" slot available
+            slot_names = [slot.get("name") for slot in context["slots"]]
+            if "main" not in slot_names:
+                context["slots"].append(
+                    {
+                        "name": "main",
+                        "title": "Main Content",
+                        "description": "Primary content area for object display",
+                        "max_widgets": 10,
+                        "is_default_object_slot": True,
+                    }
+                )
+        else:
+            context["is_object_page"] = False
+
         # Merge additional context
         if extra_context:
             context.update(extra_context)
@@ -174,12 +216,19 @@ class WebPageRenderer:
         return context
 
     def _render_widgets_by_slot(self, page, page_version, context):
-        """Render widgets organized by slot."""
+        """Render widgets organized by slot with parent slot inheritance for empty slots."""
         widgets_by_slot = {}
 
         # Get widget inheritance info
         widgets_info = page.get_widgets_inheritance_info()
 
+        # Get all available slots from the layout
+        layout_slots = context.get("slots", [])
+        layout_slot_names = [
+            slot.get("name") for slot in layout_slots if slot.get("name")
+        ]
+
+        # Process each slot from the inheritance info
         for slot_name, slot_info in widgets_info.items():
             rendered_widgets = []
 
@@ -200,7 +249,86 @@ class WebPageRenderer:
 
             widgets_by_slot[slot_name] = rendered_widgets
 
+        # Check for empty slots that should inherit from parents
+        for slot_name in layout_slot_names:
+            if slot_name not in widgets_by_slot or not widgets_by_slot[slot_name]:
+                # This slot is empty, look for parent widgets
+                parent_widgets = self._find_parent_slot_widgets(page, slot_name)
+                if parent_widgets:
+                    rendered_widgets = []
+                    for widget_data in parent_widgets:
+                        widget_html = self.render_widget_json(
+                            widget_data["widget"], context
+                        )
+                        rendered_widgets.append(
+                            {
+                                "html": widget_html,
+                                "widget_data": widget_data["widget"],
+                                "inherited_from": widget_data["inherited_from"],
+                                "is_override": False,
+                                "is_parent_slot_inheritance": True,  # Mark as parent slot inheritance
+                            }
+                        )
+                    widgets_by_slot[slot_name] = rendered_widgets
+
         return widgets_by_slot
+
+    def _find_parent_slot_widgets(self, page, slot_name):
+        """
+        Find widgets for a slot by looking up the parent hierarchy.
+        Returns the first parent that has widgets in the specified slot.
+        """
+        current = page.parent
+        while current:
+            current_version = current.get_current_published_version()
+            if not current_version:
+                current_version = current.get_latest_published_version()
+
+            if current_version and current_version.widgets:
+                slot_widgets = current_version.widgets.get(slot_name, [])
+                if slot_widgets:
+                    # Found widgets in parent slot, return them with inheritance info
+                    return [
+                        {
+                            "widget": widget_data,
+                            "inherited_from": current,
+                        }
+                        for widget_data in sorted(
+                            slot_widgets, key=lambda w: w.get("sort_order", 0)
+                        )
+                    ]
+
+            # Move up the hierarchy
+            current = current.parent
+
+        return []
+
+    def render_object(self, page, object_instance, version=None, context=None):
+        """
+        Render an object page with object data integrated into the context.
+
+        Args:
+            page: WebPage instance that links to the object
+            object_instance: The actual object instance being rendered
+            version: Optional specific PageVersion to render
+            context: Optional additional template context
+
+        Returns:
+            dict: Contains 'html', 'css', 'meta', and 'debug_info'
+        """
+        # Build enhanced context with object data
+        enhanced_context = context.copy() if context else {}
+        enhanced_context.update(
+            {
+                "object": object_instance,
+                "object_data": getattr(object_instance, "data", {}),
+                "object_type": getattr(page, "linked_object_type", "unknown"),
+                "is_object_page": True,
+            }
+        )
+
+        # Use the standard render method with enhanced context
+        return self.render(page, version, enhanced_context)
 
     def _get_layout_template_name(self, layout):
         """Get the Django template name for the layout."""

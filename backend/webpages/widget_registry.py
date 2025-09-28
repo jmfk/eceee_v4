@@ -115,6 +115,53 @@ class BaseWidget(ABC):
         except Exception:
             return {}
 
+    def prepare_template_context(self, config, context=None):
+        """
+        Default implementation of prepare_template_context.
+
+        Captures the widget_data['config'] data and provides full access to
+        current page/object data and all inherited states.
+
+        Override this method in widget subclasses for custom processing.
+
+        Args:
+            config: Widget configuration dictionary from widget_data['configuration']
+            context: Full rendering context with page, object, and inherited data
+
+        Returns:
+            dict: Processed configuration ready for template rendering
+        """
+        # Start with a copy of the base configuration
+        template_config = config.copy() if config else {}
+        context = context if context else {}
+
+        # Add context data access for widgets that need it
+        if context:
+            # Provide access to page hierarchy and inheritance
+            template_config["_context"] = {
+                "widget": config.get("config"),
+                "page": context.get("page"),
+                "current_page": context.get("current_page"),
+                "page_version": context.get("page_version"),
+                "page_data": context.get("page_data"),
+                "parent": context.get("parent"),
+                "layout": context.get("layout"),
+                "theme": context.get("theme"),
+                "slots": context.get("slots", []),
+                "request": context.get("request"),
+            }
+
+            # If this is an object page, add object context
+            if context.get("is_object_page"):
+                template_config["_context"]["object_content"] = context.get(
+                    "object_content"
+                )
+                template_config["_context"]["linked_object"] = context.get(
+                    "linked_object"
+                )
+
+        return template_config
+
     def parse_configuration(self, configuration: Dict[str, Any]) -> BaseModel:
         """
         Parse and validate configuration data, returning pydantic model instance.
@@ -295,23 +342,23 @@ class WidgetTypeRegistry:
         """
         if not identifier:
             return None
-            
+
         # Try new format first (core_widgets.WidgetName) - exact match
         widget = self.get_widget_type_by_type(identifier)
         if widget:
             return widget
-        
+
         # Try case-insensitive type match for frontend compatibility
         identifier_lower = identifier.lower()
         for widget_instance in self._instances.values():
             if widget_instance.type.lower() == identifier_lower:
                 return widget_instance
-        
+
         # Try old format (human name)
         widget = self.get_widget_type(identifier)
         if widget:
             return widget
-        
+
         # Try slug format
         return self.get_widget_type_by_slug(identifier)
 
