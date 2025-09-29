@@ -97,13 +97,22 @@ class CodeLayoutViewSet(viewsets.ViewSet):
         """Add proper HTTP caching headers"""
         from django.utils.http import http_date
         from django.utils import timezone
+        from django.conf import settings
         import time
 
-        response["Cache-Control"] = "public, max-age=3600"
+        # Use shorter cache times in development
+        if settings.DEBUG:
+            cache_max_age = 60  # 1 minute in development
+        else:
+            cache_max_age = 3600  # 1 hour in production
+
+        response["Cache-Control"] = f"public, max-age={cache_max_age}"
         response["Vary"] = "Accept-Encoding, Accept, API-Version"
 
         if layout_name:
-            etag = f'"{layout_name}-{int(time.time() // 3600)}"'
+            # Use shorter time intervals in debug mode for more frequent cache invalidation
+            time_interval = 60 if settings.DEBUG else 3600  # 1 minute vs 1 hour
+            etag = f'"{layout_name}-{int(time.time() // time_interval)}"'
             response["ETag"] = etag
 
         response["Last-Modified"] = http_date(timezone.now().timestamp())

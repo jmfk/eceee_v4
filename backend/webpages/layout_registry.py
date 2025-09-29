@@ -160,12 +160,18 @@ class LayoutRegistry:
 
         logger.info(f"Registered layout: {name}")
 
+        # Invalidate caches when layout changes
+        self._invalidate_layout_caches(name)
+
     def unregister(self, name: str) -> None:
         """Unregister a layout by name."""
         if name in self._layouts:
             del self._layouts[name]
             del self._instances[name]
             logger.info(f"Unregistered layout: {name}")
+
+            # Invalidate caches when layout is removed
+            self._invalidate_layout_caches(name)
 
     def get_layout(self, name: str) -> Optional[BaseLayout]:
         """Get a layout instance by name."""
@@ -192,10 +198,75 @@ class LayoutRegistry:
         self._instances.clear()
         logger.info("Cleared all registered layouts")
 
+        # Invalidate all layout caches
+        self._invalidate_all_layout_caches()
+
     def reload(self) -> None:
         """Clear registry and trigger re-import of layouts."""
         self.clear()
         # Re-import will happen automatically when modules are re-imported
+
+    def _invalidate_layout_caches(self, layout_name: str) -> None:
+        """Invalidate all caches related to a specific layout."""
+        try:
+            from django.core.cache import cache
+
+            # Clear specific layout caches
+            cache_keys = [
+                f"simplified_layout:{layout_name}",
+                f"layout_json:{layout_name}",
+                f"layout_template:{layout_name}",
+            ]
+
+            for cache_key in cache_keys:
+                cache.delete(cache_key)
+                logger.debug(f"Cleared cache key: {cache_key}")
+
+            # Clear layout list caches (they contain all layouts)
+            list_cache_keys = [
+                "layout_registry:list_layouts:active",
+                "layout_registry:list_layouts:all",
+                "simplified_layouts_list",
+                "layout_choices",
+            ]
+
+            for cache_key in list_cache_keys:
+                cache.delete(cache_key)
+                logger.debug(f"Cleared list cache key: {cache_key}")
+
+            logger.info(f"Invalidated caches for layout: {layout_name}")
+
+        except Exception as e:
+            logger.warning(f"Failed to invalidate caches for layout {layout_name}: {e}")
+
+    def _invalidate_all_layout_caches(self) -> None:
+        """Invalidate all layout-related caches."""
+        try:
+            from django.core.cache import cache
+
+            # Get all layout names for specific cache invalidation
+            layout_names = list(self._layouts.keys())
+
+            # Clear all specific layout caches
+            for layout_name in layout_names:
+                self._invalidate_layout_caches(layout_name)
+
+            # Clear any remaining layout-related cache patterns
+            cache_patterns = [
+                "simplified_layout:*",
+                "layout_json:*",
+                "layout_template:*",
+                "layout_registry:*",
+                "simplified_layouts_list",
+            ]
+
+            # Django's cache doesn't support pattern deletion by default,
+            # so we clear the entire cache as a fallback
+            logger.info("Clearing entire cache due to layout registry changes")
+            cache.clear()
+
+        except Exception as e:
+            logger.warning(f"Failed to invalidate all layout caches: {e}")
 
 
 # Global registry instance

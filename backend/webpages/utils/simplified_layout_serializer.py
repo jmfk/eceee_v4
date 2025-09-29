@@ -28,7 +28,8 @@ class SimplifiedLayoutSerializer:
     def __init__(self):
         self.cache_timeout = getattr(
             settings, "SIMPLIFIED_LAYOUT_CACHE_TIMEOUT", 3600
-        )  # 1 hour
+        )  # 1 hour (0 disables caching)
+        self.cache_enabled = getattr(settings, "LAYOUT_CACHE_ENABLED", True)
 
     def serialize_layout(self, layout_name: str) -> Dict[str, Any]:
         """
@@ -40,17 +41,19 @@ class SimplifiedLayoutSerializer:
         Returns:
             Dict containing simplified layout JSON
         """
-        # Check cache first
+        # Check cache first (only if caching is enabled)
         cache_key = f"simplified_layout:{layout_name}"
-        cached_result = cache.get(cache_key)
-        if cached_result:
-            logger.debug(f"Simplified layout cache hit for {layout_name}")
-            return cached_result
+        if self.cache_enabled and self.cache_timeout > 0:
+            cached_result = cache.get(cache_key)
+            if cached_result:
+                logger.debug(f"Simplified layout cache hit for {layout_name}")
+                return cached_result
 
         try:
             # Load and parse the template
             # Get the layout from registry to get the correct template path
             from ..layout_registry import layout_registry
+
             layout_instance = layout_registry.get_layout(layout_name)
             if not layout_instance:
                 raise ValueError(f"Layout '{layout_name}' not found in registry")
@@ -78,8 +81,14 @@ class SimplifiedLayoutSerializer:
                 },
             }
 
-            # Cache the result
-            cache.set(cache_key, simplified_layout, self.cache_timeout)
+            # Cache the result (only if caching is enabled)
+            if self.cache_enabled and self.cache_timeout > 0:
+                cache.set(cache_key, simplified_layout, self.cache_timeout)
+                logger.debug(
+                    f"Cached simplified layout: {layout_name} for {self.cache_timeout}s"
+                )
+            else:
+                logger.debug(f"Caching disabled for simplified layout: {layout_name}")
             logger.info(f"Generated simplified layout JSON for {layout_name}")
 
             return simplified_layout

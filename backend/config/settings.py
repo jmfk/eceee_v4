@@ -22,6 +22,16 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = config("SECRET_KEY", default="dev-secret-key-change-in-production-12345")
 DEBUG = config("DEBUG", default=True, cast=bool)
 
+# Layout caching configuration
+if DEBUG:
+    # Disable layout caching in development for immediate updates
+    SIMPLIFIED_LAYOUT_CACHE_TIMEOUT = 0  # No caching
+    LAYOUT_CACHE_ENABLED = False
+else:
+    # Enable caching in production
+    SIMPLIFIED_LAYOUT_CACHE_TIMEOUT = 3600  # 1 hour
+    LAYOUT_CACHE_ENABLED = True
+
 # Security check for production secret key
 if not DEBUG and SECRET_KEY == "dev-secret-key-change-in-production-12345":
     raise ValueError(
@@ -151,7 +161,7 @@ LOCAL_APPS = [
     "htmx",
     "webpages",  # Core CMS system (required)
     "content",
-    "default_layouts",  # Default layout definitions (optional)
+    # "default_layouts",  # Default layout definitions (optional)
     "default_widgets",  # Default widget definitions (optional)
     "eceee_layouts",
     "eceee_widgets",  # Default widget definitions (optional)

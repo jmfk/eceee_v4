@@ -23,7 +23,6 @@ logger = logging.getLogger(__name__)
 
 @api_view(["GET"])
 @permission_classes([permissions.IsAuthenticated])
-@cache_page(60 * 30)  # Cache for 30 minutes
 def simplified_layout_json(request, layout_name):
     """
     Return simplified JSON representation of a layout
