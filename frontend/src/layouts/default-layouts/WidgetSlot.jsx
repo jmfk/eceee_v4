@@ -7,8 +7,8 @@
 
 import React from 'react';
 import { Layout, Plus } from 'lucide-react';
-import PageWidgetFactory from '../PageWidgetFactory';
-import PageSlotIconMenu from '../PageSlotIconMenu';
+import PageWidgetFactory from '../../editors/page-editor/PageWidgetFactory';
+import PageSlotIconMenu from '../../editors/page-editor/PageSlotIconMenu';
 const WidgetSlot = ({
     name,
     label,

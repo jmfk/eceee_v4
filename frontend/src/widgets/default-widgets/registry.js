@@ -6,25 +6,29 @@
  * frameworks, not here.
  */
 
-// Import core widget implementations
-import ContentWidget from './core/ContentWidget'
-import ImageWidget from './core/ImageWidget'
-import TableWidget from './core/TableWidget'
-import FooterWidget from './core/FooterWidget'
-import HeaderWidget from './core/HeaderWidget'
-import NavigationWidget from './core/NavigationWidget'
-import SidebarWidget from './core/SidebarWidget'
-import FormsWidget from './core/FormsWidget'
+// Import default widget implementations
+import ContentWidget from './ContentWidget'
+import ImageWidget from './ImageWidget'
+import TableWidget from './TableWidget'
+import FooterWidget from './FooterWidget'
+import HeaderWidget from './HeaderWidget'
+import NavigationWidget from './NavigationWidget'
+import SidebarWidget from './SidebarWidget'
+import FormsWidget from './FormsWidget'
 
 /**
- * Auto-collect metadata from widget components
- * This ensures consistency and reduces boilerplate
+ * Auto-collect metadata from widget components with optional override
+ * This ensures consistency and reduces boilerplate while allowing manual control
+ * 
+ * @param {React.Component} WidgetComponent - The widget component
+ * @param {string} [overrideWidgetType] - Optional manual widget type override
  */
-const collectWidgetMetadata = (WidgetComponent) => {
+const collectWidgetMetadata = (WidgetComponent, overrideWidgetType = null) => {
     return {
         component: WidgetComponent,
         displayName: WidgetComponent.displayName,
-        widgetType: WidgetComponent.widgetType,
+        // Use override if provided, otherwise use component's widgetType, otherwise generate default
+        widgetType: overrideWidgetType || WidgetComponent.widgetType || `default_widgets.${WidgetComponent.displayName}`,
         defaultConfig: WidgetComponent.defaultConfig || {},
         actionHandlers: WidgetComponent.actionHandlers || {},
         metadata: WidgetComponent.metadata || {
@@ -39,6 +43,17 @@ const collectWidgetMetadata = (WidgetComponent) => {
 }
 
 /**
+ * Register a widget with automatic or manual widget type
+ * 
+ * @param {React.Component} WidgetComponent - The widget component
+ * @param {string} [customWidgetType] - Optional custom widget type (e.g., 'core_widgets.ContentWidget')
+ * @returns {Object} Widget metadata object
+ */
+const registerWidget = (WidgetComponent, customWidgetType = null) => {
+    return collectWidgetMetadata(WidgetComponent, customWidgetType)
+}
+
+/**
  * Core Widget Registry - Shared implementations only
  * 
  * This registry contains widget implementations that work the same way
@@ -46,14 +61,15 @@ const collectWidgetMetadata = (WidgetComponent) => {
  * handled by the editor frameworks.
  */
 export const CORE_WIDGET_REGISTRY = {
-    'core_widgets.ContentWidget': collectWidgetMetadata(ContentWidget),
-    'core_widgets.ImageWidget': collectWidgetMetadata(ImageWidget),
-    'core_widgets.TableWidget': collectWidgetMetadata(TableWidget),
-    'core_widgets.FooterWidget': collectWidgetMetadata(FooterWidget),
-    'core_widgets.HeaderWidget': collectWidgetMetadata(HeaderWidget),
-    'core_widgets.NavigationWidget': collectWidgetMetadata(NavigationWidget),
-    'core_widgets.SidebarWidget': collectWidgetMetadata(SidebarWidget),
-    'core_widgets.FormsWidget': collectWidgetMetadata(FormsWidget)
+    // Registry key MUST match the widget type for lookup to work
+    'core_widgets.ContentWidget': registerWidget(ContentWidget, 'core_widgets.ContentWidget'),
+    'core_widgets.ImageWidget': registerWidget(ImageWidget, 'core_widgets.ImageWidget'),
+    'core_widgets.TableWidget': registerWidget(TableWidget, 'core_widgets.TableWidget'),
+    'core_widgets.FooterWidget': registerWidget(FooterWidget, 'core_widgets.FooterWidget'),
+    'core_widgets.HeaderWidget': registerWidget(HeaderWidget, 'core_widgets.HeaderWidget'),
+    'core_widgets.NavigationWidget': registerWidget(NavigationWidget, 'core_widgets.NavigationWidget'),
+    'core_widgets.SidebarWidget': registerWidget(SidebarWidget, 'core_widgets.SidebarWidget'),
+    'core_widgets.FormsWidget': registerWidget(FormsWidget, 'core_widgets.FormsWidget')
 }
 
 // === CORE UTILITY FUNCTIONS ===
@@ -233,6 +249,9 @@ export const getAvailableCoreCategories = () => {
     })
     return Array.from(categories).sort()
 }
+
+// Export utilities for other widget packages
+export { registerWidget }
 
 // Export the registry for direct access if needed
 export default CORE_WIDGET_REGISTRY

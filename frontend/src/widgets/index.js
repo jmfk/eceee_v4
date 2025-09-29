@@ -1,47 +1,23 @@
 /**
- * Shared Widgets - Main Export File
+ * Widgets Main Export
  * 
- * This file exports all shared widget implementations and utilities
- * that can be used by any editor framework.
+ * Re-exports from default-widgets package.
+ * In the future, this can be enhanced to support multiple widget packages.
  */
 
-// Export all core widget components
-export { default as ContentWidget } from './core/ContentWidget'
-export { default as ImageWidget } from './core/ImageWidget'
-export { default as TableWidget } from './core/TableWidget'
-export { default as FooterWidget } from './core/FooterWidget'
-export { default as HeaderWidget } from './core/HeaderWidget'
-export { default as NavigationWidget } from './core/NavigationWidget'
-export { default as SidebarWidget } from './core/SidebarWidget'
-export { default as FormsWidget } from './core/FormsWidget'
+// Export everything from default widgets
+export * from './default-widgets';
 
-// Export the shared registry and all its utilities
+// For backward compatibility and easy access
 export {
-    CORE_WIDGET_REGISTRY,
-    getCoreWidgetComponent,
-    getCoreWidgetDefaultConfig,
-    getCoreWidgetDisplayName,
-    getCoreWidgetMetadata,
-    getCoreWidgetIcon,
-    getCoreWidgetCategory,
-    getCoreWidgetDescription,
-    getCoreWidgetTags,
-    isCoreWidgetTypeSupported,
-    getAvailableCoreWidgetTypes,
-    getAllCoreWidgetMetadata,
-    searchCoreWidgets,
-    filterCoreWidgetsByCategory,
-    getAvailableCoreCategories
-} from './registry'
-
-// Export all validation utilities
-export {
-    validateWidgetConfig,
-    validateWidgets,
-    createDefaultWidgetConfig,
-    generateWidgetId,
-    sanitizeWidget
-} from './validation'
-
-// Re-export the registry as default for direct access
-export { default } from './registry'
+    ContentWidget,
+    ImageWidget,
+    TableWidget,
+    HeaderWidget,
+    FooterWidget,
+    NavigationWidget,
+    SidebarWidget,
+    FormsWidget,
+    ContentWidgetEditorRenderer,
+    registerWidget  // Export utility for custom widget packages
+} from './default-widgets';
