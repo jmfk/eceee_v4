@@ -149,9 +149,12 @@ LOCAL_APPS = [
     # 'apps.users',
     # 'apps.api',
     "htmx",
-    "webpages",
+    "webpages",  # Core CMS system (required)
     "content",
-    "core_widgets",  # Core widget types - can be disabled to use only custom widgets
+    "default_layouts",  # Default layout definitions (optional)
+    "default_widgets",  # Default widget definitions (optional)
+    "example_custom_layouts",  # Example custom layouts (optional)
+    # "core_widgets",  # DEPRECATED: Replaced by default_widgets
     # "example_custom_widgets",  # Example of custom site-specific widgets
     "file_manager",  # Comprehensive media file management system
     "object_storage",  # Non-hierarchical object storage system

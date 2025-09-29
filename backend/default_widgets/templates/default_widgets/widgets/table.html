@@ -1,0 +1,64 @@
+{% load static %}
+
+<div class="table-widget">
+    {% if config.caption %}
+        <div class="table-caption">{{ config.caption }}</div>
+    {% endif %}
+    
+    <table class="{% if config.table_width == 'full' %}w-full{% endif %} 
+                  {% if config.show_borders %}table-bordered{% endif %} 
+                  {% if config.striped_rows %}table-striped{% endif %} 
+                  {% if config.hover_effect %}table-hover{% endif %} 
+                  {% if config.responsive %}table-responsive{% endif %}
+                  {% if config.css_class %}{{ config.css_class }}{% endif %}">
+        
+        {% for row in config.rows %}
+            <tr {% if row.is_header %}class="table-header"{% endif %}
+                {% if row.background_color %}style="background-color: {{ row.background_color }};"{% endif %}
+                {% if row.css_class %}class="{{ row.css_class }}"{% endif %}>
+                
+                {% for cell in row.cells %}
+                    {% if row.is_header %}
+                        <th {% if cell.colspan > 1 %}colspan="{{ cell.colspan }}"{% endif %}
+                            {% if cell.rowspan > 1 %}rowspan="{{ cell.rowspan }}"{% endif %}
+                            {% if cell.alignment != 'left' or cell.background_color or cell.text_color or cell.padding or cell.border %}
+                                style="
+                                    {% if cell.alignment != 'left' %}text-align: {{ cell.alignment }};{% endif %}
+                                    {% if cell.background_color %}background-color: {{ cell.background_color }};{% endif %}
+                                    {% if cell.text_color %}color: {{ cell.text_color }};{% endif %}
+                                    {% if cell.padding %}padding: {{ cell.padding }};{% endif %}
+                                    {% if cell.border %}border: {{ cell.border }};{% endif %}
+                                "
+                            {% endif %}
+                            {% if cell.css_class %}class="{{ cell.css_class }}"{% endif %}>
+                            
+                            <span class="{% if cell.font_weight == 'bold' %}cell-bold{% endif %} 
+                                         {% if cell.font_style == 'italic' %}cell-italic{% endif %}">
+                                {{ cell.content|safe }}
+                            </span>
+                        </th>
+                    {% else %}
+                        <td {% if cell.colspan > 1 %}colspan="{{ cell.colspan }}"{% endif %}
+                            {% if cell.rowspan > 1 %}rowspan="{{ cell.rowspan }}"{% endif %}
+                            {% if cell.alignment != 'left' or cell.background_color or cell.text_color or cell.padding or cell.border %}
+                                style="
+                                    {% if cell.alignment != 'left' %}text-align: {{ cell.alignment }};{% endif %}
+                                    {% if cell.background_color %}background-color: {{ cell.background_color }};{% endif %}
+                                    {% if cell.text_color %}color: {{ cell.text_color }};{% endif %}
+                                    {% if cell.padding %}padding: {{ cell.padding }};{% endif %}
+                                    {% if cell.border %}border: {{ cell.border }};{% endif %}
+                                "
+                            {% endif %}
+                            {% if cell.css_class %}class="{{ cell.css_class }}"{% endif %}>
+                            
+                            <span class="{% if cell.font_weight == 'bold' %}cell-bold{% endif %} 
+                                         {% if cell.font_style == 'italic' %}cell-italic{% endif %}">
+                                {{ cell.content|safe }}
+                            </span>
+                        </td>
+                    {% endif %}
+                {% endfor %}
+            </tr>
+        {% endfor %}
+    </table>
+</div>
