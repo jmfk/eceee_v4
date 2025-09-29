@@ -4,7 +4,7 @@ Pydantic models for widget configuration validation.
 These models define the configuration schemas for the new core widget types.
 """
 
-from typing import Optional, List, Literal, Dict, Any
+from typing import Optional, List, Literal, Dict, Any, ClassVar
 from pydantic import BaseModel, Field, HttpUrl
 from datetime import datetime
 import datetime as dt
