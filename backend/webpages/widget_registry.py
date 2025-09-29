@@ -26,6 +26,7 @@ class BaseWidget(ABC):
 
     # Required class attributes that must be defined in subclasses
     name: str = None
+    app_label: str | None = None
     description: str = ""
     template_name: str = "webpages/widgets/default.html"
 
@@ -202,8 +203,11 @@ class BaseWidget(ABC):
 
     @property
     def type(self):
-        module = self.__class__.__module__
-        app_label = module.split(".")[0]
+        if self.app_label is None:
+            module = self.__class__.__module__
+            app_label = module.split(".")[0]
+        else:
+            app_label = self.app_label
         class_id = self.__class__.__name__
         return f"{app_label}.{class_id}"
 
