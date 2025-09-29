@@ -1,0 +1,3 @@
+[submodule "eceee-components"]
+	path = eceee-components
+	url = https://github.com/jmfk/eceee-components.git

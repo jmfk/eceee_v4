@@ -7,7 +7,7 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react';
 import { Layout } from 'lucide-react';
-import { getLayoutComponent, getLayoutMetadata, layoutExists, LAYOUT_REGISTRY } from '../../layouts/default-layouts/LayoutRegistry';
+import { getLayoutComponent, getLayoutMetadata, layoutExists, LAYOUT_REGISTRY } from '../../layouts';
 import { useWidgets, createDefaultWidgetConfig } from '../../hooks/useWidgets';
 import PageWidgetSelectionModal from './PageWidgetSelectionModal';
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext';
