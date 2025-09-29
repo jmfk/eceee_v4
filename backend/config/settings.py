@@ -153,8 +153,8 @@ LOCAL_APPS = [
     "content",
     "default_layouts",  # Default layout definitions (optional)
     "default_widgets",  # Default widget definitions (optional)
-    # "eceee_layouts",
-    # "eceee_widgets",  # Default widget definitions (optional)
+    "eceee_layouts",
+    "eceee_widgets",  # Default widget definitions (optional)
     # "example_custom_layouts",  # Example custom layouts (optional)
     # "core_widgets",  # DEPRECATED: Replaced by default_widgets
     # "example_custom_widgets",  # Example of custom site-specific widgets
