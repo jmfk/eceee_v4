@@ -45,6 +45,5 @@ export {
     SidebarLayout,
     ThreeColumnLayout,
     TwoColumnLayout,
-    HeaderFooterLayout,
     WidgetSlot
 } from './default-layouts';
