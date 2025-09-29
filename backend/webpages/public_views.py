@@ -91,7 +91,6 @@ class PageDetailView(PublishedPageMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         """Add layout, theme, widgets, and object content to context"""
-        print("get_context_data")
         context = super().get_context_data(**kwargs)
         page = self.object
 
@@ -509,7 +508,6 @@ class HostnamePageView(View):
         - example.com/about/ -> 'about' page under example.com's root
         - example.com/about/team/ -> 'team' page under 'about' under example.com's root
         """
-        print("GET PAGE")
         # Get hostname from request with validation
         hostname = self.request.get_host().lower()
 

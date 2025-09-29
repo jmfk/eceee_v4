@@ -26,6 +26,7 @@ from .widget_models import (
 class ContentWidget(BaseWidget):
     """Content widget that contains HTML"""
 
+    app_label = "core_widgets"
     name = "Content"
     description = "Content widget that contains HTML"
     template_name = "default_widgets/widgets/content.html"
@@ -122,6 +123,7 @@ class ContentWidget(BaseWidget):
 class ImageWidget(BaseWidget):
     """Image widget that contains image, image gallery, or video"""
 
+    app_label = "core_widgets"
     name = "Image"
     description = "Image widget that contains image, image gallery, or video"
     template_name = "default_widgets/widgets/image.html"
@@ -371,6 +373,7 @@ class ImageWidget(BaseWidget):
 class TableWidget(BaseWidget):
     """Table widget with configurable columns and rows"""
 
+    app_label = "core_widgets"
     name = "Table"
     description = "Table widget with configurable columns and rows, cell styling, and spanning capabilities"
     template_name = "default_widgets/widgets/table.html"
@@ -501,6 +504,7 @@ class TableWidget(BaseWidget):
 class FooterWidget(BaseWidget):
     """Footer widget with background and text styling options"""
 
+    app_label = "core_widgets"
     name = "Footer"
     description = "Footer widget with background image/color and text color options"
     template_name = "default_widgets/widgets/footer.html"
@@ -589,6 +593,7 @@ class FooterWidget(BaseWidget):
 class HeaderWidget(BaseWidget):
     """Header widget with background and text styling options"""
 
+    app_label = "core_widgets"
     name = "Header"
     description = "Header widget with background image/color and text color options"
     template_name = "default_widgets/widgets/header.html"
@@ -704,6 +709,7 @@ class HeaderWidget(BaseWidget):
 class NavigationWidget(BaseWidget):
     """Navigation widget with background and text styling options"""
 
+    app_label = "core_widgets"
     name = "Navigation"
     description = "Navigation widget with background image/color and text color options"
     template_name = "default_widgets/widgets/navigation.html"
@@ -834,6 +840,7 @@ class NavigationWidget(BaseWidget):
 class SidebarWidget(BaseWidget):
     """Sidebar widget with background and text styling options"""
 
+    app_label = "core_widgets"
     name = "Sidebar"
     description = "Sidebar widget with background image/color and text color options"
     template_name = "default_widgets/widgets/sidebar.html"
@@ -971,6 +978,7 @@ class SidebarWidget(BaseWidget):
 class FormsWidget(BaseWidget):
     """Forms widget with schema support"""
 
+    app_label = "core_widgets"
     name = "Forms"
     description = "Forms widget with schema support for building custom forms"
     template_name = "default_widgets/widgets/forms.html"
