@@ -1,6 +1,6 @@
 # Makefile for eceee_v4_test_1
 
-.PHONY: help install backend frontend playwright-service migrate createsuperuser sample-content sample-pages sample-data sample-clean migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only test lint docker-up docker-down restart clean playwright-test playwright-down playwright-logs
+.PHONY: help install backend frontend playwright-service migrate createsuperuser sample-content sample-pages sample-data sample-clean migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only test lint docker-up docker-down restart clean playwright-test playwright-down playwright-logs sync-from sync-to clear-layout-cache clear-layout-cache-all
 
 # Default target - show help
 .DEFAULT_GOAL := help
@@ -50,6 +50,14 @@ help: ## Show this help message
 	@echo "  playwright-down   Stop Playwright service"
 	@echo "  playwright-logs   View Playwright service logs"
 	@echo "  clean             Clean Python, Node, and Docker artifacts"
+	@echo ""
+	@echo "ECEEE Components Sync:"
+	@echo "  sync-from         Sync components FROM eceee-components TO eceee_v4"
+	@echo "  sync-to           Sync components FROM eceee_v4 TO eceee-components"
+	@echo ""
+	@echo "Cache Management:"
+	@echo "  clear-layout-cache     Clear layout-related caches to force refresh"
+	@echo "  clear-layout-cache-all Clear ALL caches (nuclear option)"
 	@echo ""
 	@echo "Usage: make <target>"
 
@@ -162,3 +170,20 @@ clean:
 	rm -rf frontend/node_modules frontend/dist
 	docker-compose down -v
 	cd playwright-service && docker-compose down -v
+
+# ECEEE Components Sync Commands
+sync-from: ## Sync components FROM eceee-components TO eceee_v4
+	@echo "🔄 Syncing components FROM eceee-components TO eceee_v4..."
+	@./sync-from-eceee-components.sh
+
+sync-to: ## Sync components FROM eceee_v4 TO eceee-components
+	@echo "🔄 Syncing components FROM eceee_v4 TO eceee-components..."
+	@./sync-to-eceee-components.sh
+
+clear-layout-cache: ## Clear layout-related caches to force refresh
+	@echo "🧹 Clearing layout caches..."
+	docker-compose exec backend python manage.py clear_layout_cache
+
+clear-layout-cache-all: ## Clear all caches (nuclear option)
+	@echo "🧹 Clearing ALL caches..."
+	docker-compose exec backend python manage.py clear_layout_cache --all

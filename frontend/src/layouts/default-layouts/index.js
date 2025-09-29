@@ -9,7 +9,6 @@ export {
     SidebarLayout,
     ThreeColumnLayout,
     TwoColumnLayout,
-    HeaderFooterLayout,
     LAYOUT_REGISTRY
 } from './LayoutRegistry';
 
