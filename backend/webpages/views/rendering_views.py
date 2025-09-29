@@ -55,7 +55,7 @@ def layout_json(request, layout_name):
                 self.description = getattr(layout_instance, "description", "")
                 self.id = name  # Use name as ID for code-based layouts
 
-        mock_layout = MockLayout(layout_name, f"{layout_name}.html")
+        mock_layout = MockLayout(layout_name, layout_instance.template_name)
         layout_json_data = serializer.serialize_layout(mock_layout)
 
         return Response(layout_json_data)
