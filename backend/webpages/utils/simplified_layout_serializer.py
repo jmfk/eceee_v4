@@ -49,7 +49,12 @@ class SimplifiedLayoutSerializer:
 
         try:
             # Load and parse the template
-            template_name = f"webpages/layouts/{layout_name}.html"
+            # Get the layout from registry to get the correct template path
+            from ..layout_registry import layout_registry
+            layout_instance = layout_registry.get_layout(layout_name)
+            if not layout_instance:
+                raise ValueError(f"Layout '{layout_name}' not found in registry")
+            template_name = layout_instance.template_name
             template = get_template(template_name)
             template_source = template.template.source
 

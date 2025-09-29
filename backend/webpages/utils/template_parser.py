@@ -970,7 +970,8 @@ class LayoutSerializer:
             self.parser = TemplateParser(layout=layout)
 
             # Parse the template file
-            template_name = f"webpages/layouts/{layout.template_name}"
+            # Use the template_name as-is since it now includes the full path
+            template_name = layout.template_name
             layout_json = self.parser.parse_template(template_name)
 
             # Add layout metadata
