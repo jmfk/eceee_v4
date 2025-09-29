@@ -1,0 +1,59 @@
+<!-- templates/webpages/layouts/three_column.html -->
+{% extends "base.html" %}
+{% load webpages_tags %}
+
+{% block content %}
+<div class="min-h-screen bg-white">
+  <div class="max-w-7xl mx-auto px-4 py-8">
+    <!-- Grid container with 3 columns -->
+    <div class="grid grid-cols-3 gap-6">
+      
+      <!-- Header spanning all three columns -->
+      <header class="col-span-3 bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-4"
+              data-widget-slot="header"
+              data-slot-title="Header"
+              data-slot-description="Page header spanning all columns"
+              data-slot-max-widgets="2">
+        {% render_slot "header" %}
+      </header>
+      
+      <!-- Left sidebar column -->
+      <aside class="col-span-1 bg-gray-50 rounded-lg border border-gray-200 p-6"
+             data-widget-slot="left_sidebar"
+             data-slot-title="Left Sidebar"
+             data-slot-description="Left sidebar for complementary content"
+             data-slot-max-widgets="4">
+        {% render_slot "left_sidebar" %}
+      </aside>
+      
+      <!-- Main content column -->
+      <main class="col-span-1 bg-white rounded-lg shadow-sm border border-gray-200 p-8"
+            data-widget-slot="main"
+            data-slot-title="Main Content"
+            data-slot-description="Primary content area"
+            data-slot-max-widgets="">
+        {% render_slot "main" %}
+      </main>
+      
+      <!-- Right sidebar column -->
+      <aside class="col-span-1 bg-gray-50 rounded-lg border border-gray-200 p-6"
+             data-widget-slot="right_sidebar"
+             data-slot-title="Right Sidebar"
+             data-slot-description="Right sidebar for widgets and tools"
+             data-slot-max-widgets="4">
+        {% render_slot "right_sidebar" %}
+      </aside>
+      
+      <!-- Footer spanning all three columns -->
+      <footer class="col-span-3 bg-gray-100 rounded-lg border border-gray-200 p-6 mt-4"
+              data-widget-slot="footer"
+              data-slot-title="Footer"
+              data-slot-description="Page footer spanning all columns"
+              data-slot-max-widgets="2">
+        {% render_slot "footer" %}
+      </footer>
+      
+    </div>
+  </div>
+</div>
+{% endblock %} 

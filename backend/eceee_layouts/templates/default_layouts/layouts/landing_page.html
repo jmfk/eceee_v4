@@ -1,0 +1,134 @@
+<!-- Landing Page Layout with Tailwind CSS -->
+{% extends "base.html" %}
+{% load webpages_tags %}
+
+{% block content %}
+<div class="min-h-screen bg-white font-sans">
+  <!-- Navigation -->
+  <nav class="fixed top-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-b border-black/10 z-50 py-4">
+    <div class="max-w-5xl mx-auto px-8 md:px-5 flex items-center justify-between"
+         data-widget-slot="navigation"
+         data-slot-title="Navigation Bar"
+         data-slot-description="Site navigation and branding"
+         data-slot-max-widgets="3">
+      {% render_slot "navigation" %}
+    </div>
+  </nav>
+
+  <!-- Hero Section -->
+  <section class="bg-gradient-to-br from-indigo-500 to-purple-600 text-white pt-32 pb-20 px-8 md:px-5 text-center relative overflow-hidden">
+    <div class="absolute inset-0 bg-black/10"></div>
+    <div class="max-w-4xl mx-auto relative z-10"
+         data-widget-slot="hero"
+         data-slot-title="Hero Section"
+         data-slot-description="Main hero content with call-to-action"
+         data-slot-max-widgets="3">
+      {% render_slot "hero" %}
+    </div>
+  </section>
+
+  <!-- Features Section -->
+  <section class="py-20 px-8 md:px-5 bg-slate-50">
+    <div class="max-w-5xl mx-auto"
+         data-widget-slot="features"
+         data-slot-title="Features Section"
+         data-slot-description="Product features, benefits, or service highlights"
+         data-slot-max-widgets="6">
+      <div class="p-8 border-2 border-dashed border-gray-300 rounded-xl text-center text-gray-400 italic hover:border-gray-400 hover:bg-gray-50/70 transition-all duration-300 hover:-translate-y-1">
+        Features: Feature Cards, Benefits, Product Highlights, Icons
+        <br><br>
+        Showcase what makes your product or service special
+      </div>
+    </div>
+  </section>
+
+  <!-- Testimonials Section -->
+  <section class="py-20 px-8 md:px-5 bg-white">
+    <div class="max-w-4xl mx-auto"
+         data-widget-slot="testimonials"
+         data-slot-title="Testimonials Section"
+         data-slot-description="Customer testimonials, reviews, and social proof"
+         data-slot-max-widgets="5">
+      <div class="p-8 border-2 border-dashed border-gray-300 rounded-xl text-center text-gray-400 italic hover:border-gray-400 hover:bg-gray-50/70 transition-all duration-300 hover:-translate-y-1">
+        Testimonials: Customer Reviews, Case Studies, Logos, Ratings
+        <br><br>
+        Build trust with social proof and customer success stories
+      </div>
+    </div>
+  </section>
+
+  <!-- Call-to-Action Section -->
+  <section class="py-20 px-8 md:px-5 bg-gradient-to-br from-indigo-600 to-purple-700 text-white text-center">
+    <div class="max-w-4xl mx-auto"
+         data-widget-slot="cta"
+         data-slot-title="Call-to-Action Section"
+         data-slot-description="Final conversion push with compelling offer and action buttons"
+         data-slot-max-widgets="3">
+      <div class="p-8 border-2 border-dashed border-white/40 rounded-xl text-center text-white/90 italic hover:border-white/60 hover:bg-white/10 transition-all duration-300 hover:-translate-y-1">
+        CTA: Final Offer, Action Buttons, Urgency Elements
+        <br><br>
+        Drive conversions with a compelling final call-to-action
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="bg-gray-800 text-white py-16 px-8 md:px-5">
+    <div class="max-w-5xl mx-auto"
+         data-widget-slot="footer"
+         data-slot-title="Footer Section"
+         data-slot-description="Footer links, contact information, legal pages, and additional resources"
+         data-slot-max-widgets="4">
+      <div class="p-8 border-2 border-dashed border-gray-500 rounded-xl text-center text-gray-300 italic hover:border-gray-400 hover:bg-white/5 transition-all duration-300 hover:-translate-y-1">
+        Footer: Links, Contact Info, Legal Pages, Social Media
+        <br><br>
+        Provide additional resources and contact information
+      </div>
+    </div>
+  </footer>
+</div>
+
+<!-- Additional custom styles for smooth scrolling and enhanced effects -->
+<style>
+  /* Smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
+  
+  /* Enhanced responsive spacing */
+  @media (max-width: 768px) {
+    .py-20 {
+      padding-top: 3rem;
+      padding-bottom: 3rem;
+    }
+    
+    .pt-32 {
+      padding-top: 6rem;
+    }
+    
+    .pb-20 {
+      padding-bottom: 3rem;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .py-20 {
+      padding-top: 2.5rem;
+      padding-bottom: 2.5rem;
+    }
+    
+    .pt-32 {
+      padding-top: 5rem;
+    }
+    
+    .pb-20 {
+      padding-bottom: 2.5rem;
+    }
+    
+    .px-8 {
+      padding-left: 1rem;
+      padding-right: 1rem;
+    }
+  }
+</style>
+{% endblock %} 

@@ -151,9 +151,11 @@ LOCAL_APPS = [
     "htmx",
     "webpages",  # Core CMS system (required)
     "content",
-    "default_layouts",  # Default layout definitions (optional)
-    "default_widgets",  # Default widget definitions (optional)
-    "example_custom_layouts",  # Example custom layouts (optional)
+    "eceee_layouts",
+    # "default_layouts",  # Default layout definitions (optional)
+    "eceee_widgets",  # Default widget definitions (optional)
+    # "default_widgets",  # Default widget definitions (optional)
+    # "example_custom_layouts",  # Example custom layouts (optional)
     # "core_widgets",  # DEPRECATED: Replaced by default_widgets
     # "example_custom_widgets",  # Example of custom site-specific widgets
     "file_manager",  # Comprehensive media file management system
