@@ -21,3 +21,7 @@ export {
     ContentWidgetEditorRenderer,
     registerWidget  // Export utility for custom widget packages
 } from './default-widgets';
+
+// TODO: make sure we can import eceee-widget (and add to the existing widgets)
+// - How should we handle if a widget is reimplemented (using the same name)? 
+//   How should precedings be handled?
