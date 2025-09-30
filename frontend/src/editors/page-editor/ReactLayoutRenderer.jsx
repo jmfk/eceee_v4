@@ -57,7 +57,7 @@ const ReactLayoutRenderer = forwardRef(({
     const [widgetModalOpen, setWidgetModalOpen] = useState(false);
     const [selectedSlotForModal, setSelectedSlotForModal] = useState(null);
 
-    // Page context for widgets
+    // Page context for widgets - includes all necessary context data
     const pageContext = useMemo(() => ({
         versionId,
         isPublished,
@@ -76,8 +76,12 @@ const ReactLayoutRenderer = forwardRef(({
                         break;
                 }
             }
-        }
-    }), [versionId, isPublished, onVersionChange]);
+        },
+        // Add missing context for widgets
+        parentComponentId: componentId,
+        contextType: 'page',
+        pageId: context?.pageId
+    }), [versionId, isPublished, onVersionChange, componentId, context?.pageId]);
 
     // Handle widget actions
     const handleWidgetAction = useCallback(async (action, slotName, widget, ...args) => {
@@ -339,6 +343,7 @@ const ReactLayoutRenderer = forwardRef(({
                 pageContext={pageContext}
                 onShowWidgetModal={handleShowWidgetModal}
                 onClearSlot={handleClearSlot}
+                widgetPath={[]} // Initialize empty path for top-level
             />
 
             {/* Widget Selection Modal */}

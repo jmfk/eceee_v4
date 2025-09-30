@@ -26,7 +26,10 @@ const WidgetSlot = ({
     onShowWidgetModal,
     onClearSlot,
     slotType = 'content', // 'content' or 'inherited' - determines default preview mode
+    widgetPath = [], // Path from parent (empty for top-level layouts)
 }) => {
+    // Build path for this slot: append slot name to parent path
+    const slotPath = [...widgetPath, name];
     // Extract behavior props with defaults
     const {
         allowedWidgetTypes: behaviorAllowedTypes = allowedWidgetTypes,
@@ -88,6 +91,9 @@ const WidgetSlot = ({
         // Create a unique key that combines slot name, widget ID, and index to prevent collisions
         const uniqueKey = widget.id ? `${name}-${widget.id}-${index}` : `${name}-index-${index}`;
 
+        // Build full path for this widget: append widget ID to slot path
+        const fullWidgetPath = [...slotPath, widget.id];
+
         return (
             <div key={uniqueKey} className="mb-4">
                 <PageWidgetFactory
@@ -108,6 +114,12 @@ const WidgetSlot = ({
                     isPublished={pageContext.isPublished}
                     onVersionChange={pageContext.onVersionChange}
                     onPublishingAction={pageContext.onPublishingAction}
+                    // Context props for widgets
+                    parentComponentId={pageContext.parentComponentId}
+                    contextType={pageContext.contextType}
+                    pageId={pageContext.pageId}
+                    // Widget path for nested widget support
+                    widgetPath={fullWidgetPath}
                     // Slot type and preview mode for widget determination
                     slotType={finalSlotType}
                     slotPreviewMode={isSlotPreviewMode}

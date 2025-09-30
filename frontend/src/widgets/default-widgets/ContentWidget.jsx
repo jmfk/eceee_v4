@@ -95,6 +95,11 @@ const ContentWidget = memo(({
     widgetId = null,
     slotName = null,
     widgetType = null,
+    // Widget path for infinite nesting
+    widgetPath = [],
+    // Legacy nested widget context (deprecated)
+    nestedParentWidgetId = null,
+    nestedParentSlotName = null,
     //context = {}
 }) => {
     const { useExternalChanges, publishUpdate, getState } = useUnifiedData();
@@ -139,9 +144,16 @@ const ContentWidget = memo(({
             setConfig(updatedConfig);
             publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
                 id: widgetId,
+                config: updatedConfig,
+                // NEW: Path-based approach (supports infinite nesting)
+                widgetPath: widgetPath.length > 0 ? widgetPath : undefined,
+                // LEGACY: For backward compatibility with old approach
                 slotName: slotName,
                 contextType: contextType,
-                config: updatedConfig
+                ...(nestedParentWidgetId && {
+                    parentWidgetId: nestedParentWidgetId,
+                    parentSlotName: nestedParentSlotName
+                })
             });
         }
     }, [componentId, widgetId, slotName, contextType, publishUpdate, onConfigChange])

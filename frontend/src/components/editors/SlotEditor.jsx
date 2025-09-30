@@ -1,13 +1,12 @@
 /**
- * SlotEditor React Wrapper
+ * SlotEditor React Component
  * 
- * Minimal React wrapper for the SelfContainedSlotEditor vanilla JS class.
- * Provides zero-rerender slot editing with UDC integration.
+ * Direct React component using SelfContainedSlotEditor.
+ * Provides slot editing with UDC integration.
  */
 
-import React, { useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
-import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext';
-import { SelfContainedSlotEditor } from './SelfContainedSlotEditor.js';
+import React, { forwardRef, useImperativeHandle, useRef } from 'react';
+import { SelfContainedSlotEditor } from './SelfContainedSlotEditor.jsx';
 import PropTypes from 'prop-types';
 
 const SlotEditor = forwardRef(({
@@ -17,8 +16,12 @@ const SlotEditor = forwardRef(({
     availableWidgetTypes = [],
     maxWidgets = null,
     parentWidgetId,
+    parentSlotName, // Top-level slot where parent widget lives (legacy)
     contextType = 'page',
     onWidgetEdit,
+    onSlotChange, // Callback for when slot widgets change
+    parentComponentId, // Parent's UDC componentId
+    widgetPath = [], // Full path to parent widget (for infinite nesting)
     className = '',
     showAddButton = true,
     showMoveButtons = true,
@@ -26,103 +29,48 @@ const SlotEditor = forwardRef(({
     showRemoveButton = true,
     emptyMessage = null
 }, ref) => {
-    // Refs for DOM and slot editor instance
-    const containerRef = useRef(null);
-    const slotEditorInstanceRef = useRef(null);
-
-    // Get UDC functions
-    const { publishUpdate, useExternalChanges } = useUnifiedData();
-
-    // Initialize slot editor when component mounts
-    useEffect(() => {
-        if (containerRef.current && !slotEditorInstanceRef.current) {
-            const slotData = {
-                slotName,
-                slotLabel,
-                widgets,
-                availableWidgetTypes,
-                maxWidgets,
-                parentWidgetId,
-                contextType
-            };
-
-            const options = {
-                publishUpdate,
-                onWidgetEdit,
-                showAddButton,
-                showMoveButtons,
-                showEditButton,
-                showRemoveButton,
-                emptyMessage,
-                registry: window.slotRegistry
-            };
-
-            const slotEditor = new SelfContainedSlotEditor(slotData, options);
-
-            slotEditor.initialize(containerRef.current).then(success => {
-                if (success) {
-                    slotEditorInstanceRef.current = slotEditor;
-                } else {
-                    console.error('Failed to initialize slot editor');
-                }
-            }).catch(error => {
-                console.error('Slot editor initialization error:', error);
-            });
-        }
-
-        return () => {
-            // Cleanup when unmounting
-            if (slotEditorInstanceRef.current) {
-                slotEditorInstanceRef.current.destroy();
-                slotEditorInstanceRef.current = null;
-            }
-        };
-    }, []); // Empty dependency array - no rerenders from props!
-
-    // Subscribe to UDC changes (but don't cause rerenders)
-    useExternalChanges(`slot-editor-${parentWidgetId}-${slotName}`, (state) => {
-        // Update the vanilla JS instance directly
-        if (slotEditorInstanceRef.current && !slotEditorInstanceRef.current.isUpdateLocked()) {
-            const updatedWidgets = extractSlotWidgetsFromState(state, parentWidgetId, slotName);
-            if (updatedWidgets) {
-                slotEditorInstanceRef.current.updateWidgets(updatedWidgets);
-            }
-        }
-    });
-
-    // Helper to extract slot widgets from UDC state
-    const extractSlotWidgetsFromState = (state, parentId, slot) => {
-        // Implementation depends on UDC state structure
-        // For now, return null to indicate no change
-        // This would be implemented based on how container widget slots are stored in UDC
-        return null;
-    };
+    // Ref to the SelfContainedSlotEditor component
+    const slotEditorRef = useRef(null);
 
     // Expose methods to parent components
     useImperativeHandle(ref, () => ({
         updateWidgets: (newWidgets) => {
-            if (slotEditorInstanceRef.current) {
-                slotEditorInstanceRef.current.updateWidgets(newWidgets);
-            }
+            // The React component will handle this through props
         },
         getWidgets: () => {
-            return slotEditorInstanceRef.current?.getWidgets() || [];
+            return widgets;
         },
         refresh: () => {
-            if (slotEditorInstanceRef.current) {
-                slotEditorInstanceRef.current.refresh();
-            }
+            // The React component will handle this through re-renders
         },
         getSlotId: () => {
-            return slotEditorInstanceRef.current?.slotId;
+            return `${parentWidgetId}-${slotName}`;
         }
-    }), []);
+    }), [widgets, parentWidgetId, slotName]);
 
     return (
-        <div
-            ref={containerRef}
-            className={`slot-editor-wrapper ${className}`}
-        />
+        <div className={`slot-editor-wrapper ${className}`}>
+            <SelfContainedSlotEditor
+                ref={slotEditorRef}
+                slotName={slotName}
+                slotLabel={slotLabel}
+                widgets={widgets}
+                availableWidgetTypes={availableWidgetTypes}
+                maxWidgets={maxWidgets}
+                parentWidgetId={parentWidgetId}
+                parentSlotName={parentSlotName}
+                contextType={contextType}
+                onWidgetEdit={onWidgetEdit}
+                onSlotChange={onSlotChange}
+                parentComponentId={parentComponentId}
+                widgetPath={widgetPath}
+                showAddButton={showAddButton}
+                showMoveButtons={showMoveButtons}
+                showEditButton={showEditButton}
+                showRemoveButton={showRemoveButton}
+                emptyMessage={emptyMessage}
+            />
+        </div>
     );
 });
 
@@ -138,6 +86,8 @@ SlotEditor.propTypes = {
     parentWidgetId: PropTypes.string.isRequired,
     contextType: PropTypes.oneOf(['page', 'object']),
     onWidgetEdit: PropTypes.func,
+    onSlotChange: PropTypes.func,
+    parentComponentId: PropTypes.string,
     className: PropTypes.string,
     showAddButton: PropTypes.bool,
     showMoveButtons: PropTypes.bool,
