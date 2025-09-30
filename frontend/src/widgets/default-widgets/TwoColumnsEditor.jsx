@@ -70,7 +70,6 @@ const TwoColumnsEditor = forwardRef(({
         }
     }), []);
 
-    console.log("TwoColumnsEditor")
     return (
         <div className="two-columns-editor space-y-6">
             <div className="editor-header">

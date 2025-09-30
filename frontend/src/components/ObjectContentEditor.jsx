@@ -507,7 +507,7 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, mode = 
                     // Pass widget identity for event system
                     widgetId={widget.id}
                     className={`mb-2 ${isSelected ? 'ring-2 ring-blue-500' : ''}`}
-                    context={context}
+                    context={{ ...context, componentId }}
                 />
             </div>
         )

@@ -197,9 +197,13 @@ export const useWidgets = (initialWidgets = {}) => {
 }
 
 // Helper function to get display name for widget types (uses registry)
-export const getWidgetDisplayName = getDisplayNameFromRegistry
+export const getWidgetDisplayName = (widgetType) => {
+    return getDisplayNameFromRegistry(widgetType)
+}
 
 // Helper function to create default widget config (uses registry)
-export const createDefaultWidgetConfig = getWidgetDefaultConfig
+export const createDefaultWidgetConfig = (widgetType) => {
+    return getWidgetDefaultConfig(widgetType)
+}
 
 export default useWidgets
