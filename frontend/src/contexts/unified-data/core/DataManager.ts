@@ -4,6 +4,7 @@ import { SubscriptionManager } from './SubscriptionManager';
 import { StateUpdateCallback, SubscriptionOptions } from '../types/subscriptions';
 import { defaultEqualityFn } from '../utils/equality';
 import { OperationError, ValidationError, StateError, ErrorCodes, isRetryableError } from '../utils/errors';
+import { WidgetPath, isValidPath, formatPath, getTopLevelSlot, getImmediateSlot } from '../utils/widgetPath';
 
 
 type WidgetTarget = { versionId?: string; objectId?: string };
@@ -446,6 +447,118 @@ export class DataManager {
     }
 
     /**
+     * Update a widget at the specified path (supports infinite nesting)
+     * 
+     * @param widgets - The top-level widgets object
+     * @param path - Widget path [slot, widgetId, slot, widgetId, ..., targetId]
+     * @param updater - Function to update the target widget
+     * @returns Updated widgets object
+     */
+    private updateWidgetAtPath(
+        widgets: Record<string, any[]>,
+        path: WidgetPath,
+        updater: (widget: any) => any
+    ): Record<string, any[]> {
+        if (!isValidPath(path) || path.length < 2) {
+            throw new Error(`Invalid widget path: ${formatPath(path)}`);
+        }
+
+        const topSlot = path[0];
+        const slotWidgets = widgets[topSlot] || [];
+        
+        // If path only has 2 elements [slot, widgetId], it's a top-level widget
+        if (path.length === 2) {
+            const widgetId = path[1];
+            const widgetIndex = slotWidgets.findIndex((w: any) => w.id === widgetId);
+            
+            if (widgetIndex === -1) {
+                throw new Error(`Widget ${widgetId} not found in slot ${topSlot}`);
+            }
+            
+            const updatedWidgets = [...slotWidgets];
+            updatedWidgets[widgetIndex] = updater(updatedWidgets[widgetIndex]);
+            
+            return {
+                ...widgets,
+                [topSlot]: updatedWidgets
+            };
+        }
+        
+        // Nested widget - recursively traverse and update
+        const updatedSlot = this.updateNestedWidgetInSlot(slotWidgets, path.slice(1), updater);
+        
+        return {
+            ...widgets,
+            [topSlot]: updatedSlot
+        };
+    }
+
+    /**
+     * Recursively update a nested widget within a slot
+     * 
+     * @param slotWidgets - Array of widgets in current slot
+     * @param pathSegment - Remaining path [widgetId, slot, widgetId, ..., targetId]
+     * @param updater - Function to update the target widget
+     * @returns Updated slot widgets array
+     */
+    private updateNestedWidgetInSlot(
+        slotWidgets: any[],
+        pathSegment: string[],
+        updater: (widget: any) => any
+    ): any[] {
+        if (pathSegment.length < 1) {
+            throw new Error('Invalid path segment');
+        }
+
+        const currentWidgetId = pathSegment[0];
+        const widgetIndex = slotWidgets.findIndex((w: any) => w.id === currentWidgetId);
+        
+        if (widgetIndex === -1) {
+            throw new Error(`Widget ${currentWidgetId} not found in path: ${pathSegment.join(' → ')}`);
+        }
+        
+        const widget = slotWidgets[widgetIndex];
+        
+        // If this is the target widget (no more path segments), update it
+        if (pathSegment.length === 1) {
+            const updatedWidgets = [...slotWidgets];
+            updatedWidgets[widgetIndex] = updater(widget);
+            return updatedWidgets;
+        }
+        
+        // More path segments - descend into widget's slots
+        if (pathSegment.length < 3) {
+            throw new Error(`Invalid path: expected slot name after widget ${currentWidgetId}`);
+        }
+        
+        const nestedSlotName = pathSegment[1];
+        const nestedSlots = widget.config?.slots || {};
+        const nestedSlotWidgets = nestedSlots[nestedSlotName] || [];
+        
+        // Recursively update in the nested slot
+        const updatedNestedSlot = this.updateNestedWidgetInSlot(
+            nestedSlotWidgets,
+            pathSegment.slice(2),
+            updater
+        );
+        
+        // Update the container widget with the updated nested slot
+        const updatedWidgets = [...slotWidgets];
+        updatedWidgets[widgetIndex] = {
+            ...widget,
+            config: {
+                ...widget.config,
+                slots: {
+                    ...nestedSlots,
+                    [nestedSlotName]: updatedNestedSlot
+                }
+            }
+        };
+        
+        return updatedWidgets;
+    }
+
+    /**
      * Process a single operation with rollback support
      */
     private processOperation(operation: Operation): void {
@@ -609,15 +722,101 @@ export class DataManager {
                     this.setState(operation, state => {
                         const payload = operation.payload as UpdateWidgetConfigPayload;
                         const target = this.resolveWidgetTargetFromPayload(payload);
-                        const slotName = payload.slotName;
                         const widgetId = payload.id;
                         const now = new Date().toISOString();
+                        const slotName = payload.slotName || ''; // Legacy fallback
 
                         // Guard against nested config objects
                         payload.config = this.validateAndCleanConfig(payload.config, 'UPDATE_WIDGET_CONFIG');
 
                         if (target.versionId) {
                             const version = state.versions[target.versionId];
+                            
+                            // NEW: Path-based approach (supports infinite nesting)
+                            if (payload.widgetPath && isValidPath(payload.widgetPath)) {
+                                const updatedWidgets = this.updateWidgetAtPath(
+                                    version.widgets,
+                                    payload.widgetPath,
+                                    (widget) => ({
+                                        ...widget,
+                                        config: payload.config,
+                                        updated_at: now
+                                    })
+                                );
+                                
+                                return {
+                                    versions: {
+                                        ...state.versions,
+                                        [target.versionId]: {
+                                            ...version,
+                                            widgets: updatedWidgets
+                                        }
+                                    },
+                                    metadata: { ...state.metadata, isDirty: true }
+                                };
+                            }
+                            
+                            // LEGACY: Single-level parent/child approach (deprecated)
+                            if (payload.parentWidgetId) {
+                                // Find and update nested widget within parent widget's config
+                                const parentSlot = payload.parentSlotName || slotName;
+                                const parentWidgets = version.widgets[parentSlot] || [];
+                                const parentIndex = parentWidgets.findIndex(w => w.id === payload.parentWidgetId);
+                                
+                                if (parentIndex === -1) {
+                                    throw new Error(`Parent widget ${payload.parentWidgetId} not found in slot ${parentSlot} of version ${target.versionId}`);
+                                }
+                                
+                                const parentWidget = parentWidgets[parentIndex];
+                                const nestedSlots = parentWidget.config?.slots || {};
+                                const nestedWidgets = nestedSlots[slotName] || [];
+                                const nestedIndex = nestedWidgets.findIndex((w: any) => w.id === widgetId);
+                                
+                                if (nestedIndex === -1) {
+                                    throw new Error(`Nested widget ${widgetId} not found in parent ${payload.parentWidgetId} slot ${slotName}`);
+                                }
+                                
+                                // Update the nested widget
+                                const updatedNestedWidgets = [...nestedWidgets];
+                                updatedNestedWidgets[nestedIndex] = {
+                                    ...updatedNestedWidgets[nestedIndex],
+                                    config: payload.config,
+                                    updated_at: now
+                                };
+                                
+                                // Update parent widget's config with updated nested widgets
+                                const updatedParentWidget = {
+                                    ...parentWidget,
+                                    config: {
+                                        ...parentWidget.config,
+                                        slots: {
+                                            ...nestedSlots,
+                                            [slotName]: updatedNestedWidgets
+                                        }
+                                    },
+                                    updated_at: now
+                                };
+                                
+                                // Update parent in top-level slots
+                                const updatedParentWidgets = [...parentWidgets];
+                                updatedParentWidgets[parentIndex] = updatedParentWidget;
+                                
+                                return {
+                                    versions: {
+                                        ...state.versions,
+                                        [target.versionId]: {
+                                            ...version,
+                                            widgets: {
+                                                ...version.widgets,
+                                                [parentSlot]: updatedParentWidgets
+                                            }
+                                        }
+                                    },
+                                    metadata: { ...state.metadata, isDirty: true }
+                                };
+                            }
+                            
+                            // Not nested - handle as top-level widget
                             const slotWidgets = version.widgets[slotName] || [];
                             const widgetIndex = slotWidgets.findIndex(w => w.id === widgetId);
                             if (widgetIndex === -1) {
