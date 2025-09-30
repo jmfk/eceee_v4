@@ -38,7 +38,8 @@ const PageWidgetFactory = ({
     versionId,
     isPublished = false,
     onVersionChange,
-    onPublishingAction
+    onPublishingAction,
+    slotType = 'content' // 'content' or 'inherited' - determines default preview mode
 }) => {
     // Use passed props or extract from widget
     const actualWidgetId = widgetId || widget?.id
@@ -128,18 +129,25 @@ const PageWidgetFactory = ({
         }
     }
 
-    // Enhanced preview with publishing context
+    // Enhanced preview with publishing context and slot type awareness
     const handleModalPreview = async () => {
         setShowPreview(true)
         setIsLoadingPreview(true)
         setPreviewContent(null)
 
         try {
+            // Determine preview mode based on slot type and widget inheritance
+            const isInheritedWidget = widget.inherit_from_parent || widget.inherited_from
+            const defaultToViewMode = slotType === 'inherited' || isInheritedWidget
+
             // PageEditor-specific: Include version and publishing context in preview
             const result = await renderWidgetPreview(widget, {
                 versionId,
                 publishingContext: isPublished,
-                layoutContext: layoutRenderer?.getLayoutContext()
+                layoutContext: layoutRenderer?.getLayoutContext(),
+                previewMode: defaultToViewMode ? 'view' : 'edit',
+                slotType,
+                isInherited: isInheritedWidget
             })
             setPreviewContent(result)
         } catch (error) {
@@ -232,6 +240,7 @@ const PageWidgetFactory = ({
                         onMoveUp={onMoveUp ? handleMoveUp : undefined}
                         onMoveDown={onMoveDown ? handleMoveDown : undefined}
                         onPreview={handlePreview}
+                        onModalPreview={handleModalPreview}
                         canMoveUp={canMoveUp}
                         canMoveDown={canMoveDown}
                         showControls={true}
