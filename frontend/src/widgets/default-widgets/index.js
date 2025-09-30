@@ -16,7 +16,6 @@ export { default as FormsWidget } from './FormsWidget';
 
 // Export container widgets
 export { default as TwoColumnsWidget } from './TwoColumnsWidget';
-export { default as TwoColumnsEditor } from './TwoColumnsEditor';
 
 // Export utilities
 export * from './registry';

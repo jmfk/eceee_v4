@@ -5,7 +5,7 @@
  * implementations with ObjectEditor-specific behaviors and integrations.
  */
 import React, { useState, useEffect, useRef, useMemo } from 'react'
-import { Layout, Settings, Trash2, ChevronUp, ChevronDown, Eye, ChevronLeft, ChevronRight, X, EyeOff } from 'lucide-react'
+import { Layout, Settings, Trash2, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { getCoreWidgetComponent, getCoreWidgetDisplayName } from '../../widgets'
 import { renderWidgetPreview } from '../../utils/widgetPreview'
 import ObjectWidgetHeader from './ObjectWidgetHeader'
@@ -46,7 +46,6 @@ const ObjectWidgetFactory = ({
     const actualWidgetId = widgetId || widget?.id
     const actualSlotName = passedSlotName || slotName || widget?.slotName
 
-    const [isPreviewMode, setIsPreviewMode] = useState(false)
     const [showPreview, setShowPreview] = useState(false)
     const [isLoadingPreview, setIsLoadingPreview] = useState(false)
     const [previewContent, setPreviewContent] = useState(null)
@@ -105,15 +104,6 @@ const ObjectWidgetFactory = ({
         if (onMoveDown && canMoveDown) {
             onMoveDown(slotName, index, widget)
         }
-    }
-
-    // ObjectEditor-specific preview
-    const handlePreview = () => {
-        setIsPreviewMode(true)
-    }
-
-    const handleExitPreview = () => {
-        setIsPreviewMode(false)
     }
 
     // Enhanced preview with object context and slot type awareness
@@ -226,47 +216,30 @@ const ObjectWidgetFactory = ({
     if (mode === 'editor' && showControls) {
         return (
             <div
-                className={`widget-item object-editor-widget relative ${className} ${isPreviewMode ? 'preview-mode' : ''}`}
+                className={`widget-item object-editor-widget relative ${className}`}
                 data-widget-type={widget.type}
                 data-widget-id={widget.id}
                 data-object-type={objectType?.name}
                 data-slot-name={actualSlotName}
             >
                 {/* ObjectEditor-specific Widget Header */}
-                {!isPreviewMode && (
-                    <ObjectWidgetHeader
-                        widgetType={getCoreWidgetDisplayName(widget.type)}
-                        onEdit={onEdit ? handleEdit : undefined}
-                        onDelete={onDelete ? handleDelete : undefined}
-                        onMoveUp={onMoveUp ? handleMoveUp : undefined}
-                        onMoveDown={onMoveDown ? handleMoveDown : undefined}
-                        onPreview={handlePreview}
-                        onModalPreview={handleModalPreview}
-                        canMoveUp={canMoveUp}
-                        canMoveDown={canMoveDown}
-                        showControls={true}
-                        // ObjectEditor-specific props
-                        objectType={objectType}
-                        slotConfig={slotConfig}
-                        onSlotAction={handleSlotAction}
-                        isRequired={slotConfig?.required && index === 0}
-                        maxWidgets={maxWidgets}
-                        currentIndex={index}
-                    />
-                )}
-
-                {/* Preview Mode Exit Button */}
-                {isPreviewMode && (
-                    <div className="absolute top-2 right-2 z-10 opacity-30 hover:opacity-100 transition-opacity duration-200">
-                        <button
-                            onClick={handleExitPreview}
-                            className="bg-black bg-opacity-50 text-white p-2 rounded-full hover:bg-opacity-70 transition-colors"
-                            title="Exit preview mode"
-                        >
-                            <EyeOff className="h-4 w-4" />
-                        </button>
-                    </div>
-                )}
+                <ObjectWidgetHeader
+                    widgetType={getCoreWidgetDisplayName(widget.type)}
+                    onEdit={onEdit ? handleEdit : undefined}
+                    onDelete={onDelete ? handleDelete : undefined}
+                    onMoveUp={onMoveUp ? handleMoveUp : undefined}
+                    onMoveDown={onMoveDown ? handleMoveDown : undefined}
+                    canMoveUp={canMoveUp}
+                    canMoveDown={canMoveDown}
+                    showControls={true}
+                    // ObjectEditor-specific props
+                    objectType={objectType}
+                    slotConfig={slotConfig}
+                    onSlotAction={handleSlotAction}
+                    isRequired={slotConfig?.required && index === 0}
+                    maxWidgets={maxWidgets}
+                    currentIndex={index}
+                />
 
                 {/* Slot requirement indicator */}
                 {slotConfig?.required && (
@@ -278,14 +251,11 @@ const ObjectWidgetFactory = ({
                 )}
 
                 {/* Core Widget Content */}
-                <div className={`widget-content overflow-hidden ${isPreviewMode
-                    ? 'border-0 rounded'
-                    : 'border border-gray-200 border-t-0 rounded-b'
-                    }`}>
+                <div className="widget-content overflow-hidden border border-gray-200 border-t-0 rounded-b">
                     <CoreWidgetComponent
                         config={widget.config || {}}
-                        mode={isPreviewMode ? "display" : "editor"}
-                        onConfigChange={isPreviewMode ? undefined : stableConfigChangeHandler}
+                        mode="editor"
+                        onConfigChange={stableConfigChangeHandler}
                         themeId={widget.config?.themeId}
                         widgetId={actualWidgetId}
                         slotName={actualSlotName}

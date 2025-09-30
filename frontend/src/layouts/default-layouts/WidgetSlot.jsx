@@ -107,7 +107,7 @@ const WidgetSlot = ({
                     onConfigChange={(widgetId, slotName, newConfig) => handleWidgetAction('configChange', { id: widgetId }, newConfig)}
                     canMoveUp={index > 0}
                     canMoveDown={index < slotWidgets.length - 1}
-                    mode={isSlotPreviewMode ? "preview" : "editor"}
+                    mode={isSlotPreviewMode ? "display" : "editor"}
                     showControls={editable && !isSlotPreviewMode}
                     // PageEditor-specific props
                     versionId={pageContext.versionId}

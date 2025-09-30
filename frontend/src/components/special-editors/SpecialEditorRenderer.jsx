@@ -6,7 +6,6 @@
  */
 import React, { useCallback, useEffect, useMemo } from 'react'
 import MediaSpecialEditor from './MediaSpecialEditor'
-import TwoColumnsEditor from '../../widgets/default-widgets/TwoColumnsEditor'
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
 import { OperationTypes } from '../../contexts/unified-data/types/operations'
 import { useEditorContext } from '../../contexts/unified-data/hooks'
@@ -15,7 +14,6 @@ import { lookupWidget, hasWidgetContentChanged } from '../../utils/widgetUtils'
 // Registry of special editors mapped to widget types
 const SPECIAL_EDITORS = {
     'core_widgets.ImageWidget': MediaSpecialEditor,
-    'default_widgets.TwoColumnsWidget': TwoColumnsEditor,
     // Future editors can be added here:
     // 'core_widgets.FormsWidget': FormsSpecialEditor,
     // 'core_widgets.TableWidget': TableSpecialEditor,
