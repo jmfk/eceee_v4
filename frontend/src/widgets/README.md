@@ -91,19 +91,51 @@ import {
 const WidgetComponent = getCoreWidgetComponent('default_widgets.ContentWidget')
 ```
 
-## Future Extension
+## Widget Override System
 
-This structure allows for future widget packages:
+The widget system now supports **priority-based widget overrides**! Third-party packages like `eceee-widgets` can override default widgets with custom implementations.
+
+### How It Works
+
+```
+Priority Levels:
+├── DEFAULT (100)      # default-widgets
+├── ECEEE (200)        # eceee-widgets (overrides default)
+├── THIRD_PARTY (300)  # third-party widgets
+└── CUSTOM (400)       # custom/user widgets
+```
+
+### Example Override
+
+```jsx
+// eceee-widgets/CustomFooterWidget.jsx
+const CustomFooterWidget = ({ config, editable, onConfigChange }) => {
+    return <footer>Custom ECEEE Footer</footer>;
+};
+
+// Use SAME widget type to override default
+CustomFooterWidget.widgetType = 'core_widgets.FooterWidget';
+
+// Register in eceee-widgets registry
+export const ECEEE_WIDGET_REGISTRY = {
+    'core_widgets.FooterWidget': registerWidget(CustomFooterWidget, 'core_widgets.FooterWidget'),
+};
+```
+
+Now anywhere `FooterWidget` is used, the ECEEE version will be rendered automatically!
+
+### Current Packages
 
 ```
 widgets/
-├── default-widgets/     # Core defaults
-├── eceee-widgets/      # ECEEE-specific widgets  
-├── custom-widgets/     # Custom widget packages
-└── third-party-widgets/ # Third-party packages
+├── WidgetRegistryManager.js    # Central registry manager
+├── default-widgets/            # Core widget implementations (priority 100)
+├── eceee-widgets/             # ECEEE-specific widgets (priority 200)
+│   └── CustomFooterWidget.jsx # Example override
+└── WIDGET_OVERRIDE_SYSTEM.md  # Complete documentation
 ```
 
-Each package can extend or replace the defaults, similar to the backend widget system.
+📖 **[Read the complete Widget Override System documentation](./WIDGET_OVERRIDE_SYSTEM.md)**
 
 ## Migration Notes
 

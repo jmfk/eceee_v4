@@ -11,8 +11,8 @@ export { default as PageWidgetHeader } from './PageWidgetHeader'
 export { default as PageContentEditor } from './PageContentEditor'
 // Layout renderers removed - now using ReactLayoutRenderer only
 export { default as ReactLayoutRenderer } from './ReactLayoutRenderer'
-export * from '../../layouts/default-layouts/LayoutRegistry'
-export { default as WidgetSlot } from '../../layouts/default-layouts/WidgetSlot'
+export * from '../../layouts'
+export { WidgetSlot } from '../../layouts'
 
 // Test components removed after refactoring completion
 
