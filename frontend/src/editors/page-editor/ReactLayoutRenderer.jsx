@@ -28,7 +28,7 @@ const ReactLayoutRenderer = forwardRef(({
 }, ref) => {
 
     // Get update lock and UnifiedData context
-    const { useExternalChanges, publishUpdate } = useUnifiedData();
+    const { useExternalChanges, publishUpdate, getState } = useUnifiedData();
 
     // Get version context
     const versionId = currentVersion?.id || pageVersionData?.versionId;
@@ -37,7 +37,32 @@ const ReactLayoutRenderer = forwardRef(({
     // Define a stable component ID for UDC source tracking
     const componentId = `react-layout-renderer-${versionId || 'unknown'}`;
     // Page editor always uses page context
-    const contextType = 'page'
+    const contextType = 'page';
+
+    // Subscribe to UDC state changes to automatically update widgets
+    const [udcWidgets, setUdcWidgets] = useState(widgets);
+
+    useExternalChanges(componentId, (state) => {
+        console.log('🔄 ReactLayoutRenderer UDC State Change:', {
+            componentId,
+            versionId,
+            contextType,
+            timestamp: new Date().toISOString()
+        });
+
+        if (versionId && state.versions[versionId]?.widgets) {
+            const newWidgets = state.versions[versionId].widgets;
+            console.log('🔄 ReactLayoutRenderer Updating from UDC:', {
+                newWidgets,
+                previousWidgets: udcWidgets
+            });
+            setUdcWidgets(newWidgets);
+            // Trigger parent update for UI consistency
+            if (onWidgetChange) {
+                onWidgetChange(newWidgets, { sourceId: componentId });
+            }
+        }
+    })
 
     // Use shared widget hook
     const {
@@ -81,28 +106,26 @@ const ReactLayoutRenderer = forwardRef(({
                 const widgetConfig = createDefaultWidgetConfig(widgetType);
                 const newWidget = addWidget(slotName, widgetType, widgetConfig);
 
-                // Update widgets
-                const updatedWidgets = { ...widgets };
-                if (!updatedWidgets[slotName]) updatedWidgets[slotName] = [];
-                updatedWidgets[slotName].push(newWidget);
+                console.log('🎯 ReactLayoutRenderer ADD_WIDGET - Pure UDC Pattern:', {
+                    componentId,
+                    newWidgetId: newWidget.id,
+                    widgetType: newWidget.type,
+                    slotName,
+                    contextType,
+                    timestamp: new Date().toISOString()
+                });
 
-                if (onWidgetChange) {
-                    onWidgetChange(updatedWidgets, { sourceId: newWidget.id });
-                }
-
-                if (onDirtyChange) {
-                    onDirtyChange(true, `added widget to ${slotName}`);
-                }
-
-                // Publish to Unified Data Context
+                // Pure UDC pattern: Only publish to UDC, let subscriptions handle UI updates
                 await publishUpdate(componentId, OperationTypes.ADD_WIDGET, {
                     id: newWidget.id,
                     type: newWidget.type,
                     config: newWidget.config,
                     slot: slotName,
                     contextType: contextType,
-                    order: (updatedWidgets[slotName]?.length || 1) - 1
+                    order: (widgets[slotName]?.length || 0)
                 });
+
+                // No manual state updates - UDC subscriptions will handle re-rendering
                 break;
             }
 
@@ -136,9 +159,6 @@ const ReactLayoutRenderer = forwardRef(({
                     onWidgetChange(updatedWidgetsDelete, { sourceId: widget.id });
                 }
 
-                if (onDirtyChange) {
-                    onDirtyChange(true, `removed widget from ${slotName}`);
-                }
 
                 // Publish to Unified Data Context
                 await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, {
@@ -164,9 +184,6 @@ const ReactLayoutRenderer = forwardRef(({
                         onWidgetChange(updatedWidgetsUp, { sourceId: widget.id });
                     }
 
-                    if (onDirtyChange) {
-                        onDirtyChange(true, `moved widget up in ${slotName}`);
-                    }
                     // Publish to Unified Data Context
                     await publishUpdate(componentId, OperationTypes.MOVE_WIDGET, {
                         //id: widget.id,
@@ -193,9 +210,6 @@ const ReactLayoutRenderer = forwardRef(({
                         onWidgetChange(updatedWidgetsDown, { sourceId: widget.id });
                     }
 
-                    if (onDirtyChange) {
-                        onDirtyChange(true, `moved widget down in ${slotName}`);
-                    }
 
                     // Publish to Unified Data Context
                     await publishUpdate(componentId, OperationTypes.MOVE_WIDGET, {
@@ -220,9 +234,6 @@ const ReactLayoutRenderer = forwardRef(({
                     onWidgetChange(updatedWidgetsConfig, { sourceId: widget.id });
                 }
 
-                if (onDirtyChange) {
-                    onDirtyChange(true, `updated widget config in ${slotName}`);
-                }
 
                 // Publish to Unified Data Context
                 await publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
@@ -237,7 +248,7 @@ const ReactLayoutRenderer = forwardRef(({
             default:
                 break;
         }
-    }, [widgets, onWidgetChange, onDirtyChange, onOpenWidgetEditor, addWidget, publishUpdate, componentId, versionId, isPublished, onVersionChange]);
+    }, [widgets, onWidgetChange, onOpenWidgetEditor, addWidget, publishUpdate, componentId, versionId, isPublished, onVersionChange]);
 
     // Widget modal handlers
     const handleShowWidgetModal = useCallback((slotName) => {
@@ -267,16 +278,13 @@ const ReactLayoutRenderer = forwardRef(({
             onWidgetChange(updatedWidgets, { sourceId: `slot-${slotName}` });
         }
 
-        if (onDirtyChange) {
-            onDirtyChange(true, `cleared slot ${slotName}`);
-        }
 
         // Publish removals to Unified Data Context for all widgets in this slot
         const existingWidgetsInSlot = widgets[slotName] || [];
         for (const w of existingWidgetsInSlot) {
             await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, { id: w.id });
         }
-    }, [widgets, onWidgetChange, onDirtyChange, publishUpdate, componentId, versionId, isPublished]);
+    }, [widgets, onWidgetChange, publishUpdate, componentId, versionId, isPublished]);
 
     // Get layout component
     const LayoutComponent = getLayoutComponent(layoutName);
@@ -331,7 +339,7 @@ const ReactLayoutRenderer = forwardRef(({
     return (
         <div className="react-layout-renderer w-full h-full">
             <LayoutComponent
-                widgets={widgets}
+                widgets={udcWidgets}
                 onWidgetAction={handleWidgetAction}
                 editable={editable}
                 pageContext={pageContext}
