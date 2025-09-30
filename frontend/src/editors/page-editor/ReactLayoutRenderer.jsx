@@ -80,8 +80,10 @@ const ReactLayoutRenderer = forwardRef(({
         // Add missing context for widgets
         parentComponentId: componentId,
         contextType: 'page',
-        pageId: context?.pageId
-    }), [versionId, isPublished, onVersionChange, componentId, context?.pageId]);
+        pageId: context?.pageId,
+        // Pass onOpenWidgetEditor for nested widgets
+        onOpenWidgetEditor
+    }), [versionId, isPublished, onVersionChange, componentId, context?.pageId, onOpenWidgetEditor]);
 
     // Handle widget actions
     const handleWidgetAction = useCallback(async (action, slotName, widget, ...args) => {

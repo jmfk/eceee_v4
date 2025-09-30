@@ -39,6 +39,7 @@ const PageWidgetFactory = ({
     isPublished = false,
     onVersionChange,
     onPublishingAction,
+    onOpenWidgetEditor,
     // Context props for widgets
     parentComponentId,
     contextType,
@@ -289,6 +290,8 @@ const PageWidgetFactory = ({
                         parentComponentId={parentComponentId}
                         contextType={contextType}
                         pageId={pageId}
+                        onWidgetEdit={onEdit}
+                        onOpenWidgetEditor={onOpenWidgetEditor}
                         // Widget path for infinite nesting
                         widgetPath={widgetPath}
                         // Legacy nested widget context (deprecated)
@@ -388,6 +391,8 @@ const PageWidgetFactory = ({
                 parentComponentId={parentComponentId}
                 contextType={contextType}
                 pageId={pageId}
+                onWidgetEdit={onEdit}
+                onOpenWidgetEditor={onOpenWidgetEditor}
                 // Widget path for infinite nesting
                 widgetPath={widgetPath}
                 // Legacy nested widget context (deprecated)

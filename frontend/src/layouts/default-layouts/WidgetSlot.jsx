@@ -114,6 +114,7 @@ const WidgetSlot = ({
                     isPublished={pageContext.isPublished}
                     onVersionChange={pageContext.onVersionChange}
                     onPublishingAction={pageContext.onPublishingAction}
+                    onOpenWidgetEditor={pageContext.onOpenWidgetEditor}
                     // Context props for widgets
                     parentComponentId={pageContext.parentComponentId}
                     contextType={pageContext.contextType}

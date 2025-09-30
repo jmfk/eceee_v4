@@ -12,6 +12,7 @@ export interface EditorContext {
     slotName?: string;
     mode: 'edit' | 'preview';
     contextType: 'page' | 'object' | 'other';
+    widgetPath?: string[]; // Path for nested widgets: [slot, widgetId, slot, widgetId, ...]
 }
 
 export default EditorContext;

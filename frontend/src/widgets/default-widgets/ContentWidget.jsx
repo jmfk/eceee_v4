@@ -116,7 +116,7 @@ const ContentWidget = memo(({
             return;
         }
         const currentState = getState();
-        const widget = lookupWidget(currentState, widgetId, slotName, contextType);
+        const widget = lookupWidget(currentState, widgetId, slotName, contextType, widgetPath);
         const udcConfig = widget?.config;
         if (udcConfig && hasWidgetContentChanged(configRef.current, udcConfig)) {
             setConfig(udcConfig);
@@ -126,7 +126,7 @@ const ContentWidget = memo(({
 
     // Subscribe to external changes
     useExternalChanges(componentId, (state) => {
-        const widget = lookupWidget(state, widgetId, slotName, contextType);
+        const widget = lookupWidget(state, widgetId, slotName, contextType, widgetPath);
         const newConfig = widget?.config;
         if (newConfig && hasWidgetContentChanged(configRef.current, newConfig)) {
             setConfig(newConfig);

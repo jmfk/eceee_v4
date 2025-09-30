@@ -25,6 +25,7 @@ const SelfContainedSlotEditor = ({
     parentSlotName, // Top-level slot where parent widget lives (legacy)
     contextType = 'page',
     onWidgetEdit,
+    onOpenWidgetEditor,
     onSlotChange,
     parentComponentId,
     widgetPath = [], // Full path to parent widget (for infinite nesting)
@@ -86,13 +87,10 @@ const SelfContainedSlotEditor = ({
         // Create the widget with proper structure
         const newWidget = {
             id: generateWidgetId(),
-            name: getWidgetDisplayName(widgetType), // Get display name from registry
+            name: getWidgetDisplayName(widgetType),
             type: widgetType,
             config: widgetConfig,
-            slotName: slotName,
-            slot_name: slotName, // For compatibility
-            sort_order: widgets.length,
-            parent_widget_id: parentWidgetId
+            slotName: slotName
         };
 
         const newWidgets = [...widgets, newWidget];
@@ -126,10 +124,34 @@ const SelfContainedSlotEditor = ({
     /**
      * Handle editing a widget
      * Note: PageWidgetFactory calls this with (slotName, index, widget)
+     * 
+     * For nested widgets (inside container widgets), use onOpenWidgetEditor directly
+     * to bypass ReactLayoutRenderer's widget lookup
      */
     const handleEditWidget = useCallback((passedSlotName, widgetIndex, widget) => {
-        if (onWidgetEdit) {
-            // Pass widget data in the format expected by the widget editor panel
+        // If we have onOpenWidgetEditor and this is a nested widget, use it directly
+        if (onOpenWidgetEditor && widgetPath.length > 0) {
+            // Call onOpenWidgetEditor directly for nested widgets
+            // Use slotPath (which includes slot name) instead of widgetPath
+            const fullPath = [...slotPath, widget.id];
+
+            onOpenWidgetEditor({
+                ...widget,
+                slotName: passedSlotName || slotName,
+                slotIndex: widgetIndex,
+                parentWidgetId,
+                widgetPath: fullPath, // Full path including slot name and widget ID
+                context: {
+                    slotName: passedSlotName || slotName,
+                    contextType,
+                    mode: 'edit',
+                    parentWidgetId,
+                    widgetId: parentWidgetId,
+                    widgetPath: fullPath
+                }
+            });
+        } else if (onWidgetEdit) {
+            // Fallback to onWidgetEdit for top-level widgets
             onWidgetEdit({
                 ...widget,
                 slotName: passedSlotName || slotName,
@@ -143,7 +165,7 @@ const SelfContainedSlotEditor = ({
                 }
             });
         }
-    }, [onWidgetEdit, slotName, parentWidgetId, contextType]);
+    }, [onWidgetEdit, onOpenWidgetEditor, slotName, parentWidgetId, contextType, widgetPath, slotPath]);
 
     /**
      * Handle clearing all widgets from slot
@@ -279,8 +301,10 @@ SelfContainedSlotEditor.propTypes = {
     parentWidgetId: PropTypes.string.isRequired,
     contextType: PropTypes.oneOf(['page', 'object']),
     onWidgetEdit: PropTypes.func,
+    onOpenWidgetEditor: PropTypes.func,
     onSlotChange: PropTypes.func,
     parentComponentId: PropTypes.string,
+    widgetPath: PropTypes.array,
     showAddButton: PropTypes.bool,
     showMoveButtons: PropTypes.bool,
     showEditButton: PropTypes.bool,

@@ -17,7 +17,8 @@ const ImageWidget = ({
     widgetId = null,
     slotName = null,
     onConfigChange = null,
-    context
+    context,
+    widgetPath = []
 }) => {
 
 
@@ -53,7 +54,7 @@ const ImageWidget = ({
     // ODC External Changes Subscription
     useExternalChanges(componentId, (state) => {
         if (!widgetId || !slotName) return
-        const widget = lookupWidget(state, widgetId, slotName, contextType)
+        const widget = lookupWidget(state, widgetId, slotName, contextType, widgetPath)
         if (widget && widget.config && hasWidgetContentChanged(localConfig, widget.config)) {
             setLocalConfig(widget.config)
 

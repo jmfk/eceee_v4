@@ -314,12 +314,6 @@ export class DataManager {
                             { payload: operation.payload }
                         );
                     }
-                    // if (operation.payload.contextType === 'object') {
-                    //     throw new ValidationError(operation,
-                    //         'objectId is required when contextType is "object"',
-                    //         { payload: operation.payload }
-                    //     );
-                    // }
                     break;
 
                 case OperationTypes.UPDATE_WIDGET_CONFIG:
@@ -563,7 +557,6 @@ export class DataManager {
      */
     private processOperation(operation: Operation): void {
         const previousState = { ...this.state };
-        
         try {
             const validation = this.validateOperation(operation);
             if (!validation.isValid) {
