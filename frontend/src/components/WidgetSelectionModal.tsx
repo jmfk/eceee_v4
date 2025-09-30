@@ -138,7 +138,7 @@ const WidgetSelectionModal = ({ isOpen, onClose, onSelectWidget, slot, available
                         ) : (
                             filteredWidgets.map((widget, index) => (
                                 <div
-                                    key={widget.type + index}
+                                    key={`${widget.type}-${index}`}
                                     onClick={() => handleWidgetSelect(widget.type)}
                                     className="border border-gray-200 rounded-lg p-4 cursor-pointer hover:border-blue-300 hover:bg-blue-50 transition-all duration-200"
                                 >
