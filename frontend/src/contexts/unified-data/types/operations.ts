@@ -64,8 +64,13 @@ export type AddWidgetPayload = WidgetContext & {
 
 export type UpdateWidgetConfigPayload = WidgetContext & {
   id: string;
-  slotName: string;
   config: Partial<WidgetConfig>;
+  // New path-based approach (supports infinite nesting)
+  widgetPath?: string[]; // Full path: [topSlot, widgetId, slot, widgetId, ..., targetId]
+  // Legacy single-level nesting (deprecated, kept for backward compatibility)
+  slotName?: string;
+  parentWidgetId?: string;
+  parentSlotName?: string;
 };
 
 export type MoveWidgetPayload = WidgetContext & {
