@@ -293,6 +293,10 @@ const ObjectWidgetFactory = ({
                         objectType={objectType}
                         slotConfig={slotConfig}
                         isRequired={slotConfig?.required}
+                        // Context props for container widgets
+                        parentComponentId={context?.componentId}
+                        contextType="object"
+                        objectId={context?.instanceId}
                     />
                 </div>
 
@@ -385,6 +389,10 @@ const ObjectWidgetFactory = ({
                 objectType={objectType}
                 slotConfig={slotConfig}
                 isRequired={slotConfig?.required}
+                // Context props for container widgets
+                parentComponentId={context?.componentId}
+                contextType="object"
+                objectId={context?.instanceId}
             />
         </div>
     )
