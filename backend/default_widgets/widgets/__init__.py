@@ -14,14 +14,19 @@ from .navigation import NavigationWidget
 from .sidebar import SidebarWidget
 from .forms import FormsWidget
 
+# Import container widgets
+from .two_columns import TwoColumnsWidget
+
 # Make all widgets available at the package level
 __all__ = [
-    'ContentWidget',
-    'ImageWidget', 
-    'TableWidget',
-    'FooterWidget',
-    'HeaderWidget',
-    'NavigationWidget',
-    'SidebarWidget',
-    'FormsWidget',
+    "ContentWidget",
+    "ImageWidget",
+    "TableWidget",
+    "FooterWidget",
+    "HeaderWidget",
+    "NavigationWidget",
+    "SidebarWidget",
+    "FormsWidget",
+    # Container widgets
+    "TwoColumnsWidget",
 ]
