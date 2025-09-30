@@ -52,7 +52,13 @@ export const useWidgets = (initialWidgets = {}) => {
 
     // Generate unique widget ID
     const generateWidgetId = useCallback(() => {
-        return `widget-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        // Use a counter to ensure uniqueness even within the same millisecond
+        if (!generateWidgetId._counter) {
+            generateWidgetId._counter = 0;
+        }
+        generateWidgetId._counter++;
+
+        return `widget-${Date.now()}-${generateWidgetId._counter}-${Math.random().toString(36).substr(2, 9)}`
     }, [])
 
     // Add widget to a slot

@@ -46,12 +46,12 @@ const HeaderWidget = ({ config = {}, mode = 'preview' }) => {
         bottom: 0,
         backgroundColor: overlay_color,
         opacity: overlay_opacity,
-        zIndex: 1
+        zIndex: 0
     } : null
 
     const contentStyle = {
         position: 'relative',
-        zIndex: 2,
+        zIndex: 1,
         maxWidth: '1200px',
         margin: '0 auto',
         height: '100%',

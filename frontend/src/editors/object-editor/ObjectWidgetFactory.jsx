@@ -39,7 +39,8 @@ const ObjectWidgetFactory = ({
     onSlotAction,
     allowedWidgetTypes = [],
     maxWidgets = null,
-    context
+    context,
+    slotType = 'content' // 'content' or 'inherited' - determines default preview mode
 }) => {
     // Use passed props or extract from widget
     const actualWidgetId = widgetId || widget?.id
@@ -115,19 +116,26 @@ const ObjectWidgetFactory = ({
         setIsPreviewMode(false)
     }
 
-    // Enhanced preview with object context
+    // Enhanced preview with object context and slot type awareness
     const handleModalPreview = async () => {
         setShowPreview(true)
         setIsLoadingPreview(true)
         setPreviewContent(null)
 
         try {
+            // Determine preview mode based on slot type and widget inheritance
+            const isInheritedWidget = widget.inherit_from_parent || widget.inherited_from
+            const defaultToViewMode = slotType === 'inherited' || isInheritedWidget
+
             // ObjectEditor-specific: Include object type and slot context in preview
             const result = await renderWidgetPreview(widget, {
                 objectType: objectType?.name,
                 slotName: actualSlotName,
                 slotConfig,
-                objectContext: true
+                objectContext: true,
+                previewMode: defaultToViewMode ? 'view' : 'edit',
+                slotType,
+                isInherited: isInheritedWidget
             })
             setPreviewContent(result)
         } catch (error) {

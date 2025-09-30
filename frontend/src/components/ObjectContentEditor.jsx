@@ -479,8 +479,12 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, mode = 
         const isSelected = !!selectedWidgets[widgetKey]
         const slotWidgets = normalizedWidgets[slotName] || []
         const slot = objectType?.slotConfiguration?.slots?.find(s => s.name === slotName)
+
+        // Create a unique key that combines slot name, widget ID, and index to prevent collisions
+        const uniqueKey = widget.id ? `${slotName}-${widget.id}-${index}` : `${slotName}-index-${index}`;
+
         return (
-            <div key={widget.id || index} className="relative">
+            <div key={uniqueKey} className="relative">
                 <ObjectWidgetFactory
                     widget={widget}
                     slotName={slotName}
