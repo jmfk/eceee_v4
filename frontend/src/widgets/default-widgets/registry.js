@@ -16,6 +16,9 @@ import NavigationWidget from './NavigationWidget'
 import SidebarWidget from './SidebarWidget'
 import FormsWidget from './FormsWidget'
 
+// Import container widget implementations
+import TwoColumnsWidget from './TwoColumnsWidget'
+
 /**
  * Auto-collect metadata from widget components with optional override
  * This ensures consistency and reduces boilerplate while allowing manual control
@@ -69,7 +72,9 @@ export const CORE_WIDGET_REGISTRY = {
     'core_widgets.HeaderWidget': registerWidget(HeaderWidget, 'core_widgets.HeaderWidget'),
     'core_widgets.NavigationWidget': registerWidget(NavigationWidget, 'core_widgets.NavigationWidget'),
     'core_widgets.SidebarWidget': registerWidget(SidebarWidget, 'core_widgets.SidebarWidget'),
-    'core_widgets.FormsWidget': registerWidget(FormsWidget, 'core_widgets.FormsWidget')
+    'core_widgets.FormsWidget': registerWidget(FormsWidget, 'core_widgets.FormsWidget'),
+    // Container widgets
+    'default_widgets.TwoColumnsWidget': registerWidget(TwoColumnsWidget, 'default_widgets.TwoColumnsWidget')
 }
 
 // === CORE UTILITY FUNCTIONS ===

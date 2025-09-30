@@ -419,3 +419,13 @@ class FormsConfig(BaseModel):
     css_framework: Literal["default", "bootstrap", "tailwind", "custom"] = Field(
         "default", description="CSS framework for styling"
     )
+
+
+class TwoColumnsConfig(BaseModel):
+    """Configuration for simple two-column widget"""
+
+    # Just the slots - exactly like PageVersion.widgets
+    slots: Dict[str, List[Dict[str, Any]]] = Field(
+        default_factory=lambda: {"left": [], "right": []},
+        description="Widgets organized by slot name (left/right)",
+    )
