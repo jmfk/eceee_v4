@@ -85,6 +85,7 @@ const FooterWidget = ({ config = {}, mode = 'preview' }) => {
             style={footerStyle}
         >
             <div className="footer-content max-w-6xl mx-auto">
+                <h1>ECEEE</h1>
                 <div dangerouslySetInnerHTML={{ __html: content }} />
 
                 {social_links.length > 0 && (

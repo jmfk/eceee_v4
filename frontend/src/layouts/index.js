@@ -47,3 +47,7 @@ export {
     TwoColumnLayout,
     WidgetSlot
 } from './default-layouts';
+
+export {
+    MainLayout
+} from './eceee-layouts';

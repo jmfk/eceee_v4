@@ -4,15 +4,15 @@
  * Core layout implementations that can be extended or replaced
  */
 
-export {
-    SingleColumnLayout,
-    SidebarLayout,
-    ThreeColumnLayout,
-    TwoColumnLayout,
-    LAYOUT_REGISTRY
-} from './LayoutRegistry';
+// Export individual layout components
+export { SingleColumnLayout } from './SingleColumnLayout';
+export { SidebarLayout } from './SidebarLayout';
+export { TwoColumnLayout } from './TwoColumnLayout';
+export { ThreeColumnLayout } from './ThreeColumnLayout';
 
-export { default as WidgetSlot } from './WidgetSlot';
-
-// Re-export utilities
+// Export registry and utilities
+export { LAYOUT_REGISTRY } from './LayoutRegistry';
 export * from './LayoutRegistry';
+
+// Export WidgetSlot
+export { default as WidgetSlot } from './WidgetSlot';
