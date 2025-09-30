@@ -39,6 +39,15 @@ const PageWidgetFactory = ({
     isPublished = false,
     onVersionChange,
     onPublishingAction,
+    // Context props for widgets
+    parentComponentId,
+    contextType,
+    pageId,
+    // Nested widget props (for widgets inside container widgets)
+    nestedParentWidgetId,
+    nestedParentSlotName,
+    // Widget path for infinite nesting support
+    widgetPath = [],
     slotType = 'content' // 'content' or 'inherited' - determines default preview mode
 }) => {
     // Use passed props or extract from widget
@@ -276,6 +285,15 @@ const PageWidgetFactory = ({
                         layoutRenderer={layoutRenderer}
                         versionId={versionId}
                         isPublished={isPublished}
+                        // Context props for container widgets
+                        parentComponentId={parentComponentId}
+                        contextType={contextType}
+                        pageId={pageId}
+                        // Widget path for infinite nesting
+                        widgetPath={widgetPath}
+                        // Legacy nested widget context (deprecated)
+                        nestedParentWidgetId={nestedParentWidgetId}
+                        nestedParentSlotName={nestedParentSlotName}
                     />
                 </div>
 
@@ -366,6 +384,15 @@ const PageWidgetFactory = ({
                 layoutRenderer={layoutRenderer}
                 versionId={versionId}
                 isPublished={isPublished}
+                // Context props for container widgets
+                parentComponentId={parentComponentId}
+                contextType={contextType}
+                pageId={pageId}
+                // Widget path for infinite nesting
+                widgetPath={widgetPath}
+                // Legacy nested widget context (deprecated)
+                nestedParentWidgetId={nestedParentWidgetId}
+                nestedParentSlotName={nestedParentSlotName}
             />
         </div>
     )
