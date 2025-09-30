@@ -155,6 +155,14 @@ export function UnifiedDataProvider({
 
     // Generic publish update function for pub/sub system
     const publishUpdate = useCallback(async <T,>(componentId: string, type: keyof typeof OperationTypes, data: T) => {
+        console.log('📤 UDC PublishUpdate Called:', {
+            componentId,
+            type,
+            data,
+            timestamp: new Date().toISOString(),
+            callStack: new Error().stack?.split('\n').slice(1, 4).map(line => line.trim())
+        });
+
         // Auto-attach context for widget operations so widgets know if they are on a page or object
         const WIDGET_OPS: Set<keyof typeof OperationTypes> = new Set([
             OperationTypes.ADD_WIDGET,
@@ -183,14 +191,22 @@ export function UnifiedDataProvider({
             }
         }
 
-        await manager.dispatch({
+        const operation = {
             type,
             sourceId: componentId,
             payload: {
                 id: componentId,
                 ...augmentedData
             }
+        };
+
+        console.log('📤 UDC PublishUpdate Dispatching:', {
+            operation,
+            augmentedData,
+            originalData: data
         });
+
+        await manager.dispatch(operation);
     }, [manager]);
 
     // Save to current version using granular smart save API

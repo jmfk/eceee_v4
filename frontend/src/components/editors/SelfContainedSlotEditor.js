@@ -333,6 +333,15 @@ class SelfContainedSlotEditor {
             parent_widget_id: this.parentWidgetId
         };
 
+        console.log('🎯 SelfContainedSlotEditor ADD_WIDGET Starting:', {
+            slotName: this.slotName,
+            widgetType,
+            newWidgetId: newWidget.id,
+            currentWidgetCount: this.widgets.length,
+            componentId: this.componentId,
+            timestamp: new Date().toISOString()
+        });
+
         // Lock updates to prevent feedback loops
         this.lockUpdates();
 
@@ -341,9 +350,21 @@ class SelfContainedSlotEditor {
         this.renderWidgets();
         this.updateSlotCount();
 
+        console.log('🎯 SelfContainedSlotEditor Local State Updated:', {
+            slotName: this.slotName,
+            newWidgetCount: this.widgets.length,
+            widgetIds: this.widgets.map(w => w.id)
+        });
+
         // Publish to UDC
         if (this.publishUpdate) {
             try {
+                console.log('🎯 SelfContainedSlotEditor Publishing to UDC:', {
+                    componentId: this.componentId,
+                    widgetId: newWidget.id,
+                    slotName: this.slotName,
+                    contextType: this.contextType
+                });
                 await this.publishUpdate(this.componentId, OperationTypes.ADD_WIDGET, {
                     id: newWidget.id,
                     type: newWidget.type,
@@ -353,12 +374,17 @@ class SelfContainedSlotEditor {
                     parentWidgetId: this.parentWidgetId,
                     order: this.widgets.length - 1
                 });
+                console.log('🎯 SelfContainedSlotEditor UDC Publish Complete');
             } catch (error) {
                 console.error('Failed to publish ADD_WIDGET:', error);
             }
         }
 
         // Emit registry event
+        console.log('🎯 SelfContainedSlotEditor Emitting Registry Event:', {
+            slotId: this.slotId,
+            widgetId: newWidget.id
+        });
         this.registry.emit('WIDGET_ADDED', {
             slotId: this.slotId,
             widget: newWidget,

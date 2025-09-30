@@ -185,11 +185,24 @@ const ContentEditor = forwardRef(({
 
         switch (action) {
           case WIDGET_ACTIONS.ADD:
+            console.log('📝 ContentEditor ADD_WIDGET Processing:', {
+              action,
+              slotName,
+              widgetId: widgetData.id,
+              widgetType: widgetData.type,
+              currentSlotLength: updatedWidgets[slotName]?.length || 0,
+              timestamp: new Date().toISOString()
+            });
             // Add widget to slot array
             if (!updatedWidgets[slotName]) {
               updatedWidgets[slotName] = [];
             }
             updatedWidgets[slotName] = [...updatedWidgets[slotName], widgetData];
+            console.log('📝 ContentEditor ADD_WIDGET After:', {
+              slotName,
+              newSlotLength: updatedWidgets[slotName].length,
+              widgetIds: updatedWidgets[slotName].map(w => w.id)
+            });
             break;
 
           case WIDGET_ACTIONS.REMOVE:
