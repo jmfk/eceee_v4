@@ -205,7 +205,7 @@ const TwoColumnsWidget = ({
         );
     }
 
-    // In editor mode, show SlotEditor components
+    // In editor mode, show SlotEditor components with editable widgets
     if (mode === 'editor') {
         return (
             <div className="two-columns-widget-editor">
@@ -225,6 +225,9 @@ const TwoColumnsWidget = ({
                         widgetPath={widgetPath} // Pass path to nested widgets
                         emptyMessage="No widgets in left column"
                         className=""
+                        mode="editor" // Explicitly pass editor mode
+                        showClearButton={false} // Hide Clear Slot button
+                        compactAddButton={true} // Show just + icon
                     />
 
                     <SlotEditor
@@ -242,6 +245,9 @@ const TwoColumnsWidget = ({
                         widgetPath={widgetPath} // Pass path to nested widgets
                         emptyMessage="No widgets in right column"
                         className=""
+                        mode="editor" // Explicitly pass editor mode
+                        showClearButton={false} // Hide Clear Slot button
+                        compactAddButton={true} // Show just + icon
                     />
                 </div>
             </div>

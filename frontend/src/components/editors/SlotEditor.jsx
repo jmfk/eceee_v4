@@ -28,7 +28,10 @@ const SlotEditor = forwardRef(({
     showMoveButtons = true,
     showEditButton = true,
     showRemoveButton = true,
-    emptyMessage = null
+    showClearButton = true,
+    compactAddButton = false,
+    emptyMessage = null,
+    mode = 'editor' // Mode for nested widgets: 'editor' or 'display'
 }, ref) => {
     // Ref to the SelfContainedSlotEditor component
     const slotEditorRef = useRef(null);
@@ -70,7 +73,10 @@ const SlotEditor = forwardRef(({
                 showMoveButtons={showMoveButtons}
                 showEditButton={showEditButton}
                 showRemoveButton={showRemoveButton}
+                showClearButton={showClearButton}
+                compactAddButton={compactAddButton}
                 emptyMessage={emptyMessage}
+                mode={mode}
             />
         </div>
     );
@@ -96,7 +102,10 @@ SlotEditor.propTypes = {
     showMoveButtons: PropTypes.bool,
     showEditButton: PropTypes.bool,
     showRemoveButton: PropTypes.bool,
-    emptyMessage: PropTypes.string
+    showClearButton: PropTypes.bool,
+    compactAddButton: PropTypes.bool,
+    emptyMessage: PropTypes.string,
+    mode: PropTypes.oneOf(['editor', 'display'])
 };
 
 SlotEditor.displayName = 'SlotEditor';

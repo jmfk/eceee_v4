@@ -5,7 +5,7 @@
  * implementations with PageEditor-specific behaviors and integrations.
  */
 import React, { useState, useEffect, useRef, useMemo } from 'react'
-import { Layout, Settings, Trash2, ChevronUp, ChevronDown, Eye, ChevronLeft, ChevronRight, X, EyeOff } from 'lucide-react'
+import { Layout, Settings, Trash2, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { getCoreWidgetComponent, getCoreWidgetDisplayName } from '../../widgets'
 import { renderWidgetPreview } from '../../utils/widgetPreview'
 import PageWidgetHeader from './PageWidgetHeader'
@@ -55,7 +55,6 @@ const PageWidgetFactory = ({
     const actualWidgetId = widgetId || widget?.id
     const actualSlotName = passedSlotName || slotName || widget?.slotName
 
-    const [isPreviewMode, setIsPreviewMode] = useState(false)
     const [showPreview, setShowPreview] = useState(false)
     const [isLoadingPreview, setIsLoadingPreview] = useState(false)
     const [previewContent, setPreviewContent] = useState(null)
@@ -117,25 +116,6 @@ const PageWidgetFactory = ({
     const handleMoveDown = () => {
         if (onMoveDown && canMoveDown) {
             onMoveDown(slotName, index, widget)
-        }
-    }
-
-    // PageEditor-specific preview with layout context
-    const handlePreview = () => {
-        setIsPreviewMode(true)
-
-        // Notify LayoutRenderer of preview mode if available
-        if (layoutRenderer) {
-            layoutRenderer.setWidgetPreviewMode(actualSlotName, index, true)
-        }
-    }
-
-    const handleExitPreview = () => {
-        setIsPreviewMode(false)
-
-        // Notify LayoutRenderer of preview mode exit
-        if (layoutRenderer) {
-            layoutRenderer.setWidgetPreviewMode(actualSlotName, index, false)
         }
     }
 
@@ -235,50 +215,30 @@ const PageWidgetFactory = ({
     if (mode === 'editor' && showControls) {
         return (
             <div
-                className={`widget-item page-editor-widget relative ${className} ${isPreviewMode ? 'preview-mode' : ''} ${isPublished ? 'published-widget' : ''}`}
+                className={`widget-item page-editor-widget relative ${className} ${isPublished ? 'published-widget' : ''}`}
                 data-widget-type={widget.type}
                 data-widget-id={widget.id}
                 data-version-id={versionId}
                 data-published={isPublished}
             >
                 {/* PageEditor-specific Widget Header */}
-                {!isPreviewMode && (
-                    <PageWidgetHeader
-                        widgetType={getCoreWidgetDisplayName(widget.type)}
-                        onEdit={onEdit ? handleEdit : undefined}
-                        onDelete={onDelete ? handleDelete : undefined}
-                        onMoveUp={onMoveUp ? handleMoveUp : undefined}
-                        onMoveDown={onMoveDown ? handleMoveDown : undefined}
-                        onPreview={handlePreview}
-                        onModalPreview={handleModalPreview}
-                        canMoveUp={canMoveUp}
-                        canMoveDown={canMoveDown}
-                        showControls={true}
-                    />
-                )}
-
-                {/* Preview Mode Exit Button */}
-                {isPreviewMode && (
-                    <div className="absolute top-2 right-2 z-10 opacity-30 hover:opacity-100 transition-opacity duration-200">
-                        <button
-                            onClick={handleExitPreview}
-                            className="bg-black bg-opacity-50 text-white p-2 rounded-full hover:bg-opacity-70 transition-colors"
-                            title="Exit preview mode"
-                        >
-                            <EyeOff className="h-4 w-4" />
-                        </button>
-                    </div>
-                )}
+                <PageWidgetHeader
+                    widgetType={getCoreWidgetDisplayName(widget.type)}
+                    onEdit={onEdit ? handleEdit : undefined}
+                    onDelete={onDelete ? handleDelete : undefined}
+                    onMoveUp={onMoveUp ? handleMoveUp : undefined}
+                    onMoveDown={onMoveDown ? handleMoveDown : undefined}
+                    canMoveUp={canMoveUp}
+                    canMoveDown={canMoveDown}
+                    showControls={true}
+                />
 
                 {/* Core Widget Content */}
-                <div className={`widget-content overflow-hidden ${isPreviewMode
-                    ? 'border-0 rounded'
-                    : 'border border-gray-200 border-t-0 rounded-b'
-                    }`}>
+                <div className="widget-content overflow-hidden border border-gray-200 border-t-0 rounded-b">
                     <CoreWidgetComponent
                         config={widget.config || {}}
-                        mode={isPreviewMode ? "display" : "editor"}
-                        onConfigChange={isPreviewMode ? undefined : stableConfigChangeHandler}
+                        mode="editor"
+                        onConfigChange={stableConfigChangeHandler}
                         themeId={widget.config?.themeId}
                         widgetId={actualWidgetId}
                         slotName={actualSlotName}

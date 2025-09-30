@@ -10,7 +10,6 @@ import {
     Trash2,
     ChevronUp,
     ChevronDown,
-    Eye,
     MoreHorizontal
 } from 'lucide-react'
 
@@ -20,7 +19,6 @@ const PageWidgetHeader = ({
     onDelete,
     onMoveUp,
     onMoveDown,
-    onPreview,
     canMoveUp = false,
     canMoveDown = false,
     showControls = true,
@@ -94,16 +92,6 @@ const PageWidgetHeader = ({
 
                 {/* Quick actions */}
                 <div className="flex items-center space-x-1">
-                    {onPreview && (
-                        <button
-                            onClick={onPreview}
-                            className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-200 rounded transition-colors"
-                            title="Preview widget"
-                        >
-                            <Eye className="h-3 w-3" />
-                        </button>
-                    )}
-
                     {onEdit && (
                         <button
                             onClick={onEdit}

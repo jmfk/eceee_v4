@@ -33,7 +33,10 @@ const SelfContainedSlotEditor = ({
     showMoveButtons = true,
     showEditButton = true,
     showRemoveButton = true,
-    emptyMessage = null
+    showClearButton = true, // Show the Clear Slot button
+    compactAddButton = false, // Show just + icon without text
+    emptyMessage = null,
+    mode = 'editor' // Mode for nested widgets: 'editor' or 'display'
 }) => {
     // Build path for widgets in this slot: append slot name to parent path
     const slotPath = [...widgetPath, slotName];
@@ -205,17 +208,20 @@ const SelfContainedSlotEditor = ({
                 <div className="slot-actions flex items-center space-x-2">
                     {showAddButton && canAddWidget() && (
                         <button
-                            className="add-widget-btn bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1 rounded text-sm font-medium transition-colors flex items-center space-x-1"
+                            className={compactAddButton
+                                ? "add-widget-btn bg-gray-200 hover:bg-gray-300 text-gray-700 p-1.5 rounded transition-colors flex items-center justify-center"
+                                : "add-widget-btn bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1 rounded text-sm font-medium transition-colors flex items-center space-x-1"
+                            }
                             onClick={handleShowWidgetModal}
                             title="Add Widget"
                         >
                             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
                             </svg>
-                            <span>Add Widget</span>
+                            {!compactAddButton && <span>Add Widget</span>}
                         </button>
                     )}
-                    {widgets.length > 0 && (
+                    {showClearButton && widgets.length > 0 && (
                         <button
                             className="clear-slot-btn bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1 rounded text-sm font-medium transition-colors flex items-center space-x-1"
                             onClick={handleClearSlot}
@@ -260,8 +266,8 @@ const SelfContainedSlotEditor = ({
                                 onMoveDown={() => handleMoveWidget(index, index + 1)}
                                 canMoveUp={index > 0}
                                 canMoveDown={index < widgets.length - 1}
-                                mode="editor"
-                                showControls={true}
+                                mode={mode}
+                                showControls={mode === 'editor'}
                                 widgetId={widget.id}
                                 contextType={contextType}
                                 // Pass parent context for nested widgets
@@ -309,7 +315,10 @@ SelfContainedSlotEditor.propTypes = {
     showMoveButtons: PropTypes.bool,
     showEditButton: PropTypes.bool,
     showRemoveButton: PropTypes.bool,
-    emptyMessage: PropTypes.string
+    showClearButton: PropTypes.bool,
+    compactAddButton: PropTypes.bool,
+    emptyMessage: PropTypes.string,
+    mode: PropTypes.oneOf(['editor', 'display'])
 };
 
 // Export the component

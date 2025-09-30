@@ -77,7 +77,6 @@ export {
     ContentWidgetEditorRenderer,
     // Container widgets
     TwoColumnsWidget,
-    TwoColumnsEditor,
     registerWidget  // Export utility for custom widget packages
 } from './default-widgets';
 
