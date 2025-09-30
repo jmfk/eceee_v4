@@ -12,7 +12,7 @@ import { extractErrorMessage } from '../utils/errorHandling'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import { Palette, Eye, EyeOff, Check, X } from 'lucide-react'
 
-const ThemeSelector = ({ selectedThemeId, onThemeChange, onDirtyChange }) => {
+const ThemeSelector = ({ selectedThemeId, onThemeChange }) => {
     const [previewThemeId, setPreviewThemeId] = useState(null)
     const [showPreview, setShowPreview] = useState(false)
     const { addNotification } = useGlobalNotifications()
@@ -66,9 +66,6 @@ const ThemeSelector = ({ selectedThemeId, onThemeChange, onDirtyChange }) => {
     const handleThemeSelect = (themeId) => {
         if (themeId !== selectedThemeId) {
             onThemeChange(themeId)
-            if (onDirtyChange) {
-                onDirtyChange(true, 'theme changed')
-            }
             addNotification('Theme applied to page', 'success', 'theme-apply')
         }
     }

@@ -186,13 +186,62 @@ const PageEditor = () => {
     const [originalWebpageData, setOriginalWebpageData] = useState(null) // Track original for smart saving
     const [originalPageVersionData, setOriginalPageVersionData] = useState(null) // Track original for smart saving
 
+    // Local widget state for fast UI operations
+    const [localWidgets, setLocalWidgets] = useState({})
+
+    // Shared componentId for entire page editing group (includes versionId for proper isolation)
+    const versionId = pageVersionData?.versionId || pageVersionData?.id || 'current'
+    const componentId = `page-editor-${pageId}-${versionId}`;
 
     // Get current dirty state from global context
-    const componentId = `page-editor-${pageId}`;
     const [isDirty, setIsDirtyState] = useState(false);
     useExternalChanges(componentId, state => {
         setIsDirtyState(state.metadata.isDirty);
+
+        // Update local widgets from external UDC changes (other components/users)
+        if (versionId && state.versions[versionId]?.widgets) {
+            const externalWidgets = state.versions[versionId].widgets;
+            setLocalWidgets(externalWidgets);
+
+            // Also update pageVersionData to keep persistence layer in sync
+            setPageVersionData(prev => ({
+                ...prev,
+                widgets: externalWidgets
+            }));
+        }
     });
+
+    // Initialize local widgets when pageVersionData loads
+    useEffect(() => {
+        if (pageVersionData?.widgets) {
+            setLocalWidgets(pageVersionData.widgets);
+        }
+    }, [pageVersionData?.widgets]);
+
+    // Fast local widget update function
+    const updateLocalWidgets = useCallback((updatedWidgets, options = {}) => {
+        // 1. Immediate local state update (fast UI)
+        setLocalWidgets(updatedWidgets);
+
+        // 2. Update pageVersionData for persistence layer
+        setPageVersionData(prev => ({
+            ...prev,
+            widgets: updatedWidgets
+        }));
+
+        // 3. Mark as dirty for save indication
+        setIsDirty(true);
+    }, [componentId, setIsDirty]);
+
+    // UDC widget operation publisher (for external sync)
+    const publishWidgetOperation = useCallback(async (operation, data) => {
+        await publishUpdate(componentId, operation, {
+            ...data,
+            contextType: 'page',
+            pageId: pageId,
+            versionId: versionId
+        });
+    }, [publishUpdate, componentId, pageId, versionId]);
 
     const [layoutData, setLayoutData] = useState(null)
     const [isLoadingLayout, setIsLoadingLayout] = useState(false)
@@ -1057,11 +1106,6 @@ const PageEditor = () => {
         handleCloseWidgetEditor()
     }, [addNotification, handleCloseWidgetEditor])
 
-    // Memoized callback to prevent ContentEditor re-renders
-    const handleDirtyChange = useCallback((isDirty, reason) => {
-        setIsDirty(isDirty);
-    }, [setIsDirty])
-
     // Subscribe to widget events using direct subscription
     // Widget events now handled through UnifiedDataContext
 
@@ -1399,12 +1443,16 @@ const PageEditor = () => {
                                                     isNewPage={isNewPage}
                                                     layoutJson={layoutData}
                                                     editable={true}
-                                                    onDirtyChange={handleDirtyChange}
                                                     onOpenWidgetEditor={handleOpenWidgetEditor}
                                                     // PageEditor-specific props
                                                     currentVersion={currentVersion}
                                                     availableVersions={availableVersions}
                                                     onVersionChange={switchToVersion}
+                                                    // Local widget state management
+                                                    localWidgets={localWidgets}
+                                                    onLocalWidgetUpdate={updateLocalWidgets}
+                                                    sharedComponentId={componentId}
+                                                    publishWidgetOperation={publishWidgetOperation}
                                                     // Editor context
                                                     context={{
                                                         pageId: webpageData?.id,
@@ -1454,7 +1502,6 @@ const PageEditor = () => {
                                 key={`theme-${pageVersionData?.versionId || 'new'}`}
                                 selectedThemeId={pageVersionData?.theme}
                                 onThemeChange={(themeId) => updatePageData({ theme: themeId })}
-                                onDirtyChange={handleDirtyChange}
                             />
                         )}
                         {activeTab === 'preview' && (

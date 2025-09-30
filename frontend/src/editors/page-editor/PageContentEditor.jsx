@@ -14,7 +14,6 @@ const PageContentEditor = forwardRef(({
     webpageData,
     pageVersionData,
     onUpdate,
-    onDirtyChange,
     onOpenWidgetEditor,
     editable = true,
     // PageEditor-specific props
@@ -22,6 +21,11 @@ const PageContentEditor = forwardRef(({
     availableVersions,
     onVersionChange,
     context,
+    // Local widget state management (from PageEditor)
+    localWidgets,
+    onLocalWidgetUpdate,
+    sharedComponentId,
+    publishWidgetOperation,
     ...otherProps
 }, ref) => {
     // Extract layout name from layoutJson or use default
@@ -31,24 +35,16 @@ const PageContentEditor = forwardRef(({
         pageVersionData?.codeLayout ||
         'single_column';
 
-    // Get current widgets from pageVersionData
-    const currentWidgets = pageVersionData?.widgets || {};
+    // Use local widgets from PageEditor (fast local state)
+    const currentWidgets = localWidgets || pageVersionData?.widgets || {};
 
-    // Get update lock and UnifiedData context
-    const { useExternalChanges } = useUnifiedData();
-
-    // Subscribe to widget changes and update source from UnifiedDataContext
-    const componentId = `page-editor-${pageId}`;
-    const [widgets, setWidgets] = useState({});
-    //const [updateSourceId, setUpdateSourceId] = useState(null);
-
-    useExternalChanges(componentId, state => {
-        setWidgets(state.widgets);
-    });
-
-    // Handle widget changes
+    // Handle widget changes - use local update for fast UI
     const handleWidgetChange = async (updatedWidgets, data) => {
-        if (onUpdate) {
+        if (onLocalWidgetUpdate) {
+            // Use fast local update from PageEditor
+            onLocalWidgetUpdate(updatedWidgets, data);
+        } else if (onUpdate) {
+            // Fallback to original update method
             onUpdate({ widgets: updatedWidgets }, data);
         }
     };
@@ -60,13 +56,15 @@ const PageContentEditor = forwardRef(({
             widgets={currentWidgets}
             onWidgetChange={handleWidgetChange}
             editable={editable}
-            onDirtyChange={onDirtyChange}
             onOpenWidgetEditor={onOpenWidgetEditor}
             // PageEditor-specific props
             currentVersion={currentVersion}
             pageVersionData={pageVersionData}
             onVersionChange={onVersionChange}
             context={context}
+            // Local widget state management
+            sharedComponentId={sharedComponentId}
+            publishWidgetOperation={publishWidgetOperation}
             {...otherProps}
         />
     );
