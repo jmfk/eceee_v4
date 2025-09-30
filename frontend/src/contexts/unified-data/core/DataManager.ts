@@ -547,15 +547,6 @@ export class DataManager {
                     break;
 
                 case OperationTypes.ADD_WIDGET:
-                    console.log('🔄 UDC ADD_WIDGET Processing:', {
-                        operationId: operation.id,
-                        sourceId: operation.sourceId,
-                        widgetId: operation.payload.id,
-                        widgetType: operation.payload.type,
-                        slot: operation.payload.slot,
-                        contextType: operation.payload.contextType,
-                        timestamp: new Date().toISOString()
-                    });
                     this.setState(operation, state => {
                         const payload = operation.payload as AddWidgetPayload;
                         const target = this.resolveWidgetTargetFromPayload(payload);
@@ -575,21 +566,7 @@ export class DataManager {
                             const version = state.versions[versionId];
                             const slotName = newWidget.slot;
                             const slotWidgets = version.widgets[slotName] || [];
-                            console.log('📊 UDC Page Widget State BEFORE:', {
-                                versionId,
-                                slotName,
-                                existingWidgetCount: slotWidgets.length,
-                                existingWidgetIds: slotWidgets.map(w => w.id),
-                                newWidgetId: newWidget.id
-                            });
                             const updatedSlotWidgets = [...slotWidgets, newWidget];
-                            console.log('📊 UDC Page Widget State AFTER:', {
-                                versionId,
-                                slotName,
-                                newWidgetCount: updatedSlotWidgets.length,
-                                newWidgetIds: updatedSlotWidgets.map(w => w.id),
-                                addedWidgetId: newWidget.id
-                            });
                             return {
                                 versions: {
                                     ...state.versions,
@@ -608,21 +585,7 @@ export class DataManager {
                             const objValue = (state as any).objects[objectId];
                             const slotName = newWidget.slot;
                             const slotWidgets = (objValue.widgets?.[slotName] || []);
-                            console.log('📊 UDC Object Widget State BEFORE:', {
-                                objectId,
-                                slotName,
-                                existingWidgetCount: slotWidgets.length,
-                                existingWidgetIds: slotWidgets.map(w => w.id),
-                                newWidgetId: newWidget.id
-                            });
                             const updatedSlotWidgets = [...slotWidgets, newWidget];
-                            console.log('📊 UDC Object Widget State AFTER:', {
-                                objectId,
-                                slotName,
-                                newWidgetCount: updatedSlotWidgets.length,
-                                newWidgetIds: updatedSlotWidgets.map(w => w.id),
-                                addedWidgetId: newWidget.id
-                            });
                             return {
                                 objects: {
                                     ...(state as any).objects,
@@ -1122,13 +1085,6 @@ export class DataManager {
      * Dispatch an operation
      */
     dispatch(operation: Operation): void {
-        console.log('🚀 UDC Dispatch Operation:', {
-            type: operation.type,
-            sourceId: operation.sourceId,
-            operationId: operation.id,
-            payload: operation.payload,
-            timestamp: new Date().toISOString()
-        });
         try {
             this.processOperation(operation);
         } catch (error) {

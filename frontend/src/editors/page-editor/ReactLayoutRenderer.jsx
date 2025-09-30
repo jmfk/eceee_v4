@@ -18,50 +18,32 @@ const ReactLayoutRenderer = forwardRef(({
     widgets = {},
     onWidgetChange,
     editable = true,
-    onDirtyChange,
     // PageEditor-specific props
     currentVersion,
     pageVersionData,
     onVersionChange,
     onOpenWidgetEditor,
-    context
+    context,
+    // Local widget state management
+    sharedComponentId,
+    publishWidgetOperation
 }, ref) => {
 
-    // Get update lock and UnifiedData context
+    // Get UDC context (but use shared componentId from PageEditor)
     const { useExternalChanges, publishUpdate, getState } = useUnifiedData();
 
     // Get version context
     const versionId = currentVersion?.id || pageVersionData?.versionId;
     const isPublished = pageVersionData?.publicationStatus === 'published';
 
-    // Define a stable component ID for UDC source tracking
-    const componentId = `react-layout-renderer-${versionId || 'unknown'}`;
-    // Page editor always uses page context
+    // Use shared componentId from PageEditor (for component group coordination)
+    const componentId = sharedComponentId || `react-layout-renderer-${versionId || 'unknown'}`;
     const contextType = 'page';
 
-    // Subscribe to UDC state changes to automatically update widgets
-    const [udcWidgets, setUdcWidgets] = useState(widgets);
-
+    // Subscribe to UDC state changes from external sources only
     useExternalChanges(componentId, (state) => {
-        console.log('🔄 ReactLayoutRenderer UDC State Change:', {
-            componentId,
-            versionId,
-            contextType,
-            timestamp: new Date().toISOString()
-        });
-
-        if (versionId && state.versions[versionId]?.widgets) {
-            const newWidgets = state.versions[versionId].widgets;
-            console.log('🔄 ReactLayoutRenderer Updating from UDC:', {
-                newWidgets,
-                previousWidgets: udcWidgets
-            });
-            setUdcWidgets(newWidgets);
-            // Trigger parent update for UI consistency
-            if (onWidgetChange) {
-                onWidgetChange(newWidgets, { sourceId: componentId });
-            }
-        }
+        // External changes will be handled by PageEditor
+        // ReactLayoutRenderer will get updates via props (widgets)
     })
 
     // Use shared widget hook
@@ -106,26 +88,38 @@ const ReactLayoutRenderer = forwardRef(({
                 const widgetConfig = createDefaultWidgetConfig(widgetType);
                 const newWidget = addWidget(slotName, widgetType, widgetConfig);
 
-                console.log('🎯 ReactLayoutRenderer ADD_WIDGET - Pure UDC Pattern:', {
-                    componentId,
-                    newWidgetId: newWidget.id,
-                    widgetType: newWidget.type,
-                    slotName,
-                    contextType,
-                    timestamp: new Date().toISOString()
-                });
 
-                // Pure UDC pattern: Only publish to UDC, let subscriptions handle UI updates
-                await publishUpdate(componentId, OperationTypes.ADD_WIDGET, {
-                    id: newWidget.id,
-                    type: newWidget.type,
-                    config: newWidget.config,
-                    slot: slotName,
-                    contextType: contextType,
-                    order: (widgets[slotName]?.length || 0)
-                });
+                // 1. IMMEDIATE: Fast local update via parent (PageEditor)
+                const updatedWidgets = {
+                    ...widgets,
+                    [slotName]: [...(widgets[slotName] || []), newWidget]
+                };
 
-                // No manual state updates - UDC subscriptions will handle re-rendering
+                if (onWidgetChange) {
+                    onWidgetChange(updatedWidgets, { sourceId: componentId });
+                }
+
+                // 2. ASYNC: Publish to UDC for external sync (other users/components)
+                if (publishWidgetOperation) {
+                    await publishWidgetOperation(OperationTypes.ADD_WIDGET, {
+                        id: newWidget.id,
+                        type: newWidget.type,
+                        config: newWidget.config,
+                        slot: slotName,
+                        order: (widgets[slotName]?.length || 0)
+                    });
+                } else {
+                    // Fallback to direct UDC publishing
+                    await publishUpdate(componentId, OperationTypes.ADD_WIDGET, {
+                        id: newWidget.id,
+                        type: newWidget.type,
+                        config: newWidget.config,
+                        slot: slotName,
+                        contextType: contextType,
+                        order: (widgets[slotName]?.length || 0)
+                    });
+                }
+
                 break;
             }
 
@@ -339,7 +333,7 @@ const ReactLayoutRenderer = forwardRef(({
     return (
         <div className="react-layout-renderer w-full h-full">
             <LayoutComponent
-                widgets={udcWidgets}
+                widgets={widgets}
                 onWidgetAction={handleWidgetAction}
                 editable={editable}
                 pageContext={pageContext}
