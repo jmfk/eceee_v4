@@ -4,12 +4,23 @@ import { isEqual } from 'lodash';
  * Looks up a widget from state and widgets array
  * @param {Object} state - The unified data state object
  * @param {string} widgetId - The ID of the widget to find
- * @param {string} slotName - slot where the widget is located
+ * @param {string} slotName - slot where the widget is located (for top-level widgets)
  * @param {string} contextType - 'page' or 'object' context type
+ * @param {Array<string>} widgetPath - Optional path for nested widgets [slot, widgetId, slot, widgetId, ..., targetWidgetId]
  * @returns {Object|null} The widget object with cleaned config, or null if not found
  */
-export const lookupWidget = (state, widgetId, slotName, contextType = 'page') => {
-    if (!state || !widgetId || !slotName) {
+export const lookupWidget = (state, widgetId, slotName, contextType = 'page', widgetPath = null) => {
+    if (!state || !widgetId) {
+        return null;
+    }
+
+    // If widgetPath is provided, use path-based lookup (supports nested widgets)
+    if (widgetPath && Array.isArray(widgetPath) && widgetPath.length >= 2) {
+        return lookupWidgetByPath(state, widgetPath, contextType);
+    }
+
+    // Legacy: Top-level widget lookup by slot name
+    if (!slotName) {
         return null;
     }
 
@@ -50,6 +61,74 @@ export const lookupWidget = (state, widgetId, slotName, contextType = 'page') =>
         ...widget,
         config: cleanedConfig
     };
+};
+
+/**
+ * Looks up a widget using a path for nested widgets
+ * @param {Object} state - The unified data state object
+ * @param {Array<string>} path - Widget path [slot, widgetId, slot, widgetId, ..., targetWidgetId]
+ * @param {string} contextType - 'page' or 'object' context type
+ * @returns {Object|null} The widget object, or null if not found
+ */
+const lookupWidgetByPath = (state, path, contextType = 'page') => {
+    if (!path || path.length < 2) {
+        return null;
+    }
+
+    // Get root widgets collection
+    let rootWidgets = null;
+    if (contextType === 'page') {
+        const version = state.versions[state.metadata.currentVersionId];
+        if (!version) return null;
+        rootWidgets = version.widgets;
+    } else if (contextType === 'object') {
+        const objectId = state.metadata.currentObjectId;
+        if (!objectId) return null;
+        const objectData = state.objects[objectId];
+        if (!objectData) return null;
+        rootWidgets = objectData.widgets;
+    } else {
+        return null;
+    }
+
+    // Start from top-level slot
+    const topSlot = path[0];
+    let currentWidgets = rootWidgets[topSlot];
+    if (!currentWidgets) return null;
+
+    // Traverse the path: [slot, widgetId, slot, widgetId, ..., targetWidgetId]
+    for (let i = 1; i < path.length; i++) {
+        const segment = path[i];
+
+        // Odd index = widget ID
+        if (i % 2 === 1) {
+            const widget = currentWidgets.find(w => w.id === segment);
+            if (!widget) return null;
+
+            // If this is the last segment, return the widget
+            if (i === path.length - 1) {
+                const cleanedConfig = cleanNestedConfig(widget.config, 'lookupWidget');
+                return {
+                    ...widget,
+                    config: cleanedConfig
+                };
+            }
+
+            // Otherwise, prepare to descend into widget's slots
+            // The next segment should be a slot name
+            const nextSlotName = path[i + 1];
+            if (!nextSlotName) return null;
+
+            // Get the nested slot's widgets
+            currentWidgets = widget.config?.slots?.[nextSlotName];
+            if (!currentWidgets) return null;
+
+            // Skip the next iteration since we already processed the slot name
+            i++;
+        }
+    }
+
+    return null;
 };
 
 /**

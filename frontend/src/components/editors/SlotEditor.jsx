@@ -19,6 +19,7 @@ const SlotEditor = forwardRef(({
     parentSlotName, // Top-level slot where parent widget lives (legacy)
     contextType = 'page',
     onWidgetEdit,
+    onOpenWidgetEditor,
     onSlotChange, // Callback for when slot widgets change
     parentComponentId, // Parent's UDC componentId
     widgetPath = [], // Full path to parent widget (for infinite nesting)
@@ -61,6 +62,7 @@ const SlotEditor = forwardRef(({
                 parentSlotName={parentSlotName}
                 contextType={contextType}
                 onWidgetEdit={onWidgetEdit}
+                onOpenWidgetEditor={onOpenWidgetEditor}
                 onSlotChange={onSlotChange}
                 parentComponentId={parentComponentId}
                 widgetPath={widgetPath}
@@ -86,6 +88,7 @@ SlotEditor.propTypes = {
     parentWidgetId: PropTypes.string.isRequired,
     contextType: PropTypes.oneOf(['page', 'object']),
     onWidgetEdit: PropTypes.func,
+    onOpenWidgetEditor: PropTypes.func,
     onSlotChange: PropTypes.func,
     parentComponentId: PropTypes.string,
     className: PropTypes.string,

@@ -43,7 +43,8 @@ const HtmlSourceField: React.FC<HtmlSourceFieldProps> = ({
             return;
         }
         const currentState = getState();
-        const widget = lookupWidget(currentState, widgetId, slotName, contextType);
+        const widgetPath = (context as any)?.widgetPath;
+        const widget = lookupWidget(currentState, widgetId, slotName, contextType, widgetPath);
         const udcConfig = widget?.config;
         if (udcConfig?.content !== undefined && udcConfig.content !== value) {
             setCurrentValue(udcConfig.content);
@@ -51,9 +52,10 @@ const HtmlSourceField: React.FC<HtmlSourceFieldProps> = ({
     }, []);
 
     useExternalChanges(fieldId, state => {
-        const widget = lookupWidget(state, widgetId, slotName, contextType);
+        const widgetPath = (context as any)?.widgetPath;
+        const widget = lookupWidget(state, widgetId, slotName, contextType, widgetPath);
         const newConfig = widget?.config;
-        if (hasWidgetContentChanged(currentValue, newConfig?.content)) {
+        if (newConfig && hasWidgetContentChanged(currentValue, newConfig?.content)) {
             setCurrentValue(newConfig.content);
         }
     });
@@ -76,13 +78,25 @@ const HtmlSourceField: React.FC<HtmlSourceFieldProps> = ({
 
     const handleChange = (newValue: string) => {
         setCurrentValue(newValue);
+
+        // Get current widget state to merge with new content
+        const currentState = getState();
+        const widgetPath = (context as any)?.widgetPath;
+        const widget = lookupWidget(currentState, widgetId, slotName, contextType, widgetPath);
+
+        // Merge new content with existing config
+        const updatedConfig = {
+            ...(widget?.config || {}),
+            content: newValue
+        };
+
         publishUpdate(fieldId, OperationTypes.UPDATE_WIDGET_CONFIG, {
             id: widgetId,
             slotName: slotName,
             contextType,
-            config: {
-                content: newValue
-            }
+            config: updatedConfig,
+            // NEW: Path-based approach (supports infinite nesting)
+            widgetPath: widgetPath && widgetPath.length > 0 ? widgetPath : undefined
         });
         onChange(newValue);
     };

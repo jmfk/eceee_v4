@@ -16,6 +16,7 @@ const TwoColumnsWidget = ({
     mode = 'display',
     widgetId,
     onWidgetEdit,
+    onOpenWidgetEditor,
     contextType = 'page',
     parentComponentId, // PageEditor's componentId
     slotName, // Which slot this TwoColumnsWidget is in (e.g., 'main')  
@@ -55,8 +56,62 @@ const TwoColumnsWidget = ({
     useExternalChanges(componentId, (state) => {
         // When UDC state changes, look for updates to our widget's config
         // This allows us to receive updates from other sources (DataManager, other components)
-        // TODO: Extract widget config from state and update local slotsData if changed
-        // This will be implemented when we debug DataManager integration
+
+        // Extract updated widget config from UDC state
+        let version = null;
+        if (contextType === 'page') {
+            version = state.versions?.[state.metadata?.currentVersionId];
+        } else if (contextType === 'object') {
+            const objectId = state.metadata?.currentObjectId;
+            version = state.objects?.[objectId];
+        }
+
+        if (!version) return;
+
+        // Find this TwoColumnsWidget in the widgets tree using widgetPath
+        let containerWidget = null;
+        if (widgetPath && widgetPath.length >= 2) {
+            // Use path to find this container widget
+            const topSlot = widgetPath[0];
+            const widgets = version.widgets?.[topSlot] || [];
+
+            // Navigate through the path to find this widget
+            let current = widgets;
+            for (let i = 1; i < widgetPath.length; i += 2) {
+
+                const targetId = widgetPath[i];
+                const widget = current.find(w => w.id === targetId);
+                if (!widget) break;
+
+                if (widget.id === widgetId) {
+                    containerWidget = widget;
+                    break;
+                }
+
+                // Descend into next slot
+                const nextSlot = widgetPath[i + 1];
+                if (nextSlot && widget.config?.slots) {
+                    current = widget.config.slots[nextSlot] || [];
+                }
+            }
+        } else {
+            // Top-level widget - find in slot
+            const slotWidgets = version.widgets?.[slotName] || [];
+            containerWidget = slotWidgets.find(w => w.id === widgetId);
+        }
+
+        if (containerWidget && containerWidget.config?.slots) {
+            // Update local slotsData if it has changed
+
+            const newSlots = containerWidget.config.slots;
+            setSlotsData(prevSlots => {
+                // Only update if actually changed
+                if (JSON.stringify(prevSlots) !== JSON.stringify(newSlots)) {
+                    return newSlots;
+                }
+                return prevSlots;
+            });
+        }
     });
 
     // Filter widget types for container slots
@@ -107,7 +162,9 @@ const TwoColumnsWidget = ({
                     slotName: props.slotName || 'main', // Parent slot where this widget lives
                     contextType,
                     // Include parent context for DataManager to propagate upward
-                    parentComponentId
+                    parentComponentId,
+                    // NEW: Path-based approach (supports infinite nesting)
+                    widgetPath: widgetPath && widgetPath.length > 0 ? widgetPath : undefined
                 }).catch(error => {
                     console.error('TwoColumnsWidget: Failed to update config:', error);
                 });
@@ -115,7 +172,7 @@ const TwoColumnsWidget = ({
 
             return updatedSlots;
         });
-    }, [config, publishUpdate, componentId, widgetId, contextType, props.slotName, parentComponentId]);
+    }, [config, publishUpdate, componentId, widgetId, contextType, props.slotName, parentComponentId, widgetPath]);
 
     // Get filtered widget types for slots
     const filteredWidgetTypes = getFilteredWidgetTypes();
@@ -148,7 +205,7 @@ const TwoColumnsWidget = ({
         );
     }
 
-    // In edit mode, show SlotEditor components
+    // In editor mode, show SlotEditor components
     if (mode === 'editor') {
         return (
             <div className="two-columns-widget-editor">
@@ -161,6 +218,7 @@ const TwoColumnsWidget = ({
                         parentWidgetId={widgetId}
                         contextType={contextType}
                         onWidgetEdit={onWidgetEdit}
+                        onOpenWidgetEditor={onOpenWidgetEditor}
                         onSlotChange={handleSlotChange}
                         parentComponentId={parentComponentId}
                         parentSlotName={slotName}
@@ -177,6 +235,7 @@ const TwoColumnsWidget = ({
                         parentWidgetId={widgetId}
                         contextType={contextType}
                         onWidgetEdit={onWidgetEdit}
+                        onOpenWidgetEditor={onOpenWidgetEditor}
                         onSlotChange={handleSlotChange}
                         parentComponentId={parentComponentId}
                         parentSlotName={slotName}
@@ -193,7 +252,6 @@ const TwoColumnsWidget = ({
     // The actual widget rendering will be handled by the backend template
     return (
         <div className="two-columns-widget">
-            <h1>Before editor</h1>
             <div className="column-slot left" data-slot="left">
                 {slotsData.left?.length === 0 && (
                     <div className="empty-slot">Left column</div>
@@ -216,9 +274,10 @@ TwoColumnsWidget.propTypes = {
             right: PropTypes.array
         })
     }),
-    mode: PropTypes.oneOf(['display', 'edit']),
+    mode: PropTypes.oneOf(['display', 'editor']),
     widgetId: PropTypes.string,
     onWidgetEdit: PropTypes.func,
+    onOpenWidgetEditor: PropTypes.func,
     contextType: PropTypes.oneOf(['page', 'object']),
     parentComponentId: PropTypes.string
 };

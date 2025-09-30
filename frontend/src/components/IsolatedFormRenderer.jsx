@@ -163,7 +163,8 @@ const IsolatedFormRenderer = React.memo(({
     useExternalChanges(componentId, (state) => {
         if (!widgetId || !slotName || !contextType) return
 
-        const widget = lookupWidget(state, widgetId, slotName, contextType)
+        const widgetPath = context?.widgetPath
+        const widget = lookupWidget(state, widgetId, slotName, contextType, widgetPath)
         if (widget && widget.config && hasWidgetContentChanged(configRef.current, widget.config)) {
 
             configRef.current = widget.config
@@ -180,13 +181,19 @@ const IsolatedFormRenderer = React.memo(({
 
         // Get updated config for real-time updates
         const currentData = formBuffer.getCurrentData()
+
+        // Extract widgetPath from context for nested widget support
+        const widgetPath = context?.widgetPath
+
         await publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
             id: widgetId,
             slotName: slotName,
             contextType: contextType,
-            config: currentData.config
+            config: currentData.config,
+            // NEW: Path-based approach (supports infinite nesting)
+            widgetPath: widgetPath && widgetPath.length > 0 ? widgetPath : undefined
         })
-    }, [formBuffer])
+    }, [formBuffer, context, componentId, widgetId, slotName, contextType, publishUpdate])
 
     const activeSchema = schemaRef.current || schema
 

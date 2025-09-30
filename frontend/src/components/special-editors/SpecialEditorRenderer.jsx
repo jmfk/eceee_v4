@@ -62,7 +62,8 @@ const SpecialEditorRenderer = ({
         if (!widgetData?.id || !slotName || !contextType) return
 
         const currentState = getState()
-        const widget = lookupWidget(currentState, widgetData.id, slotName, contextType)
+        const widgetPath = widgetData?.context?.widgetPath || widgetData?.widgetPath
+        const widget = lookupWidget(currentState, widgetData.id, slotName, contextType, widgetPath)
         if (widget && widget.config) {
             // Initialize from ODC state
         }
@@ -72,7 +73,8 @@ const SpecialEditorRenderer = ({
     useExternalChanges(componentId, (state) => {
         if (!widgetData?.id || !slotName || !contextType) return
 
-        const widget = lookupWidget(state, widgetData.id, slotName, contextType)
+        const widgetPath = widgetData?.context?.widgetPath || widgetData?.widgetPath
+        const widget = lookupWidget(state, widgetData.id, slotName, contextType, widgetPath)
         if (widget && widget.config) {
             // Note: Special editors manage their own state internally
             // This subscription is mainly for logging and potential future synchronization needs
@@ -87,13 +89,18 @@ const SpecialEditorRenderer = ({
             return
         }
 
+        // Extract widgetPath from context for nested widget support
+        const widgetPath = widgetData?.context?.widgetPath || widgetData?.widgetPath
+
         publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
             id: widgetData.id,
             slotName: widgetData.slotName || slotName,
             contextType: contextType,
-            config: newConfig
+            config: newConfig,
+            // NEW: Path-based approach (supports infinite nesting)
+            widgetPath: widgetPath && widgetPath.length > 0 ? widgetPath : undefined
         })
-    }, [publishUpdate, componentId, widgetData?.id, widgetData?.slotName, slotName, contextType])
+    }, [publishUpdate, componentId, widgetData?.id, widgetData?.slotName, widgetData?.context?.widgetPath, widgetData?.widgetPath, slotName, contextType])
 
 
 
