@@ -57,7 +57,7 @@ const MediaReferencesDisplay = ({ fileId }) => {
         return null;
     }
 
-    const { reference_count, last_referenced, references: referenceList } = references;
+    const { reference_count = 0, last_referenced = null, references: referenceList = {} } = references;
 
     const formatDate = (dateString) => {
         if (!dateString) return 'Never';
@@ -98,7 +98,7 @@ const MediaReferencesDisplay = ({ fileId }) => {
             </div>
 
             {/* Reference List */}
-            {Object.entries(referenceList).map(([contentType, ids]) => (
+            {referenceList && Object.entries(referenceList).map(([contentType, ids]) => (
                 <div key={contentType} className="space-y-2">
                     <h3 className="text-sm font-medium text-gray-900 flex items-center gap-2">
                         <Link className="w-4 h-4" />

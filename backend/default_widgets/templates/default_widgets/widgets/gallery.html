@@ -18,9 +18,9 @@
             <div class="gallery-carousel" id="gallery-carousel">
                 <div class="carousel-container">
                     <div class="carousel-track" id="carousel-track">
-                        {% for image in config.images %}
+                        {% for image in config.media_items %}
                             <div class="carousel-slide" data-index="{{ forloop.counter0 }}">
-                                                                 <img src="{{ image.thumbnail|default:image.url }}" 
+                                                                 <img src="{{ image.thumbnail_url|default:image.url }}" 
                                      alt="{{ image.alt_text }}"
                                      class="carousel-image{% if config.enable_lightbox %} lightbox-trigger{% endif %}"
                                      data-index="{{ forloop.counter0 }}"
@@ -32,7 +32,7 @@
                         {% endfor %}
                     </div>
                     
-                    {% if config.images|length > 1 %}
+                    {% if config.media_items|length > 1 %}
                         <button class="carousel-btn carousel-prev" data-direction="-1">
                             <i class="icon-prev" aria-hidden="true"></i>
                         </button>
@@ -41,7 +41,7 @@
                         </button>
                         
                         <div class="carousel-indicators">
-                            {% for image in config.images %}
+                            {% for image in config.media_items %}
                                 <button class="indicator-dot {% if forloop.first %}active{% endif %}" 
                                         data-slide-index="{{ forloop.counter0 }}"></button>
                             {% endfor %}
@@ -54,10 +54,10 @@
             <!-- Grid, Masonry, or Lightbox layouts -->
             <div class="gallery-grid" 
                  style="grid-template-columns: repeat({{ config.columns|default:3 }}, 1fr);">
-                {% for image in config.images %}
+                {% for image in config.media_items %}
                     <div class="gallery-item" data-index="{{ forloop.counter0 }}">
                         <div class="image-container">
-                            <img src="{{ image.thumbnail|default:image.url }}" 
+                            <img src="{{ image.thumbnail_url|default:image.url }}" 
                                  alt="{{ image.alt_text }}"
                                  class="gallery-image"
                                  loading="lazy"
@@ -96,7 +96,7 @@
                 <div class="lightbox-image-container">
                     <img id="lightbox-image" src="" alt="" class="lightbox-image">
                     
-                    {% if config.images|length > 1 %}
+                                {% if config.media_items|length > 1 %}
                         <button class="lightbox-btn lightbox-prev" onclick="lightboxChangeSlide(-1)">
                             <i class="icon-prev" aria-hidden="true"></i>
                         </button>
@@ -111,7 +111,7 @@
                     <p id="lightbox-description"></p>
                 </div>
                 
-                {% if config.images|length > 1 %}
+                {% if config.media_items|length > 1 %}
                     <div class="lightbox-counter" id="lightbox-counter"></div>
                 {% endif %}
             </div>
@@ -119,7 +119,7 @@
 
         <!-- Store image data for lightbox -->
         <script type="application/json" id="gallery-images-data">
-            {{ config.images|safe }}
+            {{ config.media_items|safe }}
         </script>
     {% endif %}
 </div>

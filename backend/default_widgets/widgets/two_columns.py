@@ -5,6 +5,7 @@ Simple two-column widget implementation.
 from typing import Type
 from pydantic import BaseModel
 
+from webpages.renderers import WebPageRenderer
 from webpages.widget_registry import BaseWidget, register_widget_type
 from ..widget_models import TwoColumnsConfig
 
@@ -83,6 +84,8 @@ class TwoColumnsWidget(BaseWidget):
 
     def prepare_template_context(self, config, context=None):
         """Prepare context with slot rendering like PageVersion"""
+        request = context["request"]
+        renderer = WebPageRenderer(request=request)
         template_config = super().prepare_template_context(config, context)
 
         # Get slots data (like PageVersion.widgets)
@@ -90,14 +93,12 @@ class TwoColumnsWidget(BaseWidget):
 
         # Render widgets for each slot using existing renderer
         rendered_slots = {}
-        if context and "renderer" in context:
+        if context and renderer:
             for slot_name, widgets in slots_data.items():
                 rendered_widgets = []
                 for widget_data in widgets:
                     try:
-                        widget_html = context["renderer"].render_widget_json(
-                            widget_data, context
-                        )
+                        widget_html = renderer.render_widget_json(widget_data, context)
                         rendered_widgets.append(
                             {"html": widget_html, "widget_data": widget_data}
                         )
