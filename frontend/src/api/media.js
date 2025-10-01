@@ -87,6 +87,14 @@ export const mediaFilesApi = {
      */
     getDownloadUrl: (id) => `${endpoints.media.file(id)}download/`,
 
+    /**
+     * Get references to a media file
+     * @param {string} id - Media file ID
+     * @returns {Promise} API response with reference information
+     */
+    references: (id) => wrapApiCall(() =>
+        apiClient.get(`${endpoints.media.file(id)}references/`)
+    ),
 
 };
 

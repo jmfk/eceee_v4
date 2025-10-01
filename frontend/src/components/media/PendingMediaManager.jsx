@@ -565,14 +565,32 @@ const PendingMediaManager = ({ namespace, onFilesProcessed }) => {
 
         try {
             // Validate approved files have required tags
+            const validationErrors = {};
+            let hasValidationErrors = false;
+
             for (const fileId of approvedFiles) {
                 const formData = fileFormData[fileId];
                 if (!formData || !formData.tags || formData.tags.length === 0) {
                     const file = pendingFiles.find(f => f.id === fileId);
                     const filename = file ? file.originalFilename : 'Unknown file';
-                    addNotification(`${filename} cannot be approved: at least one tag is required`, 'error');
-                    return;
+
+                    // Set field error for visual feedback
+                    if (!validationErrors[fileId]) {
+                        validationErrors[fileId] = {};
+                    }
+                    validationErrors[fileId].tags = 'At least one tag is required to approve this file';
+                    hasValidationErrors = true;
                 }
+            }
+
+            // If there are validation errors, show them in the UI and notify
+            if (hasValidationErrors) {
+                setFieldErrors(prev => ({
+                    ...prev,
+                    ...validationErrors
+                }));
+                addNotification('Cannot approve: Some files are missing required tags. Please add at least one tag to each file.', 'error');
+                return;
             }
 
             // Process approved files
@@ -583,18 +601,24 @@ const PendingMediaManager = ({ namespace, onFilesProcessed }) => {
 
                 if (file && formData) {
                     try {
+                        // Convert tag objects to tag IDs/names (backend expects array of strings)
+                        const tagIds = (formData.tags || []).map(tag => {
+                            if (typeof tag === 'string') return tag;
+                            return tag.id || tag.name;
+                        });
+
                         await mediaApi.pendingFiles.approve(fileId, {
                             title: formData.title,
                             slug: formData.slug,
-                            tag_ids: formData.tags || [],
-                            access_level: formData.accessLevel,
-                            collection_id: selectedCollection === 'new' ? null : (selectedCollection || null),
-                            collection_name: selectedCollection === 'new' ? newCollectionName : null
+                            tagIds: tagIds,
+                            accessLevel: formData.accessLevel,
+                            collectionId: selectedCollection === 'new' ? null : (selectedCollection || null),
+                            collectionName: selectedCollection === 'new' ? newCollectionName : null
                         })();
                     } catch (error) {
                         console.error(`Failed to approve ${file.originalFilename}:`, error);
 
-                        // Handle validation errors from server
+                        // Handle validation errors from server (camelCase from backend)
                         if (error.response?.data) {
                             const serverErrors = error.response.data;
                             const errors = { ...fieldErrors };
@@ -604,8 +628,8 @@ const PendingMediaManager = ({ namespace, onFilesProcessed }) => {
                             if (serverErrors.title) {
                                 errors[fileId].title = Array.isArray(serverErrors.title) ? serverErrors.title[0] : serverErrors.title;
                             }
-                            if (serverErrors.tag_ids) {
-                                errors[fileId].tags = Array.isArray(serverErrors.tag_ids) ? serverErrors.tag_ids[0] : serverErrors.tag_ids;
+                            if (serverErrors.tagIds) {
+                                errors[fileId].tags = Array.isArray(serverErrors.tagIds) ? serverErrors.tagIds[0] : serverErrors.tagIds;
                             }
                             if (serverErrors.slug) {
                                 errors[fileId].slug = Array.isArray(serverErrors.slug) ? serverErrors.slug[0] : serverErrors.slug;
@@ -1076,7 +1100,17 @@ const PendingMediaManager = ({ namespace, onFilesProcessed }) => {
 
                                                                         {/* Tags Section */}
                                                                         <div>
-                                                                            <h4 className="text-sm font-medium text-gray-700 mb-3">Tags *</h4>
+                                                                            <div className="flex items-center justify-between mb-3">
+                                                                                <h4 className="text-sm font-medium text-gray-700">
+                                                                                    Tags <span className="text-red-500">*</span>
+                                                                                </h4>
+                                                                                {(!formData.tags || formData.tags.length === 0) && (
+                                                                                    <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium bg-red-100 text-red-700 rounded">
+                                                                                        <AlertCircle className="w-3 h-3" />
+                                                                                        Required
+                                                                                    </span>
+                                                                                )}
+                                                                            </div>
 
                                                                             <div className={`bg-white p-4 rounded-md border ${fieldErrors[file.id]?.tags
                                                                                 ? 'border-red-300 bg-red-50'
@@ -1115,7 +1149,7 @@ const PendingMediaManager = ({ namespace, onFilesProcessed }) => {
                                                                             </button>
                                                                             <button
                                                                                 onClick={() => handleMarkForApproval(file)}
-                                                                                disabled={!formData.title?.trim()}
+                                                                                disabled={!formData.title?.trim() || !formData.tags || formData.tags.length === 0}
                                                                                 className="flex items-center gap-1 px-3 py-1.5 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                                                             >
                                                                                 <Check className="w-3 h-3" />

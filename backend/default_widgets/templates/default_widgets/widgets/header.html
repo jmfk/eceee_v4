@@ -1,23 +1,8 @@
 {% load static %}
 
-<header class="header-widget {% if config.hero_style %}hero-header{% endif %} {% if config.css_class %}{{ config.css_class }}{% endif %}"
-        {% if config.background_color or config.background_image or config.text_color or config.padding or config.margin or config.min_height %}
-            style="
-                {% if config.background_color %}background-color: {{ config.background_color }};{% endif %}
-                {% if config.background_image %}
-                    background-image: url('{{ config.background_image }}');
-                    background-size: {{ config.background_size|default:'cover' }};
-                    background-position: {{ config.background_position|default:'center' }};
-                    background-repeat: no-repeat;
-                {% endif %}
-                {% if config.text_color %}color: {{ config.text_color }};{% endif %}
-                {% if config.padding %}padding: {{ config.padding }};{% endif %}
-                {% if config.margin %}margin: {{ config.margin }};{% endif %}
-                {% if config.min_height %}min-height: {{ config.min_height }};{% endif %}
-                {% if config.text_align != 'left' %}text-align: {{ config.text_align }};{% endif %}
-            "
-        {% endif %}>
-    
+
+DEFAULT    
+
     {% if config.show_overlay and config.background_image %}
         <div class="header-overlay"
              {% if config.overlay_color or config.overlay_opacity %}
@@ -37,4 +22,3 @@
             {{ config.custom_css|safe }}
         </style>
     {% endif %}
-</header>
