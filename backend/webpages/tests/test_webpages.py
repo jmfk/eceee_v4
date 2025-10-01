@@ -17,12 +17,6 @@ import json
 from webpages.models import WebPage, PageTheme, PageVersion
 from webpages.widget_registry import widget_type_registry
 
-try:
-    from webpages.widgets import TextBlockWidget, ImageWidget, ButtonWidget
-except ImportError:
-    # Handle case where core_widgets is not installed
-    TextBlockWidget = ImageWidget = ButtonWidget = None
-
 
 class WidgetRegistryTest(TestCase):
     """Test code-based widget registry functionality"""
@@ -41,7 +35,7 @@ class WidgetRegistryTest(TestCase):
         text_widget = widget_type_registry.get_widget_type("Text Block")
         self.assertIsNotNone(text_widget)
         self.assertEqual(text_widget.name, "Text Block")
-        # Test the widget class name instead of isinstance since the class might be from core_widgets
+        # Test the widget class name instead of isinstance since the class might be from default_widgets
         self.assertEqual(text_widget.__class__.__name__, "TextBlockWidget")
 
     def test_widget_type_validation(self):
@@ -347,7 +341,7 @@ class LayoutIntegrationTest(TestCase):
             created_by=self.user,
             last_modified_by=self.user,
         )
-        
+
         # Create a version with code_layout since it's stored in PageVersion now
         version = page.create_version(self.user, "Test version")
         version.code_layout = "single_column"

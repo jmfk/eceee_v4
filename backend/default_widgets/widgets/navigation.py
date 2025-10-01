@@ -13,7 +13,6 @@ from ..widget_models import NavigationConfig
 class NavigationWidget(BaseWidget):
     """Navigation widget with background and text styling options"""
 
-    app_label = "core_widgets"
     name = "Navigation"
     description = "Navigation widget with background image/color and text color options"
     template_name = "default_widgets/widgets/navigation.html"

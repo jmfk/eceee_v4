@@ -438,7 +438,7 @@ python manage.py shell -c "from webpages.widget_registry import widget_registry;
 python manage.py validate_widgets --widget "Text Block"
 
 # Test configuration parsing
-python manage.py shell -c "from webpages.widgets import TextBlockWidget; print(TextBlockWidget.get_configuration_schema())"
+python manage.py shell -c "from default_widgets.widgets.content import TextBlockWidget; print(TextBlockWidget.get_configuration_schema())"
 ```
 
 ## Security Considerations

@@ -20,7 +20,7 @@ export const SidebarLayout = ({ widgets, onWidgetAction, editable = true, pageCo
                         editable={editable}
                         pageContext={pageContext}
                         className="bg-white p-6 rounded-xl shadow-sm border border-gray-200"
-                        allowedWidgetTypes={['core_widgets.HeaderWidget', 'core_widgets.NavigationWidget']}
+                        allowedWidgetTypes={['default_widgets.HeaderWidget', 'default_widgets.NavigationWidget']}
                         maxWidgets={3}
                         required={false}
                         onShowWidgetModal={onShowWidgetModal}
@@ -39,7 +39,7 @@ export const SidebarLayout = ({ widgets, onWidgetAction, editable = true, pageCo
                         editable={editable}
                         pageContext={pageContext}
                         className="bg-white p-8 rounded-xl shadow-sm border border-gray-200 min-h-[400px]"
-                        allowedWidgetTypes={['core_widgets.ContentWidget', 'core_widgets.ImageWidget', 'core_widgets.TableWidget']}
+                        allowedWidgetTypes={['default_widgets.ContentWidget', 'default_widgets.ImageWidget', 'default_widgets.TableWidget']}
                         maxWidgets={10}
                         required={true}
                         onShowWidgetModal={onShowWidgetModal}
@@ -58,7 +58,7 @@ export const SidebarLayout = ({ widgets, onWidgetAction, editable = true, pageCo
                         editable={editable}
                         pageContext={pageContext}
                         className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 min-h-[300px]"
-                        allowedWidgetTypes={['core_widgets.NavigationWidget', 'core_widgets.ContentWidget']}
+                        allowedWidgetTypes={['default_widgets.NavigationWidget', 'default_widgets.ContentWidget']}
                         maxWidgets={5}
                         required={false}
                         onShowWidgetModal={onShowWidgetModal}
@@ -77,7 +77,7 @@ export const SidebarLayout = ({ widgets, onWidgetAction, editable = true, pageCo
                         editable={editable}
                         pageContext={pageContext}
                         className="bg-gray-700 text-white p-6 rounded-xl text-center"
-                        allowedWidgetTypes={['core_widgets.FooterWidget', 'core_widgets.NavigationWidget']}
+                        allowedWidgetTypes={['default_widgets.FooterWidget', 'default_widgets.NavigationWidget']}
                         maxWidgets={2}
                         required={false}
                         onShowWidgetModal={onShowWidgetModal}

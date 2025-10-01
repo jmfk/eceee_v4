@@ -302,10 +302,10 @@ class CustomWidgetIntegrationTest(TestCase):
         all_widgets = widget_type_registry.get_widget_names()
 
         # Should have both core widgets and custom widgets
-        core_widgets = ["Text Block", "Image", "Button"]
+        default_widgets = ["Text Block", "Image", "Button"]
         custom_widgets = ["Testimonial", "Call to Action"]
 
-        for widget_name in core_widgets + custom_widgets:
+        for widget_name in default_widgets + custom_widgets:
             self.assertIn(
                 widget_name, all_widgets, f"Widget '{widget_name}' should be available"
             )

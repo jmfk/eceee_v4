@@ -56,7 +56,7 @@ const CustomWidgetCreator = ({ onClose }) => {
                                     <div className="flex-1">
                                         <h4 className="font-medium text-gray-900">Create Pydantic Model</h4>
                                         <p className="text-gray-600 text-sm mt-1">
-                                            Define your widget's configuration schema in <code className="bg-gray-100 px-1 rounded">backend/webpages/widget_models.py</code>
+                                            Define your widget's configuration schema in your widget app's <code className="bg-gray-100 px-1 rounded">widget_models.py</code>
                                         </p>
                                         <div className="mt-2 p-3 bg-gray-50 rounded text-xs font-mono text-gray-700">
                                             {`class MyCustomWidgetConfig(BaseModel):
@@ -77,7 +77,7 @@ const CustomWidgetCreator = ({ onClose }) => {
                                     <div className="flex-1">
                                         <h4 className="font-medium text-gray-900">Register Widget Class</h4>
                                         <p className="text-gray-600 text-sm mt-1">
-                                            Create a widget class in <code className="bg-gray-100 px-1 rounded">backend/webpages/widgets.py</code>
+                                            Create a widget class in your widget app's <code className="bg-gray-100 px-1 rounded">widgets/</code> directory
                                         </p>
                                         <div className="mt-2 p-3 bg-gray-50 rounded text-xs font-mono text-gray-700">
                                             {`@register_widget_type

@@ -149,7 +149,8 @@ class PageWidgetData(BaseModel):
         None, description="Name of the widget type (legacy)"
     )
     type: Optional[str] = Field(
-        None, description="Widget type identifier (new format: core_widgets.WidgetName)"
+        None,
+        description="Widget type identifier (new format: default_widgets.WidgetName)",
     )
     slot_name: str = Field(..., description="Slot where the widget is placed")
     sort_order: int = Field(0, description="Order within the slot")

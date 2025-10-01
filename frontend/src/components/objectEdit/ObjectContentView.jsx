@@ -218,7 +218,7 @@ const ObjectContentView = forwardRef(({ objectType, instance, parentId, isNewIns
                     onClose={widgetEditorUI.handleCloseWidgetEditor}
                     widgetData={widgetEditorUI.editingWidget}
                     title={widgetEditorUI.editingWidget ? `Edit ${getWidgetDisplayName(widgetEditorUI.editingWidget.type, widgetTypes)}` : 'Edit Widget'}
-                    autoOpenSpecialEditor={widgetEditorUI.editingWidget?.type === 'core_widgets.ImageWidget'}
+                    autoOpenSpecialEditor={widgetEditorUI.editingWidget?.type === 'default_widgets.ImageWidget'}
                     namespace={namespace}
                     context={{ ...context, instanceId }}
                 />

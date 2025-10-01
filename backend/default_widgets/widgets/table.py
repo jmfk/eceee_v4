@@ -13,7 +13,6 @@ from ..widget_models import TableConfig
 class TableWidget(BaseWidget):
     """Table widget with configurable columns and rows"""
 
-    app_label = "core_widgets"
     name = "Table"
     description = "Table widget with configurable columns and rows, cell styling, and spanning capabilities"
     template_name = "default_widgets/widgets/table.html"

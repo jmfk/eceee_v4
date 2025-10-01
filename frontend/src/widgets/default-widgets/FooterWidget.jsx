@@ -122,7 +122,7 @@ const FooterWidget = ({ config = {}, mode = 'preview' }) => {
 
 // === COLOCATED METADATA ===
 FooterWidget.displayName = 'FooterWidget'
-FooterWidget.widgetType = 'core_widgets.FooterWidget'
+FooterWidget.widgetType = 'default_widgets.FooterWidget'
 
 // Default configuration
 FooterWidget.defaultConfig = {

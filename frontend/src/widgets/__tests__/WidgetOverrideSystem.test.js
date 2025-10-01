@@ -28,7 +28,7 @@ describe('Widget Override System', () => {
 
     it('should return ECEEE widget when overriding default widget', () => {
         // Test that FooterWidget is overridden by ECEEE implementation
-        const footerComponent = manager.getWidgetComponent('core_widgets.FooterWidget');
+        const footerComponent = manager.getWidgetComponent('default_widgets.FooterWidget');
 
         expect(footerComponent).toBeTruthy();
         expect(footerComponent.displayName).toBe('eceeeFooterWidget');
@@ -36,7 +36,7 @@ describe('Widget Override System', () => {
 
     it('should return default widget when no override exists', () => {
         // Test that ContentWidget still comes from default registry
-        const contentComponent = manager.getWidgetComponent('core_widgets.ContentWidget');
+        const contentComponent = manager.getWidgetComponent('default_widgets.ContentWidget');
 
         expect(contentComponent).toBeTruthy();
         expect(contentComponent.displayName).toBe('ContentWidget');
@@ -50,20 +50,20 @@ describe('Widget Override System', () => {
 
     it('should get widget metadata with priority resolution', () => {
         // Test ECEEE override metadata
-        const footerMetadata = manager.getWidgetMetadata('core_widgets.FooterWidget');
+        const footerMetadata = manager.getWidgetMetadata('default_widgets.FooterWidget');
 
         expect(footerMetadata).toBeTruthy();
         expect(footerMetadata.metadata.name).toBe('ECEEE Footer');
 
         // Test default widget metadata
-        const contentMetadata = manager.getWidgetMetadata('core_widgets.ContentWidget');
+        const contentMetadata = manager.getWidgetMetadata('default_widgets.ContentWidget');
 
         expect(contentMetadata).toBeTruthy();
         expect(contentMetadata.metadata.name).toBe('Content');
     });
 
     it('should get widget default config with priority resolution', () => {
-        const footerConfig = manager.getWidgetDefaultConfig('core_widgets.FooterWidget');
+        const footerConfig = manager.getWidgetDefaultConfig('default_widgets.FooterWidget');
 
         expect(footerConfig).toBeTruthy();
         expect(footerConfig.companyName).toBe('ECEEE');
@@ -71,33 +71,33 @@ describe('Widget Override System', () => {
     });
 
     it('should check widget type support correctly', () => {
-        expect(manager.isWidgetTypeSupported('core_widgets.FooterWidget')).toBe(true);
-        expect(manager.isWidgetTypeSupported('core_widgets.ContentWidget')).toBe(true);
+        expect(manager.isWidgetTypeSupported('default_widgets.FooterWidget')).toBe(true);
+        expect(manager.isWidgetTypeSupported('default_widgets.ContentWidget')).toBe(true);
         expect(manager.isWidgetTypeSupported('non_existent.Widget')).toBe(false);
     });
 
     it('should get all available widget types', () => {
         const availableTypes = manager.getAvailableWidgetTypes();
 
-        expect(availableTypes).toContain('core_widgets.FooterWidget');
-        expect(availableTypes).toContain('core_widgets.ContentWidget');
-        expect(availableTypes).toContain('core_widgets.ImageWidget');
+        expect(availableTypes).toContain('default_widgets.FooterWidget');
+        expect(availableTypes).toContain('default_widgets.ContentWidget');
+        expect(availableTypes).toContain('default_widgets.ImageWidget');
     });
 
     it('should search widgets across all registries', () => {
         const searchResults = manager.searchWidgets('footer');
 
-        expect(searchResults).toContain('core_widgets.FooterWidget');
+        expect(searchResults).toContain('default_widgets.FooterWidget');
 
         const eceeeResults = manager.searchWidgets('ECEEE');
-        expect(eceeeResults).toContain('core_widgets.FooterWidget');
+        expect(eceeeResults).toContain('default_widgets.FooterWidget');
     });
 
     it('should filter widgets by category', () => {
         const layoutWidgets = manager.filterWidgetsByCategory('layout');
 
         // ECEEE Footer should be in layout category
-        expect(layoutWidgets).toContain('core_widgets.FooterWidget');
+        expect(layoutWidgets).toContain('default_widgets.FooterWidget');
     });
 
     it('should get available categories from all registries', () => {
@@ -109,10 +109,10 @@ describe('Widget Override System', () => {
 
     it('should handle widget display names correctly', () => {
         // Test with widget type string
-        const footerDisplayName = manager.getWidgetDisplayName('core_widgets.FooterWidget');
+        const footerDisplayName = manager.getWidgetDisplayName('default_widgets.FooterWidget');
         expect(footerDisplayName).toBe('ECEEE Footer');
 
-        const contentDisplayName = manager.getWidgetDisplayName('core_widgets.ContentWidget');
+        const contentDisplayName = manager.getWidgetDisplayName('default_widgets.ContentWidget');
         expect(contentDisplayName).toBe('Content');
 
         // Test with widget data object
@@ -130,7 +130,7 @@ describe('Widget Override System', () => {
         newManager.registerRegistry(CORE_WIDGET_REGISTRY, newManager.priorities.DEFAULT, 'default-widgets');
 
         // Should still return ECEEE widget due to higher priority
-        const footerComponent = newManager.getWidgetComponent('core_widgets.FooterWidget');
+        const footerComponent = newManager.getWidgetComponent('default_widgets.FooterWidget');
         expect(footerComponent.displayName).toBe('eceeeFooterWidget');
     });
 });

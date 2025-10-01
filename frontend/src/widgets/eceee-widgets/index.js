@@ -10,6 +10,7 @@ import { registerWidget } from '../default-widgets/registry';
 
 // Import ECEEE-specific widgets
 import eceeeFooterWidget from './eceeeFooterWidget';
+//import eceeeTwoColumnsWidget from './eceeeTwoColumnsWidget';
 
 /**
  * ECEEE Widget Registry
@@ -17,13 +18,14 @@ import eceeeFooterWidget from './eceeeFooterWidget';
  * This registry can override default widgets by using the same widget type.
  * For example, to override the default FooterWidget:
  * 
- * 'core_widgets.FooterWidget': registerWidget(eceeeFooterWidget, 'core_widgets.FooterWidget')
+ * 'default_widgets.FooterWidget': registerWidget(eceeeFooterWidget, 'default_widgets.FooterWidget')
  * 
  * This will replace the default FooterWidget with the ECEEE-specific implementation.
  */
 export const ECEEE_WIDGET_REGISTRY = {
     // Override the default FooterWidget with ECEEE-specific implementation
-    'core_widgets.FooterWidget': registerWidget(eceeeFooterWidget, 'core_widgets.FooterWidget'),
+    'default_widgets.FooterWidget': registerWidget(eceeeFooterWidget, 'default_widgets.FooterWidget'),
+    //'default_widgets.TwoColumnsWidget': registerWidget(eceeeTwoColumnsWidget, 'default_widgets.TwoColumnsWidget'),
 
     // Example of how to add a new ECEEE-specific widget:
     // 'eceee_widgets.BlogPostWidget': registerWidget(BlogPostWidget, 'eceee_widgets.BlogPostWidget'),
@@ -76,6 +78,8 @@ export const isEceeeWidgetType = (widgetType) => {
 
 // Export individual widget components
 export { default as eceeeFooterWidget } from './eceeeFooterWidget';
+//export { default as eceeeTwoColumnsWidget } from './eceeeTwoColumnsWidget';
+
 
 // Export the registry for direct access
 export default ECEEE_WIDGET_REGISTRY;

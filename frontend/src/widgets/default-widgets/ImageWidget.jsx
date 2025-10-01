@@ -453,7 +453,7 @@ const ImageWidget = ({
 
 // === COLOCATED METADATA ===
 ImageWidget.displayName = 'ImageWidget'
-ImageWidget.widgetType = 'core_widgets.ImageWidget'
+ImageWidget.widgetType = 'default_widgets.ImageWidget'
 
 // Default configuration
 ImageWidget.defaultConfig = {

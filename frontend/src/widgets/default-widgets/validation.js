@@ -73,21 +73,21 @@ const validateSpecificWidget = (widget) => {
     }
 
     switch (widget.type) {
-        case 'core_widgets.ContentWidget':
+        case 'default_widgets.ContentWidget':
             return validateContentWidget(widget)
-        case 'core_widgets.ImageWidget':
+        case 'default_widgets.ImageWidget':
             return validateImageWidget(widget)
-        case 'core_widgets.TableWidget':
+        case 'default_widgets.TableWidget':
             return validateTableWidget(widget)
-        case 'core_widgets.HeaderWidget':
+        case 'default_widgets.HeaderWidget':
             return validateHeaderWidget(widget)
-        case 'core_widgets.FooterWidget':
+        case 'default_widgets.FooterWidget':
             return validateFooterWidget(widget)
-        case 'core_widgets.NavigationWidget':
+        case 'default_widgets.NavigationWidget':
             return validateNavigationWidget(widget)
-        case 'core_widgets.SidebarWidget':
+        case 'default_widgets.SidebarWidget':
             return validateSidebarWidget(widget)
-        case 'core_widgets.FormsWidget':
+        case 'default_widgets.FormsWidget':
             return validateFormsWidget(widget)
         default:
             return result
@@ -409,7 +409,7 @@ export const sanitizeWidget = (widget) => {
 
     const sanitized = {
         id: widget.id || generateWidgetId(),
-        type: widget.type || 'core_widgets.ContentWidget',
+        type: widget.type || 'default_widgets.ContentWidget',
         config: widget.config || {},
         name: widget.name || '',
         slotName: widget.slotName || 'main'

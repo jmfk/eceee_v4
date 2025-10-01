@@ -202,7 +202,7 @@ const NavigationWidget = ({ config = {}, mode = 'preview' }) => {
 
 // === COLOCATED METADATA ===
 NavigationWidget.displayName = 'NavigationWidget'
-NavigationWidget.widgetType = 'core_widgets.NavigationWidget'
+NavigationWidget.widgetType = 'default_widgets.NavigationWidget'
 
 // Default configuration
 NavigationWidget.defaultConfig = {

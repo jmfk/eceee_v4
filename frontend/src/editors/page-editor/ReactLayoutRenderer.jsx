@@ -89,7 +89,7 @@ const ReactLayoutRenderer = forwardRef(({
     const handleWidgetAction = useCallback(async (action, slotName, widget, ...args) => {
         switch (action) {
             case 'add': {
-                const widgetType = args[0] || 'core_widgets.ContentWidget';
+                const widgetType = args[0] || 'default_widgets.ContentWidget';
 
                 const widgetConfig = createDefaultWidgetConfig(widgetType);
                 const newWidget = addWidget(slotName, widgetType, widgetConfig);
@@ -336,6 +336,7 @@ const ReactLayoutRenderer = forwardRef(({
     }), [widgets, layoutName, versionId, isPublished]);
 
     // Render the layout component
+    // Make this div act like an iframe - break out of parent constraints and use full viewport width
     return (
         <div className="react-layout-renderer w-full h-full">
             <LayoutComponent

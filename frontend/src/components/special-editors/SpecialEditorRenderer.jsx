@@ -13,11 +13,7 @@ import { lookupWidget, hasWidgetContentChanged } from '../../utils/widgetUtils'
 
 // Registry of special editors mapped to widget types
 const SPECIAL_EDITORS = {
-    'core_widgets.ImageWidget': MediaSpecialEditor,
-    // Future editors can be added here:
-    // 'core_widgets.FormsWidget': FormsSpecialEditor,
-    // 'core_widgets.TableWidget': TableSpecialEditor,
-    // 'custom_widgets.ChartWidget': ChartSpecialEditor,
+    'default_widgets.ImageWidget': MediaSpecialEditor,
 }
 
 // Function to check if a widget type has a special editor
