@@ -158,7 +158,7 @@ const SidebarWidget = ({ config = {}, mode = 'preview' }) => {
 
 // === COLOCATED METADATA ===
 SidebarWidget.displayName = 'SidebarWidget'
-SidebarWidget.widgetType = 'core_widgets.SidebarWidget'
+SidebarWidget.widgetType = 'default_widgets.SidebarWidget'
 
 // Default configuration
 SidebarWidget.defaultConfig = {

@@ -552,7 +552,7 @@ print('Registered widgets:', list(widget_registry.get_all_widgets().keys()))
 
 # Validate widget configuration
 python manage.py shell -c "
-from webpages.widgets import TextBlockWidget
+from default_widgets.widgets.content import TextBlockWidget
 config = {'content': 'test'}
 validated = TextBlockWidget.configuration_model(**config)
 print('Validated config:', validated.dict())

@@ -68,7 +68,8 @@ The eceee_v4 project has transitioned from a database-based widget system to a c
 
 ### Backend Implementation
 - `backend/webpages/widget_registry.py` - Core widget registry system
-- `backend/webpages/widgets.py` - Built-in widget definitions
+- `backend/default_widgets/` - Default widget implementations (Content, Image, Header, etc.)
+- `backend/eceee_widgets/` - Custom ECEEE widget implementations
 - `backend/webpages/widget_autodiscovery.py` - Autodiscovery system
 - `backend/webpages/models.py` - Updated PageWidget model
 - `backend/webpages/views.py` - Updated API endpoints

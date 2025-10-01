@@ -49,7 +49,7 @@ const collectWidgetMetadata = (WidgetComponent, overrideWidgetType = null) => {
  * Register a widget with automatic or manual widget type
  * 
  * @param {React.Component} WidgetComponent - The widget component
- * @param {string} [customWidgetType] - Optional custom widget type (e.g., 'core_widgets.ContentWidget')
+ * @param {string} [customWidgetType] - Optional custom widget type (e.g., 'default_widgets.ContentWidget')
  * @returns {Object} Widget metadata object
  */
 const registerWidget = (WidgetComponent, customWidgetType = null) => {
@@ -65,15 +65,14 @@ const registerWidget = (WidgetComponent, customWidgetType = null) => {
  */
 export const CORE_WIDGET_REGISTRY = {
     // Registry key MUST match the widget type for lookup to work
-    'core_widgets.ContentWidget': registerWidget(ContentWidget, 'core_widgets.ContentWidget'),
-    'core_widgets.ImageWidget': registerWidget(ImageWidget, 'core_widgets.ImageWidget'),
-    'core_widgets.TableWidget': registerWidget(TableWidget, 'core_widgets.TableWidget'),
-    'core_widgets.FooterWidget': registerWidget(FooterWidget, 'core_widgets.FooterWidget'),
-    'core_widgets.HeaderWidget': registerWidget(HeaderWidget, 'core_widgets.HeaderWidget'),
-    'core_widgets.NavigationWidget': registerWidget(NavigationWidget, 'core_widgets.NavigationWidget'),
-    'core_widgets.SidebarWidget': registerWidget(SidebarWidget, 'core_widgets.SidebarWidget'),
-    'core_widgets.FormsWidget': registerWidget(FormsWidget, 'core_widgets.FormsWidget'),
-    // Container widgets
+    'default_widgets.ContentWidget': registerWidget(ContentWidget, 'default_widgets.ContentWidget'),
+    'default_widgets.ImageWidget': registerWidget(ImageWidget, 'default_widgets.ImageWidget'),
+    'default_widgets.TableWidget': registerWidget(TableWidget, 'default_widgets.TableWidget'),
+    'default_widgets.FooterWidget': registerWidget(FooterWidget, 'default_widgets.FooterWidget'),
+    'default_widgets.HeaderWidget': registerWidget(HeaderWidget, 'default_widgets.HeaderWidget'),
+    'default_widgets.NavigationWidget': registerWidget(NavigationWidget, 'default_widgets.NavigationWidget'),
+    'default_widgets.SidebarWidget': registerWidget(SidebarWidget, 'default_widgets.SidebarWidget'),
+    'default_widgets.FormsWidget': registerWidget(FormsWidget, 'default_widgets.FormsWidget'),
     'default_widgets.TwoColumnsWidget': registerWidget(TwoColumnsWidget, 'default_widgets.TwoColumnsWidget')
 }
 

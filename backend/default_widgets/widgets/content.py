@@ -13,7 +13,6 @@ from ..widget_models import ContentConfig
 class ContentWidget(BaseWidget):
     """Content widget that contains HTML"""
 
-    app_label = "core_widgets"
     name = "Content"
     description = "Content widget that contains HTML"
     template_name = "default_widgets/widgets/content.html"

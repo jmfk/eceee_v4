@@ -101,7 +101,7 @@ const HeaderWidget = ({ config = {}, mode = 'preview' }) => {
 
 // === COLOCATED METADATA ===
 HeaderWidget.displayName = 'HeaderWidget'
-HeaderWidget.widgetType = 'core_widgets.HeaderWidget'
+HeaderWidget.widgetType = 'default_widgets.HeaderWidget'
 
 // Default configuration
 HeaderWidget.defaultConfig = {

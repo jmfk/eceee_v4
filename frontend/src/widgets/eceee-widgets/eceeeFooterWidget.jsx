@@ -2,7 +2,7 @@
  * Custom Footer Widget - ECEEE-specific override of the default FooterWidget
  * 
  * This widget demonstrates how to override a default widget with an ECEEE-specific implementation.
- * It uses the same widget type 'core_widgets.FooterWidget' to replace the default FooterWidget.
+ * It uses the same widget type 'default_widgets.FooterWidget' to replace the default FooterWidget.
  */
 
 import React from 'react';
@@ -226,7 +226,7 @@ const eceeeFooterWidget = ({
 
 // Widget metadata
 eceeeFooterWidget.displayName = 'FooterWidget';
-eceeeFooterWidget.widgetType = 'core_widgets.FooterWidget'; // Same type as default to override it
+eceeeFooterWidget.widgetType = 'default_widgets.FooterWidget'; // Same type as default to override it
 
 eceeeFooterWidget.defaultConfig = {
     companyName: 'ECEEE',

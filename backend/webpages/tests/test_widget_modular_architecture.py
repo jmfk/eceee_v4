@@ -28,7 +28,7 @@ class ModularWidgetArchitectureTest(TestCase):
         registered_names = widget_type_registry.get_widget_names()
 
         # Should have core widgets
-        core_widgets = [
+        default_widgets = [
             "Text Block",
             "Image",
             "Button",
@@ -45,7 +45,7 @@ class ModularWidgetArchitectureTest(TestCase):
         # Should have custom widgets
         custom_widgets = ["Testimonial", "Call to Action"]
 
-        for widget_name in core_widgets:
+        for widget_name in default_widgets:
             self.assertIn(
                 widget_name,
                 registered_names,
@@ -67,13 +67,15 @@ class ModularWidgetArchitectureTest(TestCase):
 
         registered_names = widget_type_registry.get_widget_names()
 
-        # Should have core widgets (if core_widgets app is enabled)
-        core_widgets = ["Text Block", "Image", "Button"]
-        core_widgets_found = any(widget in registered_names for widget in core_widgets)
+        # Should have core widgets (if default_widgets app is enabled)
+        default_widgets = ["Text Block", "Image", "Button"]
+        core_widgets_found = any(
+            widget in registered_names for widget in default_widgets
+        )
 
         if core_widgets_found:
             # If we have core widgets, test they're properly registered
-            for widget_name in core_widgets:
+            for widget_name in default_widgets:
                 if widget_name in registered_names:
                     widget = widget_type_registry.get_widget_type(widget_name)
                     self.assertIsNotNone(widget)
@@ -114,28 +116,6 @@ class ModularWidgetArchitectureTest(TestCase):
             self.assertIsNotNone(
                 widget, f"Widget '{widget_name}' should be retrievable"
             )
-
-    def test_compatibility_layer_import_handling(self):
-        """Test that the compatibility layer handles missing imports gracefully"""
-        # Test importing from webpages.widgets when core_widgets might not be available
-        try:
-            from webpages import widgets
-
-            # Should not raise an error even if core_widgets is not available
-            self.assertTrue(True, "Import should succeed")
-        except ImportError as e:
-            self.fail(f"Compatibility layer should handle missing imports: {e}")
-
-    def test_compatibility_layer_widget_models_import_handling(self):
-        """Test that the compatibility layer handles missing widget model imports gracefully"""
-        # Test importing from webpages.widget_models when core_widgets might not be available
-        try:
-            from webpages import widget_models
-
-            # Should not raise an error even if core_widgets is not available
-            self.assertTrue(True, "Import should succeed")
-        except ImportError as e:
-            self.fail(f"Compatibility layer should handle missing imports: {e}")
 
     def test_widget_autodiscovery_handles_missing_modules(self):
         """Test that widget autodiscovery handles missing modules gracefully"""
@@ -236,11 +216,11 @@ class WidgetAppDependencyTest(TestCase):
             autodiscover_widgets()
 
     def test_core_widgets_app_independence(self):
-        """Test that core_widgets app works independently"""
+        """Test that default_widgets app works independently"""
         # Import core widgets directly
         try:
-            from core_widgets.widgets import TextBlockWidget, ImageWidget
-            from core_widgets.widget_models import TextBlockConfig, ImageConfig
+            from default_widgets.widgets import TextBlockWidget, ImageWidget
+            from default_widgets.widget_models import TextBlockConfig, ImageConfig
 
             # Should be able to create instances
             text_widget = TextBlockWidget()
@@ -251,8 +231,8 @@ class WidgetAppDependencyTest(TestCase):
             self.assertEqual(config.content, "Test")
 
         except ImportError as e:
-            # If core_widgets is not available, that's also valid for this test
-            self.skipTest(f"core_widgets app not available: {e}")
+            # If default_widgets is not available, that's also valid for this test
+            self.skipTest(f"default_widgets app not available: {e}")
 
     def test_custom_widgets_app_independence(self):
         """Test that custom widgets app works independently"""

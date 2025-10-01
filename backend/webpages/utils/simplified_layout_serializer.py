@@ -245,12 +245,12 @@ class SimplifiedLayoutSerializer:
         """Extract allowed widget types from slot element or default to all"""
         # For now, allow all core widgets - can be enhanced later
         return [
-            "core_widgets.ContentWidget",
-            "core_widgets.ImageWidget",
-            "core_widgets.TableWidget",
-            "core_widgets.HeaderWidget",
-            "core_widgets.FooterWidget",
-            "core_widgets.NavigationWidget",
+            "default_widgets.ContentWidget",
+            "default_widgets.ImageWidget",
+            "default_widgets.TableWidget",
+            "default_widgets.HeaderWidget",
+            "default_widgets.FooterWidget",
+            "default_widgets.NavigationWidget",
         ]
 
     def _detect_grid_area(self, slot_element) -> str:
@@ -496,8 +496,8 @@ def create_predefined_layouts() -> Dict[str, Dict[str, Any]]:
                 "maxWidgets": 3,
                 "required": False,
                 "allowedWidgetTypes": [
-                    "core_widgets.HeaderWidget",
-                    "core_widgets.NavigationWidget",
+                    "default_widgets.HeaderWidget",
+                    "default_widgets.NavigationWidget",
                 ],
                 "className": "header-slot bg-white p-8 rounded-xl shadow-sm border border-gray-200",
                 "style": {
@@ -516,9 +516,9 @@ def create_predefined_layouts() -> Dict[str, Dict[str, Any]]:
                 "maxWidgets": 10,
                 "required": True,
                 "allowedWidgetTypes": [
-                    "core_widgets.ContentWidget",
-                    "core_widgets.ImageWidget",
-                    "core_widgets.TableWidget",
+                    "default_widgets.ContentWidget",
+                    "default_widgets.ImageWidget",
+                    "default_widgets.TableWidget",
                 ],
                 "className": "main-slot bg-white p-8 rounded-xl shadow-sm border border-gray-200",
                 "style": {
@@ -537,8 +537,8 @@ def create_predefined_layouts() -> Dict[str, Dict[str, Any]]:
                 "maxWidgets": 5,
                 "required": False,
                 "allowedWidgetTypes": [
-                    "core_widgets.NavigationWidget",
-                    "core_widgets.ContentWidget",
+                    "default_widgets.NavigationWidget",
+                    "default_widgets.ContentWidget",
                 ],
                 "className": "sidebar-slot bg-gray-50 p-6 rounded-xl border border-gray-200",
                 "style": {
@@ -557,8 +557,8 @@ def create_predefined_layouts() -> Dict[str, Dict[str, Any]]:
                 "maxWidgets": 2,
                 "required": False,
                 "allowedWidgetTypes": [
-                    "core_widgets.FooterWidget",
-                    "core_widgets.NavigationWidget",
+                    "default_widgets.FooterWidget",
+                    "default_widgets.NavigationWidget",
                 ],
                 "className": "footer-slot bg-gray-700 text-white p-6 rounded-xl text-center",
                 "style": {
@@ -609,7 +609,7 @@ def create_predefined_layouts() -> Dict[str, Dict[str, Any]]:
                 "area": "header",
                 "maxWidgets": 2,
                 "required": False,
-                "allowedWidgetTypes": ["core_widgets.HeaderWidget"],
+                "allowedWidgetTypes": ["default_widgets.HeaderWidget"],
                 "className": "header-slot col-span-2",
             },
             {
@@ -639,7 +639,7 @@ def create_predefined_layouts() -> Dict[str, Dict[str, Any]]:
                 "area": "footer",
                 "maxWidgets": 1,
                 "required": False,
-                "allowedWidgetTypes": ["core_widgets.FooterWidget"],
+                "allowedWidgetTypes": ["default_widgets.FooterWidget"],
                 "className": "footer-slot col-span-2",
             },
         ],

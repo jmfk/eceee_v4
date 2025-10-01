@@ -13,7 +13,6 @@ from ..widget_models import SidebarConfig
 class SidebarWidget(BaseWidget):
     """Sidebar widget with background and text styling options"""
 
-    app_label = "core_widgets"
     name = "Sidebar"
     description = "Sidebar widget with background image/color and text color options"
     template_name = "default_widgets/widgets/sidebar.html"

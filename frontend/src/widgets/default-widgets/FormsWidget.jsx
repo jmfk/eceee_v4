@@ -452,7 +452,7 @@ const FormsWidget = ({ config = {}, mode = 'preview' }) => {
 
 // === COLOCATED METADATA ===
 FormsWidget.displayName = 'FormsWidget'
-FormsWidget.widgetType = 'core_widgets.FormsWidget'
+FormsWidget.widgetType = 'default_widgets.FormsWidget'
 
 // Default configuration
 FormsWidget.defaultConfig = {

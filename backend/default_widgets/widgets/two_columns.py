@@ -14,7 +14,6 @@ from ..widget_models import TwoColumnsConfig
 class TwoColumnsWidget(BaseWidget):
     """Simple two-column widget with left and right slots"""
 
-    app_label = "default_widgets"
     name = "Two Columns"
     description = "Simple two-column layout with left and right slots for widgets"
     template_name = "default_widgets/widgets/two_columns.html"

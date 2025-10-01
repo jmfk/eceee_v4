@@ -209,10 +209,12 @@ docker-compose exec backend flake8
 - `backend/webpages/models.py` - Core CMS models (WebPage, PageVersion)
 - `backend/webpages/views/` - Modular API views (webpage, version, schema, rendering)
 - `backend/webpages/serializers.py` - DRF serializers with validation
-- `backend/webpages/widgets.py` - Widget registry and base classes
+- `backend/webpages/widget_registry.py` - Widget registry and base classes
+- `backend/default_widgets/` - Default widget implementations
+- `backend/eceee_widgets/` - Custom ECEEE widget implementations
 - `backend/content/` - Content management (Events, LibraryItems, Tags)
 - `backend/config/settings.py` - Django configuration
-- `backend/templates/webpages/` - Page and widget templates
+- `backend/templates/` - Page and widget templates
 
 ### Frontend Key Files
 - `frontend/src/App.jsx` - Main app with React Router setup

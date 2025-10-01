@@ -13,7 +13,6 @@ from ..widget_models import FormsConfig
 class FormsWidget(BaseWidget):
     """Forms widget with schema support"""
 
-    app_label = "core_widgets"
     name = "Forms"
     description = "Forms widget with schema support for building custom forms"
     template_name = "default_widgets/widgets/forms.html"

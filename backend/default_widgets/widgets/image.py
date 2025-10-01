@@ -13,7 +13,6 @@ from ..widget_models import ImageConfig
 class ImageWidget(BaseWidget):
     """Image widget that contains image, image gallery, or video"""
 
-    app_label = "core_widgets"
     name = "Image"
     description = "Image widget that contains image, image gallery, or video"
     template_name = "default_widgets/widgets/image.html"

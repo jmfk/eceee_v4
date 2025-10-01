@@ -20,7 +20,7 @@ export const ThreeColumnLayout = ({ widgets, onWidgetAction, editable = true, pa
                         editable={editable}
                         pageContext={pageContext}
                         className="bg-white p-6 rounded-xl shadow-sm border border-gray-200"
-                        allowedWidgetTypes={['core_widgets.HeaderWidget']}
+                        allowedWidgetTypes={['default_widgets.HeaderWidget']}
                         maxWidgets={2}
                         required={false}
                         onShowWidgetModal={onShowWidgetModal}
@@ -96,7 +96,7 @@ export const ThreeColumnLayout = ({ widgets, onWidgetAction, editable = true, pa
                         editable={editable}
                         pageContext={pageContext}
                         className="bg-gray-700 text-white p-6 rounded-xl text-center"
-                        allowedWidgetTypes={['core_widgets.FooterWidget']}
+                        allowedWidgetTypes={['default_widgets.FooterWidget']}
                         maxWidgets={1}
                         required={false}
                         onShowWidgetModal={onShowWidgetModal}

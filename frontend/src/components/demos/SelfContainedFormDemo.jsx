@@ -13,7 +13,7 @@ import SelfContainedWidgetEditor from '../forms/SelfContainedWidgetEditor.jsx'
 const mockWidgets = {
     textWidget: {
         id: 'demo-text-widget',
-        type: 'core_widgets.TextWidget',
+        type: 'default_widgets.TextWidget',
         name: 'Text Widget',
         slotName: 'demo-slot',
         config: {
@@ -27,7 +27,7 @@ const mockWidgets = {
     },
     imageWidget: {
         id: 'demo-image-widget',
-        type: 'core_widgets.ImageWidget',
+        type: 'default_widgets.ImageWidget',
         name: 'Image Widget',
         slotName: 'demo-slot',
         config: {
@@ -40,7 +40,7 @@ const mockWidgets = {
     },
     buttonWidget: {
         id: 'demo-button-widget',
-        type: 'core_widgets.ButtonWidget',
+        type: 'default_widgets.ButtonWidget',
         name: 'Button Widget',
         slotName: 'demo-slot',
         config: {
@@ -132,8 +132,8 @@ const SelfContainedFormDemo = () => {
                                         key={key}
                                         onClick={() => setSelectedWidget(key)}
                                         className={`w-full text-left p-3 rounded-lg border transition-colors ${selectedWidget === key
-                                                ? 'border-blue-500 bg-blue-50 text-blue-900'
-                                                : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                                            ? 'border-blue-500 bg-blue-50 text-blue-900'
+                                            : 'border-gray-200 hover:border-gray-300 text-gray-700'
                                             }`}
                                     >
                                         <div className="font-medium">{widget.name}</div>

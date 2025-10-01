@@ -333,7 +333,7 @@ class WidgetTypeRegistry:
         return None
 
     def get_widget_type_by_type(self, widget_type: str) -> Optional[BaseWidget]:
-        """Get a widget type instance by type identifier (e.g., 'core_widgets.TextBlockWidget')."""
+        """Get a widget type instance by type identifier (e.g., 'default_widgets.TextBlockWidget')."""
         for widget in self._instances.values():
             if widget.type == widget_type:
                 return widget
@@ -347,7 +347,7 @@ class WidgetTypeRegistry:
         if not identifier:
             return None
 
-        # Try new format first (core_widgets.WidgetName) - exact match
+        # Try new format first (default_widgets.WidgetName) - exact match
         widget = self.get_widget_type_by_type(identifier)
         if widget:
             return widget

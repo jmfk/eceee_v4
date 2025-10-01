@@ -82,7 +82,7 @@ const WidgetSlot = ({
             onShowWidgetModal(name);
         } else {
             // Fallback to direct widget addition if modal not available
-            handleWidgetAction('add', null, 'core_widgets.ContentWidget');
+            handleWidgetAction('add', null, 'default_widgets.ContentWidget');
         }
     };
 

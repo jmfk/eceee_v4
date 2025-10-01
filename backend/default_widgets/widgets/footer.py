@@ -13,7 +13,6 @@ from ..widget_models import FooterConfig
 class FooterWidget(BaseWidget):
     """Footer widget with background and text styling options"""
 
-    app_label = "core_widgets"
     name = "Footer"
     description = "Footer widget with background image/color and text color options"
     template_name = "default_widgets/widgets/footer.html"

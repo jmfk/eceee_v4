@@ -119,7 +119,7 @@ describe('SelfContainedWidgetForm', () => {
         // Mock widget data
         widgetData = {
             id: 'test-widget-123',
-            type: 'core_widgets.TextWidget',
+            type: 'default_widgets.TextWidget',
             name: 'Test Widget',
             slotName: 'test-slot',
             config: {
@@ -147,7 +147,7 @@ describe('SelfContainedWidgetForm', () => {
 
     test('should initialize with widget data', () => {
         expect(form.widgetId).toBe('test-widget-123')
-        expect(form.widgetType).toBe('core_widgets.TextWidget')
+        expect(form.widgetType).toBe('default_widgets.TextWidget')
         expect(form.slotName).toBe('test-slot')
         expect(form.originalConfig).toEqual(widgetData.config)
         expect(form.currentConfig).toEqual(widgetData.config)
@@ -281,7 +281,7 @@ describe('SelfContainedWidgetForm', () => {
 
         expect(state).toEqual({
             widgetId: 'test-widget-123',
-            widgetType: 'core_widgets.TextWidget',
+            widgetType: 'default_widgets.TextWidget',
             slotName: 'test-slot',
             originalConfig: widgetData.config,
             currentConfig: expect.objectContaining({

@@ -288,7 +288,7 @@ class SelfContainedWidgetForm {
      */
     getMockSchema() {
         const mockSchemas = {
-            'core_widgets.TextWidget': {
+            'default_widgets.TextWidget': {
                 type: 'object',
                 properties: {
                     text: {
@@ -334,7 +334,7 @@ class SelfContainedWidgetForm {
                 },
                 required: ['text']
             },
-            'core_widgets.ImageWidget': {
+            'default_widgets.ImageWidget': {
                 type: 'object',
                 properties: {
                     src: {
@@ -376,7 +376,7 @@ class SelfContainedWidgetForm {
                 },
                 required: ['src', 'alt']
             },
-            'core_widgets.ButtonWidget': {
+            'default_widgets.ButtonWidget': {
                 type: 'object',
                 properties: {
                     text: {

@@ -188,7 +188,7 @@ const ContentWidget = memo(({
 
 // === COLOCATED METADATA ===
 ContentWidget.displayName = 'ContentWidget'
-ContentWidget.widgetType = 'core_widgets.ContentWidget'
+ContentWidget.widgetType = 'default_widgets.ContentWidget'
 
 // Default configuration
 ContentWidget.defaultConfig = {

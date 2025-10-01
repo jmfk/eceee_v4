@@ -13,7 +13,6 @@ from ..widget_models import HeaderConfig
 class HeaderWidget(BaseWidget):
     """Header widget with background and text styling options"""
 
-    app_label = "core_widgets"
     name = "Header"
     description = "Header widget with background image/color and text color options"
     template_name = "default_widgets/widgets/header.html"

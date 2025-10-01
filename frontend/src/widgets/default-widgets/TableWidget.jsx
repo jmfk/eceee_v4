@@ -138,7 +138,7 @@ const TableWidget = ({ config = {}, mode = 'preview' }) => {
 
 // === COLOCATED METADATA ===
 TableWidget.displayName = 'TableWidget'
-TableWidget.widgetType = 'core_widgets.TableWidget'
+TableWidget.widgetType = 'default_widgets.TableWidget'
 
 // Default configuration
 TableWidget.defaultConfig = {

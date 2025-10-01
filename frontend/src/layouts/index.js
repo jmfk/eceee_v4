@@ -12,10 +12,14 @@ export * from './eceee-layouts';
 import { LAYOUT_REGISTRY as DEFAULT_REGISTRY } from './default-layouts';
 import { ECEEE_LAYOUT_REGISTRY } from './eceee-layouts';
 
-// Create combined registry
+// Configuration: Set which layout apps are enabled (should match backend INSTALLED_APPS)
+const ENABLE_DEFAULT_LAYOUTS = false; // Set to false when default_layouts is disabled in backend
+const ENABLE_ECEEE_LAYOUTS = true;
+
+// Create combined registry based on configuration
 export const COMBINED_LAYOUT_REGISTRY = {
-    ...DEFAULT_REGISTRY,
-    ...ECEEE_LAYOUT_REGISTRY
+    ...(ENABLE_DEFAULT_LAYOUTS ? DEFAULT_REGISTRY : {}),
+    ...(ENABLE_ECEEE_LAYOUTS ? ECEEE_LAYOUT_REGISTRY : {})
 };
 
 // Export the combined registry as the main one
@@ -49,5 +53,6 @@ export {
 } from './default-layouts';
 
 export {
-    MainLayout
+    MainLayout,
+    LandingPage
 } from './eceee-layouts';

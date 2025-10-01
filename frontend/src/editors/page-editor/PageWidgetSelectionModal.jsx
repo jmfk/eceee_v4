@@ -49,7 +49,7 @@ const PageWidgetSelectionModal = ({
 
         const matchesCategory = selectedCategory === 'all' ||
             widget.category === selectedCategory ||
-            (selectedCategory === 'core' && widget.type.startsWith('core_widgets.'));
+            (selectedCategory === 'core' && widget.type.startsWith('default_widgets.'));
 
         return matchesSearch && matchesCategory;
     });
@@ -57,7 +57,6 @@ const PageWidgetSelectionModal = ({
     // Get unique categories
     const categories = [
         { id: 'all', label: 'All Widgets' },
-        { id: 'core', label: 'Core Widgets' },
         ...Array.from(new Set(availableWidgets.map(w => w.category).filter(Boolean)))
             .map(cat => ({ id: cat, label: cat.charAt(0).toUpperCase() + cat.slice(1) }))
     ];
@@ -119,8 +118,8 @@ const PageWidgetSelectionModal = ({
                                 key={category.id}
                                 onClick={() => setSelectedCategory(category.id)}
                                 className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${selectedCategory === category.id
-                                        ? 'bg-blue-100 text-blue-800'
-                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                    ? 'bg-blue-100 text-blue-800'
+                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                                     }`}
                             >
                                 {category.label}

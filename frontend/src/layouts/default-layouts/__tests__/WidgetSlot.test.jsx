@@ -74,8 +74,8 @@ vi.mock('../../editors/page-editor/PageSlotIconMenu', () => ({
 }))
 
 const mockWidgets = [
-    { id: '1', type: 'core_widgets.ContentWidget', config: {} },
-    { id: '2', type: 'core_widgets.ImageWidget', config: {} }
+    { id: '1', type: 'default_widgets.ContentWidget', config: {} },
+    { id: '2', type: 'default_widgets.ImageWidget', config: {} }
 ]
 
 // Helper function to render with all required providers
@@ -203,7 +203,7 @@ describe('WidgetSlot', () => {
         const addFirstWidgetBtn = screen.getByText('Add Your First Widget')
         fireEvent.click(addFirstWidgetBtn)
 
-        expect(mockOnWidgetAction).toHaveBeenCalledWith('add', 'main_content', null, 'core_widgets.ContentWidget')
+        expect(mockOnWidgetAction).toHaveBeenCalledWith('add', 'main_content', null, 'default_widgets.ContentWidget')
     })
 
     it('does not render "Add Your First Widget" button when not editable', () => {

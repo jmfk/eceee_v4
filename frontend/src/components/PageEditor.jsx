@@ -1542,7 +1542,7 @@ const PageEditor = () => {
                         onRealTimeUpdate={handleRealTimeWidgetUpdate}
                         widgetData={editingWidget}
                         title={editingWidget ? `Edit ${editingWidget.name}` : 'Edit Widget'}
-                        autoOpenSpecialEditor={editingWidget?.type === 'core_widgets.ImageWidget'}
+                        autoOpenSpecialEditor={editingWidget?.type === 'default_widgets.ImageWidget'}
                     />
                 </div>
             </div>
