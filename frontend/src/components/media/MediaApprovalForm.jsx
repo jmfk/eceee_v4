@@ -238,17 +238,17 @@ const MediaApprovalForm = ({
 
             Object.entries(fileApprovals).forEach(([fileId, approval]) => {
                 if (approval.approved) {
-                    // Convert tags string to tag IDs
+                    // Convert tags string to tag names/IDs (backend expects array of strings)
                     const tagNames = approval.tags ?
                         approval.tags.split(',').map(tag => tag.trim()).filter(tag => tag) : [];
 
-                    // For now, we'll send tag names and let the backend handle creation
+                    // Send tag names - backend will handle creation/lookup
                     approvals.push({
                         pendingFileId: fileId,
                         title: approval.title,
                         slug: approval.slug,
                         description: approval.description,
-                        tagIds: [], // Will be handled by backend based on tag names
+                        tagIds: tagNames,
                         accessLevel: approval.accessLevel
                     });
                 } else {
