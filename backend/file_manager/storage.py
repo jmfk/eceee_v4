@@ -13,13 +13,15 @@ including features like:
 import os
 import boto3
 import logging
+import hashlib
+import uuid
 from typing import Optional, Dict, Any, BinaryIO
 from django.conf import settings
 from django.core.files.storage import Storage
 from django.core.files.uploadedfile import UploadedFile
 from django.utils.deconstruct import deconstructible
 from botocore.exceptions import ClientError
-from PIL import Image
+from PIL import Image, ExifTags
 import io
 
 logger = logging.getLogger(__name__)
@@ -67,6 +69,71 @@ class S3MediaStorage(Storage):
             region_name=self.region_name,
             endpoint_url=self.endpoint_url,
         )
+
+    def upload_file(self, file: UploadedFile, folder_path: str = "") -> Dict[str, Any]:
+        """
+        Upload a file to S3 with metadata extraction and hash generation.
+
+        Args:
+            file: Uploaded file object
+            folder_path: Optional folder path for organizing files
+
+        Returns:
+            Dictionary containing:
+                - file_path: S3 key/path where file is stored
+                - file_size: Size of the file in bytes
+                - content_type: MIME type of the file
+                - file_hash: SHA-256 hash of the file content
+                - width: Image width (for images only)
+                - height: Image height (for images only)
+        """
+        # Read file content for hashing and metadata extraction
+        file_content = file.read()
+        file.seek(0)  # Reset file pointer
+
+        # Generate file hash
+        file_hash = hashlib.sha256(file_content).hexdigest()
+
+        # Generate unique filename to avoid collisions
+        file_extension = os.path.splitext(file.name)[1]
+        unique_filename = f"{uuid.uuid4()}{file_extension}"
+
+        # Construct S3 key with folder path
+        if folder_path:
+            file_path = f"{folder_path.strip('/')}/{unique_filename}"
+        else:
+            file_path = f"uploads/{unique_filename}"
+
+        # Get content type
+        content_type = getattr(file, "content_type", "application/octet-stream")
+
+        # Prepare result dictionary
+        result = {
+            "file_path": file_path,
+            "file_size": file.size,
+            "content_type": content_type,
+            "file_hash": file_hash,
+        }
+
+        # Extract image metadata if applicable
+        if content_type.startswith("image/"):
+            try:
+                metadata = self.extract_metadata(file_content, content_type)
+                if "width" in metadata:
+                    result["width"] = metadata["width"]
+                if "height" in metadata:
+                    result["height"] = metadata["height"]
+            except Exception as e:
+                logger.warning(f"Failed to extract image metadata: {e}")
+
+        # Upload to S3
+        try:
+            self._save(file_path, file)
+        except Exception as e:
+            logger.error(f"Failed to upload file {file.name} to S3: {e}")
+            raise
+
+        return result
 
     def _get_key(self, name: str) -> str:
         """
@@ -302,6 +369,24 @@ class S3MediaStorage(Storage):
             if content_type in allowed_types:
                 return file_type
         return "other"
+
+    def get_file_content(self, file_path: str) -> bytes:
+        """
+        Get file content from S3.
+
+        Args:
+            file_path: S3 key/path to the file
+
+        Returns:
+            File content as bytes
+        """
+        try:
+            key = self._get_key(file_path)
+            response = self.client.get_object(Bucket=self.bucket_name, Key=key)
+            return response["Body"].read()
+        except ClientError as e:
+            logger.error(f"Failed to get file content for {file_path}: {e}")
+            raise
 
 
 # Create a singleton instance

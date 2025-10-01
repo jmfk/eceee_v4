@@ -270,6 +270,157 @@ class MediaAIService:
             logger.error(f"Failed to generate slug: {e}")
             return "media-file"
 
+    def analyze_media_file(
+        self, file_content: bytes, filename: str, content_type: str
+    ) -> Dict[str, Any]:
+        """
+        Analyze a media file and generate AI suggestions.
+
+        NOTE: This is a fallback implementation that works without external AI services.
+        It generates basic metadata from filename and file properties.
+
+        Args:
+            file_content: File content as bytes
+            filename: Original filename
+            content_type: MIME type of the file
+
+        Returns:
+            Dictionary with suggested_tags, suggested_title, extracted_text, and confidence_score
+        """
+        results = {
+            "suggested_tags": [],
+            "suggested_title": "",
+            "extracted_text": "",
+            "confidence_score": 0.5,  # Medium confidence for basic analysis
+        }
+
+        try:
+            # Generate title from filename (basic implementation without AI)
+            title = self._generate_basic_title_from_filename(filename)
+            results["suggested_title"] = title
+
+            # Generate basic tags from filename and content type
+            basic_tags = self._generate_basic_tags(filename, content_type)
+            results["suggested_tags"] = basic_tags
+
+            # If AI service is configured, try to use it for enhanced analysis
+            if self.api_key and self.api_url:
+                try:
+                    # Try AI-powered analysis
+                    ai_title = self.generate_title_from_filename(filename)
+                    if ai_title:
+                        results["suggested_title"] = ai_title
+                        results["confidence_score"] = 0.9
+
+                    # Image-specific AI analysis
+                    if content_type.startswith("image/"):
+                        image_analysis = self.analyze_image_content(file_content)
+                        if image_analysis:
+                            results["suggested_tags"] = image_analysis.get(
+                                "tags", basic_tags
+                            )
+                            results["confidence_score"] = image_analysis.get(
+                                "confidence", 0.9
+                            )
+
+                        # OCR extraction
+                        extracted_text = self.extract_text_from_image(file_content)
+                        if extracted_text:
+                            results["extracted_text"] = extracted_text
+
+                except Exception as e:
+                    logger.debug(f"AI analysis unavailable, using basic analysis: {e}")
+                    # Keep basic results
+
+            return results
+
+        except Exception as e:
+            logger.error(f"Failed to analyze media file {filename}: {e}")
+            return results
+
+    def _generate_basic_title_from_filename(self, filename: str) -> str:
+        """
+        Generate a basic human-readable title from filename without AI.
+
+        Args:
+            filename: Original filename
+
+        Returns:
+            Cleaned title string
+        """
+        # Remove extension
+        name_without_ext = os.path.splitext(filename)[0]
+
+        # Replace underscores and hyphens with spaces
+        title = name_without_ext.replace("_", " ").replace("-", " ")
+
+        # Capitalize words
+        title = " ".join(word.capitalize() for word in title.split())
+
+        return title
+
+    def _generate_basic_tags(self, filename: str, content_type: str) -> List[str]:
+        """
+        Generate basic tags from filename and content type without AI.
+
+        Args:
+            filename: Original filename
+            content_type: MIME type
+
+        Returns:
+            List of basic tags
+        """
+        tags = []
+
+        # Add file type tag
+        if content_type.startswith("image/"):
+            tags.append("image")
+            # Add specific image format
+            if "jpeg" in content_type or "jpg" in content_type:
+                tags.append("photo")
+            elif "png" in content_type:
+                tags.append("png")
+            elif "gif" in content_type:
+                tags.append("animation")
+            elif "svg" in content_type:
+                tags.append("vector")
+        elif content_type.startswith("video/"):
+            tags.append("video")
+        elif content_type.startswith("audio/"):
+            tags.append("audio")
+        elif "pdf" in content_type:
+            tags.append("document")
+            tags.append("pdf")
+
+        # Extract potential tags from filename
+        name_parts = os.path.splitext(filename)[0].lower()
+        # Split by common separators
+        words = name_parts.replace("_", " ").replace("-", " ").split()
+
+        # Add meaningful words as tags (skip common words and very short words)
+        common_words = {
+            "the",
+            "a",
+            "an",
+            "and",
+            "or",
+            "but",
+            "in",
+            "on",
+            "at",
+            "to",
+            "for",
+            "of",
+            "with",
+            "by",
+        }
+        for word in words:
+            if len(word) > 3 and word not in common_words and word.isalpha():
+                if word not in tags:  # Avoid duplicates
+                    tags.append(word)
+
+        return tags[:10]  # Limit to 10 tags
+
     def analyze_file_complete_workflow(
         self, file_content: bytes, filename: str, namespace_id: str
     ) -> Dict[str, Any]:
