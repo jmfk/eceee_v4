@@ -6,6 +6,7 @@
 
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import SlotEditor from '../../components/editors/SlotEditor';
+import PageWidgetFactory from '../../editors/page-editor/PageWidgetFactory';
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext';
 import { OperationTypes } from '../../contexts/unified-data/types/operations';
 import { useWidgets } from '../../hooks/useWidgets';
@@ -177,6 +178,32 @@ const TwoColumnsWidget = ({
     // Get filtered widget types for slots
     const filteredWidgetTypes = getFilteredWidgetTypes();
 
+    // Render individual widget in a slot (for display mode)
+    const renderWidget = useCallback((widget, slotName, index) => {
+        // Create unique key for widget
+        const uniqueKey = widget.id ? `${slotName}-${widget.id}-${index}` : `${slotName}-index-${index}`;
+
+        // Build full path for this widget: widgetPath + widgetId + slotName + widget.id
+        const fullWidgetPath = [...widgetPath, widgetId, slotName, widget.id];
+
+        return (
+            <div key={uniqueKey} className="widget-wrapper">
+                <PageWidgetFactory
+                    widget={widget}
+                    slotName={slotName}
+                    index={index}
+                    mode="display"
+                    showControls={false}
+                    // Context props
+                    parentComponentId={componentId}
+                    contextType={contextType}
+                    // Widget path for nested widget support
+                    widgetPath={fullWidgetPath}
+                />
+            </div>
+        );
+    }, [widgetPath, widgetId, componentId, contextType]);
+
     // Show loading state while fetching widget types
     if (mode === 'editor' && isLoadingTypes) {
         return (
@@ -254,18 +281,21 @@ const TwoColumnsWidget = ({
         );
     }
 
-    // In display mode, just show the layout structure
-    // The actual widget rendering will be handled by the backend template
+    // In display mode, render the widgets in each slot
     return (
         <div className="two-columns-widget">
             <div className="column-slot left" data-slot="left">
-                {slotsData.left?.length === 0 && (
+                {slotsData.left && slotsData.left.length > 0 ? (
+                    slotsData.left.map((widget, index) => renderWidget(widget, 'left', index))
+                ) : (
                     <div className="empty-slot">Left column</div>
                 )}
             </div>
 
             <div className="column-slot right" data-slot="right">
-                {slotsData.right?.length === 0 && (
+                {slotsData.right && slotsData.right.length > 0 ? (
+                    slotsData.right.map((widget, index) => renderWidget(widget, 'right', index))
+                ) : (
                     <div className="empty-slot">Right column</div>
                 )}
             </div>

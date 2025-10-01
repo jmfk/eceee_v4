@@ -424,8 +424,14 @@ class FormsConfig(BaseModel):
 class TwoColumnsConfig(BaseModel):
     """Configuration for simple two-column widget"""
 
-    # Just the slots - exactly like PageVersion.widgets
-    slots: Dict[str, List[Dict[str, Any]]] = Field(
-        default_factory=lambda: {"left": [], "right": []},
-        description="Widgets organized by slot name (left/right)",
+    layout_style: Optional[str] = Field(
+        None,
+        description="Select widget layout",
+        json_schema_extra={
+            "component": "SelectInput",
+            "order": 1,
+            "group": "Display Options",
+            "valueListName": "two-column-layout",  # References a value list
+            "placeholder": "Select layout...",
+        },
     )
