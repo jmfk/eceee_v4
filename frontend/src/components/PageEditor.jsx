@@ -18,7 +18,7 @@ import {
     Calendar,
     Save
 } from 'lucide-react'
-import { pagesApi, layoutsApi, versionsApi, themesApi } from '../api'
+import { pagesApi, layoutsApi, versionsApi, themesApi, namespacesApi } from '../api'
 import { api } from '../api/client'
 import { endpoints } from '../api/endpoints'
 import { smartSave, analyzeChanges, determineSaveStrategy, generateChangeSummary, processLoadedVersionData } from '../utils/smartSaveUtils'
@@ -283,9 +283,26 @@ const PageEditor = () => {
     const [errorTodoItems, setErrorTodoItems] = useState([])
     const [schemaValidationState, setSchemaValidationState] = useState({ isValid: true, hasErrors: false })
 
+    // Namespace for media operations
+    const [namespace, setNamespace] = useState(null)
+
     const queryClient = useQueryClient()
     const { showError, showConfirm } = useNotificationContext()
     const { addNotification } = useGlobalNotifications()
+
+    // Load default namespace for media operations
+    useEffect(() => {
+        const loadNamespace = async () => {
+            try {
+                const defaultNamespace = await namespacesApi.getDefault()
+                setNamespace(defaultNamespace?.slug || 'default')
+            } catch (error) {
+                console.error('Failed to load namespace:', error)
+                setNamespace('default') // Fallback to 'default' if loading fails
+            }
+        }
+        loadNamespace()
+    }, [])
 
     // Initialize data for new page
     useEffect(() => {
@@ -1495,7 +1512,7 @@ const PageEditor = () => {
                                 })}
                                 onValidationChange={setSchemaValidationState}
                                 onValidatedDataSync={handleValidatedPageDataSync}
-                                namespace={null} // TODO: Add proper namespace integration
+                                namespace={namespace}
                             />
                         )}
                         {activeTab === 'theme' && (
@@ -1544,6 +1561,7 @@ const PageEditor = () => {
                         widgetData={editingWidget}
                         title={editingWidget ? `Edit ${getWidgetDisplayName(editingWidget.type)}` : 'Edit Widget'}
                         autoOpenSpecialEditor={true}
+                        namespace={namespace}
                     />
                 </div>
             </div>

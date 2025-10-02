@@ -1,3 +1,5 @@
 {% load static %}
 
-{{ config.content|safe }}
+{% if config.image %}
+<img src="{{ config.image }}" alt="Header Image" class="header-image">
+{% endif %}
