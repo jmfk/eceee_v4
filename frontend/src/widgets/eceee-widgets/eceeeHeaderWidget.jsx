@@ -1,75 +1,49 @@
 import React from 'react'
-import { Layout } from 'lucide-react'
+import { Image as ImageIcon } from 'lucide-react'
 
 /**
  * ECEEE Header Widget Component
- * Renders header content with hero sections, background images, and overlays
+ * Simple header widget that displays an image
  */
 const eceeeHeaderWidget = ({ config = {}, mode = 'preview' }) => {
-    const {
-        content = 'Header content will appear here...',
-        background_color = '#ffffff',
-        background_image = '',
-        background_size = 'cover',
-        background_position = 'center',
-        text_color = '#1f2937',
-        padding = '2rem 1rem',
-        text_align = 'center',
-        show_overlay = false,
-        overlay_color = 'rgba(0, 0, 0, 0.5)',
-        overlay_opacity = 0.5,
-        hero_style = false,
-        min_height = '',
-        css_class = '',
-        custom_css = ''
-    } = config
+    const { image } = config
 
-    const headerStyle = {
-        backgroundColor: background_color,
-        backgroundImage: background_image ? `url(${background_image})` : 'none',
-        backgroundSize: background_size,
-        backgroundPosition: background_position,
-        backgroundRepeat: 'no-repeat',
-        color: text_color,
-        padding: padding,
-        textAlign: text_align,
-        minHeight: min_height || (hero_style ? '60vh' : 'auto'),
-        position: 'relative',
-        overflow: 'hidden'
-    }
-
-    const overlayStyle = show_overlay && background_image ? {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: overlay_color,
-        opacity: overlay_opacity,
-        zIndex: 0
-    } : null
-
-    const contentStyle = {
-        position: 'relative',
-        zIndex: 1,
-        maxWidth: '1200px',
-        margin: '0 auto',
-        height: '100%',
-        display: hero_style ? 'flex' : 'block',
-        alignItems: hero_style ? 'center' : 'normal',
-        justifyContent: hero_style ? 'center' : 'normal'
-    }
-
+    // Editor mode: show placeholder if no image
     if (mode === 'editor') {
+        if (!image) {
+            return (
+                <div className="w-full border-2 border-dashed border-gray-300 rounded-lg p-8 flex flex-col items-center justify-center text-gray-400">
+                    <ImageIcon className="w-12 h-12 mb-2" />
+                    <p className="text-sm">No header image selected</p>
+                    <p className="text-xs mt-1">Configure this widget to add an image</p>
+                </div>
+            )
+        }
+
         return (
-            <div dangerouslySetInnerHTML={{ __html: content }} />
+            <div className="w-full">
+                <img
+                    src={image}
+                    alt="Header Image"
+                    className="w-full h-auto block"
+                />
+            </div>
         )
     }
 
+    // Preview mode: only render if image exists
+    if (!image) {
+        return null
+    }
+
     return (
-        <>
-            <div dangerouslySetInnerHTML={{ __html: content }} />
-        </>
+        <div className="w-full">
+            <img
+                src={image}
+                alt="Header Image"
+                className="w-full h-auto block"
+            />
+        </div>
     )
 }
 
@@ -79,28 +53,16 @@ eceeeHeaderWidget.widgetType = 'eceee_widgets.HeaderWidget'
 
 // Default configuration
 eceeeHeaderWidget.defaultConfig = {
-    content: '<h1>Welcome to Our Website</h1><p>Your journey starts here</p>',
-    background_color: '#ffffff',
-    background_image: '',
-    background_size: 'cover',
-    background_position: 'center',
-    text_color: '#1f2937',
-    padding: '2rem 1rem',
-    text_align: 'center',
-    show_overlay: false,
-    overlay_color: 'rgba(0, 0, 0, 0.5)',
-    overlay_opacity: 0.5,
-    hero_style: false,
-    min_height: ''
+    image: null
 }
 
 // Display metadata
 eceeeHeaderWidget.metadata = {
-    name: 'HeaderWidget',
-    description: 'Website header with hero sections, background images, and overlay support',
+    name: 'Header',
+    description: 'Simple header widget with image',
     category: 'layout',
-    icon: Layout,
-    tags: ['eceee', 'header', 'hero', 'banner', 'layout', 'title', 'intro']
+    icon: ImageIcon,
+    tags: ['eceee', 'header', 'image', 'layout']
 }
 
 export default eceeeHeaderWidget
