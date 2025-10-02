@@ -1,8 +1,8 @@
 /**
- * ECEEE Two-Column Widget Component
+ * ECEEE Three-Column Widget Component
  * 
- * ECEEE-specific two-column layout with left and right slots that work like regular page slots.
- * Widget type: eceee_widgets.TwoColumnsWidget
+ * ECEEE-specific three-column layout with left, center, and right slots.
+ * Widget type: eceee_widgets.ThreeColumnsWidget
  */
 
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
@@ -13,21 +13,21 @@ import { OperationTypes } from '../../contexts/unified-data/types/operations';
 import { useWidgets } from '../../hooks/useWidgets';
 import PropTypes from 'prop-types';
 
-const eceeeTwoColumnsWidget = ({
+const eceeeThreeColumnsWidget = ({
     config = {},
     mode = 'display',
     widgetId,
     onWidgetEdit,
     onOpenWidgetEditor,
     contextType = 'page',
-    parentComponentId, // PageEditor's componentId
-    slotName, // Which slot this TwoColumnsWidget is in (e.g., 'main')  
-    widgetPath = [], // Full path to this widget (for infinite nesting)
+    parentComponentId,
+    slotName,
+    widgetPath = [],
     ...props
 }) => {
     // Create this widget's own UDC componentId
     const componentId = useMemo(() => {
-        return `two-columns-widget-${widgetId}`;
+        return `three-columns-widget-${widgetId}`;
     }, [widgetId]);
 
     // Get UDC functions
@@ -37,9 +37,8 @@ const eceeeTwoColumnsWidget = ({
     const { widgetTypes, isLoadingTypes, typesError } = useWidgets();
 
     // Local state management for slots data
-    // Initialize from config.slots, but maintain locally to avoid prop resets
     const [slotsData, setSlotsData] = useState(() => {
-        return config.slots || { left: [], right: [] };
+        return config.slots || { left: [], center: [], right: [] };
     });
 
     // Track the widget ID to detect when we're rendering a different widget
@@ -48,18 +47,13 @@ const eceeeTwoColumnsWidget = ({
     // Only update from props when widgetId changes (different widget) or on mount
     useEffect(() => {
         if (previousWidgetIdRef.current !== widgetId) {
-            // Different widget - reinitialize from config
-            setSlotsData(config.slots || { left: [], right: [] });
+            setSlotsData(config.slots || { left: [], center: [], right: [] });
             previousWidgetIdRef.current = widgetId;
         }
     }, [widgetId, config.slots]);
 
     // Subscribe to external UDC changes for this specific widget
     useExternalChanges(componentId, (state) => {
-        // When UDC state changes, look for updates to our widget's config
-        // This allows us to receive updates from other sources (DataManager, other components)
-
-        // Extract updated widget config from UDC state
         let version = null;
         if (contextType === 'page') {
             version = state.versions?.[state.metadata?.currentVersionId];
@@ -70,17 +64,14 @@ const eceeeTwoColumnsWidget = ({
 
         if (!version) return;
 
-        // Find this TwoColumnsWidget in the widgets tree using widgetPath
+        // Find this ThreeColumnsWidget in the widgets tree using widgetPath
         let containerWidget = null;
         if (widgetPath && widgetPath.length >= 2) {
-            // Use path to find this container widget
             const topSlot = widgetPath[0];
             const widgets = version.widgets?.[topSlot] || [];
 
-            // Navigate through the path to find this widget
             let current = widgets;
             for (let i = 1; i < widgetPath.length; i += 2) {
-
                 const targetId = widgetPath[i];
                 const widget = current.find(w => w.id === targetId);
                 if (!widget) break;
@@ -90,24 +81,19 @@ const eceeeTwoColumnsWidget = ({
                     break;
                 }
 
-                // Descend into next slot
                 const nextSlot = widgetPath[i + 1];
                 if (nextSlot && widget.config?.slots) {
                     current = widget.config.slots[nextSlot] || [];
                 }
             }
         } else {
-            // Top-level widget - find in slot
             const slotWidgets = version.widgets?.[slotName] || [];
             containerWidget = slotWidgets.find(w => w.id === widgetId);
         }
 
         if (containerWidget && containerWidget.config?.slots) {
-            // Update local slotsData if it has changed
-
             const newSlots = containerWidget.config.slots;
             setSlotsData(prevSlots => {
-                // Only update if actually changed
                 if (JSON.stringify(prevSlots) !== JSON.stringify(newSlots)) {
                     return newSlots;
                 }
@@ -117,17 +103,15 @@ const eceeeTwoColumnsWidget = ({
     });
 
     // Filter widget types for container slots
-    // TwoColumnsWidget allows most widgets but excludes certain types
     const getFilteredWidgetTypes = useCallback(() => {
         if (!widgetTypes || !Array.isArray(widgetTypes)) return [];
 
         return widgetTypes
             .filter(widget => {
-                // Exclude widgets that shouldn't be in container slots
                 const excludedTypes = [
-                    'layout.full-width', // Layout widgets
-                    'navigation.main-nav', // Navigation widgets
-                    'system.header', // System widgets
+                    'layout.full-width',
+                    'navigation.main-nav',
+                    'system.header',
                     'system.footer'
                 ];
 
@@ -141,34 +125,29 @@ const eceeeTwoColumnsWidget = ({
             }));
     }, [widgetTypes]);
 
-    // Handle slot changes - update local state first, then publish to UDC
+    // Handle slot changes
     const handleSlotChange = useCallback(async (slotName, widgets) => {
-        // Update local state immediately for fast UI
         setSlotsData(prevSlots => {
             const updatedSlots = {
                 ...prevSlots,
                 [slotName]: widgets
             };
 
-            // Publish to UDC using this widget's own componentId
             const updatedConfig = {
                 ...config,
                 slots: updatedSlots
             };
 
             if (publishUpdate) {
-                // Publish using our own componentId (not parent's) so DataManager knows this widget changed
                 publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
                     id: widgetId,
                     config: updatedConfig,
-                    slotName: props.slotName || 'main', // Parent slot where this widget lives
+                    slotName: props.slotName || 'main',
                     contextType,
-                    // Include parent context for DataManager to propagate upward
                     parentComponentId,
-                    // NEW: Path-based approach (supports infinite nesting)
                     widgetPath: widgetPath && widgetPath.length > 0 ? widgetPath : undefined
                 }).catch(error => {
-                    console.error('TwoColumnsWidget: Failed to update config:', error);
+                    console.error('ThreeColumnsWidget: Failed to update config:', error);
                 });
             }
 
@@ -181,10 +160,7 @@ const eceeeTwoColumnsWidget = ({
 
     // Render individual widget in a slot (for display mode)
     const renderWidget = useCallback((widget, slotName, index) => {
-        // Create unique key for widget
         const uniqueKey = widget.id ? `${slotName}-${widget.id}-${index}` : `${slotName}-index-${index}`;
-
-        // Build full path for this widget: widgetPath + widgetId + slotName + widget.id
         const fullWidgetPath = [...widgetPath, widgetId, slotName, widget.id];
 
         return (
@@ -195,49 +171,45 @@ const eceeeTwoColumnsWidget = ({
                     index={index}
                     mode="display"
                     showControls={false}
-                    // Context props
                     parentComponentId={componentId}
                     contextType={contextType}
-                    // Widget path for nested widget support
                     widgetPath={fullWidgetPath}
                 />
             </div>
         );
     }, [widgetPath, widgetId, componentId, contextType]);
 
-    // Show loading state while fetching widget types
+    // Show loading state
     if (mode === 'editor' && isLoadingTypes) {
         return (
-            <div className="two-columns-widget-editor">
-                <div className="columns-grid grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <div className="p-4 text-center text-gray-500">Loading widget types...</div>
-                    <div className="p-4 text-center text-gray-500">Loading widget types...</div>
+            <div className="three-columns-widget-editor">
+                <div className="columns-grid grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    <div className="p-4 text-center text-gray-500">Loading...</div>
+                    <div className="p-4 text-center text-gray-500">Loading...</div>
+                    <div className="p-4 text-center text-gray-500">Loading...</div>
                 </div>
             </div>
         );
     }
 
-    // Show error state if widget types failed to load
+    // Show error state
     if (mode === 'editor' && typesError) {
         return (
-            <div className="two-columns-widget-editor">
-                <div className="columns-grid grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <div className="p-4 text-center text-red-500">
-                        Error loading widget types: {typesError.message}
-                    </div>
-                    <div className="p-4 text-center text-red-500">
-                        Error loading widget types: {typesError.message}
-                    </div>
+            <div className="three-columns-widget-editor">
+                <div className="columns-grid grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    <div className="p-4 text-center text-red-500">Error: {typesError.message}</div>
+                    <div className="p-4 text-center text-red-500">Error: {typesError.message}</div>
+                    <div className="p-4 text-center text-red-500">Error: {typesError.message}</div>
                 </div>
             </div>
         );
     }
 
-    // In editor mode, show SlotEditor components with editable widgets
+    // In editor mode, show SlotEditor components
     if (mode === 'editor') {
         return (
-            <div className="two-columns-widget-editor">
-                <div className="columns-grid grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="three-columns-widget-editor">
+                <div className="columns-grid grid grid-cols-1 lg:grid-cols-3 gap-4">
                     <SlotEditor
                         slotName="left"
                         slotLabel="Left Column"
@@ -250,12 +222,32 @@ const eceeeTwoColumnsWidget = ({
                         onSlotChange={handleSlotChange}
                         parentComponentId={parentComponentId}
                         parentSlotName={slotName}
-                        widgetPath={widgetPath} // Pass path to nested widgets
+                        widgetPath={widgetPath}
                         emptyMessage="No widgets in left column"
                         className=""
-                        mode="editor" // Explicitly pass editor mode
-                        showClearButton={false} // Hide Clear Slot button
-                        compactAddButton={true} // Show just + icon
+                        mode="editor"
+                        showClearButton={false}
+                        compactAddButton={true}
+                    />
+
+                    <SlotEditor
+                        slotName="center"
+                        slotLabel="Center Column"
+                        widgets={slotsData.center || []}
+                        availableWidgetTypes={filteredWidgetTypes}
+                        parentWidgetId={widgetId}
+                        contextType={contextType}
+                        onWidgetEdit={onWidgetEdit}
+                        onOpenWidgetEditor={onOpenWidgetEditor}
+                        onSlotChange={handleSlotChange}
+                        parentComponentId={parentComponentId}
+                        parentSlotName={slotName}
+                        widgetPath={widgetPath}
+                        emptyMessage="No widgets in center column"
+                        className=""
+                        mode="editor"
+                        showClearButton={false}
+                        compactAddButton={true}
                     />
 
                     <SlotEditor
@@ -270,12 +262,12 @@ const eceeeTwoColumnsWidget = ({
                         onSlotChange={handleSlotChange}
                         parentComponentId={parentComponentId}
                         parentSlotName={slotName}
-                        widgetPath={widgetPath} // Pass path to nested widgets
+                        widgetPath={widgetPath}
                         emptyMessage="No widgets in right column"
                         className=""
-                        mode="editor" // Explicitly pass editor mode
-                        showClearButton={false} // Hide Clear Slot button
-                        compactAddButton={true} // Show just + icon
+                        mode="editor"
+                        showClearButton={false}
+                        compactAddButton={true}
                     />
                 </div>
             </div>
@@ -284,12 +276,20 @@ const eceeeTwoColumnsWidget = ({
 
     // In display mode, render the widgets in each slot
     return (
-        <div className="two-columns-widget">
+        <div className="three-columns-widget">
             <div className="column-slot left" data-slot="left">
                 {slotsData.left && slotsData.left.length > 0 ? (
                     slotsData.left.map((widget, index) => renderWidget(widget, 'left', index))
                 ) : (
                     <div className="empty-slot">Left column</div>
+                )}
+            </div>
+
+            <div className="column-slot center" data-slot="center">
+                {slotsData.center && slotsData.center.length > 0 ? (
+                    slotsData.center.map((widget, index) => renderWidget(widget, 'center', index))
+                ) : (
+                    <div className="empty-slot">Center column</div>
                 )}
             </div>
 
@@ -304,10 +304,11 @@ const eceeeTwoColumnsWidget = ({
     );
 };
 
-eceeeTwoColumnsWidget.propTypes = {
+eceeeThreeColumnsWidget.propTypes = {
     config: PropTypes.shape({
         slots: PropTypes.shape({
             left: PropTypes.array,
+            center: PropTypes.array,
             right: PropTypes.array
         })
     }),
@@ -319,17 +320,24 @@ eceeeTwoColumnsWidget.propTypes = {
     parentComponentId: PropTypes.string
 };
 
-eceeeTwoColumnsWidget.displayName = 'ECEEE Two Columns';
-eceeeTwoColumnsWidget.widgetType = 'eceee_widgets.TwoColumnsWidget';
-eceeeTwoColumnsWidget.description = 'ECEEE-specific two-column layout with left and right slots for widgets';
+eceeeThreeColumnsWidget.displayName = 'ECEEE Three Columns';
+eceeeThreeColumnsWidget.widgetType = 'eceee_widgets.ThreeColumnsWidget';
+eceeeThreeColumnsWidget.description = 'ECEEE-specific three-column layout with left, center, and right slots';
 
 // Define slot configuration for the editor
-eceeeTwoColumnsWidget.slotConfiguration = {
+eceeeThreeColumnsWidget.slotConfiguration = {
     slots: [
         {
             name: "left",
             label: "Left Column",
             description: "Widgets in the left column",
+            maxWidgets: null,
+            required: false
+        },
+        {
+            name: "center",
+            label: "Center Column",
+            description: "Widgets in the center column",
             maxWidgets: null,
             required: false
         },
@@ -343,18 +351,19 @@ eceeeTwoColumnsWidget.slotConfiguration = {
     ]
 };
 
-eceeeTwoColumnsWidget.defaultConfig = {
+eceeeThreeColumnsWidget.defaultConfig = {
     layout_style: null,
-    slots: { left: [], right: [] }
+    slots: { left: [], center: [], right: [] }
 };
 
-eceeeTwoColumnsWidget.metadata = {
-    name: 'ECEEE Two Columns',
-    description: 'ECEEE-specific two-column layout with left and right slots',
+eceeeThreeColumnsWidget.metadata = {
+    name: 'ECEEE Three Columns',
+    description: 'ECEEE-specific three-column layout with left, center, and right slots',
     category: 'layout',
     icon: null,
-    tags: ['layout', 'columns', 'container', 'eceee'],
+    tags: ['layout', 'columns', 'container', 'eceee', 'three-column'],
     menuItems: []
 };
 
-export default eceeeTwoColumnsWidget;
+export default eceeeThreeColumnsWidget;
+

@@ -106,16 +106,18 @@ Widget templates are located in `templates/default_widgets/widgets/`:
 
 ## Configuration Models
 
-Widget configuration is handled by Pydantic models in `widget_models.py`:
+Widget configuration is handled by Pydantic models co-located with their widgets:
 
-- `ContentConfig` - Content widget configuration
-- `ImageConfig` - Image widget configuration  
-- `TableConfig` - Table widget configuration
-- `FooterConfig` - Footer widget configuration
-- `HeaderConfig` - Header widget configuration
-- `NavigationConfig` - Navigation widget configuration
-- `SidebarConfig` - Sidebar widget configuration
-- `FormsConfig` - Forms widget configuration
+- `ContentConfig` (in `widgets/content.py`) - Content widget configuration
+- `ImageConfig` (in `widgets/image.py`) - Image widget configuration  
+- `TableConfig` (in `widgets/table.py`) - Table widget configuration
+- `FooterConfig` (in `widgets/footer.py`) - Footer widget configuration
+- `HeaderConfig` (in `widgets/header.py`) - Header widget configuration
+- `NavigationConfig` (in `widgets/navigation.py`) - Navigation widget configuration
+- `SidebarConfig` (in `widgets/sidebar.py`) - Sidebar widget configuration
+- `FormsConfig` (in `widgets/forms.py`) - Forms widget configuration
+
+Each widget file contains both the widget class and its associated Pydantic configuration model.
 
 ## Customization
 

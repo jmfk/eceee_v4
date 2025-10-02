@@ -1,0 +1,40 @@
+{% load widget_tags %}
+
+<div class="three-columns-widget" data-widget-type="three-columns">
+    <div class="column-slot left" data-slot="left">
+        {% if rendered_slots.left %}
+            {% for widget in rendered_slots.left %}
+                <div class="widget-wrapper">
+                    {{ widget.html|safe }}
+                </div>
+            {% endfor %}
+        {% else %}
+            <div class="empty-slot">Left column</div>
+        {% endif %}
+    </div>
+
+    <div class="column-slot center" data-slot="center">
+        {% if rendered_slots.center %}
+            {% for widget in rendered_slots.center %}
+                <div class="widget-wrapper">
+                    {{ widget.html|safe }}
+                </div>
+            {% endfor %}
+        {% else %}
+            <div class="empty-slot">Center column</div>
+        {% endif %}
+    </div>
+
+    <div class="column-slot right" data-slot="right">
+        {% if rendered_slots.right %}
+            {% for widget in rendered_slots.right %}
+                <div class="widget-wrapper">
+                    {{ widget.html|safe }}
+                </div>
+            {% endfor %}
+        {% else %}
+            <div class="empty-slot">Right column</div>
+        {% endif %}
+    </div>
+</div>
+

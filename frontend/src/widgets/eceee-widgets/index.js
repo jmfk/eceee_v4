@@ -2,7 +2,7 @@
  * ECEEE Widgets Package
  * 
  * ECEEE-specific widget implementations that mirror the backend eceee_widgets app.
- * This package can override default widgets by registering widgets with the same widget type.
+ * These are NEW widgets with their own namespace (eceee_widgets.*), not overrides.
  */
 
 // Import the registerWidget utility from default-widgets
@@ -10,27 +10,38 @@ import { registerWidget } from '../default-widgets/registry';
 
 // Import ECEEE-specific widgets
 import eceeeFooterWidget from './eceeeFooterWidget';
-//import eceeeTwoColumnsWidget from './eceeeTwoColumnsWidget';
+import eceeeContentWidget from './eceeeContentWidget';
+import eceeeImageWidget from './eceeeImageWidget';
+import eceeeTableWidget from './eceeeTableWidget';
+import eceeeHeaderWidget from './eceeeHeaderWidget';
+import eceeeNavigationWidget from './eceeeNavigationWidget';
+import eceeeSidebarWidget from './eceeeSidebarWidget';
+import eceeeFormsWidget from './eceeeFormsWidget';
+import eceeeTwoColumnsWidget from './eceeeTwoColumnsWidget';
+import eceeeThreeColumnsWidget from './eceeeThreeColumnsWidget';
 
 /**
  * ECEEE Widget Registry
  * 
- * This registry can override default widgets by using the same widget type.
- * For example, to override the default FooterWidget:
+ * These are ECEEE-specific widgets with their own namespace (eceee_widgets.*)
+ * They are separate from default widgets and don't override them.
  * 
- * 'default_widgets.FooterWidget': registerWidget(eceeeFooterWidget, 'default_widgets.FooterWidget')
- * 
- * This will replace the default FooterWidget with the ECEEE-specific implementation.
+ * Note: eceeeFooterWidget is registered with 'default_widgets.FooterWidget' to override it.
  */
 export const ECEEE_WIDGET_REGISTRY = {
     // Override the default FooterWidget with ECEEE-specific implementation
     'default_widgets.FooterWidget': registerWidget(eceeeFooterWidget, 'default_widgets.FooterWidget'),
-    //'default_widgets.TwoColumnsWidget': registerWidget(eceeeTwoColumnsWidget, 'default_widgets.TwoColumnsWidget'),
 
-    // Example of how to add a new ECEEE-specific widget:
-    // 'eceee_widgets.BlogPostWidget': registerWidget(BlogPostWidget, 'eceee_widgets.BlogPostWidget'),
-
-    // Future ECEEE-specific widgets will be registered here
+    // ECEEE-specific widgets (new widgets, not overrides)
+    'eceee_widgets.ContentWidget': registerWidget(eceeeContentWidget, 'eceee_widgets.ContentWidget'),
+    'eceee_widgets.ImageWidget': registerWidget(eceeeImageWidget, 'eceee_widgets.ImageWidget'),
+    'eceee_widgets.TableWidget': registerWidget(eceeeTableWidget, 'eceee_widgets.TableWidget'),
+    'eceee_widgets.HeaderWidget': registerWidget(eceeeHeaderWidget, 'eceee_widgets.HeaderWidget'),
+    'eceee_widgets.NavigationWidget': registerWidget(eceeeNavigationWidget, 'eceee_widgets.NavigationWidget'),
+    'eceee_widgets.SidebarWidget': registerWidget(eceeeSidebarWidget, 'eceee_widgets.SidebarWidget'),
+    'eceee_widgets.FormsWidget': registerWidget(eceeeFormsWidget, 'eceee_widgets.FormsWidget'),
+    'eceee_widgets.TwoColumnsWidget': registerWidget(eceeeTwoColumnsWidget, 'eceee_widgets.TwoColumnsWidget'),
+    'eceee_widgets.ThreeColumnsWidget': registerWidget(eceeeThreeColumnsWidget, 'eceee_widgets.ThreeColumnsWidget'),
 };
 
 /**
@@ -78,8 +89,15 @@ export const isEceeeWidgetType = (widgetType) => {
 
 // Export individual widget components
 export { default as eceeeFooterWidget } from './eceeeFooterWidget';
-//export { default as eceeeTwoColumnsWidget } from './eceeeTwoColumnsWidget';
-
+export { default as eceeeContentWidget } from './eceeeContentWidget';
+export { default as eceeeImageWidget } from './eceeeImageWidget';
+export { default as eceeeTableWidget } from './eceeeTableWidget';
+export { default as eceeeHeaderWidget } from './eceeeHeaderWidget';
+export { default as eceeeNavigationWidget } from './eceeeNavigationWidget';
+export { default as eceeeSidebarWidget } from './eceeeSidebarWidget';
+export { default as eceeeFormsWidget } from './eceeeFormsWidget';
+export { default as eceeeTwoColumnsWidget } from './eceeeTwoColumnsWidget';
+export { default as eceeeThreeColumnsWidget } from './eceeeThreeColumnsWidget';
 
 // Export the registry for direct access
 export default ECEEE_WIDGET_REGISTRY;

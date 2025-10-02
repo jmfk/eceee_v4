@@ -6,7 +6,7 @@
  */
 import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { Layout, Settings, Trash2, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, X } from 'lucide-react'
-import { getCoreWidgetComponent, getCoreWidgetDisplayName } from '../../widgets'
+import { getWidgetComponent, getWidgetDisplayName } from '../../widgets'
 import { renderWidgetPreview } from '../../utils/widgetPreview'
 import ObjectWidgetHeader from './ObjectWidgetHeader'
 import DeleteConfirmationModal from '../../components/DeleteConfirmationModal'
@@ -158,7 +158,7 @@ const ObjectWidgetFactory = ({
     }
 
     // Get the core widget component
-    const CoreWidgetComponent = getCoreWidgetComponent(widget.type)
+    const CoreWidgetComponent = getWidgetComponent(widget.type)
 
     if (!CoreWidgetComponent) {
         // Fallback for unsupported widgets
@@ -224,7 +224,7 @@ const ObjectWidgetFactory = ({
             >
                 {/* ObjectEditor-specific Widget Header */}
                 <ObjectWidgetHeader
-                    widgetType={getCoreWidgetDisplayName(widget.type)}
+                    widgetType={getWidgetDisplayName(widget.type)}
                     onEdit={onEdit ? handleEdit : undefined}
                     onDelete={onDelete ? handleDelete : undefined}
                     onMoveUp={onMoveUp ? handleMoveUp : undefined}
@@ -283,7 +283,7 @@ const ObjectWidgetFactory = ({
                             <div className="flex items-center justify-between p-4 border-b border-gray-200">
                                 <div>
                                     <h3 className="text-lg font-medium text-gray-900">
-                                        Preview: {getCoreWidgetDisplayName(widget.type)}
+                                        Preview: {getWidgetDisplayName(widget.type)}
                                     </h3>
                                     <p className="text-sm text-gray-500">
                                         {objectType?.name} • {slotConfig?.label || actualSlotName}
@@ -328,8 +328,8 @@ const ObjectWidgetFactory = ({
                     onClose={handleCancelDelete}
                     onConfirm={handleConfirmDelete}
                     title="Delete Widget"
-                    message={`Are you sure you want to delete this ${getCoreWidgetDisplayName(widget.type)} widget?${slotConfig?.required ? ' This is a required slot and deleting this widget may cause validation errors.' : ' This action cannot be undone.'}`}
-                    itemName={getCoreWidgetDisplayName(widget.type)}
+                    message={`Are you sure you want to delete this ${getWidgetDisplayName(widget.type)} widget?${slotConfig?.required ? ' This is a required slot and deleting this widget may cause validation errors.' : ' This action cannot be undone.'}`}
+                    itemName={getWidgetDisplayName(widget.type)}
                     isDeleting={isDeleting}
                     deleteButtonText="Delete Widget"
                     warningText={slotConfig?.required ? "This widget is in a required slot" : null}

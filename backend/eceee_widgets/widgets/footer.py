@@ -49,7 +49,7 @@ class FooterWidget(BaseWidget):
 
     name = "Footer"
     description = "Footer widget with background image/color and text color options"
-    template_name = "default_widgets/widgets/footer.html"
+    template_name = "eceee_widgets/widgets/footer.html"
 
     widget_css = """
     .footer-widget {
