@@ -2,8 +2,8 @@ import { useState, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { widgetsApi } from '../api'
 import {
-    getCoreWidgetDisplayName as getDisplayNameFromRegistry,
-    getCoreWidgetDefaultConfig as getWidgetDefaultConfig
+    getWidgetDisplayName as getDisplayNameFromRegistry,
+    getWidgetDefaultConfig
 } from '../widgets'
 
 /**

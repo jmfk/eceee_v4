@@ -10,9 +10,9 @@ import {
 import { widgetsApi } from '../api'
 import { getAvailableWidgetTypes } from '../utils/widgetTypeValidation'
 import {
-    getCoreWidgetIcon as getWidgetIcon,
-    getCoreWidgetCategory as getWidgetCategory,
-    getCoreWidgetDescription as getWidgetDescription,
+    getWidgetIcon,
+    getWidgetCategory,
+    getWidgetDescription,
     searchCoreWidgets as searchWidgets,
     filterCoreWidgetsByCategory as filterWidgetsByCategory,
     getAvailableCoreCategories as getAvailableCategories

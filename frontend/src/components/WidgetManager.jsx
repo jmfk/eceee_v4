@@ -16,8 +16,8 @@ import {
 } from 'lucide-react'
 import { widgetsApi } from '../api'
 import {
-    getCoreWidgetIcon as getWidgetIcon,
-    getCoreWidgetCategory as getWidgetCategory,
+    getWidgetIcon,
+    getWidgetCategory,
     getAvailableCoreCategories as getAvailableCategories
 } from '../widgets'
 

@@ -3,7 +3,7 @@
  * Used by ContentEditor's LayoutRenderer for DOM-based widget rendering
  */
 
-import { getCoreWidgetComponent as getWidgetComponent } from '../widgets'
+import { getWidgetComponent } from '../widgets'
 
 /**
  * Create a DOM element for a widget using the shared widget logic

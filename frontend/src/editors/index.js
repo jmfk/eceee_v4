@@ -20,8 +20,8 @@ export { ObjectWidgetFactory } from './object-editor'
 
 // Export shared components that both editors can use
 export {
-    getCoreWidgetComponent,
-    getCoreWidgetDisplayName,
+    getWidgetComponent,
+    getWidgetDisplayName,
     validateWidgetConfig,
     createDefaultWidgetConfig,
     generateWidgetId

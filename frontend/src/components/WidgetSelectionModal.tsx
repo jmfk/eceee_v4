@@ -3,9 +3,9 @@ import React, { useState, useMemo, useRef, useEffect } from 'react'
 import { X } from 'lucide-react'
 import { getWidgetDisplayName } from '../hooks/useWidgets'
 import {
-    getCoreWidgetIcon as getWidgetIcon,
-    getCoreWidgetCategory as getWidgetCategory,
-    getCoreWidgetDescription as getWidgetDescription
+    getWidgetIcon,
+    getWidgetCategory,
+    getWidgetDescription
 } from '../widgets'
 const WidgetSelectionModal = ({ isOpen, onClose, onSelectWidget, slot, availableWidgetTypes, isFilteringTypes, context }) => {
     const [searchTerm, setSearchTerm] = useState('')

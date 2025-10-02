@@ -8,9 +8,9 @@ import InlineImageUpload from './InlineImageUpload'
 import { validateFieldName } from '../utils/schemaValidation'
 import { getAllFieldTypes } from '../utils/fieldTypeRegistry'
 import {
-    getCoreWidgetIcon as getWidgetIcon,
-    getCoreWidgetCategory as getWidgetCategory,
-    getCoreWidgetDescription as getWidgetDescription
+    getWidgetIcon,
+    getWidgetCategory,
+    getWidgetDescription
 } from '../widgets'
 
 // Get field types from the registry
