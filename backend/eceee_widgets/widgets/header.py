@@ -11,35 +11,188 @@ from webpages.widget_registry import BaseWidget, register_widget_type
 class LayoutWidgetConfig(BaseModel):
     """Base configuration for layout widgets (Footer, Header, Navigation, Sidebar)"""
 
-    content: str = Field(..., description="Widget content (HTML)")
-    background_color: Optional[str] = Field(
-        None, description="Background color (hex or CSS color)"
+    content: str = Field(
+        ...,
+        description="Widget content (HTML)",
+        json_schema_extra={
+            "component": "RichTextInput",
+            "order": 1,
+            "group": "Content",
+        },
     )
-    background_image: Optional[str] = Field(None, description="Background image URL")
+    background_color: Optional[str] = Field(
+        None,
+        description="Background color (hex or CSS color)",
+        json_schema_extra={
+            "component": "ColorInput",
+            "order": 1,
+            "group": "Background",
+        },
+    )
+    background_image: Optional[str] = Field(
+        None,
+        description="Background image URL",
+        json_schema_extra={
+            "component": "MediaInput",
+            "order": 2,
+            "group": "Background",
+            "mediaTypes": ["image"],
+        },
+    )
     background_size: Literal["cover", "contain", "auto"] = Field(
-        "cover", description="Background image size"
+        "cover",
+        description="Background image size",
+        json_schema_extra={
+            "component": "SegmentedControlInput",
+            "order": 3,
+            "group": "Background",
+            "options": [
+                {"value": "cover", "label": "Cover"},
+                {"value": "contain", "label": "Contain"},
+                {"value": "auto", "label": "Auto"},
+            ],
+        },
     )
     background_position: Literal["center", "top", "bottom", "left", "right"] = Field(
-        "center", description="Background image position"
+        "center",
+        description="Background image position",
+        json_schema_extra={
+            "component": "SegmentedControlInput",
+            "order": 4,
+            "group": "Background",
+            "options": [
+                {"value": "center", "label": "Center"},
+                {"value": "top", "label": "Top"},
+                {"value": "bottom", "label": "Bottom"},
+                {"value": "left", "label": "Left"},
+                {"value": "right", "label": "Right"},
+            ],
+        },
     )
-    text_color: Optional[str] = Field(None, description="Text color (hex or CSS color)")
-    padding: Optional[str] = Field(None, description="Widget padding (CSS value)")
-    margin: Optional[str] = Field(None, description="Widget margin (CSS value)")
+    text_color: Optional[str] = Field(
+        None,
+        description="Text color (hex or CSS color)",
+        json_schema_extra={
+            "component": "ColorInput",
+            "order": 1,
+            "group": "Styling",
+        },
+    )
+    padding: Optional[str] = Field(
+        None,
+        description="Widget padding (CSS value)",
+        json_schema_extra={
+            "component": "TextInput",
+            "order": 2,
+            "group": "Styling",
+            "placeholder": "e.g., 2rem 1rem",
+        },
+    )
+    margin: Optional[str] = Field(
+        None,
+        description="Widget margin (CSS value)",
+        json_schema_extra={
+            "component": "TextInput",
+            "order": 3,
+            "group": "Styling",
+            "placeholder": "e.g., 1rem 0",
+        },
+    )
     text_align: Literal["left", "center", "right", "justify"] = Field(
-        "left", description="Text alignment"
+        "left",
+        description="Text alignment",
+        json_schema_extra={
+            "component": "SegmentedControlInput",
+            "order": 4,
+            "group": "Styling",
+            "options": [
+                {"value": "left", "label": "Left"},
+                {"value": "center", "label": "Center"},
+                {"value": "right", "label": "Right"},
+                {"value": "justify", "label": "Justify"},
+            ],
+        },
     )
-    css_class: Optional[str] = Field(None, description="Additional CSS class")
-    custom_css: Optional[str] = Field(None, description="Custom CSS for this widget")
+    css_class: Optional[str] = Field(
+        None,
+        description="Additional CSS class",
+        json_schema_extra={
+            "component": "TextInput",
+            "order": 1,
+            "group": "Advanced",
+            "placeholder": "custom-class",
+        },
+    )
+    custom_css: Optional[str] = Field(
+        None,
+        description="Custom CSS for this widget",
+        json_schema_extra={
+            "component": "TextareaInput",
+            "order": 2,
+            "group": "Advanced",
+            "rows": 5,
+            "placeholder": ".header-widget { /* custom styles */ }",
+        },
+    )
 
 
 class HeaderConfig(LayoutWidgetConfig):
     """Configuration for Header widget"""
 
-    show_overlay: bool = Field(False, description="Show overlay on background image")
-    overlay_color: Optional[str] = Field(None, description="Overlay color")
-    overlay_opacity: float = Field(0.5, ge=0, le=1, description="Overlay opacity")
-    hero_style: bool = Field(False, description="Use hero banner styling")
-    min_height: Optional[str] = Field(None, description="Minimum height (CSS value)")
+    show_overlay: bool = Field(
+        False,
+        description="Show overlay on background image",
+        json_schema_extra={
+            "component": "BooleanInput",
+            "variant": "toggle",
+            "order": 5,
+            "group": "Background",
+        },
+    )
+    overlay_color: Optional[str] = Field(
+        None,
+        description="Overlay color",
+        json_schema_extra={
+            "component": "ColorInput",
+            "order": 6,
+            "group": "Background",
+        },
+    )
+    overlay_opacity: float = Field(
+        0.5,
+        ge=0,
+        le=1,
+        description="Overlay opacity",
+        json_schema_extra={
+            "component": "SliderInput",
+            "order": 7,
+            "group": "Background",
+            "min": 0,
+            "max": 1,
+            "step": 0.1,
+            "showValue": True,
+        },
+    )
+    hero_style: bool = Field(
+        False,
+        description="Use hero banner styling",
+        json_schema_extra={
+            "component": "BooleanInput",
+            "variant": "toggle",
+            "order": 5,
+            "group": "Styling",
+        },
+    )
+    min_height: Optional[str] = Field(
+        None,
+        description="Minimum height (CSS value)",
+        json_schema_extra={
+            "component": "TextInput",
+            "order": 6,
+            "group": "Styling",
+            "placeholder": "e.g., 60vh or 400px",
+        },
+    )
 
 
 @register_widget_type

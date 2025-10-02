@@ -82,20 +82,9 @@ const HeaderWidget = ({ config = {}, mode = 'preview' }) => {
     }
 
     return (
-        <header
-            className={`header-widget ${hero_style ? 'hero-header' : ''} ${css_class}`}
-            style={headerStyle}
-        >
-            {overlayStyle && <div className="header-overlay" style={overlayStyle}></div>}
-
-            <div className="header-content" style={contentStyle}>
-                <div dangerouslySetInnerHTML={{ __html: content }} />
-            </div>
-
-            {custom_css && (
-                <style dangerouslySetInnerHTML={{ __html: custom_css }} />
-            )}
-        </header>
+        <>
+            <div dangerouslySetInnerHTML={{ __html: content }} />
+        </>
     )
 }
 

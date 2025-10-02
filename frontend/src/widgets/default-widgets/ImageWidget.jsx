@@ -478,7 +478,8 @@ ImageWidget.metadata = {
     description: 'Images, galleries, and videos with multiple display modes and responsive design',
     category: 'media',
     icon: Image,
-    tags: ['image', 'picture', 'photo', 'video', 'gallery', 'media', 'carousel']
+    tags: ['image', 'picture', 'photo', 'video', 'gallery', 'media', 'carousel'],
+    specialEditor: 'MediaSpecialEditor' // Declare which special editor to use
 }
 
 export default ImageWidget

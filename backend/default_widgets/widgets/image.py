@@ -30,7 +30,11 @@ class ImageConfig(BaseModel):
     """Configuration for Image widget"""
 
     mediaItems: List[ImageMediaItem] = Field(
-        default_factory=list, description="List of images/videos to display"
+        default_factory=list,
+        description="List of images/videos to display",
+        json_schema_extra={
+            "hidden": True,  # Hidden from UI - managed by MediaSpecialEditor
+        },
     )
     displayType: Literal["gallery", "carousel"] = Field(
         "gallery",
@@ -104,12 +108,20 @@ class ImageConfig(BaseModel):
         },
     )
 
-    # Collection support
+    # Collection support (managed by MediaSpecialEditor)
     collectionId: Optional[str] = Field(
-        None, description="ID of selected media collection"
+        None,
+        description="ID of selected media collection",
+        json_schema_extra={
+            "hidden": True,  # Hidden from UI - managed by MediaSpecialEditor
+        },
     )
     collectionConfig: Optional[dict] = Field(
-        None, description="Collection display configuration"
+        None,
+        description="Collection display configuration",
+        json_schema_extra={
+            "hidden": True,  # Hidden from UI - managed by MediaSpecialEditor
+        },
     )
 
 

@@ -35,7 +35,8 @@ eceeeImageWidget.metadata = {
     category: 'media',
     icon: null,
     tags: ['image', 'gallery', 'carousel', 'eceee'],
-    menuItems: []
+    menuItems: [],
+    specialEditor: 'MediaSpecialEditor' // Declare which special editor to use
 };
 
 export default eceeeImageWidget;
