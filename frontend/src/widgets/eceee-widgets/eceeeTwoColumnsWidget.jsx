@@ -284,20 +284,20 @@ const eceeeTwoColumnsWidget = ({
 
     // In display mode, render the widgets in each slot
     return (
-        <div className="two-columns-widget">
-            <div className="column-slot left" data-slot="left">
+        <div className="flex flex-col lg:flex-row gap-[30px] w-[995px]">
+            <div className="flex flex-col space-y-4 w-full lg:max-w-[585px]" data-slot="left">
                 {slotsData.left && slotsData.left.length > 0 ? (
                     slotsData.left.map((widget, index) => renderWidget(widget, 'left', index))
                 ) : (
-                    <div className="empty-slot">Left column</div>
+                    <div className="p-4 text-center text-gray-400">Left column</div>
                 )}
             </div>
 
-            <div className="column-slot right" data-slot="right">
+            <div className="flex flex-col space-y-4 w-full lg:max-w-[380px]" data-slot="right">
                 {slotsData.right && slotsData.right.length > 0 ? (
                     slotsData.right.map((widget, index) => renderWidget(widget, 'right', index))
                 ) : (
-                    <div className="empty-slot">Right column</div>
+                    <div className="p-4 text-center text-gray-400">Right column</div>
                 )}
             </div>
         </div>

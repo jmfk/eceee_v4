@@ -5,8 +5,8 @@
  * These are NEW widgets with their own namespace (eceee_widgets.*), not overrides.
  */
 
-// Import the registerWidget utility from default-widgets
-import { registerWidget } from '../default-widgets/registry';
+// Import the registerWidget utility
+import { registerWidget } from './registry';
 
 // Import ECEEE-specific widgets
 import eceeeFooterWidget from './eceeeFooterWidget';

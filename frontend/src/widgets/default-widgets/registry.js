@@ -112,13 +112,13 @@ export const getCoreWidgetDisplayName = (widgetTypeOrData, widgetTypes = []) => 
     if (typeof widgetTypeOrData === 'string') {
         const registryEntry = CORE_WIDGET_REGISTRY[widgetTypeOrData]
         if (registryEntry) {
-            return registryEntry.metadata.name
+            return registryEntry.metadata.display_name
         }
 
         // Fallback to API data if available
         const widgetTypeData = widgetTypes.find(w => w.type === widgetTypeOrData)
         if (widgetTypeData) {
-            return widgetTypeData.name || widgetTypeData.label || widgetTypeData.display_name || widgetTypeOrData
+            return widgetTypeData.display_name || widgetTypeData.label || widgetTypeData.name || widgetTypeOrData
         }
 
         // Last resort fallback
