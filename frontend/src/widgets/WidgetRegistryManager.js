@@ -15,9 +15,8 @@ class WidgetRegistryManager {
         this.registries = new Map(); // Map<priority, registry>
         this.priorities = {
             DEFAULT: 100,
-            ECEEE: 200,
-            THIRD_PARTY: 300,
-            CUSTOM: 400
+            THIRD_PARTY: 200,
+            CUSTOM: 300
         };
     }
 
@@ -68,6 +67,7 @@ class WidgetRegistryManager {
 
         for (const priority of sortedPriorities) {
             const { registry } = this.registries.get(priority);
+
             if (registry[widgetType]) {
                 return registry[widgetType];
             }
@@ -96,6 +96,7 @@ class WidgetRegistryManager {
      */
     getWidgetDisplayName(widgetTypeOrData, widgetTypes = []) {
         // If widgetTypeOrData is an object (widget type data), extract name from it
+
         if (typeof widgetTypeOrData === 'object' && widgetTypeOrData !== null) {
             return widgetTypeOrData.name || widgetTypeOrData.label || widgetTypeOrData.display_name || widgetTypeOrData.type;
         }
@@ -104,13 +105,13 @@ class WidgetRegistryManager {
         if (typeof widgetTypeOrData === 'string') {
             const metadata = this.getWidgetMetadata(widgetTypeOrData);
             if (metadata) {
-                return metadata.metadata?.name || metadata.displayName;
+                return metadata.displayName;
             }
 
             // Fallback to API data if available
             const widgetTypeData = widgetTypes.find(w => w.type === widgetTypeOrData);
             if (widgetTypeData) {
-                return widgetTypeData.name || widgetTypeData.label || widgetTypeData.display_name || widgetTypeOrData;
+                return widgetTypeData.display_name || widgetTypeOrData;
             }
 
             // Last resort fallback

@@ -36,6 +36,7 @@ import ThemeSelector from './ThemeSelector'
 import PagePreview from './PagePreview'
 import SettingsEditor from './SettingsEditor'
 import PublishingEditor from './PublishingEditor'
+import { getWidgetDisplayName } from '../hooks/useWidgets'
 
 import { logValidationSync } from '../utils/stateVerification'
 
@@ -1541,7 +1542,7 @@ const PageEditor = () => {
                         onSave={handleSaveWidget}
                         onRealTimeUpdate={handleRealTimeWidgetUpdate}
                         widgetData={editingWidget}
-                        title={editingWidget ? `Edit ${editingWidget.name}` : 'Edit Widget'}
+                        title={editingWidget ? `Edit ${getWidgetDisplayName(editingWidget.type)}` : 'Edit Widget'}
                         autoOpenSpecialEditor={true}
                     />
                 </div>

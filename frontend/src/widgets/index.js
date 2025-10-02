@@ -12,7 +12,7 @@ import { ECEEE_WIDGET_REGISTRY } from './eceee-widgets';
 // Register all widget registries with priority levels
 // Higher priority numbers override lower priority numbers
 widgetRegistryManager.registerRegistry(CORE_WIDGET_REGISTRY, widgetRegistryManager.priorities.DEFAULT, 'default-widgets');
-widgetRegistryManager.registerRegistry(ECEEE_WIDGET_REGISTRY, widgetRegistryManager.priorities.ECEEE, 'eceee-widgets');
+widgetRegistryManager.registerRegistry(ECEEE_WIDGET_REGISTRY, widgetRegistryManager.priorities.THIRD_PARTY, 'eceee-widgets');
 
 // Export everything from default widgets for backward compatibility
 export * from './default-widgets';
