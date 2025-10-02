@@ -1,8 +1,8 @@
 /**
  * SpecialEditorRenderer Component
  * 
- * Renders the appropriate special editor based on widget type.
- * This component serves as a registry and renderer for different special editors.
+ * Renders the appropriate special editor based on widget metadata.
+ * Special editors are now declared in widget metadata for better modularity.
  */
 import React, { useCallback, useEffect, useMemo } from 'react'
 import MediaSpecialEditor from './MediaSpecialEditor'
@@ -10,20 +10,56 @@ import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataC
 import { OperationTypes } from '../../contexts/unified-data/types/operations'
 import { useEditorContext } from '../../contexts/unified-data/hooks'
 import { lookupWidget, hasWidgetContentChanged } from '../../utils/widgetUtils'
+import { getWidgetMetadata } from '../../widgets'
 
-// Registry of special editors mapped to widget types
-const SPECIAL_EDITORS = {
-    'default_widgets.ImageWidget': MediaSpecialEditor,
+// Map of special editor names to components
+const SPECIAL_EDITOR_COMPONENTS = {
+    'MediaSpecialEditor': MediaSpecialEditor,
 }
 
-// Function to check if a widget type has a special editor
-export const hasSpecialEditor = (widgetType) => {
-    return widgetType && SPECIAL_EDITORS[widgetType] !== undefined
+// Legacy registry for backward compatibility (deprecated - use widget metadata instead)
+const LEGACY_SPECIAL_EDITORS = {
+    'default_widgets.ImageWidget': 'MediaSpecialEditor',
+    'eceee_widgets.ImageWidget': 'MediaSpecialEditor',
 }
 
-// Function to get the special editor component for a widget type
+/**
+ * Get special editor component for a widget type
+ * First checks widget metadata, then falls back to legacy registry
+ * @param {string} widgetType - Widget type identifier
+ * @returns {React.Component|null} Special editor component or null
+ */
 export const getSpecialEditor = (widgetType) => {
-    return SPECIAL_EDITORS[widgetType] || null
+    if (!widgetType) return null
+
+    // Try to get from widget metadata first (preferred approach)
+    const widgetEntry = getWidgetMetadata(widgetType)
+    // The metadata is nested inside the registry entry
+    const metadata = widgetEntry?.metadata
+    if (metadata?.specialEditor) {
+        const editorComponent = SPECIAL_EDITOR_COMPONENTS[metadata.specialEditor]
+        if (editorComponent) {
+            return editorComponent
+        }
+        console.warn(`[SpecialEditor] Editor "${metadata.specialEditor}" declared in metadata but not found in SPECIAL_EDITOR_COMPONENTS`)
+    }
+
+    // Fall back to legacy registry
+    const legacyEditorName = LEGACY_SPECIAL_EDITORS[widgetType]
+    if (legacyEditorName) {
+        return SPECIAL_EDITOR_COMPONENTS[legacyEditorName]
+    }
+
+    return null
+}
+
+/**
+ * Check if a widget type has a special editor
+ * @param {string} widgetType - Widget type identifier
+ * @returns {boolean} True if widget has a special editor
+ */
+export const hasSpecialEditor = (widgetType) => {
+    return getSpecialEditor(widgetType) !== null
 }
 
 const SpecialEditorRenderer = ({
