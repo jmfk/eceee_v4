@@ -219,16 +219,16 @@ class WidgetAppDependencyTest(TestCase):
         """Test that default_widgets app works independently"""
         # Import core widgets directly
         try:
-            from default_widgets.widgets import TextBlockWidget, ImageWidget
-            from default_widgets.widget_models import TextBlockConfig, ImageConfig
+            from default_widgets.widgets.content import ContentWidget, ContentConfig
+            from default_widgets.widgets.image import ImageWidget, ImageConfig
 
             # Should be able to create instances
-            text_widget = TextBlockWidget()
-            self.assertEqual(text_widget.name, "Text Block")
+            content_widget = ContentWidget()
+            self.assertEqual(content_widget.name, "Content")
 
             # Should be able to create configurations
-            config = TextBlockConfig(content="Test")
-            self.assertEqual(config.content, "Test")
+            config = ContentConfig(content="<p>Test</p>")
+            self.assertEqual(config.content, "<p>Test</p>")
 
         except ImportError as e:
             # If default_widgets is not available, that's also valid for this test

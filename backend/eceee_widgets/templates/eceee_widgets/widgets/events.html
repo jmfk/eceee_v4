@@ -1,0 +1,215 @@
+{% load static %}
+
+<article class="events-widget widget-events" data-widget-type="events">
+    <header class="event-header">
+        <h2 class="event-title">{{ config.event_title }}</h2>
+        {% if config.event_type %}
+            <span class="event-type event-type-{{ config.event_type }}">{{ config.event_type|title }}</span>
+        {% endif %}
+    </header>
+
+    <div class="event-details">
+        <div class="event-datetime">
+            <div class="event-start">
+                <i class="icon-clock" aria-hidden="true"></i>
+                <div class="datetime-info">
+                    <strong>Starts:</strong>
+                    <time datetime="{{ config.start_date }}">
+                        {{ config.start_date|date:"l, F j, Y \a\t g:i A" }}
+                    </time>
+                </div>
+            </div>
+            {% if config.end_date %}
+                <div class="event-end">
+                    <i class="icon-clock-end" aria-hidden="true"></i>
+                    <div class="datetime-info">
+                        <strong>Ends:</strong>
+                        <time datetime="{{ config.end_date }}">
+                            {{ config.end_date|date:"l, F j, Y \a\t g:i A" }}
+                        </time>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+
+        {% if config.location %}
+            <div class="event-location">
+                <i class="icon-location" aria-hidden="true"></i>
+                <span>{{ config.location }}</span>
+            </div>
+        {% endif %}
+
+        {% if config.price %}
+            <div class="event-price">
+                <i class="icon-money" aria-hidden="true"></i>
+                <span class="price">{{ config.price }}</span>
+            </div>
+        {% endif %}
+
+        {% if config.capacity %}
+            <div class="event-capacity">
+                <i class="icon-users" aria-hidden="true"></i>
+                <span>Max {{ config.capacity }} attendee{{ config.capacity|pluralize }}</span>
+            </div>
+        {% endif %}
+    </div>
+
+    {% if config.description %}
+        <div class="event-description">
+            {{ config.description|linebreaks }}
+        </div>
+    {% endif %}
+
+    {% if config.registration_url %}
+        <div class="event-actions">
+            <a href="{{ config.registration_url }}" class="event-register-btn" target="_blank" rel="noopener">
+                Register Now
+                <i class="icon-external" aria-hidden="true"></i>
+            </a>
+        </div>
+    {% endif %}
+</article>
+
+<style>
+.events-widget {
+    border: 1px solid #e1e5e9;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin: 1rem 0;
+    background: #fff;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.event-header {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #e1e5e9;
+}
+
+.event-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #1a202c;
+    margin: 0 0 0.5rem 0;
+    line-height: 1.2;
+}
+
+.event-type {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.event-type-conference { background: #bee3f8; color: #2b6cb0; }
+.event-type-workshop { background: #c6f6d5; color: #276749; }
+.event-type-seminar { background: #fbb6ce; color: #b83280; }
+.event-type-meeting { background: #faf089; color: #744210; }
+.event-type-social { background: #fed7d7; color: #c53030; }
+.event-type-other { background: #e2e8f0; color: #4a5568; }
+
+.event-details {
+    display: grid;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.event-datetime, .event-location, .event-price, .event-capacity {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background: #f7fafc;
+    border-radius: 6px;
+    border-left: 4px solid #4299e1;
+}
+
+.event-start, .event-end {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.event-end {
+    margin-bottom: 0;
+}
+
+.datetime-info {
+    line-height: 1.4;
+}
+
+.datetime-info strong {
+    display: block;
+    font-size: 0.875rem;
+    color: #4a5568;
+    margin-bottom: 0.25rem;
+}
+
+.event-location { border-left-color: #48bb78; }
+.event-price { border-left-color: #ed8936; }
+.event-capacity { border-left-color: #9f7aea; }
+
+.event-description {
+    color: #4a5568;
+    line-height: 1.6;
+    margin-bottom: 1.5rem;
+}
+
+.event-actions {
+    text-align: center;
+    padding-top: 1rem;
+    border-top: 1px solid #e1e5e9;
+}
+
+.event-register-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    background: #4299e1;
+    color: white;
+    text-decoration: none;
+    border-radius: 6px;
+    font-weight: 600;
+    transition: background-color 0.2s;
+}
+
+.event-register-btn:hover {
+    background: #3182ce;
+    color: white;
+    text-decoration: none;
+}
+
+.price {
+    font-weight: 600;
+    color: #ed8936;
+}
+
+/* Icons */
+.icon-clock::before { content: "🕒"; }
+.icon-clock-end::before { content: "🕕"; }
+.icon-location::before { content: "📍"; }
+.icon-money::before { content: "💰"; }
+.icon-users::before { content: "👥"; }
+.icon-external::before { content: "↗️"; }
+
+@media (max-width: 768px) {
+    .events-widget {
+        padding: 1rem;
+    }
+    
+    .event-title {
+        font-size: 1.5rem;
+    }
+    
+    .event-datetime, .event-location, .event-price, .event-capacity {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+}
+</style> 

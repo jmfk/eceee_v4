@@ -119,7 +119,7 @@ class ImageWidget(BaseWidget):
 
     name = "Image"
     description = "Image widget that contains image, image gallery, or video"
-    template_name = "default_widgets/widgets/image.html"
+    template_name = "eceee_widgets/widgets/image.html"
 
     widget_css = """
     .image-widget {

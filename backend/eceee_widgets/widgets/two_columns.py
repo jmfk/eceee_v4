@@ -5,7 +5,6 @@ Simple two-column widget implementation.
 from typing import Type, Optional
 from pydantic import BaseModel, Field
 
-from webpages.renderers import WebPageRenderer
 from webpages.widget_registry import BaseWidget, register_widget_type
 
 
@@ -29,9 +28,10 @@ class TwoColumnsConfig(BaseModel):
 class TwoColumnsWidget(BaseWidget):
     """Simple two-column widget with left and right slots"""
 
+    app_label = "eceee_widgets"
     name = "Two Columns"
     description = "Simple two-column layout with left and right slots for widgets"
-    template_name = "default_widgets/widgets/two_columns.html"
+    template_name = "eceee_widgets/widgets/two_column.html"
 
     widget_css = """
     .two-columns-widget {
@@ -98,8 +98,6 @@ class TwoColumnsWidget(BaseWidget):
 
     def prepare_template_context(self, config, context=None):
         """Prepare context with slot rendering like PageVersion"""
-        request = context["request"]
-        renderer = WebPageRenderer(request=request)
         template_config = super().prepare_template_context(config, context)
 
         # Get slots data (like PageVersion.widgets)
@@ -107,12 +105,14 @@ class TwoColumnsWidget(BaseWidget):
 
         # Render widgets for each slot using existing renderer
         rendered_slots = {}
-        if context and renderer:
+        if context and "renderer" in context:
             for slot_name, widgets in slots_data.items():
                 rendered_widgets = []
                 for widget_data in widgets:
                     try:
-                        widget_html = renderer.render_widget_json(widget_data, context)
+                        widget_html = context["renderer"].render_widget_json(
+                            widget_data, context
+                        )
                         rendered_widgets.append(
                             {"html": widget_html, "widget_data": widget_data}
                         )

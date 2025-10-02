@@ -50,9 +50,11 @@ backend/
 │   ├── serializers.py    # DRF serializers
 │   ├── urls.py           # App URLs
 │   └── management/       # Django commands
-├── core_widgets/         # Built-in widget types
-│   ├── widgets.py        # Widget implementations
-│   ├── widget_models.py  # Pydantic models
+├── default_widgets/      # Built-in widget types
+│   ├── widgets/          # Widget implementations
+│   │   ├── content.py    # Content widget + config
+│   │   ├── image.py      # Image widget + config
+│   │   └── ...           # Other widgets
 │   └── templates/        # Widget templates
 ├── content/              # Content management
 ├── htmx/                 # HTMX demonstrations

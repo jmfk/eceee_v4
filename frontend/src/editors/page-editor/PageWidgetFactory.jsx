@@ -6,7 +6,7 @@
  */
 import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { Layout, Settings, Trash2, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, X } from 'lucide-react'
-import { getCoreWidgetComponent, getCoreWidgetDisplayName } from '../../widgets'
+import { getWidgetComponent, getWidgetDisplayName } from '../../widgets'
 import { renderWidgetPreview } from '../../utils/widgetPreview'
 import PageWidgetHeader from './PageWidgetHeader'
 import DeleteConfirmationModal from '../../components/DeleteConfirmationModal'
@@ -162,8 +162,8 @@ const PageWidgetFactory = ({
         setIsLoadingPreview(false)
     }
 
-    // Get the core widget component
-    const CoreWidgetComponent = getCoreWidgetComponent(widget.type)
+    // Get the widget component (supports ECEEE widgets and overrides)
+    const CoreWidgetComponent = getWidgetComponent(widget.type)
 
     if (!CoreWidgetComponent) {
         // Fallback for unsupported widgets
@@ -223,7 +223,7 @@ const PageWidgetFactory = ({
             >
                 {/* PageEditor-specific Widget Header */}
                 <PageWidgetHeader
-                    widgetType={getCoreWidgetDisplayName(widget.type)}
+                    widgetType={getWidgetDisplayName(widget.type)}
                     onEdit={onEdit ? handleEdit : undefined}
                     onDelete={onDelete ? handleDelete : undefined}
                     onMoveUp={onMoveUp ? handleMoveUp : undefined}
@@ -318,8 +318,8 @@ const PageWidgetFactory = ({
                     onClose={handleCancelDelete}
                     onConfirm={handleConfirmDelete}
                     title="Delete Widget"
-                    message={`Are you sure you want to delete this ${getCoreWidgetDisplayName(widget.type)} widget? This action cannot be undone.`}
-                    itemName={getCoreWidgetDisplayName(widget.type)}
+                    message={`Are you sure you want to delete this ${getWidgetDisplayName(widget.type)} widget? This action cannot be undone.`}
+                    itemName={getWidgetDisplayName(widget.type)}
                     isDeleting={isDeleting}
                     deleteButtonText="Delete Widget"
                 />

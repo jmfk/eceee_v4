@@ -45,7 +45,7 @@ class ContentWidget(BaseWidget):
 
     name = "Content"
     description = "Content widget that contains HTML"
-    template_name = "default_widgets/widgets/content.html"
+    template_name = "eceee_widgets/widgets/content.html"
 
     widget_css = """
     .content-widget {
