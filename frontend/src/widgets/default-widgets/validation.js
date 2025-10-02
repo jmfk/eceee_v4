@@ -5,7 +5,7 @@
  * consistent widget validation behavior.
  */
 
-import { getCoreWidgetDefaultConfig, isCoreWidgetTypeSupported } from './registry'
+import { getWidgetDefaultConfig, isWidgetTypeSupported } from '../index'
 
 /**
  * Validate widget configuration against its schema
@@ -30,7 +30,7 @@ export const validateWidgetConfig = (widget) => {
     if (!widget.type) {
         result.isValid = false
         result.errors.type = ['Widget type is required']
-    } else if (!isCoreWidgetTypeSupported(widget.type)) {
+    } else if (!isWidgetTypeSupported(widget.type)) {
         result.isValid = false
         result.errors.type = [`Unsupported widget type: ${widget.type}`]
     }
@@ -44,11 +44,11 @@ export const validateWidgetConfig = (widget) => {
     // Validate configuration
     if (!widget.config || typeof widget.config !== 'object') {
         result.warnings.config = ['Widget config is missing or invalid, using defaults']
-        widget.config = getCoreWidgetDefaultConfig(widget.type)
+        widget.config = getWidgetDefaultConfig(widget.type)
     }
 
     // Widget-specific validation
-    if (widget.type && isCoreWidgetTypeSupported(widget.type)) {
+    if (widget.type && isWidgetTypeSupported(widget.type)) {
         const specificValidation = validateSpecificWidget(widget)
         result.isValid = result.isValid && specificValidation.isValid
         result.errors = { ...result.errors, ...specificValidation.errors }
@@ -376,7 +376,7 @@ export const validateWidgets = (widgets) => {
  * @returns {Object} Widget configuration
  */
 export const createDefaultWidgetConfig = (widgetType, overrides = {}) => {
-    const defaultConfig = getCoreWidgetDefaultConfig(widgetType)
+    const defaultConfig = getWidgetDefaultConfig(widgetType)
     return {
         ...defaultConfig,
         ...overrides

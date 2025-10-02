@@ -273,7 +273,7 @@ const PageWidgetFactory = ({
                             <div className="flex items-center justify-between p-4 border-b border-gray-200">
                                 <div>
                                     <h3 className="text-lg font-medium text-gray-900">
-                                        Preview: {getCoreWidgetDisplayName(widget.type)}
+                                        Preview: {getWidgetDisplayName(widget.type)}
                                     </h3>
                                     {versionId && (
                                         <p className="text-sm text-gray-500">Version: {versionId}</p>

@@ -61,6 +61,27 @@ export const getAvailableCategories = () => {
     return widgetRegistryManager.getAvailableCategories();
 };
 
+// Helper functions that extract from metadata
+export const getWidgetIcon = (widgetType) => {
+    const metadata = widgetRegistryManager.getWidgetMetadata(widgetType);
+    return metadata?.metadata?.icon || null;
+};
+
+export const getWidgetCategory = (widgetType) => {
+    const metadata = widgetRegistryManager.getWidgetMetadata(widgetType);
+    return metadata?.metadata?.category || 'other';
+};
+
+export const getWidgetDescription = (widgetType) => {
+    const metadata = widgetRegistryManager.getWidgetMetadata(widgetType);
+    return metadata?.metadata?.description || '';
+};
+
+export const getWidgetTags = (widgetType) => {
+    const metadata = widgetRegistryManager.getWidgetMetadata(widgetType);
+    return metadata?.metadata?.tags || [];
+};
+
 // Export the registry manager for advanced usage
 export { widgetRegistryManager };
 
