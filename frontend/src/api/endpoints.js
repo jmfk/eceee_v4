@@ -34,6 +34,7 @@ export const endpoints = {
         linkObject: (id) => `${BASE_PATH}/webpages/pages/${id}/link-object/`,
         unlinkObject: (id) => `${BASE_PATH}/webpages/pages/${id}/unlink-object/`,
         syncObject: (id) => `${BASE_PATH}/webpages/pages/${id}/sync-object/`,
+        widgetInheritance: (id) => `${BASE_PATH}/webpages/pages/${id}/widget-inheritance/`,
         publicationStatus: `${BASE_PATH}/webpages/pages/publicationStatus/`,
         // DEPRECATED: Version-related endpoints moved to versions API (but URLs remain consistent)
         versions: (id) => `${BASE_PATH}/webpages/pages/${id}/versions/`, // Still works, now consistent path-based

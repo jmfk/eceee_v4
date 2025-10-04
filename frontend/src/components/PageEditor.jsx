@@ -37,6 +37,7 @@ import PagePreview from './PagePreview'
 import SettingsEditor from './SettingsEditor'
 import PublishingEditor from './PublishingEditor'
 import { getWidgetDisplayName } from '../hooks/useWidgets'
+import { useWidgetInheritance } from '../hooks/useWidgetInheritance'
 
 import { logValidationSync } from '../utils/stateVerification'
 
@@ -361,6 +362,15 @@ const PageEditor = () => {
         },
         enabled: !isNewPage
     })
+
+    // Fetch widget inheritance data
+    const {
+        inheritedWidgets,
+        slotInheritanceRules,
+        hasInheritedContent,
+        parentId,
+        isLoading: isLoadingInheritance
+    } = useWidgetInheritance(pageId, !isNewPage && Boolean(pageId))
 
     // Combined loading state
     const isLoading = isLoadingWebpage || isLoadingPageVersion
@@ -1471,6 +1481,10 @@ const PageEditor = () => {
                                                     onLocalWidgetUpdate={updateLocalWidgets}
                                                     sharedComponentId={componentId}
                                                     publishWidgetOperation={publishWidgetOperation}
+                                                    // Widget inheritance
+                                                    inheritedWidgets={inheritedWidgets}
+                                                    slotInheritanceRules={slotInheritanceRules}
+                                                    hasInheritedContent={hasInheritedContent}
                                                     // Editor context
                                                     context={{
                                                         pageId: webpageData?.id,

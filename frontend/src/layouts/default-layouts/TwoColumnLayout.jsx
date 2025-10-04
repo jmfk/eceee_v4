@@ -5,7 +5,20 @@
 import React from 'react';
 import WidgetSlot from './WidgetSlot';
 
-export const TwoColumnLayout = ({ widgets, onWidgetAction, editable = true, pageContext = {}, onShowWidgetModal, onClearSlot }) => {
+export const TwoColumnLayout = ({
+    widgets,
+    onWidgetAction,
+    editable = true,
+    pageContext = {},
+    onShowWidgetModal,
+    onClearSlot,
+    inheritedWidgets = {},
+    slotInheritanceRules = {}
+}) => {
+    console.log("TwoColumnLayout")
+    console.log("inheritedWidgets", inheritedWidgets)
+    console.log("slotInheritanceRules", slotInheritanceRules)
+
     return (
         <div className="two-column-layout w-full h-full overflow-y-auto bg-gray-50">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-6xl mx-auto p-6 pb-20">
@@ -15,7 +28,7 @@ export const TwoColumnLayout = ({ widgets, onWidgetAction, editable = true, page
                         name="header"
                         label="Header"
                         description="Page header area"
-                        widgets={widgets.header || []}
+                        widgets={widgets}
                         onWidgetAction={onWidgetAction}
                         editable={editable}
                         pageContext={pageContext}
@@ -25,6 +38,8 @@ export const TwoColumnLayout = ({ widgets, onWidgetAction, editable = true, page
                         required={false}
                         onShowWidgetModal={onShowWidgetModal}
                         onClearSlot={onClearSlot}
+                        inheritedWidgets={inheritedWidgets}
+                        slotInheritanceRules={slotInheritanceRules}
                     />
                 </div>
 
@@ -34,7 +49,7 @@ export const TwoColumnLayout = ({ widgets, onWidgetAction, editable = true, page
                         name="left"
                         label="Left Column"
                         description="Left content column"
-                        widgets={widgets.left || []}
+                        widgets={widgets}
                         onWidgetAction={onWidgetAction}
                         editable={editable}
                         pageContext={pageContext}
@@ -44,6 +59,8 @@ export const TwoColumnLayout = ({ widgets, onWidgetAction, editable = true, page
                         required={true}
                         onShowWidgetModal={onShowWidgetModal}
                         onClearSlot={onClearSlot}
+                        inheritedWidgets={inheritedWidgets}
+                        slotInheritanceRules={slotInheritanceRules}
                     />
                 </div>
 
@@ -53,7 +70,7 @@ export const TwoColumnLayout = ({ widgets, onWidgetAction, editable = true, page
                         name="right"
                         label="Right Column"
                         description="Right content column"
-                        widgets={widgets.right || []}
+                        widgets={widgets}
                         onWidgetAction={onWidgetAction}
                         editable={editable}
                         pageContext={pageContext}
@@ -63,6 +80,8 @@ export const TwoColumnLayout = ({ widgets, onWidgetAction, editable = true, page
                         required={true}
                         onShowWidgetModal={onShowWidgetModal}
                         onClearSlot={onClearSlot}
+                        inheritedWidgets={inheritedWidgets}
+                        slotInheritanceRules={slotInheritanceRules}
                     />
                 </div>
 
@@ -72,7 +91,7 @@ export const TwoColumnLayout = ({ widgets, onWidgetAction, editable = true, page
                         name="footer"
                         label="Footer"
                         description="Page footer area"
-                        widgets={widgets.footer || []}
+                        widgets={widgets}
                         onWidgetAction={onWidgetAction}
                         editable={editable}
                         pageContext={pageContext}
@@ -82,6 +101,8 @@ export const TwoColumnLayout = ({ widgets, onWidgetAction, editable = true, page
                         required={false}
                         onShowWidgetModal={onShowWidgetModal}
                         onClearSlot={onClearSlot}
+                        inheritedWidgets={inheritedWidgets}
+                        slotInheritanceRules={slotInheritanceRules}
                     />
                 </div>
             </div>

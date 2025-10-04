@@ -26,7 +26,11 @@ const ReactLayoutRenderer = forwardRef(({
     context,
     // Local widget state management
     sharedComponentId,
-    publishWidgetOperation
+    publishWidgetOperation,
+    // Widget inheritance props
+    inheritedWidgets = {},
+    slotInheritanceRules = {},
+    hasInheritedContent = false
 }, ref) => {
 
     // Get UDC context (but use shared componentId from PageEditor)
@@ -347,6 +351,9 @@ const ReactLayoutRenderer = forwardRef(({
                 onShowWidgetModal={handleShowWidgetModal}
                 onClearSlot={handleClearSlot}
                 widgetPath={[]} // Initialize empty path for top-level
+                // Widget inheritance
+                inheritedWidgets={inheritedWidgets}
+                slotInheritanceRules={slotInheritanceRules}
             />
 
             {/* Widget Selection Modal */}

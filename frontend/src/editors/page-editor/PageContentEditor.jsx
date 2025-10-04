@@ -26,6 +26,10 @@ const PageContentEditor = forwardRef(({
     onLocalWidgetUpdate,
     sharedComponentId,
     publishWidgetOperation,
+    // Widget inheritance props
+    inheritedWidgets,
+    slotInheritanceRules,
+    hasInheritedContent,
     ...otherProps
 }, ref) => {
     // Extract layout name from layoutJson or use default
@@ -65,6 +69,10 @@ const PageContentEditor = forwardRef(({
             // Local widget state management
             sharedComponentId={sharedComponentId}
             publishWidgetOperation={publishWidgetOperation}
+            // Widget inheritance
+            inheritedWidgets={inheritedWidgets}
+            slotInheritanceRules={slotInheritanceRules}
+            hasInheritedContent={hasInheritedContent}
             {...otherProps}
         />
     );

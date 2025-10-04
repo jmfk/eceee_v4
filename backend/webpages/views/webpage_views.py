@@ -190,3 +190,96 @@ class WebPageViewSet(viewsets.ModelViewSet):
             },
             status=status.HTTP_200_OK,
         )
+
+    @action(detail=True, methods=["get"], url_path="widget-inheritance")
+    def widget_inheritance(self, request, pk=None):
+        """
+        Get widget inheritance information for this page.
+
+        Returns inherited widgets from parent pages organized by slot,
+        along with slot-level inheritance rules.
+        """
+        page = self.get_object()
+
+        # Get inheritance info from the model method
+        inheritance_info = page.get_widgets_inheritance_info()
+
+        # Get effective layout to determine slot rules
+        effective_layout = page.get_effective_layout()
+
+        # Build response structure
+        response_data = {
+            "pageId": page.id,
+            "parentId": page.parent_id if page.parent else None,
+            "hasParent": page.parent is not None,
+            "slots": {},
+        }
+
+        # Process each slot's inheritance info
+        for slot_name, slot_info in inheritance_info.items():
+            # Get slot configuration from layout
+            slot_config = {}
+            if effective_layout and effective_layout.slot_configuration:
+                slots = effective_layout.slot_configuration.get("slots", [])
+                slot_config = next((s for s in slots if s.get("name") == slot_name), {})
+
+            # Determine inheritance rules (with defaults)
+            # Header/footer typically allow inheritance, main content typically doesn't
+            default_allows_inheritance = slot_name in ["header", "footer", "sidebar"]
+
+            # Check if either field is explicitly set (using snake_case from Python)
+            has_requires_local = "requires_local" in slot_config
+            has_allows_inheritance = "allows_inheritance" in slot_config
+
+            # Get values (using snake_case from Python)
+            requires_local = slot_config.get("requires_local", False)
+            allows_inheritance = slot_config.get(
+                "allows_inheritance", default_allows_inheritance
+            )
+
+            # Apply mutual exclusivity: requires_local takes precedence
+            if has_requires_local:
+                # requires_local is explicitly set - use it and invert for inheritance
+                allows_inheritance = not requires_local
+            elif has_allows_inheritance:
+                # Only allows_inheritance is set - use it and invert for requires_local
+                requires_local = not allows_inheritance
+            # else: both use defaults (already set above)
+
+            # Extract inherited widgets (those not from current page)
+            inherited_widgets = []
+            for widget_info in slot_info.get("widgets", []):
+                inherited_from = widget_info.get("inherited_from")
+
+                # Only include if it's actually inherited (not from current page)
+                if inherited_from and inherited_from != page:
+                    widget_data = widget_info["widget"].copy()
+
+                    # Add inheritance metadata
+                    widget_data["inheritedFrom"] = {
+                        "id": inherited_from.id,
+                        "title": inherited_from.title,
+                        "slug": inherited_from.slug,
+                    }
+                    widget_data["isInherited"] = True
+                    widget_data["canOverride"] = True
+
+                    # Calculate inheritance depth
+                    depth = 1
+                    current = page.parent
+                    while current and current != inherited_from:
+                        depth += 1
+                        current = current.parent
+                    widget_data["inheritanceDepth"] = depth
+
+                    inherited_widgets.append(widget_data)
+
+            # Build slot response
+            response_data["slots"][slot_name] = {
+                "hasInheritedWidgets": len(inherited_widgets) > 0,
+                "inheritedWidgets": inherited_widgets,
+                "inheritanceAllowed": allows_inheritance,
+                "requiresLocal": requires_local,
+            }
+
+        return Response(response_data)

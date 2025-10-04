@@ -49,7 +49,9 @@ const PageWidgetFactory = ({
     nestedParentSlotName,
     // Widget path for infinite nesting support
     widgetPath = [],
-    slotType = 'content' // 'content' or 'inherited' - determines default preview mode
+    slotType = 'content', // 'content' or 'inherited' - determines default preview mode
+    // NEW: Inheritance props
+    isInherited = false
 }) => {
     // Use passed props or extract from widget
     const actualWidgetId = widgetId || widget?.id
@@ -231,6 +233,8 @@ const PageWidgetFactory = ({
                     canMoveUp={canMoveUp}
                     canMoveDown={canMoveDown}
                     showControls={true}
+                    isInherited={isInherited}
+                    inheritedFrom={widget.inheritedFrom || null}
                 />
 
                 {/* Core Widget Content */}
