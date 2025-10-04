@@ -1,15 +1,18 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { Layout } from 'lucide-react'
+import { getImgproxyUrlFromImage, IMGPROXY_PRESETS } from '../../utils/imgproxySecure'
 
 /**
  * Header Widget Component
  * Renders header content with hero sections, background images, and overlays
+ * Uses secure server-side imgproxy URL signing
  */
 const HeaderWidget = ({ config = {}, mode = 'preview' }) => {
     const {
+        image = null, // MediaFile image object
         content = 'Header content will appear here...',
         background_color = '#ffffff',
-        background_image = '',
+        background_image = '', // Legacy: kept for backwards compatibility
         background_size = 'cover',
         background_position = 'center',
         text_color = '#1f2937',
@@ -24,9 +27,36 @@ const HeaderWidget = ({ config = {}, mode = 'preview' }) => {
         custom_css = ''
     } = config
 
+    // State for securely generated imgproxy URL
+    const [optimizedImageUrl, setOptimizedImageUrl] = useState('')
+    const [imageLoading, setImageLoading] = useState(false)
+
+    // Load optimized image URL from backend
+    useEffect(() => {
+        if (image && mode === 'editor') {
+            setImageLoading(true)
+
+            // Get signed imgproxy URL from backend
+            getImgproxyUrlFromImage(image, IMGPROXY_PRESETS.header)
+                .then(url => {
+                    setOptimizedImageUrl(url)
+                    setImageLoading(false)
+                })
+                .catch(error => {
+                    console.error('Failed to load optimized image:', error)
+                    // Fallback to original URL
+                    setOptimizedImageUrl(image.imgproxy_base_url || image.file_url || '')
+                    setImageLoading(false)
+                })
+        }
+    }, [image, mode])
+
+    // Determine which background image to use
+    const backgroundImageUrl = image ? optimizedImageUrl : background_image
+
     const headerStyle = {
         backgroundColor: background_color,
-        backgroundImage: background_image ? `url(${background_image})` : 'none',
+        backgroundImage: backgroundImageUrl ? `url(${backgroundImageUrl})` : 'none',
         backgroundSize: background_size,
         backgroundPosition: background_position,
         backgroundRepeat: 'no-repeat',
@@ -38,7 +68,7 @@ const HeaderWidget = ({ config = {}, mode = 'preview' }) => {
         overflow: 'hidden'
     }
 
-    const overlayStyle = show_overlay && background_image ? {
+    const overlayStyle = show_overlay && backgroundImageUrl ? {
         position: 'absolute',
         top: 0,
         left: 0,
@@ -70,6 +100,11 @@ const HeaderWidget = ({ config = {}, mode = 'preview' }) => {
                     {overlayStyle && <div className="header-overlay" style={overlayStyle}></div>}
 
                     <div className="header-content" style={contentStyle}>
+                        {imageLoading && image && (
+                            <div className="absolute top-2 right-2 bg-blue-500 text-white text-xs px-2 py-1 rounded">
+                                Loading optimized image...
+                            </div>
+                        )}
                         <div dangerouslySetInnerHTML={{ __html: content }} />
                     </div>
 
@@ -81,6 +116,7 @@ const HeaderWidget = ({ config = {}, mode = 'preview' }) => {
         )
     }
 
+    // Preview mode: server-rendered HTML already has optimized images
     return (
         <>
             <div dangerouslySetInnerHTML={{ __html: content }} />
@@ -94,9 +130,10 @@ HeaderWidget.widgetType = 'default_widgets.HeaderWidget'
 
 // Default configuration
 HeaderWidget.defaultConfig = {
+    image: null, // MediaFile image object (use image picker in editor)
     content: '<h1>Welcome to Our Website</h1><p>Your journey starts here</p>',
     background_color: '#ffffff',
-    background_image: '',
+    background_image: '', // Legacy fallback
     background_size: 'cover',
     background_position: 'center',
     text_color: '#1f2937',

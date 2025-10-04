@@ -122,18 +122,22 @@ class ImgProxyService:
     def _generate_signature(self, path: str) -> str:
         """Generate HMAC signature for imgproxy URL."""
         try:
-            # Create HMAC
-            mac = hmac.new(self.key_bytes, digestmod=hashlib.sha256)
-            mac.update(self.salt_bytes)
-            mac.update(path.encode())
+            # Generate HMAC-SHA256 signature
+            # According to imgproxy docs: HMAC(key, salt + path)
+            digest = hmac.new(
+                self.key_bytes,
+                msg=self.salt_bytes + path.encode(),
+                digestmod=hashlib.sha256,
+            ).digest()
 
-            # Get signature
-            signature = base64.urlsafe_b64encode(mac.digest()).decode()
+            # Encode to URL-safe base64
+            signature = base64.urlsafe_b64encode(digest).decode()
 
-            # Truncate to specified size
+            # Truncate to specified size if configured
             if self.signature_size and self.signature_size < len(signature):
                 signature = signature[: self.signature_size]
 
+            # Remove padding
             return signature.rstrip("=")
 
         except Exception as e:

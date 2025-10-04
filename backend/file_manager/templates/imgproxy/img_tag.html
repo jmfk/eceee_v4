@@ -1,0 +1,16 @@
+{% comment %}
+Template for imgproxy_img inclusion tag.
+Renders a complete <img> element with imgproxy URL and proper attributes.
+{% endcomment %}
+
+{% if src %}
+<img 
+    src="{{ src }}"
+    {% if alt %}alt="{{ alt }}"{% endif %}
+    {% if class %}class="{{ class }}"{% endif %}
+    {% if width %}width="{{ width }}"{% endif %}
+    {% if height %}height="{{ height }}"{% endif %}
+    {% if lazy %}loading="lazy"{% endif %}
+>
+{% endif %}
+

@@ -1,5 +1,17 @@
-{% load static %}
+{% load static imgproxy_tags %}
 
 {% if config.image %}
-<img src="{{ config.image }}" alt="Header Image" class="header-image">
+    {% comment %}
+    Using imgproxy template tag for optimized image delivery.
+    Settings can be configured in the widget configuration or passed explicitly.
+    
+    Examples:
+    - With settings dict: {% imgproxy_img config.image settings=config.image_display class_name='header-image' %}
+    - Explicit params: {% imgproxy_img config.image width=1920 height=400 resize_type='fill' gravity='sm' class_name='header-image' %}
+    {% endcomment %}
+    
+    <div className="w-full">
+        {% imgproxy_img config.image width=1280 height=132 resize_type='fill' gravity='sm' class_name='header-image' %}
+    </div>
+
 {% endif %}
