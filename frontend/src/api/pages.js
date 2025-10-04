@@ -245,7 +245,17 @@ export const pagesApi = {
      */
     syncObject: wrapApiCall(async (pageId, syncData) => {
         return api.post(endpoints.pages.syncObject(pageId), syncData)
-    }, 'pages.syncObject')
+    }, 'pages.syncObject'),
+
+    /**
+     * Get widget inheritance information for a page
+     * Returns inherited widgets from parent pages organized by slot
+     * @param {number} pageId - Page ID
+     * @returns {Promise<Object>} Inheritance data with slots and inherited widgets
+     */
+    getWidgetInheritance: wrapApiCall(async (pageId) => {
+        return api.get(endpoints.pages.widgetInheritance(pageId))
+    }, 'pages.getWidgetInheritance')
 }
 
 // Legacy exports for backward compatibility

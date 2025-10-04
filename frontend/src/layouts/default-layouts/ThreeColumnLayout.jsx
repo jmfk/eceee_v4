@@ -5,7 +5,21 @@
 import React from 'react';
 import WidgetSlot from './WidgetSlot';
 
-export const ThreeColumnLayout = ({ widgets, onWidgetAction, editable = true, pageContext = {}, onShowWidgetModal, onClearSlot }) => {
+export const ThreeColumnLayout = ({
+    widgets,
+    onWidgetAction,
+    editable = true,
+    pageContext = {},
+    onShowWidgetModal,
+    onClearSlot,
+    inheritedWidgets = {},
+    slotInheritanceRules = {}
+}) => {
+    console.log("ThreeColumnLayout")
+    console.log("inheritedWidgets", inheritedWidgets)
+    console.log("slotInheritanceRules", slotInheritanceRules)
+
+
     return (
         <div className="three-column-layout w-full h-full overflow-y-auto bg-gray-50">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 max-w-7xl mx-auto p-6 pb-20">
@@ -15,7 +29,7 @@ export const ThreeColumnLayout = ({ widgets, onWidgetAction, editable = true, pa
                         name="header"
                         label="Header"
                         description="Page header area"
-                        widgets={widgets.header || []}
+                        widgets={widgets}
                         onWidgetAction={onWidgetAction}
                         editable={editable}
                         pageContext={pageContext}
@@ -25,6 +39,8 @@ export const ThreeColumnLayout = ({ widgets, onWidgetAction, editable = true, pa
                         required={false}
                         onShowWidgetModal={onShowWidgetModal}
                         onClearSlot={onClearSlot}
+                        inheritedWidgets={inheritedWidgets}
+                        slotInheritanceRules={slotInheritanceRules}
                     />
                 </div>
 
@@ -34,7 +50,7 @@ export const ThreeColumnLayout = ({ widgets, onWidgetAction, editable = true, pa
                         name="left"
                         label="Left Column"
                         description="Left content column"
-                        widgets={widgets.left || []}
+                        widgets={widgets}
                         onWidgetAction={onWidgetAction}
                         editable={editable}
                         pageContext={pageContext}
@@ -44,6 +60,8 @@ export const ThreeColumnLayout = ({ widgets, onWidgetAction, editable = true, pa
                         required={false}
                         onShowWidgetModal={onShowWidgetModal}
                         onClearSlot={onClearSlot}
+                        inheritedWidgets={inheritedWidgets}
+                        slotInheritanceRules={slotInheritanceRules}
                     />
                 </div>
 
@@ -53,7 +71,7 @@ export const ThreeColumnLayout = ({ widgets, onWidgetAction, editable = true, pa
                         name="center"
                         label="Center Column"
                         description="Center content column"
-                        widgets={widgets.center || []}
+                        widgets={widgets}
                         onWidgetAction={onWidgetAction}
                         editable={editable}
                         pageContext={pageContext}
@@ -63,6 +81,8 @@ export const ThreeColumnLayout = ({ widgets, onWidgetAction, editable = true, pa
                         required={true}
                         onShowWidgetModal={onShowWidgetModal}
                         onClearSlot={onClearSlot}
+                        inheritedWidgets={inheritedWidgets}
+                        slotInheritanceRules={slotInheritanceRules}
                     />
                 </div>
 
@@ -72,7 +92,7 @@ export const ThreeColumnLayout = ({ widgets, onWidgetAction, editable = true, pa
                         name="right"
                         label="Right Column"
                         description="Right content column"
-                        widgets={widgets.right || []}
+                        widgets={widgets}
                         onWidgetAction={onWidgetAction}
                         editable={editable}
                         pageContext={pageContext}
@@ -82,6 +102,8 @@ export const ThreeColumnLayout = ({ widgets, onWidgetAction, editable = true, pa
                         required={false}
                         onShowWidgetModal={onShowWidgetModal}
                         onClearSlot={onClearSlot}
+                        inheritedWidgets={inheritedWidgets}
+                        slotInheritanceRules={slotInheritanceRules}
                     />
                 </div>
 
@@ -91,7 +113,7 @@ export const ThreeColumnLayout = ({ widgets, onWidgetAction, editable = true, pa
                         name="footer"
                         label="Footer"
                         description="Page footer area"
-                        widgets={widgets.footer || []}
+                        widgets={widgets}
                         onWidgetAction={onWidgetAction}
                         editable={editable}
                         pageContext={pageContext}
@@ -101,6 +123,8 @@ export const ThreeColumnLayout = ({ widgets, onWidgetAction, editable = true, pa
                         required={false}
                         onShowWidgetModal={onShowWidgetModal}
                         onClearSlot={onClearSlot}
+                        inheritedWidgets={inheritedWidgets}
+                        slotInheritanceRules={slotInheritanceRules}
                     />
                 </div>
             </div>

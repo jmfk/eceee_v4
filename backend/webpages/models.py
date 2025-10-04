@@ -934,10 +934,17 @@ class WebPage(models.Model):
             }
 
             # Collect widgets from inheritance chain using PageVersion data
+            # REPLACEMENT BEHAVIOR: Local widgets replace inherited widgets (not merge)
             current = self
+            slot_has_local_widgets = False
+
             while current:
-                # Get current published version for this page
+                # Get current published version, or fallback to latest version for editor
                 current_version = current.get_current_published_version()
+                if not current_version:
+                    # If no published version, use latest version (for draft/editing mode)
+                    current_version = current.get_latest_version()
+
                 page_widgets = []
                 has_overrides = False
 
@@ -950,6 +957,10 @@ class WebPage(models.Model):
                         page_widgets, key=lambda w: w.get("sort_order", 0)
                     )
 
+                    # Check if current page (self) has widgets in this slot
+                    if current == self and len(page_widgets) > 0:
+                        slot_has_local_widgets = True
+
                     for widget_data in page_widgets:
                         widget_info = {
                             "widget": widget_data,  # JSON data instead of model instance
@@ -957,24 +968,28 @@ class WebPage(models.Model):
                             "inherited_from": current if current != self else None,
                             "is_override": widget_data.get("override_parent", False),
                             "allows_inheritance": widget_data.get(
-                                "inherit_from_parent", False
+                                "inherit_from_parent",
+                                True,  # Default to True - widgets are inheritable by default
                             ),
                         }
 
-                        # If this is the original page or widget allows inheritance
-                        if current == self or widget_data.get(
-                            "inherit_from_parent", False
-                        ):
-                            # If this widget overrides, replace all previous widgets
-                            if (
-                                widget_data.get("override_parent", False)
-                                and current == self
-                            ):
-                                inheritance_info[slot_name]["widgets"] = [widget_info]
-                            else:
-                                inheritance_info[slot_name]["widgets"].append(
-                                    widget_info
-                                )
+                        # REPLACEMENT LOGIC:
+                        # Include widget if:
+                        # 1. It's from the current page (self), OR
+                        # 2. It's from a parent page AND current page has NO local widgets AND allows inheritance
+                        is_from_current = current == self
+                        is_from_parent_and_inheritable = (
+                            current != self
+                            and not slot_has_local_widgets
+                            and widget_data.get("inherit_from_parent", True)
+                        )
+
+                        should_include = (
+                            is_from_current or is_from_parent_and_inheritable
+                        )
+
+                        if should_include:
+                            inheritance_info[slot_name]["widgets"].append(widget_info)
 
                     # Check for overrides in this page's widgets
                     has_overrides = any(
@@ -988,6 +1003,10 @@ class WebPage(models.Model):
                         "has_overrides": has_overrides,
                     }
                 )
+
+                # REPLACEMENT BEHAVIOR: If current page has widgets, stop walking up the chain
+                if slot_has_local_widgets:
+                    break
 
                 current = current.parent
 

@@ -2,13 +2,14 @@
  * WidgetSlot - React component for rendering widget slots
  * 
  * This component renders a slot area where widgets can be placed.
- * It handles widget rendering, empty states, and slot management.
+ * It handles widget rendering, empty states, slot management, and widget inheritance.
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Layout, Plus, Eye, EyeOff } from 'lucide-react';
 import PageWidgetFactory from '../../editors/page-editor/PageWidgetFactory';
 import PageSlotIconMenu from '../../editors/page-editor/PageSlotIconMenu';
+import { getSlotWidgetsForMode, shouldSlotDefaultToPreview, hasInheritedContent } from '../../utils/widgetMerging';
 const WidgetSlot = ({
     name,
     label,
@@ -27,6 +28,11 @@ const WidgetSlot = ({
     onClearSlot,
     slotType = 'content', // 'content' or 'inherited' - determines default preview mode
     widgetPath = [], // Path from parent (empty for top-level layouts)
+    // NEW: Inheritance props
+    inheritedWidgets = {}, // Widgets inherited from parent pages
+    slotInheritanceRules = {}, // Per-slot inheritance rules
+    slotMode, // External mode control (optional)
+    onSlotModeChange, // Callback when mode changes
 }) => {
     // Build path for this slot: append slot name to parent path
     const slotPath = [...widgetPath, name];
@@ -43,26 +49,38 @@ const WidgetSlot = ({
     const finalMaxWidgets = behaviorMaxWidgets;
     const finalRequired = behaviorRequired;
     const finalSlotType = behaviorSlotType;
+
     // Extract widgets for this specific slot
-    const slotWidgets = widgets[name] || [];
-    // Determine smart default for slot preview mode
-    const defaultPreviewMode = useMemo(() => {
-        // If slot type is inherited, default to preview mode
-        if (finalSlotType === 'inherited') {
-            return true;
-        }
+    const localWidgets = widgets[name] || [];
+    const slotInheritedWidgets = inheritedWidgets[name] || [];
+    const slotRules = slotInheritanceRules[name] || {};
 
-        // If slot has widgets and is not explicitly content type, default to preview
-        if (slotWidgets.length > 0 && finalSlotType !== 'content') {
-            return true;
-        }
+    // Determine smart default for slot mode
+    const defaultMode = useMemo(() => {
+        // Use smart logic to determine default mode based on inheritance
+        return shouldSlotDefaultToPreview(name, localWidgets, slotInheritedWidgets, slotRules) ? 'preview' : 'edit';
+    }, [name, localWidgets, slotInheritedWidgets, slotRules]);
 
-        // Content slots default to edit mode
-        return false;
-    }, [finalSlotType, slotWidgets.length]);
+    // Slot-level mode state (controlled or uncontrolled)
+    const [internalMode, setInternalMode] = useState(defaultMode);
+    const currentMode = slotMode || internalMode; // Use external mode if provided
+    const isPreviewMode = currentMode === 'preview';
 
-    // Slot-level preview state
-    const [isSlotPreviewMode, setIsSlotPreviewMode] = useState(defaultPreviewMode);
+    // Get effective widgets based on current mode
+    const effectiveWidgets = useMemo(() => {
+        return getSlotWidgetsForMode(currentMode, localWidgets, slotInheritedWidgets, slotRules);
+    }, [currentMode, localWidgets, slotInheritedWidgets, slotRules]);
+
+    // Check if slot has inherited content
+    const hasInheritance = hasInheritedContent(slotInheritedWidgets);
+
+    // Extract parent page info from first inherited widget
+    const parentPageInfo = slotInheritedWidgets.length > 0 && slotInheritedWidgets[0].inheritedFrom
+        ? slotInheritedWidgets[0].inheritedFrom
+        : null;
+
+    // Legacy: Keep isSlotPreviewMode for backward compatibility
+    const isSlotPreviewMode = isPreviewMode;
 
     // Handle widget actions
     const handleWidgetAction = (action, widget, ...args) => {
@@ -71,9 +89,18 @@ const WidgetSlot = ({
         }
     };
 
-    // Handle slot preview toggle
+    // Handle mode change
+    const handleModeChange = (newMode) => {
+        setInternalMode(newMode);
+        if (onSlotModeChange) {
+            onSlotModeChange(name, newMode);
+        }
+    };
+
+    // Handle slot preview toggle (legacy support)
     const handleSlotPreviewToggle = () => {
-        setIsSlotPreviewMode(!isSlotPreviewMode);
+        const newMode = isPreviewMode ? 'edit' : 'preview';
+        handleModeChange(newMode);
     };
 
     // Handle add widget - show modal for widget selection
@@ -106,7 +133,8 @@ const WidgetSlot = ({
                     onMoveDown={(slotName, idx, w) => handleWidgetAction('moveDown', w, idx)}
                     onConfigChange={(widgetId, slotName, newConfig) => handleWidgetAction('configChange', { id: widgetId }, newConfig)}
                     canMoveUp={index > 0}
-                    canMoveDown={index < slotWidgets.length - 1}
+                    canMoveDown={index < effectiveWidgets.length - 1}
+                    isInherited={widget.isInherited || false}
                     mode={isSlotPreviewMode ? "display" : "editor"}
                     showControls={editable && !isSlotPreviewMode}
                     // PageEditor-specific props
@@ -146,7 +174,7 @@ const WidgetSlot = ({
                     data-slot-name={name}
                     data-slot-title={label}
                 >
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between mb-3">
                         <div className="flex-1">
                             <div className="flex items-center">
                                 <Layout className="h-4 w-4 mr-2 text-gray-400" />
@@ -162,19 +190,19 @@ const WidgetSlot = ({
                             </div>
                         </div>
                         <div className="flex items-center space-x-2">
-                            {/* Slot Preview Toggle - Only visible on hover */}
+                            {/* Slot Preview Toggle - Always visible on hover */}
                             <button
                                 onClick={handleSlotPreviewToggle}
                                 className="p-1 rounded transition-all duration-200 text-gray-600 hover:text-gray-900 hover:bg-gray-200 opacity-0 group-hover:opacity-100"
-                                title="Preview entire slot"
+                                title={isPreviewMode ? "Exit preview mode" : "Preview entire slot"}
                             >
-                                <Eye className="h-4 w-4" />
+                                {isPreviewMode ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                             </button>
 
                             <PageSlotIconMenu
                                 slotName={name}
                                 slotLabel={label}
-                                widgets={slotWidgets}
+                                widgets={localWidgets}
                                 maxWidgets={finalMaxWidgets}
                                 onAddWidget={handleWidgetAction}
                                 onClearSlot={onClearSlot}
@@ -184,6 +212,7 @@ const WidgetSlot = ({
                     </div>
                 </div>
             )}
+
 
             {/* Floating Preview Exit Button - Only show in preview mode, visible on hover */}
             {isSlotPreviewMode && editable && (
@@ -199,8 +228,8 @@ const WidgetSlot = ({
             )}
 
             {/* Widgets - Direct rendering without unnecessary containers */}
-            {slotWidgets.length > 0 ? (
-                slotWidgets.map((widget, index) => renderWidget(widget, index))
+            {effectiveWidgets.length > 0 ? (
+                effectiveWidgets.map((widget, index) => renderWidget(widget, index))
             ) : (
                 // Empty slot handling - only show in edit mode
                 !isSlotPreviewMode && editable && (
@@ -208,13 +237,27 @@ const WidgetSlot = ({
                         <Layout className="h-12 w-12 mx-auto mb-4 text-gray-400" />
                         <h4 className="text-lg font-medium text-gray-900 mb-2">{label}</h4>
                         <p className="text-sm">{description}</p>
+
+                        {/* Show inheritance info if slot has inherited widgets */}
+                        {hasInheritance && parentPageInfo && (
+                            <div className="mt-3 px-4 py-2 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-800 max-w-md mx-auto">
+                                <p className="font-medium">
+                                    Currently showing {slotInheritedWidgets.length} inherited widget{slotInheritedWidgets.length !== 1 ? 's' : ''} from{' '}
+                                    <span className="font-semibold">{parentPageInfo.title}</span>
+                                </p>
+                                <p className="text-xs text-amber-700 mt-1">
+                                    Adding widgets here will <strong>replace</strong> the inherited content for this slot.
+                                </p>
+                            </div>
+                        )}
+
                         <div className="mt-4">
                             <button
                                 onClick={handleAddWidget}
                                 className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
                             >
                                 <Plus className="h-4 w-4 mr-2" />
-                                Add Your First Widget
+                                {hasInheritance ? 'Add Local Widget' : 'Add Your First Widget'}
                             </button>
                         </div>
                         {finalRequired && (

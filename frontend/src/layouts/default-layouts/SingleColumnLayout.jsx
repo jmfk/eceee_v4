@@ -5,7 +5,21 @@
 import React from 'react';
 import WidgetSlot from './WidgetSlot';
 
-export const SingleColumnLayout = ({ widgets, onWidgetAction, editable = true, pageContext = {}, onShowWidgetModal, onClearSlot }) => {
+export const SingleColumnLayout = ({
+    widgets,
+    onWidgetAction,
+    editable = true,
+    pageContext = {},
+    onShowWidgetModal,
+    onClearSlot,
+    // Inheritance props
+    inheritedWidgets = {},
+    slotInheritanceRules = {}
+}) => {
+    console.log("SingleColumnLayout")
+    console.log("inheritedWidgets", inheritedWidgets)
+    console.log("slotInheritanceRules", slotInheritanceRules)
+
     return (
         <div className="single-column-layout w-full h-full overflow-y-auto">
             <div className="max-w-4xl mx-auto p-6 pb-20">
@@ -13,7 +27,7 @@ export const SingleColumnLayout = ({ widgets, onWidgetAction, editable = true, p
                     name="main"
                     label="Main Content"
                     description="Primary content area for articles and posts"
-                    widgets={widgets.main || []}
+                    widgets={widgets}
                     onWidgetAction={onWidgetAction}
                     editable={editable}
                     pageContext={pageContext}
@@ -23,6 +37,9 @@ export const SingleColumnLayout = ({ widgets, onWidgetAction, editable = true, p
                     required={true}
                     onShowWidgetModal={onShowWidgetModal}
                     onClearSlot={onClearSlot}
+                    // Forward inheritance props
+                    inheritedWidgets={inheritedWidgets}
+                    slotInheritanceRules={slotInheritanceRules}
                 />
             </div>
         </div>

@@ -5,7 +5,21 @@
 import React from 'react';
 import WidgetSlot from './WidgetSlot';
 
-export const SidebarLayout = ({ widgets, onWidgetAction, editable = true, pageContext = {}, onShowWidgetModal, onClearSlot }) => {
+export const SidebarLayout = ({
+    widgets,
+    onWidgetAction,
+    editable = true,
+    pageContext = {},
+    onShowWidgetModal,
+    onClearSlot,
+    // Inheritance props
+    inheritedWidgets = {},
+    slotInheritanceRules = {}
+}) => {
+    console.log("SidebarLayout")
+    console.log("inheritedWidgets", inheritedWidgets)
+    console.log("slotInheritanceRules", slotInheritanceRules)
+
     return (
         <div className="sidebar-layout w-full h-full overflow-y-auto bg-gray-50">
             <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6 max-w-7xl mx-auto p-6 pb-20">
@@ -15,7 +29,7 @@ export const SidebarLayout = ({ widgets, onWidgetAction, editable = true, pageCo
                         name="header"
                         label="Page Header"
                         description="Site navigation, branding, and header content"
-                        widgets={widgets.header || []}
+                        widgets={widgets}
                         onWidgetAction={onWidgetAction}
                         editable={editable}
                         pageContext={pageContext}
@@ -25,6 +39,9 @@ export const SidebarLayout = ({ widgets, onWidgetAction, editable = true, pageCo
                         required={false}
                         onShowWidgetModal={onShowWidgetModal}
                         onClearSlot={onClearSlot}
+                        // Forward inheritance props
+                        inheritedWidgets={inheritedWidgets}
+                        slotInheritanceRules={slotInheritanceRules}
                     />
                 </div>
 
@@ -34,7 +51,7 @@ export const SidebarLayout = ({ widgets, onWidgetAction, editable = true, pageCo
                         name="main"
                         label="Main Content"
                         description="Primary content area for articles and posts"
-                        widgets={widgets.main || []}
+                        widgets={widgets}
                         onWidgetAction={onWidgetAction}
                         editable={editable}
                         pageContext={pageContext}
@@ -44,6 +61,9 @@ export const SidebarLayout = ({ widgets, onWidgetAction, editable = true, pageCo
                         required={true}
                         onShowWidgetModal={onShowWidgetModal}
                         onClearSlot={onClearSlot}
+                        // Forward inheritance props
+                        inheritedWidgets={inheritedWidgets}
+                        slotInheritanceRules={slotInheritanceRules}
                     />
                 </div>
 
@@ -53,7 +73,7 @@ export const SidebarLayout = ({ widgets, onWidgetAction, editable = true, pageCo
                         name="sidebar"
                         label="Sidebar"
                         description="Complementary content and navigation widgets"
-                        widgets={widgets.sidebar || []}
+                        widgets={widgets}
                         onWidgetAction={onWidgetAction}
                         editable={editable}
                         pageContext={pageContext}
@@ -63,6 +83,9 @@ export const SidebarLayout = ({ widgets, onWidgetAction, editable = true, pageCo
                         required={false}
                         onShowWidgetModal={onShowWidgetModal}
                         onClearSlot={onClearSlot}
+                        // Forward inheritance props
+                        inheritedWidgets={inheritedWidgets}
+                        slotInheritanceRules={slotInheritanceRules}
                     />
                 </div>
 
@@ -72,7 +95,7 @@ export const SidebarLayout = ({ widgets, onWidgetAction, editable = true, pageCo
                         name="footer"
                         label="Footer"
                         description="Site footer with links and copyright"
-                        widgets={widgets.footer || []}
+                        widgets={widgets}
                         onWidgetAction={onWidgetAction}
                         editable={editable}
                         pageContext={pageContext}
@@ -82,6 +105,9 @@ export const SidebarLayout = ({ widgets, onWidgetAction, editable = true, pageCo
                         required={false}
                         onShowWidgetModal={onShowWidgetModal}
                         onClearSlot={onClearSlot}
+                        // Forward inheritance props
+                        inheritedWidgets={inheritedWidgets}
+                        slotInheritanceRules={slotInheritanceRules}
                     />
                 </div>
             </div>
