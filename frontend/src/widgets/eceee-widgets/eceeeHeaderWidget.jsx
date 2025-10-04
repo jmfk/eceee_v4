@@ -1,12 +1,43 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { Image as ImageIcon } from 'lucide-react'
+import { getImgproxyUrlFromImage } from '../../utils/imgproxySecure'
 
 /**
  * ECEEE Header Widget Component
- * Simple header widget that displays an image
+ * Simple header widget that displays an optimized image via imgproxy
+ * Matches backend template: width=1280, height=132, resize_type='fill', gravity='sm'
  */
 const eceeeHeaderWidget = ({ config = {}, mode = 'preview' }) => {
     const { image } = config
+
+    // State for secure imgproxy URL
+    const [optimizedImageUrl, setOptimizedImageUrl] = useState('')
+    const [imageLoading, setImageLoading] = useState(false)
+
+    // Load optimized image URL from backend API
+    useEffect(() => {
+        if (image) {
+            setImageLoading(true)
+
+            // Get signed imgproxy URL from backend with same params as template
+            getImgproxyUrlFromImage(image, {
+                width: 1280,
+                height: 132,
+                resizeType: 'fill',
+                gravity: 'sm'
+            })
+                .then(url => {
+                    setOptimizedImageUrl(url)
+                    setImageLoading(false)
+                })
+                .catch(error => {
+                    console.error('Failed to load optimized header image:', error)
+                    // Fallback to original URL
+                    setOptimizedImageUrl(image.imgproxyBaseUrl || image.fileUrl || '')
+                    setImageLoading(false)
+                })
+        }
+    }, [image, mode])
 
     // Editor mode: show placeholder if no image
     if (mode === 'editor') {
@@ -21,28 +52,33 @@ const eceeeHeaderWidget = ({ config = {}, mode = 'preview' }) => {
         }
 
         return (
-            <div className="w-full">
-                <img
-                    src={image}
-                    alt="Header Image"
-                    className="w-full h-auto block"
-                />
+            <div className="w-full relative">
+                {imageLoading && (
+                    <div className="absolute top-2 right-2 bg-blue-500 text-white text-xs px-2 py-1 rounded shadow-lg z-10">
+                        Optimizing image...
+                    </div>
+                )}
+                {optimizedImageUrl && (<img
+                    src={optimizedImageUrl}
+                    alt={image.title || 'Header Image'}
+                    className="w-full h-auto block header-image"
+                />)}
             </div>
         )
     }
 
-    // Preview mode: only render if image exists
+    // Preview mode: server-rendered HTML already has optimized images
     if (!image) {
         return null
     }
 
     return (
         <div className="w-full">
-            <img
-                src={image}
-                alt="Header Image"
-                className="w-full h-auto block"
-            />
+            {optimizedImageUrl && (<img
+                src={optimizedImageUrl}
+                alt={image.title || 'Header Image'}
+                className="w-full h-auto block header-image"
+            />)}
         </div>
     )
 }

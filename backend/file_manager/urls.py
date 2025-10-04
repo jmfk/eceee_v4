@@ -18,6 +18,8 @@ from .views import (
     MediaSlugValidationView,
     BulkMediaOperationsView,
 )
+from django.views.decorators.csrf import csrf_exempt
+from .views.imgproxy_sign import sign_imgproxy_url, batch_sign_imgproxy_urls
 
 app_name = "file_manager"
 
@@ -53,5 +55,16 @@ urlpatterns = [
         "download/<slug:namespace_slug>/<slug:file_slug>/",
         MediaFileDownloadView.as_view(),
         name="media-file-download",
+    ),
+    # imgproxy URL signing endpoints (secure server-side signing)
+    path(
+        "imgproxy/sign/",
+        csrf_exempt(sign_imgproxy_url),
+        name="imgproxy-sign",
+    ),
+    path(
+        "imgproxy/sign-batch/",
+        csrf_exempt(batch_sign_imgproxy_urls),
+        name="imgproxy-sign-batch",
     ),
 ]
