@@ -74,13 +74,15 @@ class WebPageRenderer:
             ),
         }
 
-    def render_widget_json(self, widget_data, context=None):
+    def render_widget_json(self, widget_data, context=None, slot_dimensions=None):
         """
         Render a widget from JSON data (as stored in PageVersion.widgets).
 
         Args:
             widget_data: Widget JSON data from PageVersion
             context: Optional template context
+            slot_dimensions: Optional dimensions for the slot this widget is in
+                Format: {"mobile": {"width": 360, "height": None}, ...}
 
         Returns:
             str: Rendered widget HTML
@@ -102,11 +104,18 @@ class WebPageRenderer:
         # Get base configuration
         base_config = widget_data.get("config", {})
 
+        # Enhanced context with dimensions
+        enhanced_context = dict(context or {})
+        if slot_dimensions:
+            enhanced_context["_widget_dimensions"] = slot_dimensions
+
         # Prepare template context with widget-specific logic (e.g., collection resolution)
         # All widgets now have prepare_template_context (default implementation in BaseWidget)
         template_config = base_config
         try:
-            template_config = widget_type.prepare_template_context(base_config, context)
+            template_config = widget_type.prepare_template_context(
+                base_config, enhanced_context
+            )
         except Exception as e:
             # Log error but continue with base config to prevent crashes
             import logging
@@ -138,7 +147,7 @@ class WebPageRenderer:
                     "widget_id": widget_data.get("id", "unknown"),
                     "widget_type": widget_type,
                     "widget_data": widget_data,  # Full widget data access
-                    **(context or {}),
+                    **enhanced_context,
                 },
                 request=self.request,
             )
@@ -228,15 +237,27 @@ class WebPageRenderer:
             slot.get("name") for slot in layout_slots if slot.get("name")
         ]
 
+        # Build a map of slot names to their dimension configurations
+        slot_dimensions_map = {}
+        for slot in layout_slots:
+            slot_name = slot.get("name")
+            if slot_name and "dimensions" in slot:
+                slot_dimensions_map[slot_name] = slot.get("dimensions")
+
         # Process each slot from the inheritance info
         for slot_name, slot_info in widgets_info.items():
             rendered_widgets = []
 
+            # Get dimensions for this slot
+            slot_dimensions = slot_dimensions_map.get(slot_name)
+
             for widget_info in slot_info.get("widgets", []):
                 widget_data = widget_info["widget"]
 
-                # Render the widget
-                widget_html = self.render_widget_json(widget_data, context)
+                # Render the widget with slot dimensions
+                widget_html = self.render_widget_json(
+                    widget_data, context, slot_dimensions=slot_dimensions
+                )
 
                 rendered_widgets.append(
                     {
@@ -256,9 +277,13 @@ class WebPageRenderer:
                 parent_widgets = self._find_parent_slot_widgets(page, slot_name)
                 if parent_widgets:
                     rendered_widgets = []
+                    slot_dimensions = slot_dimensions_map.get(slot_name)
+
                     for widget_data in parent_widgets:
                         widget_html = self.render_widget_json(
-                            widget_data["widget"], context
+                            widget_data["widget"],
+                            context,
+                            slot_dimensions=slot_dimensions,
                         )
                         rendered_widgets.append(
                             {

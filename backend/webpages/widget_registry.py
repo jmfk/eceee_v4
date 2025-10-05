@@ -116,6 +116,128 @@ class BaseWidget(ABC):
         except Exception:
             return {}
 
+    @classmethod
+    def get_slot_definitions(cls) -> Optional[Dict[str, Dict[str, Any]]]:
+        """
+        Define slots provided by this container widget (if any).
+
+        For container widgets that provide nested slots, return a dictionary
+        mapping slot names to their definitions including dimensions.
+
+        Returns:
+            Dict mapping slot name to slot definition with structure:
+            {
+                "slot_name": {
+                    "name": str,
+                    "title": str,
+                    "description": str,
+                    "max_widgets": int,
+                    "dimensions": {
+                        "mobile": {"width": float|int|None, "height": float|int|None},
+                        "tablet": {"width": float|int|None, "height": float|int|None},
+                        "desktop": {"width": float|int|None, "height": float|int|None},
+                    }
+                }
+            }
+
+            Dimension values:
+            - None: Unknown/dynamic dimension
+            - int (e.g., 896): Absolute pixels (used in layouts)
+            - float 0.0-1.0 (e.g., 0.5): Fraction of parent (used in container widgets)
+
+        Example:
+            @classmethod
+            def get_slot_definitions(cls):
+                return {
+                    "left": {
+                        "name": "left",
+                        "title": "Left Column",
+                        "description": "Left column content",
+                        "max_widgets": 10,
+                        "dimensions": {
+                            "mobile": {"width": 1.0, "height": None},
+                            "tablet": {"width": 0.48, "height": None},
+                            "desktop": {"width": 0.48, "height": None},
+                        }
+                    }
+                }
+        """
+        return None
+
+    def get_widget_dimensions(
+        self, context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Dict[str, Optional[int]]]:
+        """
+        Get the calculated dimensions for this widget from the rendering context.
+
+        Args:
+            context: Rendering context containing _widget_dimensions
+
+        Returns:
+            Dictionary with dimensions per breakpoint:
+            {
+                "mobile": {"width": 360, "height": None},
+                "tablet": {"width": 768, "height": None},
+                "desktop": {"width": 896, "height": None}
+            }
+        """
+        if not context:
+            return {}
+        return context.get("_widget_dimensions", {})
+
+    def calculate_nested_slot_dimensions(
+        self,
+        parent_dimensions: Dict[str, Dict[str, Optional[int]]],
+        slot_dimensions: Dict[str, Dict[str, Optional[float]]],
+    ) -> Dict[str, Dict[str, Optional[int]]]:
+        """
+        Calculate pixel dimensions for a nested slot based on parent widget dimensions.
+
+        Args:
+            parent_dimensions: Parent widget's dimensions in pixels per breakpoint
+            slot_dimensions: Slot's dimension fractions/values per breakpoint
+
+        Returns:
+            Calculated pixel dimensions per breakpoint
+        """
+        result = {}
+
+        for breakpoint in ["mobile", "tablet", "desktop"]:
+            parent = parent_dimensions.get(breakpoint, {})
+            slot = slot_dimensions.get(breakpoint, {})
+
+            parent_width = parent.get("width")
+            parent_height = parent.get("height")
+            slot_width = slot.get("width")
+            slot_height = slot.get("height")
+
+            # Calculate width
+            if parent_width and slot_width:
+                if isinstance(slot_width, float) and 0 <= slot_width <= 1.0:
+                    # Fraction of parent
+                    calculated_width = int(parent_width * slot_width)
+                else:
+                    # Already absolute pixels
+                    calculated_width = int(slot_width)
+            else:
+                calculated_width = None
+
+            # Calculate height (if specified)
+            if parent_height and slot_height:
+                if isinstance(slot_height, float) and 0 <= slot_height <= 1.0:
+                    calculated_height = int(parent_height * slot_height)
+                else:
+                    calculated_height = int(slot_height)
+            else:
+                calculated_height = None
+
+            result[breakpoint] = {
+                "width": calculated_width,
+                "height": calculated_height,
+            }
+
+        return result
+
     def prepare_template_context(self, config, context=None):
         """
         Default implementation of prepare_template_context.

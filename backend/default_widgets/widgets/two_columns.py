@@ -96,11 +96,50 @@ class TwoColumnsWidget(BaseWidget):
     def configuration_model(self) -> Type[BaseModel]:
         return TwoColumnsConfig
 
+    @classmethod
+    def get_slot_definitions(cls):
+        """
+        Define the slots this container widget provides.
+        Dimensions are fractions of parent widget's space.
+        """
+        return {
+            "left": {
+                "name": "left",
+                "title": "Left Column",
+                "description": "Left column content",
+                "max_widgets": 10,
+                "dimensions": {
+                    # On mobile: stacks vertically, takes full width
+                    "mobile": {"width": 1.0, "height": None},
+                    # On tablet/desktop: side-by-side, each takes ~48% (accounting for gap)
+                    "tablet": {"width": 0.48, "height": None},
+                    "desktop": {"width": 0.48, "height": None},
+                },
+            },
+            "right": {
+                "name": "right",
+                "title": "Right Column",
+                "description": "Right column content",
+                "max_widgets": 10,
+                "dimensions": {
+                    "mobile": {"width": 1.0, "height": None},
+                    "tablet": {"width": 0.48, "height": None},
+                    "desktop": {"width": 0.48, "height": None},
+                },
+            },
+        }
+
     def prepare_template_context(self, config, context=None):
-        """Prepare context with slot rendering like PageVersion"""
+        """Prepare context with slot rendering and dimension propagation"""
         request = context["request"]
         renderer = WebPageRenderer(request=request)
         template_config = super().prepare_template_context(config, context)
+
+        # Get this widget's dimensions from context (passed from parent)
+        parent_dimensions = self.get_widget_dimensions(context)
+
+        # Get slot definitions with dimensions
+        slot_defs = self.get_slot_definitions()
 
         # Get slots data (like PageVersion.widgets)
         slots_data = config.get("slots", {"left": [], "right": []})
@@ -110,14 +149,31 @@ class TwoColumnsWidget(BaseWidget):
         if context and renderer:
             for slot_name, widgets in slots_data.items():
                 rendered_widgets = []
+
+                # Calculate dimensions for this nested slot
+                slot_def = slot_defs.get(slot_name, {})
+                slot_dim_fractions = slot_def.get("dimensions", {})
+
+                # Calculate pixel dimensions based on parent
+                nested_slot_dimensions = self.calculate_nested_slot_dimensions(
+                    parent_dimensions, slot_dim_fractions
+                )
+
                 for widget_data in widgets:
                     try:
-                        widget_html = renderer.render_widget_json(widget_data, context)
+                        # Pass calculated dimensions to nested widget
+                        widget_html = renderer.render_widget_json(
+                            widget_data, context, slot_dimensions=nested_slot_dimensions
+                        )
                         rendered_widgets.append(
                             {"html": widget_html, "widget_data": widget_data}
                         )
                     except Exception as e:
                         # Log error and continue
+                        import logging
+
+                        logger = logging.getLogger(__name__)
+                        logger.error(f"Error rendering nested widget: {e}")
                         continue
                 rendered_slots[slot_name] = rendered_widgets
         else:

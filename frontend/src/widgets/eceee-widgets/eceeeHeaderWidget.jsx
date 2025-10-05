@@ -4,22 +4,26 @@ import { getImgproxyUrlFromImage } from '../../utils/imgproxySecure'
 
 /**
  * ECEEE Header Widget Component
- * Simple header widget that displays an optimized image via imgproxy
- * Matches backend template: width=1280, height=132, resize_type='fill', gravity='sm'
+ * Responsive header widget that displays an optimized image via imgproxy
+ * - Height scales dynamically from 60px (mobile) to 132px (desktop)
+ * - Uses object-fit: cover to fill the space
+ * - Supports alignment (left, center, right)
  */
 const eceeeHeaderWidget = ({ config = {}, mode = 'preview' }) => {
-    const { image } = config
+    const { image, alignment = 'center' } = config
 
-    // State for secure imgproxy URL
+    // State for secure imgproxy URL (desktop version)
     const [optimizedImageUrl, setOptimizedImageUrl] = useState('')
     const [imageLoading, setImageLoading] = useState(false)
 
     // Load optimized image URL from backend API
+    // Using desktop dimensions - CSS will handle responsive sizing
     useEffect(() => {
         if (image) {
             setImageLoading(true)
 
-            // Get signed imgproxy URL from backend with same params as template
+            // Get signed imgproxy URL from backend
+            // Desktop dimensions - responsive behavior handled by CSS
             getImgproxyUrlFromImage(image, {
                 width: 1280,
                 height: 132,
@@ -39,6 +43,14 @@ const eceeeHeaderWidget = ({ config = {}, mode = 'preview' }) => {
         }
     }, [image, mode])
 
+    // Map alignment to object-position
+    const objectPositionMap = {
+        left: 'left center',
+        center: 'center center',
+        right: 'right center'
+    }
+    const objectPosition = objectPositionMap[alignment] || 'center center'
+
     // Editor mode: show placeholder if no image
     if (mode === 'editor') {
         if (!image) {
@@ -52,17 +64,44 @@ const eceeeHeaderWidget = ({ config = {}, mode = 'preview' }) => {
         }
 
         return (
-            <div className="w-full relative">
+            <div className="header-widget w-full overflow-hidden relative">
                 {imageLoading && (
                     <div className="absolute top-2 right-2 bg-blue-500 text-white text-xs px-2 py-1 rounded shadow-lg z-10">
                         Optimizing image...
                     </div>
                 )}
-                {optimizedImageUrl && (<img
-                    src={optimizedImageUrl}
-                    alt={image.title || 'Header Image'}
-                    className="w-full h-auto block header-image"
-                />)}
+                {optimizedImageUrl && (
+                    <img
+                        src={optimizedImageUrl}
+                        alt={image.title || 'Header Image'}
+                        className={`header-image w-full block align-${alignment}`}
+                        style={{
+                            objectFit: 'cover',
+                            objectPosition: objectPosition
+                        }}
+                    />
+                )}
+                <style dangerouslySetInnerHTML={{
+                    __html: `
+                    .header-widget .header-image {
+                        width: 100%;
+                        height: clamp(60px, 12vw, 132px) !important;
+                        object-fit: cover;
+                        display: block;
+                    }
+                    
+                    @media (max-width: 375px) {
+                        .header-widget .header-image {
+                            height: 60px !important;
+                        }
+                    }
+                    
+                    @media (min-width: 1200px) {
+                        .header-widget .header-image {
+                            height: 132px !important;
+                        }
+                    }
+                `}} />
             </div>
         )
     }
@@ -73,12 +112,39 @@ const eceeeHeaderWidget = ({ config = {}, mode = 'preview' }) => {
     }
 
     return (
-        <div className="w-full">
-            {optimizedImageUrl && (<img
-                src={optimizedImageUrl}
-                alt={image.title || 'Header Image'}
-                className="w-full h-auto block header-image"
-            />)}
+        <div className="header-widget w-full overflow-hidden relative">
+            {optimizedImageUrl && (
+                <img
+                    src={optimizedImageUrl}
+                    alt={image.title || 'Header Image'}
+                    className={`header-image w-full block align-${alignment}`}
+                    style={{
+                        objectFit: 'cover',
+                        objectPosition: objectPosition
+                    }}
+                />
+            )}
+            <style dangerouslySetInnerHTML={{
+                __html: `
+                .header-widget .header-image {
+                    width: 100%;
+                    height: clamp(60px, 12vw, 132px) !important;
+                    object-fit: cover;
+                    display: block;
+                }
+                
+                @media (max-width: 375px) {
+                    .header-widget .header-image {
+                        height: 60px !important;
+                    }
+                }
+                
+                @media (min-width: 1200px) {
+                    .header-widget .header-image {
+                        height: 132px !important;
+                    }
+                }
+            `}} />
         </div>
     )
 }
@@ -89,16 +155,17 @@ eceeeHeaderWidget.widgetType = 'eceee_widgets.HeaderWidget'
 
 // Default configuration
 eceeeHeaderWidget.defaultConfig = {
-    image: null
+    image: null,
+    alignment: 'center'
 }
 
 // Display metadata
 eceeeHeaderWidget.metadata = {
     name: 'Header',
-    description: 'Simple header widget with image',
+    description: 'Responsive header with dynamic height (60px-132px) and alignment options',
     category: 'layout',
     icon: ImageIcon,
-    tags: ['eceee', 'header', 'image', 'layout']
+    tags: ['eceee', 'header', 'image', 'layout', 'responsive', 'cover']
 }
 
 export default eceeeHeaderWidget
