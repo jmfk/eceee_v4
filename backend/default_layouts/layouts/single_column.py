@@ -26,6 +26,11 @@ class SingleColumnLayout(BaseLayout):
                     "description": "Page header content",
                     "max_widgets": 3,
                     "css_classes": "slot-header",
+                    "dimensions": {
+                        "mobile": {"width": 360, "height": None},
+                        "tablet": {"width": 768, "height": None},
+                        "desktop": {"width": 896, "height": None},  # max-w-4xl
+                    },
                 },
                 {
                     "name": "main",
@@ -33,6 +38,11 @@ class SingleColumnLayout(BaseLayout):
                     "description": "Primary page content area",
                     "max_widgets": None,  # Unlimited widgets
                     "css_classes": "slot-main",
+                    "dimensions": {
+                        "mobile": {"width": 360, "height": None},
+                        "tablet": {"width": 768, "height": None},
+                        "desktop": {"width": 896, "height": None},  # max-w-4xl
+                    },
                     "default_widgets": [
                         {
                             "type": "text",
@@ -57,6 +67,11 @@ class SingleColumnLayout(BaseLayout):
                     "description": "Complementary content and widgets",
                     "max_widgets": 4,
                     "css_classes": "slot-sidebar",
+                    "dimensions": {
+                        "mobile": {"width": 360, "height": None},
+                        "tablet": {"width": 320, "height": None},
+                        "desktop": {"width": 320, "height": None},
+                    },
                     "default_widgets": [
                         {
                             "type": "recent_posts",
@@ -74,7 +89,11 @@ class SingleColumnLayout(BaseLayout):
                     "description": "Page footer content",
                     "max_widgets": 2,
                     "css_classes": "slot-footer",
+                    "dimensions": {
+                        "mobile": {"width": 360, "height": None},
+                        "tablet": {"width": 768, "height": None},
+                        "desktop": {"width": 896, "height": None},
+                    },
                 },
             ]
         }
-

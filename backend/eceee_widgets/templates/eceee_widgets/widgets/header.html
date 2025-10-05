@@ -2,16 +2,20 @@
 
 {% if config.image %}
     {% comment %}
-    Using imgproxy template tag for optimized image delivery.
-    Settings can be configured in the widget configuration or passed explicitly.
-    
-    Examples:
-    - With settings dict: {% imgproxy_img config.image settings=config.image_display class_name='header-image' %}
-    - Explicit params: {% imgproxy_img config.image width=1920 height=400 resize_type='fill' gravity='sm' class_name='header-image' %}
+    Responsive header image with dynamic height scaling.
+    - Height scales from 60px (mobile) to 132px (desktop) using clamp()
+    - Uses object-fit: cover to fill the space
+    - Alignment controls focal point (left, center, right)
     {% endcomment %}
     
-    <div className="w-full">
-        {% imgproxy_img config.image width=1280 height=132 resize_type='fill' gravity='sm' class_name='header-image' %}
+    <div class="header-widget">
+        {% if config.responsive_header %}
+            {# Generate image for desktop size, CSS will handle responsive height. include_dimensions=False to allow object-fit: cover to work properly #}
+            {% imgproxy_img config.image width=config.responsive_header.desktop.width height=config.responsive_header.desktop.height resize_type='fill' gravity='sm' class_name='header-image align-{{ config.alignment|default:"center" }}' lazy=True include_dimensions=False %}
+        {% else %}
+            {# Fallback dimensions #}
+            {% imgproxy_img config.image width=1280 height=132 resize_type='fill' gravity='sm' class_name='header-image align-{{ config.alignment|default:"center" }}' lazy=True include_dimensions=False %}
+        {% endif %}
     </div>
 
 {% endif %}

@@ -110,6 +110,7 @@ def imgproxy_img(
     alt=None,
     class_name=None,
     lazy=True,
+    include_dimensions=True,  # Whether to include width/height HTML attributes
     # Common imgproxy parameters
     width=None,
     height=None,
@@ -133,6 +134,8 @@ def imgproxy_img(
         alt: Alt text (auto-generated from image title/description if not provided)
         class_name: CSS classes for the img tag
         lazy: Enable lazy loading (default: True)
+        include_dimensions: Include width/height HTML attributes (default: True).
+                          Set to False for object-fit: cover to work properly.
         width, height, resize_type, gravity, quality, format, preset: imgproxy parameters
         **kwargs: Additional imgproxy options
 
@@ -141,7 +144,7 @@ def imgproxy_img(
         - src: imgproxy URL
         - alt: alt text
         - class: CSS classes
-        - width, height: dimensions
+        - width, height: dimensions (None if include_dimensions=False)
         - lazy: lazy loading flag
         - original_width, original_height: original image dimensions
 
@@ -150,8 +153,10 @@ def imgproxy_img(
         {% imgproxy_img config.image width=800 height=600 class_name='hero' %}
         {% imgproxy_img config.image width=400 gravity='face' alt='Profile' %}
         {% imgproxy_img config.image preset='hero' class_name='banner-image' %}
+        {% imgproxy_img config.image width=1280 height=132 include_dimensions=False %}
     """
     try:
+        print("imgproxy_img")
         # Extract URL and metadata
         source_url = _extract_url_from_image(image_obj)
         metadata = _extract_metadata(image_obj)
@@ -198,8 +203,8 @@ def imgproxy_img(
             "src": imgproxy_url,
             "alt": alt,
             "class": class_name,
-            "width": params.get("width"),
-            "height": params.get("height"),
+            "width": params.get("width") if include_dimensions else None,
+            "height": params.get("height") if include_dimensions else None,
             "lazy": lazy,
             "original_width": metadata.get("width"),
             "original_height": metadata.get("height"),
