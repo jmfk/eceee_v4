@@ -67,6 +67,7 @@ export const validateWidgetConfiguration = async (widgetType, widgetData) => {
     try {
         // Properly encode the widget type to handle dots and spaces
         const encodedWidgetType = encodeURIComponent(widgetType)
+        console.log("validateWidgetConfiguration", widgetData)
         const response = await api.post(`/api/v1/webpages/widget-types/${encodedWidgetType}/validate/`, {
             widgetData: widgetData
         })

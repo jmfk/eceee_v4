@@ -99,7 +99,7 @@ export default function ValidatedInput({
         const commonProps = {
             ref: inputRef,
             value,
-            onChange,
+            onChange: (e) => onChange?.(e.target.value), // Extract value from event
             onFocus: handleFocus,
             onBlur: handleBlur,
             placeholder,

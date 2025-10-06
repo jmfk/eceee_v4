@@ -202,6 +202,7 @@ class HeaderWidget(BaseWidget):
     name = "Header"
     description = "Header widget with background image/color and text color options"
     template_name = "default_widgets/widgets/header.html"
+    default_inheritance_level = -1  # Infinite - header typically sitewide
 
     widget_css = """
     .header-widget {

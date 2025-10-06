@@ -317,6 +317,8 @@ class WebPageRenderer:
                     slot_dimensions = slot_dimensions_map.get(slot_name)
 
                     for widget_data in parent_widgets:
+                        context["layout_name"] = context["layout"].name
+                        context["slot_name"] = slot_name
                         widget_html = self.render_widget_json(
                             widget_data["widget"],
                             context,

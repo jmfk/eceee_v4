@@ -228,22 +228,29 @@ class WebPageViewSet(viewsets.ModelViewSet):
             default_allows_inheritance = slot_name in ["header", "footer", "sidebar"]
 
             # Check if either field is explicitly set (using snake_case from Python)
-            has_requires_local = "requires_local" in slot_config
+            # Support both old (requires_local) and new (allows_replacement_only) naming
+            has_allows_replacement_only = "allows_replacement_only" in slot_config
+            has_requires_local = (
+                "requires_local" in slot_config
+            )  # Backward compatibility
             has_allows_inheritance = "allows_inheritance" in slot_config
 
             # Get values (using snake_case from Python)
-            requires_local = slot_config.get("requires_local", False)
+            allows_replacement_only = slot_config.get(
+                "allows_replacement_only",
+                slot_config.get("requires_local", False),  # Fallback to old name
+            )
             allows_inheritance = slot_config.get(
                 "allows_inheritance", default_allows_inheritance
             )
 
-            # Apply mutual exclusivity: requires_local takes precedence
-            if has_requires_local:
-                # requires_local is explicitly set - use it and invert for inheritance
-                allows_inheritance = not requires_local
+            # Apply mutual exclusivity: allows_replacement_only takes precedence
+            if has_allows_replacement_only or has_requires_local:
+                # allows_replacement_only is explicitly set - use it and invert for inheritance
+                allows_inheritance = not allows_replacement_only
             elif has_allows_inheritance:
-                # Only allows_inheritance is set - use it and invert for requires_local
-                requires_local = not allows_inheritance
+                # Only allows_inheritance is set - use it and invert for allows_replacement_only
+                allows_replacement_only = not allows_inheritance
             # else: both use defaults (already set above)
 
             # Extract inherited widgets (those not from current page)
@@ -279,7 +286,9 @@ class WebPageViewSet(viewsets.ModelViewSet):
                 "hasInheritedWidgets": len(inherited_widgets) > 0,
                 "inheritedWidgets": inherited_widgets,
                 "inheritanceAllowed": allows_inheritance,
-                "requiresLocal": requires_local,
+                "allowsReplacementOnly": allows_replacement_only,
+                "requiresLocal": allows_replacement_only,  # Backward compatibility - deprecated
+                "mergeMode": allows_inheritance and not allows_replacement_only,
             }
 
         return Response(response_data)

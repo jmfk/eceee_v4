@@ -17,12 +17,24 @@
  * @returns {Array} Widget array with inheritance metadata
  */
 export function mergeWidgetsForSlot(localWidgets = [], inheritedWidgets = [], slotRules = {}) {
-    // If inheritance not allowed, return only local widgets
-    if (!slotRules.inheritanceAllowed || slotRules.requiresLocal) {
+    // Support both old (requiresLocal) and new (allowsReplacementOnly) naming
+    const replacementOnly = slotRules.allowsReplacementOnly ?? slotRules.requiresLocal
+
+    // If inheritance not allowed or replacement-only mode, return only local widgets
+    if (!slotRules.inheritanceAllowed || replacementOnly) {
         return localWidgets.map(w => ({ ...w, isInherited: false }))
     }
 
-    // REPLACEMENT BEHAVIOR: If slot has any local widgets, they REPLACE inherited widgets
+    // MERGE MODE: Check if slot supports merging (new behavior)
+    // If mergeMode is true, combine inherited + local widgets
+    if (slotRules.mergeMode && inheritedWidgets.length > 0) {
+        return [
+            ...inheritedWidgets.map(w => ({ ...w, isInherited: true })),
+            ...localWidgets.map(w => ({ ...w, isInherited: false }))
+        ]
+    }
+
+    // REPLACEMENT BEHAVIOR (default): If slot has any local widgets, they REPLACE inherited widgets
     if (localWidgets && localWidgets.length > 0) {
         return localWidgets.map(w => ({ ...w, isInherited: false }))
     }
@@ -63,8 +75,10 @@ export function getSlotWidgetsForMode(mode, localWidgets = [], inheritedWidgets 
  * @returns {boolean} True if should default to preview mode
  */
 export function shouldSlotDefaultToPreview(slotName, localWidgets = [], inheritedWidgets = [], slotRules = {}) {
+    const replacementOnly = slotRules.allowsReplacementOnly ?? slotRules.requiresLocal
+
     // If inheritance not allowed, always edit mode
-    if (!slotRules.inheritanceAllowed || slotRules.requiresLocal) {
+    if (!slotRules.inheritanceAllowed || replacementOnly) {
         return false
     }
 
@@ -73,7 +87,12 @@ export function shouldSlotDefaultToPreview(slotName, localWidgets = [], inherite
         return false
     }
 
-    // If has local widgets, default to edit mode (user is editing)
+    // In merge mode with local widgets, show preview to see both
+    if (slotRules.mergeMode && localWidgets.length > 0 && inheritedWidgets.length > 0) {
+        return true
+    }
+
+    // If has local widgets (replacement mode), default to edit mode (user is editing)
     if (localWidgets && localWidgets.length > 0) {
         return false
     }
@@ -99,7 +118,8 @@ export function hasInheritedContent(inheritedWidgets = []) {
  * @returns {boolean} True if inheritance is allowed
  */
 export function slotAllowsInheritance(slotRules = {}) {
-    if (slotRules.requiresLocal) {
+    const replacementOnly = slotRules.allowsReplacementOnly ?? slotRules.requiresLocal
+    if (replacementOnly) {
         return false
     }
     return slotRules.inheritanceAllowed !== false
@@ -115,6 +135,7 @@ export function slotAllowsInheritance(slotRules = {}) {
  * @returns {Object} Summary object with inheritance metadata
  */
 export function getSlotInheritanceSummary(slotName, localWidgets = [], inheritedWidgets = [], slotRules = {}) {
+    const replacementOnly = slotRules.allowsReplacementOnly ?? slotRules.requiresLocal
     return {
         slotName,
         hasInheritedWidgets: hasInheritedContent(inheritedWidgets),
@@ -122,7 +143,9 @@ export function getSlotInheritanceSummary(slotName, localWidgets = [], inherited
         localCount: localWidgets.length,
         totalCount: localWidgets.length + (slotRules.inheritanceAllowed ? inheritedWidgets.length : 0),
         allowsInheritance: slotAllowsInheritance(slotRules),
-        requiresLocal: slotRules.requiresLocal || false,
+        allowsReplacementOnly: replacementOnly || false,
+        requiresLocal: replacementOnly || false, // Backward compatibility
+        mergeMode: slotRules.mergeMode || false,
         defaultMode: shouldSlotDefaultToPreview(slotName, localWidgets, inheritedWidgets, slotRules) ? 'preview' : 'edit'
     }
 }
@@ -150,10 +173,13 @@ export function transformInheritanceData(inheritanceData) {
         // Extract inherited widgets
         inheritedWidgets[slotName] = slotData.inheritedWidgets || []
 
-        // Extract slot rules
+        // Extract slot rules (support both old and new naming)
+        const replacementOnly = slotData.allowsReplacementOnly ?? slotData.requiresLocal
         slotInheritanceRules[slotName] = {
             inheritanceAllowed: slotData.inheritanceAllowed !== false,
-            requiresLocal: slotData.requiresLocal || false,
+            allowsReplacementOnly: replacementOnly || false,
+            requiresLocal: replacementOnly || false, // Backward compatibility
+            mergeMode: slotData.mergeMode || false,
             hasInheritedWidgets: slotData.hasInheritedWidgets || false
         }
 

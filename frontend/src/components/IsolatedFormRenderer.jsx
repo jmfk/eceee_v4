@@ -44,6 +44,7 @@ const IsolatedFieldWrapper = React.memo(({
                 [fieldName]: value
             }
 
+            console.log("IsolatedFieldWrapper", widgetData.type, fullConfig)
             const result = await validateWidgetConfiguration(widgetData.type, fullConfig)
 
             const fieldValidation = result.errors?.[fieldName] ? {

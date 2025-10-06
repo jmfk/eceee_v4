@@ -30,6 +30,12 @@ class BaseWidget(ABC):
     description: str = ""
     template_name: str = "webpages/widgets/default.html"
 
+    # Inheritance and publishing defaults
+    default_inheritance_level: int = (
+        0  # Default: page-specific (0 = this page only, -1 = infinite)
+    )
+    default_is_published: bool = True  # Default: published
+
     # Enhanced CSS injection system
     widget_css: str = ""  # Widget-specific CSS
     css_variables: Dict[str, str] = {}  # Widget-specific CSS variables
