@@ -642,6 +642,14 @@ const MediaSpecialEditor = ({
                 // For other cases (pending/deleted), check if we can approve
                 if (!originalUpload?.metadata?.tags?.length) continue;
                 if ((rejectedFile.reason === 'duplicate_pending' || rejectedFile.reason === 'deleted') && rejectedFile.existingFile) {
+                    // Get the file ID from either existingFileId or existingFile.id
+                    const fileId = rejectedFile.existingFileId || rejectedFile.existingFile?.id
+
+                    if (!fileId) {
+                        console.warn('No file ID found for rejected file:', rejectedFile)
+                        continue
+                    }
+
                     // Prepare approval data
                     const approvalData = {
                         title: originalUpload.metadata.title,
@@ -652,7 +660,7 @@ const MediaSpecialEditor = ({
                     }
                     try {
                         approvalPromises.push(
-                            mediaApi.pendingFiles.approve(rejectedFile.existingFileId, approvalData)()
+                            mediaApi.pendingFiles.approve(fileId, approvalData)()
                         )
                     } catch (error) {
                         console.error('Failed to approve file:', error)
