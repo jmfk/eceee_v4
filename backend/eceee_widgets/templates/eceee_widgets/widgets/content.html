@@ -1,6 +1,6 @@
 {% load static %}
 
-<div class="content-widget">
+<div class="content-widget mx-auto xl:mx-0 p-0 m-0 bg-gray-200 xl:pl-[80px] xl:pr-[60px] max-w-[650px] xl:max-w-[790px]">
     {% if config.sanitize_html and not config.allow_scripts %}
         <!-- Sanitized HTML content -->
         {{ config.content|safe }}

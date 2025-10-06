@@ -7,15 +7,18 @@
     - Uses object-fit: cover to fill the space
     - Alignment controls focal point (left, center, right)
     {% endcomment %}
-    
-    <div class="header-widget">
-        {% if config.responsive_header %}
-            {# Generate image for desktop size, CSS will handle responsive height. include_dimensions=False to allow object-fit: cover to work properly #}
-            {% imgproxy_img config.image width=config.responsive_header.desktop.width height=config.responsive_header.desktop.height resize_type='fill' gravity='sm' class_name='header-image align-{{ config.alignment|default:"center" }}' lazy=True include_dimensions=False %}
-        {% else %}
-            {# Fallback dimensions #}
-            {% imgproxy_img config.image width=1280 height=132 resize_type='fill' gravity='sm' class_name='header-image align-{{ config.alignment|default:"center" }}' lazy=True include_dimensions=False %}
-        {% endif %}
-    </div>
 
+    <code class="text-white"><pre>
+        layout_name: {{layout_name}}
+        slot_name: {{slot_name}}
+        theme: {{theme}}
+    </pre></code>
+
+    {% if config.responsive_header %}
+        {# Generate image for desktop size, CSS will handle responsive height. include_dimensions=False to allow object-fit: cover to work properly #}
+        {% imgproxy_img config.image width=config.responsive_header.desktop.width height=config.responsive_header.desktop.height resize_type='fill' gravity='sm' class_name='header-image align-{{ config.alignment|default:"center" }}' lazy=True include_dimensions=False %}
+    {% else %}
+        {# Fallback dimensions #}
+        {% imgproxy_img config.image width=1280 height=132 resize_type='fill' gravity='sm' class_name='header-image align-{{ config.alignment|default:"center" }}' lazy=True include_dimensions=False %}
+    {% endif %}
 {% endif %}

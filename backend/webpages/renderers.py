@@ -137,10 +137,46 @@ class WebPageRenderer:
 
         mock_widget = MockWidget(widget_type, template_config, widget_data)
 
+        slot_name = context.get("slot_name", "")
+        layout_name = context.get("layout_name", "")
+        theme = context.get("theme", "") or context.get("theme_name", "")
+
+        # Split template_name into base and extension
+        template_name = widget_type.template_name
+        base_name, ext = (
+            template_name.rsplit(".", 1)
+            if "." in template_name
+            else (template_name, "html")
+        )
+
+        # Build list of template names to try (in order of specificity)
+        template_names = []
+
+        # Most specific: theme + layout + slot
+        if theme and layout_name and slot_name:
+            template_names.append(
+                f"{base_name}_{theme}_{layout_name}_{slot_name}.{ext}"
+            )
+
+        # Layout + slot specific
+        if layout_name and slot_name:
+            template_names.append(f"{base_name}_{layout_name}_{slot_name}.{ext}")
+
+        # Layout specific
+        if layout_name:
+            template_names.append(f"{base_name}_{layout_name}.{ext}")
+
+        # Slot specific
+        if slot_name:
+            template_names.append(f"{base_name}_{slot_name}.{ext}")
+
+        # Default fallback
+        template_names.append(template_name)
+
         # Render using the widget's template
         try:
             widget_html = render_to_string(
-                widget_type.template_name,
+                template_names,
                 {
                     "widget": mock_widget,
                     "config": template_config,
@@ -253,12 +289,13 @@ class WebPageRenderer:
 
             for widget_info in slot_info.get("widgets", []):
                 widget_data = widget_info["widget"]
+                context["layout_name"] = context["layout"].name
+                context["slot_name"] = slot_name
 
                 # Render the widget with slot dimensions
                 widget_html = self.render_widget_json(
                     widget_data, context, slot_dimensions=slot_dimensions
                 )
-
                 rendered_widgets.append(
                     {
                         "html": widget_html,

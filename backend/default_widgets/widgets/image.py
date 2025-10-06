@@ -57,8 +57,8 @@ class ImageConfig(BaseModel):
             "component": "SelectInput",
             "order": 2,
             "group": "Display Options",
-            "valueListName": "image-styles",  # References a value list
             "placeholder": "Select image style...",
+            "options": [],  # Options loaded dynamically from theme
         },
     )
     enableLightbox: bool = Field(

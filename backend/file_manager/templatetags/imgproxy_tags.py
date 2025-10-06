@@ -156,7 +156,7 @@ def imgproxy_img(
         {% imgproxy_img config.image width=1280 height=132 include_dimensions=False %}
     """
     try:
-        print("imgproxy_img")
+
         # Extract URL and metadata
         source_url = _extract_url_from_image(image_obj)
         metadata = _extract_metadata(image_obj)
