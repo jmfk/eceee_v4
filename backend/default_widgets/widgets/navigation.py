@@ -68,6 +68,7 @@ class NavigationWidget(BaseWidget):
     name = "Navigation"
     description = "Navigation widget with background image/color and text color options"
     template_name = "default_widgets/widgets/navigation.html"
+    default_inheritance_level = -1  # Infinite - navigation typically sitewide
 
     widget_css = """
     .navigation-widget {

@@ -6,6 +6,7 @@ import DeletedWidgetWarning from './DeletedWidgetWarning.jsx'
 
 import { SpecialEditorRenderer, hasSpecialEditor } from './special-editors'
 import IsolatedFormRenderer from './IsolatedFormRenderer.jsx'
+import WidgetPublishingInheritanceFields from './WidgetPublishingInheritanceFields.jsx'
 
 
 /**
@@ -422,20 +423,28 @@ const WidgetEditorPanel = forwardRef(({
                                 </div>
                             </div>
                         ) : widgetData ? (
-                            <IsolatedFormRenderer
-                                initWidgetData={widgetData}
-                                initschema={fetchedSchema || schema}
-                                namespace={namespace}
-                                contextType={contextType}
-                                widgetId={widgetData?.id}
-                                slotName={widgetData?.slotName || widgetData?.slot}
-                                context={widgetData?.context || {
-                                    widgetId: widgetData?.id,
-                                    slotName: widgetData?.slotName || widgetData?.slot,
-                                    mode: 'edit',
-                                    contextType
-                                }}
-                            />
+                            <>
+                                <IsolatedFormRenderer
+                                    initWidgetData={widgetData}
+                                    initschema={fetchedSchema || schema}
+                                    namespace={namespace}
+                                    contextType={contextType}
+                                    widgetId={widgetData?.id}
+                                    slotName={widgetData?.slotName || widgetData?.slot}
+                                    context={widgetData?.context || {
+                                        widgetId: widgetData?.id,
+                                        slotName: widgetData?.slotName || widgetData?.slot,
+                                        mode: 'edit',
+                                        contextType
+                                    }}
+                                />
+                                <WidgetPublishingInheritanceFields
+                                    widgetData={widgetData}
+                                    widgetType={widgetTypeValidation}
+                                    contextType={context?.contextType}
+                                    componentId={`widget-editor-${widgetData?.id}`}
+                                />
+                            </>
                         ) : (
                             <div className="text-center text-gray-500 py-8 p-4">
                                 <p>No widget selected for editing.</p>

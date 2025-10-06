@@ -915,7 +915,21 @@ class WebPage(models.Model):
         return inheritance_info
 
     def get_widgets_inheritance_info(self):
-        """Get detailed information about widget inheritance for all slots"""
+        """
+        Get detailed information about widget inheritance for all slots.
+
+        Supports two inheritance modes:
+        - MERGE: Inherited widgets + local widgets (inherited first)
+        - REPLACE: Local widgets replace all inherited widgets
+
+        Widget visibility controlled by:
+        - is_published: On/off switch
+        - publish_effective_date/publish_expire_date: Temporal visibility
+        - inheritance_level: How many levels deep widget inherits (-1 = infinite, 0 = page only)
+        - inherit_from_parent: Master on/off for inheritance
+        """
+        from django.utils import timezone
+
         inheritance_info = {}
 
         # Get all slots from effective layout
@@ -927,31 +941,82 @@ class WebPage(models.Model):
 
         for slot in slots:
             slot_name = slot["name"]
+
+            # Get slot configuration for inheritance rules
+            slot_allows_inheritance = slot.get(
+                "allows_inheritance", slot_name in ["header", "footer", "sidebar"]
+            )
+            slot_allows_replacement_only = slot.get(
+                "allows_replacement_only", slot.get("requires_local", False)
+            )
+
             inheritance_info[slot_name] = {
                 "widgets": [],
                 "inheritance_chain": [],
                 "can_override": True,
+                "merge_mode": slot_allows_inheritance
+                and not slot_allows_replacement_only,
             }
 
-            # Collect widgets from inheritance chain using PageVersion data
-            # REPLACEMENT BEHAVIOR: Local widgets replace inherited widgets (not merge)
+            # If slot doesn't allow inheritance at all, only get local widgets
+            if not slot_allows_inheritance:
+                current_version = (
+                    self.get_current_published_version() or self.get_latest_version()
+                )
+                if current_version and current_version.widgets:
+                    local_widgets = self._filter_published_widgets(
+                        current_version.widgets.get(slot_name, [])
+                    )
+                    for widget_data in sorted(
+                        local_widgets, key=lambda w: w.get("sort_order", 0)
+                    ):
+                        inheritance_info[slot_name]["widgets"].append(
+                            {
+                                "widget": widget_data,
+                                "page": self,
+                                "inherited_from": None,
+                                "is_override": widget_data.get(
+                                    "override_parent", False
+                                ),
+                                "allows_inheritance": widget_data.get(
+                                    "inherit_from_parent", True
+                                ),
+                            }
+                        )
+                continue
+
+            # Collect widgets from inheritance chain with level tracking
             current = self
+            depth = 0
             slot_has_local_widgets = False
+            inherited_widgets_found = False
+            local_widgets = []
+            inherited_widgets = []
 
             while current:
                 # Get current published version, or fallback to latest version for editor
                 current_version = current.get_current_published_version()
                 if not current_version:
-                    # If no published version, use latest version (for draft/editing mode)
                     current_version = current.get_latest_version()
 
                 page_widgets = []
                 has_overrides = False
 
                 if current_version and current_version.widgets:
-                    # Get widgets for this slot from JSON data (widgets is a dict with slot_name as key)
+                    # Get widgets for this slot from JSON data
                     widgets_data = current_version.widgets
-                    page_widgets = widgets_data.get(slot_name, [])
+                    raw_widgets = widgets_data.get(slot_name, [])
+
+                    # Filter by publishing status and dates
+                    published_widgets = self._filter_published_widgets(raw_widgets)
+
+                    # Filter by inheritance level
+                    page_widgets = [
+                        w
+                        for w in published_widgets
+                        if self._widget_inheritable_at_depth(w, depth)
+                    ]
+
                     # Sort by sort_order
                     page_widgets = sorted(
                         page_widgets, key=lambda w: w.get("sort_order", 0)
@@ -960,57 +1025,175 @@ class WebPage(models.Model):
                     # Check if current page (self) has widgets in this slot
                     if current == self and len(page_widgets) > 0:
                         slot_has_local_widgets = True
+                        local_widgets = page_widgets
 
+                    # Process widgets from this level
                     for widget_data in page_widgets:
                         widget_info = {
-                            "widget": widget_data,  # JSON data instead of model instance
+                            "widget": widget_data,
                             "page": current,
                             "inherited_from": current if current != self else None,
                             "is_override": widget_data.get("override_parent", False),
                             "allows_inheritance": widget_data.get(
-                                "inherit_from_parent",
-                                True,  # Default to True - widgets are inheritable by default
+                                "inherit_from_parent", True
                             ),
+                            "inheritance_level": widget_data.get(
+                                "inheritance_level", 0
+                            ),
+                            "depth": depth,
                         }
 
-                        # REPLACEMENT LOGIC:
-                        # Include widget if:
-                        # 1. It's from the current page (self), OR
-                        # 2. It's from a parent page AND current page has NO local widgets AND allows inheritance
                         is_from_current = current == self
-                        is_from_parent_and_inheritable = (
-                            current != self
-                            and not slot_has_local_widgets
-                            and widget_data.get("inherit_from_parent", True)
-                        )
 
-                        should_include = (
-                            is_from_current or is_from_parent_and_inheritable
-                        )
+                        # MERGE MODE: Collect both inherited and local widgets
+                        if inheritance_info[slot_name]["merge_mode"]:
+                            if is_from_current:
+                                # Will add local widgets at the end
+                                pass
+                            elif not inherited_widgets_found and widget_data.get(
+                                "inherit_from_parent", True
+                            ):
+                                # First parent level with inheritable widgets
+                                inherited_widgets.append(widget_info)
+                        else:
+                            # REPLACE MODE: Original behavior
+                            is_from_parent_and_inheritable = (
+                                current != self
+                                and not slot_has_local_widgets
+                                and widget_data.get("inherit_from_parent", True)
+                            )
 
-                        if should_include:
-                            inheritance_info[slot_name]["widgets"].append(widget_info)
+                            should_include = (
+                                is_from_current or is_from_parent_and_inheritable
+                            )
+
+                            if should_include:
+                                inheritance_info[slot_name]["widgets"].append(
+                                    widget_info
+                                )
 
                     # Check for overrides in this page's widgets
                     has_overrides = any(
                         w.get("override_parent", False) for w in page_widgets
                     )
 
+                    # Mark that we found inheritable widgets at this level
+                    if (
+                        current != self
+                        and len(page_widgets) > 0
+                        and not inherited_widgets_found
+                    ):
+                        inherited_widgets_found = True
+
                 inheritance_info[slot_name]["inheritance_chain"].append(
                     {
                         "page": current,
                         "widgets_count": len(page_widgets),
                         "has_overrides": has_overrides,
+                        "depth": depth,
                     }
                 )
 
-                # REPLACEMENT BEHAVIOR: If current page has widgets, stop walking up the chain
-                if slot_has_local_widgets:
+                # REPLACE MODE: If current page has widgets, stop walking up the chain
+                if (
+                    not inheritance_info[slot_name]["merge_mode"]
+                    and slot_has_local_widgets
+                ):
+                    break
+
+                # MERGE MODE: Stop after finding first inheritable parent widgets
+                if (
+                    inheritance_info[slot_name]["merge_mode"]
+                    and inherited_widgets_found
+                    and slot_has_local_widgets
+                ):
                     break
 
                 current = current.parent
+                depth += 1
+
+            # MERGE MODE: Combine inherited + local widgets (inherited first)
+            if inheritance_info[slot_name]["merge_mode"]:
+                final_widgets = inherited_widgets.copy()
+                for widget_data in local_widgets:
+                    final_widgets.append(
+                        {
+                            "widget": widget_data,
+                            "page": self,
+                            "inherited_from": None,
+                            "is_override": widget_data.get("override_parent", False),
+                            "allows_inheritance": widget_data.get(
+                                "inherit_from_parent", True
+                            ),
+                            "inheritance_level": widget_data.get(
+                                "inheritance_level", 0
+                            ),
+                            "depth": 0,
+                        }
+                    )
+                inheritance_info[slot_name]["widgets"] = final_widgets
 
         return inheritance_info
+
+    def _filter_published_widgets(self, widgets):
+        """Filter widgets by publishing status and date range"""
+        from django.utils import timezone
+
+        now = timezone.now()
+        published = []
+
+        for widget in widgets:
+            # Check is_published flag (default to True for backward compatibility)
+            if not widget.get("is_published", True):
+                continue
+
+            # Check effective date
+            effective_date = widget.get("publish_effective_date")
+            if effective_date:
+                from datetime import datetime
+
+                if isinstance(effective_date, str):
+                    effective_date = datetime.fromisoformat(
+                        effective_date.replace("Z", "+00:00")
+                    )
+                if effective_date > now:
+                    continue
+
+            # Check expire date
+            expire_date = widget.get("publish_expire_date")
+            if expire_date:
+                from datetime import datetime
+
+                if isinstance(expire_date, str):
+                    expire_date = datetime.fromisoformat(
+                        expire_date.replace("Z", "+00:00")
+                    )
+                if expire_date < now:
+                    continue
+
+            published.append(widget)
+
+        return published
+
+    def _widget_inheritable_at_depth(self, widget, depth):
+        """Check if widget should be inherited at the given depth"""
+        # Check inherit_from_parent master switch
+        if not widget.get("inherit_from_parent", True):
+            return depth == 0  # Only visible on its own page
+
+        # Check inheritance_level
+        inheritance_level = widget.get("inheritance_level", 0)
+
+        # -1 means infinite inheritance
+        if inheritance_level == -1:
+            return True
+
+        # 0 means this page only
+        if inheritance_level == 0:
+            return depth == 0
+
+        # Otherwise check if depth is within level
+        return depth <= inheritance_level
 
     def can_inherit_from(self, ancestor_page):
         """Check if this page can inherit from the specified ancestor"""
