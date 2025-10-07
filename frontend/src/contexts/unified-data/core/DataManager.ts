@@ -720,7 +720,9 @@ export class DataManager {
                         const slotName = payload.slotName || ''; // Legacy fallback
 
                         // Guard against nested config objects
-                        payload.config = this.validateAndCleanConfig(payload.config, 'UPDATE_WIDGET_CONFIG');
+                        if (payload.config) {
+                            payload.config = this.validateAndCleanConfig(payload.config, 'UPDATE_WIDGET_CONFIG');
+                        }
 
                         if (target.versionId) {
                             const version = state.versions[target.versionId];
@@ -732,7 +734,8 @@ export class DataManager {
                                     payload.widgetPath,
                                     (widget) => ({
                                         ...widget,
-                                        config: payload.config,
+                                        ...(payload.config && { config: payload.config }),
+                                        ...(payload.widgetUpdates || {}),
                                         updated_at: now
                                     })
                                 );
@@ -773,7 +776,8 @@ export class DataManager {
                                 const updatedNestedWidgets = [...nestedWidgets];
                                 updatedNestedWidgets[nestedIndex] = {
                                     ...updatedNestedWidgets[nestedIndex],
-                                    config: payload.config,
+                                    ...(payload.config && { config: payload.config }),
+                                    ...(payload.widgetUpdates || {}),
                                     updated_at: now
                                 };
                                 
@@ -816,11 +820,15 @@ export class DataManager {
                                 throw new Error(`Widget ${widgetId} not found in slot ${slotName} of version ${target.versionId}`);
                             }
                             const updatedWidgets = [...slotWidgets];
-                            updatedWidgets[widgetIndex] = {
+                            const widgetUpdate: any = {
                                 ...updatedWidgets[widgetIndex],
-                                config: payload.config, // Replace config entirely instead of merging
+                                ...(payload.widgetUpdates || {}),
                                 updated_at: now
                             };
+                            if (payload.config !== undefined) {
+                                widgetUpdate.config = payload.config;
+                            }
+                            updatedWidgets[widgetIndex] = widgetUpdate;
                             return {
                                 versions: {
                                     ...state.versions,
