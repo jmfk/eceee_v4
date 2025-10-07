@@ -25,26 +25,26 @@ class WidgetRegistryTest(TestCase):
         """Test that built-in widgets are registered"""
         widget_names = widget_type_registry.get_widget_names()
 
-        # Check that basic widgets are registered
-        expected_widgets = ["Text Block", "Image", "Button", "Spacer", "HTML Block"]
+        # Check that basic widgets are registered (updated names)
+        expected_widgets = ["Content", "Image", "Header", "Footer", "Navigation"]
         for widget_name in expected_widgets:
             self.assertIn(widget_name, widget_names)
 
     def test_get_widget_type_by_name(self):
         """Test retrieving widget types by name"""
-        text_widget = widget_type_registry.get_widget_type("Text Block")
-        self.assertIsNotNone(text_widget)
-        self.assertEqual(text_widget.name, "Text Block")
-        # Test the widget class name instead of isinstance since the class might be from default_widgets
-        self.assertEqual(text_widget.__class__.__name__, "TextBlockWidget")
+        content_widget = widget_type_registry.get_widget_type("Content")
+        self.assertIsNotNone(content_widget)
+        self.assertEqual(content_widget.name, "Content")
+        # Test the widget class name
+        self.assertEqual(content_widget.__class__.__name__, "ContentWidget")
 
     def test_widget_type_validation(self):
         """Test widget configuration validation"""
-        text_widget = widget_type_registry.get_widget_type("Text Block")
+        content_widget = widget_type_registry.get_widget_type("Content")
 
         # Valid configuration
-        valid_config = {"content": "Hello World", "alignment": "left"}
-        is_valid, errors = text_widget.validate_configuration(valid_config)
+        valid_config = {"content": "Hello World", "text_align": "left"}
+        is_valid, errors = content_widget.validate_configuration(valid_config)
         self.assertTrue(is_valid)
         self.assertEqual(errors, [])
 
@@ -323,6 +323,137 @@ class PageThemeTest(TestCase):
         valid_css = {"--primary-color": "#007bff", "--font-size": "16px"}
         css_model = CSSVariables(variables=valid_css)
         self.assertEqual(css_model.variables["--primary-color"], "#007bff")
+
+
+class InheritanceEnhancementTest(TestCase):
+    """Test enhanced widget inheritance functionality."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="testuser", email="test@example.com", password="testpass123"
+        )
+
+        self.theme = PageTheme.objects.create(
+            name="Test Theme",
+            description="Test theme",
+            css_variables={},
+            is_active=True,
+            created_by=self.user,
+        )
+
+        self.root_page = WebPage.objects.create(
+            title="Root", slug="root", created_by=self.user, last_modified_by=self.user
+        )
+
+        self.child_page = WebPage.objects.create(
+            title="Child",
+            slug="child",
+            parent=self.root_page,
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+    def test_inheritance_level_filtering(self):
+        """Test that inheritance_level controls widget inheritance depth."""
+
+        # Root page version with widgets at different inheritance levels
+        root_version = PageVersion.objects.create(
+            page=self.root_page,
+            version_number=1,
+            widgets={
+                "header": [
+                    {
+                        "id": "infinite-widget",
+                        "type": "eceee_widgets.HeaderWidget",
+                        "config": {"content": "Infinite"},
+                        "inheritance_level": -1,
+                        "is_published": True,
+                        "inherit_from_parent": True,
+                    },
+                    {
+                        "id": "page-only-widget",
+                        "type": "eceee_widgets.HeaderWidget",
+                        "config": {"content": "Page Only"},
+                        "inheritance_level": 0,
+                        "is_published": True,
+                        "inherit_from_parent": True,
+                    },
+                ]
+            },
+            code_layout="main_layout",
+            theme=self.theme,
+            page_data={},
+            created_by=self.user,
+        )
+
+        PageVersion.objects.create(
+            page=self.child_page,
+            version_number=1,
+            widgets={},
+            code_layout="main_layout",
+            theme=self.theme,
+            page_data={},
+            created_by=self.user,
+        )
+
+        # Test child inheritance
+        inheritance_info = self.child_page.get_widgets_inheritance_info()
+        header_widgets = inheritance_info["header"]["widgets"]
+        contents = [w["widget"]["config"]["content"] for w in header_widgets]
+
+        # Should inherit infinite (-1) but not page-only (0)
+        self.assertIn("Infinite", contents)
+        self.assertNotIn("Page Only", contents)
+
+    def test_publishing_filter(self):
+        """Test that unpublished widgets are not inherited."""
+
+        PageVersion.objects.create(
+            page=self.root_page,
+            version_number=1,
+            widgets={
+                "header": [
+                    {
+                        "id": "published-widget",
+                        "type": "eceee_widgets.HeaderWidget",
+                        "config": {"content": "Published"},
+                        "inheritance_level": -1,
+                        "is_published": True,
+                        "inherit_from_parent": True,
+                    },
+                    {
+                        "id": "unpublished-widget",
+                        "type": "eceee_widgets.HeaderWidget",
+                        "config": {"content": "Unpublished"},
+                        "inheritance_level": -1,
+                        "is_published": False,
+                        "inherit_from_parent": True,
+                    },
+                ]
+            },
+            code_layout="main_layout",
+            theme=self.theme,
+            page_data={},
+            created_by=self.user,
+        )
+
+        PageVersion.objects.create(
+            page=self.child_page,
+            version_number=1,
+            widgets={},
+            code_layout="main_layout",
+            theme=self.theme,
+            page_data={},
+            created_by=self.user,
+        )
+
+        inheritance_info = self.child_page.get_widgets_inheritance_info()
+        header_widgets = inheritance_info["header"]["widgets"]
+        contents = [w["widget"]["config"]["content"] for w in header_widgets]
+
+        # Should only inherit published widget
+        self.assertIn("Published", contents)
+        self.assertNotIn("Unpublished", contents)
 
 
 class LayoutIntegrationTest(TestCase):
