@@ -49,17 +49,14 @@ const WidgetPublishingInheritanceFields = ({
         // Update local state immediately for UI responsiveness
         setLocalValues(prev => ({ ...prev, [field]: value }))
 
-        // Update widget data object (will be persisted on save)
-        if (widgetData) {
-            widgetData[field] = value
-        }
-
-        // Publish update through UDC to mark page as dirty
+        // Publish widget-level update through UDC
         await publishUpdate(componentId, 'UPDATE_WIDGET_CONFIG', {
             id: widgetData?.id,
             slotName: widgetData?.slotName || widgetData?.slot,
             contextType: contextType,
-            config: widgetData?.config  // Config unchanged, just trigger dirty state
+            widgetUpdates: {
+                [field]: value
+            }
         })
     }, [widgetData, contextType, componentId, publishUpdate])
 
