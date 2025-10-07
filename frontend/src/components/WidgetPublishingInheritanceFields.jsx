@@ -32,7 +32,7 @@ const WidgetPublishingInheritanceFields = ({
     const [localValues, setLocalValues] = useState({
         isPublished: widgetData?.isPublished ?? widgetData?.is_published ?? true,
         inheritanceLevel: widgetData?.inheritanceLevel ?? widgetData?.inheritance_level ?? defaultInheritanceLevel,
-        inheritFromParent: widgetData?.inheritFromParent ?? widgetData?.inherit_from_parent ?? true,
+        inheritanceBehavior: widgetData?.inheritanceBehavior ?? widgetData?.inheritance_behavior ?? 'insert_after_parent',
         publishEffectiveDate: widgetData?.publishEffectiveDate ?? widgetData?.publish_effective_date ?? '',
         publishExpireDate: widgetData?.publishExpireDate ?? widgetData?.publish_expire_date ?? ''
     })
@@ -42,7 +42,7 @@ const WidgetPublishingInheritanceFields = ({
         setLocalValues({
             isPublished: widgetData?.isPublished ?? widgetData?.is_published ?? true,
             inheritanceLevel: widgetData?.inheritanceLevel ?? widgetData?.inheritance_level ?? defaultInheritanceLevel,
-            inheritFromParent: widgetData?.inheritFromParent ?? widgetData?.inherit_from_parent ?? true,
+            inheritanceBehavior: widgetData?.inheritanceBehavior ?? widgetData?.inheritance_behavior ?? 'insert_after_parent',
             publishEffectiveDate: widgetData?.publishEffectiveDate ?? widgetData?.publish_effective_date ?? '',
             publishExpireDate: widgetData?.publishExpireDate ?? widgetData?.publish_expire_date ?? ''
         })
@@ -154,32 +154,24 @@ const WidgetPublishingInheritanceFields = ({
                         </p>
                     </div>
 
-                    {/* Inherit From Parent Toggle */}
-                    <div className="flex items-center justify-between">
-                        <label className="text-sm font-medium text-gray-700">
-                            Can Be Inherited
+                    {/* Inheritance Behavior Dropdown */}
+                    <div>
+                        <label className="text-sm font-medium text-gray-700 block mb-2">
+                            Inheritance Behavior
                         </label>
-                        <button
-                            type="button"
-                            onClick={() => handleFieldChange('inheritFromParent', !localValues.inheritFromParent)}
-                            className={`
-                        relative inline-flex h-6 w-11 items-center rounded-full transition-colors
-                        ${localValues.inheritFromParent ? 'bg-blue-600' : 'bg-gray-300'}
-                    `}
-                            role="switch"
-                            aria-checked={localValues.inheritFromParent}
+                        <select
+                            value={localValues.inheritanceBehavior}
+                            onChange={(e) => handleFieldChange('inheritanceBehavior', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         >
-                            <span
-                                className={`
-                            inline-block h-4 w-4 transform rounded-full bg-white transition-transform
-                            ${localValues.inheritFromParent ? 'translate-x-6' : 'translate-x-1'}
-                        `}
-                            />
-                        </button>
+                            <option value="insert_after_parent">Insert After Parent Widgets</option>
+                            <option value="insert_before_parent">Insert Before Parent Widgets</option>
+                            <option value="override_parent">Override Parent Widgets</option>
+                        </select>
+                        <p className="text-xs text-gray-500 mt-1">
+                            How this widget interacts with inherited parent widgets
+                        </p>
                     </div>
-                    <p className="text-xs text-gray-500 -mt-2">
-                        Master switch for inheritance (overrides level)
-                    </p>
 
                     {/* Effective Date */}
                     <div>

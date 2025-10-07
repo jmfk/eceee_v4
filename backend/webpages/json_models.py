@@ -11,6 +11,14 @@ from datetime import datetime
 from enum import Enum
 
 
+class WidgetInheritanceBehavior(str, Enum):
+    """Widget inheritance behavior options"""
+
+    OVERRIDE_PARENT = "override_parent"  # Replace all parent widgets in slot
+    INSERT_AFTER_PARENT = "insert_after_parent"  # Add after inherited widgets
+    INSERT_BEFORE_PARENT = "insert_before_parent"  # Add before inherited widgets
+
+
 # ============================================================================
 # API Response Models
 # ============================================================================
@@ -176,13 +184,19 @@ class PageWidgetData(BaseModel):
     id: Optional[str] = Field(
         None, description="Unique identifier for the widget instance"
     )
-    inherit_from_parent: bool = Field(
-        False, description="Whether this widget inherits from parent page"
-    )
-    override_parent: bool = Field(
-        False, description="Whether this widget overrides parent widget"
+    inheritance_behavior: WidgetInheritanceBehavior = Field(
+        WidgetInheritanceBehavior.INSERT_AFTER_PARENT,
+        description="How this widget behaves with parent widgets",
     )
     is_visible: bool = Field(True, description="Whether the widget is visible")
+
+    # Backward compatibility - deprecated fields
+    inherit_from_parent: Optional[bool] = Field(
+        None, description="DEPRECATED: Use inheritance_behavior instead"
+    )
+    override_parent: Optional[bool] = Field(
+        None, description="DEPRECATED: Use inheritance_behavior instead"
+    )
 
 
 class PageDataSnapshot(BaseModel):

@@ -1112,26 +1112,50 @@ class WebPage(models.Model):
                 current = current.parent
                 depth += 1
 
-            # MERGE MODE: Combine inherited + local widgets (inherited first)
+            # MERGE MODE: Combine widgets based on inheritance behavior
             if inheritance_info[slot_name]["merge_mode"]:
-                final_widgets = inherited_widgets.copy()
+                from .json_models import WidgetInheritanceBehavior
+
+                # Categorize local widgets by inheritance behavior
+                before_widgets = []
+                override_widgets = []
+                after_widgets = []
+
                 for widget_data in local_widgets:
-                    final_widgets.append(
-                        {
-                            "widget": widget_data,
-                            "page": self,
-                            "inherited_from": None,
-                            "is_override": widget_data.get("override_parent", False),
-                            "allows_inheritance": widget_data.get(
-                                "inherit_from_parent", True
-                            ),
-                            "inheritance_level": widget_data.get(
-                                "inheritance_level", 0
-                            ),
-                            "depth": 0,
-                        }
-                    )
-                inheritance_info[slot_name]["widgets"] = final_widgets
+                    widget_info = {
+                        "widget": widget_data,
+                        "page": self,
+                        "inherited_from": None,
+                        "is_override": widget_data.get("override_parent", False),
+                        "allows_inheritance": widget_data.get(
+                            "inherit_from_parent", True
+                        ),
+                        "inheritance_level": widget_data.get("inheritance_level", 0),
+                        "depth": 0,
+                    }
+
+                    # Determine behavior (with backward compatibility)
+                    behavior = widget_data.get("inheritance_behavior")
+                    if not behavior:
+                        if widget_data.get("override_parent", False):
+                            behavior = WidgetInheritanceBehavior.OVERRIDE_PARENT
+                        else:
+                            behavior = WidgetInheritanceBehavior.INSERT_AFTER_PARENT
+
+                    if behavior == WidgetInheritanceBehavior.OVERRIDE_PARENT:
+                        override_widgets.append(widget_info)
+                    elif behavior == WidgetInheritanceBehavior.INSERT_BEFORE_PARENT:
+                        before_widgets.append(widget_info)
+                    else:  # INSERT_AFTER_PARENT
+                        after_widgets.append(widget_info)
+
+                # Build final widget list: before + inherited + after
+                # Override widgets replace ALL inherited widgets
+                if override_widgets:
+                    inheritance_info[slot_name]["widgets"] = override_widgets
+                else:
+                    final_widgets = before_widgets + inherited_widgets + after_widgets
+                    inheritance_info[slot_name]["widgets"] = final_widgets
 
         return inheritance_info
 
@@ -1177,11 +1201,23 @@ class WebPage(models.Model):
 
     def _widget_inheritable_at_depth(self, widget, depth):
         """Check if widget should be inherited at the given depth"""
-        # Check inherit_from_parent master switch
-        if not widget.get("inherit_from_parent", True):
-            return depth == 0  # Only visible on its own page
+        from .json_models import WidgetInheritanceBehavior
 
-        # Check inheritance_level
+        # Get inheritance behavior (with backward compatibility)
+        inheritance_behavior = widget.get("inheritance_behavior")
+        if not inheritance_behavior:
+            # Backward compatibility: convert old boolean fields
+            inherit_from_parent = widget.get("inherit_from_parent", True)
+            override_parent = widget.get("override_parent", False)
+
+            if not inherit_from_parent:
+                return depth == 0  # Only on its own page
+            elif override_parent:
+                inheritance_behavior = WidgetInheritanceBehavior.OVERRIDE_PARENT
+            else:
+                inheritance_behavior = WidgetInheritanceBehavior.INSERT_AFTER_PARENT
+
+        # Check inheritance_level depth limits
         inheritance_level = widget.get("inheritance_level", 0)
 
         # -1 means infinite inheritance
