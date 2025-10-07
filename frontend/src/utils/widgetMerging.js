@@ -17,15 +17,25 @@
  * @returns {Array} Widget array with inheritance metadata
  */
 export function mergeWidgetsForSlot(localWidgets = [], inheritedWidgets = [], slotRules = {}) {
-    // Support both old (requiresLocal) and new (allowsReplacementOnly) naming
-    const replacementOnly = slotRules.allowsReplacementOnly ?? slotRules.requiresLocal
-
-    // If inheritance not allowed or replacement-only mode, return only local widgets
-    if (!slotRules.inheritanceAllowed || replacementOnly) {
+    // If inheritance not allowed, return only local widgets
+    if (!slotRules.inheritanceAllowed) {
         return localWidgets.map(w => ({ ...w, isInherited: false }))
     }
 
-    // MERGE MODE: Check if slot supports merging (new behavior)
+    // TYPE-BASED REPLACEMENT: If inheritableTypes defined and any local widget matches, skip all inherited
+    if (slotRules.inheritableTypes?.length > 0) {
+        const localTypes = localWidgets.map(w => w.type);
+        const hasMatchingType = slotRules.inheritableTypes.some(type =>
+            localTypes.includes(type)
+        );
+
+        if (hasMatchingType) {
+            // Local widget of inheritable type exists, skip all inherited widgets
+            return localWidgets.map(w => ({ ...w, isInherited: false }));
+        }
+    }
+
+    // MERGE MODE: Check if slot supports merging (mergeMode = inheritanceAllowed AND allowMerge)
     // If mergeMode is true, combine inherited + local widgets
     if (slotRules.mergeMode && inheritedWidgets.length > 0) {
         return [
@@ -34,12 +44,13 @@ export function mergeWidgetsForSlot(localWidgets = [], inheritedWidgets = [], sl
         ]
     }
 
-    // REPLACEMENT BEHAVIOR (default): If slot has any local widgets, they REPLACE inherited widgets
+    // REPLACEMENT MODE (allowMerge=false): Local widgets REPLACE inherited widgets
+    // If slot has any local widgets, they REPLACE inherited widgets
     if (localWidgets && localWidgets.length > 0) {
         return localWidgets.map(w => ({ ...w, isInherited: false }))
     }
 
-    // No local widgets - show inherited widgets
+    // No local widgets - show inherited widgets (until user adds local widgets to replace them)
     return inheritedWidgets.map(w => ({ ...w, isInherited: true }))
 }
 
@@ -65,8 +76,10 @@ export function getSlotWidgetsForMode(mode, localWidgets = [], inheritedWidgets 
 /**
  * Determine if a slot should default to preview mode
  * 
- * Logic: If slot has inherited widgets AND allows inheritance AND has no local widgets,
- * default to preview mode to show the inherited content
+ * Logic:
+ * - If slot has inherited widgets AND allows inheritance:
+ *   - In MERGE mode: Default to EDIT mode (to encourage adding widgets that merge)
+ *   - In REPLACEMENT mode: Default to PREVIEW mode if no local widgets (show inherited content)
  * 
  * @param {string} slotName - Name of the slot
  * @param {Array} localWidgets - Local widgets for this slot
@@ -75,10 +88,8 @@ export function getSlotWidgetsForMode(mode, localWidgets = [], inheritedWidgets 
  * @returns {boolean} True if should default to preview mode
  */
 export function shouldSlotDefaultToPreview(slotName, localWidgets = [], inheritedWidgets = [], slotRules = {}) {
-    const replacementOnly = slotRules.allowsReplacementOnly ?? slotRules.requiresLocal
-
     // If inheritance not allowed, always edit mode
-    if (!slotRules.inheritanceAllowed || replacementOnly) {
+    if (!slotRules.inheritanceAllowed) {
         return false
     }
 
@@ -87,17 +98,22 @@ export function shouldSlotDefaultToPreview(slotName, localWidgets = [], inherite
         return false
     }
 
-    // In merge mode with local widgets, show preview to see both
-    if (slotRules.mergeMode && localWidgets.length > 0 && inheritedWidgets.length > 0) {
-        return true
+    // MERGE MODE BEHAVIOR (mergeMode = inheritanceAllowed AND allowMerge):
+    // In merge mode, default to EDIT mode to encourage adding widgets alongside inherited content
+    // Exception: Only show preview if user has already added local widgets (to see the merged result)
+    if (slotRules.mergeMode) {
+        // Show preview mode only if user has added local widgets (to see both merged together)
+        return localWidgets.length > 0 && inheritedWidgets.length > 0
     }
 
-    // If has local widgets (replacement mode), default to edit mode (user is editing)
+    // REPLACEMENT MODE BEHAVIOR (allowMerge=false):
+    // If has local widgets, default to edit mode (user is editing local widgets that will replace inherited)
     if (localWidgets && localWidgets.length > 0) {
         return false
     }
 
-    // Has inherited widgets, allows inheritance, no local widgets -> preview
+    // Has inherited widgets, allows inheritance, no local widgets, replacement mode -> preview
+    // (Show the inherited content in collapsed/preview mode)
     return true
 }
 
@@ -118,8 +134,13 @@ export function hasInheritedContent(inheritedWidgets = []) {
  * @returns {boolean} True if inheritance is allowed
  */
 export function slotAllowsInheritance(slotRules = {}) {
-    const replacementOnly = slotRules.allowsReplacementOnly ?? slotRules.requiresLocal
-    if (replacementOnly) {
+    // Support new allowMerge field (preferred) and fallback to old naming
+    const allowMerge = slotRules.allowMerge ??
+        !slotRules.allowsReplacementOnly ??
+        !slotRules.requiresLocal ??
+        true
+
+    if (!allowMerge) {
         return false
     }
     return slotRules.inheritanceAllowed !== false
@@ -135,7 +156,13 @@ export function slotAllowsInheritance(slotRules = {}) {
  * @returns {Object} Summary object with inheritance metadata
  */
 export function getSlotInheritanceSummary(slotName, localWidgets = [], inheritedWidgets = [], slotRules = {}) {
-    const replacementOnly = slotRules.allowsReplacementOnly ?? slotRules.requiresLocal
+    // Support new allowMerge field (preferred) and fallback to old naming
+    const allowMerge = slotRules.allowMerge ??
+        !slotRules.allowsReplacementOnly ??
+        !slotRules.requiresLocal ??
+        true
+    const replacementOnly = !allowMerge
+
     return {
         slotName,
         hasInheritedWidgets: hasInheritedContent(inheritedWidgets),
@@ -143,8 +170,9 @@ export function getSlotInheritanceSummary(slotName, localWidgets = [], inherited
         localCount: localWidgets.length,
         totalCount: localWidgets.length + (slotRules.inheritanceAllowed ? inheritedWidgets.length : 0),
         allowsInheritance: slotAllowsInheritance(slotRules),
-        allowsReplacementOnly: replacementOnly || false,
-        requiresLocal: replacementOnly || false, // Backward compatibility
+        allowMerge: allowMerge, // New preferred field
+        allowsReplacementOnly: replacementOnly || false, // Backward compatibility
+        requiresLocal: replacementOnly || false, // Backward compatibility - deprecated
         mergeMode: slotRules.mergeMode || false,
         defaultMode: shouldSlotDefaultToPreview(slotName, localWidgets, inheritedWidgets, slotRules) ? 'preview' : 'edit'
     }
@@ -173,14 +201,22 @@ export function transformInheritanceData(inheritanceData) {
         // Extract inherited widgets
         inheritedWidgets[slotName] = slotData.inheritedWidgets || []
 
-        // Extract slot rules (support both old and new naming)
-        const replacementOnly = slotData.allowsReplacementOnly ?? slotData.requiresLocal
+        // Extract slot rules with new allowMerge field (preferred) and fallback to old naming
+        const allowMerge = slotData.allowMerge ??
+            !slotData.allowsReplacementOnly ??
+            !slotData.requiresLocal ??
+            true
+        const replacementOnly = !allowMerge
+
         slotInheritanceRules[slotName] = {
             inheritanceAllowed: slotData.inheritanceAllowed !== false,
-            allowsReplacementOnly: replacementOnly || false,
-            requiresLocal: replacementOnly || false, // Backward compatibility
+            allowMerge: allowMerge, // New preferred field
+            allowsReplacementOnly: replacementOnly || false, // Backward compatibility
+            requiresLocal: replacementOnly || false, // Backward compatibility - deprecated
             mergeMode: slotData.mergeMode || false,
-            hasInheritedWidgets: slotData.hasInheritedWidgets || false
+            hasInheritedWidgets: slotData.hasInheritedWidgets || false,
+            inheritableTypes: slotData.inheritableTypes || [], // Widget types allowed for inheritance/replacement
+            slotName: slotName  // Add slotName to rules for debug logging
         }
 
         // Track if any slot has inherited content

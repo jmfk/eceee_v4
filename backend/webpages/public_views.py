@@ -646,8 +646,6 @@ class HostnamePageView(View):
         else:
             context["slots"] = []
 
-        # debug
-
         return render(request, template_name, context)
 
     def _is_page_accessible(self, page):
@@ -656,7 +654,6 @@ class HostnamePageView(View):
 
     def get_context_data(self, **kwargs):
         """Add layout, theme, widgets, hostname info, and object content to context"""
-        # debug
         context = super().get_context_data(**kwargs)
         page = self.object
         hostname = self.request.get_host().lower()

@@ -30,6 +30,7 @@ const PageContentEditor = forwardRef(({
     inheritedWidgets,
     slotInheritanceRules,
     hasInheritedContent,
+    refetchInheritance,
     ...otherProps
 }, ref) => {
     // Extract layout name from layoutJson or use default
@@ -73,6 +74,7 @@ const PageContentEditor = forwardRef(({
             inheritedWidgets={inheritedWidgets}
             slotInheritanceRules={slotInheritanceRules}
             hasInheritedContent={hasInheritedContent}
+            refetchInheritance={refetchInheritance}
             {...otherProps}
         />
     );

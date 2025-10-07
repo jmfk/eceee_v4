@@ -30,7 +30,8 @@ const ReactLayoutRenderer = forwardRef(({
     // Widget inheritance props
     inheritedWidgets = {},
     slotInheritanceRules = {},
-    hasInheritedContent = false
+    hasInheritedContent = false,
+    refetchInheritance
 }, ref) => {
 
     // Get UDC context (but use shared componentId from PageEditor)
@@ -60,6 +61,8 @@ const ReactLayoutRenderer = forwardRef(({
     // Widget modal state
     const [widgetModalOpen, setWidgetModalOpen] = useState(false);
     const [selectedSlotForModal, setSelectedSlotForModal] = useState(null);
+    const [selectedSlotMetadata, setSelectedSlotMetadata] = useState(null);
+    const [replacementContext, setReplacementContext] = useState(null); // { isReplacement: true, position: number }
 
     // Page context for widgets - includes all necessary context data
     const pageContext = useMemo(() => ({
@@ -94,15 +97,24 @@ const ReactLayoutRenderer = forwardRef(({
         switch (action) {
             case 'add': {
                 const widgetType = args[0] || 'default_widgets.ContentWidget';
+                const insertPosition = args[1]; // Optional position parameter
 
                 const widgetConfig = createDefaultWidgetConfig(widgetType);
                 const newWidget = addWidget(slotName, widgetType, widgetConfig);
 
-
                 // 1. IMMEDIATE: Fast local update via parent (PageEditor)
+                const slotWidgets = [...(widgets[slotName] || [])];
+
+                // Insert at specific position if provided, otherwise append to end
+                if (insertPosition !== undefined && insertPosition !== null && insertPosition >= 0) {
+                    slotWidgets.splice(insertPosition, 0, newWidget);
+                } else {
+                    slotWidgets.push(newWidget);
+                }
+
                 const updatedWidgets = {
                     ...widgets,
-                    [slotName]: [...(widgets[slotName] || []), newWidget]
+                    [slotName]: slotWidgets
                 };
 
                 if (onWidgetChange) {
@@ -110,13 +122,17 @@ const ReactLayoutRenderer = forwardRef(({
                 }
 
                 // 2. ASYNC: Publish to UDC for external sync (other users/components)
+                const widgetOrder = insertPosition !== undefined && insertPosition !== null && insertPosition >= 0
+                    ? insertPosition
+                    : (widgets[slotName]?.length || 0);
+
                 if (publishWidgetOperation) {
                     await publishWidgetOperation(OperationTypes.ADD_WIDGET, {
                         id: newWidget.id,
                         type: newWidget.type,
                         config: newWidget.config,
                         slot: slotName,
-                        order: (widgets[slotName]?.length || 0)
+                        order: widgetOrder
                     });
                 } else {
                     // Fallback to direct UDC publishing
@@ -126,7 +142,7 @@ const ReactLayoutRenderer = forwardRef(({
                         config: newWidget.config,
                         slot: slotName,
                         contextType: contextType,
-                        order: (widgets[slotName]?.length || 0)
+                        order: widgetOrder
                     });
                 }
 
@@ -169,6 +185,7 @@ const ReactLayoutRenderer = forwardRef(({
                     id: widget.id,
                     contextType: contextType
                 });
+
                 break;
             }
 
@@ -255,22 +272,31 @@ const ReactLayoutRenderer = forwardRef(({
     }, [widgets, onWidgetChange, onOpenWidgetEditor, addWidget, publishUpdate, componentId, versionId, isPublished, onVersionChange]);
 
     // Widget modal handlers
-    const handleShowWidgetModal = useCallback((slotName) => {
+    const handleShowWidgetModal = useCallback((slotName, slotMetadata = null, replacementInfo = null) => {
         setSelectedSlotForModal(slotName);
+        setSelectedSlotMetadata(slotMetadata);
+        setReplacementContext(replacementInfo);
         setWidgetModalOpen(true);
     }, []);
 
     const handleCloseWidgetModal = useCallback(() => {
         setWidgetModalOpen(false);
         setSelectedSlotForModal(null);
+        setSelectedSlotMetadata(null);
+        setReplacementContext(null);
     }, []);
 
     const handleWidgetSelection = useCallback((widgetType) => {
         if (selectedSlotForModal) {
-            handleWidgetAction('add', selectedSlotForModal, null, widgetType);
+            // If replacing an inherited widget, pass the position
+            if (replacementContext?.isReplacement) {
+                handleWidgetAction('add', selectedSlotForModal, null, widgetType, replacementContext.position);
+            } else {
+                handleWidgetAction('add', selectedSlotForModal, null, widgetType);
+            }
         }
         handleCloseWidgetModal();
-    }, [selectedSlotForModal, handleWidgetAction, handleCloseWidgetModal]);
+    }, [selectedSlotForModal, replacementContext, handleWidgetAction, handleCloseWidgetModal]);
 
     // Clear slot handler
     const handleClearSlot = useCallback(async (slotName) => {
@@ -362,7 +388,8 @@ const ReactLayoutRenderer = forwardRef(({
                 onClose={handleCloseWidgetModal}
                 onWidgetSelect={handleWidgetSelection}
                 slotName={selectedSlotForModal}
-                slotLabel={selectedSlotForModal}
+                slotLabel={selectedSlotMetadata?.label || selectedSlotForModal}
+                allowedWidgetTypes={selectedSlotMetadata?.allowedWidgetTypes}
             />
         </div>
     );

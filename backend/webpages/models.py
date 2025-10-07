@@ -946,16 +946,22 @@ class WebPage(models.Model):
             slot_allows_inheritance = slot.get(
                 "allows_inheritance", slot_name in ["header", "footer", "sidebar"]
             )
-            slot_allows_replacement_only = slot.get(
-                "allows_replacement_only", slot.get("requires_local", False)
+            # Support new allow_merge field (preferred) and fallback to old naming for compatibility
+            slot_allow_merge = slot.get(
+                "allow_merge",
+                not slot.get(
+                    "allows_replacement_only", slot.get("requires_local", False)
+                ),
             )
+            # Get inheritable widget types (empty list means inherit all types)
+            slot_inheritable_types = slot.get("inheritableTypes", [])
 
             inheritance_info[slot_name] = {
                 "widgets": [],
                 "inheritance_chain": [],
                 "can_override": True,
-                "merge_mode": slot_allows_inheritance
-                and not slot_allows_replacement_only,
+                "merge_mode": slot_allows_inheritance and slot_allow_merge,
+                "inheritable_types": slot_inheritable_types,  # NEW
             }
 
             # If slot doesn't allow inheritance at all, only get local widgets
@@ -967,9 +973,8 @@ class WebPage(models.Model):
                     local_widgets = self._filter_published_widgets(
                         current_version.widgets.get(slot_name, [])
                     )
-                    for widget_data in sorted(
-                        local_widgets, key=lambda w: w.get("sort_order", 0)
-                    ):
+                    # Use array position as order - no need to sort
+                    for widget_data in local_widgets:
                         inheritance_info[slot_name]["widgets"].append(
                             {
                                 "widget": widget_data,
@@ -992,6 +997,9 @@ class WebPage(models.Model):
             inherited_widgets_found = False
             local_widgets = []
             inherited_widgets = []
+            all_inherited_widgets = (
+                []
+            )  # Collect ALL inherited for API (not filtered by logic)
 
             while current:
                 # Get current published version, or fallback to latest version for editor
@@ -1017,10 +1025,7 @@ class WebPage(models.Model):
                         if self._widget_inheritable_at_depth(w, depth)
                     ]
 
-                    # Sort by sort_order
-                    page_widgets = sorted(
-                        page_widgets, key=lambda w: w.get("sort_order", 0)
-                    )
+                    # Use array position as order - no need to sort
 
                     # Check if current page (self) has widgets in this slot
                     if current == self and len(page_widgets) > 0:
@@ -1029,6 +1034,24 @@ class WebPage(models.Model):
 
                     # Process widgets from this level
                     for widget_data in page_widgets:
+                        # Check if widget type is allowed for inheritance (if inheritableTypes is specified)
+                        inheritable_types = inheritance_info[slot_name].get(
+                            "inheritable_types", []
+                        )
+                        widget_type = widget_data.get("widget_type") or widget_data.get(
+                            "type"
+                        )
+
+                        # If inheritableTypes is specified and widget is from parent, filter by type
+                        is_from_parent = current != self
+                        if (
+                            is_from_parent
+                            and inheritable_types
+                            and widget_type not in inheritable_types
+                        ):
+                            # Skip this widget - type not in inheritable list
+                            continue
+
                         widget_info = {
                             "widget": widget_data,
                             "page": current,
@@ -1044,6 +1067,10 @@ class WebPage(models.Model):
                         }
 
                         is_from_current = current == self
+
+                        # Collect ALL inherited widgets for API (regardless of merge logic)
+                        if not is_from_current and widget_info.get("inherited_from"):
+                            all_inherited_widgets.append(widget_info)
 
                         # MERGE MODE: Collect both inherited and local widgets
                         if inheritance_info[slot_name]["merge_mode"]:
@@ -1112,6 +1139,15 @@ class WebPage(models.Model):
                 current = current.parent
                 depth += 1
 
+            # TYPE-BASED REPLACEMENT: If local widgets match inheritableTypes, skip all inherited
+            if slot_inheritable_types and local_widgets:
+                local_types = {
+                    w.get("widget_type") or w.get("type") for w in local_widgets
+                }
+                # If any local widget type matches inheritableTypes, clear inherited widgets
+                if local_types & set(slot_inheritable_types):
+                    inherited_widgets = []
+
             # MERGE MODE: Combine widgets based on inheritance behavior
             if inheritance_info[slot_name]["merge_mode"]:
                 from .json_models import WidgetInheritanceBehavior
@@ -1150,12 +1186,23 @@ class WebPage(models.Model):
                         after_widgets.append(widget_info)
 
                 # Build final widget list: before + inherited + after
-                # Override widgets replace ALL inherited widgets
+                # Override widgets replace ALL inherited widgets FOR RENDERING
                 if override_widgets:
                     inheritance_info[slot_name]["widgets"] = override_widgets
                 else:
                     final_widgets = before_widgets + inherited_widgets + after_widgets
                     inheritance_info[slot_name]["widgets"] = final_widgets
+
+                # CRITICAL: Store ALL inherited widgets separately for API access
+                # The API needs to always return inherited widgets, even when overridden
+                inheritance_info[slot_name][
+                    "inherited_widgets_raw"
+                ] = all_inherited_widgets
+            else:
+                # REPLACE MODE: Store inherited widgets for API (even though they won't render)
+                inheritance_info[slot_name][
+                    "inherited_widgets_raw"
+                ] = all_inherited_widgets
 
         return inheritance_info
 
@@ -2054,35 +2101,6 @@ class PageVersion(models.Model):
         )
 
         return draft
-
-    # def to_dict(self):
-    #     """Convert version to dictionary representation"""
-    #     return {
-    #         "id": self.id,
-    #         "page_id": self.page_id,
-    #         "version_number": self.version_number,
-    #         "version_title": self.version_title,
-    #         "change_summary": self.change_summary,
-    #         "meta_title": self.meta_title,
-    #         "meta_description": self.meta_description,
-    #         "slug": self.page.slug,
-    #         "hostnames": self.page.hostnames,
-    #         "code_layout": self.code_layout,
-    #         "theme": self.theme,
-    #         "page_css_variables": self.page_css_variables,
-    #         "page_custom_css": self.page_custom_css,
-    #         "enable_css_injection": self.enable_css_injection,
-    #         "effective_date": self.effective_date,
-    #         "expiry_date": self.expiry_date,
-    #         # New date-based publishing status
-    #         "publication_status": self.get_publication_status(),
-    #         "is_published": self.is_published(),
-    #         "is_current_published": self.is_current_published(),
-    #         "created_at": self.created_at.isoformat() if self.created_at else None,
-    #         "created_by": self.created_by.username if self.created_by else None,
-    #         "page_data": self.page_data,
-    #         "widgets": self.widgets,
-    #     }
 
 
 class PageDataSchema(models.Model):
