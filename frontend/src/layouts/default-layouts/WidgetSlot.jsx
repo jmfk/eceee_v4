@@ -55,6 +55,7 @@ const WidgetSlot = ({
     const slotInheritedWidgets = inheritedWidgets[name] || [];
     const slotRules = slotInheritanceRules[name] || {};
 
+
     // Determine smart default for slot mode
     const defaultMode = useMemo(() => {
         // Use smart logic to determine default mode based on inheritance
@@ -66,13 +67,42 @@ const WidgetSlot = ({
     const currentMode = slotMode || internalMode; // Use external mode if provided
     const isPreviewMode = currentMode === 'preview';
 
-    // Get effective widgets based on current mode
-    const effectiveWidgets = useMemo(() => {
-        return getSlotWidgetsForMode(currentMode, localWidgets, slotInheritedWidgets, slotRules);
-    }, [currentMode, localWidgets, slotInheritedWidgets, slotRules]);
-
     // Check if slot has inherited content
     const hasInheritance = hasInheritedContent(slotInheritedWidgets);
+
+    if (name === 'sidebar') {
+        console.log(name, "slotInheritedWidgets", slotInheritedWidgets)
+    }
+
+    // Get effective widgets based on current mode
+    const effectiveWidgets = useMemo(() => {
+        const result = getSlotWidgetsForMode(currentMode, localWidgets, slotInheritedWidgets, slotRules);
+        return result;
+    }, [currentMode, localWidgets, slotInheritedWidgets, slotRules, name]);
+
+    // NEW: Filter inherited widgets based on type-based replacement before displaying
+    const displayInheritedWidgets = useMemo(() => {
+        if (isPreviewMode || !hasInheritance) {
+            return [];
+        }
+
+        // TYPE-BASED REPLACEMENT: If inheritableTypes defined and any local widget matches, skip inherited
+        if (slotRules.inheritableTypes?.length > 0) {
+            const localTypes = localWidgets.map(w => w.type);
+            const hasMatchingType = slotRules.inheritableTypes.some(type =>
+                localTypes.includes(type)
+            );
+
+            if (hasMatchingType) {
+                // Local widget of inheritable type exists, don't show inherited widgets
+                return [];
+            }
+        }
+
+        return slotInheritedWidgets;
+    }, [isPreviewMode, hasInheritance, slotInheritedWidgets, localWidgets, slotRules.inheritableTypes, name]);
+
+    const displayLocalWidgets = !isPreviewMode ? localWidgets : [];
 
     // Extract parent page info from first inherited widget
     const parentPageInfo = slotInheritedWidgets.length > 0 && slotInheritedWidgets[0].inheritedFrom
@@ -106,7 +136,27 @@ const WidgetSlot = ({
     // Handle add widget - show modal for widget selection
     const handleAddWidget = () => {
         if (onShowWidgetModal) {
-            onShowWidgetModal(name);
+            // Determine which widget types are allowed for this slot
+            // Priority: inheritableTypes (if defined and non-empty) > allowedWidgetTypes
+            // Note: empty inheritableTypes array means "all types" according to backend
+            let allowedTypes = finalAllowedWidgetTypes;
+
+            if (slotRules.inheritableTypes !== undefined) {
+                // inheritableTypes is explicitly set in the layout
+                if (slotRules.inheritableTypes.length > 0) {
+                    // Use the specific types defined
+                    allowedTypes = slotRules.inheritableTypes;
+                } else {
+                    // Empty array means "all types allowed" (backend convention)
+                    allowedTypes = ['*'];
+                }
+            }
+
+            onShowWidgetModal(name, {
+                label,
+                allowedWidgetTypes: allowedTypes,
+                maxWidgets: finalMaxWidgets
+            });
         } else {
             // Fallback to direct widget addition if modal not available
             handleWidgetAction('add', null, 'default_widgets.ContentWidget');
@@ -120,6 +170,16 @@ const WidgetSlot = ({
 
         // Build full path for this widget: append widget ID to slot path
         const fullWidgetPath = [...slotPath, widget.id];
+
+        // Determine allowed widget types for this slot (same logic as handleAddWidget)
+        let allowedTypes = finalAllowedWidgetTypes;
+        if (slotRules.inheritableTypes !== undefined) {
+            if (slotRules.inheritableTypes.length > 0) {
+                allowedTypes = slotRules.inheritableTypes;
+            } else {
+                allowedTypes = ['*'];
+            }
+        }
 
         return (
             <div key={uniqueKey} className="mb-4">
@@ -152,6 +212,13 @@ const WidgetSlot = ({
                     // Slot type and preview mode for widget determination
                     slotType={finalSlotType}
                     slotPreviewMode={isSlotPreviewMode}
+                    // Widget modal for replace functionality
+                    onShowWidgetModal={onShowWidgetModal}
+                    slotMetadata={{
+                        label,
+                        allowedWidgetTypes: allowedTypes,
+                        maxWidgets: finalMaxWidgets
+                    }}
                 />
             </div>
         );
@@ -227,43 +294,70 @@ const WidgetSlot = ({
                 </div>
             )}
 
-            {/* Widgets - Direct rendering without unnecessary containers */}
-            {effectiveWidgets.length > 0 ? (
-                effectiveWidgets.map((widget, index) => renderWidget(widget, index))
+            {/* Widgets Rendering */}
+            {isSlotPreviewMode ? (
+                // Preview mode: Show merged widgets using effectiveWidgets
+                effectiveWidgets.length > 0 ? (
+                    effectiveWidgets.map((widget, index) => renderWidget(widget, index))
+                ) : null
             ) : (
-                // Empty slot handling - only show in edit mode
-                !isSlotPreviewMode && editable && (
-                    <div className="empty-slot text-center py-12 text-gray-500 border-2 border-dashed border-gray-300 rounded-lg">
-                        <Layout className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                        <h4 className="text-lg font-medium text-gray-900 mb-2">{label}</h4>
-                        <p className="text-sm">{description}</p>
+                // Edit mode: Show inherited widgets (read-only) + local widgets (editable) separately
+                editable && (
+                    <>
+                        {/* Inherited Widgets Section */}
+                        {displayInheritedWidgets.length > 0 && (
+                            <div className="inherited-widgets-section mb-4">
+                                {displayInheritedWidgets.map((widget, index) =>
+                                    renderWidget({ ...widget, isInherited: true }, index)
+                                )}
+                            </div>
+                        )}
 
-                        {/* Show inheritance info if slot has inherited widgets */}
-                        {hasInheritance && parentPageInfo && (
-                            <div className="mt-3 px-4 py-2 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-800 max-w-md mx-auto">
-                                <p className="font-medium">
-                                    Currently showing {slotInheritedWidgets.length} inherited widget{slotInheritedWidgets.length !== 1 ? 's' : ''} from{' '}
-                                    <span className="font-semibold">{parentPageInfo.title}</span>
-                                </p>
-                                <p className="text-xs text-amber-700 mt-1">
-                                    Adding widgets here will <strong>replace</strong> the inherited content for this slot.
+                        {/* Add Widget Section - Show when in merge mode with inherited widgets but no local widgets */}
+                        {slotRules.mergeMode && displayInheritedWidgets.length > 0 && displayLocalWidgets.length === 0 && (
+                            <div className="add-widget-section text-center py-8 border-2 border-dashed border-blue-300 rounded-lg bg-blue-50">
+                                <button
+                                    onClick={handleAddWidget}
+                                    className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                                >
+                                    <Plus className="h-4 w-4 mr-2" />
+                                    Add Your First Widget
+                                </button>
+                                <p className="text-xs text-blue-700 mt-2">
+                                    Widgets added here will appear alongside the inherited content above
                                 </p>
                             </div>
                         )}
 
-                        <div className="mt-4">
-                            <button
-                                onClick={handleAddWidget}
-                                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                            >
-                                <Plus className="h-4 w-4 mr-2" />
-                                {hasInheritance ? 'Add Local Widget' : 'Add Your First Widget'}
-                            </button>
-                        </div>
-                        {finalRequired && (
-                            <p className="text-xs text-orange-600 mt-2">This slot is required</p>
+                        {/* Local Widgets Section (editable) */}
+                        {displayLocalWidgets.length > 0 && (
+                            <div className="local-widgets-section">
+                                {displayLocalWidgets.map((widget, index) => renderWidget(widget, index))}
+                            </div>
                         )}
-                    </div>
+
+                        {/* Empty slot handling - only when NO inherited AND NO local widgets */}
+                        {displayInheritedWidgets.length === 0 && displayLocalWidgets.length === 0 && (
+                            <div className="empty-slot text-center py-12 text-gray-500 border-2 border-dashed border-gray-300 rounded-lg">
+                                <Layout className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                                <h4 className="text-lg font-medium text-gray-900 mb-2">{label}</h4>
+                                <p className="text-sm">{description}</p>
+
+                                <div className="mt-4">
+                                    <button
+                                        onClick={handleAddWidget}
+                                        className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                                    >
+                                        <Plus className="h-4 w-4 mr-2" />
+                                        Add Your First Widget
+                                    </button>
+                                </div>
+                                {finalRequired && (
+                                    <p className="text-xs text-orange-600 mt-2">This slot is required</p>
+                                )}
+                            </div>
+                        )}
+                    </>
                 )
             )}
         </div>

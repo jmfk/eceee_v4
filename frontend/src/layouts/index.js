@@ -47,8 +47,6 @@ export const layoutExists = (layoutName) => {
 export {
     SingleColumnLayout,
     SidebarLayout,
-    ThreeColumnLayout,
-    TwoColumnLayout,
     WidgetSlot
 } from './default-layouts';
 

@@ -28,13 +28,14 @@ export interface PageMetadata {
 export interface WidgetData {
   id: string;
   type: string;
-  slot: string;
   config: WidgetConfig;
-  content?: any;
-  order: number;
+  // Optional metadata (not stored in widget JSON, derived from context)
+  slot?: string;
+  order?: number;
   parentId?: string;
-  createdAt: string;
-  updatedAt: string;
+  createdAt?: string;
+  updatedAt?: string;
+  content?: any;
   // Publishing & Inheritance fields (camelCase for frontend)
   isPublished?: boolean;
   inheritanceLevel?: number;

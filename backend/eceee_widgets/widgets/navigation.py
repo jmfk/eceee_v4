@@ -67,7 +67,7 @@ class NavigationWidget(BaseWidget):
 
     name = "Navigation"
     description = "Navigation widget with background image/color and text color options"
-    template_name = "default_widgets/widgets/navigation.html"
+    template_name = "eceee_widgets/widgets/navigation.html"
 
     widget_css = """
     .navigation-widget {

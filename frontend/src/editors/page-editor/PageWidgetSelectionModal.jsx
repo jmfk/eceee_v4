@@ -14,7 +14,8 @@ const PageWidgetSelectionModal = ({
     onClose,
     onWidgetSelect,
     slotName,
-    slotLabel
+    slotLabel,
+    allowedWidgetTypes = ['*'] // Default to all widgets
 }) => {
     const [availableWidgets, setAvailableWidgets] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -41,8 +42,19 @@ const PageWidgetSelectionModal = ({
         }
     };
 
-    // Filter widgets based on search and category
+    // Filter widgets based on allowed types, search, and category
     const filteredWidgets = availableWidgets.filter(widget => {
+        // Check if widget type is allowed in this slot
+        const isAllowed = allowedWidgetTypes.includes('*') ||
+            allowedWidgetTypes.some(allowedType => {
+                // Support wildcards like 'default_widgets.*'
+                if (allowedType.endsWith('.*')) {
+                    const prefix = allowedType.slice(0, -2);
+                    return widget.type.startsWith(prefix);
+                }
+                return widget.type === allowedType;
+            });
+
         const matchesSearch = !searchTerm ||
             widget.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             widget.description?.toLowerCase().includes(searchTerm.toLowerCase());
@@ -51,8 +63,27 @@ const PageWidgetSelectionModal = ({
             widget.category === selectedCategory ||
             (selectedCategory === 'core' && widget.type.startsWith('default_widgets.'));
 
-        return matchesSearch && matchesCategory;
+        return isAllowed && matchesSearch && matchesCategory;
     });
+
+    // Debug: Log filtering info when modal opens
+    if (isOpen && availableWidgets.length > 0) {
+        console.log(`[PageWidgetSelectionModal] Filtering widgets for slot "${slotName}":`, {
+            allowedWidgetTypes,
+            totalAvailable: availableWidgets.length,
+            afterTypeFilter: availableWidgets.filter(w =>
+                allowedWidgetTypes.includes('*') ||
+                allowedWidgetTypes.some(allowedType => {
+                    if (allowedType.endsWith('.*')) {
+                        const prefix = allowedType.slice(0, -2);
+                        return w.type.startsWith(prefix);
+                    }
+                    return w.type === allowedType;
+                })
+            ).length,
+            finalFiltered: filteredWidgets.length
+        });
+    }
 
     // Get unique categories
     const categories = [

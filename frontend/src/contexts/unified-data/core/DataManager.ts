@@ -663,23 +663,27 @@ export class DataManager {
                     this.setState(operation, state => {
                         const payload = operation.payload as AddWidgetPayload;
                         const target = this.resolveWidgetTargetFromPayload(payload);
-                        const now = new Date().toISOString();
+
+                        // Create new widget (no sort_order - array position is the order)
                         const newWidget = {
                             id: payload.id,
                             type: payload.type,
-                            config: payload.config || {},
-                            slot: payload.slot || 'main',
-                            order: payload.order || 0,
-                            created_at: now,
-                            updated_at: now
+                            config: payload.config || {}
                         };
 
                         if (operation.payload.contextType === "page") {
                             const versionId = target.versionId as string;
                             const version = state.versions[versionId];
-                            const slotName = newWidget.slot;
+                            const slotName = payload.slot || 'main';
                             const slotWidgets = version.widgets[slotName] || [];
-                            const updatedSlotWidgets = [...slotWidgets, newWidget];
+                            
+                            // Insert at the specified position (order), or append to end
+                            const insertPosition = payload.order !== undefined && payload.order !== null 
+                                ? payload.order 
+                                : slotWidgets.length;
+                            
+                            const updatedSlotWidgets = [...slotWidgets];
+                            updatedSlotWidgets.splice(insertPosition, 0, newWidget);
                             return {
                                 versions: {
                                     ...state.versions,
@@ -696,9 +700,16 @@ export class DataManager {
                         } else if (operation.payload.contextType === "object") {
                             const objectId = (target as any).objectId as string;
                             const objValue = (state as any).objects[objectId];
-                            const slotName = newWidget.slot;
+                            const slotName = payload.slot || 'main';
                             const slotWidgets = (objValue.widgets?.[slotName] || []);
-                            const updatedSlotWidgets = [...slotWidgets, newWidget];
+                            
+                            // Insert at the specified position (order), or append to end
+                            const insertPosition = payload.order !== undefined && payload.order !== null 
+                                ? payload.order 
+                                : slotWidgets.length;
+                            
+                            const updatedSlotWidgets = [...slotWidgets];
+                            updatedSlotWidgets.splice(insertPosition, 0, newWidget);
                             return {
                                 objects: {
                                     ...(state as any).objects,

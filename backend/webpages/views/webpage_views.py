@@ -272,7 +272,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
             # Use the raw inherited widgets field (preserves them even when overridden)
             inherited_widgets = []
             raw_inherited = slot_info.get("inherited_widgets_raw", [])
-            
+
             for widget_info in raw_inherited:
                 inherited_from = widget_info.get("inherited_from")
 

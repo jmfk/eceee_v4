@@ -2,11 +2,9 @@
 
 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 w-full mb-4">
     <div class="column-slot left min-h-[50px]">
-        HEJ
         {% if config.rendered_slots.left %}
             {% for widget in config.rendered_slots.left %}
                 <div class="mb-3 last:mb-0">
-                    HEJ
                     {{ widget.html|safe }}
                 </div>
             {% endfor %}

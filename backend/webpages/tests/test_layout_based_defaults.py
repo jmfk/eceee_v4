@@ -4,7 +4,7 @@ Test cases for layout-based default widgets system
 
 from django.test import TestCase
 from webpages.utils.template_parser import TemplateParser
-from webpages.layouts import SingleColumnLayout, TwoColumnLayout, SidebarLayout
+from webpages.layouts import SingleColumnLayout, SidebarLayout
 
 
 class TestLayoutBasedDefaults(TestCase):

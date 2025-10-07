@@ -8,11 +8,9 @@
 // Import layout components from individual files
 import { SingleColumnLayout } from './SingleColumnLayout';
 import { SidebarLayout } from './SidebarLayout';
-import { TwoColumnLayout } from './TwoColumnLayout';
-import { ThreeColumnLayout } from './ThreeColumnLayout';
 
 // Re-export layout components for backward compatibility
-export { SingleColumnLayout, SidebarLayout, TwoColumnLayout, ThreeColumnLayout };
+export { SingleColumnLayout, SidebarLayout };
 
 /**
  * Layout Registry - Maps layout names to React components
@@ -32,22 +30,6 @@ export const LAYOUT_REGISTRY = {
         label: 'Sidebar Layout',
         description: 'Main content with sidebar for complementary content',
         slots: ['header', 'main', 'sidebar', 'footer'],
-        responsive: true
-    },
-    'two_column': {
-        component: TwoColumnLayout,
-        name: 'two_column',
-        label: 'Two Column',
-        description: 'Equal two column layout',
-        slots: ['header', 'left', 'right', 'footer'],
-        responsive: true
-    },
-    'three_column': {
-        component: ThreeColumnLayout,
-        name: 'three_column',
-        label: 'Three Column',
-        description: 'Three column layout with header and footer',
-        slots: ['header', 'left', 'center', 'right', 'footer'],
         responsive: true
     }
 };
