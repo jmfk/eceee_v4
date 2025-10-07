@@ -25,23 +25,23 @@ const WidgetPublishingInheritanceFields = ({
     // Get default inheritance level from widget type
     const defaultInheritanceLevel = widgetType?.default_inheritance_level ?? 0
 
-    // Use local state for immediate UI updates
+    // Use local state for immediate UI updates (camelCase for frontend)
     const [localValues, setLocalValues] = useState({
-        is_published: widgetData?.is_published ?? true,
-        inheritance_level: widgetData?.inheritance_level ?? defaultInheritanceLevel,
-        inherit_from_parent: widgetData?.inherit_from_parent ?? true,
-        publish_effective_date: widgetData?.publish_effective_date ?? '',
-        publish_expire_date: widgetData?.publish_expire_date ?? ''
+        isPublished: widgetData?.isPublished ?? widgetData?.is_published ?? true,
+        inheritanceLevel: widgetData?.inheritanceLevel ?? widgetData?.inheritance_level ?? defaultInheritanceLevel,
+        inheritFromParent: widgetData?.inheritFromParent ?? widgetData?.inherit_from_parent ?? true,
+        publishEffectiveDate: widgetData?.publishEffectiveDate ?? widgetData?.publish_effective_date ?? '',
+        publishExpireDate: widgetData?.publishExpireDate ?? widgetData?.publish_expire_date ?? ''
     })
 
     // Sync local state when widgetData changes
     useEffect(() => {
         setLocalValues({
-            is_published: widgetData?.is_published ?? true,
-            inheritance_level: widgetData?.inheritance_level ?? defaultInheritanceLevel,
-            inherit_from_parent: widgetData?.inherit_from_parent ?? true,
-            publish_effective_date: widgetData?.publish_effective_date ?? '',
-            publish_expire_date: widgetData?.publish_expire_date ?? ''
+            isPublished: widgetData?.isPublished ?? widgetData?.is_published ?? true,
+            inheritanceLevel: widgetData?.inheritanceLevel ?? widgetData?.inheritance_level ?? defaultInheritanceLevel,
+            inheritFromParent: widgetData?.inheritFromParent ?? widgetData?.inherit_from_parent ?? true,
+            publishEffectiveDate: widgetData?.publishEffectiveDate ?? widgetData?.publish_effective_date ?? '',
+            publishExpireDate: widgetData?.publishExpireDate ?? widgetData?.publish_expire_date ?? ''
         })
     }, [widgetData, defaultInheritanceLevel])
 
@@ -70,7 +70,7 @@ const WidgetPublishingInheritanceFields = ({
             {/* Publishing Toggle */}
             <div className="flex items-center justify-between">
                 <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                    {localValues.is_published ? (
+                    {localValues.isPublished ? (
                         <Eye className="w-4 h-4 text-green-600" />
                     ) : (
                         <EyeOff className="w-4 h-4 text-gray-400" />
@@ -79,18 +79,18 @@ const WidgetPublishingInheritanceFields = ({
                 </label>
                 <button
                     type="button"
-                    onClick={() => handleFieldChange('is_published', !localValues.is_published)}
+                    onClick={() => handleFieldChange('isPublished', !localValues.isPublished)}
                     className={`
                         relative inline-flex h-6 w-11 items-center rounded-full transition-colors
-                        ${localValues.is_published ? 'bg-green-600' : 'bg-gray-300'}
+                        ${localValues.isPublished ? 'bg-green-600' : 'bg-gray-300'}
                     `}
                     role="switch"
-                    aria-checked={localValues.is_published}
+                    aria-checked={localValues.isPublished}
                 >
                     <span
                         className={`
                             inline-block h-4 w-4 transform rounded-full bg-white transition-transform
-                            ${localValues.is_published ? 'translate-x-6' : 'translate-x-1'}
+                            ${localValues.isPublished ? 'translate-x-6' : 'translate-x-1'}
                         `}
                     />
                 </button>
@@ -102,8 +102,8 @@ const WidgetPublishingInheritanceFields = ({
                     Inheritance Level
                 </label>
                 <select
-                    value={localValues.inheritance_level}
-                    onChange={(e) => handleFieldChange('inheritance_level', parseInt(e.target.value, 10))}
+                    value={localValues.inheritanceLevel}
+                    onChange={(e) => handleFieldChange('inheritanceLevel', parseInt(e.target.value, 10))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                 >
                     <option value={-1}>Infinite (All descendants)</option>
@@ -115,9 +115,9 @@ const WidgetPublishingInheritanceFields = ({
                     <option value={5}>5 Levels</option>
                 </select>
                 <p className="mt-1 text-xs text-gray-500">
-                    {localValues.inheritance_level === -1 && 'Widget visible on all descendant pages'}
-                    {localValues.inheritance_level === 0 && 'Widget only visible on this page'}
-                    {localValues.inheritance_level > 0 && `Widget visible ${localValues.inheritance_level} level${localValues.inheritance_level > 1 ? 's' : ''} deep`}
+                    {localValues.inheritanceLevel === -1 && 'Widget visible on all descendant pages'}
+                    {localValues.inheritanceLevel === 0 && 'Widget only visible on this page'}
+                    {localValues.inheritanceLevel > 0 && `Widget visible ${localValues.inheritanceLevel} level${localValues.inheritanceLevel > 1 ? 's' : ''} deep`}
                 </p>
             </div>
 
@@ -128,18 +128,18 @@ const WidgetPublishingInheritanceFields = ({
                 </label>
                 <button
                     type="button"
-                    onClick={() => handleFieldChange('inherit_from_parent', !localValues.inherit_from_parent)}
+                    onClick={() => handleFieldChange('inheritFromParent', !localValues.inheritFromParent)}
                     className={`
                         relative inline-flex h-6 w-11 items-center rounded-full transition-colors
-                        ${localValues.inherit_from_parent ? 'bg-blue-600' : 'bg-gray-300'}
+                        ${localValues.inheritFromParent ? 'bg-blue-600' : 'bg-gray-300'}
                     `}
                     role="switch"
-                    aria-checked={localValues.inherit_from_parent}
+                    aria-checked={localValues.inheritFromParent}
                 >
                     <span
                         className={`
                             inline-block h-4 w-4 transform rounded-full bg-white transition-transform
-                            ${localValues.inherit_from_parent ? 'translate-x-6' : 'translate-x-1'}
+                            ${localValues.inheritFromParent ? 'translate-x-6' : 'translate-x-1'}
                         `}
                     />
                 </button>
@@ -156,8 +156,8 @@ const WidgetPublishingInheritanceFields = ({
                 </label>
                 <input
                     type="datetime-local"
-                    value={localValues.publish_effective_date ? new Date(localValues.publish_effective_date).toISOString().slice(0, 16) : ''}
-                    onChange={(e) => handleFieldChange('publish_effective_date', e.target.value ? new Date(e.target.value).toISOString() : null)}
+                    value={localValues.publishEffectiveDate ? new Date(localValues.publishEffectiveDate).toISOString().slice(0, 16) : ''}
+                    onChange={(e) => handleFieldChange('publishEffectiveDate', e.target.value ? new Date(e.target.value).toISOString() : null)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                 />
                 <p className="mt-1 text-xs text-gray-500">
@@ -173,8 +173,8 @@ const WidgetPublishingInheritanceFields = ({
                 </label>
                 <input
                     type="datetime-local"
-                    value={localValues.publish_expire_date ? new Date(localValues.publish_expire_date).toISOString().slice(0, 16) : ''}
-                    onChange={(e) => handleFieldChange('publish_expire_date', e.target.value ? new Date(e.target.value).toISOString() : null)}
+                    value={localValues.publishExpireDate ? new Date(localValues.publishExpireDate).toISOString().slice(0, 16) : ''}
+                    onChange={(e) => handleFieldChange('publishExpireDate', e.target.value ? new Date(e.target.value).toISOString() : null)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                 />
                 <p className="mt-1 text-xs text-gray-500">
@@ -183,7 +183,7 @@ const WidgetPublishingInheritanceFields = ({
             </div>
 
             {/* Info box about inheritance + publishing */}
-            {!localValues.is_published && (
+            {!localValues.isPublished && (
                 <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
                     <p className="text-xs text-yellow-800">
                         <strong>Note:</strong> Unpublished widgets are not inherited by child pages, regardless of inheritance settings.

@@ -65,13 +65,13 @@ export type AddWidgetPayload = WidgetContext & {
 export type UpdateWidgetConfigPayload = WidgetContext & {
   id: string;
   config?: Partial<WidgetConfig>;
-  // Widget-level updates (publishing, inheritance, etc.)
+  // Widget-level updates (publishing, inheritance, etc.) - camelCase for frontend
   widgetUpdates?: {
-    is_published?: boolean;
-    inheritance_level?: number;
-    inherit_from_parent?: boolean;
-    publish_effective_date?: string;
-    publish_expire_date?: string;
+    isPublished?: boolean;
+    inheritanceLevel?: number;
+    inheritFromParent?: boolean;
+    publishEffectiveDate?: string;
+    publishExpireDate?: string;
   };
   // New path-based approach (supports infinite nesting)
   widgetPath?: string[]; // Full path: [topSlot, widgetId, slot, widgetId, ..., targetId]

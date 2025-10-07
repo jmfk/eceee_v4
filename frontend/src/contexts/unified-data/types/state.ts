@@ -32,15 +32,15 @@ export interface WidgetData {
   config: WidgetConfig;
   content?: any;
   order: number;
-  parent_id?: string;
-  created_at: string;
-  updated_at: string;
-  // Publishing & Inheritance fields
-  is_published?: boolean;
-  inheritance_level?: number;
-  inherit_from_parent?: boolean;
-  publish_effective_date?: string;
-  publish_expire_date?: string;
+  parentId?: string;
+  createdAt: string;
+  updatedAt: string;
+  // Publishing & Inheritance fields (camelCase for frontend)
+  isPublished?: boolean;
+  inheritanceLevel?: number;
+  inheritFromParent?: boolean;
+  publishEffectiveDate?: string;
+  publishExpireDate?: string;
 }
 
 export interface WidgetConfig {
