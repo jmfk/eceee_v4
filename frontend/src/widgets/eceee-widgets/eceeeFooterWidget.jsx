@@ -226,7 +226,7 @@ const eceeeFooterWidget = ({
 
 // Widget metadata
 eceeeFooterWidget.displayName = 'FooterWidget';
-eceeeFooterWidget.widgetType = 'default_widgets.FooterWidget'; // Same type as default to override it
+eceeeFooterWidget.widgetType = 'eceee_widgets.FooterWidget'; // Same type as default to override it
 
 eceeeFooterWidget.defaultConfig = {
     companyName: 'ECEEE',

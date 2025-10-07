@@ -94,10 +94,18 @@ const PageWidgetHeader = ({
 
             {/* Right side - Action buttons */}
             {isInherited ? (
-                /* Read-only indicator for inherited widgets */
-                <div className="flex items-center space-x-2 text-xs text-amber-700">
-                    <Lock className="h-3 w-3" />
-                    <span className="font-medium">Read-only</span>
+                /* Replace button for inherited widgets - only visible on hover */
+                <div className="flex items-center space-x-2">
+                    <button
+                        onClick={() => {
+                            // TODO: Implement replace functionality
+                            alert(`Replace inherited ${widgetType} from ${inheritedFrom?.title || 'parent page'}\n\nReplace functionality coming soon.`);
+                        }}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity px-2 py-1 text-xs font-medium text-amber-700 bg-amber-100 hover:bg-amber-200 border border-amber-300 rounded"
+                        title="Replace this inherited widget with a local one"
+                    >
+                        Replace
+                    </button>
                 </div>
             ) : (
                 /* Normal controls for local widgets */

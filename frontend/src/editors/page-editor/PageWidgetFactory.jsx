@@ -51,7 +51,10 @@ const PageWidgetFactory = ({
     widgetPath = [],
     slotType = 'content', // 'content' or 'inherited' - determines default preview mode
     // NEW: Inheritance props
-    isInherited = false
+    isInherited = false,
+    // Widget modal for replace functionality
+    onShowWidgetModal,
+    slotMetadata = null
 }) => {
     // Use passed props or extract from widget
     const actualWidgetId = widgetId || widget?.id
@@ -215,9 +218,73 @@ const PageWidgetFactory = ({
 
     // Widget wrapper with PageEditor-specific controls
     if (mode === 'editor' && showControls) {
+        // For inherited widgets in merge mode, show clean display with hover replace button
+        if (isInherited) {
+            // Only show replace button if slot has inheritableTypes defined and non-empty
+            const showReplaceButton = slotMetadata?.allowedWidgetTypes?.length > 0 &&
+                !slotMetadata.allowedWidgetTypes.includes('*');
+
+            return (
+                <div
+                    className={`widget-item page-editor-widget-inherited relative group ${className}`}
+                    data-widget-type={widget.type}
+                    data-widget-id={widget.id}
+                    data-version-id={versionId}
+                    data-inherited="true"
+                >
+                    {/* Replace button - only visible on hover, positioned at top-right */}
+                    {showReplaceButton && (
+                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                            <button
+                                onClick={() => {
+                                    // Open widget selection modal to choose a replacement widget
+                                    if (onShowWidgetModal) {
+                                        // Pass replacement context
+                                        // Note: With type-based replacement, adding ANY local widget of the inheritable type
+                                        // will hide ALL inherited widgets, so we always insert at position 0
+                                        const replacementInfo = {
+                                            isReplacement: true,
+                                            position: 0 // Always insert at beginning since all inherited will be hidden
+                                        };
+                                        onShowWidgetModal(actualSlotName, slotMetadata, replacementInfo);
+                                    } else {
+                                        alert(`Replace inherited ${getWidgetDisplayName(widget.type)} from ${widget.inheritedFrom?.title || 'parent page'}\n\nWidget modal not available.`);
+                                    }
+                                }}
+                                className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded shadow-lg"
+                                title="Replace this inherited widget with a local one"
+                            >
+                                Replace
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Core Widget Content - render the actual widget in display mode */}
+                    <CoreWidgetComponent
+                        config={widget.config || {}}
+                        mode="display"
+                        themeId={widget.config?.themeId}
+                        widgetId={actualWidgetId}
+                        slotName={actualSlotName}
+                        widgetType={widget.type}
+                        layoutRenderer={layoutRenderer}
+                        versionId={versionId}
+                        isPublished={isPublished}
+                        parentComponentId={parentComponentId}
+                        contextType={contextType}
+                        pageId={pageId}
+                        widgetPath={widgetPath}
+                        nestedParentWidgetId={nestedParentWidgetId}
+                        nestedParentSlotName={nestedParentSlotName}
+                    />
+                </div>
+            )
+        }
+
+        // Normal local widget rendering with full header
         return (
             <div
-                className={`widget-item page-editor-widget relative ${className} ${isPublished ? 'published-widget' : ''}`}
+                className={`widget-item page-editor-widget relative group ${className} ${isPublished ? 'published-widget' : ''}`}
                 data-widget-type={widget.type}
                 data-widget-id={widget.id}
                 data-version-id={versionId}
@@ -233,8 +300,8 @@ const PageWidgetFactory = ({
                     canMoveUp={canMoveUp}
                     canMoveDown={canMoveDown}
                     showControls={true}
-                    isInherited={isInherited}
-                    inheritedFrom={widget.inheritedFrom || null}
+                    isInherited={false}
+                    inheritedFrom={null}
                 />
 
                 {/* Core Widget Content */}

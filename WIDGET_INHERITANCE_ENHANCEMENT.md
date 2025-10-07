@@ -42,7 +42,7 @@ Enhanced the widget inheritance system with support for:
   - `FooterWidget.default_inheritance_level = -1` (infinite)
 
 #### 3. Slot Configuration Rename
-- **`requires_local` → `allows_replacement_only`**
+- **`requires_local` → `allows_replacement_only` → `allow_merge`** (inverted logic for clarity)
 - Backward compatibility maintained (checks both names)
 - Applied in:
   - `backend/webpages/models.py` - inheritance logic
@@ -104,7 +104,7 @@ Enhanced the widget inheritance system with support for:
 {
   "name": "header",
   "allows_inheritance": true,
-  "allows_replacement_only": false,  // NEW (replaces requires_local)
+  "allow_merge": true,  // NEW preferred field (replaces allows_replacement_only)
   "requires_local": false             // DEPRECATED (maintained for backward compat)
 }
 ```
@@ -118,12 +118,12 @@ Enhanced the widget inheritance system with support for:
 
 #### Merge vs Replace Modes
 
-**Replace Mode** (`allows_replacement_only=true` OR `allows_inheritance=False`):
+**Replace Mode** (`allow_merge=false` OR `allows_inheritance=False`):
 - If page has local widgets → show ONLY local widgets
 - If page has no local widgets → show inherited widgets
 - Original behavior preserved
 
-**Merge Mode** (`allows_inheritance=true` AND `allows_replacement_only=false`):
+**Merge Mode** (`allows_inheritance=true` AND `allow_merge=true`):
 - Combines first inheritable parent widgets + local widgets
 - Inherited widgets render first, then local widgets
 - Respects sort order within each group
@@ -183,7 +183,7 @@ No database migration needed - all changes are in JSON fields:
   - `publish_effective_date`: defaults to `null`
   - `publish_expire_date`: defaults to `null`
 
-- **Slots**: Old `requires_local` still works, new `allows_replacement_only` preferred
+- **Slots**: Old `requires_local` and `allows_replacement_only` still work, new `allow_merge` preferred (inverted logic)
 
 ### Deployment Steps
 1. Deploy backend changes

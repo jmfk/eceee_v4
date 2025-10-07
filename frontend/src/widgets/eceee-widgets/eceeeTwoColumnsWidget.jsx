@@ -236,8 +236,8 @@ const eceeeTwoColumnsWidget = ({
     // In editor mode, show SlotEditor components with editable widgets
     if (mode === 'editor') {
         return (
-            <div className="two-columns-widget-editor">
-                <div className="columns-grid grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 w-full mb-4">
+                <div class="column-slot left min-h-[50px]">
                     <SlotEditor
                         slotName="left"
                         slotLabel="Left Column"
@@ -257,7 +257,8 @@ const eceeeTwoColumnsWidget = ({
                         showClearButton={false} // Hide Clear Slot button
                         compactAddButton={true} // Show just + icon
                     />
-
+                </div>
+                <div class="column-slot right min-h-[50px]">
                     <SlotEditor
                         slotName="right"
                         slotLabel="Right Column"
@@ -284,16 +285,15 @@ const eceeeTwoColumnsWidget = ({
 
     // In display mode, render the widgets in each slot
     return (
-        <div className="flex flex-col lg:flex-row gap-[30px] w-[995px]">
-            <div className="flex flex-col space-y-4 w-full lg:max-w-[585px]" data-slot="left">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 w-full mb-4">
+            <div class="column-slot left min-h-[50px]">
                 {slotsData.left && slotsData.left.length > 0 ? (
                     slotsData.left.map((widget, index) => renderWidget(widget, 'left', index))
                 ) : (
                     <div className="p-4 text-center text-gray-400">Left column</div>
                 )}
             </div>
-
-            <div className="flex flex-col space-y-4 w-full lg:max-w-[380px]" data-slot="right">
+            <div class="column-slot right min-h-[50px]">
                 {slotsData.right && slotsData.right.length > 0 ? (
                     slotsData.right.map((widget, index) => renderWidget(widget, 'right', index))
                 ) : (
