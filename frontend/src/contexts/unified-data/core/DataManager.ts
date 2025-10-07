@@ -317,9 +317,16 @@ export class DataManager {
                     break;
 
                 case OperationTypes.UPDATE_WIDGET_CONFIG:
-                    if (!operation.payload?.id || !operation.payload?.slotName|| !operation.payload?.config) {  
+                    if (!operation.payload?.id || !operation.payload?.slotName) {  
                         throw new ValidationError(operation,
-                            'Widget ID and config are required',
+                            'Widget ID and slotName are required',
+                            { payload: operation.payload }
+                        );
+                    }
+                    // Either config or widgetUpdates must be provided
+                    if (!operation.payload?.config && !operation.payload?.widgetUpdates) {
+                        throw new ValidationError(operation,
+                            'Either config or widgetUpdates must be provided',
                             { payload: operation.payload }
                         );
                     }
