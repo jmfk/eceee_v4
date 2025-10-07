@@ -4,6 +4,7 @@
  * Fetches and manages widget inheritance data for a page
  */
 
+import { useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { pagesApi } from '../api'
 import { transformInheritanceData } from '../utils/widgetMerging'
@@ -30,7 +31,7 @@ export function useWidgetInheritance(pageId, enabled = true) {
             return await pagesApi.getWidgetInheritance(pageId)
         },
         enabled: enabled && pageId && pageId !== 'new',
-        staleTime: 5 * 60 * 1000, // 5 minutes
+        staleTime: 0, // Always refetch on widget changes - no caching
         retry: 1
     })
 

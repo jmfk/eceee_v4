@@ -227,39 +227,57 @@ class WebPageViewSet(viewsets.ModelViewSet):
             # Header/footer typically allow inheritance, main content typically doesn't
             default_allows_inheritance = slot_name in ["header", "footer", "sidebar"]
 
-            # Check if either field is explicitly set (using snake_case from Python)
-            # Support both old (requires_local) and new (allows_replacement_only) naming
+            # Check which fields are explicitly set (priority: allow_merge > allows_replacement_only > requires_local)
+            has_allow_merge = "allow_merge" in slot_config
             has_allows_replacement_only = "allows_replacement_only" in slot_config
             has_requires_local = (
                 "requires_local" in slot_config
             )  # Backward compatibility
             has_allows_inheritance = "allows_inheritance" in slot_config
 
-            # Get values (using snake_case from Python)
-            allows_replacement_only = slot_config.get(
-                "allows_replacement_only",
-                slot_config.get("requires_local", False),  # Fallback to old name
-            )
+            # Get values with priority order
+            if has_allow_merge:
+                # New preferred field - use directly
+                allow_merge = slot_config.get("allow_merge", True)
+                allows_replacement_only = not allow_merge
+            else:
+                # Fall back to old naming for compatibility
+                allows_replacement_only = slot_config.get(
+                    "allows_replacement_only",
+                    slot_config.get("requires_local", False),  # Fallback to oldest name
+                )
+                allow_merge = not allows_replacement_only
+
             allows_inheritance = slot_config.get(
                 "allows_inheritance", default_allows_inheritance
             )
 
-            # Apply mutual exclusivity: allows_replacement_only takes precedence
-            if has_allows_replacement_only or has_requires_local:
-                # allows_replacement_only is explicitly set - use it and invert for inheritance
-                allows_inheritance = not allows_replacement_only
+            # Apply mutual exclusivity: allow_merge takes highest precedence
+            if has_allow_merge:
+                # allow_merge is explicitly set - use it and derive others
+                allows_inheritance = (
+                    allows_inheritance if allow_merge else allows_inheritance
+                )
+                allows_replacement_only = not allow_merge
+            elif has_allows_replacement_only or has_requires_local:
+                # Old replacement-only field is set - use it and invert for merge
+                allow_merge = not allows_replacement_only
             elif has_allows_inheritance:
-                # Only allows_inheritance is set - use it and invert for allows_replacement_only
+                # Only allows_inheritance is set - derive merge from it
+                allow_merge = allows_inheritance
                 allows_replacement_only = not allows_inheritance
-            # else: both use defaults (already set above)
+            # else: use defaults
 
-            # Extract inherited widgets (those not from current page)
+            # Always return inherited widgets - let frontend decide display logic
+            # Use the raw inherited widgets field (preserves them even when overridden)
             inherited_widgets = []
-            for widget_info in slot_info.get("widgets", []):
+            raw_inherited = slot_info.get("inherited_widgets_raw", [])
+            
+            for widget_info in raw_inherited:
                 inherited_from = widget_info.get("inherited_from")
 
-                # Only include if it's actually inherited (not from current page)
-                if inherited_from and inherited_from != page:
+                # Include all inherited widgets
+                if inherited_from:
                     widget_data = widget_info["widget"].copy()
 
                     # Add inheritance metadata
@@ -286,9 +304,13 @@ class WebPageViewSet(viewsets.ModelViewSet):
                 "hasInheritedWidgets": len(inherited_widgets) > 0,
                 "inheritedWidgets": inherited_widgets,
                 "inheritanceAllowed": allows_inheritance,
-                "allowsReplacementOnly": allows_replacement_only,
+                "allowMerge": allow_merge,  # New preferred field
+                "allowsReplacementOnly": allows_replacement_only,  # Backward compatibility
                 "requiresLocal": allows_replacement_only,  # Backward compatibility - deprecated
-                "mergeMode": allows_inheritance and not allows_replacement_only,
+                "mergeMode": allows_inheritance and allow_merge,
+                "inheritableTypes": slot_info.get(
+                    "inheritable_types", []
+                ),  # NEW: Type-based inheritance
             }
 
         return Response(response_data)
