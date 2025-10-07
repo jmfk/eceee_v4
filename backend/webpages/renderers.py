@@ -341,8 +341,11 @@ class WebPageRenderer:
         """
         Find widgets for a slot by looking up the parent hierarchy.
         Returns the first parent that has widgets in the specified slot.
+        Applies proper filtering for publication status and inheritance rules.
         """
         current = page.parent
+        depth = 1  # Start at depth 1 since we're looking at parent
+
         while current:
             current_version = current.get_current_published_version()
             if not current_version:
@@ -351,19 +354,30 @@ class WebPageRenderer:
             if current_version and current_version.widgets:
                 slot_widgets = current_version.widgets.get(slot_name, [])
                 if slot_widgets:
-                    # Found widgets in parent slot, return them with inheritance info
-                    return [
-                        {
-                            "widget": widget_data,
-                            "inherited_from": current,
-                        }
-                        for widget_data in sorted(
-                            slot_widgets, key=lambda w: w.get("sort_order", 0)
-                        )
+                    # Apply proper filtering using the page's methods
+                    filtered_widgets = page._filter_published_widgets(slot_widgets)
+                    inheritable_widgets = [
+                        w
+                        for w in filtered_widgets
+                        if page._widget_inheritable_at_depth(w, depth)
                     ]
+
+                    if inheritable_widgets:
+                        # Found valid widgets in parent slot, return them with inheritance info
+                        return [
+                            {
+                                "widget": widget_data,
+                                "inherited_from": current,
+                            }
+                            for widget_data in sorted(
+                                inheritable_widgets,
+                                key=lambda w: w.get("sort_order", 0),
+                            )
+                        ]
 
             # Move up the hierarchy
             current = current.parent
+            depth += 1
 
         return []
 
