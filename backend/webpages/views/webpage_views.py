@@ -194,13 +194,54 @@ class WebPageViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["get"], url_path="widget-inheritance")
     def widget_inheritance(self, request, pk=None):
         """
-        Get widget inheritance information for this page.
+        Get widget inheritance tree for this page.
 
-        Returns inherited widgets from parent pages organized by slot,
-        along with slot-level inheritance rules.
+        NEW: Returns complete inheritance tree structure instead of slot-based data.
+        Provides backward compatibility by also including legacy slot format.
         """
         page = self.get_object()
 
+        try:
+            # NEW: Build inheritance tree
+            from .inheritance_tree import InheritanceTreeBuilder
+            from .inheritance_helpers import InheritanceTreeHelpers
+
+            builder = InheritanceTreeBuilder()
+            tree = builder.build_tree(page)
+            helpers = InheritanceTreeHelpers(tree)
+
+            # Convert tree to JSON-serializable format
+            tree_json = self._serialize_tree_node(tree)
+
+            # Get tree statistics
+            stats = builder.get_tree_statistics(tree)
+
+            # Build new response format
+            response_data = {
+                "version": "tree",  # API version identifier
+                "tree": tree_json,
+                "statistics": {
+                    "nodeCount": stats.node_count,
+                    "maxDepth": stats.max_depth,
+                    "totalWidgets": stats.total_widgets,
+                    "generationTimeMs": stats.generation_time_ms,
+                },
+                # Legacy compatibility - convert tree back to slot format
+                "legacy": self._convert_tree_to_legacy_format(tree, helpers),
+            }
+
+            return Response(response_data)
+
+        except Exception as e:
+            # Fallback to old system
+            print(f"Tree generation error: {e}")
+            import traceback
+
+            traceback.print_exc()
+            return self._widget_inheritance_legacy(page)
+
+    def _widget_inheritance_legacy(self, page):
+        """Legacy widget inheritance method (backup)"""
         # Get inheritance info from the model method
         inheritance_info = page.get_widgets_inheritance_info()
 
@@ -308,9 +349,96 @@ class WebPageViewSet(viewsets.ModelViewSet):
                 "allowsReplacementOnly": allows_replacement_only,  # Backward compatibility
                 "requiresLocal": allows_replacement_only,  # Backward compatibility - deprecated
                 "mergeMode": allows_inheritance and allow_merge,
-                "inheritableTypes": slot_info.get(
+                "inheritable_types": slot_info.get(
                     "inheritable_types", []
                 ),  # NEW: Type-based inheritance
             }
 
         return Response(response_data)
+
+    def _serialize_tree_node(self, node):
+        """Convert InheritanceTreeNode to JSON-serializable dictionary"""
+        serialized_slots = {}
+
+        for slot_name, widgets in node.slots.items():
+            serialized_slots[slot_name] = [
+                {
+                    "id": widget.id,
+                    "type": widget.type,
+                    "config": widget.config,
+                    "order": widget.order,
+                    "depth": widget.depth,
+                    "inheritanceBehavior": widget.inheritance_behavior.value,
+                    "isPublished": widget.is_published,
+                    "inheritanceLevel": widget.inheritance_level,
+                    "publishEffectiveDate": widget.publish_effective_date,
+                    "publishExpireDate": widget.publish_expire_date,
+                    "isLocal": widget.is_local,
+                    "isInherited": widget.is_inherited,
+                    "canBeOverridden": widget.can_be_overridden,
+                }
+                for widget in widgets
+            ]
+
+        return {
+            "pageId": node.page_id,
+            "depth": node.depth,
+            "page": {
+                "id": node.page.id,
+                "title": node.page.title,
+                "slug": node.page.slug,
+                "parentId": node.page.parent_id,
+                "description": node.page.description,
+                "layout": node.page.layout,
+                "theme": node.page.theme,
+                "hostname": node.page.hostname,
+            },
+            "slots": serialized_slots,
+            "parent": self._serialize_tree_node(node.parent) if node.parent else None,
+        }
+
+    def _convert_tree_to_legacy_format(self, tree, helpers):
+        """Convert tree back to legacy slot-based format for backward compatibility"""
+        legacy_data = {
+            "pageId": tree.page_id,
+            "parentId": tree.parent.page_id if tree.parent else None,
+            "hasParent": tree.parent is not None,
+            "slots": {},
+        }
+
+        # Get all slots from tree
+        all_slots = set()
+        current = tree
+        while current:
+            all_slots.update(current.slots.keys())
+            current = current.parent
+
+        # Convert each slot to legacy format
+        for slot_name in all_slots:
+            inherited_widgets = helpers.get_inherited_widgets(slot_name)
+
+            legacy_data["slots"][slot_name] = {
+                "hasInheritedWidgets": len(inherited_widgets) > 0,
+                "inheritedWidgets": [
+                    {
+                        "id": widget.id,
+                        "type": widget.type,
+                        "config": widget.config,
+                        "inheritedFrom": {
+                            "id": tree.parent.page_id if tree.parent else None,
+                            "title": tree.parent.page.title if tree.parent else None,
+                            "slug": tree.parent.page.slug if tree.parent else None,
+                        },
+                        "isInherited": True,
+                        "canOverride": widget.can_be_overridden,
+                        "inheritanceDepth": widget.depth,
+                        "inheritanceBehavior": widget.inheritance_behavior.value,
+                    }
+                    for widget in inherited_widgets
+                ],
+                "inheritanceAllowed": True,
+                "mergeMode": True,
+                "inheritable_types": [],
+            }
+
+        return legacy_data

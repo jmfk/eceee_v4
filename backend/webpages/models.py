@@ -954,7 +954,7 @@ class WebPage(models.Model):
                 ),
             )
             # Get inheritable widget types (empty list means inherit all types)
-            slot_inheritable_types = slot.get("inheritableTypes", [])
+            slot_inheritable_types = slot.get("inheritable_types", [])
 
             inheritance_info[slot_name] = {
                 "widgets": [],
@@ -1034,7 +1034,7 @@ class WebPage(models.Model):
 
                     # Process widgets from this level
                     for widget_data in page_widgets:
-                        # Check if widget type is allowed for inheritance (if inheritableTypes is specified)
+                        # Check if widget type is allowed for inheritance (if inheritable_types is specified)
                         inheritable_types = inheritance_info[slot_name].get(
                             "inheritable_types", []
                         )
@@ -1042,7 +1042,7 @@ class WebPage(models.Model):
                             "type"
                         )
 
-                        # If inheritableTypes is specified and widget is from parent, filter by type
+                        # If inheritable_types is specified and widget is from parent, filter by type
                         is_from_parent = current != self
                         if (
                             is_from_parent
@@ -1139,12 +1139,12 @@ class WebPage(models.Model):
                 current = current.parent
                 depth += 1
 
-            # TYPE-BASED REPLACEMENT: If local widgets match inheritableTypes, skip all inherited
+            # TYPE-BASED REPLACEMENT: If local widgets match inheritable_types, skip all inherited
             if slot_inheritable_types and local_widgets:
                 local_types = {
                     w.get("widget_type") or w.get("type") for w in local_widgets
                 }
-                # If any local widget type matches inheritableTypes, clear inherited widgets
+                # If any local widget type matches inheritable_types, clear inherited widgets
                 if local_types & set(slot_inheritable_types):
                     inherited_widgets = []
 
