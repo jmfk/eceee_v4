@@ -6,9 +6,11 @@ import ValidatedInput from '../validation/ValidatedInput'
  * 
  * Multi-line text input field component with auto-resize and character counting.
  * Integrates with the validation system.
+ * Supports both controlled (value) and uncontrolled (defaultValue) modes.
  */
 const TextareaInput = ({
     value,
+    defaultValue,
     onChange,
     validation,
     isValidating,
@@ -23,7 +25,9 @@ const TextareaInput = ({
     autoResize = false,
     ...props
 }) => {
-    const characterCount = value ? value.length : 0
+    const isControlled = value !== undefined
+    const currentValue = isControlled ? value : defaultValue
+    const characterCount = currentValue ? currentValue.length : 0
     const isOverLimit = maxLength && characterCount > maxLength
 
     const handleChange = (e) => {
@@ -31,6 +35,35 @@ const TextareaInput = ({
             return // Don't allow input beyond max length
         }
         onChange(e)
+    }
+
+    // Build props for ValidatedInput
+    const inputProps = {
+        type: "textarea",
+        onChange: handleChange,
+        validation,
+        isValidating,
+        disabled,
+        placeholder,
+        rows: autoResize ? undefined : rows,
+        maxLength,
+        style: autoResize ? {
+            minHeight: `${rows * 1.5}rem`,
+            resize: 'none',
+            overflow: 'hidden'
+        } : undefined,
+        onInput: autoResize ? (e) => {
+            e.target.style.height = 'auto'
+            e.target.style.height = e.target.scrollHeight + 'px'
+        } : undefined,
+        ...props
+    }
+
+    // Add either value or defaultValue, but never both
+    if (isControlled) {
+        inputProps.value = value || ''
+    } else if (defaultValue !== undefined) {
+        inputProps.defaultValue = defaultValue
     }
 
     return (
@@ -41,7 +74,7 @@ const TextareaInput = ({
                         {label}
                         {required && <span className="text-red-500 ml-1">*</span>}
                     </label>
-                    {showCharacterCount && (
+                    {showCharacterCount && isControlled && (
                         <span className={`text-xs ${isOverLimit ? 'text-red-500' : 'text-gray-500'}`}>
                             {characterCount}{maxLength && `/${maxLength}`}
                         </span>
@@ -49,27 +82,7 @@ const TextareaInput = ({
                 </div>
             )}
 
-            <ValidatedInput
-                type="textarea"
-                value={value || ''}
-                onChange={handleChange}
-                validation={validation}
-                isValidating={isValidating}
-                disabled={disabled}
-                placeholder={placeholder}
-                rows={autoResize ? undefined : rows}
-                maxLength={maxLength}
-                style={autoResize ? {
-                    minHeight: `${rows * 1.5}rem`,
-                    resize: 'none',
-                    overflow: 'hidden'
-                } : undefined}
-                onInput={autoResize ? (e) => {
-                    e.target.style.height = 'auto'
-                    e.target.style.height = e.target.scrollHeight + 'px'
-                } : undefined}
-                {...props}
-            />
+            <ValidatedInput {...inputProps} />
 
             {description && (
                 <p className="text-sm text-gray-500">{description}</p>

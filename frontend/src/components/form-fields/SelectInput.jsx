@@ -7,9 +7,11 @@ import { valueListsApi } from '../../api/valueLists'
  * 
  * Dropdown selection field component that integrates with the validation system.
  * Supports single selection from a list of options.
+ * Supports both controlled (value) and uncontrolled (defaultValue) modes.
  */
 const SelectInput = ({
     value,
+    defaultValue,
     onChange,
     validation,
     isValidating,
@@ -71,19 +73,28 @@ const SelectInput = ({
     const effectiveOptions = valueListName && valueListOptions.length > 0 ? valueListOptions : options
     const normalizedOptions = normalizeOptions(effectiveOptions)
 
+    // Build props for ValidatedInput
+    const inputProps = {
+        type: "select",
+        onChange,
+        validation,
+        isValidating,
+        label,
+        description,
+        required,
+        disabled,
+        ...props
+    }
+
+    // Add either value or defaultValue, but never both
+    if (value !== undefined) {
+        inputProps.value = value || ''
+    } else if (defaultValue !== undefined) {
+        inputProps.defaultValue = defaultValue
+    }
+
     return (
-        <ValidatedInput
-            type="select"
-            value={value || ''}
-            onChange={onChange}
-            validation={validation}
-            isValidating={isValidating}
-            label={label}
-            description={description}
-            required={required}
-            disabled={disabled}
-            {...props}
-        >
+        <ValidatedInput {...inputProps}>
             {!required && (
                 <option value="">{loadingValueList ? 'Loading...' : placeholder}</option>
             )}

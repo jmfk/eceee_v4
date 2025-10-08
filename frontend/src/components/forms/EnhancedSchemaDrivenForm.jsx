@@ -192,6 +192,7 @@ const EnhancedSchemaDrivenForm = ({
                     isValidating={isValidating}
                     required={isRequired}
                     namespace={namespace}
+                    schema={schema}
                 />
             )
         }

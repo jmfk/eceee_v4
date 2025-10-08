@@ -6,11 +6,13 @@ import ValidatedInput from '../validation/ValidatedInput'
  * 
  * Numeric input field component that integrates with the validation system.
  * Handles both integers and floating-point numbers.
+ * Supports both controlled (value) and uncontrolled (defaultValue) modes.
  * 
  * Optimized with React.memo and useCallback to prevent unnecessary re-renders.
  */
 const NumberInput = React.memo(({
     value,
+    defaultValue,
     onChange,
     validation,
     isValidating,
@@ -31,24 +33,31 @@ const NumberInput = React.memo(({
         onChange(eventValue === '' ? null : numericValue)
     }, [onChange])
 
-    return (
-        <ValidatedInput
-            type="number"
-            value={value || ''}
-            onChange={handleChange}
-            validation={validation}
-            isValidating={isValidating}
-            label={label}
-            description={description}
-            required={required}
-            disabled={disabled}
-            placeholder={placeholder}
-            min={min}
-            max={max}
-            step={step}
-            {...props}
-        />
-    )
+    // Build props for ValidatedInput
+    const inputProps = {
+        type: "number",
+        onChange: handleChange,
+        validation,
+        isValidating,
+        label,
+        description,
+        required,
+        disabled,
+        placeholder,
+        min,
+        max,
+        step,
+        ...props
+    }
+
+    // Add either value or defaultValue, but never both
+    if (value !== undefined) {
+        inputProps.value = value || ''
+    } else if (defaultValue !== undefined) {
+        inputProps.defaultValue = defaultValue
+    }
+
+    return <ValidatedInput {...inputProps} />
 })
 
 NumberInput.displayName = 'NumberInput'

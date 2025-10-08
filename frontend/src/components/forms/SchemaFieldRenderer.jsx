@@ -125,6 +125,7 @@ const SchemaFieldRenderer = ({
     disabled = false,
     namespace = null,
     context = null,
+    schema = null, // Full schema for resolving $refs
     ...props
 }) => {
     // Map JSON Schema type/format to our field type system
@@ -212,7 +213,28 @@ const SchemaFieldRenderer = ({
             placeholder: fieldSchema.placeholder,
             namespace: namespace,
             context: context,
+            fieldName: fieldName, // Pass fieldName for UDC integration
             ...componentProps
+        }
+
+        // Special handling for ItemsListField - pass itemSchema
+        if (componentName === 'ItemsListField' && fieldSchema.items) {
+            let itemSchema = fieldSchema.items
+
+            // Resolve $ref if present
+            if (itemSchema.$ref && schema && schema.$defs) {
+                const refPath = itemSchema.$ref.replace('#/$defs/', '')
+                itemSchema = schema.$defs[refPath] || itemSchema
+            }
+
+            fieldProps.itemSchema = itemSchema
+
+            // Handle itemLabelTemplate function
+            if (componentProps.itemLabelTemplate && typeof componentProps.itemLabelTemplate === 'string') {
+                // If it's a string, convert to a function that accesses that property
+                const propertyName = componentProps.itemLabelTemplate
+                fieldProps.itemLabelTemplate = (item) => item[propertyName] || ''
+            }
         }
         return (
             <Suspense fallback={

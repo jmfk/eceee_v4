@@ -5,10 +5,12 @@ import ValidationMessage from './ValidationMessage.jsx'
  * ValidatedInput Component
  * 
  * Input component with integrated validation display
+ * Supports both controlled (value) and uncontrolled (defaultValue) modes
  */
 export default function ValidatedInput({
     type = 'text',
-    value = '',
+    value,
+    defaultValue,
     onChange,
     validation = null,
     isValidating = false,
@@ -24,6 +26,10 @@ export default function ValidatedInput({
 }) {
     const [focused, setFocused] = useState(false)
     const inputRef = useRef(null)
+
+    // Determine if this is controlled or uncontrolled
+    const isControlled = value !== undefined
+    const isUncontrolled = defaultValue !== undefined
 
     // Get validation status for styling
     const getValidationStatus = () => {
@@ -96,9 +102,9 @@ export default function ValidatedInput({
     `.trim()
 
     const renderInput = () => {
+        // Build props based on controlled vs uncontrolled mode
         const commonProps = {
             ref: inputRef,
-            value,
             onChange: (e) => onChange?.(e.target.value), // Extract value from event
             onFocus: handleFocus,
             onBlur: handleBlur,
@@ -106,6 +112,16 @@ export default function ValidatedInput({
             disabled,
             className: inputClasses,
             ...props
+        }
+
+        // Add either value or defaultValue, but never both
+        if (isControlled) {
+            commonProps.value = value
+        } else if (isUncontrolled) {
+            commonProps.defaultValue = defaultValue
+        } else {
+            // Neither provided, default to empty controlled
+            commonProps.value = ''
         }
 
         switch (type) {
