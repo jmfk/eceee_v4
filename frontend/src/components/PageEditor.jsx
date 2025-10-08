@@ -830,13 +830,6 @@ const PageEditor = () => {
                     });
                     // Merge any changes from ContentEditor with existing widgets
                     collectedData.widgets = widgetResult.data || widgetResult || collectedData.widgets;
-
-                    console.log('[PageEditor] handleActualSave - After collecting from ContentEditor:', {
-                        widgetsBySlot: Object.entries(collectedData.widgets).reduce((acc, [slot, widgets]) => {
-                            acc[slot] = widgets.map((w, idx) => ({ position: idx, id: w.id, type: w.type }));
-                            return acc;
-                        }, {})
-                    });
                 } catch (error) {
                     console.error('❌ SMART SAVE: Widget data collection failed', error);
                 }

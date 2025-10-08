@@ -70,10 +70,6 @@ const WidgetSlot = ({
     // Check if slot has inherited content
     const hasInheritance = hasInheritedContent(slotInheritedWidgets);
 
-    if (name === 'sidebar') {
-        console.log(name, "slotInheritedWidgets", slotInheritedWidgets)
-    }
-
     // Get effective widgets based on current mode
     const effectiveWidgets = useMemo(() => {
         const result = getSlotWidgetsForMode(currentMode, localWidgets, slotInheritedWidgets, slotRules);

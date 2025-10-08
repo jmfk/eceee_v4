@@ -318,7 +318,6 @@ class WebPageRenderer:
 
         except Exception as e:
             # Fallback to old system if tree generation fails
-            print(f"Tree generation failed, falling back to old system: {e}")
             return self._render_widgets_by_slot_legacy(page, page_version, context)
 
     def _render_widgets_by_slot_legacy(self, page, page_version, context):

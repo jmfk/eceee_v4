@@ -31,8 +31,6 @@ def invalidate_page_tree_on_save(sender, instance, created, **kwargs):
             if new_parent_id:
                 InheritanceTreeCache.invalidate_hierarchy(new_parent_id)
 
-    print(f"Cache invalidation: Cleared {invalidated} tree caches for page changes")
-
 
 @receiver(pre_save, sender=WebPage)
 def track_parent_changes(sender, instance, **kwargs):
@@ -52,8 +50,6 @@ def invalidate_version_tree_on_save(sender, instance, created, **kwargs):
     # Invalidate page and all descendants (they inherit from this page)
     invalidated = InheritanceTreeCache.invalidate_page(instance.page_id)
 
-    print(f"Cache invalidation: Cleared {invalidated} tree caches for version changes")
-
 
 @receiver(post_delete, sender=WebPage)
 def invalidate_tree_on_page_delete(sender, instance, **kwargs):
@@ -62,8 +58,6 @@ def invalidate_tree_on_page_delete(sender, instance, **kwargs):
     # Invalidate entire hierarchy (parent and all descendants)
     invalidated = InheritanceTreeCache.invalidate_hierarchy(instance.id)
 
-    print(f"Cache invalidation: Cleared {invalidated} tree caches for page deletion")
-
 
 @receiver(post_delete, sender=PageVersion)
 def invalidate_tree_on_version_delete(sender, instance, **kwargs):
@@ -71,8 +65,6 @@ def invalidate_tree_on_version_delete(sender, instance, **kwargs):
 
     # Invalidate page and descendants
     invalidated = InheritanceTreeCache.invalidate_page(instance.page_id)
-
-    print(f"Cache invalidation: Cleared {invalidated} tree caches for version deletion")
 
 
 # Utility functions for manual cache management
