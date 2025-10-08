@@ -74,4 +74,64 @@ describe('TextInput', () => {
 
         expect(screen.getByText('This field is required')).toBeInTheDocument()
     })
+
+    describe('Uncontrolled mode (defaultValue)', () => {
+        test('uses defaultValue for initial value', () => {
+            const mockOnChange = vi.fn()
+
+            render(
+                <TextInput
+                    defaultValue="default text"
+                    onChange={mockOnChange}
+                    label="Test Input"
+                />
+            )
+
+            const input = screen.getByRole('textbox')
+            expect(input).toHaveValue('default text')
+        })
+
+        test('calls onChange when typing in uncontrolled mode', () => {
+            const mockOnChange = vi.fn()
+
+            render(
+                <TextInput
+                    defaultValue="initial"
+                    onChange={mockOnChange}
+                    label="Test Input"
+                />
+            )
+
+            const input = screen.getByRole('textbox')
+            fireEvent.change(input, { target: { value: 'updated text' } })
+
+            expect(mockOnChange).toHaveBeenCalledWith('updated text')
+        })
+
+        test('does not re-render when defaultValue changes', () => {
+            const mockOnChange = vi.fn()
+            const { rerender } = render(
+                <TextInput
+                    defaultValue="first"
+                    onChange={mockOnChange}
+                    label="Test Input"
+                />
+            )
+
+            const input = screen.getByRole('textbox')
+            expect(input).toHaveValue('first')
+
+            // Changing defaultValue should not update the input (that's how uncontrolled works)
+            rerender(
+                <TextInput
+                    defaultValue="second"
+                    onChange={mockOnChange}
+                    label="Test Input"
+                />
+            )
+
+            // Input keeps its value (DOM is the source of truth)
+            expect(input).toHaveValue('first')
+        })
+    })
 })

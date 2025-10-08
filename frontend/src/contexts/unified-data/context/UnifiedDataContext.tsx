@@ -34,7 +34,7 @@ export function UnifiedDataProvider({
 
     const useExternalChanges = useCallback(<T,>(componentId: string, callback: StateChangeCallback<T>): void => {
         const stableCallback = React.useMemo(
-            () => (state: any) => callback(state),
+            () => (state: any, metadata?: any) => callback(state, metadata),
             [callback, componentId]
         );
         useEffect(() => {
@@ -42,7 +42,13 @@ export function UnifiedDataProvider({
                 () => manager.getState(),
                 (_, operation: Operation) => {
                     if (operation && operation?.sourceId && operation?.sourceId !== componentId) {
-                        stableCallback(manager.getState());
+                        // Pass metadata including sourceId to callback
+                        const metadata = {
+                            sourceId: operation.sourceId,
+                            type: operation.type,
+                            timestamp: Date.now()
+                        };
+                        stableCallback(manager.getState(), metadata);
                     }
                 },
                 { equalityFn: defaultEqualityFn, componentId }

@@ -20,14 +20,20 @@ const ItemForm = ({ initialItem, schema, disabled, errors = [], context = {}, it
     const contextType = context?.contextType
     const widgetPath = context?.widgetPath
     const fieldName = context?.fieldName
+    const parentComponentId = context?.parentComponentId
 
     // UDC Integration
     const { useExternalChanges, publishUpdate, getState } = useUnifiedData()
-    const componentId = useMemo(() =>
-        `item-form-${widgetId || 'preview'}-${fieldName || 'items'}-${itemIndex}`,
-        [widgetId, fieldName, itemIndex]
-    )
-    console.log("ItemForm::componentId", componentId)
+
+    // Create hierarchical componentId using parent's ID as prefix
+    const componentId = useMemo(() => {
+        if (parentComponentId) {
+            return `${parentComponentId}-item-${itemIndex}`
+        }
+        // Fallback for standalone use
+        return `item-form-${widgetId || 'preview'}-${fieldName || 'items'}-${itemIndex}`
+    }, [parentComponentId, widgetId, fieldName, itemIndex])
+
     // Helper to get item from UDC
     const getItemFromUDC = useCallback(() => {
         if (widgetId && slotName && contextType && fieldName && getState) {
@@ -62,7 +68,6 @@ const ItemForm = ({ initialItem, schema, disabled, errors = [], context = {}, it
                 const externalItem = items[itemIndex]
                 // Only remount if external change differs from our ref
                 if (JSON.stringify(externalItem) !== JSON.stringify(itemRef.current)) {
-                    console.log("ItemForm: External change detected, remounting", externalItem)
                     itemRef.current = externalItem
                     setFormKey(prev => prev + 1) // Force remount with new defaultValues
                 }
@@ -81,7 +86,6 @@ const ItemForm = ({ initialItem, schema, disabled, errors = [], context = {}, it
     // Handle field changes - update ref and publish to UDC (NO re-render)
     const handleFieldChange = useCallback(async (changedFieldName, value) => {
 
-        console.log("handleFieldChange", changedFieldName, value)
         // Update our internal ref (no state change = no re-render)
         const updatedItem = {
             ...itemRef.current,
@@ -97,12 +101,10 @@ const ItemForm = ({ initialItem, schema, disabled, errors = [], context = {}, it
         // Get current items array from UDC
         const state = getState()
         const widget = lookupWidget(state, widgetId, slotName, contextType, widgetPath)
-        console.log(widget, widget.config, widget.config[fieldName])
         if (widget && widget.config && widget.config[fieldName]) {
             const currentItems = widget.config[fieldName] || []
             const newItems = [...currentItems]
             newItems[itemIndex] = updatedItem
-            console.log("Publish changes")
             // Publish full array to UDC (batched automatically by UDC)
             await publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
                 id: widgetId,
@@ -128,7 +130,7 @@ const ItemForm = ({ initialItem, schema, disabled, errors = [], context = {}, it
             errors: fieldErrors.map(err => err.message || err.error)
         }
     }
-    console.log("render::ItemForm")
+
     return (
         <div key={formKey} className="space-y-4">
             {schema.fields.map((field, idx) => {

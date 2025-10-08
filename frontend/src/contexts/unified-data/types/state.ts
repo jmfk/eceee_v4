@@ -185,9 +185,18 @@ export interface AppState {
 export type StateSelector<T = any> = (state: AppState) => T;
 
 /**
+ * Change metadata passed to state change callbacks
+ */
+export interface ChangeMetadata {
+  sourceId?: string;
+  type?: string;
+  timestamp?: number;
+}
+
+/**
  * State change callback type - used by components to handle external changes
  */
-export type StateChangeCallback<T = any> = (state: AppState) => void;
+export type StateChangeCallback<T = any> = (state: AppState, metadata?: ChangeMetadata) => void;
 
 /**
  * State update type

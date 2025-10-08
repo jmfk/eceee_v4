@@ -5,9 +5,11 @@ import React from 'react'
  * 
  * Radio button group component for single selection from multiple options.
  * Integrates with the validation system.
+ * Supports both controlled (value) and uncontrolled (defaultValue) modes.
  */
 const RadioInput = ({
     value,
+    defaultValue,
     onChange,
     validation,
     isValidating,
@@ -19,6 +21,7 @@ const RadioInput = ({
     layout = 'vertical', // 'vertical' or 'horizontal'
     ...props
 }) => {
+    const isControlled = value !== undefined
     // Handle both array of strings and array of objects
     const normalizeOptions = (opts) => {
         if (!Array.isArray(opts)) return []
@@ -61,33 +64,43 @@ const RadioInput = ({
             )}
 
             <div className={`space-${layout === 'horizontal' ? 'x' : 'y'}-2 ${layout === 'horizontal' ? 'flex flex-wrap' : ''}`}>
-                {normalizedOptions.map((option) => (
-                    <div key={option.value} className="flex items-center">
-                        <input
-                            id={option.id}
-                            type="radio"
-                            name={props.name || 'radio-group'}
-                            value={option.value}
-                            checked={value === option.value}
-                            onChange={() => handleChange(option.value)}
-                            disabled={disabled}
-                            className={`
-                                h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500
-                                ${hasError ? 'border-red-300' : ''}
-                                ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}
-                            `}
-                        />
-                        <label
-                            htmlFor={option.id}
-                            className={`
-                                ml-2 text-sm text-gray-700
-                                ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}
-                            `}
-                        >
-                            {option.label}
-                        </label>
-                    </div>
-                ))}
+                {normalizedOptions.map((option) => {
+                    const radioProps = {
+                        id: option.id,
+                        type: "radio",
+                        name: props.name || 'radio-group',
+                        value: option.value,
+                        onChange: () => handleChange(option.value),
+                        disabled,
+                        className: `
+                            h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500
+                            ${hasError ? 'border-red-300' : ''}
+                            ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}
+                        `
+                    }
+
+                    // Add either checked or defaultChecked based on mode
+                    if (isControlled) {
+                        radioProps.checked = value === option.value
+                    } else if (defaultValue !== undefined) {
+                        radioProps.defaultChecked = defaultValue === option.value
+                    }
+
+                    return (
+                        <div key={option.value} className="flex items-center">
+                            <input {...radioProps} />
+                            <label
+                                htmlFor={option.id}
+                                className={`
+                                    ml-2 text-sm text-gray-700
+                                    ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}
+                                `}
+                            >
+                                {option.label}
+                            </label>
+                        </div>
+                    )
+                })}
             </div>
 
             {/* Validation Message */}

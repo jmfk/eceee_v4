@@ -13,7 +13,10 @@ class NavigationItem(BaseModel):
 
     label: str = Field(..., description="Menu item label")
     url: str = Field(..., description="Menu item URL")
-    is_active: bool = Field(False, description="Whether this item is active")
+    is_active: bool = Field(True, description="Whether this item is active")
+    target_blank: bool = Field(
+        False, description="Whether the link opens in a new window"
+    )
 
 
 # Update forward reference
@@ -42,12 +45,6 @@ class NavigationWidget(BaseWidget):
     name = "Navigation"
     description = "Navigation widget with background image/color and text color options"
     template_name = "eceee_widgets/widgets/navigation.html"
-
-    widget_css = """"""
-
-    css_variables = {}
-
-    css_scope = "widget"
 
     @property
     def configuration_model(self) -> Type[BaseModel]:

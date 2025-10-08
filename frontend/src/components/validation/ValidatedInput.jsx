@@ -125,8 +125,22 @@ export default function ValidatedInput({
         }
 
         switch (type) {
-            case 'textarea':
-                return <textarea {...commonProps} rows={props.rows || 3} />
+            case 'textarea': {
+                const textareaProps = { ...commonProps }
+                // Handle rows attribute carefully for auto-resize support
+                const rowsValue = props.rows
+                if (rowsValue === null) {
+                    // Explicitly null (autoResize) - remove rows attribute
+                    delete textareaProps.rows
+                } else if (typeof rowsValue === 'number' && rowsValue > 0) {
+                    // Explicit number - use it
+                    textareaProps.rows = rowsValue
+                } else if (rowsValue === undefined && !('rows' in props)) {
+                    // Not mentioned at all - default to 3
+                    textareaProps.rows = 3
+                }
+                return <textarea {...textareaProps} />
+            }
             case 'select':
                 return (
                     <select {...commonProps}>

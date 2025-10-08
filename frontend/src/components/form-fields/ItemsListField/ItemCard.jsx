@@ -28,7 +28,7 @@ const ItemCard = ({
         : labelTemplate || `Item ${index + 1}`
 
     const hasErrors = errors && errors.length > 0
-    console.log("render::ItemCard")
+
     return (
         <div
             className={`transition-colors ${isExpanded ? 'bg-gray-50' : 'hover:bg-gray-50'}`}
