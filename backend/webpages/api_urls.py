@@ -25,6 +25,21 @@ from .views.simplified_layout_views import (
     simplified_layout_schema,
     validate_simplified_layout,
 )
+from .api_structure_views import (
+    page_metadata_view,
+    page_by_path_view,
+    page_children_view,
+    page_tree_view,
+    page_ancestors_view,
+    page_breadcrumbs_view,
+    page_root_view,
+    version_metadata_view,
+    page_versions_view,
+    page_current_version_view,
+    page_with_versions_view,
+    page_structure_summary_view,
+    pages_search_view,
+)
 
 # Create router and register viewsets
 router = DefaultRouter()
@@ -132,5 +147,39 @@ urlpatterns = [
         name="page-version-render",
     ),
     path("pages/preview/", render_page_preview, name="page-preview"),
+    # Page structure query endpoints
+    path("pages/<int:page_id>/metadata/", page_metadata_view, name="page-metadata"),
+    path("pages/by-path/", page_by_path_view, name="page-by-path"),
+    path("pages/<int:page_id>/children/", page_children_view, name="page-children"),
+    path("pages/<int:page_id>/tree/", page_tree_view, name="page-tree"),
+    path("pages/<int:page_id>/ancestors/", page_ancestors_view, name="page-ancestors"),
+    path(
+        "pages/<int:page_id>/breadcrumbs/",
+        page_breadcrumbs_view,
+        name="page-breadcrumbs",
+    ),
+    path("pages/<int:page_id>/root/", page_root_view, name="page-root"),
+    path(
+        "page-versions/<int:version_id>/metadata/",
+        version_metadata_view,
+        name="version-metadata",
+    ),
+    path("pages/<int:page_id>/versions/", page_versions_view, name="page-versions"),
+    path(
+        "pages/<int:page_id>/current-version/",
+        page_current_version_view,
+        name="page-current-version-metadata",
+    ),
+    path(
+        "pages/<int:page_id>/with-versions/",
+        page_with_versions_view,
+        name="page-with-versions",
+    ),
+    path(
+        "pages/<int:page_id>/structure-summary/",
+        page_structure_summary_view,
+        name="page-structure-summary",
+    ),
+    path("pages/search/", pages_search_view, name="pages-search"),
     path("", include(router.urls)),
 ] + widget_type_patterns
