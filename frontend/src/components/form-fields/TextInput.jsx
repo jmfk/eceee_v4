@@ -6,11 +6,13 @@ import ValidatedInput from '../validation/ValidatedInput'
  * 
  * Basic text input field component that integrates with the validation system.
  * Used for single-line text input fields.
+ * Supports both controlled (value) and uncontrolled (defaultValue) modes.
  * 
  * Optimized with React.memo to prevent unnecessary re-renders.
  */
 const TextInput = React.memo(({
     value,
+    defaultValue,
     onChange,
     validation,
     isValidating,
@@ -27,21 +29,28 @@ const TextInput = React.memo(({
         onChange(newValue)
     }, [onChange])
 
-    return (
-        <ValidatedInput
-            type="text"
-            value={value || ''}
-            onChange={handleChange}
-            validation={validation}
-            isValidating={isValidating}
-            label={label}
-            description={description}
-            required={required}
-            disabled={disabled}
-            placeholder={placeholder}
-            {...props}
-        />
-    )
+    // Build props for ValidatedInput
+    const inputProps = {
+        type: "text",
+        onChange: handleChange,
+        validation,
+        isValidating,
+        label,
+        description,
+        required,
+        disabled,
+        placeholder,
+        ...props
+    }
+
+    // Add either value or defaultValue, but never both
+    if (value !== undefined) {
+        inputProps.value = value || ''
+    } else if (defaultValue !== undefined) {
+        inputProps.defaultValue = defaultValue
+    }
+
+    return <ValidatedInput {...inputProps} />
 })
 
 TextInput.displayName = 'TextInput'

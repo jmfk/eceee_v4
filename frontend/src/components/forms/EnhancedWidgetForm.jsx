@@ -177,6 +177,7 @@ const EnhancedWidgetForm = ({
                         validation={fieldValidation}
                         isValidating={isValidating}
                         required={isRequired}
+                        schema={schema}
                         {...props}
                     />
                 )

@@ -124,6 +124,8 @@ const ObjectSchemaForm = React.memo(forwardRef(({ schema, data = {}, onChange, n
             placeholder: field.placeholder || `Enter ${field.label || field.name}...`,
             // Pass namespace for media operations
             namespace: namespace,
+            // Pass fieldName for UDC integration
+            fieldName: field.name,
             // Pass through field type specific UI props
             ...uiProps,
             // Pass through field definition props (like min, max, options, etc.)

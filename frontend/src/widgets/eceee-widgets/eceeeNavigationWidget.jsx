@@ -7,46 +7,10 @@ import { Menu, X, ChevronDown } from 'lucide-react'
  */
 const eceeeNavigationWidget = ({ config = {}, mode = 'preview' }) => {
     const {
-        content = 'Navigation content will appear here...',
-        background_color = '#ffffff',
-        background_image = '',
-        background_size = 'cover',
-        background_position = 'center',
-        text_color = '#1f2937',
-        padding = '1rem',
-        text_align = 'left',
-        brand_name = '',
-        brand_url = '',
-        brand_logo = '',
         menu_items = [],
-        mobile_friendly = true,
-        sticky = false,
-        dropdown_enabled = true,
-        css_class = '',
-        custom_css = ''
     } = config
 
-    const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
     const [activeDropdown, setActiveDropdown] = useState(null)
-
-    const navStyle = {
-        backgroundColor: background_color,
-        backgroundImage: background_image ? `url(${background_image})` : 'none',
-        backgroundSize: background_size,
-        backgroundPosition: background_position,
-        backgroundRepeat: 'no-repeat',
-        color: text_color,
-        padding: padding,
-        textAlign: text_align
-    }
-
-    const toggleMobileMenu = () => {
-        setMobileMenuOpen(!mobileMenuOpen)
-    }
-
-    const toggleDropdown = (index) => {
-        setActiveDropdown(activeDropdown === index ? null : index)
-    }
 
     const renderMenuItems = (items, isMobile = false) => {
         return items.map((item, index) => (
@@ -89,114 +53,22 @@ const eceeeNavigationWidget = ({ config = {}, mode = 'preview' }) => {
 
     if (mode === 'editor') {
         return (
-            <div className="navigation-widget-editor p-4">
-                <nav
-                    className={`navigation-widget rounded border border-gray-200 ${sticky ? 'sticky top-0 z-50' : ''} ${css_class}`}
-                    style={navStyle}
-                >
-                    <div className="nav-container flex justify-between items-center max-w-6xl mx-auto">
-                        {(brand_name || brand_logo) && (
-                            <div className="nav-brand flex items-center">
-                                {brand_logo && (
-                                    <img src={brand_logo} alt={brand_name || 'Logo'} className="nav-brand-logo h-8 w-auto mr-2" />
-                                )}
-                                {brand_name && (
-                                    <span className="nav-brand-text text-xl font-bold">{brand_name}</span>
-                                )}
-                            </div>
-                        )}
+            <nav className="navigation-widget">
+                <ul className="nav-container">
+                    <li><a href="#">Nav row 1</a></li>
+                </ul>
+            </nav>
 
-                        {menu_items.length > 0 ? (
-                            <>
-                                {mobile_friendly && (
-                                    <button
-                                        className="nav-toggle md:hidden p-2 rounded-md hover:bg-gray-100"
-                                        onClick={toggleMobileMenu}
-                                        aria-label="Toggle navigation"
-                                    >
-                                        {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-                                    </button>
-                                )}
-
-                                <ul className={`nav-menu ${mobile_friendly ? 'hidden md:flex' : 'flex'} space-x-1`}>
-                                    {renderMenuItems(menu_items)}
-                                </ul>
-
-                                {mobile_friendly && (
-                                    <ul className={`nav-menu-mobile md:hidden absolute top-full left-0 right-0 bg-white border-t border-gray-200 shadow-lg ${mobileMenuOpen ? 'block' : 'hidden'
-                                        }`}>
-                                        <div className="px-4 py-2 space-y-1">
-                                            {renderMenuItems(menu_items, true)}
-                                        </div>
-                                    </ul>
-                                )}
-                            </>
-                        ) : (
-                            <div className="nav-content" dangerouslySetInnerHTML={{ __html: content }} />
-                        )}
-                    </div>
-
-                    {custom_css && (
-                        <style dangerouslySetInnerHTML={{ __html: custom_css }} />
-                    )}
-                </nav>
-            </div>
         )
     }
 
     return (
-        <nav
-            className={`navigation-widget ${sticky ? 'sticky top-0 z-50' : ''} ${css_class}`}
-            style={navStyle}
-        >
-            <div className="nav-container flex justify-between items-center max-w-6xl mx-auto relative">
-                {(brand_name || brand_logo) && (
-                    <div className="nav-brand flex items-center">
-                        {brand_logo && (
-                            <img src={brand_logo} alt={brand_name || 'Logo'} className="nav-brand-logo h-8 w-auto mr-2" />
-                        )}
-                        {brand_name && (
-                            <a href={brand_url || '/'} className="nav-brand-text text-xl font-bold hover:opacity-80">
-                                {brand_name}
-                            </a>
-                        )}
-                    </div>
-                )}
-
-                {menu_items.length > 0 ? (
-                    <>
-                        {mobile_friendly && (
-                            <button
-                                className="nav-toggle md:hidden p-2 rounded-md hover:bg-gray-100"
-                                onClick={toggleMobileMenu}
-                                aria-label="Toggle navigation"
-                            >
-                                {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-                            </button>
-                        )}
-
-                        <ul className={`nav-menu ${mobile_friendly ? 'hidden md:flex' : 'flex'} space-x-1`}>
-                            {renderMenuItems(menu_items)}
-                        </ul>
-
-                        {mobile_friendly && (
-                            <ul className={`nav-menu-mobile md:hidden absolute top-full left-0 right-0 bg-white border-t border-gray-200 shadow-lg ${mobileMenuOpen ? 'block' : 'hidden'
-                                }`}>
-                                <div className="px-4 py-2 space-y-1">
-                                    {renderMenuItems(menu_items, true)}
-                                </div>
-                            </ul>
-                        )}
-                    </>
-                ) : (
-                    <div className="nav-content" dangerouslySetInnerHTML={{ __html: content }} />
-                )}
-            </div>
-
-            {custom_css && (
-                <style dangerouslySetInnerHTML={{ __html: custom_css }} />
-            )}
+        <nav className="navigation-widget">
+            <ul className="nav-container">
+                <li><a href="">Nav row 1</a></li>
+            </ul>
         </nav>
+
     )
 }
 
@@ -206,31 +78,8 @@ eceeeNavigationWidget.widgetType = 'eceee_widgets.NavigationWidget'
 
 // Default configuration
 eceeeNavigationWidget.defaultConfig = {
-    content: 'Navigation content will appear here...',
-    background_color: '#ffffff',
-    background_image: '',
-    background_size: 'cover',
-    background_position: 'center',
-    text_color: '#1f2937',
-    padding: '1rem',
-    text_align: 'left',
-    brand_name: 'Your Brand',
-    brand_url: '/',
-    brand_logo: '',
-    menu_items: [
-        { label: 'Home', url: '/', is_active: true },
-        { label: 'About', url: '/about', is_active: false },
-        {
-            label: 'Services', url: '/services', is_active: false, children: [
-                { label: 'Web Design', url: '/services/web-design' },
-                { label: 'Development', url: '/services/development' }
-            ]
-        },
-        { label: 'Contact', url: '/contact', is_active: false }
-    ],
-    mobile_friendly: true,
-    sticky: false,
-    dropdown_enabled: true
+
+    menu_items: [],
 }
 
 // Display metadata

@@ -20,6 +20,7 @@ const IsolatedFieldWrapper = React.memo(({
     onFieldChange,
     namespace = null,
     context = {},
+    fullSchema = null, // Full schema with $defs for resolving $ref
 }) => {
     // Get initial value from widget data
     const initialValue = widgetData?.config?.[fieldName] ?? ''
@@ -92,6 +93,7 @@ const IsolatedFieldWrapper = React.memo(({
                 disabled={false}
                 namespace={namespace}
                 context={context}
+                schema={fullSchema}
             />
         )
     }
@@ -108,6 +110,7 @@ const IsolatedFieldWrapper = React.memo(({
             disabled={false}
             namespace={namespace}
             context={context}
+            schema={fullSchema}
         />
     )
 })
@@ -222,6 +225,7 @@ const IsolatedFormRenderer = React.memo(({
                         onFieldChange={handleFieldChange}
                         namespace={namespace}
                         context={context}
+                        fullSchema={activeSchema}
                     />
                 )
             })}

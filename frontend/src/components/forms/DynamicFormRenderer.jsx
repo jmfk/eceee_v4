@@ -128,6 +128,7 @@ const DynamicFormRenderer = React.memo(({
             validation: fieldValidation,
             isValidating: fieldIsValidating,
             namespace: namespace,
+            fieldName: fieldName, // Pass fieldName for UDC integration
             // Pass through field type specific UI props
             ...uiProps,
             // Pass through field definition props
