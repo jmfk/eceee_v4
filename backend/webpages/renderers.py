@@ -261,10 +261,71 @@ class WebPageRenderer:
         return context
 
     def _render_widgets_by_slot(self, page, page_version, context):
-        """Render widgets organized by slot with parent slot inheritance for empty slots."""
+        """Render widgets organized by slot using inheritance tree for better performance."""
         widgets_by_slot = {}
 
-        # Get widget inheritance info
+        # NEW: Build inheritance tree (replaces complex slot-by-slot inheritance logic)
+        try:
+            builder = InheritanceTreeBuilder()
+            tree = builder.build_tree(page)
+            helpers = InheritanceTreeHelpers(tree)
+
+            # Get effective layout for slot configuration
+            effective_layout = page.get_effective_layout()
+            layout_slots = []
+            if effective_layout and effective_layout.slot_configuration:
+                layout_slots = effective_layout.slot_configuration.get("slots", [])
+
+            # Process each layout slot using tree queries
+            for slot_config in layout_slots:
+                slot_name = slot_config.get("name")
+                if not slot_name:
+                    continue
+
+                # Use tree to get merged widgets for display (much simpler!)
+                merged_widgets = helpers.get_merged_widgets(slot_name)
+
+                # Render each widget
+                rendered_widgets = []
+                for widget in merged_widgets:
+                    context["layout_name"] = context.get("layout", {}).get("name", "")
+                    context["slot_name"] = slot_name
+
+                    # Convert TreeWidget back to dict format for existing renderer
+                    widget_data = {
+                        "id": widget.id,
+                        "type": widget.type,
+                        "config": widget.config,
+                        "order": widget.order,
+                    }
+
+                    widget_html = self.render_widget_json(widget_data, context)
+                    rendered_widgets.append(
+                        {
+                            "html": widget_html,
+                            "widget_data": widget_data,
+                            "inherited_from": (
+                                None if widget.is_local else f"depth-{widget.depth}"
+                            ),
+                            "is_override": widget.inheritance_behavior.value
+                            == "override_parent",
+                        }
+                    )
+
+                widgets_by_slot[slot_name] = rendered_widgets
+
+            return widgets_by_slot
+
+        except Exception as e:
+            # Fallback to old system if tree generation fails
+            print(f"Tree generation failed, falling back to old system: {e}")
+            return self._render_widgets_by_slot_legacy(page, page_version, context)
+
+    def _render_widgets_by_slot_legacy(self, page, page_version, context):
+        """Legacy rendering method (backup)"""
+        widgets_by_slot = {}
+
+        # OLD: Get widget inheritance info (kept as fallback)
         widgets_info = page.get_widgets_inheritance_info()
 
         # Get all available slots from the layout

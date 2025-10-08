@@ -1,0 +1,381 @@
+{
+  "description": "Canonical test data for widget inheritance tree implementations",
+  "testCases": {
+    "basic_hierarchy": {
+      "description": "3-level hierarchy: Home -> About -> History with various inheritance behaviors",
+      "pages": {
+        "1": {
+          "id": 1,
+          "title": "Home",
+          "slug": "home", 
+          "parent_id": null,
+          "widgets": {
+            "header": [
+              {
+                "id": "home-header-1",
+                "type": "HeaderWidget",
+                "config": {"title": "Site Header"},
+                "inheritanceBehavior": "insert_after_parent", 
+                "isPublished": true,
+                "inheritanceLevel": -1,
+                "order": 0
+              }
+            ],
+            "sidebar": [
+              {
+                "id": "home-nav-1",
+                "type": "NavigationWidget", 
+                "config": {"menu": ["Home", "About"]},
+                "inheritanceBehavior": "insert_after_parent",
+                "isPublished": true,
+                "inheritanceLevel": 1,
+                "order": 0
+              }
+            ],
+            "main": [],
+            "footer": []
+          }
+        },
+        "2": {
+          "id": 2,
+          "title": "About",
+          "slug": "about",
+          "parent_id": 1,
+          "widgets": {
+            "main": [
+              {
+                "id": "about-content-1",
+                "type": "ContentWidget",
+                "config": {"content": "About page content"},
+                "inheritanceBehavior": "insert_after_parent",
+                "isPublished": true,
+                "inheritanceLevel": -1,
+                "order": 0
+              }
+            ],
+            "sidebar": [
+              {
+                "id": "about-nav-1", 
+                "type": "NavigationWidget",
+                "config": {"menu": ["About", "History"]},
+                "inheritanceBehavior": "override_parent",
+                "isPublished": true,
+                "inheritanceLevel": -1,
+                "order": 0
+              }
+            ],
+            "header": [],
+            "footer": []
+          }
+        },
+        "4": {
+          "id": 4,
+          "title": "History",
+          "slug": "history",
+          "parent_id": 2,
+          "widgets": {
+            "main": [
+              {
+                "id": "history-content-1", 
+                "type": "ContentWidget",
+                "config": {"content": "History page content"},
+                "inheritanceBehavior": "insert_after_parent",
+                "isPublished": true,
+                "inheritanceLevel": -1,
+                "order": 0
+              }
+            ],
+            "sidebar": [
+              {
+                "id": "history-sidebar-1",
+                "type": "ContentWidget", 
+                "config": {"content": "History sidebar"},
+                "inheritanceBehavior": "insert_before_parent",
+                "isPublished": true,
+                "inheritanceLevel": -1,
+                "order": 0
+              }
+            ],
+            "header": [],
+            "footer": []
+          }
+        }
+      },
+      "expectedResults": {
+        "pageId4_getAllWidgets_main": [
+          {
+            "id": "history-content-1",
+            "depth": 0,
+            "isLocal": true,
+            "isInherited": false
+          },
+          {
+            "id": "about-content-1", 
+            "depth": 1,
+            "isLocal": false,
+            "isInherited": true
+          }
+        ],
+        "pageId4_getInheritedWidgets_sidebar": [
+          {
+            "id": "about-nav-1",
+            "depth": 1,
+            "isInherited": true
+          }
+        ],
+        "pageId4_getMergedWidgets_sidebar": [
+          {
+            "id": "history-sidebar-1", 
+            "depth": 0,
+            "order": 0,
+            "note": "insert_before_parent"
+          },
+          {
+            "id": "about-nav-1",
+            "depth": 1, 
+            "order": 0,
+            "note": "override_parent replaces home-nav-1"
+          }
+        ],
+        "pageId4_hasInheritedContent_main": true,
+        "pageId4_hasInheritedContent_footer": false,
+        "pageId4_getWidgetsAtDepth_1": [
+          {
+            "id": "about-content-1",
+            "depth": 1,
+            "slotName": "main"
+          },
+          {
+            "id": "about-nav-1",
+            "depth": 1,
+            "slotName": "sidebar"  
+          }
+        ]
+      }
+    },
+    "publishing_filters": {
+      "description": "Test publishing status and date filtering",
+      "pages": {
+        "1": {
+          "id": 1,
+          "title": "Root",
+          "slug": "root",
+          "parent_id": null,
+          "widgets": {
+            "main": [
+              {
+                "id": "published-widget",
+                "type": "ContentWidget", 
+                "config": {"content": "Published content"},
+                "inheritanceBehavior": "insert_after_parent",
+                "isPublished": true,
+                "inheritanceLevel": -1,
+                "order": 0
+              },
+              {
+                "id": "unpublished-widget",
+                "type": "ContentWidget",
+                "config": {"content": "Unpublished content"}, 
+                "inheritanceBehavior": "insert_after_parent",
+                "isPublished": false,
+                "inheritanceLevel": -1,
+                "order": 1
+              },
+              {
+                "id": "future-widget",
+                "type": "ContentWidget",
+                "config": {"content": "Future content"},
+                "inheritanceBehavior": "insert_after_parent", 
+                "isPublished": true,
+                "inheritanceLevel": -1,
+                "publishEffectiveDate": "2030-01-01T00:00:00Z",
+                "order": 2
+              }
+            ]
+          }
+        },
+        "2": {
+          "id": 2,
+          "title": "Child", 
+          "slug": "child",
+          "parent_id": 1,
+          "widgets": {
+            "main": []
+          }
+        }
+      },
+      "expectedResults": {
+        "pageId2_getAllWidgets_main_includeUnpublished": [
+          {"id": "published-widget", "isPublished": true},
+          {"id": "unpublished-widget", "isPublished": false}, 
+          {"id": "future-widget", "isPublished": true}
+        ],
+        "pageId2_getMergedWidgets_main_respectPublishing": [
+          {"id": "published-widget", "isPublished": true}
+        ]
+      }
+    },
+    "inheritance_levels": {
+      "description": "Test inheritance level depth limiting",  
+      "pages": {
+        "1": {
+          "id": 1,
+          "title": "Root",
+          "slug": "root",
+          "parent_id": null,
+          "widgets": {
+            "main": [
+              {
+                "id": "infinite-widget",
+                "type": "ContentWidget",
+                "inheritanceBehavior": "insert_after_parent",
+                "isPublished": true,
+                "inheritanceLevel": -1,
+                "order": 0
+              },
+              {
+                "id": "one-level-widget", 
+                "type": "ContentWidget",
+                "inheritanceBehavior": "insert_after_parent",
+                "isPublished": true,
+                "inheritanceLevel": 1,
+                "order": 1
+              },
+              {
+                "id": "page-only-widget",
+                "type": "ContentWidget", 
+                "inheritanceBehavior": "insert_after_parent",
+                "isPublished": true,
+                "inheritanceLevel": 0,
+                "order": 2
+              }
+            ]
+          }
+        },
+        "2": {
+          "id": 2,
+          "title": "Level 1",
+          "slug": "level1", 
+          "parent_id": 1,
+          "widgets": {"main": []}
+        },
+        "3": {
+          "id": 3,
+          "title": "Level 2", 
+          "slug": "level2",
+          "parent_id": 2,
+          "widgets": {"main": []}
+        }
+      },
+      "expectedResults": {
+        "pageId2_getAllWidgets_main": [
+          {"id": "infinite-widget", "depth": 1},
+          {"id": "one-level-widget", "depth": 1}
+        ],
+        "pageId3_getAllWidgets_main": [
+          {"id": "infinite-widget", "depth": 2}
+        ]
+      }
+    },
+    "behavior_combinations": {
+      "description": "Test different inheritance behavior combinations",
+      "pages": {
+        "1": {
+          "id": 1, 
+          "title": "Parent",
+          "slug": "parent",
+          "parent_id": null,
+          "widgets": {
+            "main": [
+              {
+                "id": "parent-widget-1",
+                "type": "ContentWidget",
+                "inheritanceBehavior": "insert_after_parent",
+                "isPublished": true,
+                "inheritanceLevel": -1,
+                "order": 0
+              },
+              {
+                "id": "parent-widget-2", 
+                "type": "ContentWidget",
+                "inheritanceBehavior": "insert_after_parent",
+                "isPublished": true,
+                "inheritanceLevel": -1,
+                "order": 1
+              }
+            ]
+          }
+        },
+        "2": {
+          "id": 2,
+          "title": "Child Override",
+          "slug": "child-override", 
+          "parent_id": 1,
+          "widgets": {
+            "main": [
+              {
+                "id": "override-widget",
+                "type": "ContentWidget",
+                "inheritanceBehavior": "override_parent",
+                "isPublished": true, 
+                "inheritanceLevel": -1,
+                "order": 0
+              }
+            ]
+          }
+        },
+        "3": {
+          "id": 3,
+          "title": "Child Before",
+          "slug": "child-before",
+          "parent_id": 1,
+          "widgets": {
+            "main": [
+              {
+                "id": "before-widget", 
+                "type": "ContentWidget",
+                "inheritanceBehavior": "insert_before_parent",
+                "isPublished": true,
+                "inheritanceLevel": -1,
+                "order": 0
+              }
+            ]
+          }
+        },
+        "4": {
+          "id": 4,
+          "title": "Child After",
+          "slug": "child-after",
+          "parent_id": 1, 
+          "widgets": {
+            "main": [
+              {
+                "id": "after-widget",
+                "type": "ContentWidget",
+                "inheritanceBehavior": "insert_after_parent", 
+                "isPublished": true,
+                "inheritanceLevel": -1,
+                "order": 0
+              }
+            ]
+          }
+        }
+      },
+      "expectedResults": {
+        "pageId2_getMergedWidgets_main": [
+          {"id": "override-widget", "note": "Overrides all parent widgets"}
+        ],
+        "pageId3_getMergedWidgets_main": [
+          {"id": "before-widget", "note": "Before parent"},
+          {"id": "parent-widget-1", "note": "Parent widget 1"},
+          {"id": "parent-widget-2", "note": "Parent widget 2"}
+        ],
+        "pageId4_getMergedWidgets_main": [
+          {"id": "parent-widget-1", "note": "Parent widget 1"}, 
+          {"id": "parent-widget-2", "note": "Parent widget 2"},
+          {"id": "after-widget", "note": "After parent"}
+        ]
+      }
+    }
+  }
+}

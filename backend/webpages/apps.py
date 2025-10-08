@@ -8,8 +8,12 @@ class WebpagesConfig(AppConfig):
     def ready(self):
         """
         Called when the app is ready.
-        Triggers layout and widget type autodiscovery to register all classes.
+        Triggers layout and widget type autodiscovery and imports cache invalidation signals.
         """
+        # Import signals for cache invalidation
+        # TODO: Temporarily disabled - check if causing save issues
+        # import webpages.signals
+
         # Import here to avoid circular imports
         from .layout_autodiscovery import (
             autodiscover_layouts,
