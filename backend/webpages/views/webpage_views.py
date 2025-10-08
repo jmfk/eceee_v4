@@ -234,10 +234,6 @@ class WebPageViewSet(viewsets.ModelViewSet):
 
         except Exception as e:
             # Fallback to old system
-            print(f"Tree generation error: {e}")
-            import traceback
-
-            traceback.print_exc()
             return self._widget_inheritance_legacy(page)
 
     def _widget_inheritance_legacy(self, page):

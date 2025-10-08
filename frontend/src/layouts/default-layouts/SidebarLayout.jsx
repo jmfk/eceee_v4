@@ -16,10 +16,6 @@ export const SidebarLayout = ({
     inheritedWidgets = {},
     slotInheritanceRules = {}
 }) => {
-    console.log("SidebarLayout")
-    console.log("inheritedWidgets", inheritedWidgets)
-    console.log("slotInheritanceRules", slotInheritanceRules)
-
     return (
         <div className="sidebar-layout w-full h-full overflow-y-auto bg-gray-50">
             <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6 max-w-7xl mx-auto p-6 pb-20">
