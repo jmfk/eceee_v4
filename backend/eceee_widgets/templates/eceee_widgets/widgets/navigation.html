@@ -2,6 +2,8 @@
 
 <nav class="navigation-widget">
     <ul class="nav-container">
-        <li><a href="">Nav row 1</a></li>
+        {% for menu in config.menu_items %}
+            <li><a href="{{menu.url}}">{{menu.label}}</a></li>
+        {% endfor %}
     </ul>
 </nav>

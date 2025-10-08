@@ -78,21 +78,23 @@ const ItemsListField = ({
         [widgetId, fieldName]
     )
 
-    // Local state for items
-    const [items, setItems] = useState(() => Array.isArray(value) ? value : [])
+    // Ref-based data storage (no re-render on data updates)
+    const itemsRef = useRef(Array.isArray(value) ? value : [])
+
+    // Manual re-render mechanism
+    const [renderKey, setRenderKey] = useState(0)
+    const forceRerender = useCallback(() => {
+        setRenderKey(prev => prev + 1)
+    }, [])
+
+    // UI state (keeps re-rendering for UI interactions)
     const [expandedItems, setExpandedItems] = useState(new Set())
     const [itemErrors, setItemErrors] = useState({})
     const lastAddedIndex = useRef(null)
-    const itemsRef = useRef(items)
-
-    // Keep ref in sync
-    useEffect(() => {
-        itemsRef.current = items
-    }, [items])
 
     // Subscribe to UDC external changes
     // useExternalChanges is a hook that handles useEffect internally
-    useExternalChanges(componentId, (state) => {
+    useExternalChanges(componentId, (state, metadata) => {
         if (!widgetId || !slotName || !contextType || !fieldName) {
             return
         }
@@ -100,9 +102,20 @@ const ItemsListField = ({
         const widget = lookupWidget(state, widgetId, slotName, contextType, widgetPath)
         if (widget && widget.config && widget.config[fieldName]) {
             const newItems = widget.config[fieldName]
+
             // Only update if items actually changed
             if (JSON.stringify(newItems) !== JSON.stringify(itemsRef.current)) {
-                setItems(Array.isArray(newItems) ? newItems : [])
+                // Check if change is from a sub-component (ItemForm within this list)
+                const isSubComponentUpdate = metadata?.sourceId?.startsWith(componentId + '-item-')
+
+                if (isSubComponentUpdate) {
+                    // Silent update - just sync ref, no re-render
+                    itemsRef.current = Array.isArray(newItems) ? newItems : []
+                } else {
+                    // External update - sync ref AND re-render
+                    itemsRef.current = Array.isArray(newItems) ? newItems : []
+                    forceRerender()
+                }
             }
         }
     })
@@ -135,7 +148,7 @@ const ItemsListField = ({
             setExpandedItems(newExpanded)
             lastAddedIndex.current = null
         }
-    }, [items.length, autoExpandNew, accordionMode])
+    }, [renderKey, autoExpandNew, accordionMode])
 
     // Generate a label for an item
     const getItemLabel = useCallback((item, index) => {
@@ -183,24 +196,25 @@ const ItemsListField = ({
     // Add new item
     const handleAddItem = useCallback(async () => {
         if (disabled || !allowAdd) return
-        if (maxItems && items.length >= maxItems) return
+        if (maxItems && itemsRef.current.length >= maxItems) return
 
         // Create default item from schema or use provided default
         const newItem = defaultItem
             ? (typeof defaultItem === 'function' ? defaultItem() : { ...defaultItem })
             : parsedSchema.defaultValues || {}
 
-        const newItems = [...items, newItem]
+        const newItems = [...itemsRef.current, newItem]
         lastAddedIndex.current = newItems.length - 1
-        setItems(newItems)
+        itemsRef.current = newItems
+        forceRerender()
         await publishItemsUpdate(newItems)
-    }, [disabled, allowAdd, maxItems, items, defaultItem, parsedSchema, publishItemsUpdate])
+    }, [disabled, allowAdd, maxItems, defaultItem, parsedSchema, publishItemsUpdate, forceRerender])
 
     // Remove item
     const handleRemoveItem = useCallback(async (index) => {
         if (disabled || !allowRemove) return
 
-        const newItems = items.filter((_, i) => i !== index)
+        const newItems = itemsRef.current.filter((_, i) => i !== index)
 
         // Update expanded items set
         setExpandedItems(prev => {
@@ -222,9 +236,10 @@ const ItemsListField = ({
             return newErrors
         })
 
-        setItems(newItems)
+        itemsRef.current = newItems
+        forceRerender()
         await publishItemsUpdate(newItems)
-    }, [disabled, allowRemove, items, publishItemsUpdate])
+    }, [disabled, allowRemove, publishItemsUpdate, forceRerender])
 
 
     // Move item (for reordering)
@@ -232,7 +247,7 @@ const ItemsListField = ({
         if (disabled || !allowReorder) return
         if (fromIndex === toIndex) return
 
-        const newItems = [...items]
+        const newItems = [...itemsRef.current]
         const [movedItem] = newItems.splice(fromIndex, 1)
         newItems.splice(toIndex, 0, movedItem)
 
@@ -259,15 +274,16 @@ const ItemsListField = ({
             return newExpanded
         })
 
-        setItems(newItems)
+        itemsRef.current = newItems
+        forceRerender()
         await publishItemsUpdate(newItems)
-    }, [disabled, allowReorder, items, publishItemsUpdate])
+    }, [disabled, allowReorder, publishItemsUpdate, forceRerender])
 
     // Validation
     const hasError = validation && !validation.isValid
-    const canAddMore = !maxItems || items.length < maxItems
-    const needsMore = minItems && items.length < minItems
-    console.log("render::ItemsListField")
+    const canAddMore = !maxItems || itemsRef.current.length < maxItems
+    const needsMore = minItems && itemsRef.current.length < minItems
+
     return (
         <div className="space-y-1">
             {/* Label */}
@@ -285,9 +301,9 @@ const ItemsListField = ({
                     <div className="flex items-center space-x-2">
                         <List className="w-4 h-4 text-gray-600" />
                         <span className="text-sm font-medium text-gray-900">
-                            {items.length} {items.length === 1 ? 'Item' : 'Items'}
+                            {itemsRef.current.length} {itemsRef.current.length === 1 ? 'Item' : 'Items'}
                             {maxItems && ` (max ${maxItems})`}
-                            {needsMore && <span className="text-red-600 ml-2">• {minItems - items.length} more required</span>}
+                            {needsMore && <span className="text-red-600 ml-2">• {minItems - itemsRef.current.length} more required</span>}
                         </span>
                     </div>
 
@@ -307,7 +323,7 @@ const ItemsListField = ({
 
                 {/* Items List */}
                 <div className="divide-y divide-gray-200">
-                    {items.length === 0 ? (
+                    {itemsRef.current.length === 0 ? (
                         <div className="p-8 text-center">
                             <List className="w-12 h-12 mx-auto mb-3 text-gray-300" />
                             <p className="text-sm text-gray-500 mb-4">{emptyText}</p>
@@ -323,9 +339,9 @@ const ItemsListField = ({
                             )}
                         </div>
                     ) : (
-                        items.map((item, index) => (
+                        itemsRef.current.map((item, index) => (
                             <ItemCard
-                                key={index}
+                                key={`${renderKey}-${index}`}
                                 initialItem={item}
                                 index={index}
                                 labelTemplate={itemLabelTemplate}
@@ -333,11 +349,11 @@ const ItemsListField = ({
                                 onToggle={() => toggleItemExpansion(index)}
                                 onRemove={allowRemove ? () => handleRemoveItem(index) : null}
                                 onMoveUp={allowReorder && index > 0 ? () => handleMoveItem(index, index - 1) : null}
-                                onMoveDown={allowReorder && index < items.length - 1 ? () => handleMoveItem(index, index + 1) : null}
+                                onMoveDown={allowReorder && index < itemsRef.current.length - 1 ? () => handleMoveItem(index, index + 1) : null}
                                 schema={parsedSchema}
                                 disabled={disabled}
                                 errors={itemErrors[index]}
-                                context={{ ...context, fieldName }}
+                                context={{ ...context, fieldName, parentComponentId: componentId }}
                             />
                         ))
                     )}

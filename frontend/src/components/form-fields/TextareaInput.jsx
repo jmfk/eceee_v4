@@ -31,7 +31,8 @@ const TextareaInput = ({
     const isOverLimit = maxLength && characterCount > maxLength
 
     const handleChange = (e) => {
-        if (maxLength && e.target.value.length > maxLength) {
+        const newValue = e?.target?.value ?? e
+        if (maxLength && newValue && newValue.length > maxLength) {
             return // Don't allow input beyond max length
         }
         onChange(e)
@@ -45,18 +46,25 @@ const TextareaInput = ({
         isValidating,
         disabled,
         placeholder,
-        rows: autoResize ? undefined : rows,
         maxLength,
-        style: autoResize ? {
+        ...props
+    }
+
+    // Handle rows attribute
+    if (autoResize) {
+        // Explicitly set to null so ValidatedInput knows not to add default
+        inputProps.rows = null
+        inputProps.style = {
             minHeight: `${rows * 1.5}rem`,
             resize: 'none',
             overflow: 'hidden'
-        } : undefined,
-        onInput: autoResize ? (e) => {
+        }
+        inputProps.onInput = (e) => {
             e.target.style.height = 'auto'
             e.target.style.height = e.target.scrollHeight + 'px'
-        } : undefined,
-        ...props
+        }
+    } else {
+        inputProps.rows = rows
     }
 
     // Add either value or defaultValue, but never both

@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Check } from 'lucide-react'
 
 /**
@@ -22,10 +22,24 @@ const BooleanInput = ({
     ...props
 }) => {
     const isControlled = value !== undefined
-    const currentValue = isControlled ? value : defaultValue
+
+    // For toggle variant in uncontrolled mode, we need local state
+    // (buttons don't have native state management like inputs)
+    const [localValue, setLocalValue] = useState(defaultValue ?? false)
+
+    // Current value depends on mode
+    const currentValue = isControlled ? value : localValue
 
     const handleChange = (e) => {
         onChange(e.target.checked)
+    }
+
+    const handleToggleClick = () => {
+        const newValue = !currentValue
+        if (!isControlled) {
+            setLocalValue(newValue)
+        }
+        onChange(newValue)
     }
 
     // Get validation status for styling
@@ -55,7 +69,7 @@ const BooleanInput = ({
                         type="button"
                         role="switch"
                         aria-checked={!!currentValue}
-                        onClick={() => onChange(!currentValue)}
+                        onClick={handleToggleClick}
                         disabled={disabled}
                         className={`
                             relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent 

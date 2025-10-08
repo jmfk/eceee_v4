@@ -6,12 +6,14 @@ import { Minus, Plus } from 'lucide-react'
  * 
  * Range slider input with numeric display and optional step buttons.
  * Supports custom formatting and validation.
+ * Supports both controlled (value) and uncontrolled (defaultValue) modes.
  * 
  * Optimized with React.memo, useCallback, and local state management
  * to prevent unnecessary re-renders.
  */
 const SliderInput = React.memo(({
     value,
+    defaultValue,
     onChange,
     validation,
     isValidating,
@@ -30,15 +32,16 @@ const SliderInput = React.memo(({
     marks = [], // Array of {value, label} for tick marks
     ...props
 }) => {
-    const [localValue, setLocalValue] = useState(value || min)
+    const isControlled = value !== undefined
+    const [localValue, setLocalValue] = useState(isControlled ? (value || min) : (defaultValue || min))
     const [isDragging, setIsDragging] = useState(false)
 
-    // Sync local value with prop value only when not dragging
+    // Sync local value with prop value only when controlled and not dragging
     useEffect(() => {
-        if (value !== localValue && !isDragging) {
+        if (isControlled && value !== localValue && !isDragging) {
             setLocalValue(value || min)
         }
-    }, [value, min, isDragging, localValue])
+    }, [value, min, isDragging, localValue, isControlled])
 
     const handleSliderChange = useCallback((e) => {
         const newValue = Number(e.target.value)

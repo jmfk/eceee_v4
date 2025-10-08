@@ -1,14 +1,16 @@
 import React, { useState } from 'react'
-import { Star, Heart, ThumbsUp, Circle, Square, Triangle } from 'lucide-react'
+import { Star, Heart, ThumbsUp, Circle, Square, Triangle, X } from 'lucide-react'
 
 /**
  * RatingInput Component
  * 
  * Rating input with customizable icons (stars, hearts, etc.) and interactive feedback.
  * Supports half-ratings, hover effects, and custom rating scales.
+ * Supports both controlled (value) and uncontrolled (defaultValue) modes.
  */
 const RatingInput = ({
     value,
+    defaultValue,
     onChange,
     validation,
     isValidating,
@@ -28,6 +30,9 @@ const RatingInput = ({
     readOnly = false,
     ...props
 }) => {
+    const isControlled = value !== undefined
+    const [localValue, setLocalValue] = useState(defaultValue || 0)
+    const currentValue = isControlled ? value : localValue
     const [hoverValue, setHoverValue] = useState(null)
 
     // Icon components mapping
@@ -85,11 +90,17 @@ const RatingInput = ({
     const handleRatingClick = (rating) => {
         if (disabled || readOnly) return
 
-        if (allowClear && value === rating) {
-            onChange(null) // Clear rating if clicking same value
+        let newValue
+        if (allowClear && currentValue === rating) {
+            newValue = null // Clear rating if clicking same value
         } else {
-            onChange(rating)
+            newValue = rating
         }
+
+        if (!isControlled) {
+            setLocalValue(newValue)
+        }
+        onChange(newValue)
     }
 
     // Handle hover
@@ -104,13 +115,13 @@ const RatingInput = ({
 
     // Determine if icon should be filled
     const isIconFilled = (rating) => {
-        const currentValue = hoverValue !== null ? hoverValue : (value || 0)
+        const displayValue = hoverValue !== null ? hoverValue : (currentValue || 0)
 
         if (precision === 1) {
-            return rating <= currentValue
+            return rating <= displayValue
         } else {
             // Handle half ratings
-            return rating <= currentValue
+            return rating <= displayValue
         }
     }
 
@@ -161,10 +172,15 @@ const RatingInput = ({
                     ))}
 
                     {/* Clear Button */}
-                    {allowClear && value && !disabled && !readOnly && (
+                    {allowClear && currentValue && !disabled && !readOnly && (
                         <button
                             type="button"
-                            onClick={() => onChange(null)}
+                            onClick={() => {
+                                if (!isControlled) {
+                                    setLocalValue(null)
+                                }
+                                onChange(null)
+                            }}
                             className="ml-2 p-1 text-gray-400 hover:text-gray-600 transition-colors"
                             title="Clear rating"
                         >
@@ -177,9 +193,9 @@ const RatingInput = ({
                 {showValue && (
                     <div className="flex items-center space-x-2">
                         <span className="text-sm font-medium text-gray-700">
-                            {value ? `${value}/${max}` : 'No rating'}
+                            {currentValue ? `${currentValue}/${max}` : 'No rating'}
                         </span>
-                        {hoverValue !== null && hoverValue !== value && (
+                        {hoverValue !== null && hoverValue !== currentValue && (
                             <span className="text-sm text-gray-500">
                                 (hover: {hoverValue}/{max})
                             </span>
@@ -188,9 +204,9 @@ const RatingInput = ({
                 )}
 
                 {/* Labels */}
-                {showLabels && (hoverValue !== null || value) && (
+                {showLabels && (hoverValue !== null || currentValue) && (
                     <div className="text-sm text-gray-600">
-                        {getRatingLabel(hoverValue || value)}
+                        {getRatingLabel(hoverValue || currentValue)}
                     </div>
                 )}
 
