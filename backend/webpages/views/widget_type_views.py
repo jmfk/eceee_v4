@@ -210,7 +210,6 @@ def find_pydantic_model(model_name: str):
     Searches through:
     - default_widgets.widgets
     - eceee_widgets.widgets
-    - example_custom_widgets.widgets
     - Any other registered widget modules
 
     Args:
@@ -234,9 +233,8 @@ def find_pydantic_model(model_name: str):
     # Also add common widget module paths
     widget_modules.update(
         [
-            "default_widgets.widgets",
+            # "default_widgets.widgets",
             "eceee_widgets.widgets",
-            "example_custom_widgets.widgets",
         ]
     )
 
@@ -285,9 +283,8 @@ def pydantic_model_schema(request, model_name):
     Returns:
         JSON schema for the Pydantic model, including json_schema_extra metadata
     """
-    print("pydantic_model_schema", model_name)
     model_class = find_pydantic_model(model_name)
-    print("model_class", model_class)
+
     if model_class is None:
         return Response(
             {

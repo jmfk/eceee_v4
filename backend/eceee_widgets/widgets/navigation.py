@@ -59,9 +59,9 @@ class NavigationConfig(BaseModel):
         populate_by_name=True,
     )
 
-    menus: Optional[Literal["pageSections", "pageSubmenu", "none"]] = Field(
-        default="none",
-        description="Menu type to display",
+    menus: Dict[str, Any] = Field(
+        default_factory=lambda: {"activeGroup": "none", "formData": {}},
+        description="Menu configuration (stores active group and all form data)",
         json_schema_extra={
             "component": "ConditionalGroupField",
             "groups": {
@@ -77,16 +77,6 @@ class NavigationConfig(BaseModel):
                     "label": "None",
                 },
             },
-        },
-    )
-
-    menus_config: Optional[
-        Union[PageSectionConfig, PageSubmenuConfig, Dict[str, Any]]
-    ] = Field(
-        default=None,
-        description="Configuration data for the selected menu type",
-        json_schema_extra={
-            "hidden": True,  # Hidden from UI - managed by ConditionalGroupField
         },
     )
 

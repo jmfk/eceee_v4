@@ -33,7 +33,8 @@ import SelectInput from './SelectInput'
  * />
  */
 const ConditionalGroupField = ({
-    value, // Current active group (e.g., "internal", "external", "none") - from UDC
+    value = {}, // Complex value: {activeGroup: "pageSections", formData: {pageSections: {...}, ...}}
+    onChange, // Called with full value object when changed
     validation,
     isValidating,
     label,
@@ -43,11 +44,13 @@ const ConditionalGroupField = ({
     // ConditionalGroupField-specific props
     groups = {}, // Group configuration from json_schema_extra
     variant = 'buttons', // 'buttons' or 'selectbox'
-    formData = {}, // Current form data for active group (camelCase)
     context = {}, // UDC context
-    fieldName, // Field name for this conditional group field
+    fieldName, // Field name (for UDC publishing)
     ...props
 }) => {
+    // Destructure the complex value
+    const { activeGroup: initialActiveGroup, formData: initialFormData } = value
+
     // Extract UDC context
     const widgetId = context?.widgetId
     const slotName = context?.slotName
@@ -66,40 +69,31 @@ const ConditionalGroupField = ({
         return `conditional-group-${widgetId || 'preview'}-${fieldName || 'group'}`
     }, [parentComponentId, widgetId, fieldName])
 
-    // Helper to get initial form data from UDC
-    const getFormDataFromUDC = useCallback(() => {
-        if (widgetId && slotName && contextType && fieldName && getState) {
-            const state = getState()
-            const widget = lookupWidget(state, widgetId, slotName, contextType, widgetPath)
-            if (widget && widget.config) {
-                return widget.config[`${fieldName}Config`] || {}
-            }
-        }
-        return formData || {}
-    }, [widgetId, slotName, contextType, fieldName, getState, widgetPath, formData])
-
     // Local state
-    const [activeGroup, setActiveGroup] = useState(value || Object.keys(groups)[0] || 'none')
+    const [activeGroup, setActiveGroup] = useState(initialActiveGroup || Object.keys(groups)[0] || 'none')
     const [schemas, setSchemas] = useState({}) // Fetched Pydantic model schemas
     const [schemaLoading, setSchemaLoading] = useState({}) // Loading state per group
     const [schemaErrors, setSchemaErrors] = useState({}) // Error state per group
     const [formKey, setFormKey] = useState(0) // Force remount when switching groups
 
-    // Ref for form data (uncontrolled like ItemForm) - initialize lazily
-    const formDataRef = useRef(null)
+    // Ref for ALL groups' form data (uncontrolled like ItemForm)
+    // Structure: {pageSections: {...}, pageSubmenu: {...}, none: {}}
+    const formDataRef = useRef(initialFormData || {})
 
-    // Initialize ref from UDC on first render
-    if (formDataRef.current === null) {
-        formDataRef.current = getFormDataFromUDC()
-    }
-
-    // Update ref when formData prop changes (external changes)
+    // Update ref when value prop changes (external changes)
     useEffect(() => {
-        if (JSON.stringify(formData) !== JSON.stringify(formDataRef.current)) {
-            formDataRef.current = formData || {}
-            setFormKey(prev => prev + 1) // Force remount
+        const externalActiveGroup = value?.activeGroup
+        const externalFormData = value?.formData || {}
+
+        if (externalActiveGroup && externalActiveGroup !== activeGroup) {
+            setActiveGroup(externalActiveGroup)
+            formDataRef.current = externalFormData
+            setFormKey(prev => prev + 1)
+        } else if (JSON.stringify(externalFormData) !== JSON.stringify(formDataRef.current)) {
+            formDataRef.current = externalFormData
+            setFormKey(prev => prev + 1)
         }
-    }, [formData])
+    }, [value, activeGroup])
 
     // Fetch schema for a config model
     const fetchSchema = useCallback(async (modelName, groupKey) => {
@@ -137,19 +131,24 @@ const ConditionalGroupField = ({
         }
 
         const widget = lookupWidget(state, widgetId, slotName, contextType, widgetPath)
-        if (widget && widget.config) {
-            const externalActiveGroup = widget.config[fieldName]
-            const externalFormData = widget.config[`${fieldName}Config`] || {}  // Note: camelCase suffix
+        if (widget && widget.config && widget.config[fieldName]) {
+            const externalValue = widget.config[fieldName]  // Full complex value
+            const externalActiveGroup = externalValue.activeGroup
+            const externalFormData = externalValue.formData || {}
 
             // Check if change is from this component (internal change)
             const isInternalChange = metadata?.sourceId === componentId
 
-            // Check if external change differs from our current state
+            // Handle active group change
             if (externalActiveGroup !== activeGroup) {
                 setActiveGroup(externalActiveGroup)
                 formDataRef.current = externalFormData
-                setFormKey(prev => prev + 1)
-            } else if (JSON.stringify(externalFormData) !== JSON.stringify(formDataRef.current)) {
+                setFormKey(prev => prev + 1)  // Remount to show new group's data
+                return
+            }
+
+            // Handle form data changes (compare full dict)
+            if (JSON.stringify(externalFormData) !== JSON.stringify(formDataRef.current)) {
                 if (isInternalChange) {
                     // Internal change (from our own field edits) - just sync ref, no remount
                     formDataRef.current = externalFormData
@@ -169,9 +168,18 @@ const ConditionalGroupField = ({
 
         setActiveGroup(newGroup)
 
-        // Clear form data when switching groups
-        formDataRef.current = {}
-        setFormKey(prev => prev + 1) // Force form remount
+        // DON'T clear form data - all groups' data is preserved in formDataRef
+        // Just switch which group we're viewing
+        setFormKey(prev => prev + 1) // Force form remount to show new group's data
+
+        // Create new value object
+        const newValue = {
+            activeGroup: newGroup,
+            formData: formDataRef.current  // ALL groups' data preserved
+        }
+
+        // Call onChange if provided
+        onChange?.(newValue)
 
         // Publish to UDC - Get current config and merge
         if (publishUpdate && widgetId && slotName && contextType && fieldName && getState) {
@@ -184,23 +192,39 @@ const ConditionalGroupField = ({
                 slotName: slotName,
                 contextType: contextType,
                 config: {
-                    ...currentConfig,  // Preserve existing config
-                    [fieldName]: newGroup,
-                    [`${fieldName}Config`]: {}  // Note: camelCase suffix
+                    ...currentConfig,  // Preserve existing config (menuItems, etc.)
+                    [fieldName]: newValue  // Single complex value
                 },
                 widgetPath: widgetPath && widgetPath.length > 0 ? widgetPath : undefined
             })
         }
-    }, [disabled, activeGroup, publishUpdate, widgetId, slotName, contextType, fieldName, widgetPath, componentId, getState])
+    }, [disabled, activeGroup, onChange, publishUpdate, widgetId, slotName, contextType, fieldName, widgetPath, componentId, getState])
 
     // Handle field changes within active form
     const handleFieldChange = useCallback(async (changedFieldName, fieldValue) => {
-        console.log("handleFieldChange", changedFieldName, fieldValue, "fieldName", fieldName)
-        // Update ref (no re-render)
-        formDataRef.current = {
-            ...formDataRef.current,
+        // Get current group's data
+        const currentGroupData = formDataRef.current[activeGroup] || {}
+
+        // Update only the active group's data
+        const updatedGroupData = {
+            ...currentGroupData,
             [changedFieldName]: fieldValue
         }
+
+        // Update ref with new group data (no re-render)
+        formDataRef.current = {
+            ...formDataRef.current,
+            [activeGroup]: updatedGroupData
+        }
+
+        // Create new value object
+        const newValue = {
+            activeGroup: activeGroup,
+            formData: formDataRef.current  // ALL groups' data
+        }
+
+        // Call onChange if provided
+        onChange?.(newValue)
 
         // Publish to UDC - Get current config and merge
         if (publishUpdate && widgetId && slotName && contextType && fieldName && getState) {
@@ -213,14 +237,13 @@ const ConditionalGroupField = ({
                 slotName: slotName,
                 contextType: contextType,
                 config: {
-                    ...currentConfig,  // Preserve existing config
-                    [fieldName]: activeGroup,
-                    [`${fieldName}Config`]: formDataRef.current  // Note: camelCase suffix
+                    ...currentConfig,  // Preserve existing config (menuItems, etc.)
+                    [fieldName]: newValue  // Single complex value
                 },
                 widgetPath: widgetPath && widgetPath.length > 0 ? widgetPath : undefined
             })
         }
-    }, [publishUpdate, widgetId, slotName, contextType, fieldName, activeGroup, widgetPath, componentId, getState])
+    }, [publishUpdate, widgetId, slotName, contextType, fieldName, activeGroup, widgetPath, componentId, getState, onChange])
 
     // Prepare group options for selector
     const groupOptions = useMemo(() => {
@@ -240,7 +263,6 @@ const ConditionalGroupField = ({
 
     // Render form fields from schema
     const renderFormFields = () => {
-        console.log("renderFormFields")
         if (!hasConfigModel) {
             // "none" option or group without configModel
             return (
@@ -283,17 +305,19 @@ const ConditionalGroupField = ({
         const properties = schema.properties || {}
         const requiredFields = schema.required || []
 
+        // Get current group's data from the full dict
+        const currentGroupData = formDataRef.current[activeGroup] || {}
+
         return (
             <div key={formKey} className="space-y-4 mt-4">
                 {Object.entries(properties).map(([propName, propSchema]) => {
-                    const fieldValue = formDataRef.current[propName] || ''
+                    const fieldValue = currentGroupData[propName] || ''  // Read from active group's data
                     const isRequired = requiredFields.includes(propName)
 
                     // Determine component from json_schema_extra or type
                     const componentName = propSchema.component ||
                         propSchema.control_type ||
                         mapSchemaTypeToComponent(propSchema)
-                    console.log("fieldValue", fieldValue)
                     const fieldProps = {
                         label: propSchema.title || propName,
                         description: propSchema.description,
@@ -305,8 +329,7 @@ const ConditionalGroupField = ({
                         validation: validation?.[propName],
                         ...propSchema // Pass all schema props (options, min, max, etc.)
                     }
-                    console.log("componentName", componentName)
-                    console.log(fieldProps)
+
                     return (
                         <DynamicFieldLoader
                             key={propName}
@@ -418,7 +441,7 @@ const DynamicFieldLoader = ({ componentName, fieldProps }) => {
             </div>
         )
     }
-    console.log(FieldComponent)
+
     return <FieldComponent {...fieldProps} />
 }
 

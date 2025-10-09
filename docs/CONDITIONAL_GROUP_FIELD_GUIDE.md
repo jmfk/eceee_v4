@@ -123,33 +123,50 @@ class ExternalLinkConfig(BaseModel):
     )
 ```
 
-### Step 2: Add Storage Field
+### Step 2: Define the Field
 
-ConditionalGroupField needs TWO fields in your config model:
-
-1. **Selector field**: Which group is active
-2. **Config field**: The form data for the active group
+ConditionalGroupField uses a **single field** that stores a complex value containing both the active group and all form data:
 
 ```python
-from typing import Union, Dict, Any
+from typing import Dict, Any
 
 class MyWidgetConfig(BaseModel):
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
     
-    # Field 1: Group selector
-    link_type: Literal["internal", "external", "none"] = Field(...)
-    
-    # Field 2: Config storage (name must be {selector_field}_config)
-    link_type_config: Optional[Union[InternalLinkConfig, ExternalLinkConfig, Dict[str, Any]]] = Field(
-        default=None,
-        description="Configuration data for the selected link type",
+    # Single field storing complete state
+    link_type: Dict[str, Any] = Field(
+        default_factory=lambda: {"activeGroup": "none", "formData": {}},
+        description="Link type and configuration",
         json_schema_extra={
-            "hidden": True,  # Don't show in UI - managed by ConditionalGroupField
-        },
+            "component": "ConditionalGroupField",
+            "groups": {
+                "internal": {
+                    "label": "Internal",
+                    "config_model": "InternalLinkConfig"
+                },
+                "external": {
+                    "label": "External",
+                    "config_model": "ExternalLinkConfig"
+                },
+                "none": {
+                    "label": "None"
+                }
+            }
+        }
     )
 ```
 
-**Important**: The config field name MUST be `{selector_field}_config` (with underscore). The frontend will access it as `{selectorField}Config` (camelCase).
+**Value Structure:**
+```python
+{
+    "activeGroup": "internal",  # Which group is currently selected
+    "formData": {               # All groups' data preserved
+        "internal": {"pageId": "123", "label": "Home"},
+        "external": {"url": "https://...", "label": "Link"},
+        "none": {}
+    }
+}
+```
 
 ### Step 3: Use in Widget Config
 
@@ -197,26 +214,32 @@ If you need to use it programmatically:
 import ConditionalGroupField from './components/form-fields/ConditionalGroupField'
 
 <ConditionalGroupField
-    value="internal"
-    onChange={handleGroupChange}
+    value={{
+        activeGroup: "internal",
+        formData: {
+            internal: { pageId: "123", label: "Home" },
+            external: { url: "https://...", label: "Link" },
+            none: {}
+        }
+    }}
+    onChange={handleChange}
     groups={{
         internal: { 
             label: "Internal", 
             icon: "FileText", 
-            config_model: "InternalLinkConfig" 
+            configModel: "InternalLinkConfig" 
         },
         external: { 
             label: "External", 
             icon: "ExternalLink", 
-            config_model: "ExternalLinkConfig" 
+            configModel: "ExternalLinkConfig" 
         },
         none: { 
             label: "None" 
         }
     }}
-    formData={{ pageId: "123", label: "Home" }}
-    onFormDataChange={handleFormDataChange}
     variant="buttons"
+    fieldName="linkType"
     context={{
         widgetId: "widget-1",
         slotName: "main",
@@ -265,7 +288,9 @@ GET /api/webpages/pydantic-models/{model_name}/schema/
 ### 1. Link Types
 
 ```python
-link_type: Literal["internal", "external", "download"] = Field(
+link_type: Dict[str, Any] = Field(
+    default_factory=lambda: {"activeGroup": "internal", "formData": {}},
+    description="Link type configuration",
     json_schema_extra={
         "component": "ConditionalGroupField",
         "groups": {
@@ -289,7 +314,9 @@ link_type: Literal["internal", "external", "download"] = Field(
 ### 2. Media Sources
 
 ```python
-source_type: Literal["upload", "url", "embed"] = Field(
+source_type: Dict[str, Any] = Field(
+    default_factory=lambda: {"activeGroup": "upload", "formData": {}},
+    description="Media source configuration",
     json_schema_extra={
         "component": "ConditionalGroupField",
         "variant": "selectbox",
@@ -317,7 +344,9 @@ source_type: Literal["upload", "url", "embed"] = Field(
 ### 3. Content Types
 
 ```python
-content_type: Literal["text", "video", "gallery", "form"] = Field(
+content_type: Dict[str, Any] = Field(
+    default_factory=lambda: {"activeGroup": "text", "formData": {}},
+    description="Content type configuration",
     json_schema_extra={
         "component": "ConditionalGroupField",
         "groups": {
@@ -349,16 +378,17 @@ content_type: Literal["text", "video", "gallery", "form"] = Field(
 ### 4. Menu Types (With None Option)
 
 ```python
-menu_type: Optional[Literal["page_sections", "page_submenu", "custom", "none"]] = Field(
-    default="none",
+menu_type: Dict[str, Any] = Field(
+    default_factory=lambda: {"activeGroup": "none", "formData": {}},
+    description="Menu type configuration",
     json_schema_extra={
         "component": "ConditionalGroupField",
         "groups": {
-            "page_sections": {
+            "pageSections": {
                 "label": "Page Sections",
                 "config_model": "PageSectionConfig"
             },
-            "page_submenu": {
+            "pageSubmenu": {
                 "label": "Page Submenu",
                 "config_model": "PageSubmenuConfig"
             },
@@ -395,44 +425,48 @@ menu_type: Optional[Literal["page_sections", "page_submenu", "custom", "none"]] 
 
 ## Data Storage
 
-The component stores data in two fields:
+The component stores data in a **single complex value** that contains both the active group and all form data:
 
-1. **Group selector field**: Stores the active group (e.g., `"internal"`, `"external"`, `"none"`)
-2. **Form data field**: Stores the configuration for the active group
-
-### Example Data Structure
+### Data Structure
 
 ```json
 {
-    "linkType": "internal",
-    "linkTypeConfig": {
-        "pageId": "123",
-        "label": "Home Page"
+    "linkType": {
+        "activeGroup": "internal",
+        "formData": {
+            "internal": {
+                "pageId": "123",
+                "label": "Home Page"
+            },
+            "external": {
+                "url": "https://example.com",
+                "label": "External Link",
+                "targetBlank": true
+            },
+            "none": {}
+        }
     }
 }
 ```
 
-Or for "none":
+### Benefits of This Approach
 
-```json
-{
-    "linkType": "none",
-    "linkTypeConfig": {}
-}
-```
+1. **Self-Contained**: Field owns its entire state (like any other field component)
+2. **No Data Loss**: All groups' data preserved when switching
+3. **Cleaner API**: Single value, not separate fields
+4. **Type Safe**: Can validate the structure if needed
+5. **Simpler Backend**: One field instead of two
 
 ## Component Props
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
-| `value` | `string` | First group | Currently active group |
-| `onChange` | `function` | - | Called when active group changes |
-| `groups` | `object` | `{}` | Group configuration |
+| `value` | `object` | `{activeGroup: "none", formData: {}}` | Complex value containing activeGroup and formData |
+| `onChange` | `function` | - | Called with full value object when changed |
+| `groups` | `object` | `{}` | Group configuration from json_schema_extra |
 | `variant` | `"buttons" \| "selectbox"` | `"buttons"` | Display variant |
-| `formData` | `object` | `{}` | Current form data (camelCase) |
-| `onFormDataChange` | `function` | - | Called when form fields change |
 | `context` | `object` | `{}` | UDC context for state management |
-| `fieldName` | `string` | - | Field name for this conditional group |
+| `fieldName` | `string` | - | Field name (required for UDC publishing) |
 | `label` | `string` | - | Field label |
 | `description` | `string` | - | Field description |
 | `required` | `boolean` | `false` | Whether field is required |
