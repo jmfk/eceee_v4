@@ -3,10 +3,16 @@ WidgetType ViewSet for managing code-based widget types.
 """
 
 import json
+import importlib
+import inspect
 from rest_framework import viewsets, status, permissions
-from rest_framework.decorators import action
+from rest_framework.decorators import (
+    action,
+    api_view,
+    permission_classes as dec_permission_classes,
+)
 from rest_framework.response import Response
-from pydantic import ValidationError
+from pydantic import ValidationError, BaseModel
 
 
 def format_pydantic_errors(pydantic_errors):
@@ -195,3 +201,110 @@ class WidgetTypeViewSet(viewsets.ViewSet):
             )
 
         return Response(widget_type.configuration_model.model_json_schema())
+
+
+def find_pydantic_model(model_name: str):
+    """
+    Find a Pydantic model by name across all widget modules.
+
+    Searches through:
+    - default_widgets.widgets
+    - eceee_widgets.widgets
+    - example_custom_widgets.widgets
+    - Any other registered widget modules
+
+    Args:
+        model_name: Name of the Pydantic model class (e.g., "PageSectionConfig")
+
+    Returns:
+        The Pydantic model class, or None if not found
+    """
+    from ..widget_registry import widget_type_registry
+
+    # Get all registered widget modules
+    widget_modules = set()
+    for widget_type in widget_type_registry.list_widget_types(active_only=False):
+        # Get the module where the widget is defined
+        widget_module = widget_type.__class__.__module__
+        # Extract the app and widgets path (e.g., "default_widgets.widgets")
+        if ".widgets." in widget_module:
+            base_module = widget_module.rsplit(".", 1)[0]
+            widget_modules.add(base_module)
+
+    # Also add common widget module paths
+    widget_modules.update(
+        [
+            "default_widgets.widgets",
+            "eceee_widgets.widgets",
+            "example_custom_widgets.widgets",
+        ]
+    )
+
+    # Search each module for the model
+    for module_path in widget_modules:
+        try:
+            module = importlib.import_module(module_path)
+            # Check if the module has submodules (e.g., navigation, content, etc.)
+            if hasattr(module, "__path__"):
+                # It's a package, search through all submodules
+                import pkgutil
+
+                for importer, modname, ispkg in pkgutil.iter_modules(module.__path__):
+                    try:
+                        submodule = importlib.import_module(f"{module_path}.{modname}")
+                        if hasattr(submodule, model_name):
+                            obj = getattr(submodule, model_name)
+                            # Verify it's a Pydantic model
+                            if inspect.isclass(obj) and issubclass(obj, BaseModel):
+                                return obj
+                    except (ImportError, AttributeError):
+                        continue
+            # Also check the module itself
+            if hasattr(module, model_name):
+                obj = getattr(module, model_name)
+                if inspect.isclass(obj) and issubclass(obj, BaseModel):
+                    return obj
+        except (ImportError, AttributeError):
+            continue
+
+    return None
+
+
+@api_view(["GET"])
+@dec_permission_classes([permissions.IsAuthenticated])
+def pydantic_model_schema(request, model_name):
+    """
+    API endpoint to fetch a Pydantic model's JSON schema by model name.
+
+    This is used by ConditionalGroupField to dynamically fetch schemas
+    for referenced config models.
+
+    Usage:
+        GET /api/v1/webpages/pydantic-models/PageSectionConfig/schema/
+
+    Returns:
+        JSON schema for the Pydantic model, including json_schema_extra metadata
+    """
+    print("pydantic_model_schema", model_name)
+    model_class = find_pydantic_model(model_name)
+    print("model_class", model_class)
+    if model_class is None:
+        return Response(
+            {
+                "error": f"Pydantic model '{model_name}' not found",
+                "detail": "Model must be defined in a widget module and be a subclass of BaseModel",
+            },
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    try:
+        schema = model_class.model_json_schema()
+        return Response({"model_name": model_name, "schema": schema})
+    except Exception as e:
+        return Response(
+            {
+                "error": f"Failed to generate schema for '{model_name}'",
+                "detail": str(e),
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )

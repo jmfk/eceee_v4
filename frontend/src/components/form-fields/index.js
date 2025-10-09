@@ -62,6 +62,9 @@ export { default as ObjectSelectorInput } from './ObjectSelectorInput'
 // List Components
 export { default as ItemsListField } from './ItemsListField'
 
+// Conditional Form Components
+export { default as ConditionalGroupField } from './ConditionalGroupField'
+
 // TODO: Add more components as they are implemented
 // export { default as AddressInput } from './AddressInput'
 
@@ -110,6 +113,8 @@ export const FIELD_COMPONENTS = {
     HtmlSource: () => import('../fields/HtmlSourceField'),
     // List Components
     ItemsListField: () => import('./ItemsListField'),
+    // Conditional Form Components
+    ConditionalGroupField: () => import('./ConditionalGroupField'),
     // TODO: Add more components
 }
 

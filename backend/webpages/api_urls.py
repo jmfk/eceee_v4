@@ -19,6 +19,7 @@ from .views import (
     render_page_backend,
     render_page_preview,
 )
+from .views.widget_type_views import pydantic_model_schema
 from .views.simplified_layout_views import (
     simplified_layout_json,
     simplified_layouts_list,
@@ -181,5 +182,11 @@ urlpatterns = [
         name="page-structure-summary",
     ),
     path("pages/search/", pages_search_view, name="pages-search"),
+    # Pydantic model schema endpoint for ConditionalGroupField
+    re_path(
+        r"^pydantic-models/(?P<model_name>[A-Za-z0-9_]+)/schema/$",
+        pydantic_model_schema,
+        name="pydantic-model-schema",
+    ),
     path("", include(router.urls)),
 ] + widget_type_patterns

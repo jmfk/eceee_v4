@@ -203,14 +203,6 @@ const PageEditor = () => {
         // Update local widgets from external UDC changes (other components/users)
         if (versionId && state.versions[versionId]?.widgets) {
             const externalWidgets = state.versions[versionId].widgets;
-
-            console.log('[PageEditor] useExternalChanges - Received UDC update:', {
-                widgetsBySlot: Object.entries(externalWidgets).reduce((acc, [slot, widgets]) => {
-                    acc[slot] = widgets.map((w, idx) => ({ position: idx, id: w.id, type: w.type }));
-                    return acc;
-                }, {})
-            });
-
             setLocalWidgets(externalWidgets);
 
             // Also update pageVersionData to keep persistence layer in sync
@@ -230,14 +222,6 @@ const PageEditor = () => {
 
     // Fast local widget update function
     const updateLocalWidgets = useCallback((updatedWidgets, options = {}) => {
-        console.log('[PageEditor] updateLocalWidgets called:', {
-            slots: Object.keys(updatedWidgets),
-            widgetsBySlot: Object.entries(updatedWidgets).reduce((acc, [slot, widgets]) => {
-                acc[slot] = widgets.map((w, idx) => ({ position: idx, id: w.id, type: w.type }));
-                return acc;
-            }, {})
-        });
-
         // 1. Immediate local state update (fast UI)
         setLocalWidgets(updatedWidgets);
 
@@ -814,13 +798,6 @@ const PageEditor = () => {
             // Collect current widget data (from pageVersionData) and any unsaved changes from ContentEditor
             collectedData.widgets = pageVersionData?.widgets || {};
 
-            console.log('[PageEditor] handleActualSave - Initial widgets from pageVersionData:', {
-                widgetsBySlot: Object.entries(collectedData.widgets).reduce((acc, [slot, widgets]) => {
-                    acc[slot] = widgets.map((w, idx) => ({ position: idx, id: w.id, type: w.type }));
-                    return acc;
-                }, {})
-            });
-
             if (contentEditorRef.current && contentEditorRef.current.saveWidgets) {
                 try {
                     const widgetResult = await contentEditorRef.current.saveWidgets({
@@ -860,13 +837,6 @@ const PageEditor = () => {
                 widgets: collectedData.widgets
             };
 
-            console.log('[PageEditor] handleActualSave - About to call smartSave with:', {
-                widgetsBySlot: Object.entries(collectedData.widgets).reduce((acc, [slot, widgets]) => {
-                    acc[slot] = widgets.map((w, idx) => ({ position: idx, id: w.id, type: w.type }));
-                    return acc;
-                }, {})
-            });
-
             // Use smart save with separated data
             const saveResult = await smartSave(
                 originalWebpageData || {},      // Original webpage data
@@ -879,10 +849,6 @@ const PageEditor = () => {
                     forceNewVersion: saveOptions.option === 'new'
                 }
             );
-
-            console.log('[PageEditor] handleActualSave - smartSave result:', saveResult);
-
-
 
             // Update UI based on what was saved
             let updatedWebpageData = currentWebpageDataForSave;

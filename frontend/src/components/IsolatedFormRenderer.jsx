@@ -44,10 +44,7 @@ const IsolatedFieldWrapper = React.memo(({
                 ...widgetData.config,
                 [fieldName]: value
             }
-
-            console.log("IsolatedFieldWrapper", widgetData.type, fullConfig)
             const result = await validateWidgetConfiguration(widgetData.type, fullConfig)
-
             const fieldValidation = result.errors?.[fieldName] ? {
                 isValid: false,
                 errors: Array.isArray(result.errors[fieldName]) ? result.errors[fieldName] : [result.errors[fieldName]],
@@ -211,24 +208,29 @@ const IsolatedFormRenderer = React.memo(({
     // Render isolated fields - each field manages its own state and rerenders
     return (
         <div className="space-y-4 p-4">
-            {Object.entries(activeSchema.properties).map(([fieldName, fieldSchema]) => {
-                const isRequired = activeSchema?.required?.includes(fieldName) || false
+            {Object.entries(activeSchema.properties)
+                .filter(([fieldName, fieldSchema]) => {
+                    // Filter out hidden fields
+                    return !fieldSchema.hidden
+                })
+                .map(([fieldName, fieldSchema]) => {
+                    const isRequired = activeSchema?.required?.includes(fieldName) || false
 
-                return (
-                    <IsolatedFieldWrapper
-                        key={fieldName}
-                        fieldName={fieldName}
-                        fieldSchema={fieldSchema}
-                        widgetData={formBuffer.getCurrentData()}
-                        widgetType={formBuffer.getCurrentData()?.type || ''}
-                        isRequired={isRequired}
-                        onFieldChange={handleFieldChange}
-                        namespace={namespace}
-                        context={context}
-                        fullSchema={activeSchema}
-                    />
-                )
-            })}
+                    return (
+                        <IsolatedFieldWrapper
+                            key={fieldName}
+                            fieldName={fieldName}
+                            fieldSchema={fieldSchema}
+                            widgetData={formBuffer.getCurrentData()}
+                            widgetType={formBuffer.getCurrentData()?.type || ''}
+                            isRequired={isRequired}
+                            onFieldChange={handleFieldChange}
+                            namespace={namespace}
+                            context={context}
+                            fullSchema={activeSchema}
+                        />
+                    )
+                })}
         </div>
     )
 }, (prevProps, nextProps) => {
