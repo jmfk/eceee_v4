@@ -77,9 +77,13 @@ export function getSlotWidgetsForMode(mode, localWidgets = [], inheritedWidgets 
  * Determine if a slot should default to preview mode
  * 
  * Logic:
- * - If slot has inherited widgets AND allows inheritance:
- *   - In MERGE mode: Default to EDIT mode (to encourage adding widgets that merge)
- *   - In REPLACEMENT mode: Default to PREVIEW mode if no local widgets (show inherited content)
+ * - Respects collapse_behavior setting if provided (never, any, all)
+ * - Falls back to legacy behavior based on merge mode and local widgets
+ * 
+ * Collapse Behavior Options:
+ * - "never": Never collapse (always show in edit mode)
+ * - "any": Collapse if any visible widgets are inherited (default legacy behavior)
+ * - "all": Collapse only if all visible widgets are inherited
  * 
  * @param {string} slotName - Name of the slot
  * @param {Array} localWidgets - Local widgets for this slot
@@ -97,6 +101,28 @@ export function shouldSlotDefaultToPreview(slotName, localWidgets = [], inherite
     if (!inheritedWidgets || inheritedWidgets.length === 0) {
         return false
     }
+
+    // NEW: Respect collapseBehavior setting if provided
+    if (slotRules.collapseBehavior) {
+        switch (slotRules.collapseBehavior) {
+            case 'never':
+                // Never collapse - always show in edit mode
+                return false
+
+            case 'all':
+                // Collapse only if ALL visible widgets are inherited
+                // If any local widgets exist, don't collapse
+                return localWidgets.length === 0
+
+            case 'any':
+            default:
+                // Collapse if ANY inherited widgets are present (default legacy behavior)
+                // Continue to legacy logic below
+                break
+        }
+    }
+
+    // LEGACY BEHAVIOR (when collapseBehavior not specified):
 
     // MERGE MODE BEHAVIOR (mergeMode = inheritanceAllowed AND allowMerge):
     // In merge mode, default to EDIT mode to encourage adding widgets alongside inherited content
@@ -216,6 +242,7 @@ export function transformInheritanceData(inheritanceData) {
             mergeMode: slotData.mergeMode || false,
             hasInheritedWidgets: slotData.hasInheritedWidgets || false,
             inheritableTypes: slotData.inheritableTypes || [], // Widget types allowed for inheritance/replacement
+            collapseBehavior: slotData.collapseBehavior, // Collapse behavior from backend (camelCase)
             slotName: slotName  // Add slotName to rules for debug logging
         }
 
