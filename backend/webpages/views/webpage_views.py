@@ -216,15 +216,15 @@ class WebPageViewSet(viewsets.ModelViewSet):
             # Get tree statistics
             stats = builder.get_tree_statistics(tree)
 
-            # Build new response format
+            # Build new response format (snake_case auto-converted to camelCase)
             response_data = {
                 "version": "tree",  # API version identifier
                 "tree": tree_json,
                 "statistics": {
-                    "nodeCount": stats.node_count,
-                    "maxDepth": stats.max_depth,
-                    "totalWidgets": stats.total_widgets,
-                    "generationTimeMs": stats.generation_time_ms,
+                    "node_count": stats.node_count,
+                    "max_depth": stats.max_depth,
+                    "total_widgets": stats.total_widgets,
+                    "generation_time_ms": stats.generation_time_ms,
                 },
                 # Legacy compatibility - convert tree back to slot format
                 "legacy": self._convert_tree_to_legacy_format(tree, helpers),
@@ -244,11 +244,11 @@ class WebPageViewSet(viewsets.ModelViewSet):
         # Get effective layout to determine slot rules
         effective_layout = page.get_effective_layout()
 
-        # Build response structure
+        # Build response structure (snake_case will be auto-converted to camelCase)
         response_data = {
-            "pageId": page.id,
-            "parentId": page.parent_id if page.parent else None,
-            "hasParent": page.parent is not None,
+            "page_id": page.id,
+            "parent_id": page.parent_id if page.parent else None,
+            "has_parent": page.parent is not None,
             "slots": {},
         }
 
@@ -317,14 +317,14 @@ class WebPageViewSet(viewsets.ModelViewSet):
                 if inherited_from:
                     widget_data = widget_info["widget"].copy()
 
-                    # Add inheritance metadata
-                    widget_data["inheritedFrom"] = {
+                    # Add inheritance metadata (snake_case will be auto-converted to camelCase)
+                    widget_data["inherited_from"] = {
                         "id": inherited_from.id,
                         "title": inherited_from.title,
                         "slug": inherited_from.slug,
                     }
-                    widget_data["isInherited"] = True
-                    widget_data["canOverride"] = True
+                    widget_data["is_inherited"] = True
+                    widget_data["can_override"] = True
 
                     # Calculate inheritance depth
                     depth = 1
@@ -332,28 +332,31 @@ class WebPageViewSet(viewsets.ModelViewSet):
                     while current and current != inherited_from:
                         depth += 1
                         current = current.parent
-                    widget_data["inheritanceDepth"] = depth
+                    widget_data["inheritance_depth"] = depth
 
                     inherited_widgets.append(widget_data)
 
-            # Build slot response
+            # Build slot response (snake_case will be auto-converted to camelCase by DRF renderer)
             response_data["slots"][slot_name] = {
-                "hasInheritedWidgets": len(inherited_widgets) > 0,
-                "inheritedWidgets": inherited_widgets,
-                "inheritanceAllowed": allows_inheritance,
-                "allowMerge": allow_merge,  # New preferred field
-                "allowsReplacementOnly": allows_replacement_only,  # Backward compatibility
-                "requiresLocal": allows_replacement_only,  # Backward compatibility - deprecated
-                "mergeMode": allows_inheritance and allow_merge,
+                "has_inherited_widgets": len(inherited_widgets) > 0,
+                "inherited_widgets": inherited_widgets,
+                "inheritance_allowed": allows_inheritance,
+                "allow_merge": allow_merge,  # New preferred field
+                "allows_replacement_only": allows_replacement_only,  # Backward compatibility
+                "requires_local": allows_replacement_only,  # Backward compatibility - deprecated
+                "merge_mode": allows_inheritance and allow_merge,
                 "inheritable_types": slot_info.get(
                     "inheritable_types", []
-                ),  # NEW: Type-based inheritance
+                ),  # Type-based inheritance
+                "collapse_behavior": slot_config.get(
+                    "collapse_behavior", "any"
+                ),  # Collapse behavior: "never", "any", "all"
             }
 
         return Response(response_data)
 
     def _serialize_tree_node(self, node):
-        """Convert InheritanceTreeNode to JSON-serializable dictionary"""
+        """Convert InheritanceTreeNode to JSON-serializable dictionary (snake_case auto-converted)"""
         serialized_slots = {}
 
         for slot_name, widgets in node.slots.items():
@@ -364,26 +367,26 @@ class WebPageViewSet(viewsets.ModelViewSet):
                     "config": widget.config,
                     "order": widget.order,
                     "depth": widget.depth,
-                    "inheritanceBehavior": widget.inheritance_behavior.value,
-                    "isPublished": widget.is_published,
-                    "inheritanceLevel": widget.inheritance_level,
-                    "publishEffectiveDate": widget.publish_effective_date,
-                    "publishExpireDate": widget.publish_expire_date,
-                    "isLocal": widget.is_local,
-                    "isInherited": widget.is_inherited,
-                    "canBeOverridden": widget.can_be_overridden,
+                    "inheritance_behavior": widget.inheritance_behavior.value,
+                    "is_published": widget.is_published,
+                    "inheritance_level": widget.inheritance_level,
+                    "publish_effective_date": widget.publish_effective_date,
+                    "publish_expire_date": widget.publish_expire_date,
+                    "is_local": widget.is_local,
+                    "is_inherited": widget.is_inherited,
+                    "can_be_overridden": widget.can_be_overridden,
                 }
                 for widget in widgets
             ]
 
         return {
-            "pageId": node.page_id,
+            "page_id": node.page_id,
             "depth": node.depth,
             "page": {
                 "id": node.page.id,
                 "title": node.page.title,
                 "slug": node.page.slug,
-                "parentId": node.page.parent_id,
+                "parent_id": node.page.parent_id,
                 "description": node.page.description,
                 "layout": node.page.layout,
                 "theme": node.page.theme,
@@ -394,11 +397,11 @@ class WebPageViewSet(viewsets.ModelViewSet):
         }
 
     def _convert_tree_to_legacy_format(self, tree, helpers):
-        """Convert tree back to legacy slot-based format for backward compatibility"""
+        """Convert tree back to legacy slot-based format (snake_case auto-converted)"""
         legacy_data = {
-            "pageId": tree.page_id,
-            "parentId": tree.parent.page_id if tree.parent else None,
-            "hasParent": tree.parent is not None,
+            "page_id": tree.page_id,
+            "parent_id": tree.parent.page_id if tree.parent else None,
+            "has_parent": tree.parent is not None,
             "slots": {},
         }
 
@@ -414,26 +417,26 @@ class WebPageViewSet(viewsets.ModelViewSet):
             inherited_widgets = helpers.get_inherited_widgets(slot_name)
 
             legacy_data["slots"][slot_name] = {
-                "hasInheritedWidgets": len(inherited_widgets) > 0,
-                "inheritedWidgets": [
+                "has_inherited_widgets": len(inherited_widgets) > 0,
+                "inherited_widgets": [
                     {
                         "id": widget.id,
                         "type": widget.type,
                         "config": widget.config,
-                        "inheritedFrom": {
+                        "inherited_from": {
                             "id": tree.parent.page_id if tree.parent else None,
                             "title": tree.parent.page.title if tree.parent else None,
                             "slug": tree.parent.page.slug if tree.parent else None,
                         },
-                        "isInherited": True,
-                        "canOverride": widget.can_be_overridden,
-                        "inheritanceDepth": widget.depth,
-                        "inheritanceBehavior": widget.inheritance_behavior.value,
+                        "is_inherited": True,
+                        "can_override": widget.can_be_overridden,
+                        "inheritance_depth": widget.depth,
+                        "inheritance_behavior": widget.inheritance_behavior.value,
                     }
                     for widget in inherited_widgets
                 ],
-                "inheritanceAllowed": True,
-                "mergeMode": True,
+                "inheritance_allowed": True,
+                "merge_mode": True,
                 "inheritable_types": [],
             }
 
