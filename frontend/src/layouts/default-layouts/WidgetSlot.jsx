@@ -203,6 +203,8 @@ const WidgetSlot = ({
                     parentComponentId={pageContext.parentComponentId}
                     contextType={pageContext.contextType}
                     pageId={pageContext.pageId}
+                    webpageData={pageContext.webpageData}
+                    pageVersionData={pageContext.pageVersionData}
                     // Widget path for nested widget support
                     widgetPath={fullWidgetPath}
                     // Slot type and preview mode for widget determination

@@ -20,6 +20,7 @@ const ReactLayoutRenderer = forwardRef(({
     editable = true,
     // PageEditor-specific props
     currentVersion,
+    webpageData,
     pageVersionData,
     onVersionChange,
     onOpenWidgetEditor,
@@ -87,10 +88,13 @@ const ReactLayoutRenderer = forwardRef(({
         // Add missing context for widgets
         parentComponentId: componentId,
         contextType: 'page',
-        pageId: context?.pageId,
+        pageId: context?.pageId || webpageData?.id,
+        // Full page data for widget context
+        webpageData: webpageData,
+        pageVersionData: pageVersionData,
         // Pass onOpenWidgetEditor for nested widgets
         onOpenWidgetEditor
-    }), [versionId, isPublished, onVersionChange, componentId, context?.pageId, onOpenWidgetEditor]);
+    }), [versionId, isPublished, onVersionChange, componentId, context?.pageId, webpageData, pageVersionData, onOpenWidgetEditor]);
 
     // Handle widget actions
     const handleWidgetAction = useCallback(async (action, slotName, widget, ...args) => {

@@ -3,13 +3,19 @@ Forms widget implementation.
 """
 
 from typing import Type, Optional, List, Literal, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
+from pydantic.alias_generators import to_camel
 
 from webpages.widget_registry import BaseWidget, register_widget_type
 
 
 class FormField(BaseModel):
     """Individual form field configuration"""
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
 
     name: str = Field(..., min_length=1, description="Field name")
     label: str = Field(..., min_length=1, description="Field label")
@@ -41,6 +47,20 @@ class FormField(BaseModel):
 
 class FormsConfig(BaseModel):
     """Configuration for Forms widget"""
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
+
+    anchor: str = Field(
+        "",
+        description="Anchor Title",
+        json_schema_extra={
+            "component": "TextInput",
+            "placeholder": "section-name",
+        },
+    )
 
     title: str = Field(
         ...,

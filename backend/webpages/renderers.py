@@ -198,6 +198,7 @@ class WebPageRenderer:
             "current_page": page,
             "page_version": page_version,
             "page_data": page_version.page_data,
+            "widgets": page_version.widgets,  # All widgets by slot (matches frontend context)
             "version_number": page_version.version_number,
             "publication_status": page_version.get_publication_status(),
             "is_current_published": page_version.is_current_published(),

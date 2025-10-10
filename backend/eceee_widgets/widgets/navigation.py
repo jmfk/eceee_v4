@@ -37,7 +37,25 @@ class PageSectionConfig(BaseModel):
         populate_by_name=True,
     )
 
-    label: str = Field(..., description="Page Section label")
+    slot_name: str = Field(
+        "main",
+        description="Slot to search for section widgets",
+        json_schema_extra={
+            "component": "SelectInput",
+            "optionsFunction": "getLayoutSlots",  # Dynamic function to get slots
+            "placeholder": "Select slot...",
+        },
+    )
+
+    sections_preview: Optional[str] = Field(
+        default=None,
+        description="Preview of page sections (display only)",
+        json_schema_extra={
+            "component": "PageSectionsDisplayField",
+            "label": "Page Sections",
+            "description": "Widgets with anchors from the selected slot will appear as navigation sections",
+        },
+    )
 
 
 class PageSubmenuConfig(BaseModel):
@@ -48,7 +66,15 @@ class PageSubmenuConfig(BaseModel):
         populate_by_name=True,
     )
 
-    label: str = Field(..., description="Page Submenu label")
+    children_preview: Optional[str] = Field(
+        default=None,
+        description="Preview of child pages (display only)",
+        json_schema_extra={
+            "component": "PageChildrenDisplayField",
+            "label": "Child Pages",
+            "description": "These pages will appear in this navigation section",
+        },
+    )
 
 
 class NavigationConfig(BaseModel):
@@ -103,3 +129,76 @@ class NavigationWidget(BaseWidget):
     @property
     def configuration_model(self) -> Type[BaseModel]:
         return NavigationConfig
+
+    def prepare_template_context(self, config, context=None):
+        """
+        Prepare navigation menu items based on configuration.
+        Handles dynamic menu generation from page sections and child pages.
+        """
+        from webpages.structure_helpers import get_structure_helpers
+
+        # Start with base config
+        template_config = super().prepare_template_context(config, context)
+        context = context if context else {}
+
+        # Initialize dynamic menu items
+        dynamic_menu_items = []
+
+        # Get menus configuration
+        menus = config.get("menus", {})
+        active_group = menus.get("active_group")
+        form_data = menus.get("form_data", {})
+
+        if active_group in ["page_sections", "pageSections"]:
+            # Get widgets with anchors from selected slot
+            page_sections_data = form_data.get("page_sections", {})
+            slot_name = page_sections_data.get("slot_name", "main")
+
+            # Get widgets from context (now available from _build_base_context)
+            widgets_by_slot = context.get("widgets", {})
+            slot_widgets = widgets_by_slot.get(slot_name, [])
+
+            # Filter widgets with anchor
+            for widget in slot_widgets:
+                widget_config = widget.get("config", {})
+                anchor = widget_config.get("anchor")
+                if anchor and anchor.strip():
+                    dynamic_menu_items.append(
+                        {
+                            "label": anchor,
+                            "url": f"#{anchor}",
+                            "is_active": True,
+                            "target_blank": False,
+                        }
+                    )
+
+        elif active_group in ["page_submenu", "pageSubmenu"]:
+            # Get child pages using structure helpers
+            current_page = context.get("page") or context.get("current_page")
+
+            if current_page:
+                helpers = get_structure_helpers()
+                try:
+                    children = helpers.get_active_children(
+                        current_page.id, include_unpublished=False
+                    )
+
+                    for child_info in children:
+                        # child_info is a ChildPageInfo dataclass
+                        page_metadata = child_info.page
+                        dynamic_menu_items.append(
+                            {
+                                "label": page_metadata.title,
+                                "url": page_metadata.path,
+                                "is_active": True,
+                                "target_blank": False,
+                            }
+                        )
+                except Exception as e:
+                    # Silently fail if children can't be loaded
+                    pass
+
+        # Add dynamic menu items to config
+        template_config["dynamic_menu_items"] = dynamic_menu_items
+
+        return template_config

@@ -41,7 +41,7 @@ export class PageStructureHelpers {
             if (versionFilter) {
                 params.version_filter = versionFilter
             }
-            const response = await api.get(`/api/webpages/pages/${pageId}/metadata/`, { params })
+            const response = await api.get(`/api/v1/webpages/pages/${pageId}/metadata/`, { params })
             return response.data
         } catch (error: any) {
             if (error.response?.status === 404) {
@@ -72,7 +72,7 @@ export class PageStructureHelpers {
             if (versionFilter) {
                 params.version_filter = versionFilter
             }
-            const response = await api.get('/api/webpages/pages/by-path/', { params })
+            const response = await api.get('/api/v1/webpages/pages/by-path/', { params })
             return response.data
         } catch (error: any) {
             if (error.response?.status === 404) {
@@ -98,7 +98,7 @@ export class PageStructureHelpers {
          * @returns List of ChildPageInfo objects
          */
         try {
-            const response = await api.get(`/api/pages/${pageId}/children/`, {
+            const response = await api.get(`/api/v1/webpages/pages/${pageId}/children/`, {
                 params: { include_unpublished: includeUnpublished }
             })
             return response.data
@@ -129,7 +129,7 @@ export class PageStructureHelpers {
             if (maxDepth !== undefined) {
                 params.max_depth = maxDepth
             }
-            const response = await api.get(`/api/pages/${pageId}/tree/`, { params })
+            const response = await api.get(`/api/v1/webpages/pages/${pageId}/tree/`, { params })
             return response.data
         } catch (error: any) {
             if (error.response?.status === 404) {
@@ -154,7 +154,7 @@ export class PageStructureHelpers {
          * @returns List of PageMetadata from immediate parent to root
          */
         try {
-            const response = await api.get(`/api/pages/${pageId}/ancestors/`)
+            const response = await api.get(`/api/v1/webpages/pages/${pageId}/ancestors/`)
             return response.data
         } catch (error: any) {
             throw new StructureQueryError(
@@ -173,7 +173,7 @@ export class PageStructureHelpers {
          * @returns List of BreadcrumbItem from root to current page
          */
         try {
-            const response = await api.get(`/api/pages/${pageId}/breadcrumbs/`)
+            const response = await api.get(`/api/v1/webpages/pages/${pageId}/breadcrumbs/`)
             return response.data
         } catch (error: any) {
             throw new StructureQueryError(
@@ -192,7 +192,7 @@ export class PageStructureHelpers {
          * @returns PageMetadata of root page or null
          */
         try {
-            const response = await api.get(`/api/pages/${pageId}/root/`)
+            const response = await api.get(`/api/v1/webpages/pages/${pageId}/root/`)
             return response.data
         } catch (error: any) {
             if (error.response?.status === 404) {
@@ -241,7 +241,7 @@ export class PageStructureHelpers {
             if (status) {
                 params.status = status
             }
-            const response = await api.get(`/api/pages/${pageId}/versions/`, { params })
+            const response = await api.get(`/api/v1/webpages/pages/${pageId}/versions/`, { params })
             return response.data
         } catch (error: any) {
             throw new StructureQueryError(
@@ -255,7 +255,7 @@ export class PageStructureHelpers {
     async getCurrentVersion(pageId: number): Promise<VersionMetadata | null> {
         /**Get the current published version for a page*/
         try {
-            const response = await api.get(`/api/pages/${pageId}/current-version/`)
+            const response = await api.get(`/api/v1/webpages/pages/${pageId}/current-version/`)
             return response.data
         } catch (error: any) {
             if (error.response?.status === 404) {
@@ -277,7 +277,7 @@ export class PageStructureHelpers {
          * @returns PageWithVersion with current, published, and latest version info
          */
         try {
-            const response = await api.get(`/api/pages/${pageId}/with-versions/`)
+            const response = await api.get(`/api/v1/webpages/pages/${pageId}/with-versions/`)
             return response.data
         } catch (error: any) {
             if (error.response?.status === 404) {
@@ -301,7 +301,7 @@ export class PageStructureHelpers {
          * @returns PageStructureSummary with full structural information
          */
         try {
-            const response = await api.get(`/api/pages/${pageId}/structure-summary/`)
+            const response = await api.get(`/api/v1/webpages/pages/${pageId}/structure-summary/`)
             return response.data
         } catch (error: any) {
             if (error.response?.status === 404) {
@@ -325,7 +325,7 @@ export class PageStructureHelpers {
          * @returns List of matching PageMetadata
          */
         try {
-            const response = await api.get('/api/pages/search/', { params: options })
+            const response = await api.get('/api/v1/webpages/pages/search/', { params: options })
             return response.data
         } catch (error: any) {
             throw new StructureQueryError(

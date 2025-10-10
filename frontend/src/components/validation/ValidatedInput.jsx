@@ -22,6 +22,11 @@ export default function ValidatedInput({
     required = false,
     showValidation = true,
     validationPosition = 'bottom', // 'bottom', 'right', 'inline'
+    // Custom props that shouldn't be spread to DOM
+    context,
+    formData,
+    fieldName,
+    children,
     ...props
 }) {
     const [focused, setFocused] = useState(false)
@@ -144,7 +149,7 @@ export default function ValidatedInput({
             case 'select':
                 return (
                     <select {...commonProps}>
-                        {props.children}
+                        {children}
                     </select>
                 )
             default:

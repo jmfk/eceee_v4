@@ -241,18 +241,6 @@ const SegmentedControlInput = React.memo(({
                     )}
                 </div>
             )}
-            {/* Labels */}
-            {options.length > 0 && (
-                <div className="text-xs text-gray-500">
-                    <div className="flex justify-between">
-                        {normalizedOptions.map((option, index) => (
-                            <span key={index} className="text-center">
-                                {option.label}
-                            </span>
-                        ))}
-                    </div>
-                </div>
-            )}
 
             {description && (
                 <p className="text-sm text-gray-500">{description}</p>

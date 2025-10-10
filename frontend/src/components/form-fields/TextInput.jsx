@@ -21,9 +21,14 @@ const TextInput = React.memo(({
     required,
     disabled,
     placeholder,
+    // Custom props that shouldn't be spread to DOM
+    context,
+    formData,
+    fieldName,
     ...props
 }) => {
     const handleChange = useCallback((e) => {
+
         // Extract value from event if it's an event object, otherwise use as-is
         const newValue = e && e.target ? e.target.value : e
         onChange(newValue)

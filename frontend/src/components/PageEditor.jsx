@@ -1574,6 +1574,14 @@ const PageEditor = () => {
                         title={editingWidget ? `Edit ${getWidgetDisplayName(editingWidget.type)}` : 'Edit Widget'}
                         autoOpenSpecialEditor={true}
                         namespace={namespace}
+                        webpageData={webpageData}
+                        pageVersionData={pageVersionData}
+                        context={{
+                            pageId: webpageData?.id,
+                            versionId: pageVersionData?.versionId,
+                            webpageData: webpageData,
+                            pageVersionData: pageVersionData
+                        }}
                     />
                 </div>
             </div>

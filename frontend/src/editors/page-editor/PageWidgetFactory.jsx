@@ -44,6 +44,8 @@ const PageWidgetFactory = ({
     parentComponentId,
     contextType,
     pageId,
+    webpageData,
+    pageVersionData,
     // Nested widget props (for widgets inside container widgets)
     nestedParentWidgetId,
     nestedParentSlotName,
@@ -276,6 +278,16 @@ const PageWidgetFactory = ({
                         widgetPath={widgetPath}
                         nestedParentWidgetId={nestedParentWidgetId}
                         nestedParentSlotName={nestedParentSlotName}
+                        context={{
+                            widgetId: actualWidgetId,
+                            slotName: actualSlotName,
+                            contextType,
+                            pageId,
+                            versionId,
+                            webpageData,
+                            pageVersionData,
+                            widgetPath
+                        }}
                     />
                 </div>
             )
@@ -328,6 +340,16 @@ const PageWidgetFactory = ({
                         // Legacy nested widget context (deprecated)
                         nestedParentWidgetId={nestedParentWidgetId}
                         nestedParentSlotName={nestedParentSlotName}
+                        context={{
+                            widgetId: actualWidgetId,
+                            slotName: actualSlotName,
+                            contextType,
+                            pageId,
+                            versionId,
+                            webpageData,
+                            pageVersionData,
+                            widgetPath
+                        }}
                     />
                 </div>
 
@@ -429,6 +451,16 @@ const PageWidgetFactory = ({
                 // Legacy nested widget context (deprecated)
                 nestedParentWidgetId={nestedParentWidgetId}
                 nestedParentSlotName={nestedParentSlotName}
+                context={{
+                    widgetId: actualWidgetId,
+                    slotName: actualSlotName,
+                    contextType,
+                    pageId,
+                    versionId,
+                    webpageData,
+                    pageVersionData,
+                    widgetPath
+                }}
             />
         </div>
     )

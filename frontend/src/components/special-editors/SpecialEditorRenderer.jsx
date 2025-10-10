@@ -70,7 +70,8 @@ const SpecialEditorRenderer = ({
     namespace = null,
     contextType = null,
     widgetId = null,
-    slotName = null
+    slotName = null,
+    context = {}
 }) => {
 
     if (!widgetData?.type || !hasSpecialEditor(widgetData.type)) {
@@ -150,6 +151,7 @@ const SpecialEditorRenderer = ({
                 contextType={contextType}
                 widgetId={widgetId}
                 slotName={slotName}
+                context={context}
             />
         </div>
     )
