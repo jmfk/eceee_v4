@@ -65,6 +65,10 @@ export { default as ItemsListField } from './ItemsListField'
 // Conditional Form Components
 export { default as ConditionalGroupField } from './ConditionalGroupField'
 
+// Display Components (read-only)
+export { default as PageChildrenDisplayField } from './PageChildrenDisplayField'
+export { default as PageSectionsDisplayField } from './PageSectionsDisplayField'
+
 // TODO: Add more components as they are implemented
 // export { default as AddressInput } from './AddressInput'
 
@@ -115,6 +119,9 @@ export const FIELD_COMPONENTS = {
     ItemsListField: () => import('./ItemsListField'),
     // Conditional Form Components
     ConditionalGroupField: () => import('./ConditionalGroupField'),
+    // Display Components
+    PageChildrenDisplayField: () => import('./PageChildrenDisplayField'),
+    PageSectionsDisplayField: () => import('./PageSectionsDisplayField'),
     // TODO: Add more components
 }
 

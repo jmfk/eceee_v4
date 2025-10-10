@@ -318,6 +318,16 @@ const ConditionalGroupField = ({
                     const componentName = propSchema.component ||
                         propSchema.control_type ||
                         mapSchemaTypeToComponent(propSchema)
+                    // Extract schema props, filtering out internal JSON schema metadata
+                    const {
+                        component: _component,
+                        control_type: _controlType,
+                        hidden: _hidden,
+                        order: _order,
+                        group: _group,
+                        ...schemaProps
+                    } = propSchema
+
                     const fieldProps = {
                         label: propSchema.title || propName,
                         description: propSchema.description,
@@ -327,7 +337,9 @@ const ConditionalGroupField = ({
                         defaultValue: fieldValue,
                         onChange: (value) => handleFieldChange(propName, value),
                         validation: validation?.[propName],
-                        ...propSchema // Pass all schema props (options, min, max, etc.)
+                        context: context,  // Pass context through to child fields
+                        formData: currentGroupData,  // Pass current group's form data to child fields
+                        ...schemaProps // Pass filtered schema props (options, min, max, etc.)
                     }
 
                     return (

@@ -3,13 +3,19 @@ Simple two-column widget implementation.
 """
 
 from typing import Type, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
+from pydantic.alias_generators import to_camel
 
 from webpages.widget_registry import BaseWidget, register_widget_type
 
 
 class TwoColumnsConfig(BaseModel):
     """Configuration for simple two-column widget"""
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
 
     layout_style: Optional[str] = Field(
         None,

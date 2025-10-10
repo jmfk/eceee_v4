@@ -3,13 +3,19 @@ Table widget implementation.
 """
 
 from typing import Type, Optional, List, Literal
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
+from pydantic.alias_generators import to_camel
 
 from webpages.widget_registry import BaseWidget, register_widget_type
 
 
 class TableCell(BaseModel):
     """Individual table cell configuration"""
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
 
     content: str = Field("", description="Cell content")
     colspan: int = Field(1, ge=1, description="Number of columns to span")
@@ -31,6 +37,20 @@ class TableCell(BaseModel):
 class TableRow(BaseModel):
     """Table row configuration"""
 
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
+
+    anchor: str = Field(
+        "",
+        description="Anchor Title",
+        json_schema_extra={
+            "component": "TextInput",
+            "placeholder": "section-name",
+        },
+    )
+
     cells: List[TableCell] = Field(..., description="List of cells in this row")
     is_header: bool = Field(False, description="Whether this is a header row")
     background_color: Optional[str] = Field(None, description="Row background color")
@@ -39,6 +59,11 @@ class TableRow(BaseModel):
 
 class TableConfig(BaseModel):
     """Configuration for Table widget"""
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
 
     rows: List[TableRow] = Field(..., min_items=1, description="Table rows")
     caption: Optional[str] = Field(None, description="Table caption")

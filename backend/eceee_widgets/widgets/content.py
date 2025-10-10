@@ -3,13 +3,28 @@ Content widget implementation.
 """
 
 from typing import Type
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
+from pydantic.alias_generators import to_camel
 
 from webpages.widget_registry import BaseWidget, register_widget_type
 
 
 class ContentConfig(BaseModel):
     """Configuration for Content widget"""
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
+
+    anchor: str = Field(
+        "",
+        description="Anchor Title",
+        json_schema_extra={
+            "component": "TextInput",
+            "placeholder": "section-name",
+        },
+    )
 
     content: str = Field(
         ...,

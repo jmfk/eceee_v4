@@ -64,6 +64,7 @@ const PageContentEditor = forwardRef(({
             onOpenWidgetEditor={onOpenWidgetEditor}
             // PageEditor-specific props
             currentVersion={currentVersion}
+            webpageData={webpageData}
             pageVersionData={pageVersionData}
             onVersionChange={onVersionChange}
             context={context}

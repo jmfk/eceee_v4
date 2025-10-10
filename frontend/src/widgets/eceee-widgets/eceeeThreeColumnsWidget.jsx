@@ -23,6 +23,7 @@ const eceeeThreeColumnsWidget = ({
     parentComponentId,
     slotName,
     widgetPath = [],
+    context = {}, // Full context including page data
     ...props
 }) => {
     // Create this widget's own UDC componentId
@@ -173,11 +174,15 @@ const eceeeThreeColumnsWidget = ({
                     showControls={false}
                     parentComponentId={componentId}
                     contextType={contextType}
+                    pageId={context.pageId}
+                    webpageData={context.webpageData}
+                    pageVersionData={context.pageVersionData}
+                    versionId={context.versionId}
                     widgetPath={fullWidgetPath}
                 />
             </div>
         );
-    }, [widgetPath, widgetId, componentId, contextType]);
+    }, [widgetPath, widgetId, componentId, contextType, context]);
 
     // Show loading state
     if (mode === 'editor' && isLoadingTypes) {

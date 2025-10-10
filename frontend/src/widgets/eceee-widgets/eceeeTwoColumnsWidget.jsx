@@ -23,6 +23,7 @@ const eceeeTwoColumnsWidget = ({
     parentComponentId, // PageEditor's componentId
     slotName, // Which slot this TwoColumnsWidget is in (e.g., 'main')  
     widgetPath = [], // Full path to this widget (for infinite nesting)
+    context = {}, // Full context including page data
     ...props
 }) => {
     // Create this widget's own UDC componentId
@@ -198,12 +199,16 @@ const eceeeTwoColumnsWidget = ({
                     // Context props
                     parentComponentId={componentId}
                     contextType={contextType}
+                    pageId={context.pageId}
+                    webpageData={context.webpageData}
+                    pageVersionData={context.pageVersionData}
+                    versionId={context.versionId}
                     // Widget path for nested widget support
                     widgetPath={fullWidgetPath}
                 />
             </div>
         );
-    }, [widgetPath, widgetId, componentId, contextType]);
+    }, [widgetPath, widgetId, componentId, contextType, context]);
 
     // Show loading state while fetching widget types
     if (mode === 'editor' && isLoadingTypes) {

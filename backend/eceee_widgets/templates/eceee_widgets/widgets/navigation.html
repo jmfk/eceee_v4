@@ -2,8 +2,22 @@
 
 <nav class="navigation-widget">
     <ul class="nav-container">
+        {# Dynamic menu items (calculated in prepare_template_context) #}
+        {% for item in config.dynamic_menu_items %}
+            <li>
+                <a href="{{ item.url }}"{% if item.target_blank %} target="_blank" rel="noopener noreferrer"{% endif %}>
+                    {{ item.label }}
+                </a>
+            </li>
+        {% endfor %}
+        
+        {# Static menu items #}
         {% for menu in config.menu_items %}
-            <li><a href="{{menu.url}}">{{menu.label}}</a></li>
+            <li>
+                <a href="{{ menu.url }}"{% if menu.target_blank %} target="_blank" rel="noopener noreferrer"{% endif %}>
+                    {{ menu.label }}
+                </a>
+            </li>
         {% endfor %}
     </ul>
 </nav>

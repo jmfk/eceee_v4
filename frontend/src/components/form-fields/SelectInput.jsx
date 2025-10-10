@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import ValidatedInput from '../validation/ValidatedInput'
 import { valueListsApi } from '../../api/valueLists'
+import { executeOptionsFunction, hasOptionsFunction } from '../../utils/optionsFunctions'
 
 /**
  * SelectInput Component
@@ -22,10 +23,23 @@ const SelectInput = ({
     placeholder = 'Select an option...',
     options = [],
     valueListName = null, // Name of value list to load options from
+    optionsFunction = null, // Name of function to generate options dynamically
+    // Custom props that shouldn't be spread to DOM or override component behavior
+    context,
+    formData,
+    type: schemaType, // Don't let schema type override input type
     ...props
 }) => {
     const [valueListOptions, setValueListOptions] = useState([])
     const [loadingValueList, setLoadingValueList] = useState(false)
+
+    // Execute options function if provided
+    const functionOptions = useMemo(() => {
+        if (optionsFunction && hasOptionsFunction(optionsFunction)) {
+            return executeOptionsFunction(optionsFunction, context, formData)
+        }
+        return []
+    }, [optionsFunction, context, formData])
 
     // Load value list options if valueListName is provided
     useEffect(() => {
@@ -69,8 +83,10 @@ const SelectInput = ({
         })
     }
 
-    // Use value list options if available, otherwise use provided options
-    const effectiveOptions = valueListName && valueListOptions.length > 0 ? valueListOptions : options
+    // Priority: optionsFunction > valueList > static options
+    const effectiveOptions = functionOptions.length > 0
+        ? functionOptions
+        : (valueListName && valueListOptions.length > 0 ? valueListOptions : options)
     const normalizedOptions = normalizeOptions(effectiveOptions)
 
     // Build props for ValidatedInput

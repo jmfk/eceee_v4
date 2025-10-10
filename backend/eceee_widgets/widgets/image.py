@@ -3,13 +3,19 @@ Image widget implementation.
 """
 
 from typing import Type, Optional, List, Literal, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
+from pydantic.alias_generators import to_camel
 
 from webpages.widget_registry import BaseWidget, register_widget_type
 
 
 class ImageMediaItem(BaseModel):
     """Individual media item for Image widget"""
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
 
     id: Optional[str] = Field(None, description="Media file ID")
     url: str = Field(..., description="Media URL (image or video)")
@@ -29,6 +35,19 @@ class ImageMediaItem(BaseModel):
 class ImageConfig(BaseModel):
     """Configuration for Image widget"""
 
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
+
+    anchor: str = Field(
+        "",
+        description="Anchor Title",
+        json_schema_extra={
+            "component": "TextInput",
+            "placeholder": "section-name",
+        },
+    )
     mediaItems: List[ImageMediaItem] = Field(
         default_factory=list,
         description="List of images/videos to display",

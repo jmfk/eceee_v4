@@ -27,7 +27,9 @@ const WidgetEditorPanel = forwardRef(({
     title = "Edit Widget",
     autoOpenSpecialEditor = false,
     namespace = null,
-    context
+    context = {},
+    webpageData = null,
+    pageVersionData = null
 }, ref) => {
     const [hasChanges, setHasChanges] = useState(false)
     const [widgetTypeName, setWidgetTypeName] = useState(null)
@@ -369,6 +371,13 @@ const WidgetEditorPanel = forwardRef(({
                         contextType={contextType}
                         widgetId={widgetData?.id}
                         slotName={widgetData?.slotName || widgetData?.slot}
+                        context={{
+                            pageId: context?.pageId || webpageData?.id,
+                            versionId: context?.versionId || pageVersionData?.versionId,
+                            webpageData: context?.webpageData || webpageData,
+                            pageVersionData: context?.pageVersionData || pageVersionData,
+                            contextType
+                        }}
                     />
                 )}
 
@@ -431,11 +440,16 @@ const WidgetEditorPanel = forwardRef(({
                                     contextType={contextType}
                                     widgetId={widgetData?.id}
                                     slotName={widgetData?.slotName || widgetData?.slot}
-                                    context={widgetData?.context || {
+                                    context={{
+                                        ...(widgetData?.context || {}),
                                         widgetId: widgetData?.id,
                                         slotName: widgetData?.slotName || widgetData?.slot,
                                         mode: 'edit',
-                                        contextType
+                                        contextType,
+                                        pageId: context?.pageId || webpageData?.id,
+                                        versionId: context?.versionId || pageVersionData?.versionId,
+                                        webpageData: context?.webpageData || webpageData,
+                                        pageVersionData: context?.pageVersionData || pageVersionData
                                     }}
                                 />
                                 <WidgetPublishingInheritanceFields
