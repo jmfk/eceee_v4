@@ -40,6 +40,7 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
     const [originalSchema, setOriginalSchema] = useState(null)
     const [isSavingSchema, setIsSavingSchema] = useState(false)
     const [schemaError, setSchemaError] = useState(null)
+    const [schemaValidationErrors, setSchemaValidationErrors] = useState({})
 
     const [hasUnsavedBasicChanges, setHasUnsavedBasicChanges] = useState(false)
     const [originalBasicInfo, setOriginalBasicInfo] = useState(null)
@@ -314,6 +315,10 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
         if (schemaError) {
             setSchemaError(null)
         }
+    }
+
+    const handleSchemaValidationChange = (isValid, errors) => {
+        setSchemaValidationErrors(errors)
     }
 
     const handleSlotChange = (slots) => {
@@ -907,6 +912,7 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
                     <SchemaEditor
                         schema={formData.schema}
                         onChange={handleSchemaChange}
+                        onValidationChange={handleSchemaValidationChange}
                         showPreview={true}
                         showJsonView={true}
                     />
@@ -1127,8 +1133,9 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
                     <button
                         type="button"
                         onClick={handleSaveSchema}
-                        disabled={!hasUnsavedSchemaChanges || isSavingSchema}
+                        disabled={!hasUnsavedSchemaChanges || isSavingSchema || Object.keys(schemaValidationErrors).length > 0}
                         className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        title={Object.keys(schemaValidationErrors).length > 0 ? 'Please fix validation errors before saving' : ''}
                     >
                         {isSavingSchema ? (
                             <>
