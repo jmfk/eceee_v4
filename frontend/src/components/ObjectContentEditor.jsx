@@ -36,10 +36,16 @@ const ObjectContentEditor = ({ objectType, widgets = {}, mode = 'object', onWidg
     // State for normalized widgets that can be updated from UDC
     const [internalWidgets, setInternalWidgets] = useState(widgets)
     const isInitialized = useRef(false)
+    const internalWidgetsRef = useRef(internalWidgets)
 
     // Use widgets directly since migration is complete
     const normalizedWidgets = useMemo(() => {
         return internalWidgets
+    }, [internalWidgets])
+
+    // Keep ref in sync
+    useEffect(() => {
+        internalWidgetsRef.current = internalWidgets
     }, [internalWidgets])
 
     // Initialize widgets from props only once on mount
@@ -59,7 +65,33 @@ const ObjectContentEditor = ({ objectType, widgets = {}, mode = 'object', onWidg
             // For object editing, we want all slots, so we take the entire widgets object
             const objectData = state.objects?.[instanceId]
             if (objectData?.widgets) {
-                setInternalWidgets(objectData.widgets)
+                // Check if this is just a config update (not structural)
+                const newWidgets = objectData.widgets
+                const currentWidgets = internalWidgetsRef.current
+
+                // Check if the structure changed (widget added/removed/reordered)
+                // Check all slots in both old and new widgets
+                const allSlots = new Set([
+                    ...Object.keys(newWidgets),
+                    ...Object.keys(currentWidgets)
+                ])
+
+                const structureChanged = Array.from(allSlots).some(slotName => {
+                    const newSlot = newWidgets[slotName] || []
+                    const currentSlot = currentWidgets[slotName] || []
+
+                    // Different number of widgets = structure changed
+                    if (newSlot.length !== currentSlot.length) return true
+
+                    // Different widget IDs or order = structure changed
+                    return newSlot.some((w, idx) => w.id !== currentSlot[idx]?.id)
+                })
+
+                // Only update if structure changed (not just config)
+                // ContentWidget handles its own config updates via refs
+                if (structureChanged) {
+                    setInternalWidgets(newWidgets)
+                }
             }
         }
     })
