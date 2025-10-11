@@ -220,26 +220,6 @@ class ObjectTypeDefinition(models.Model):
                             raise ValidationError(
                                 f"Slot '{slot['name']}': widget control {i+1} default_config must be an object"
                             )
-
-                # Legacy support - validate old format if present
-                if "allowedWidgets" in slot:
-                    if not isinstance(slot["allowedWidgets"], list):
-                        raise ValidationError(
-                            f"Slot '{slot['name']}': allowedWidgets must be an array"
-                        )
-
-                    # Validate that widget types exist
-                    self._validate_widget_types(slot["allowedWidgets"], slot["name"])
-
-                if "disallowedWidgets" in slot:
-                    if not isinstance(slot["disallowedWidgets"], list):
-                        raise ValidationError(
-                            f"Slot '{slot['name']}': disallowedWidgets must be an array"
-                        )
-
-                    # Validate that widget types exist
-                    self._validate_widget_types(slot["disallowedWidgets"], slot["name"])
-
                 if "maxWidgets" in slot and slot["maxWidgets"] is not None:
                     if (
                         not isinstance(slot["maxWidgets"], int)

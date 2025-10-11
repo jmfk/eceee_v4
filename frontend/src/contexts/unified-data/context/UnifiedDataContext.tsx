@@ -191,13 +191,23 @@ export function UnifiedDataProvider({
             }
         }
 
+        // Operations that need to preserve their own ID (not componentId)
+        const PRESERVE_ID_OPS: Set<keyof typeof OperationTypes> = new Set([
+            OperationTypes.INIT_OBJECT,
+            OperationTypes.INIT_VERSION,
+            OperationTypes.SWITCH_OBJECT_VERSION,
+            OperationTypes.SWITCH_VERSION
+        ] as unknown as Array<keyof typeof OperationTypes>);
+
         const operation = {
             type,
             sourceId: componentId,
-            payload: {
-                id: componentId,
-                ...augmentedData
-            }
+            payload: PRESERVE_ID_OPS.has(type)
+                ? augmentedData  // Don't add componentId, preserve the ID from data
+                : {
+                    id: componentId,
+                    ...augmentedData
+                }
         };
 
         await manager.dispatch(operation);
