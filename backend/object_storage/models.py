@@ -220,6 +220,7 @@ class ObjectTypeDefinition(models.Model):
                             raise ValidationError(
                                 f"Slot '{slot['name']}': widget control {i+1} default_config must be an object"
                             )
+
                 if "maxWidgets" in slot and slot["maxWidgets"] is not None:
                     if (
                         not isinstance(slot["maxWidgets"], int)
@@ -306,16 +307,6 @@ class ObjectTypeDefinition(models.Model):
                 control["widgetType"] for control in slot["widgetControls"]
             }
             return [w for w in all_widgets if w.slug in allowed_slugs]
-
-        # Legacy format: If allowedWidgets is specified, use only those
-        if "allowedWidgets" in slot:
-            allowed_slugs = set(slot["allowedWidgets"])
-            return [w for w in all_widgets if w.slug in allowed_slugs]
-
-        # Legacy format: If disallowedWidgets is specified, exclude those
-        if "disallowedWidgets" in slot:
-            disallowed_slugs = set(slot["disallowedWidgets"])
-            return [w for w in all_widgets if w.slug not in disallowed_slugs]
 
         # Otherwise, all widgets are allowed
         return all_widgets
@@ -843,6 +834,7 @@ class ObjectVersion(models.Model):
     )
     created_by = models.ForeignKey(User, on_delete=models.PROTECT)
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     change_description = models.TextField(
         blank=True, help_text="Description of changes made in this version"
     )
