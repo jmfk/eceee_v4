@@ -1,0 +1,144 @@
+<!-- Path Debug Widget Template -->
+<div class="path-debug-widget border-2 border-purple-500 bg-purple-50 rounded-lg p-6">
+    <h3 class="text-lg font-bold text-purple-900 mb-4 flex items-center gap-2">
+        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+        </svg>
+        {{ config.title }}
+    </h3>
+
+    <div class="space-y-4">
+        <!-- Mode Indicator -->
+        <div class="bg-white rounded p-3 border border-purple-200">
+            <div class="text-sm font-semibold text-gray-700 mb-1">Mode</div>
+            <div class="flex items-center gap-2">
+                {% if path_variables %}
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                        <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                        </svg>
+                        Detail View
+                    </span>
+                {% else %}
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                        <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/>
+                        </svg>
+                        List View
+                    </span>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Path Variables -->
+        <div class="bg-white rounded p-3 border border-purple-200">
+            <div class="text-sm font-semibold text-gray-700 mb-2">Captured Path Variables</div>
+            {% if path_variables %}
+                <div class="space-y-2">
+                    {% for key, value in path_variables.items %}
+                        <div class="flex items-start gap-2 font-mono text-sm">
+                            <span class="text-purple-600 font-bold">{{ key }}:</span>
+                            <span class="text-gray-900 bg-gray-100 px-2 py-1 rounded">{{ value }}</span>
+                        </div>
+                    {% endfor %}
+                </div>
+                <div class="mt-2 text-xs text-gray-500">
+                    {{ path_variables|length }} variable{{ path_variables|length|pluralize }} captured
+                </div>
+            {% else %}
+                <div class="text-sm text-gray-500 italic">
+                    No path variables captured (listing mode)
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Current Path -->
+        <div class="bg-white rounded p-3 border border-purple-200">
+            <div class="text-sm font-semibold text-gray-700 mb-1">Current Path</div>
+            <div class="font-mono text-sm text-gray-900 bg-gray-100 px-2 py-1 rounded">
+                {{ request.path }}
+            </div>
+        </div>
+
+        <!-- Page Pattern -->
+        {% if config.pattern_info %}
+            <div class="bg-white rounded p-3 border border-purple-200">
+                <div class="text-sm font-semibold text-gray-700 mb-2">Page Path Pattern</div>
+                <div class="space-y-2">
+                    <div class="flex gap-2">
+                        <span class="text-xs text-gray-600 font-semibold">Name:</span>
+                        <span class="text-sm text-gray-900">{{ config.pattern_info.name }}</span>
+                    </div>
+                    <div class="flex gap-2">
+                        <span class="text-xs text-gray-600 font-semibold">Key:</span>
+                        <span class="text-xs font-mono text-gray-900 bg-gray-100 px-2 py-1 rounded">{{ config.pattern_info.key }}</span>
+                    </div>
+                    <div class="flex flex-col gap-1">
+                        <span class="text-xs text-gray-600 font-semibold">Regex Pattern:</span>
+                        <span class="text-xs font-mono text-gray-900 bg-gray-100 px-2 py-1 rounded break-all">{{ config.pattern_info.regex }}</span>
+                    </div>
+                    {% if config.pattern_info.description %}
+                    <div class="flex flex-col gap-1">
+                        <span class="text-xs text-gray-600 font-semibold">Description:</span>
+                        <span class="text-xs text-gray-700">{{ config.pattern_info.description }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        {% elif current_page.path_pattern_key %}
+            <div class="bg-white rounded p-3 border border-purple-200">
+                <div class="text-sm font-semibold text-gray-700 mb-1">Page Path Pattern</div>
+                <div class="font-mono text-sm text-yellow-700 bg-yellow-100 px-2 py-1 rounded">
+                    Pattern key "{{ current_page.path_pattern_key }}" not found in registry
+                </div>
+            </div>
+        {% else %}
+            <div class="bg-white rounded p-3 border border-purple-200">
+                <div class="text-sm font-semibold text-gray-700 mb-1">Page Path Pattern</div>
+                <div class="text-sm text-gray-500 italic">
+                    No path pattern configured
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- Full Context (Optional) -->
+        {% if config.show_full_context and current_page %}
+            <div class="bg-white rounded p-3 border border-purple-200">
+                <div class="text-sm font-semibold text-gray-700 mb-2">Full Context</div>
+                <div class="space-y-1 text-xs font-mono">
+                    <div class="flex gap-2">
+                        <span class="text-purple-600">page_id:</span>
+                        <span class="text-gray-700">{{ current_page.id }}</span>
+                    </div>
+                    <div class="flex gap-2">
+                        <span class="text-purple-600">page_slug:</span>
+                        <span class="text-gray-700">{{ current_page.slug }}</span>
+                    </div>
+                    <div class="flex gap-2">
+                        <span class="text-purple-600">page_title:</span>
+                        <span class="text-gray-700">{{ current_page.title }}</span>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- Usage Hint -->
+        <div class="bg-purple-100 rounded p-3 border border-purple-300">
+            <div class="text-xs text-purple-800">
+                <strong>💡 Usage:</strong> This widget shows path variables captured by the page's path pattern.
+                Visit URLs like <code class="bg-purple-200 px-1 rounded">/news/article-slug/</code> to see variables in action.
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.path-debug-widget {
+    font-family: system-ui, -apple-system, sans-serif;
+}
+.path-debug-widget code {
+    font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+    font-size: 0.875rem;
+}
+</style>
+
