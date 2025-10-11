@@ -14,7 +14,6 @@ const WidgetSelectionModal = ({ isOpen, onClose, onSelectWidget, slot, available
     // Filter available widget types based on slot configuration and search term
     const filteredWidgets = useMemo(() => {
         if (!availableWidgetTypes) return []
-        console.log("slot?.widgetControls", slot?.widgetControls)
 
         // If no widgetControls, use all available widgets (fallback - matches backend behavior)
         if (!slot?.widgetControls || slot.widgetControls.length === 0) {
@@ -72,7 +71,6 @@ const WidgetSelectionModal = ({ isOpen, onClose, onSelectWidget, slot, available
                 widget.type.toLowerCase().includes(term)
             )
         }
-
         return widgets
     }, [slot, availableWidgetTypes, searchTerm])
 
@@ -111,7 +109,6 @@ const WidgetSelectionModal = ({ isOpen, onClose, onSelectWidget, slot, available
 
     if (!isOpen) return null
 
-    console.log("filteredWidgets", filteredWidgets)
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div
