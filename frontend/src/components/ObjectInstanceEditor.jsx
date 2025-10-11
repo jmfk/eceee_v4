@@ -1,3 +1,12 @@
+/**
+ * @deprecated This component is deprecated and no longer used.
+ * Use ObjectInstanceEditPage with ObjectContentView, ObjectSettingsView, and ObjectPublishingView instead.
+ * This file is kept for reference only and may be removed in future versions.
+ * 
+ * Migration note: The new page-level editor uses UDC (Unified Data Context) for state management,
+ * providing better synchronization and consistent state across all editing tabs.
+ */
+
 import React, { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Save, X, Eye, Calendar, User, Hash, Type, ToggleLeft, Image, FileText, History } from 'lucide-react'

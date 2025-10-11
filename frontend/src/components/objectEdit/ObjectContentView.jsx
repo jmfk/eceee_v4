@@ -18,15 +18,24 @@ const ObjectContentView = forwardRef(({ objectType, instance, parentId, isNewIns
     const { instanceId, objectTypeId, tab } = useParams()
     const [localWidgets, setLocalWidgets] = useState(instance?.widgets || {})
     const [namespace, setNamespace] = useState(null)
+    const [formValidationState, setFormValidationState] = useState({ isValid: true, errors: {} })
 
     const { useExternalChanges, publishUpdate } = useUnifiedData()
 
 
     const componentId = useMemo(() => `object-instance-editor-${instanceId || 'new'}`, [instanceId])
 
-    useExternalChanges(componentId, state => {
-        // Handle external changes if needed
-        // Currently no specific handling required for ObjectContentView
+    // Subscribe to external changes from UDC
+    useExternalChanges(componentId, (state) => {
+        if (!instanceId) return;
+
+        const objectData = state.objects?.[String(instanceId)];
+        if (objectData) {
+            // Sync widgets from UDC state
+            if (objectData.widgets && JSON.stringify(objectData.widgets) !== JSON.stringify(localWidgets)) {
+                setLocalWidgets(objectData.widgets);
+            }
+        }
     });
 
     // Widget editor state
