@@ -22,7 +22,6 @@ const ObjectContentView = forwardRef(({ objectType, instance, parentId, isNewIns
 
     const { useExternalChanges, publishUpdate } = useUnifiedData()
 
-
     const componentId = useMemo(() => `object-instance-editor-${instanceId || 'new'}`, [instanceId])
 
     // Subscribe to external changes from UDC
@@ -81,15 +80,15 @@ const ObjectContentView = forwardRef(({ objectType, instance, parentId, isNewIns
         loadNamespace()
     }, [objectType?.namespace])
 
+    // Note: handleWidgetChange is no longer used by ObjectContentEditor
+    // Widget updates now flow exclusively through UDC:
+    // 1. ObjectContentEditor publishes updates via publishUpdate()
+    // 2. This component receives updates via useExternalChanges() subscription
+    // 3. localWidgets state is automatically synced from UDC
+    // This prevents duplicate state updates and maintains single source of truth
     const handleWidgetChange = useCallback(async (widgets, widgetId) => {
-        setLocalWidgets(widgets)
-
-        await publishUpdate(componentId, OperationTypes.MOVE_WIDGET, {
-            //id: instanceId,
-            //slot: slotName,
-            contextType: 'object',
-            widgets: widgets
-        });
+        // Legacy callback - kept for compatibility but should not be called
+        // Updates should only come through UDC now
     }, [])
 
     // Widget editor state management - direct callback approach instead of polling

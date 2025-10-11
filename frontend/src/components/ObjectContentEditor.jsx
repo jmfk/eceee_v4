@@ -11,7 +11,7 @@ import { useWidgetEvents } from '../contexts/WidgetEventContext'
 import { useEditorContext } from '../contexts/unified-data/hooks'
 
 
-const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, mode = 'object', onWidgetEditorStateChange, context }) => {
+const ObjectContentEditor = ({ objectType, widgets = {}, mode = 'object', onWidgetEditorStateChange, context }) => {
     const [selectedWidgets, setSelectedWidgets] = useState({}) // For bulk operations
 
     // Get update lock and UnifiedData context
@@ -20,13 +20,6 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, mode = 
     // Stable component identifier for UDC source tracking
     const instanceId = context.instanceId
     const componentId = useMemo(() => `object-instance-editor-${instanceId || 'new'}`, [instanceId])
-
-    // Centralized function to notify parent of widget changes
-    const notifyWidgetChange = useCallback((updatedWidgets, widgetId) => {
-        if (onWidgetChange) {
-            onWidgetChange(updatedWidgets, { sourceId: widgetId })
-        }
-    }, [])
 
     // Widget editor panel state
     const [widgetEditorOpen, setWidgetEditorOpen] = useState(false)
@@ -40,22 +33,27 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, mode = 
 
     const contextType = useEditorContext()
 
-    // State for normalized widgets that can be updated from ODC
+    // State for normalized widgets that can be updated from UDC
     const [internalWidgets, setInternalWidgets] = useState(widgets)
+    const isInitialized = useRef(false)
 
     // Use widgets directly since migration is complete
     const normalizedWidgets = useMemo(() => {
         return internalWidgets
     }, [internalWidgets])
 
-    // Update internal widgets when props change (for initial load)
+    // Initialize widgets from props only once on mount
+    // After that, updates come from optimistic updates or UDC subscription
     useEffect(() => {
-        setInternalWidgets(widgets)
+        if (!isInitialized.current) {
+            setInternalWidgets(widgets)
+            isInitialized.current = true
+        }
     }, [widgets])
 
     // Subscribe to external changes via Unified Data Context
     useExternalChanges(componentId, (state) => {
-        // When widgets are updated through ODC, extract widgets for this specific object
+        // When widgets are updated through UDC, extract widgets for this specific object
         if (state && instanceId) {
             // Objects store widgets under state.objects[objectId].widgets[slotName]
             // For object editing, we want all slots, so we take the entire widgets object
@@ -75,13 +73,8 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, mode = 
         normalizedWidgetsRef.current = normalizedWidgets
     }, [normalizedWidgets])
 
-    // Use the shared widget hook (but we'll override widgetTypes with object type's configuration)
-    const {
-        widgetTypes,
-        addWidget,
-        updateWidget,
-        deleteWidget
-    } = useWidgets(normalizedWidgets)
+    // Use the shared widget hook to get widget types
+    const { widgetTypes } = useWidgets(normalizedWidgets)
 
     // State for filtered widget types
     const [filteredWidgetTypes, setFilteredWidgetTypes] = useState([])
@@ -184,27 +177,32 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, mode = 
             }
         }
 
-        // Use the shared addWidget function
-        const newWidget = addWidget(slotName, widgetType, widgetConfig)
+        // Create new widget object
+        const newWidget = {
+            id: `widget-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            type: widgetType,
+            config: widgetConfig,
+            name: getWidgetDisplayName(widgetType, widgetTypes) || widgetType
+        }
 
-        // Compute updated widgets and notify parent
-        const currentWidgets = normalizedWidgets
-        const currentSlotWidgets = currentWidgets[slotName] || []
+        // Optimistically update local state
+        const currentSlotWidgets = normalizedWidgets[slotName] || []
         const updatedWidgets = {
-            ...currentWidgets,
+            ...normalizedWidgets,
             [slotName]: [...currentSlotWidgets, newWidget]
         }
-        //notifyWidgetChange(updatedWidgets, newWidget.id)
+        setInternalWidgets(updatedWidgets)
 
-        // Publish to Unified Data Context
-        await publishUpdate(componentId, OperationTypes.ADD_WIDGET, {
+        // Publish to Unified Data Context (for persistence and other subscribers)
+        const addWidgetPayload = {
             id: newWidget.id,
             type: newWidget.type,
             config: newWidget.config,
             slot: slotName,
             contextType: contextType,
-            order: (updatedWidgets[slotName]?.length || 1) - 1
-        })
+            order: currentSlotWidgets.length
+        }
+        await publishUpdate(componentId, OperationTypes.ADD_WIDGET, addWidgetPayload)
     }
 
     // Widget editor handlers
@@ -286,13 +284,12 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, mode = 
     const handleDeleteWidget = async (slotName, widgetIndex, widget) => {
         const slot = objectType?.slotConfiguration?.slots?.find(s => s.name === slotName)
 
-        // Compute updated widgets and notify parent
-        const currentWidgets = normalizedWidgets
-        const updatedWidgets = { ...currentWidgets }
+        // Optimistically update local state
+        const updatedWidgets = { ...normalizedWidgets }
         if (updatedWidgets[slotName]) {
             updatedWidgets[slotName] = updatedWidgets[slotName].filter((_, i) => i !== widgetIndex)
         }
-        //notifyWidgetChange(updatedWidgets, widget?.id)
+        setInternalWidgets(updatedWidgets)
 
         // Publish removal to Unified Data Context
         if (widget?.id) {
@@ -301,9 +298,6 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, mode = 
                 contextType: contextType
             })
         }
-
-        // Use the shared deleteWidget function
-        deleteWidget(slotName, widgetIndex)
 
         // Remove from selection if selected
         const widgetKey = `${slotName}-${widgetIndex}`
@@ -317,44 +311,54 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, mode = 
     }
 
     // Move widget up in the slot
-    const handleMoveWidgetUp = (slotName, widgetIndex, widget) => {
+    const handleMoveWidgetUp = async (slotName, widgetIndex, widget) => {
         if (widgetIndex <= 0) return // Can't move the first widget up
-        const slot = objectType?.slotConfiguration?.slots?.find(s => s.name === slotName)
-        const currentWidgets = normalizedWidgets
-        const slotWidgets = [...(currentWidgets[slotName] || [])]
 
-        if (widgetIndex < slotWidgets.length) {
-            const [movedWidget] = slotWidgets.splice(widgetIndex, 1)
-            slotWidgets.splice(widgetIndex - 1, 0, movedWidget)
-
-            const updatedWidgets = {
-                ...currentWidgets,
-                [slotName]: slotWidgets
-            }
-            onWidgetChange(updatedWidgets)
+        // Optimistically update local state
+        const slotWidgets = [...(normalizedWidgets[slotName] || [])]
+        const [movedWidget] = slotWidgets.splice(widgetIndex, 1)
+        slotWidgets.splice(widgetIndex - 1, 0, movedWidget)
+        const updatedWidgets = {
+            ...normalizedWidgets,
+            [slotName]: slotWidgets
         }
+        setInternalWidgets(updatedWidgets)
+
+        // Publish move operation to UDC
+        await publishUpdate(componentId, OperationTypes.MOVE_WIDGET, {
+            id: widget.id,
+            slotName,
+            fromIndex: widgetIndex,
+            toIndex: widgetIndex - 1,
+            contextType: contextType
+        })
     }
 
     // Move widget down in the slot
-    const handleMoveWidgetDown = (slotName, widgetIndex, widget) => {
+    const handleMoveWidgetDown = async (slotName, widgetIndex, widget) => {
         const slotWidgets = normalizedWidgets[slotName] || []
         if (widgetIndex >= slotWidgets.length - 1) {
             return // Can't move the last widget down
         }
-        const slot = objectType?.slotConfiguration?.slots?.find(s => s.name === slotName)
-        const currentWidgets = normalizedWidgets
-        const currentSlotWidgets = [...(currentWidgets[slotName] || [])]
 
-        if (widgetIndex >= 0 && widgetIndex < currentSlotWidgets.length - 1) {
-            const [movedWidget] = currentSlotWidgets.splice(widgetIndex, 1)
-            currentSlotWidgets.splice(widgetIndex + 1, 0, movedWidget)
-
-            const updatedWidgets = {
-                ...currentWidgets,
-                [slotName]: currentSlotWidgets
-            }
-            onWidgetChange(updatedWidgets)
+        // Optimistically update local state
+        const currentSlotWidgets = [...slotWidgets]
+        const [movedWidget] = currentSlotWidgets.splice(widgetIndex, 1)
+        currentSlotWidgets.splice(widgetIndex + 1, 0, movedWidget)
+        const updatedWidgets = {
+            ...normalizedWidgets,
+            [slotName]: currentSlotWidgets
         }
+        setInternalWidgets(updatedWidgets)
+
+        // Publish move operation to UDC
+        await publishUpdate(componentId, OperationTypes.MOVE_WIDGET, {
+            id: widget.id,
+            slotName,
+            fromIndex: widgetIndex,
+            toIndex: widgetIndex + 1,
+            contextType: contextType
+        })
     }
 
     // Widget modal handlers
@@ -377,15 +381,16 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, mode = 
     // Clear all widgets in a slot
     const handleClearSlot = async (slotName) => {
         const slot = objectType?.slotConfiguration?.slots?.find(s => s.name === slotName)
-        const previousWidgetCount = (normalizedWidgets[slotName] || []).length
+        const existingWidgetsInSlot = normalizedWidgets[slotName] || []
 
+        // Optimistically update local state
         const updatedWidgets = {
             ...normalizedWidgets,
             [slotName]: []
         }
+        setInternalWidgets(updatedWidgets)
 
         // Publish removal of all widgets in the slot to Unified Data Context
-        const existingWidgetsInSlot = normalizedWidgets[slotName] || []
         for (const w of existingWidgetsInSlot) {
             await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, {
                 id: w.id, contextType: contextType,
@@ -402,9 +407,6 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, mode = 
             })
             return newSelection
         })
-
-        // Notify parent component via callback
-        //notifyWidgetChange(updatedWidgets, `slot-${slotName}`)
     }
 
     // Handle ObjectEditor-specific slot actions
@@ -414,23 +416,20 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, mode = 
         switch (action) {
             case 'duplicate':
                 if (widget) {
-                    const duplicatedWidget = {
+                    // Create duplicated widget object
+                    const newWidget = {
                         ...widget,
                         id: `widget-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
                         name: `${widget.name} (Copy)`
                     }
 
-                    // Add the duplicated widget
-                    const newWidget = addWidget(slotName, widget.type, duplicatedWidget.config)
-
-                    // Compute updated widgets and notify parent
-                    const currentWidgets = normalizedWidgets
-                    const currentSlotWidgets = currentWidgets[slotName] || []
+                    // Optimistically update local state
+                    const currentSlotWidgets = normalizedWidgets[slotName] || []
                     const updatedWidgets = {
-                        ...currentWidgets,
+                        ...normalizedWidgets,
                         [slotName]: [...currentSlotWidgets, newWidget]
                     }
-                    //notifyWidgetChange(updatedWidgets, newWidget.id)
+                    setInternalWidgets(updatedWidgets)
 
                     // Publish duplication as add operation to UDC
                     await publishUpdate(componentId, OperationTypes.ADD_WIDGET, {
@@ -439,7 +438,7 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, mode = 
                         config: newWidget.config,
                         slot: slotName,
                         contextType: contextType,
-                        order: (updatedWidgets[slotName]?.length || 1) - 1
+                        order: currentSlotWidgets.length
                     })
                 }
                 break;
@@ -452,7 +451,7 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, mode = 
             default:
                 console.warn('Unknown slot action:', action)
         }
-    }, [objectType, addWidget, publishUpdate, componentId, normalizedWidgets])
+    }, [objectType, publishUpdate, componentId, normalizedWidgets, contextType])
 
     // Stable config change handler that doesn't depend on widget.config
     const stableConfigChangeHandler = useCallback(async (widgetId, slotName, newConfig) => {
@@ -465,7 +464,12 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, mode = 
                 ...currentWidget,
                 config: newConfig
             };
-            updateWidget(slotName, widgetIndex, updatedWidget);
+
+            // Optimistically update local state
+            const updatedWidgets = { ...normalizedWidgets };
+            updatedWidgets[slotName] = [...currentWidgets];
+            updatedWidgets[slotName][widgetIndex] = updatedWidget;
+            setInternalWidgets(updatedWidgets);
 
             // Update editingWidget if this is the widget being edited
             if (editingWidget && editingWidget.id === widgetId) {
@@ -475,14 +479,10 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, mode = 
                 });
             }
 
-            // Create updated widgets object and notify parent
-            const updatedWidgets = { ...normalizedWidgets };
-            updatedWidgets[slotName] = [...currentWidgets];
-            updatedWidgets[slotName][widgetIndex] = updatedWidget;
-
-            //await notifyWidgetChange(updatedWidgets);
+            // Note: Config updates are handled via UDC publishUpdate in the save handler
+            // This is just the local preview during editing
         }
-    }, [normalizedWidgets, updateWidget, editingWidget]);
+    }, [normalizedWidgets, editingWidget]);
 
     const renderWidget = (widget, slotName, index) => {
         const widgetKey = `${slotName}-${index}`
