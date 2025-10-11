@@ -14,7 +14,8 @@ import { validateFieldName, validateSchemaShape } from '../../utils/schemaValida
 export default function SchemaEditor({
   schema = {},
   onChange,
-  disabled = false
+  disabled = false,
+  onValidationChange = null
 }) {
   const [isLoading, setIsLoading] = useState(true)
   const [initError, setInitError] = useState(null)
@@ -88,6 +89,8 @@ export default function SchemaEditor({
 
   /**
    * Convert internal properties format to JSON schema
+   * Note: We preserve all properties, even those with validation errors,
+   * to prevent data loss during editing. Validation errors will prevent saving.
    */
   const convertPropertiesToSchema = useCallback((propertiesList) => {
     const newSchema = {
@@ -100,7 +103,9 @@ export default function SchemaEditor({
     propertiesList.forEach(prop => {
       const { key, required, _id, ...schemaProp } = prop
 
-      if (key && validateFieldName(key)) {
+      // Preserve all properties with keys, even invalid ones
+      // This prevents fields from being deleted when editing
+      if (key) {
         // Add to properties object
         newSchema.properties[key] = schemaProp
         newSchema.propertyOrder.push(key)
@@ -153,8 +158,15 @@ export default function SchemaEditor({
     })
 
     setValidationErrors(errors)
-    return Object.keys(errors).length === 0
-  }, [])
+    const isValid = Object.keys(errors).length === 0
+
+    // Notify parent component of validation state
+    if (onValidationChange) {
+      onValidationChange(isValid, errors)
+    }
+
+    return isValid
+  }, [onValidationChange])
 
   /**
    * Handle properties change and update schema

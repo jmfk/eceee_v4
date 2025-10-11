@@ -749,6 +749,8 @@ export default function VisualSchemaEditor({ schema, onChange }) {
   }
 
   // Update parent schema when properties change
+  // Note: We preserve all properties, even those with validation errors,
+  // to prevent data loss during editing. Validation errors will prevent saving.
   const updateSchema = useCallback((newProperties) => {
     const newSchema = {
       type: 'object',
@@ -760,7 +762,9 @@ export default function VisualSchemaEditor({ schema, onChange }) {
     // Convert internal properties format to JSON Schema format
     newProperties.forEach(prop => {
       const { key, required, uiType, _id, ...schemaProp } = prop
-      if (key && validateFieldName(key)) {
+      // Preserve all properties with keys, even invalid ones
+      // This prevents fields from being deleted when editing
+      if (key) {
         // Add fieldType to the property definition
         const propertyWithFieldType = {
           ...schemaProp,
