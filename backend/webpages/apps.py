@@ -25,6 +25,10 @@ class WebpagesConfig(AppConfig):
             autodiscover_widgets,
             validate_widget_types,
         )
+        from .path_pattern_autodiscovery import (
+            autodiscover_path_patterns,
+            validate_path_patterns,
+        )
 
         if LAYOUT_AUTODISCOVERY_ENABLED:
             autodiscover_layouts()
@@ -35,7 +39,10 @@ class WebpagesConfig(AppConfig):
         # Always autodiscover widget types
         autodiscover_widgets()
 
-        # Validate widget types on startup in debug mode
+        # Always autodiscover path patterns
+        autodiscover_path_patterns()
+
+        # Validate widget types and path patterns on startup in debug mode
         from django.conf import settings
 
         if settings.DEBUG:
@@ -46,4 +53,13 @@ class WebpagesConfig(AppConfig):
                 logger = logging.getLogger(__name__)
                 logger.warning(
                     f"Widget type validation issues found: {validation_results['issues']}"
+                )
+
+            pattern_validation = validate_path_patterns()
+            if not pattern_validation["valid"]:
+                import logging
+
+                logger = logging.getLogger(__name__)
+                logger.warning(
+                    f"Path pattern validation issues found: {pattern_validation['issues']}"
                 )

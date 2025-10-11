@@ -50,6 +50,7 @@ export const endpoints = {
         publish: (id) => `${BASE_PATH}/webpages/versions/${id}/publish/`,
         createDraft: (id) => `${BASE_PATH}/webpages/versions/${id}/create_draft/`,
         restore: (id) => `${BASE_PATH}/webpages/versions/${id}/restore/`,
+        updatePublishing: (id) => `${BASE_PATH}/webpages/versions/${id}/publishing/`,
         compare: `${BASE_PATH}/webpages/versions/compare/`,
         search: `${BASE_PATH}/webpages/versions/search/`,
         // NEW: Consistent path-based endpoints (no query strings)

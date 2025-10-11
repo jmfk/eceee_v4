@@ -15,7 +15,7 @@ import { OperationTypes } from '../../contexts/unified-data/types/operations'
 
 
 const TreeBasedLayoutRenderer = forwardRef(({
-    layoutName = 'single_column',
+    layoutName = 'main_layout',  // Default to main_layout (available layout)
     widgets = {},
     onWidgetChange,
     editable = true,

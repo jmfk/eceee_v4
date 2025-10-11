@@ -278,6 +278,9 @@ class BaseWidget(ABC):
                 "theme": context.get("theme"),
                 "slots": context.get("slots", []),
                 "request": context.get("request"),
+                "path_variables": context.get(
+                    "path_variables", {}
+                ),  # NEW: Add path variables
             }
 
             # If this is an object page, add object context

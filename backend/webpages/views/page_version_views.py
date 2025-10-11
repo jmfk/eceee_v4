@@ -353,7 +353,7 @@ class PageVersionViewSet(viewsets.ModelViewSet):
         url_path="pages/(?P<page_id>[^/.]+)/versions/current",
     )
     def current_for_page(self, request, page_id=None):
-        """Get current published version for a specific page"""
+        """Get current published version for a specific page, creating one if none exists"""
         try:
             page = get_object_or_404(WebPage, id=page_id)
         except ValueError:
@@ -369,9 +369,16 @@ class PageVersionViewSet(viewsets.ModelViewSet):
                 current_version = page.get_latest_version()
 
         if not current_version:
-            return Response(
-                {"detail": "No versions found for this page"},
-                status=status.HTTP_404_NOT_FOUND,
+            # Auto-create initial version if none exists
+            current_version = page.create_version(
+                user=request.user, version_title="Auto-generated initial version"
+            )
+            # Log the auto-creation
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.info(
+                f"Auto-created initial version for page {page_id} (no versions existed)"
             )
 
         serializer = self.get_serializer(current_version)

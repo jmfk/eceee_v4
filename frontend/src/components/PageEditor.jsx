@@ -28,6 +28,7 @@ import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import { useUnifiedData } from '../contexts/unified-data'
 import { OperationTypes } from '../contexts/unified-data/types/operations'
 import PageContentEditor from '../editors/page-editor/PageContentEditor'
+import { getDefaultLayout } from '../utils/defaultLayout'
 import ErrorTodoSidebar from './ErrorTodoSidebar'
 import SchemaDrivenForm from './SchemaDrivenForm'
 import StatusBar from './StatusBar'
@@ -247,6 +248,9 @@ const PageEditor = () => {
 
     const [layoutData, setLayoutData] = useState(null)
     const [isLoadingLayout, setIsLoadingLayout] = useState(false)
+    const [activeLayoutName, setActiveLayoutName] = useState(null)
+    const [isUsingFallbackLayout, setIsUsingFallbackLayout] = useState(false)
+    const [showEssentialFieldsModal, setShowEssentialFieldsModal] = useState(false)
 
     // Feature flag for new self-contained widget editor
     const contentEditorRef = useRef(null)
@@ -305,43 +309,77 @@ const PageEditor = () => {
         loadNamespace()
     }, [])
 
-    // Initialize data for new page
+    // Initialize data for new page - show modal for essential fields
     useEffect(() => {
         if (isNewPage && !webpageData && !pageVersionData) {
-            const initialWebpageData = {
-                title: '',
-                slug: '',
-                description: '',
-                hostnames: [],
-                enableCssInjection: false,
-                pageCssVariables: {},
-                pageCustomCss: ''
+            // Show modal to collect essential fields for new page
+            setShowEssentialFieldsModal(true);
+        }
+    }, [isNewPage, webpageData, pageVersionData])
+
+    // Create page on backend after essential fields are provided
+    const createNewPageMutation = useMutation({
+        mutationFn: async (essentialFields) => {
+            // Get parent info from location state if available
+            const parentId = location.state?.parentId || location.state?.parentPage?.id || null;
+
+            // Create the page on backend
+            const pageData = {
+                title: essentialFields.title,
+                slug: essentialFields.slug,
+                description: essentialFields.description,
+                parentId: parentId,
+                pathPattern: essentialFields.pathPattern || '',
             };
 
-            const initialPageVersionData = {
+            const newPage = await pagesApi.create(pageData);
+
+            // Create initial version with layout
+            // Note: versionsApi.create automatically adds 'page: pageId' to the request
+            const versionData = {
                 pageData: {},
                 widgets: {},
-                codeLayout: '',
+                codeLayout: essentialFields.codeLayout || '',
                 theme: null,
                 versionTitle: 'Initial version',
-                publicationStatus: 'unpublished'
+                effectiveDate: null,  // Draft version
+                expiryDate: null,
             };
 
-            // // Initialize WebPage data
-            // setWebpageData(initialWebpageData);
-            // publishUpdate(componentId, OperationTypes.INIT_PAGE, {
-            //     id: 'new',
-            //     data: initialWebpageData
-            // });
+            let newVersion;
+            try {
+                newVersion = await versionsApi.create(newPage.id, versionData);
+                console.log('Version created successfully:', newVersion);
+            } catch (versionError) {
+                console.error('Failed to create version:', versionError);
+                // Version creation failed, but page was created
+                // The backend will auto-create a version when we navigate to the page
+                console.log('Page created but version failed - backend will auto-create on load');
+            }
 
-            // Initialize PageVersion data
-            setPageVersionData(initialPageVersionData);
-            publishUpdate(componentId, OperationTypes.INIT_VERSION, {
-                id: 'new',
-                data: initialPageVersionData
+            return { page: newPage, version: newVersion };
+        },
+        onSuccess: ({ page, version }) => {
+            addNotification(`Page "${page.title}" created successfully`, 'success', 'page-create');
+            setShowEssentialFieldsModal(false);
+
+            // Navigate to the newly created page editor
+            // The page editor will fetch the current version (which will auto-create if needed)
+            navigate(`/pages/${page.id}/edit/content`, {
+                state: { previousView }
             });
+        },
+        onError: (error) => {
+            console.error('Failed to create page:', error);
+            showError(error, 'Failed to create page');
+            addNotification('Failed to create page', 'error', 'page-create');
         }
-    }, [isNewPage, webpageData, pageVersionData, publishUpdate, componentId])
+    });
+
+    // Handle essential fields modal submission
+    const handleCreateNewPage = useCallback((essentialFields) => {
+        createNewPageMutation.mutate(essentialFields);
+    }, [createNewPageMutation])
 
     // Fetch webpage data (WebPage model data)
     const { data: webpage, isLoading: isLoadingWebpage } = useQuery({
@@ -450,14 +488,24 @@ const PageEditor = () => {
             let isUsingFallback = false;
 
             if (!layoutToLoad) {
-                // Use fallback layout for versions without layout
-                layoutToLoad = 'single_column'; // Default fallback layout
-                isUsingFallback = true;
+                // Fetch default layout from backend
+                try {
+                    layoutToLoad = await getDefaultLayout();
+                    isUsingFallback = true;
+                } catch (error) {
+                    console.error('Failed to fetch default layout:', error);
+                    layoutToLoad = 'main_layout'; // Hard fallback
+                    isUsingFallback = true;
+                }
             }
+
+            // Store the layout name and fallback status
+            setActiveLayoutName(layoutToLoad);
+            setIsUsingFallbackLayout(isUsingFallback);
 
             try {
                 if (isUsingFallback) {
-                    addNotification(`Using fallback layout: ${layoutToLoad}`, 'info', 'layout-load')
+                    addNotification(`Using default layout: ${layoutToLoad}`, 'info', 'layout-load')
                 } else {
                     addNotification(`Loading layout: ${layoutToLoad}`, 'info', 'layout-load')
                 }
@@ -466,7 +514,7 @@ const PageEditor = () => {
                 setLayoutData(layoutData)
 
                 if (isUsingFallback) {
-                    addNotification(`Fallback layout "${layoutToLoad}" loaded for preview`, 'success', 'layout-load')
+                    addNotification(`Default layout "${layoutToLoad}" loaded for preview`, 'success', 'layout-load')
                 } else {
                     addNotification(`Layout "${layoutToLoad}" loaded successfully`, 'success', 'layout-load')
                 }
@@ -1205,7 +1253,6 @@ const PageEditor = () => {
     // Tab navigation (main tabs)
     const tabs = [
         { id: 'content', label: 'Content', icon: Layout },
-        { id: 'data', label: 'Data', icon: FileText },
         { id: 'settings', label: 'Settings & SEO', icon: Settings },
         { id: 'theme', label: 'Theme', icon: Palette },
         { id: 'publishing', label: 'Publishing', icon: Calendar },
@@ -1443,7 +1490,7 @@ const PageEditor = () => {
                                                     </div>
                                                     <div className="ml-3">
                                                         <p className="text-sm text-amber-700">
-                                                            <strong>No layout specified for this version.</strong> Using fallback single-column layout for preview.
+                                                            <strong>No layout specified for this version.</strong> Using default layout "{activeLayoutName || 'main_layout'}" for preview.
                                                         </p>
                                                     </div>
                                                 </div>
@@ -1499,9 +1546,12 @@ const PageEditor = () => {
                             <SettingsEditor
                                 key={`settings-${pageVersionData?.versionId || 'new'}`}
                                 ref={settingsEditorRef}
-                                webpageData={webpageData}
-                                pageVersionData={pageVersionData}
-                                onUpdate={updatePageData}
+                                componentId={`${componentId}-settings`}
+                                context={{
+                                    pageId: webpageData?.id || pageId,
+                                    versionId: pageVersionData?.id || versionId,
+                                    contextType: 'page'
+                                }}
                                 isNewPage={isNewPage}
                             />
                         )}
@@ -1513,18 +1563,6 @@ const PageEditor = () => {
                                 pageId={pageId}
                                 currentVersion={currentVersion}
                                 onVersionChange={switchToVersion}
-                            />
-                        )}
-                        {activeTab === 'data' && (
-                            <SchemaDrivenForm
-                                key={`data-${pageVersionData?.id || 'new'}`}
-                                pageVersionData={pageVersionData}
-                                onChange={(data) => updatePageData({
-                                    pageData: { ...pageVersionData?.pageData, ...data }
-                                })}
-                                onValidationChange={setSchemaValidationState}
-                                onValidatedDataSync={handleValidatedPageDataSync}
-                                namespace={namespace}
                             />
                         )}
                         {activeTab === 'theme' && (
@@ -1628,11 +1666,229 @@ const PageEditor = () => {
                     </div>
                 }
             />
+
+            {/* Essential Fields Modal for New Pages */}
+            {showEssentialFieldsModal && (
+                <EssentialFieldsModal
+                    onSave={handleCreateNewPage}
+                    onCancel={() => {
+                        setShowEssentialFieldsModal(false);
+                        navigate(previousView);
+                    }}
+                    isLoading={createNewPageMutation.isPending}
+                />
+            )}
         </div>
     )
 }
 
-export default PageEditor
+// Essential Fields Modal Component
+const EssentialFieldsModal = ({ onSave, onCancel, isLoading = false }) => {
+    const [title, setTitle] = useState('')
+    const [slug, setSlug] = useState('')
+    const [description, setDescription] = useState('')
+    const [pathPattern, setPathPattern] = useState('')
+    const [autoGenerateSlug, setAutoGenerateSlug] = useState(true)
+    const [availableLayouts, setAvailableLayouts] = useState([])
+    const [selectedLayout, setSelectedLayout] = useState('')
+
+    // Fetch available layouts
+    useEffect(() => {
+        const fetchLayouts = async () => {
+            try {
+                const response = await fetch('/api/v1/webpages/layouts/', {
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                const layouts = data.results || [];
+                setAvailableLayouts(layouts);
+
+                // Set first layout as default
+                if (layouts.length > 0 && !selectedLayout) {
+                    setSelectedLayout(layouts[0].name);
+                }
+            } catch (error) {
+                console.error('Failed to fetch layouts:', error);
+            }
+        };
+        fetchLayouts();
+    }, []);
+
+    // Auto-generate slug from title
+    useEffect(() => {
+        if (autoGenerateSlug && title) {
+            const generatedSlug = title
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/^-|-$/g, '');
+            setSlug(generatedSlug);
+        }
+    }, [title, autoGenerateSlug]);
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+
+        if (!title.trim()) {
+            alert('Title is required');
+            return;
+        }
+
+        if (!slug.trim()) {
+            alert('Slug is required');
+            return;
+        }
+
+        onSave({
+            title,
+            slug,
+            description,
+            pathPattern,
+            codeLayout: selectedLayout
+        });
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+                <form onSubmit={handleSubmit}>
+                    {/* Header */}
+                    <div className="px-6 py-4 border-b border-gray-200">
+                        <h2 className="text-xl font-semibold text-gray-900">Create New Page</h2>
+                        <p className="text-sm text-gray-500 mt-1">Fill in the essential fields to get started</p>
+                    </div>
+
+                    {/* Body */}
+                    <div className="px-6 py-4 space-y-4">
+                        {/* Title */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Title <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                                type="text"
+                                value={title}
+                                onChange={(e) => setTitle(e.target.value)}
+                                disabled={isLoading}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                                placeholder="e.g., News, About Us, Contact"
+                                autoFocus
+                                required
+                            />
+                        </div>
+
+                        {/* Slug */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Slug <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                                type="text"
+                                value={slug}
+                                onChange={(e) => {
+                                    setSlug(e.target.value);
+                                    setAutoGenerateSlug(false);
+                                }}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                placeholder="e.g., news, about-us, contact"
+                                required
+                            />
+                            <div className="mt-1 flex items-center">
+                                <input
+                                    type="checkbox"
+                                    id="auto-slug"
+                                    checked={autoGenerateSlug}
+                                    onChange={(e) => setAutoGenerateSlug(e.target.checked)}
+                                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                />
+                                <label htmlFor="auto-slug" className="ml-2 text-sm text-gray-600">
+                                    Auto-generate from title
+                                </label>
+                            </div>
+                        </div>
+
+                        {/* Description */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Description (optional)
+                            </label>
+                            <textarea
+                                value={description}
+                                onChange={(e) => setDescription(e.target.value)}
+                                rows={3}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                placeholder="Brief description of this page..."
+                            />
+                        </div>
+
+                        {/* Layout */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Layout (optional)
+                            </label>
+                            <select
+                                value={selectedLayout}
+                                onChange={(e) => setSelectedLayout(e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            >
+                                <option value="">-- Use Default Layout --</option>
+                                {availableLayouts.map(layout => (
+                                    <option key={layout.name} value={layout.name}>
+                                        {layout.name}
+                                    </option>
+                                ))}
+                            </select>
+                            <p className="mt-1 text-xs text-gray-500">
+                                Leave blank to use the default layout
+                            </p>
+                        </div>
+
+                        {/* Path Pattern */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Path Pattern (optional - advanced)
+                            </label>
+                            <input
+                                type="text"
+                                value={pathPattern}
+                                onChange={(e) => setPathPattern(e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                                placeholder="e.g., ^(?P<slug>[\w-]+)/$"
+                            />
+                            <p className="mt-1 text-xs text-gray-500">
+                                Regex pattern for dynamic object publishing. Leave blank for regular pages.
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Footer */}
+                    <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+                        <button
+                            type="button"
+                            onClick={onCancel}
+                            disabled={isLoading}
+                            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={isLoading}
+                            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                        >
+                            {isLoading && (
+                                <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                            )}
+                            <span>{isLoading ? 'Creating...' : 'Create Page'}</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+}
 
 // Navigate user to the view that needs fixing based on item.target
 function navigateToFix({ item, navigate, pageId, isNewPage, currentVersion, previousView }) {
@@ -1645,3 +1901,5 @@ function navigateToFix({ item, navigate, pageId, isNewPage, currentVersion, prev
     if (targetType === 'content') path = `${base}/content`
     navigate(path, { state: { previousView } })
 }
+
+export default PageEditor

@@ -19,6 +19,7 @@ from .views import (
     render_page_backend,
     render_page_preview,
 )
+from .views.path_pattern_views import PathPatternViewSet
 from .views.widget_type_views import pydantic_model_schema
 from .views.simplified_layout_views import (
     simplified_layout_json,
@@ -54,6 +55,8 @@ router.register(r"themes", PageThemeViewSet, basename="pagetheme")
 # Widget-types will be handled with custom patterns to allow dots in widget type names
 # router.register(r"widget-types", WidgetTypeViewSet, basename="widgettype")
 router.register(r"page-data-schemas", PageDataSchemaViewSet, basename="pagedataschema")
+# Path patterns registry
+router.register(r"path-patterns", PathPatternViewSet, basename="path-pattern")
 
 # Custom widget-types patterns that allow dots in widget type names
 widget_type_patterns = [

@@ -206,6 +206,43 @@ class CodeLayoutViewSet(viewsets.ViewSet):
         response = self._add_rate_limiting_headers(response, request, "list")
         return response
 
+    @action(detail=False, methods=["get"])
+    def default(self, request):
+        """Get the default layout to use when no layout is specified"""
+        from ..layout_registry import layout_registry
+
+        # Log metrics
+        self._log_metrics(request, "default")
+
+        default_layout = layout_registry.get_default_layout()
+        
+        if not default_layout:
+            error_data = {
+                "error": "No default layout available",
+                "message": "No active layouts are registered"
+            }
+            return self._create_formatted_response(
+                error_data, request, status.HTTP_404_NOT_FOUND
+            )
+
+        api_version = self._get_api_version(request)
+
+        # Get layout data
+        layout_data = default_layout.to_dict()
+
+        # Use serializer for consistent formatting
+        serializer_context = {
+            "api_version": api_version,
+            "request": request,
+        }
+
+        serializer = LayoutSerializer(layout_data, context=serializer_context)
+
+        response = self._create_formatted_response(serializer.data, request)
+        response = self._add_caching_headers(response, layout_name=default_layout.name)
+        response = self._add_rate_limiting_headers(response, request, "detail")
+        return response
+
     @action(detail=False, methods=["post"])
     def reload(self, request):
         """Reload all layouts (admin/dev use)"""

@@ -60,6 +60,15 @@ class WebPageViewSet(viewsets.ModelViewSet):
         """Filter queryset based on action and permissions"""
         queryset = super().get_queryset()
 
+        # Exclude deleted pages by default (unless specifically accessing deleted endpoint)
+        # Check if is_deleted field exists (migration might not be run yet)
+        if self.action not in ["list_deleted", "bulk_restore"]:
+            try:
+                queryset = queryset.filter(is_deleted=False)
+            except Exception:
+                # is_deleted field doesn't exist yet (migration not run)
+                pass
+
         if self.action in ["list", "retrieve"]:
             # For public endpoints, only show published pages to non-staff users
             if not self.request.user.is_staff:
@@ -441,3 +450,124 @@ class WebPageViewSet(viewsets.ModelViewSet):
             }
 
         return legacy_data
+
+    @action(detail=False, methods=["post"], url_path="bulk-delete")
+    def bulk_delete(self, request):
+        """
+        Bulk soft delete pages.
+
+        Request body:
+        {
+            "page_ids": [1, 2, 3],
+            "recursive": true  // optional, default false
+        }
+        """
+        page_ids = request.data.get("page_ids", [])
+        recursive = request.data.get("recursive", False)
+
+        if not page_ids:
+            return Response(
+                {"error": "page_ids is required"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Fetch pages
+        pages = WebPage.objects.filter(id__in=page_ids, is_deleted=False)
+
+        if not pages.exists():
+            return Response(
+                {"error": "No valid pages found for deletion"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Perform soft delete
+        total_deleted = 0
+        deleted_pages = []
+
+        for page in pages:
+            count = page.soft_delete(user=request.user, recursive=recursive)
+            total_deleted += count
+            deleted_pages.append(
+                {
+                    "id": page.id,
+                    "title": page.title,
+                    "slug": page.slug,
+                    "deleted_count": count,
+                }
+            )
+
+        return Response(
+            {
+                "message": f"Successfully deleted {total_deleted} page(s)",
+                "total_deleted": total_deleted,
+                "pages": deleted_pages,
+                "recursive": recursive,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    @action(detail=False, methods=["post"], url_path="bulk-restore")
+    def bulk_restore(self, request):
+        """
+        Bulk restore soft-deleted pages.
+
+        Request body:
+        {
+            "page_ids": [1, 2, 3],
+            "recursive": true  // optional, default false
+        }
+        """
+        page_ids = request.data.get("page_ids", [])
+        recursive = request.data.get("recursive", False)
+
+        if not page_ids:
+            return Response(
+                {"error": "page_ids is required"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Fetch deleted pages
+        pages = WebPage.objects.filter(id__in=page_ids, is_deleted=True)
+
+        if not pages.exists():
+            return Response(
+                {"error": "No deleted pages found for restoration"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Perform restore
+        total_restored = 0
+        restored_pages = []
+
+        for page in pages:
+            count = page.restore(user=request.user, recursive=recursive)
+            total_restored += count
+            restored_pages.append(
+                {
+                    "id": page.id,
+                    "title": page.title,
+                    "slug": page.slug,
+                    "restored_count": count,
+                }
+            )
+
+        return Response(
+            {
+                "message": f"Successfully restored {total_restored} page(s)",
+                "total_restored": total_restored,
+                "pages": restored_pages,
+                "recursive": recursive,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    @action(detail=False, methods=["get"], url_path="deleted")
+    def list_deleted(self, request):
+        """Get list of soft-deleted pages"""
+        deleted_pages = self.get_queryset().filter(is_deleted=True)
+
+        page = self.paginate_queryset(deleted_pages)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(deleted_pages, many=True)
+        return Response(serializer.data)
