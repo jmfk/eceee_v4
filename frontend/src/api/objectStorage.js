@@ -6,7 +6,6 @@
  */
 
 import { api } from './client.js'
-import { convertKeysToCamel, convertKeysToSnake } from '../utils/caseConversion.js'
 
 const BASE_URL = '/api/v1/objects/api'
 
@@ -19,10 +18,7 @@ export const objectTypesApi = {
      */
     async list(params = {}) {
         const response = await api.get(`${BASE_URL}/object-types/`, { params })
-        return {
-            ...response,
-            data: (response.data.results || response.data).map(convertKeysToCamel)
-        }
+        return response
     },
 
     /**
@@ -30,50 +26,23 @@ export const objectTypesApi = {
      */
     async get(id) {
         const response = await api.get(`${BASE_URL}/object-types/${id}/`)
-        return {
-            ...response,
-            data: convertKeysToCamel(response.data)
-        }
+        return response
     },
 
     /**
      * Create new object type
      */
     async create(data) {
-        // Always handle as JSON data - image uploads are handled separately
-        const snakeCaseData = convertKeysToSnake(data)
-
-        // Handle allowed_child_types special case for backend compatibility
-        if (snakeCaseData.allowed_child_types) {
-            snakeCaseData.allowed_child_types_input = snakeCaseData.allowed_child_types
-            delete snakeCaseData.allowed_child_types
-        }
-
-        const response = await api.post(`${BASE_URL}/object-types/`, snakeCaseData)
-        return {
-            ...response,
-            data: convertKeysToCamel(response.data)
-        }
+        const response = await api.post(`${BASE_URL}/object-types/`, data)
+        return response
     },
 
     /**
      * Update object type
      */
     async update(id, data) {
-        // Always handle as JSON data - image uploads are handled separately
-        const snakeCaseData = convertKeysToSnake(data)
-
-        // Handle allowed_child_types special case for backend compatibility
-        if (snakeCaseData.allowed_child_types) {
-            snakeCaseData.allowed_child_types_input = snakeCaseData.allowed_child_types
-            delete snakeCaseData.allowed_child_types
-        }
-
-        const response = await api.put(`${BASE_URL}/object-types/${id}/`, snakeCaseData)
-        return {
-            ...response,
-            data: convertKeysToCamel(response.data)
-        }
+        const response = await api.put(`${BASE_URL}/object-types/${id}/`, data)
+        return response
     },
 
     /**
@@ -88,58 +57,40 @@ export const objectTypesApi = {
      */
     async getSchema(id) {
         const response = await api.get(`${BASE_URL}/object-types/${id}/schema/`)
-        return {
-            ...response,
-            data: convertKeysToCamel(response.data)
-        }
+        return response
     },
 
     /**
      * Update basic info for object type
      */
     async updateBasicInfo(id, basicInfo) {
-        const snakeCaseData = convertKeysToSnake(basicInfo)
-        const response = await api.put(`${BASE_URL}/object-types/${id}/update_basic_info/`, snakeCaseData)
-        return {
-            ...response,
-            data: convertKeysToCamel(response.data)
-        }
+        const response = await api.put(`${BASE_URL}/object-types/${id}/update_basic_info/`, basicInfo)
+        return response
     },
 
     /**
      * Update widget slots for object type
+     * Note: slotConfiguration is stored as-is (camelCase) since it's a JSONField
      */
     async updateSlots(id, slotConfiguration) {
-        const snakeCaseData = convertKeysToSnake(slotConfiguration)
-        const response = await api.put(`${BASE_URL}/object-types/${id}/update_slots/`, snakeCaseData)
-        return {
-            ...response,
-            data: convertKeysToCamel(response.data)
-        }
+        const response = await api.put(`${BASE_URL}/object-types/${id}/update_slots/`, slotConfiguration)
+        return response
     },
 
     /**
      * Update relationships for object type
      */
     async updateRelationships(id, relationshipsData) {
-        const snakeCaseData = convertKeysToSnake(relationshipsData)
-        const response = await api.put(`${BASE_URL}/object-types/${id}/update_relationships/`, snakeCaseData)
-        return {
-            ...response,
-            data: convertKeysToCamel(response.data)
-        }
+        const response = await api.put(`${BASE_URL}/object-types/${id}/update_relationships/`, relationshipsData)
+        return response
     },
 
     /**
      * Update schema for object type
      */
     async updateSchema(id, schema) {
-        const snakeCaseSchema = convertKeysToSnake(schema)
-        const response = await api.put(`${BASE_URL}/object-types/${id}/update_schema/`, snakeCaseSchema)
-        return {
-            ...response,
-            data: convertKeysToCamel(response.data)
-        }
+        const response = await api.put(`${BASE_URL}/object-types/${id}/update_schema/`, schema)
+        return response
     },
 
     /**
@@ -147,10 +98,7 @@ export const objectTypesApi = {
      */
     async getInstances(id, params = {}) {
         const response = await api.get(`${BASE_URL}/object-types/${id}/instances/`, { params })
-        return {
-            ...response,
-            data: (response.data.results || response.data).map(convertKeysToCamel)
-        }
+        return response
     },
 
     /**
@@ -158,10 +106,7 @@ export const objectTypesApi = {
      */
     async getActive() {
         const response = await api.get(`${BASE_URL}/object-types/active/`)
-        return {
-            ...response,
-            data: (response.data.results || response.data).map(convertKeysToCamel)
-        }
+        return response
     },
 
     /**
@@ -169,10 +114,7 @@ export const objectTypesApi = {
      */
     async getMainBrowserTypes() {
         const response = await api.get(`${BASE_URL}/object-types/main_browser_types/`)
-        return {
-            ...response,
-            data: (response.data.results || response.data).map(convertKeysToCamel)
-        }
+        return response
     }
 }
 
@@ -185,10 +127,7 @@ export const objectInstancesApi = {
      */
     async list(params = {}) {
         const response = await api.get(`${BASE_URL}/objects/`, { params })
-        return {
-            ...response,
-            data: (response.data.results || response.data).map(convertKeysToCamel)
-        }
+        return response
     },
 
     /**
@@ -196,46 +135,31 @@ export const objectInstancesApi = {
      */
     async get(id) {
         const response = await api.get(`${BASE_URL}/objects/${id}/`)
-        return {
-            ...response,
-            data: convertKeysToCamel(response.data)
-        }
+        return response
     },
 
     /**
      * Create new object instance
      */
     async create(data) {
-        const snakeCaseData = convertKeysToSnake(data)
-        const response = await api.post(`${BASE_URL}/objects/`, snakeCaseData)
-        return {
-            ...response,
-            data: convertKeysToCamel(response.data)
-        }
+        const response = await api.post(`${BASE_URL}/objects/`, data)
+        return response
     },
 
     /**
      * Update object instance (creates new version)
      */
     async update(id, data) {
-        const snakeCaseData = convertKeysToSnake(data)
-        const response = await api.put(`${BASE_URL}/objects/${id}/`, snakeCaseData)
-        return {
-            ...response,
-            data: convertKeysToCamel(response.data)
-        }
+        const response = await api.put(`${BASE_URL}/objects/${id}/`, data)
+        return response
     },
 
     /**
      * Update current version (doesn't create new version)
      */
     async updateCurrentVersion(id, data) {
-        const snakeCaseData = convertKeysToSnake(data)
-        const response = await api.put(`${BASE_URL}/objects/${id}/update_current_version/`, snakeCaseData)
-        return {
-            ...response,
-            data: convertKeysToCamel(response.data)
-        }
+        const response = await api.put(`${BASE_URL}/objects/${id}/update_current_version/`, data)
+        return response
     },
 
     /**
@@ -244,12 +168,9 @@ export const objectInstancesApi = {
     async updateWidgets(id, widgets, changeDescription = 'Widget update') {
         const response = await api.put(`${BASE_URL}/objects/${id}/update_widgets/`, {
             widgets,
-            change_description: changeDescription
+            changeDescription
         })
-        return {
-            ...response,
-            data: convertKeysToCamel(response.data)
-        }
+        return response
     },
 
     /**
@@ -263,12 +184,8 @@ export const objectInstancesApi = {
      * Publish object instance
      */
     async publish(id, data = {}) {
-        const snakeCaseData = convertKeysToSnake(data)
-        const response = await api.post(`${BASE_URL}/objects/${id}/publish/`, snakeCaseData)
-        return {
-            ...response,
-            data: convertKeysToCamel(response.data)
-        }
+        const response = await api.post(`${BASE_URL}/objects/${id}/publish/`, data)
+        return response
     },
 
     /**
@@ -276,10 +193,7 @@ export const objectInstancesApi = {
      */
     async getVersions(id) {
         const response = await api.get(`${BASE_URL}/objects/${id}/versions/`)
-        return {
-            ...response,
-            data: (response.data.results || response.data).map(convertKeysToCamel)
-        }
+        return response
     },
 
     /**
@@ -287,10 +201,7 @@ export const objectInstancesApi = {
      */
     async getChildren(id) {
         const response = await api.get(`${BASE_URL}/objects/${id}/children/`)
-        return {
-            ...response,
-            data: (response.data.results || response.data).map(convertKeysToCamel)
-        }
+        return response
     },
 
     /**
@@ -298,10 +209,7 @@ export const objectInstancesApi = {
      */
     async getDescendants(id) {
         const response = await api.get(`${BASE_URL}/objects/${id}/descendants/`)
-        return {
-            ...response,
-            data: (response.data.results || response.data).map(convertKeysToCamel)
-        }
+        return response
     },
 
     /**
@@ -309,10 +217,7 @@ export const objectInstancesApi = {
      */
     async getAncestors(id) {
         const response = await api.get(`${BASE_URL}/objects/${id}/ancestors/`)
-        return {
-            ...response,
-            data: (response.data.results || response.data).map(convertKeysToCamel)
-        }
+        return response
     },
 
     /**
@@ -320,10 +225,7 @@ export const objectInstancesApi = {
      */
     async getSiblings(id) {
         const response = await api.get(`${BASE_URL}/objects/${id}/siblings/`)
-        return {
-            ...response,
-            data: (response.data.results || response.data).map(convertKeysToCamel)
-        }
+        return response
     },
 
     /**
@@ -331,10 +233,7 @@ export const objectInstancesApi = {
      */
     async getTree(id) {
         const response = await api.get(`${BASE_URL}/objects/${id}/tree/`)
-        return {
-            ...response,
-            data: (response.data.results || response.data).map(convertKeysToCamel)
-        }
+        return response
     },
 
     /**
@@ -342,26 +241,18 @@ export const objectInstancesApi = {
      */
     async getPathToRoot(id) {
         const response = await api.get(`${BASE_URL}/objects/${id}/path_to_root/`)
-        return {
-            ...response,
-            data: (response.data.results || response.data).map(convertKeysToCamel)
-        }
+        return response
     },
 
     /**
      * Move object to new parent
      */
     async moveTo(id, newParentId, position = 'last-child') {
-        const data = {
+        const response = await api.post(`${BASE_URL}/objects/${id}/move_to/`, {
             newParentId,
             position
-        }
-        const snakeCaseData = convertKeysToSnake(data)
-        const response = await api.post(`${BASE_URL}/objects/${id}/move_to/`, snakeCaseData)
-        return {
-            ...response,
-            data: convertKeysToCamel(response.data)
-        }
+        })
+        return response
     },
 
     /**
@@ -369,10 +260,7 @@ export const objectInstancesApi = {
      */
     async getPublished(params = {}) {
         const response = await api.get(`${BASE_URL}/objects/published/`, { params })
-        return {
-            ...response,
-            data: (response.data.results || response.data).map(convertKeysToCamel)
-        }
+        return response
     },
 
     /**
@@ -381,10 +269,7 @@ export const objectInstancesApi = {
     async getByType(typeName, params = {}) {
         const allParams = { ...params, type: typeName }
         const response = await api.get(`${BASE_URL}/objects/by-type/${typeName}/`, { params: allParams })
-        return {
-            ...response,
-            data: (response.data.results || response.data).map(convertKeysToCamel)
-        }
+        return response
     },
 
     /**
@@ -392,10 +277,7 @@ export const objectInstancesApi = {
      */
     async getRoots(params = {}) {
         const response = await api.get(`${BASE_URL}/objects/roots/`, { params })
-        return {
-            ...response,
-            data: (response.data.results || response.data).map(convertKeysToCamel)
-        }
+        return response
     },
 
     /**
@@ -404,29 +286,18 @@ export const objectInstancesApi = {
     async search(query, params = {}) {
         const allParams = { ...params, q: query }
         const response = await api.get(`${BASE_URL}/objects/search/`, { params: allParams })
-        return {
-            ...response,
-            data: response.data.results ? {
-                ...convertKeysToCamel(response.data),
-                results: response.data.results.map(convertKeysToCamel)
-            } : (response.data.results || response.data).map(convertKeysToCamel)
-        }
+        return response
     },
 
     /**
      * Bulk operations
      */
     async bulkOperation(operation, objectIds) {
-        const data = {
+        const response = await api.post(`${BASE_URL}/objects/bulk-operations/`, {
             operation,
             objectIds
-        }
-        const snakeCaseData = convertKeysToSnake(data)
-        const response = await api.post(`${BASE_URL}/objects/bulk-operations/`, snakeCaseData)
-        return {
-            ...response,
-            data: convertKeysToCamel(response.data)
-        }
+        })
+        return response
     }
 }
 
@@ -439,10 +310,7 @@ export const objectVersionsApi = {
      */
     async list(params = {}) {
         const response = await api.get(`${BASE_URL}/versions/`, { params })
-        return {
-            ...response,
-            data: (response.data.results || response.data).map(convertKeysToCamel)
-        }
+        return response
     },
 
     /**
@@ -450,10 +318,7 @@ export const objectVersionsApi = {
      */
     async get(id) {
         const response = await api.get(`${BASE_URL}/versions/${id}/`)
-        return {
-            ...response,
-            data: convertKeysToCamel(response.data)
-        }
+        return response
     }
 }
 

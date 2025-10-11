@@ -51,33 +51,6 @@ export const convertKeysToCamel = (obj) => {
 }
 
 /**
- * Convert object keys from camelCase to snake_case recursively
- * @param {any} obj - Object to convert
- * @returns {any} Object with snake_case keys
- */
-export const convertKeysToSnake = (obj) => {
-    if (obj === null || obj === undefined || typeof obj !== 'object') {
-        return obj
-    }
-
-    if (Array.isArray(obj)) {
-        return obj.map(convertKeysToSnake)
-    }
-
-    if (obj instanceof Date) {
-        return obj
-    }
-
-    const converted = {}
-    for (const [key, value] of Object.entries(obj)) {
-        const snakeKey = camelToSnake(key)
-        converted[snakeKey] = convertKeysToSnake(value)
-    }
-
-    return converted
-}
-
-/**
  * Fields that should NOT be converted (already in correct format or special cases)
  */
 const CONVERSION_EXCLUSIONS = new Set([
