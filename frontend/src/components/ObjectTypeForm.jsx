@@ -50,6 +50,7 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
     const [originalSlotConfiguration, setOriginalSlotConfiguration] = useState(null)
     const [isSavingSlots, setIsSavingSlots] = useState(false)
     const [slotsError, setSlotsError] = useState(null)
+    const [slotsWarnings, setSlotsWarnings] = useState([])
 
     const [hasUnsavedRelationshipsChanges, setHasUnsavedRelationshipsChanges] = useState(false)
     const [originalRelationships, setOriginalRelationships] = useState(null)
@@ -532,7 +533,12 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
             setOriginalSlotConfiguration(JSON.parse(JSON.stringify(formData.slotConfiguration)))
             setHasUnsavedSlotsChanges(false)
 
-            // Widget slots saved successfully
+            // Check for warnings in the response
+            if (response?.data?.warnings && response.data.warnings.length > 0) {
+                setSlotsWarnings(response.data.warnings)
+            } else {
+                setSlotsWarnings([])
+            }
 
         } catch (error) {
             // Failed to save widget slots
@@ -914,6 +920,43 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
                     <p className="text-gray-600 mb-6">
                         Define widget slots where content editors can add widgets to object instances.
                     </p>
+
+                    {/* Widget Slots Warnings Display */}
+                    {slotsWarnings.length > 0 && (
+                        <div className="mb-6 bg-yellow-50 border-2 border-yellow-400 rounded-md p-4">
+                            <div className="flex items-start">
+                                <div className="flex-shrink-0">
+                                    <svg className="h-6 w-6 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                </div>
+                                <div className="ml-3 flex-1">
+                                    <h3 className="text-base font-semibold text-yellow-800 mb-2">
+                                        ⚠️ Widget Controls Filtered ({slotsWarnings.length} issue{slotsWarnings.length !== 1 ? 's' : ''})
+                                    </h3>
+                                    <p className="text-sm text-yellow-700 mb-3">
+                                        Some widget controls were removed during save because they reference widget types that don't exist:
+                                    </p>
+                                    <ul className="list-disc list-inside space-y-1 text-sm text-yellow-800">
+                                        {slotsWarnings.map((warning, idx) => (
+                                            <li key={idx} className="ml-2">
+                                                <span className="font-medium">{warning.slot}:</span> {warning.message}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                    <div className="mt-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => setSlotsWarnings([])}
+                                            className="text-sm text-yellow-700 hover:text-yellow-600 underline font-medium"
+                                        >
+                                            Dismiss
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Widget Slots Error Display */}
                     {slotsError && (
@@ -1401,13 +1444,13 @@ const WidgetControlManager = ({ widgetControls = [], availableWidgets = [], load
 
         // Get widgets that aren't already added
         const availableToAdd = availableWidgets.filter(widget => {
-            const widgetType = widget.type || widget.slug || widget.widget_type
+            const widgetType = widget.type || widget.widget_type
             return !widgetControls.some(control => control.widgetType === widgetType)
         })
 
         // Create controls for all available widgets
         availableToAdd.forEach(widget => {
-            const widgetType = widget.type || widget.slug || widget.widget_type
+            const widgetType = widget.type || widget.widget_type
             const widgetName = widget.display_name || widget.name || widget.label || widgetType
             const newControl = {
                 id: `control_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -1718,7 +1761,7 @@ const WidgetControlManager = ({ widgetControls = [], availableWidgets = [], load
                             type="button"
                             onClick={addAllWidgetControls}
                             disabled={loadingWidgets || availableWidgets.filter(widget => {
-                                const widgetType = widget.type || widget.slug || widget.widget_type
+                                const widgetType = widget.type || widget.widget_type
                                 return !widgetControls.some(control => control.widgetType === widgetType)
                             }).length === 0}
                             className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center"
@@ -1726,7 +1769,7 @@ const WidgetControlManager = ({ widgetControls = [], availableWidgets = [], load
                         >
                             <Plus className="h-3 w-3 mr-1" />
                             Add All ({availableWidgets.filter(widget => {
-                                const widgetType = widget.type || widget.slug || widget.widget_type
+                                const widgetType = widget.type || widget.widget_type
                                 return !widgetControls.some(control => control.widgetType === widgetType)
                             }).length})
                         </button>
@@ -1746,11 +1789,11 @@ const WidgetControlManager = ({ widgetControls = [], availableWidgets = [], load
                             </option>
                             {availableWidgets
                                 .filter(widget => {
-                                    const widgetType = widget.type || widget.slug || widget.widget_type
+                                    const widgetType = widget.type || widget.widget_type
                                     return !widgetControls.some(control => control.widgetType === widgetType)
                                 })
                                 .map((widget, index) => {
-                                    const widgetType = widget.type || widget.slug || widget.widget_type
+                                    const widgetType = widget.type || widget.widget_type
                                     const widgetName = widget.display_name || widget.name || widget.label || widgetType
                                     return (
                                         <option key={widgetType || index} value={widgetType}>

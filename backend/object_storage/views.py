@@ -199,14 +199,22 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
             serializer.is_valid(raise_exception=True)
             serializer.save()
 
-            return Response(
-                {
-                    "message": "Widget slots updated successfully",
-                    "slotConfiguration": serializer.data.get("slot_configuration"),
-                    "updated_at": serializer.data.get("updated_at"),
-                },
-                status=status.HTTP_200_OK,
-            )
+            # Collect any warnings from validation
+            warnings = getattr(serializer, "_slot_warnings", [])
+
+            response_data = {
+                "message": "Widget slots updated successfully",
+                "slotConfiguration": serializer.data.get("slot_configuration"),
+                "updated_at": serializer.data.get("updated_at"),
+            }
+
+            if warnings:
+                response_data["warnings"] = warnings
+                response_data["message"] = (
+                    f"Widget slots updated with {len(warnings)} warning(s)"
+                )
+
+            return Response(response_data, status=status.HTTP_200_OK)
 
         except ValidationError as e:
             logger.warning(f"Validation error updating widget slots: {str(e)}")
@@ -386,7 +394,7 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
                 widgets_data.append(
                     {
                         "name": widget.name,
-                        "slug": widget.slug,
+                        "type": widget.type,
                         "description": widget.description,
                         "template_name": widget.template_name,
                         "is_active": widget.is_active,
@@ -423,7 +431,7 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
                 widgets_data.append(
                     {
                         "name": widget.name,
-                        "slug": widget.slug,
+                        "type": widget.type,
                         "description": widget.description,
                         "template_name": widget.template_name,
                         "is_active": widget.is_active,

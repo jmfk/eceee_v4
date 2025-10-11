@@ -182,7 +182,7 @@ const WidgetManager = () => {
                         const IconComponent = getWidgetIconComponent(widget)
                         return (
                             <div
-                                key={widget.slug}
+                                key={widget.type}
                                 className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
                             >
                                 <div className="flex items-start justify-between">
@@ -215,7 +215,7 @@ const WidgetManager = () => {
 
                                             <div className="flex flex-wrap gap-2 text-xs">
                                                 <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded">
-                                                    Slug: {widget.slug}
+                                                    Type: {widget.type}
                                                 </span>
                                                 <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded">
                                                     Category: {getWidgetCategory(widget.type) || 'other'}

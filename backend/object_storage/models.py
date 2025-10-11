@@ -156,62 +156,69 @@ class ObjectTypeDefinition(models.Model):
                     if key not in slot:
                         raise ValidationError(f"Slot missing required key: {key}")
 
-                # Validate widget control definitions
-                if "widgetControls" in slot:
-                    if not isinstance(slot["widgetControls"], list):
+                # Validate widget control definitions (accept both camelCase and snake_case)
+                widget_controls_key = None
+                if "widget_controls" in slot:
+                    widget_controls_key = "widget_controls"
+                elif "widgetControls" in slot:
+                    widget_controls_key = "widgetControls"
+
+                if widget_controls_key:
+                    if not isinstance(slot[widget_controls_key], list):
                         raise ValidationError(
-                            f"Slot '{slot['name']}': widgetControls must be an array"
+                            f"Slot '{slot['name']}': widget_controls must be an array"
                         )
 
-                    for i, widget_control in enumerate(slot["widgetControls"]):
+                    for i, widget_control in enumerate(slot[widget_controls_key]):
                         if not isinstance(widget_control, dict):
                             raise ValidationError(
                                 f"Slot '{slot['name']}': widget control {i+1} must be an object"
                             )
 
-                        # Required fields
-                        if "widgetType" not in widget_control:
+                        # Required fields (accept both cases)
+                        widget_type = widget_control.get(
+                            "widget_type"
+                        ) or widget_control.get("widgetType")
+                        if not widget_type:
                             raise ValidationError(
-                                f"Slot '{slot['name']}': widget control {i+1} missing 'widgetType' field"
+                                f"Slot '{slot['name']}': widget control {i+1} missing 'widget_type' field"
                             )
 
                         # Validate widget type exists
-                        self._validate_widget_types(
-                            [widget_control["widgetType"]], slot["name"]
-                        )
+                        self._validate_widget_types([widget_type], slot["name"])
 
-                        # Validate optional fields
-                        if (
-                            "maxInstances" in widget_control
-                            and widget_control["maxInstances"] is not None
-                        ):
-                            if (
-                                not isinstance(widget_control["maxInstances"], int)
-                                or widget_control["maxInstances"] < 0
-                            ):
+                        # Validate optional fields (accept both cases)
+                        max_instances = widget_control.get(
+                            "max_instances"
+                        ) or widget_control.get("maxInstances")
+                        if max_instances is not None:
+                            if not isinstance(max_instances, int) or max_instances < 0:
                                 raise ValidationError(
-                                    f"Slot '{slot['name']}': widget control {i+1} maxInstances must be a positive integer or null"
+                                    f"Slot '{slot['name']}': widget control {i+1} max_instances must be a positive integer or null"
                                 )
 
-                        if "required" in widget_control and not isinstance(
-                            widget_control["required"], bool
-                        ):
+                        required = widget_control.get("required")
+                        if required is not None and not isinstance(required, bool):
                             raise ValidationError(
                                 f"Slot '{slot['name']}': widget control {i+1} required must be a boolean"
                             )
 
-                        if "preCreate" in widget_control and not isinstance(
-                            widget_control["preCreate"], bool
-                        ):
+                        pre_create = widget_control.get(
+                            "pre_create"
+                        ) or widget_control.get("preCreate")
+                        if pre_create is not None and not isinstance(pre_create, bool):
                             raise ValidationError(
-                                f"Slot '{slot['name']}': widget control {i+1} preCreate must be a boolean"
+                                f"Slot '{slot['name']}': widget control {i+1} pre_create must be a boolean"
                             )
 
-                        if "defaultConfig" in widget_control and not isinstance(
-                            widget_control["defaultConfig"], dict
+                        default_config = widget_control.get(
+                            "default_config"
+                        ) or widget_control.get("defaultConfig")
+                        if default_config is not None and not isinstance(
+                            default_config, dict
                         ):
                             raise ValidationError(
-                                f"Slot '{slot['name']}': widget control {i+1} defaultConfig must be an object"
+                                f"Slot '{slot['name']}': widget control {i+1} default_config must be an object"
                             )
 
                 # Legacy support - validate old format if present
@@ -264,7 +271,7 @@ class ObjectTypeDefinition(models.Model):
         from webpages.widget_registry import widget_type_registry
 
         available_widgets = {
-            widget.slug for widget in widget_type_registry.list_widget_types()
+            widget.type for widget in widget_type_registry.list_widget_types()
         }
 
         for widget_type in widget_types:
@@ -558,8 +565,8 @@ class ObjectInstance(MPTTModel):
                     if not widget_type:
                         continue
 
-                    # Get widget type from registry
-                    widget_instance = widget_type_registry.get_widget_type_by_slug(
+                    # Get widget type from registry (supports multiple formats for compatibility)
+                    widget_instance = widget_type_registry.get_widget_type_flexible(
                         widget_type
                     )
                     if not widget_instance:
@@ -573,8 +580,7 @@ class ObjectInstance(MPTTModel):
                     # Create widget with merged configuration
                     widget_data = {
                         "id": str(uuid.uuid4()),
-                        "type": widget_instance.name,
-                        "slug": widget_type,
+                        "type": widget_instance.type,
                         "config": merged_config,
                         "order": len(slot_widgets),
                         "created_at": timezone.now().isoformat(),
@@ -592,8 +598,8 @@ class ObjectInstance(MPTTModel):
                     if not widget_type:
                         continue
 
-                    # Get widget type from registry
-                    widget_instance = widget_type_registry.get_widget_type_by_slug(
+                    # Get widget type from registry (supports multiple formats for compatibility)
+                    widget_instance = widget_type_registry.get_widget_type_flexible(
                         widget_type
                     )
                     if not widget_instance:
@@ -602,8 +608,7 @@ class ObjectInstance(MPTTModel):
                     # Create widget with default configuration
                     widget_data = {
                         "id": str(uuid.uuid4()),
-                        "type": widget_instance.name,
-                        "slug": widget_type,
+                        "type": widget_instance.type,
                         "config": widget_instance.get_configuration_defaults(),
                         "order": len(slot_widgets),
                         "created_at": timezone.now().isoformat(),
