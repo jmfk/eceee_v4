@@ -115,6 +115,10 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
             for ct in child_types
         ]
 
+    def get_slot_configuration(self, obj):
+        """Return slot configuration as-is (snake_case)"""
+        return obj.slot_configuration or {}
+
     def validate_name(self, value):
         """Validate object type name"""
         if not value.islower():
@@ -136,7 +140,11 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
         return value
 
     def validate_slot_configuration(self, value):
-        """Validate slot configuration structure"""
+        """Validate slot configuration structure and convert to snake_case"""
+        # Initialize warnings list
+        if not hasattr(self, "_slot_warnings"):
+            self._slot_warnings = []
+
         if not isinstance(value, dict):
             raise serializers.ValidationError(
                 "Slot configuration must be a JSON object"
@@ -174,50 +182,124 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
         from webpages.widget_registry import widget_type_registry
 
         available_widgets = {
-            widget.slug for widget in widget_type_registry.list_widget_types()
+            widget.type for widget in widget_type_registry.list_widget_types()
         }
-
-        # Validate allowedWidgets
-        if "allowedWidgets" in slot:
-            if not isinstance(slot["allowedWidgets"], list):
+        # Validate widget_controls (new field)
+        if "widget_controls" in slot:
+            if not isinstance(slot["widget_controls"], list):
                 raise serializers.ValidationError(
-                    f"Slot '{slot['name']}': allowedWidgets must be an array"
+                    f"Slot '{slot['name']}': widget_controls must be an array"
                 )
 
-            for widget_type in slot["allowedWidgets"]:
+            valid_controls = []
+            for i, control in enumerate(slot["widget_controls"]):
+                if not isinstance(control, dict):
+                    self._slot_warnings.append(
+                        {
+                            "slot": slot["name"],
+                            "issue": "invalid_control",
+                            "message": f"Widget control {i} is not an object and was removed",
+                        }
+                    )
+                    continue
+
+                # Check required fields
+                if "widget_type" not in control:
+                    self._slot_warnings.append(
+                        {
+                            "slot": slot["name"],
+                            "control": control.get("label", f"control {i}"),
+                            "issue": "missing_widget_type",
+                            "message": f"Widget control '{control.get('label', i)}' is missing 'widget_type' field and was removed",
+                        }
+                    )
+                    continue
+
+                if "label" not in control:
+                    self._slot_warnings.append(
+                        {
+                            "slot": slot["name"],
+                            "control": control.get("widget_type", f"control {i}"),
+                            "issue": "missing_label",
+                            "message": f"Widget control for '{control.get('widget_type', i)}' is missing 'label' field and was removed",
+                        }
+                    )
+                    continue
+
+                # Filter out controls with invalid widget types
+                widget_type = control["widget_type"]
+                if widget_type not in available_widgets:
+                    self._slot_warnings.append(
+                        {
+                            "slot": slot["name"],
+                            "control": control["label"],
+                            "widget_type": widget_type,
+                            "issue": "widget_type_not_found",
+                            "message": f"Widget type '{widget_type}' for control '{control['label']}' does not exist and was removed",
+                        }
+                    )
+                    continue
+
+                valid_controls.append(control)
+
+            # Add summary if widgets were filtered
+            original_count = len(slot["widget_controls"])
+            filtered_count = len(valid_controls)
+            if filtered_count < original_count:
+                self._slot_warnings.append(
+                    {
+                        "slot": slot["name"],
+                        "issue": "widgets_filtered",
+                        "message": f"Slot '{slot['name']}': {original_count - filtered_count} widget control(s) were filtered out",
+                        "original_count": original_count,
+                        "filtered_count": filtered_count,
+                    }
+                )
+
+            # Replace with filtered list
+            slot["widget_controls"] = valid_controls
+
+        # Validate allowed_widgets
+        if "allowed_widgets" in slot:
+            if not isinstance(slot["allowed_widgets"], list):
+                raise serializers.ValidationError(
+                    f"Slot '{slot['name']}': allowed_widgets must be an array"
+                )
+
+            for widget_type in slot["allowed_widgets"]:
                 if widget_type not in available_widgets:
                     raise serializers.ValidationError(
                         f"Slot '{slot['name']}': widget type '{widget_type}' not found in registry"
                     )
 
-        # Validate disallowedWidgets
-        if "disallowedWidgets" in slot:
-            if not isinstance(slot["disallowedWidgets"], list):
+        # Validate disallowed_widgets
+        if "disallowed_widgets" in slot:
+            if not isinstance(slot["disallowed_widgets"], list):
                 raise serializers.ValidationError(
-                    f"Slot '{slot['name']}': disallowedWidgets must be an array"
+                    f"Slot '{slot['name']}': disallowed_widgets must be an array"
                 )
 
-            for widget_type in slot["disallowedWidgets"]:
+            for widget_type in slot["disallowed_widgets"]:
                 if widget_type not in available_widgets:
                     raise serializers.ValidationError(
                         f"Slot '{slot['name']}': widget type '{widget_type}' not found in registry"
                     )
 
-        # Validate maxWidgets
-        if "maxWidgets" in slot and slot["maxWidgets"] is not None:
-            if not isinstance(slot["maxWidgets"], int) or slot["maxWidgets"] < 0:
+        # Validate max_widgets
+        if "max_widgets" in slot and slot["max_widgets"] is not None:
+            if not isinstance(slot["max_widgets"], int) or slot["max_widgets"] < 0:
                 raise serializers.ValidationError(
-                    f"Slot '{slot['name']}': maxWidgets must be a positive integer or null"
+                    f"Slot '{slot['name']}': max_widgets must be a positive integer or null"
                 )
 
-        # Validate preCreatedWidgets
-        if "preCreatedWidgets" in slot:
-            if not isinstance(slot["preCreatedWidgets"], list):
+        # Validate pre_created_widgets
+        if "pre_created_widgets" in slot:
+            if not isinstance(slot["pre_created_widgets"], list):
                 raise serializers.ValidationError(
-                    f"Slot '{slot['name']}': preCreatedWidgets must be an array"
+                    f"Slot '{slot['name']}': pre_created_widgets must be an array"
                 )
 
-            for widget in slot["preCreatedWidgets"]:
+            for widget in slot["pre_created_widgets"]:
                 if not isinstance(widget, dict):
                     raise serializers.ValidationError(
                         f"Slot '{slot['name']}': each pre-created widget must be an object"

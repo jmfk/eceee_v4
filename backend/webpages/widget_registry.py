@@ -303,7 +303,11 @@ class BaseWidget(ABC):
 
     @property
     def slug(self):
-        """Generate a URL-safe slug from the widget name"""
+        """
+        DEPRECATED: Use widget.type instead.
+        Generate a URL-safe slug from the widget name.
+        This property is kept for backward compatibility only.
+        """
         return slugify(self.name)
 
     def to_dict(self, include_template_json: bool = True) -> Dict[str, Any]:
@@ -314,9 +318,8 @@ class BaseWidget(ABC):
                 omit it to reduce payload size and avoid parsing overhead.
         """
         result = {
-            "type": self.type,  # Unique type id
+            "type": self.type,  # Unique type id (e.g., "default_widgets.ContentWidget")
             "name": self.name,
-            "slug": self.slug,  # URL-safe slug for API endpoints
             "description": self.description,
             "template_name": self.template_name,  # Include template name for backward compatibility
             "widget_class": self.__class__.__name__,
@@ -457,7 +460,11 @@ class WidgetTypeRegistry:
         return self._instances.get(name)
 
     def get_widget_type_by_slug(self, slug: str) -> Optional[BaseWidget]:
-        """Get a widget type instance by slug."""
+        """
+        DEPRECATED: Use get_widget_type_by_type() or get_widget_type_flexible() instead.
+        Get a widget type instance by slug.
+        This method is kept for backward compatibility only.
+        """
         for widget in self._instances.values():
             if widget.slug == slug:
                 return widget
@@ -472,8 +479,13 @@ class WidgetTypeRegistry:
 
     def get_widget_type_flexible(self, identifier: str) -> Optional[BaseWidget]:
         """
-        Get a widget type instance by any identifier - tries type, then name, then slug.
+        Get a widget type instance by any identifier - tries type, then name.
         This provides backward compatibility during the transition to new naming.
+
+        Lookup order:
+        1. Exact type match (e.g., "default_widgets.ContentWidget")
+        2. Case-insensitive type match
+        3. Human-readable name (legacy)
         """
         if not identifier:
             return None
@@ -489,13 +501,12 @@ class WidgetTypeRegistry:
             if widget_instance.type.lower() == identifier_lower:
                 return widget_instance
 
-        # Try old format (human name)
+        # Try old format (human name) for backward compatibility
         widget = self.get_widget_type(identifier)
         if widget:
             return widget
 
-        # Try slug format
-        return self.get_widget_type_by_slug(identifier)
+        return None
 
     def get_widget_class(self, name: str) -> Optional[Type[BaseWidget]]:
         """Get a widget type class by name."""
