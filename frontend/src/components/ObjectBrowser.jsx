@@ -4,7 +4,6 @@ import { useNavigate, useSearchParams, useParams } from 'react-router-dom'
 import { Search, ArrowLeft, Plus, Grid, List, AlertCircle, Image, FolderOpen, Trash2 } from 'lucide-react'
 import { objectTypesApi, objectInstancesApi } from '../api/objectStorage'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
-import ObjectInstanceEditor from './ObjectInstanceEditor'
 import DeleteConfirmationModal from './DeleteConfirmationModal'
 
 const ObjectBrowser = () => {
@@ -15,7 +14,6 @@ const ObjectBrowser = () => {
     const [selectedObjectType, setSelectedObjectType] = useState(null)
     const [searchTerm, setSearchTerm] = useState('')
     const [statusFilter, setStatusFilter] = useState('')
-    const [editingInstance, setEditingInstance] = useState(null)
     const [deleteModal, setDeleteModal] = useState({ isOpen: false, instance: null })
 
     const { addNotification } = useGlobalNotifications()
@@ -156,20 +154,6 @@ const ObjectBrowser = () => {
 
     const handleCloseDeleteModal = () => {
         setDeleteModal({ isOpen: false, instance: null })
-    }
-
-    const handleEditCancel = () => {
-        setEditingInstance(null)
-        setCurrentView(selectedObjectType ? 'list' : 'grid')
-    }
-
-    const handleEditSave = (savedInstance) => {
-        setEditingInstance(null)
-        setCurrentView('list')
-        addNotification(
-            `Object ${editingInstance ? 'updated' : 'created'} successfully`,
-            'success'
-        )
     }
 
 

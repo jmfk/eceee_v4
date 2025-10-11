@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react'
-import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
-import { Save, Calendar, Eye, EyeOff, Archive, Clock, CheckCircle } from 'lucide-react'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { Calendar, Eye, EyeOff, Archive, Clock } from 'lucide-react'
 import { objectInstancesApi, objectVersionsApi } from '../../api/objectStorage'
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext'
+import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
+import { OperationTypes } from '../../contexts/unified-data/types/operations'
 
 const ObjectPublishingView = ({ objectType, instance, isNewInstance, onSave, onCancel, onUnsavedChanges, context }) => {
     const [formData, setFormData] = useState({
@@ -11,8 +13,9 @@ const ObjectPublishingView = ({ objectType, instance, isNewInstance, onSave, onC
     })
     const [isDirty, setIsDirty] = useState(false)
 
-    const queryClient = useQueryClient()
     const { addNotification } = useGlobalNotifications()
+    const { useExternalChanges, publishUpdate, setIsObjectDirty } = useUnifiedData()
+    const componentId = useMemo(() => `object-publishing-view-${instance?.id || 'new'}`, [instance?.id])
 
     // Fetch current published version for the object
     const { data: currentPublishedVersion, isLoading: currentVersionLoading } = useQuery({
@@ -31,12 +34,25 @@ const ObjectPublishingView = ({ objectType, instance, isNewInstance, onSave, onC
 
     const versions = versionsResponse?.data || []
 
-    // Notify parent about unsaved changes
+    // Subscribe to external changes from UDC
+    useExternalChanges(componentId, (state) => {
+        if (!instance?.id) return;
+
+        const objectData = state.objects?.[String(instance.id)];
+        if (objectData) {
+            // Sync any publishing-related state changes from UDC
+            // Currently publishing state is primarily managed via API calls
+            // This subscription ensures we stay in sync if other components update the object
+        }
+    });
+
+    // Notify parent about unsaved changes and update UDC dirty state
     useEffect(() => {
         if (onUnsavedChanges) {
             onUnsavedChanges(isDirty)
         }
-    }, [isDirty, onUnsavedChanges])
+        setIsObjectDirty(isDirty)
+    }, [isDirty, onUnsavedChanges, setIsObjectDirty])
 
     useEffect(() => {
         if (currentPublishedVersion?.data) {
@@ -49,76 +65,109 @@ const ObjectPublishingView = ({ objectType, instance, isNewInstance, onSave, onC
     }, [currentPublishedVersion])
 
     // Schedule version publication
-    const scheduleMutation = useMutation({
-        mutationFn: (data) => {
-            const latestVersion = versions[0] // Versions are ordered by version_number desc
-            if (!latestVersion) {
-                throw new Error('No version found to schedule')
-            }
-            return objectVersionsApi.schedule(latestVersion.id, {
+    const [isScheduling, setIsScheduling] = useState(false)
+    const handleScheduleVersion = useCallback(async (data) => {
+        const latestVersion = versions[0] // Versions are ordered by version_number desc
+        if (!latestVersion) {
+            addNotification('No version found to schedule', 'error')
+            return
+        }
+
+        setIsScheduling(true)
+        try {
+            await objectVersionsApi.schedule(latestVersion.id, {
                 effectiveDate: data.effectiveDate,
                 expiryDate: data.expiryDate || null
             })
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries(['objectInstances'])
-            queryClient.invalidateQueries(['objectInstance', instance?.id])
-            queryClient.invalidateQueries(['objectVersions', instance?.id])
-            queryClient.invalidateQueries(['objectInstance', instance?.id, 'currentPublishedVersion'])
+
+            // Notify UDC that publishing state changed
+            if (instance?.id) {
+                await publishUpdate(componentId, OperationTypes.UPDATE_OBJECT, {
+                    id: String(instance.id),
+                    updates: {
+                        isPublished: true,
+                        metadata: { ...instance.metadata, lastPublishAction: 'scheduled' }
+                    }
+                });
+            }
+
             setIsDirty(false)
             addNotification('Publication scheduled successfully', 'success')
-        },
-        onError: (error) => {
+        } catch (error) {
             console.error('Schedule failed:', error)
             const errorMessage = error.response?.data?.error || 'Failed to schedule publication'
             addNotification(errorMessage, 'error')
+        } finally {
+            setIsScheduling(false)
         }
-    })
+    }, [versions, instance, componentId, publishUpdate, addNotification])
 
     // Publish immediately
-    const publishMutation = useMutation({
-        mutationFn: () => {
-            const latestVersion = versions[0] // Versions are ordered by version_number desc
-            if (!latestVersion) {
-                throw new Error('No version found to publish')
+    const [isPublishing, setIsPublishing] = useState(false)
+    const handlePublishVersion = useCallback(async () => {
+        const latestVersion = versions[0] // Versions are ordered by version_number desc
+        if (!latestVersion) {
+            addNotification('No version found to publish', 'error')
+            return
+        }
+
+        setIsPublishing(true)
+        try {
+            await objectVersionsApi.publish(latestVersion.id)
+
+            // Notify UDC that publishing state changed
+            if (instance?.id) {
+                await publishUpdate(componentId, OperationTypes.UPDATE_OBJECT, {
+                    id: String(instance.id),
+                    updates: {
+                        isPublished: true,
+                        metadata: { ...instance.metadata, lastPublishAction: 'published' }
+                    }
+                });
             }
-            return objectVersionsApi.publish(latestVersion.id)
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries(['objectInstances'])
-            queryClient.invalidateQueries(['objectInstance', instance?.id])
-            queryClient.invalidateQueries(['objectVersions', instance?.id])
-            queryClient.invalidateQueries(['objectInstance', instance?.id, 'currentPublishedVersion'])
+
             addNotification('Version published successfully', 'success')
-        },
-        onError: (error) => {
+        } catch (error) {
             console.error('Publish failed:', error)
             const errorMessage = error.response?.data?.error || 'Failed to publish version'
             addNotification(errorMessage, 'error')
+        } finally {
+            setIsPublishing(false)
         }
-    })
+    }, [versions, instance, componentId, publishUpdate, addNotification])
 
     // Unpublish current version
-    const unpublishMutation = useMutation({
-        mutationFn: () => {
-            if (!currentPublishedVersion?.data) {
-                throw new Error('No published version to unpublish')
+    const [isUnpublishing, setIsUnpublishing] = useState(false)
+    const handleUnpublishVersion = useCallback(async () => {
+        if (!currentPublishedVersion?.data) {
+            addNotification('No published version to unpublish', 'error')
+            return
+        }
+
+        setIsUnpublishing(true)
+        try {
+            await objectVersionsApi.unpublish(currentPublishedVersion.data.id)
+
+            // Notify UDC that publishing state changed
+            if (instance?.id) {
+                await publishUpdate(componentId, OperationTypes.UPDATE_OBJECT, {
+                    id: String(instance.id),
+                    updates: {
+                        isPublished: false,
+                        metadata: { ...instance.metadata, lastPublishAction: 'unpublished' }
+                    }
+                });
             }
-            return objectVersionsApi.unpublish(currentPublishedVersion.data.id)
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries(['objectInstances'])
-            queryClient.invalidateQueries(['objectInstance', instance?.id])
-            queryClient.invalidateQueries(['objectVersions', instance?.id])
-            queryClient.invalidateQueries(['objectInstance', instance?.id, 'currentPublishedVersion'])
+
             addNotification('Version unpublished successfully', 'success')
-        },
-        onError: (error) => {
+        } catch (error) {
             console.error('Unpublish failed:', error)
             const errorMessage = error.response?.data?.error || 'Failed to unpublish version'
             addNotification(errorMessage, 'error')
+        } finally {
+            setIsUnpublishing(false)
         }
-    })
+    }, [currentPublishedVersion, instance, componentId, publishUpdate, addNotification])
 
     const handleInputChange = (field, value) => {
         setFormData(prev => ({ ...prev, [field]: value }))
@@ -134,7 +183,7 @@ const ObjectPublishingView = ({ objectType, instance, isNewInstance, onSave, onC
             addNotification('Please set an effective date', 'warning')
             return
         }
-        scheduleMutation.mutate(formData)
+        handleScheduleVersion(formData)
     }
 
     const handleQuickPublish = () => {
@@ -142,7 +191,7 @@ const ObjectPublishingView = ({ objectType, instance, isNewInstance, onSave, onC
             addNotification('Please save the object first before publishing', 'warning')
             return
         }
-        publishMutation.mutate()
+        handlePublishVersion()
     }
 
     const handleQuickUnpublish = () => {
@@ -150,7 +199,7 @@ const ObjectPublishingView = ({ objectType, instance, isNewInstance, onSave, onC
             addNotification('Please save the object first', 'warning')
             return
         }
-        unpublishMutation.mutate()
+        handleUnpublishVersion()
     }
 
     const getStatusColor = (status) => {
@@ -261,11 +310,11 @@ const ObjectPublishingView = ({ objectType, instance, isNewInstance, onSave, onC
                                 <div className="flex justify-end">
                                     <button
                                         onClick={handleSchedule}
-                                        disabled={scheduleMutation.isPending || !formData.effectiveDate || isNewInstance}
+                                        disabled={isScheduling || !formData.effectiveDate || isNewInstance}
                                         className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-colors"
                                     >
                                         <Clock className="h-4 w-4 mr-2" />
-                                        {scheduleMutation.isPending ? 'Scheduling...' : 'Schedule Version'}
+                                        {isScheduling ? 'Scheduling...' : 'Schedule Version'}
                                     </button>
                                 </div>
                             </div>
@@ -315,19 +364,19 @@ const ObjectPublishingView = ({ objectType, instance, isNewInstance, onSave, onC
                             <div className="flex space-x-4">
                                 <button
                                     onClick={handleQuickPublish}
-                                    disabled={publishMutation.isPending || isPublished}
+                                    disabled={isPublishing || isPublished}
                                     className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-colors"
                                 >
                                     <Eye className="h-4 w-4 mr-2" />
-                                    {publishMutation.isPending ? 'Publishing...' : 'Publish Now'}
+                                    {isPublishing ? 'Publishing...' : 'Publish Now'}
                                 </button>
                                 <button
                                     onClick={handleQuickUnpublish}
-                                    disabled={unpublishMutation.isPending || !isPublished}
+                                    disabled={isUnpublishing || !isPublished}
                                     className="px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-colors"
                                 >
                                     <EyeOff className="h-4 w-4 mr-2" />
-                                    {unpublishMutation.isPending ? 'Unpublishing...' : 'Unpublish'}
+                                    {isUnpublishing ? 'Unpublishing...' : 'Unpublish'}
                                 </button>
                             </div>
                         </div>

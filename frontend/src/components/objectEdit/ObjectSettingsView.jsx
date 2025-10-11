@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react'
-import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
-import { Save, Settings as SettingsIcon } from 'lucide-react'
-import { objectInstancesApi } from '../../api/objectStorage'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import { Settings as SettingsIcon } from 'lucide-react'
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext'
+import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
+import { OperationTypes } from '../../contexts/unified-data/types/operations'
 import ParentObjectSelector from '../ParentObjectSelector'
 
 const ObjectSettingsView = ({ objectType, instance, isNewInstance, parentId, onSave, onCancel, onUnsavedChanges, context }) => {
@@ -12,18 +12,38 @@ const ObjectSettingsView = ({ objectType, instance, isNewInstance, parentId, onS
     })
     const [isDirty, setIsDirty] = useState(false)
 
-    const queryClient = useQueryClient()
     const { addNotification } = useGlobalNotifications()
+    const { useExternalChanges, publishUpdate, setIsObjectDirty } = useUnifiedData()
+    const componentId = useMemo(() => `object-settings-view-${instance?.id || 'new'}`, [instance?.id])
 
-    // Notify parent about unsaved changes
+    // Subscribe to external changes from UDC
+    useExternalChanges(componentId, (state) => {
+        if (!instance?.id) return;
+
+        const objectData = state.objects?.[String(instance.id)];
+        if (objectData) {
+            const newFormData = {
+                parent: objectData.parentId || null,
+                metadata: objectData.metadata || {}
+            };
+
+            // Only update if data has actually changed to avoid unnecessary re-renders
+            const hasChanged = JSON.stringify(formData) !== JSON.stringify(newFormData);
+            if (hasChanged) {
+                setFormData(newFormData);
+            }
+        }
+    });
+
+    // Notify parent about unsaved changes and update UDC dirty state
     useEffect(() => {
         if (onUnsavedChanges) {
             onUnsavedChanges(isDirty)
         }
-    }, [isDirty, onUnsavedChanges])
+        setIsObjectDirty(isDirty)
+    }, [isDirty, onUnsavedChanges, setIsObjectDirty])
 
-    // Parent object selection is now handled by ParentObjectSelector component
-
+    // Initialize form data from instance
     useEffect(() => {
         if (instance) {
             const parentValue = instance.parent?.id || parentId || null
@@ -40,62 +60,27 @@ const ObjectSettingsView = ({ objectType, instance, isNewInstance, parentId, onS
         }
     }, [instance, parentId, isNewInstance])
 
-    // Save mutation
-    const saveMutation = useMutation({
-        mutationFn: (data) => {
-            if (isNewInstance) {
-                return objectInstancesApi.create({
-                    objectTypeId: objectType?.id,
-                    title: instance?.title || 'New Object',
-                    data: instance?.data || {},
-                    ...data
-                })
-            } else {
-                // For updates, include required fields along with the settings data
-                const updateData = {
-                    objectTypeId: objectType?.id,
-                    title: instance?.title,
-                    data: instance?.data || {},
-                    status: instance?.status || 'draft',
-                    ...data
-                }
-                return objectInstancesApi.update(instance.id, updateData)
-            }
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries(['objectInstances'])
-            queryClient.invalidateQueries(['objectInstance', instance?.id])
-            setIsDirty(false)
-            addNotification('Settings saved successfully', 'success')
-        },
-        onError: (error) => {
-            console.error('Save failed:', error)
-
-            // Handle validation errors
-            let errorMessage = 'Failed to save settings'
-            if (error.response?.data) {
-                const data = error.response.data
-                if (data.parent && Array.isArray(data.parent)) {
-                    errorMessage = `Parent validation error: ${data.parent[0]}`
-                } else if (data.error) {
-                    errorMessage = data.error
-                } else if (data.message) {
-                    errorMessage = data.message
-                }
-            }
-
-            addNotification(errorMessage, 'error')
-        }
-    })
-
-    const handleInputChange = (field, value) => {
+    // Handle field changes and publish to UDC
+    const handleInputChange = useCallback(async (field, value) => {
+        // Update local state immediately for UI responsiveness
         setFormData(prev => ({ ...prev, [field]: value }))
         setIsDirty(true)
-    }
 
-    const handleSave = () => {
-        saveMutation.mutate(formData)
-    }
+        // Publish update to UDC if we have an instance ID
+        if (instance?.id) {
+            const updates = {};
+            if (field === 'parent') {
+                updates.parentId = value;
+            } else {
+                updates[field] = value;
+            }
+
+            await publishUpdate(componentId, OperationTypes.UPDATE_OBJECT, {
+                id: String(instance.id),
+                updates
+            });
+        }
+    }, [instance?.id, componentId, publishUpdate])
 
     return (
         <div className="h-full flex flex-col relative">
@@ -118,12 +103,6 @@ const ObjectSettingsView = ({ objectType, instance, isNewInstance, parentId, onS
                                 value={formData.parent}
                                 onChange={(parentId) => {
                                     handleInputChange('parent', parentId)
-                                    // Auto-save when parent changes
-                                    const autoSaveData = {
-                                        parent: parentId,
-                                        metadata: formData.metadata
-                                    }
-                                    saveMutation.mutate(autoSaveData)
                                 }}
                                 currentObjectType={objectType}
                                 currentObjectId={instance?.id}
