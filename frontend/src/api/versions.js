@@ -304,6 +304,54 @@ export const versionsApi = {
     }, 'versions.restore'),
 
     /**
+     * Update version publishing dates
+     * @param {number} versionId - Version ID
+     * @param {Object} publishingData - { effective_date, expiry_date }
+     * @returns {Promise<Object>} Updated version
+     */
+    updateVersionPublishing: wrapApiCall(async (versionId, publishingData) => {
+        return api.patch(endpoints.versions.updatePublishing(versionId), publishingData)
+    }, 'versions.updateVersionPublishing'),
+
+    /**
+     * Publish a version immediately
+     * @param {number} versionId - Version ID
+     * @returns {Promise<Object>} Published version
+     */
+    publishVersionNow: wrapApiCall(async (versionId) => {
+        return api.patch(endpoints.versions.updatePublishing(versionId), {
+            effective_date: new Date().toISOString(),
+            expiry_date: null
+        })
+    }, 'versions.publishVersionNow'),
+
+    /**
+     * Unpublish a version (clear dates)
+     * @param {number} versionId - Version ID
+     * @returns {Promise<Object>} Unpublished version
+     */
+    unpublishVersion: wrapApiCall(async (versionId) => {
+        return api.patch(endpoints.versions.updatePublishing(versionId), {
+            effective_date: null,
+            expiry_date: null
+        })
+    }, 'versions.unpublishVersion'),
+
+    /**
+     * Schedule a version for future publication
+     * @param {number} versionId - Version ID
+     * @param {string} effectiveDate - ISO date string for when to publish
+     * @param {string|null} expiryDate - Optional ISO date string for when to expire
+     * @returns {Promise<Object>} Scheduled version
+     */
+    scheduleVersion: wrapApiCall(async (versionId, effectiveDate, expiryDate = null) => {
+        return api.patch(endpoints.versions.updatePublishing(versionId), {
+            effective_date: effectiveDate,
+            expiry_date: expiryDate
+        })
+    }, 'versions.scheduleVersion'),
+
+    /**
      * Compare two versions
      * @param {number} version1Id - First version ID
      * @param {number} version2Id - Second version ID
@@ -338,6 +386,10 @@ export const createDraftFromPublished = versionsApi.createDraftFromPublished
 export const restoreVersion = versionsApi.restore
 export const compareVersions = versionsApi.compare
 export const getVersionsFiltered = versionsApi.getFiltered
+export const updateVersionPublishing = versionsApi.updateVersionPublishing
+export const publishVersionNow = versionsApi.publishVersionNow
+export const unpublishVersion = versionsApi.unpublishVersion
+export const scheduleVersion = versionsApi.scheduleVersion
 
 /**
  * Version utility functions
@@ -412,29 +464,6 @@ export const formatVersionForDisplay = (version) => {
         createdDisplay: new Date(version.createdAt).toLocaleDateString()
     }
 }
-
-/**
- * Schedule a version for publishing
- * @param {number} versionId - Version ID  
- * @param {Object} scheduleData - Schedule data with effectiveDate and expiryDate
- * @returns {Promise<Object>} Schedule result
- */
-export const scheduleVersion = wrapApiCall(async (versionId, scheduleData) => {
-    return api.patch(endpoints.versions.detail(versionId), scheduleData)
-}, 'versions.scheduleVersion')
-
-/**
- * Publish a version immediately
- * @param {number} versionId - Version ID
- * @returns {Promise<Object>} Publish result
- */
-export const publishVersionNow = wrapApiCall(async (versionId) => {
-    const scheduleData = {
-        effectiveDate: new Date().toISOString(),
-        expiryDate: null
-    }
-    return api.patch(endpoints.versions.detail(versionId), scheduleData)
-}, 'versions.publishVersionNow')
 
 /**
  * Pack versions aggressively (bulk version management)

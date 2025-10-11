@@ -260,6 +260,18 @@ class WebPage(models.Model):
     title = models.CharField(max_length=255, default="")
     description = models.TextField(blank=True, default="")
     slug = models.SlugField(max_length=255, unique=False, null=True, blank=True)
+
+    # URL pattern matching for dynamic object publishing
+    # Uses secure registry-based patterns instead of arbitrary regex
+    path_pattern_key = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        help_text="Select a predefined pattern for dynamic path matching. "
+        "Patterns are defined in code for security. See path_pattern_registry for available patterns.",
+        db_column="path_pattern",  # Keep same DB column to avoid migration issues
+    )
+
     # Page-level CSS injection controls (kept for backward compatibility and manual overrides)
     enable_css_injection = models.BooleanField(
         default=True,
@@ -292,6 +304,24 @@ class WebPage(models.Model):
         User, on_delete=models.PROTECT, related_name="modified_pages"
     )
 
+    # Soft delete support
+    is_deleted = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text="Whether this page is marked as deleted (soft delete for reversibility)",
+    )
+    deleted_at = models.DateTimeField(
+        null=True, blank=True, help_text="When this page was marked as deleted"
+    )
+    deleted_by = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name="deleted_pages",
+        null=True,
+        blank=True,
+        help_text="User who deleted this page",
+    )
+
     class Meta:
         ordering = [
             "sort_order",
@@ -315,12 +345,22 @@ class WebPage(models.Model):
             parent_url = (self.parent.get_absolute_url() or "/").rstrip("/")
             slug_part = (self.slug or "").strip("/")
             return f"{parent_url}/{slug_part}/"
+
+        # Root page: if it has hostnames, slug is silent (returns "/")
+        if self.hostnames:
+            return "/"
+
+        # Root page without hostnames: include slug
         slug_part = (self.slug or "").strip("/")
         return f"/{slug_part}/"
 
     def is_root_page(self):
         """Check if this is a root page (no parent)"""
         return self.parent is None
+
+    def has_silent_slug(self):
+        """Check if this page's slug should be silent (not appear in URLs)"""
+        return self.is_root_page() and bool(self.hostnames)
 
     @classmethod
     def normalize_hostname(cls, hostname):
@@ -789,6 +829,16 @@ class WebPage(models.Model):
                             raise ValidationError(
                                 f"Port number must be between 1-65535: {hostname}"
                             )
+
+        # Validate path_pattern_key against registry
+        if self.path_pattern_key:
+            from .path_pattern_registry import path_pattern_registry
+
+            if not path_pattern_registry.is_registered(self.path_pattern_key):
+                raise ValidationError(
+                    f"Invalid path pattern key: '{self.path_pattern_key}'. "
+                    f"Must be one of: {', '.join(path_pattern_registry.list_pattern_keys())}"
+                )
 
         # Check for hostname conflicts with other root pages
         if self.hostnames and self.parent is None:
@@ -1724,6 +1774,118 @@ class WebPage(models.Model):
 
         return "\n\n".join(css_parts)
 
+    def soft_delete(self, user, recursive=False):
+        """
+        Mark this page as deleted (soft delete).
+
+        Args:
+            user: User performing the deletion
+            recursive: If True, also soft delete all descendant pages
+
+        Returns:
+            int: Number of pages deleted
+        """
+        from django.utils import timezone
+
+        count = 0
+
+        if recursive:
+            # Get all descendants
+            descendants = self.get_all_descendants()
+            for descendant in descendants:
+                if not descendant.is_deleted:
+                    descendant.is_deleted = True
+                    descendant.deleted_at = timezone.now()
+                    descendant.deleted_by = user
+                    descendant.save(
+                        update_fields=["is_deleted", "deleted_at", "deleted_by"]
+                    )
+                    count += 1
+
+        # Delete the page itself
+        if not self.is_deleted:
+            self.is_deleted = True
+            self.deleted_at = timezone.now()
+            self.deleted_by = user
+            self.save(update_fields=["is_deleted", "deleted_at", "deleted_by"])
+            count += 1
+
+        return count
+
+    def restore(self, user, recursive=False):
+        """
+        Restore a soft-deleted page.
+
+        Args:
+            user: User performing the restoration
+            recursive: If True, also restore all descendant pages
+
+        Returns:
+            int: Number of pages restored
+        """
+        count = 0
+
+        if recursive:
+            # Get all descendants
+            descendants = self.get_all_descendants(include_deleted=True)
+            for descendant in descendants:
+                if descendant.is_deleted:
+                    descendant.is_deleted = False
+                    descendant.deleted_at = None
+                    descendant.deleted_by = None
+                    descendant.last_modified_by = user
+                    descendant.save(
+                        update_fields=[
+                            "is_deleted",
+                            "deleted_at",
+                            "deleted_by",
+                            "last_modified_by",
+                        ]
+                    )
+                    count += 1
+
+        # Restore the page itself
+        if self.is_deleted:
+            self.is_deleted = False
+            self.deleted_at = None
+            self.deleted_by = None
+            self.last_modified_by = user
+            self.save(
+                update_fields=[
+                    "is_deleted",
+                    "deleted_at",
+                    "deleted_by",
+                    "last_modified_by",
+                ]
+            )
+            count += 1
+
+        return count
+
+    def get_all_descendants(self, include_deleted=False):
+        """
+        Get all descendant pages recursively.
+
+        Args:
+            include_deleted: If True, include soft-deleted pages in results
+
+        Returns:
+            QuerySet: All descendant pages
+        """
+        descendants = []
+
+        def collect_descendants(page):
+            queryset = page.children.all()
+            if not include_deleted:
+                queryset = queryset.filter(is_deleted=False)
+
+            for child in queryset:
+                descendants.append(child)
+                collect_descendants(child)
+
+        collect_descendants(self)
+        return descendants
+
     def save(self, *args, **kwargs):
         """Override save to clear hostname cache when hostnames change."""
         # Check if hostnames are being changed (for cache invalidation)
@@ -1854,6 +2016,7 @@ class PageVersion(models.Model):
 
     # Timestamps and ownership
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     created_by = models.ForeignKey(User, on_delete=models.PROTECT)
 
     class Meta:

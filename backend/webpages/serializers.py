@@ -254,6 +254,9 @@ class WebPageTreeSerializer(serializers.ModelSerializer):
     title = serializers.SerializerMethodField()
     # description = serializers.SerializerMethodField()
     code_layout = serializers.SerializerMethodField()
+    is_deleted = serializers.SerializerMethodField()
+    deleted_at = serializers.SerializerMethodField()
+    deleted_by = serializers.SerializerMethodField()
 
     class Meta:
         model = WebPage
@@ -266,10 +269,14 @@ class WebPageTreeSerializer(serializers.ModelSerializer):
             "parent",
             "sort_order",
             "hostnames",
+            "path_pattern_key",  # Registry-based path pattern key
             "publication_status",
             "effective_date",
             "expiry_date",
             "children_count",
+            "is_deleted",  # NEW: Add soft delete fields
+            "deleted_at",
+            "deleted_by",
         ]
 
     def get_title(self, obj):
@@ -282,6 +289,21 @@ class WebPageTreeSerializer(serializers.ModelSerializer):
 
     def get_children_count(self, obj):
         return obj.children.count()
+
+    def get_is_deleted(self, obj):
+        """Get is_deleted field (safe if migration not run)"""
+        return getattr(obj, "is_deleted", False)
+
+    def get_deleted_at(self, obj):
+        """Get deleted_at field (safe if migration not run)"""
+        return getattr(obj, "deleted_at", None)
+
+    def get_deleted_by(self, obj):
+        """Get deleted_by field (safe if migration not run)"""
+        deleted_by = getattr(obj, "deleted_by", None)
+        if deleted_by:
+            return deleted_by.id
+        return None
 
     def get_publication_status(self, obj):
         """DEPRECATED: Get publication status from PageVersionSerializer instead"""
@@ -315,6 +337,9 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
     layout_inheritance_info = serializers.SerializerMethodField()
     available_code_layouts = serializers.SerializerMethodField()
     children_count = serializers.SerializerMethodField()
+    is_deleted = serializers.SerializerMethodField()
+    deleted_at = serializers.SerializerMethodField()
+    deleted_by = serializers.SerializerMethodField()
 
     class Meta:
         model = WebPage
@@ -327,6 +352,7 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
             "parent_id",
             "sort_order",
             "hostnames",
+            "path_pattern_key",  # Registry-based path pattern key
             "created_at",
             "updated_at",
             "created_by",
@@ -338,6 +364,9 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
             "layout_inheritance_info",
             "available_code_layouts",
             "children_count",
+            "is_deleted",  # NEW: Add soft delete fields
+            "deleted_at",
+            "deleted_by",
         ]
         read_only_fields = [
             "id",
@@ -345,6 +374,9 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
             "updated_at",
             "created_by",
             "last_modified_by",
+            "is_deleted",
+            "deleted_at",
+            "deleted_by",
         ]
 
     def __init__(self, *args, **kwargs):
@@ -448,6 +480,21 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
     def get_children_count(self, obj):
         return obj.children.count()
 
+    def get_is_deleted(self, obj):
+        """Get is_deleted field (safe if migration not run)"""
+        return getattr(obj, "is_deleted", False)
+
+    def get_deleted_at(self, obj):
+        """Get deleted_at field (safe if migration not run)"""
+        return getattr(obj, "deleted_at", None)
+
+    def get_deleted_by(self, obj):
+        """Get deleted_by field (safe if migration not run)"""
+        deleted_by = getattr(obj, "deleted_by", None)
+        if deleted_by:
+            return UserSerializer(deleted_by).data
+        return None
+
 
 class PageVersionSerializer(serializers.ModelSerializer):
     """Serializer for page versions with enhanced workflow support"""
@@ -458,6 +505,14 @@ class PageVersionSerializer(serializers.ModelSerializer):
     publication_status = serializers.SerializerMethodField()
     version_id = serializers.SerializerMethodField()
     page_id = serializers.SerializerMethodField()
+
+    # Writable page field for creation
+    page = serializers.PrimaryKeyRelatedField(
+        queryset=WebPage.objects.all(),
+        write_only=True,
+        required=False,
+        help_text="Page ID for creating new version",
+    )
 
     # Tags as array of strings
     tags = serializers.ListField(
@@ -473,6 +528,7 @@ class PageVersionSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "version_id",
+            "page",  # Writable field for creation
             "page_id",
             "version_number",
             "version_title",

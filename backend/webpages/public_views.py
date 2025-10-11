@@ -501,19 +501,19 @@ class HostnamePageView(View):
 
     def get(self, request, *args, **kwargs):
         """
-        Resolve page based on hostname and path.
+        Resolve page based on hostname and path with pattern matching support.
 
         For requests like:
         - example.com/ -> root page for example.com
         - example.com/about/ -> 'about' page under example.com's root
-        - example.com/about/team/ -> 'team' page under 'about' under example.com's root
+        - example.com/news/my-article/ -> 'news' page with path_pattern capturing 'my-article'
         """
+        import re
+
         # Get hostname from request with validation
         hostname = self.request.get_host().lower()
 
         # Validate hostname format to prevent host header injection
-        import re
-
         # Allow hostname with optional port (e.g., localhost:8000, example.com:443)
         if not re.match(r"^[a-z0-9.-]+(?::[0-9]+)?$", hostname) or ".." in hostname:
             raise Http404("Invalid hostname format")
@@ -530,93 +530,35 @@ class HostnamePageView(View):
         if not root_page:
             raise Http404(f"No site configured for hostname: {hostname}")
 
+        # Initialize path_variables (will be populated if pattern matching occurs)
+        path_variables = {}
+
         # If no path specified, return the root page
-        content = root_page.get_latest_published_version()
+        if not slug_parts:
+            current_page = root_page
+            remaining_path = ""
+        else:
+            # NEW: Smart path resolution - find longest matching page path
+            current_page, remaining_path = self._resolve_page_with_pattern(
+                root_page, slug_parts
+            )
+
+            # If we have a remaining path and the page has a path_pattern_key, extract variables
+            if remaining_path and current_page.path_pattern_key:
+                path_variables = self._extract_path_variables(
+                    current_page.path_pattern_key, remaining_path
+                )
+
+                # If pattern doesn't match, it's a 404
+                if path_variables is None:
+                    raise Http404(f"Path does not match pattern: {remaining_path}")
+
+        # Get the published version
+        content = current_page.get_latest_published_version()
 
         # Handle case where no published version exists
         if not content:
-            raise Http404(f"No published content available for this site")
-
-        widgets = content.widgets
-        page_data = content.page_data
-
-        context = {
-            "root_page": root_page,
-            "current_page": root_page,
-            "widgets": widgets,
-            "layout": root_page.get_effective_layout(),
-            "theme": root_page.get_effective_theme(),
-            "parent": root_page.parent,
-            "slug_parts": slug_parts,
-            "request": request,
-            "widgets": widgets,
-            "page_data": page_data,
-            "version_number": content.version_number,
-            "status": content.get_publication_status(),
-            "is_current": content.is_current_published(),
-            "published_at": content.effective_date,
-            "published_by": content.created_by,
-        }
-
-        if not slug_parts:
-            current_page = root_page
-        else:
-            # First check if the first slug is a direct child of root_page
-            first_slug = slug_parts[0]
-            if not WebPage.objects.filter(slug=first_slug, parent=root_page).exists():
-                raise Http404(f"Page '{first_slug}' not found under site root")
-
-            # Navigate through the hierarchy starting from the root page
-            current_page = root_page
-            # context["current_hostname"] = hostname
-            # context["is_root_page"] = page.is_root_page()
-            # context["site_root_page"] = self._get_site_root_page(page)
-            # # Get effective layout and theme
-            # context["effective_layout"] = page.get_effective_layout()
-            # context["effective_theme"] = page.get_effective_theme()
-            # # Get widgets organized by slot with inheritance
-            # context["widgets_by_slot"] = self._get_widgets_by_slot(page)
-            # # Get breadcrumbs
-            # context["breadcrumbs"] = page.get_breadcrumbs()
-            # # If this is an object page, get object content
-            # if page.is_object_page():
-            #     context["object_content"] = page.get_object_content()
-            #     context["is_object_page"] = True
-            #     context["linked_object"] = {
-            #         "type": page.linked_object_type,
-            #         "id": page.linked_object_id,
-            #     }
-            # else:
-            #     context["is_object_page"] = False
-
-            for slug in slug_parts:
-                try:
-                    current_page = WebPage.objects.select_related("parent").get(
-                        slug=slug, parent=current_page
-                    )
-                    content = current_page.get_latest_published_version()
-
-                    # Handle case where no published version exists
-                    if not content:
-                        raise Http404(
-                            f"No published content available for page: {slug}"
-                        )
-
-                    widgets = content.widgets
-                    page_data = content.page_data
-                    context["current_page"] = current_page
-                    context["widgets"] = widgets
-                    context["page_data"] = page_data
-                    context["version_number"] = content.version_number
-                    context["status"] = content.get_publication_status()
-                    context["is_current"] = content.is_current_published()
-                    context["published_at"] = content.effective_date
-                    context["published_by"] = content.created_by
-                    context["layout"] = current_page.get_effective_layout()
-                    context["theme"] = current_page.get_effective_theme()
-                    context["parent"] = current_page.parent
-                except WebPage.DoesNotExist:
-                    raise Http404(f"Page not found: /{'/'.join(slug_parts)}/")
+            raise Http404(f"No published content available for this page")
 
         # Check if page is published and effective
         if not self._is_page_accessible(current_page):
@@ -630,13 +572,36 @@ class HostnamePageView(View):
             else "webpages/page_detail.html"
         )
 
-        # Ensure effective layout, theme, and widgets_by_slot are present in context
-        context["effective_layout"] = effective_layout
-        context["effective_theme"] = current_page.get_effective_theme()
+        # Build context with path_variables
+        widgets = content.widgets
+        page_data = content.page_data
+
+        context = {
+            "root_page": root_page,
+            "current_page": current_page,
+            "widgets": widgets,
+            "layout": effective_layout,
+            "theme": current_page.get_effective_theme(),
+            "parent": current_page.parent,
+            "slug_parts": slug_parts,
+            "request": request,
+            "page_data": page_data,
+            "version_number": content.version_number,
+            "status": content.get_publication_status(),
+            "is_current": content.is_current_published(),
+            "published_at": content.effective_date,
+            "published_by": content.created_by,
+            "effective_layout": effective_layout,
+            "effective_theme": current_page.get_effective_theme(),
+            "path_variables": path_variables,  # NEW: Add path variables to context
+        }
 
         # Build widgets_by_slot via renderer (new system)
         renderer = WebPageRenderer(request=request)
-        base_context = renderer._build_base_context(current_page, content, {})
+        # Pass path_variables in the extra context
+        base_context = renderer._build_base_context(
+            current_page, content, {"path_variables": path_variables}
+        )
         context["widgets_by_slot"] = renderer._render_widgets_by_slot(
             current_page, content, base_context
         )
@@ -651,6 +616,93 @@ class HostnamePageView(View):
     def _is_page_accessible(self, page):
         """Check if page is published and currently accessible using date-based logic"""
         return page.is_published()
+
+    def _resolve_page_with_pattern(self, root_page, slug_parts):
+        """
+        Resolve page using smart path matching.
+
+        Tries to find the longest matching page path, returning the matched page
+        and any remaining path components.
+
+        Args:
+            root_page: The root page to start from
+            slug_parts: List of path components (e.g., ['news', 'my-article'])
+
+        Returns:
+            tuple: (matched_page, remaining_path_string)
+
+        Example:
+            For slug_parts=['news', 'my-article']:
+            1. Try to find page at /news/my-article/ -> not found
+            2. Try to find page at /news/ -> found!
+            3. Return (news_page, 'my-article/')
+        """
+        # Try to match paths from longest to shortest
+        current_page = root_page
+
+        for i in range(len(slug_parts), 0, -1):
+            # Try to navigate through this subset of slugs
+            temp_page = root_page
+            found = True
+
+            for j in range(i):
+                slug = slug_parts[j]
+                try:
+                    temp_page = WebPage.objects.select_related("parent").get(
+                        slug=slug, parent=temp_page
+                    )
+                except WebPage.DoesNotExist:
+                    found = False
+                    break
+
+            if found:
+                # We found a matching page at this depth
+                current_page = temp_page
+                # Calculate remaining path
+                remaining_parts = slug_parts[i:]
+                remaining_path = (
+                    "/".join(remaining_parts) + "/" if remaining_parts else ""
+                )
+                return current_page, remaining_path
+
+        # No page found in hierarchy
+        raise Http404(f"Page not found: /{'/'.join(slug_parts)}/")
+
+    def _extract_path_variables(self, pattern_key, remaining_path):
+        """
+        Extract variables from remaining path using a registry-based pattern.
+
+        Args:
+            pattern_key: Key of the pattern in the registry (e.g., 'news_slug')
+            remaining_path: The remaining path to match (e.g., 'my-article/')
+
+        Returns:
+            dict: Extracted variables or None if no match
+
+        Example:
+            pattern_key = "news_slug"
+            remaining_path = "my-article/"
+            returns: {'slug': 'my-article'}
+        """
+        from .path_pattern_registry import path_pattern_registry
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        # Get the pattern from the registry
+        pattern = path_pattern_registry.get_pattern(pattern_key)
+        if not pattern:
+            logger.error(f"Path pattern '{pattern_key}' not found in registry")
+            return None
+
+        # Use the pattern's validate_match method
+        try:
+            return pattern.validate_match(remaining_path)
+        except Exception as e:
+            logger.error(
+                f"Error validating path '{remaining_path}' with pattern '{pattern_key}': {e}"
+            )
+            return None
 
     def get_context_data(self, **kwargs):
         """Add layout, theme, widgets, hostname info, and object content to context"""

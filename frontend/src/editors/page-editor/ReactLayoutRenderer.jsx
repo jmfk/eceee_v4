@@ -14,7 +14,7 @@ import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataC
 import { OperationTypes } from '../../contexts/unified-data/types/operations';
 
 const ReactLayoutRenderer = forwardRef(({
-    layoutName = 'single_column',
+    layoutName = 'main_layout',  // Default to main_layout (available layout)
     widgets = {},
     onWidgetChange,
     editable = true,

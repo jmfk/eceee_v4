@@ -2,9 +2,10 @@ import React, { createContext, useContext, useRef, useCallback, useEffect } from
 import { DataManager } from '../core/DataManager';
 import { UnifiedDataContextValue, UnifiedDataProviderProps } from '../types/context';
 import { Operation, OperationTypes } from '../types/operations';
+import { pagesApi } from '../../../api/pages';
 import { versionsApi } from '../../../api/versions';
 import { objectInstancesApi } from '../../../api/objectStorage';
-import { StateChangeCallback, VersionData } from '../types/state';
+import { StateChangeCallback, VersionData, PageData } from '../types/state';
 import { defaultEqualityFn } from '../utils/equality';
 
 // Create the context
@@ -209,15 +210,25 @@ export function UnifiedDataProvider({
 
         // Determine context type based on what's currently active
         if (currentPageId && currentVersionId) {
-            // Page context - save using versionsApi
-            const version = state.versions[String(currentVersionId)] as VersionData;
-            if (!version) {
+            // Page context - save both WebPage and PageVersion data
+            const pageData = state.pages[String(currentPageId)] as PageData;
+            const versionData = state.versions[String(currentVersionId)] as VersionData;
+
+            if (!versionData) {
                 throw new Error(`Version ${currentVersionId} not found in UDC state`);
             }
 
-            const result = await versionsApi.update(currentVersionId, version);
+            // Save WebPage data first (title, slug, pathPattern, hostnames, etc.)
+            let pageResult;
+            if (pageData) {
+                pageResult = await pagesApi.update(currentPageId, pageData);
+            }
+
+            // Save PageVersion data (widgets, codeLayout, metaTitle, metaDescription, etc.)
+            const versionResult = await versionsApi.update(currentVersionId, versionData);
+
             // Update page dirty state
-            if (result) {
+            if (versionResult) {
                 manager.dispatch({
                     type: OperationTypes.SET_DIRTY,
                     sourceId: 'udc-save-current-version',
@@ -225,7 +236,7 @@ export function UnifiedDataProvider({
                 });
             }
 
-            return result;
+            return versionResult;
         } else if (currentObjectId) {
             // Object context - save using objectInstancesApi
             const objectData = state.objects[String(currentObjectId)];

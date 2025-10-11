@@ -19,6 +19,7 @@ import eceeeSidebarWidget from './eceeeSidebarWidget';
 import eceeeFormsWidget from './eceeeFormsWidget';
 import eceeeTwoColumnsWidget from './eceeeTwoColumnsWidget';
 import eceeeThreeColumnsWidget from './eceeeThreeColumnsWidget';
+import eceeePathDebugWidget from './eceeePathDebugWidget';
 
 /**
  * ECEEE Widget Registry
@@ -42,6 +43,7 @@ export const ECEEE_WIDGET_REGISTRY = {
     'eceee_widgets.FormsWidget': registerWidget(eceeeFormsWidget, 'eceee_widgets.FormsWidget'),
     'eceee_widgets.TwoColumnsWidget': registerWidget(eceeeTwoColumnsWidget, 'eceee_widgets.TwoColumnsWidget'),
     'eceee_widgets.ThreeColumnsWidget': registerWidget(eceeeThreeColumnsWidget, 'eceee_widgets.ThreeColumnsWidget'),
+    'eceee_widgets.PathDebugWidget': registerWidget(eceeePathDebugWidget, 'eceee_widgets.PathDebugWidget'),
 };
 
 /**

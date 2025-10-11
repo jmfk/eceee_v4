@@ -192,6 +192,16 @@ class LayoutRegistry:
             layouts = [layout for layout in layouts if layout.is_active]
         return layouts
 
+    def get_default_layout(self) -> Optional[BaseLayout]:
+        """
+        Get the default layout to use when no layout is specified.
+        Returns the first active registered layout, or None if no layouts are registered.
+        """
+        active_layouts = self.list_layouts(active_only=True)
+        if active_layouts:
+            return active_layouts[0]
+        return None
+
     def clear(self) -> None:
         """Clear all registered layouts."""
         self._layouts.clear()

@@ -15,6 +15,7 @@ from .sidebar import SidebarWidget
 from .forms import FormsWidget
 from .two_columns import TwoColumnsWidget
 from .three_columns import ThreeColumnsWidget
+from .path_debug import PathDebugWidget
 
 # Make all widgets available at the package level
 __all__ = [
@@ -28,4 +29,5 @@ __all__ = [
     "FormsWidget",
     "TwoColumnsWidget",
     "ThreeColumnsWidget",
+    "PathDebugWidget",
 ]

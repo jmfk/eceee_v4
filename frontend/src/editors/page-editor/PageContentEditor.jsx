@@ -5,9 +5,10 @@
  * layout protocol. Simple, flexible, and maintainable.
  */
 
-import React, { forwardRef, useState } from 'react';
+import React, { forwardRef, useState, useEffect } from 'react';
 import ReactLayoutRenderer from './ReactLayoutRenderer';
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext';
+import { getDefaultLayout } from '../../utils/defaultLayout';
 
 const PageContentEditor = forwardRef(({
     layoutJson,
@@ -33,12 +34,22 @@ const PageContentEditor = forwardRef(({
     refetchInheritance,
     ...otherProps
 }, ref) => {
+    // State for default layout fetched from backend
+    const [defaultLayoutName, setDefaultLayoutName] = useState('main_layout');
+
+    // Fetch default layout from backend on mount
+    useEffect(() => {
+        getDefaultLayout().then(layoutName => {
+            setDefaultLayoutName(layoutName);
+        });
+    }, []);
+
     // Extract layout name from layoutJson or use default
-    const pageId = webpageData.id;
+    const pageId = webpageData?.id;
     const layoutName = layoutJson?.layout?.name ||
         layoutJson?.name ||
         pageVersionData?.codeLayout ||
-        'single_column';
+        defaultLayoutName;  // Use default layout from backend
 
     // Use local widgets from PageEditor (fast local state)
     const currentWidgets = localWidgets || pageVersionData?.widgets || {};
