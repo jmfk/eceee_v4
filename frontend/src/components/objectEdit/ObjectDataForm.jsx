@@ -238,17 +238,22 @@ const ObjectDataForm = forwardRef(({
 
         // Publish update to ODC if we have an instance ID
         if (instance?.id) {
+            // Get current state from UDC to avoid stale closure data
+            const currentState = getState();
+            const currentObject = currentState.objects?.[String(instance.id)];
+            const currentData = currentObject?.data || {};
+
             await publishUpdate(componentId, OperationTypes.UPDATE_OBJECT, {
                 id: String(instance.id),
                 updates: {
                     data: {
-                        ...formData.data,
+                        ...currentData,
                         [fieldName]: value
                     }
                 }
             });
         }
-    }, [errors, onFormChange, instance?.id, componentId, publishUpdate, formData.data])
+    }, [errors, onFormChange, instance?.id, componentId, publishUpdate, getState])
 
 
 
