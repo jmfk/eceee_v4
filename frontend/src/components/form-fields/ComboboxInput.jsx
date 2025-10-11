@@ -29,6 +29,7 @@ const ComboboxInput = ({
     searchDebounce = 300,
     minSearchLength = 0,
     caseSensitive = false,
+    fieldName, // Extract fieldName to prevent it from being spread to DOM
     ...props
 }) => {
     const [isOpen, setIsOpen] = useState(false)

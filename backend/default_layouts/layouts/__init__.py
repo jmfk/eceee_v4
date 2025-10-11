@@ -19,4 +19,3 @@ __all__ = [
     "SingleColumnLayout",
     # Additional layouts would be added here
 ]
-

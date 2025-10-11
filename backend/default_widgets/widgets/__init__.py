@@ -22,11 +22,4 @@ __all__ = [
     "ContentWidget",
     "ImageWidget",
     "TableWidget",
-    "FooterWidget",
-    "HeaderWidget",
-    "NavigationWidget",
-    "SidebarWidget",
-    "FormsWidget",
-    # Container widgets
-    "TwoColumnsWidget",
 ]

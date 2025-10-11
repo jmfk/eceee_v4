@@ -13,7 +13,32 @@ const WidgetSelectionModal = ({ isOpen, onClose, onSelectWidget, slot, available
 
     // Filter available widget types based on slot configuration and search term
     const filteredWidgets = useMemo(() => {
-        if (!slot?.widgetControls || !availableWidgetTypes) return []
+        if (!availableWidgetTypes) return []
+        console.log("slot?.widgetControls", slot?.widgetControls)
+
+        // If no widgetControls, use all available widgets (fallback - matches backend behavior)
+        if (!slot?.widgetControls || slot.widgetControls.length === 0) {
+            let widgets = availableWidgetTypes.map(wt => ({
+                type: wt.type || wt.widgetType,
+                name: wt.name || wt.display_name || getWidgetDisplayName(wt.type || wt.widgetType),
+                description: getWidgetDescription(wt.type || wt.widgetType) || wt.description || 'No description available',
+                category: getWidgetCategory(wt.type || wt.widgetType) || wt.category || 'General',
+                icon: getWidgetIcon(wt.type || wt.widgetType) || wt.icon || '🧩'
+            }))
+
+            // Apply search filter
+            if (searchTerm.trim()) {
+                const term = searchTerm.toLowerCase()
+                widgets = widgets.filter(widget =>
+                    widget.name.toLowerCase().includes(term) ||
+                    widget.description.toLowerCase().includes(term) ||
+                    widget.category.toLowerCase().includes(term) ||
+                    widget.type.toLowerCase().includes(term)
+                )
+            }
+
+            return widgets
+        }
 
         let widgets = slot.widgetControls
             .filter(control => {
@@ -86,6 +111,7 @@ const WidgetSelectionModal = ({ isOpen, onClose, onSelectWidget, slot, available
 
     if (!isOpen) return null
 
+    console.log("filteredWidgets", filteredWidgets)
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div

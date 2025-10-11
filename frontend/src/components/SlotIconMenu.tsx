@@ -50,7 +50,7 @@ const SlotIconMenu = ({ slotName, slot, availableWidgetTypes, isFilteringTypes, 
             {isOpen && (
                 <div className="absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg min-w-48">
                     {/* Add Widget */}
-                    {!isFilteringTypes && slot.widgetControls && slot.widgetControls.length > 0 && (
+                    {!isFilteringTypes && (
                         <>
                             <button
                                 onClick={handleAddWidgetClick}

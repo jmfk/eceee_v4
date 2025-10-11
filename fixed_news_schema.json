@@ -1,0 +1,64 @@
+{
+  "type": "object",
+  "properties": {
+    "title": {
+      "displayLabel": "Article Title",
+      "componentType": "text",
+      "maxLength": 200
+    },
+    "summary": {
+      "displayLabel": "Summary",
+      "componentType": "text",
+      "maxLength": 300
+    },
+    "content": {
+      "displayLabel": "Article Content",
+      "componentType": "rich_text"
+    },
+    "author": {
+      "displayLabel": "Author",
+      "componentType": "user_reference"
+    },
+    "category": {
+      "displayLabel": "Category",
+      "componentType": "choice",
+      "choices": [
+        {
+          "label": "Company News",
+          "value": "company"
+        },
+        {
+          "label": "Industry News",
+          "value": "industry"
+        },
+        {
+          "label": "Research",
+          "value": "research"
+        },
+        {
+          "label": "Announcement",
+          "value": "announcement"
+        }
+      ]
+    },
+    "featured": {
+      "displayLabel": "Featured Article",
+      "componentType": "boolean"
+    }
+  },
+  "required": [
+    "title",
+    "content",
+    "author",
+    "category"
+  ],
+  "propertyOrder": [
+    "title",
+    "summary",
+    "content",
+    "author",
+    "category",
+    "featured"
+  ]
+}
+

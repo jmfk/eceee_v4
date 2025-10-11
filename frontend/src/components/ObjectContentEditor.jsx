@@ -116,7 +116,17 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, mode = 
     useEffect(() => {
         const filterTypes = async () => {
             if (rawAvailableWidgetTypes.length === 0) {
-                setFilteredWidgetTypes([])
+                // Fetch all available widgets as fallback (matches backend behavior)
+                setIsFilteringTypes(true)
+                try {
+                    const { widgetsApi } = await import('../api')
+                    const allWidgets = await widgetsApi.getTypes(true)
+                    setFilteredWidgetTypes(allWidgets || [])
+                } catch (error) {
+                    console.error('[ObjectContentEditor] Error fetching all widgets:', error)
+                    setFilteredWidgetTypes([])
+                }
+                setIsFilteringTypes(false)
                 return
             }
 
