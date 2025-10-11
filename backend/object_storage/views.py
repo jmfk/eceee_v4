@@ -193,6 +193,8 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
             # Wrap the slots in slot_configuration object
             slot_config_data = {"slot_configuration": request.data}
 
+            print("slot_config_data", slot_config_data)
+
             serializer = self.get_serializer(
                 obj_type, data=slot_config_data, partial=True
             )

@@ -445,13 +445,11 @@ class Command(BaseCommand):
                     {
                         "name": "details",
                         "label": "Event Details",
-                        "allowedWidgets": ["text_block", "html_block", "image"],
                         "required": True,
                     },
                     {
                         "name": "registration",
                         "label": "Registration Information",
-                        "allowedWidgets": ["forms", "button"],
                         "maxWidgets": 2,
                         "required": False,
                     },
@@ -534,13 +532,11 @@ class Command(BaseCommand):
                     {
                         "name": "overview",
                         "label": "Project Overview",
-                        "allowedWidgets": ["text_block", "html_block", "image"],
                         "required": True,
                     },
                     {
                         "name": "resources",
                         "label": "Resources & Links",
-                        "allowedWidgets": ["button", "text_block"],
                         "maxWidgets": 5,
                         "required": False,
                     },
