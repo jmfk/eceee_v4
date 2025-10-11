@@ -80,13 +80,6 @@ export function UnifiedDataProvider({
         });
     }, [manager]);
 
-    const setIsObjectDirty = useCallback((isDirty: boolean) => {
-        manager.dispatch({
-            type: OperationTypes.SET_OBJECT_DIRTY,
-            sourceId: undefined,
-            payload: { isDirty }
-        });
-    }, [manager]);
 
     const setIsObjectLoading = useCallback((isLoading: boolean) => {
         manager.dispatch({
@@ -255,10 +248,10 @@ export function UnifiedDataProvider({
             }
 
             const result = await objectInstancesApi.updateCurrentVersion(currentObjectId, objectData);
-            // Update object dirty state
+            // Update dirty state (use same flag as pages)
             if (result) {
                 manager.dispatch({
-                    type: OperationTypes.SET_OBJECT_DIRTY,
+                    type: OperationTypes.SET_DIRTY,
                     sourceId: 'udc-save-current-version',
                     payload: { isDirty: false }
                 });
@@ -297,7 +290,6 @@ export function UnifiedDataProvider({
         useExternalChanges,
         setIsDirty,
         setIsLoading,
-        setIsObjectDirty,
         setIsObjectLoading,
         markWidgetDirty,
         markWidgetSaved,

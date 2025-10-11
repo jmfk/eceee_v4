@@ -13,7 +13,7 @@ const ObjectSettingsView = ({ objectType, instance, isNewInstance, parentId, onS
     const [isDirty, setIsDirty] = useState(false)
 
     const { addNotification } = useGlobalNotifications()
-    const { useExternalChanges, publishUpdate, setIsObjectDirty } = useUnifiedData()
+    const { useExternalChanges, publishUpdate, setIsDirty: setUDCDirty } = useUnifiedData()
     const componentId = useMemo(() => `object-settings-view-${instance?.id || 'new'}`, [instance?.id])
 
     // Subscribe to external changes from UDC
@@ -40,8 +40,8 @@ const ObjectSettingsView = ({ objectType, instance, isNewInstance, parentId, onS
         if (onUnsavedChanges) {
             onUnsavedChanges(isDirty)
         }
-        setIsObjectDirty(isDirty)
-    }, [isDirty, onUnsavedChanges, setIsObjectDirty])
+        setUDCDirty(isDirty)
+    }, [isDirty, onUnsavedChanges, setUDCDirty])
 
     // Initialize form data from instance
     useEffect(() => {
