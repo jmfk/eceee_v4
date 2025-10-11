@@ -1145,14 +1145,6 @@ export class DataManager {
                     }));
                     break;
 
-                case OperationTypes.SET_OBJECT_DIRTY:
-                    this.setState(operation, state => ({
-                        metadata: {
-                            ...state.metadata,
-                            isObjectDirty: operation.payload.isDirty
-                        }
-                    }));
-                    break;
 
                 case OperationTypes.MARK_WIDGET_SAVED:
                     this.setState(operation, state => ({

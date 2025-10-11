@@ -14,7 +14,7 @@ const ObjectPublishingView = ({ objectType, instance, isNewInstance, onSave, onC
     const [isDirty, setIsDirty] = useState(false)
 
     const { addNotification } = useGlobalNotifications()
-    const { useExternalChanges, publishUpdate, setIsObjectDirty } = useUnifiedData()
+    const { useExternalChanges, publishUpdate, setIsDirty: setUDCDirty } = useUnifiedData()
     const componentId = useMemo(() => `object-publishing-view-${instance?.id || 'new'}`, [instance?.id])
 
     // Fetch current published version for the object
@@ -51,8 +51,8 @@ const ObjectPublishingView = ({ objectType, instance, isNewInstance, onSave, onC
         if (onUnsavedChanges) {
             onUnsavedChanges(isDirty)
         }
-        setIsObjectDirty(isDirty)
-    }, [isDirty, onUnsavedChanges, setIsObjectDirty])
+        setUDCDirty(isDirty)
+    }, [isDirty, onUnsavedChanges, setUDCDirty])
 
     useEffect(() => {
         if (currentPublishedVersion?.data) {

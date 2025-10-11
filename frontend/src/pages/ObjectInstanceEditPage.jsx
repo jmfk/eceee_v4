@@ -23,10 +23,10 @@ const ObjectInstanceEditPage = () => {
     const navigate = useNavigate()
     const location = useLocation()
     const { addNotification } = useGlobalNotifications()
-    const { useExternalChanges, setIsDirty, publishUpdate, saveCurrentVersion } = useUnifiedData()
+    const { useExternalChanges, publishUpdate, saveCurrentVersion } = useUnifiedData()
     const queryClient = useQueryClient()
 
-    // Save state management
+    // Save state management - sync with UDC's object dirty state
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
 
     // Version management state
@@ -39,7 +39,12 @@ const ObjectInstanceEditPage = () => {
     // Refs for tab components
     const contentTabRef = useRef(null)
 
-    const componentId = useMemo(() => `object-instance-editor-${instanceId || 'new'}`, [instanceId])
+    const componentId = useMemo(() => `object-instance-editor-${instanceId}`, [instanceId])
+
+    // Subscribe to UDC's dirty state (like PageEditor does)
+    useExternalChanges(componentId, state => {
+        setHasUnsavedChanges(state.metadata.isDirty);
+    });
 
     // Create object mutation (for new objects before editing)
     const createNewObjectMutation = useMutation({
@@ -264,8 +269,7 @@ const ObjectInstanceEditPage = () => {
     const handleSave = useCallback(async () => {
         setIsSaving(true);
         try {
-            await saveCurrentVersion();
-            setIsDirty(false);
+            await saveCurrentVersion(); // This dispatches SET_OBJECT_DIRTY(false) internally
             addNotification({
                 type: 'success',
                 message: 'Current version saved'
@@ -279,7 +283,7 @@ const ObjectInstanceEditPage = () => {
         } finally {
             setIsSaving(false);
         }
-    }, [saveCurrentVersion, setIsDirty, addNotification]);
+    }, [saveCurrentVersion, addNotification]);
 
     // const handleSaveNew = useCallback(async () => {
     //     setIsSaving(true);
