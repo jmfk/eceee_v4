@@ -677,14 +677,19 @@ class HostnamePageView(View):
             remaining_path: The remaining path to match (e.g., 'my-article/')
 
         Returns:
-            dict: Extracted variables or None if no match
+            dict: Extracted variables or None if no match (with HTML-escaped values)
 
         Example:
             pattern_key = "news_slug"
             remaining_path = "my-article/"
             returns: {'slug': 'my-article'}
+
+        Security:
+            All extracted path variables are HTML-escaped to prevent XSS attacks.
+            This provides defense-in-depth even though Django templates auto-escape by default.
         """
         from .path_pattern_registry import path_pattern_registry
+        from django.utils.html import escape
         import logging
 
         logger = logging.getLogger(__name__)
@@ -697,7 +702,15 @@ class HostnamePageView(View):
 
         # Use the pattern's validate_match method
         try:
-            return pattern.validate_match(remaining_path)
+            variables = pattern.validate_match(remaining_path)
+            if variables:
+                # Sanitize path variables to prevent XSS attacks
+                # Even though Django templates auto-escape by default, this provides
+                # defense-in-depth in case templates use |safe filter or raw rendering
+                variables = {
+                    key: escape(str(value)) for key, value in variables.items()
+                }
+            return variables
         except Exception as e:
             logger.error(
                 f"Error validating path '{remaining_path}' with pattern '{pattern_key}': {e}"

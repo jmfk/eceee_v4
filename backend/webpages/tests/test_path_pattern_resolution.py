@@ -216,6 +216,199 @@ class PathResolutionTests(TestCase):
             view._resolve_page_with_pattern(self.root_page, ["nonexistent"])
 
 
+class PathVariableSecurityTests(TestCase):
+    """Security tests for path variable sanitization"""
+
+    def setUp(self):
+        """Set up test data"""
+        self.factory = RequestFactory()
+        self.user = User.objects.create_user(
+            username="testuser", password="testpass123"
+        )
+
+        # Create root page
+        self.root_page = WebPage.objects.create(
+            slug="",
+            hostnames=["testserver"],
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+    def test_path_variables_are_html_escaped(self):
+        """Test that path variables containing HTML are properly escaped"""
+        from webpages.path_patterns import NewsSlugPattern
+        from webpages.path_pattern_registry import path_pattern_registry
+
+        # Register the pattern if not already registered
+        if not path_pattern_registry.is_registered("news_slug"):
+            path_pattern_registry.register(NewsSlugPattern)
+
+        view = HostnamePageView()
+
+        # Test with various HTML characters that should be escaped
+        test_cases = [
+            ("test-article/", "test-article"),  # Normal case
+            # Note: The regex pattern [\w-]+ won't match HTML characters,
+            # so we're testing that IF somehow malicious input got through,
+            # it would be escaped. The regex itself is the first line of defense.
+        ]
+
+        for remaining_path, expected_slug in test_cases:
+            variables = view._extract_path_variables("news_slug", remaining_path)
+            if variables:
+                # Verify variable exists and matches expected
+                self.assertIn("slug", variables)
+                self.assertEqual(variables["slug"], expected_slug)
+
+    def test_special_characters_are_escaped(self):
+        """Test that special HTML characters are escaped in path variables"""
+        view = HostnamePageView()
+
+        # Create a custom test pattern that allows more characters
+        # This simulates if someone creates a permissive pattern
+        from webpages.path_pattern_registry import (
+            BasePathPattern,
+            path_pattern_registry,
+        )
+
+        class TestPermissivePattern(BasePathPattern):
+            key = "test_permissive"
+            name = "Test Permissive Pattern"
+            description = "Test pattern for security testing"
+            # Intentionally permissive pattern (don't do this in production!)
+            regex_pattern = r"^(?P<slug>.+?)/$"
+            example_url = "test/"
+            extracted_variables = [
+                {
+                    "name": "slug",
+                    "type": "string",
+                    "description": "Test slug",
+                    "example": "test",
+                }
+            ]
+
+        # Register the test pattern
+        path_pattern_registry.register(TestPermissivePattern)
+
+        # Test that HTML characters are escaped
+        test_cases = [
+            ("test<script>/", "test&lt;script&gt;"),
+            ("test&value/", "test&amp;value"),
+            ("test'quote/", "test&#x27;quote"),
+            ('test"double/', "test&quot;double"),
+        ]
+
+        for remaining_path, expected_escaped in test_cases:
+            variables = view._extract_path_variables("test_permissive", remaining_path)
+            if variables:
+                self.assertIn("slug", variables)
+                self.assertEqual(
+                    variables["slug"],
+                    expected_escaped,
+                    f"Expected '{expected_escaped}' but got '{variables['slug']}'",
+                )
+
+        # Clean up
+        path_pattern_registry.unregister("test_permissive")
+
+    def test_xss_payload_is_neutralized(self):
+        """Test that common XSS payloads are properly escaped"""
+        view = HostnamePageView()
+
+        # Register permissive test pattern
+        from webpages.path_pattern_registry import (
+            BasePathPattern,
+            path_pattern_registry,
+        )
+
+        class TestXSSPattern(BasePathPattern):
+            key = "test_xss"
+            name = "Test XSS Pattern"
+            description = "Test pattern for XSS testing"
+            regex_pattern = r"^(?P<slug>.+?)/$"
+            example_url = "test/"
+            extracted_variables = [
+                {
+                    "name": "slug",
+                    "type": "string",
+                    "description": "Test slug",
+                    "example": "test",
+                }
+            ]
+
+        path_pattern_registry.register(TestXSSPattern)
+
+        # Test various XSS payloads
+        test_cases = [
+            (
+                "<script>alert('xss')</script>/",
+                "&lt;script&gt;alert(&#x27;xss&#x27;)&lt;/script&gt;",
+            ),
+            (
+                "<img src=x onerror=alert('xss')/",
+                "&lt;img src=x onerror=alert(&#x27;xss&#x27;)",
+            ),
+            ("<svg onload=alert('xss')/", "&lt;svg onload=alert(&#x27;xss&#x27;)"),
+        ]
+
+        for payload, expected_escaped in test_cases:
+            variables = view._extract_path_variables("test_xss", payload)
+            if variables and "slug" in variables:
+                # Verify that dangerous HTML tags are escaped
+                self.assertNotIn("<script>", variables["slug"])
+                self.assertNotIn("<img", variables["slug"])
+                self.assertNotIn("<svg", variables["slug"])
+                # Check that < and > are properly escaped
+                self.assertIn("&lt;", variables["slug"])
+                # Verify the full escaped value
+                self.assertEqual(variables["slug"], expected_escaped)
+
+        # Clean up
+        path_pattern_registry.unregister("test_xss")
+
+    def test_multiple_path_variables_all_escaped(self):
+        """Test that all path variables in multi-capture patterns are escaped"""
+        view = HostnamePageView()
+
+        from webpages.path_pattern_registry import (
+            BasePathPattern,
+            path_pattern_registry,
+        )
+
+        class TestMultiPattern(BasePathPattern):
+            key = "test_multi"
+            name = "Test Multi Pattern"
+            description = "Test pattern with multiple captures"
+            regex_pattern = r"^(?P<category>.+?)/(?P<slug>.+?)/$"
+            example_url = "cat/slug/"
+            extracted_variables = [
+                {
+                    "name": "category",
+                    "type": "string",
+                    "description": "Category",
+                    "example": "cat",
+                },
+                {
+                    "name": "slug",
+                    "type": "string",
+                    "description": "Slug",
+                    "example": "slug",
+                },
+            ]
+
+        path_pattern_registry.register(TestMultiPattern)
+
+        # Test that both variables are escaped
+        variables = view._extract_path_variables("test_multi", "cat<tag>/slug&test/")
+
+        self.assertIsNotNone(variables)
+        self.assertEqual(variables["category"], "cat&lt;tag&gt;")
+        self.assertEqual(variables["slug"], "slug&amp;test")
+
+        # Clean up
+        path_pattern_registry.unregister("test_multi")
+
+
 class PathPatternIntegrationTests(TestCase):
     """Integration tests for full request-response cycle with patterns"""
 
