@@ -1,7 +1,7 @@
 """
 Tests for path pattern resolution and variable extraction.
 
-This module tests the new path_pattern functionality that enables
+This module tests the new path_pattern_key functionality that enables
 dynamic object publishing through URL pattern matching.
 """
 
@@ -14,7 +14,7 @@ import re
 
 
 class PathPatternModelTests(TestCase):
-    """Test path_pattern field validation and behavior"""
+    """Test path_pattern_key field validation and behavior"""
 
     def setUp(self):
         """Set up test data"""
@@ -23,20 +23,20 @@ class PathPatternModelTests(TestCase):
         )
 
     def test_path_pattern_field_exists(self):
-        """Test that path_pattern field exists and has correct properties"""
+        """Test that path_pattern_key field exists and has correct properties"""
         page = WebPage.objects.create(
             slug="test",
-            path_pattern="^(?P<slug>[\\w-]+)/$",
+            path_pattern_key="^(?P<slug>[\\w-]+)/$",
             created_by=self.user,
             last_modified_by=self.user,
         )
-        self.assertEqual(page.path_pattern, "^(?P<slug>[\\w-]+)/$")
+        self.assertEqual(page.path_pattern_key, "^(?P<slug>[\\w-]+)/$")
 
     def test_valid_regex_pattern(self):
         """Test that valid regex patterns are accepted"""
         page = WebPage(
             slug="news",
-            path_pattern="^(?P<news_slug>[\\w-]+)/$",
+            path_pattern_key="^(?P<news_slug>[\\w-]+)/$",
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -51,7 +51,7 @@ class PathPatternModelTests(TestCase):
 
         page = WebPage(
             slug="invalid",
-            path_pattern="^(?P<slug>[\\w-+)/$",  # Invalid - missing closing bracket
+            path_pattern_key="^(?P<slug>[\\w-+)/$",  # Invalid - missing closing bracket
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -60,20 +60,20 @@ class PathPatternModelTests(TestCase):
         self.assertIn("Invalid regex pattern", str(context.exception))
 
     def test_empty_path_pattern_allowed(self):
-        """Test that empty path_pattern is allowed (backward compatibility)"""
+        """Test that empty path_pattern_key is allowed (backward compatibility)"""
         page = WebPage.objects.create(
             slug="normal",
-            path_pattern="",
+            path_pattern_key="",
             created_by=self.user,
             last_modified_by=self.user,
         )
-        self.assertEqual(page.path_pattern, "")
+        self.assertEqual(page.path_pattern_key, "")
 
     def test_complex_regex_pattern(self):
         """Test that complex regex patterns with multiple captures work"""
         page = WebPage(
             slug="events",
-            path_pattern="^(?P<year>\\d{4})/(?P<month>\\d{2})/(?P<slug>[\\w-]+)/$",
+            path_pattern_key="^(?P<year>\\d{4})/(?P<month>\\d{2})/(?P<slug>[\\w-]+)/$",
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -109,7 +109,7 @@ class PathResolutionTests(TestCase):
         self.news_page = WebPage.objects.create(
             slug="news",
             parent=self.root_page,
-            path_pattern="^(?P<news_slug>[\\w-]+)/$",
+            path_pattern_key="^(?P<news_slug>[\\w-]+)/$",
             created_by=self.user,
             last_modified_by=self.user,
         )
@@ -436,7 +436,7 @@ class PathPatternIntegrationTests(TestCase):
         self.events_page = WebPage.objects.create(
             slug="events",
             parent=self.root_page,
-            path_pattern="^(?P<event_slug>[\\w-]+)/$",
+            path_pattern_key="^(?P<event_slug>[\\w-]+)/$",
             created_by=self.user,
             last_modified_by=self.user,
         )
