@@ -30,7 +30,6 @@ const ComboboxInput = ({
     minSearchLength = 0,
     caseSensitive = false,
     fieldName, // Extract fieldName to prevent it from being spread to DOM
-    allow_create, // Extract allow_create to prevent it from being spread to DOM (use allowCreate instead)
     ...props
 }) => {
     const [isOpen, setIsOpen] = useState(false)
