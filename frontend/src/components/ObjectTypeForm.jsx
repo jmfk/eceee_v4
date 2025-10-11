@@ -1822,7 +1822,7 @@ const WidgetControlManager = ({ widgetControls = [], availableWidgets = [], load
                 </div>
                 {selectedWidgetType && (
                     <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
-                        <strong>{availableWidgets.find(w => w.slug === selectedWidgetType)?.name}</strong>: {availableWidgets.find(w => w.slug === selectedWidgetType)?.description}
+                        <strong>{availableWidgets.find(w => w.type === selectedWidgetType)?.name}</strong>: {availableWidgets.find(w => w.type === selectedWidgetType)?.description}
                     </div>
                 )}
             </div>
