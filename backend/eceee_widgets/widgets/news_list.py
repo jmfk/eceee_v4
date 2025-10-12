@@ -19,12 +19,12 @@ class NewsListConfig(BaseModel):
         populate_by_name=True,
     )
 
-    object_types: List[str] = Field(
-        default=["news"],
+    object_types: List[int] = Field(
+        default=[],
         description="Select ObjectType(s) to display",
         json_schema_extra={
-            "component": "MultiSelectInput",
-            "placeholder": "Select object types...",
+            "component": "ObjectTypeSelectorInput",
+            "multiple": True,
         },
     )
 
@@ -287,7 +287,7 @@ class NewsListWidget(BaseWidget):
         try:
             # Build queryset
             queryset = ObjectInstance.objects.filter(
-                object_type__name__in=config.object_types, status="published"
+                object_type_id__in=config.object_types, status="published"
             ).select_related("object_type", "current_version")
 
             # Annotate with pinned/featured status from metadata
