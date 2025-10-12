@@ -24,7 +24,7 @@ const ObjectDataForm = forwardRef(({
     const [namespace, setNamespace] = useState(null)
 
     // ODC Integration
-    const { useExternalChanges, publishUpdate, getState } = useUnifiedData()
+    const { useExternalChanges, publishUpdate } = useUnifiedData()
     const componentId = useMemo(() => `object-data-form-${instance?.id || 'new'}`, [instance?.id])
     const contextType = useEditorContext()
 
@@ -220,40 +220,35 @@ const ObjectDataForm = forwardRef(({
 
     // Update nested data field
     const handleDataFieldChange = useCallback(async (fieldName, value) => {
-        // Update local state immediately for UI responsiveness
+        let updatedData;
+
+        // Update local state immediately for UI responsiveness and capture the new data
         setFormData(prev => {
-            const newData = {
+            const newFormData = {
                 ...prev,
                 data: { ...prev.data, [fieldName]: value }
-            }
-            onFormChange?.(newData)
-            return newData
-        })
+            };
+            updatedData = newFormData.data; // Capture for publishing to UDC
+            onFormChange?.(newFormData);
+            return newFormData;
+        });
 
         // Clear error when user starts typing
-        const errorKey = `data_${fieldName}`
+        const errorKey = `data_${fieldName}`;
         if (errors[errorKey]) {
-            setErrors(prev => ({ ...prev, [errorKey]: null }))
+            setErrors(prev => ({ ...prev, [errorKey]: null }));
         }
 
-        // Publish update to ODC if we have an instance ID
+        // Publish local state to UDC (local state is source of truth during user input)
         if (instance?.id) {
-            // Get current state from UDC to avoid stale closure data
-            const currentState = getState();
-            const currentObject = currentState.objects?.[String(instance.id)];
-            const currentData = currentObject?.data || {};
-
             await publishUpdate(componentId, OperationTypes.UPDATE_OBJECT, {
                 id: String(instance.id),
                 updates: {
-                    data: {
-                        ...currentData,
-                        [fieldName]: value
-                    }
+                    data: updatedData // Use captured local state, not UDC state
                 }
             });
         }
-    }, [errors, onFormChange, instance?.id, componentId, publishUpdate, getState])
+    }, [errors, onFormChange, instance?.id, componentId, publishUpdate])
 
 
 
