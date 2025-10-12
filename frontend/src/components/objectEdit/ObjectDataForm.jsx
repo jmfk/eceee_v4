@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, forwardRef, useImperativeHandle, useMemo } from 'react'
+import React, { useState, useEffect, useCallback, forwardRef, useImperativeHandle, useMemo, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { AlertCircle } from 'lucide-react'
 import { namespacesApi } from '../../api'
@@ -39,6 +39,9 @@ const ObjectDataForm = forwardRef(({
     })
 
     const [errors, setErrors] = useState({})
+
+    // Ref for debouncing data field updates
+    const dataFieldTimeoutRef = useRef(null)
 
     // Fetch available object types for selection (when creating)
     const { data: typesResponse } = useQuery({
@@ -129,6 +132,15 @@ const ObjectDataForm = forwardRef(({
         }
     }, [instance])
 
+    // Cleanup timeout on component unmount
+    useEffect(() => {
+        return () => {
+            if (dataFieldTimeoutRef.current) {
+                clearTimeout(dataFieldTimeoutRef.current);
+            }
+        };
+    }, [])
+
     // Helper function to convert object type schema to ObjectSchemaForm format
     const getSchemaFromObjectType = useCallback((objectType) => {
         if (!objectType?.schema?.properties) {
@@ -218,19 +230,15 @@ const ObjectDataForm = forwardRef(({
         }
     }, [errors, onFormChange, instance?.id, componentId, publishUpdate])
 
-    // Update nested data field
-    const handleDataFieldChange = useCallback(async (fieldName, value) => {
-        let updatedData;
-
-        // Update local state immediately for UI responsiveness and capture the new data
+    // Update nested data field with debouncing
+    const handleDataFieldChange = useCallback((fieldName, value) => {
+        // Update local state immediately for instant UI feedback
         setFormData(prev => {
-            const newFormData = {
+            const updated = {
                 ...prev,
                 data: { ...prev.data, [fieldName]: value }
             };
-            updatedData = newFormData.data; // Capture for publishing to UDC
-            onFormChange?.(newFormData);
-            return newFormData;
+            return updated;
         });
 
         // Clear error when user starts typing
@@ -239,14 +247,26 @@ const ObjectDataForm = forwardRef(({
             setErrors(prev => ({ ...prev, [errorKey]: null }));
         }
 
-        // Publish local state to UDC (local state is source of truth during user input)
+        // Cancel any pending publish (debounce pattern)
+        if (dataFieldTimeoutRef.current) {
+            clearTimeout(dataFieldTimeoutRef.current);
+        }
+
+        // Schedule publish of final state after user stops typing
         if (instance?.id) {
-            await publishUpdate(componentId, OperationTypes.UPDATE_OBJECT, {
-                id: String(instance.id),
-                updates: {
-                    data: updatedData // Use captured local state, not UDC state
-                }
-            });
+            dataFieldTimeoutRef.current = setTimeout(() => {
+                // Capture current form state at time of publish
+                setFormData(current => {
+                    // Notify parent of the change (outside render cycle)
+                    Promise.resolve().then(() => onFormChange?.(current));
+
+                    publishUpdate(componentId, OperationTypes.UPDATE_OBJECT, {
+                        id: String(instance.id),
+                        updates: { data: current.data }
+                    });
+                    return current; // No change to state
+                });
+            }, 300); // 300ms delay - responsive for typing
         }
     }, [errors, onFormChange, instance?.id, componentId, publishUpdate])
 
