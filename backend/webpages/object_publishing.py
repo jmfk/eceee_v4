@@ -62,88 +62,10 @@ class BaseContentTransformer:
         return getattr(self, "object_type", "unknown")
 
 
-class NewsContentTransformer(BaseContentTransformer):
-    """Transformer for News objects."""
-
-    object_type = "news"
-
-    def transform(self, news_object: models.Model) -> Dict[str, Any]:
-        """Transform news object with news-specific fields."""
-        base_content = super().transform(news_object)
-        news_specific = {
-            "author": getattr(news_object, "author", ""),
-            "priority": getattr(news_object, "priority", "normal"),
-            "category": getattr(news_object, "category", None),
-            "source": getattr(news_object, "source", ""),
-        }
-        return {**base_content, **news_specific}
-
-
-class EventContentTransformer(BaseContentTransformer):
-    """Transformer for Event objects."""
-
-    object_type = "event"
-
-    def transform(self, event_object: models.Model) -> Dict[str, Any]:
-        """Transform event object with event-specific fields."""
-        base_content = super().transform(event_object)
-        event_specific = {
-            "start_date": getattr(event_object, "start_date", None),
-            "end_date": getattr(event_object, "end_date", None),
-            "location_name": getattr(event_object, "location_name", ""),
-            "location_address": getattr(event_object, "location_address", ""),
-            "organizer_name": getattr(event_object, "organizer_name", ""),
-            "status": getattr(event_object, "status", "scheduled"),
-        }
-        return {**base_content, **event_specific}
-
-
-class LibraryItemContentTransformer(BaseContentTransformer):
-    """Transformer for LibraryItem objects."""
-
-    object_type = "libraryitem"
-
-    def transform(self, library_object: models.Model) -> Dict[str, Any]:
-        """Transform library item with library-specific fields."""
-        base_content = super().transform(library_object)
-        library_specific = {
-            "item_type": getattr(library_object, "item_type", "document"),
-            "file_url": getattr(library_object, "file_url", ""),
-            "file_size": getattr(library_object, "file_size", ""),
-            "file_format": getattr(library_object, "file_format", ""),
-            "access_level": getattr(library_object, "access_level", "public"),
-        }
-        return {**base_content, **library_specific}
-
-
-class MemberContentTransformer(BaseContentTransformer):
-    """Transformer for Member objects."""
-
-    object_type = "member"
-
-    def transform(self, member_object: models.Model) -> Dict[str, Any]:
-        """Transform member object with member-specific fields."""
-        base_content = super().transform(member_object)
-        member_specific = {
-            "first_name": getattr(member_object, "first_name", ""),
-            "last_name": getattr(member_object, "last_name", ""),
-            "job_title": getattr(member_object, "job_title", ""),
-            "department": getattr(member_object, "department", ""),
-            "member_type": getattr(member_object, "member_type", "staff"),
-            "biography": getattr(member_object, "biography", ""),
-        }
-        return {**base_content, **member_specific}
-
-
 class ContentTransformerFactory:
     """Factory for creating content transformers."""
 
-    _transformers = {
-        "news": NewsContentTransformer(),
-        "event": EventContentTransformer(),
-        "libraryitem": LibraryItemContentTransformer(),
-        "member": MemberContentTransformer(),
-    }
+    _transformers = {}
 
     @classmethod
     def create(cls, object_type: str) -> BaseContentTransformer:
@@ -289,16 +211,8 @@ class ObjectPublishingService:
 # Register content models on import
 def register_content_models():
     """Register all content models with the registry."""
-    try:
-        from content.models import News, Event, LibraryItem, Member
-
-        ObjectTypeRegistry.register("news", News)
-        ObjectTypeRegistry.register("event", Event)
-        ObjectTypeRegistry.register("libraryitem", LibraryItem)
-        ObjectTypeRegistry.register("member", Member)
-    except ImportError:
-        # Content models not available
-        pass
+    # Content models have been deprecated - use object storage system instead
+    pass
 
 
 # Auto-register on import

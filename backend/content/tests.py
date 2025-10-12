@@ -6,7 +6,9 @@ from django.test import TestCase
 from django.contrib.auth.models import User
 from rest_framework.test import APITestCase, APIClient
 
-from content.models import News, Event, LibraryItem, Member, Category, Tag
+from content.models import Category, Tag
+
+# News, Event, LibraryItem, Member models have been deprecated
 
 
 class ContentModelsTest(TestCase):

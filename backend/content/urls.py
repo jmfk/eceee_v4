@@ -13,10 +13,6 @@ router = DefaultRouter()
 router.register(r"namespaces", views.NamespaceViewSet)
 router.register(r"categories", views.CategoryViewSet)
 router.register(r"tags", views.TagViewSet)
-router.register(r"news", views.NewsViewSet)
-router.register(r"events", views.EventViewSet)
-router.register(r"library-items", views.LibraryItemViewSet)
-router.register(r"members", views.MemberViewSet)
 
 app_name = "content"
 

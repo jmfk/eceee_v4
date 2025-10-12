@@ -12,7 +12,7 @@ import random
 import logging
 from typing import List, Dict, Any
 
-from content.models import Category, Tag, News, Event, LibraryItem, Member
+from content.models import Category, Tag
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +50,15 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        self.stdout.write(
+            self.style.WARNING(
+                "This command is deprecated. News, Event, LibraryItem, and Member models "
+                "have been removed. Use the Object Storage system instead."
+            )
+        )
+        return
+
+        # DEPRECATED CODE BELOW
         count = options["count"]
         clean = options["clean"]
         seed = options["seed"]

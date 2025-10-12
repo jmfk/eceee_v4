@@ -5,8 +5,9 @@
  * Widget type: eceee_widgets.NewsListWidget
  */
 
-import React from 'react';
-import { Newspaper } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Newspaper, Calendar, ArrowRight, Pin } from 'lucide-react';
+import { objectInstancesApi } from '../../api';
 
 const eceeeNewsListWidget = ({
     config = {},
@@ -14,6 +15,68 @@ const eceeeNewsListWidget = ({
     widgetId,
     ...props
 }) => {
+    const [newsItems, setNewsItems] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
+
+    // Fetch news items when in display mode
+    useEffect(() => {
+        if (mode === 'display' && config.objectTypes && config.objectTypes.length > 0) {
+            fetchNewsItems();
+        }
+    }, [mode, config.objectTypes, config.limit, config.sortOrder]);
+
+    const fetchNewsItems = async () => {
+        try {
+            setLoading(true);
+            setError(null);
+
+            const params = {
+                limit: config.limit || 10,
+                sort_order: config.sortOrder || '-publish_date'
+            };
+
+            const response = await objectInstancesApi.getNewsList(config.objectTypes, params);
+            setNewsItems(response.results || []);
+        } catch (err) {
+            console.error('Error fetching news items:', err);
+            setError('Failed to load news items');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const formatDate = (dateString) => {
+        if (!dateString) return '';
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+    };
+
+    const getExcerpt = (item) => {
+        const data = item.data || {};
+        const maxLength = config.excerptLength || 150;
+        const text = data.excerpt || data.summary || data.description || data.content || '';
+
+        if (text.length > maxLength) {
+            return text.substring(0, maxLength).trim() + '...';
+        }
+        return text;
+    };
+
+    const getFeaturedImage = (item) => {
+        const data = item.data || {};
+        return data.featured_image || data.featuredImage;
+    };
+
+    const isPinned = (item) => {
+        const metadata = item.metadata || {};
+        return metadata.pinned || metadata.featured;
+    };
+
     if (mode === 'editor') {
         return (
             <div className="news-list-widget-editor p-6 bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg">
@@ -24,22 +87,125 @@ const eceeeNewsListWidget = ({
                         Displays a list of news articles from selected ObjectTypes
                     </p>
                     <div className="text-xs text-gray-400 space-y-1">
-                        {config.object_types && config.object_types.length > 0 && (
-                            <p>Object Types: {config.object_types.join(', ')}</p>
+                        {config.objectTypes && config.objectTypes.length > 0 && (
+                            <p>Object Types: {config.objectTypes.join(', ')}</p>
                         )}
                         {config.limit && <p>Limit: {config.limit} items</p>}
-                        {config.hide_on_detail_view && <p>Hidden on detail pages</p>}
+                        {config.sortOrder && <p>Sort: {config.sortOrder}</p>}
+                        {config.hideOnDetailView && <p>Hidden on detail pages</p>}
                     </div>
                 </div>
             </div>
         );
     }
 
-    // In display mode, this widget is rendered server-side
+    // Display mode
+    if (loading) {
+        return (
+            <div className="news-list-widget" data-widget-id={widgetId}>
+                <div className="p-4 text-center text-gray-500">
+                    Loading news items...
+                </div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="news-list-widget" data-widget-id={widgetId}>
+                <div className="p-4 text-center text-red-500">
+                    {error}
+                </div>
+            </div>
+        );
+    }
+
+    if (!config.objectTypes || config.objectTypes.length === 0) {
+        return (
+            <div className="news-list-widget" data-widget-id={widgetId}>
+                <div className="p-4 text-center text-gray-500">
+                    No object types configured
+                </div>
+            </div>
+        );
+    }
+
+    if (newsItems.length === 0) {
+        return (
+            <div className="news-list-widget" data-widget-id={widgetId}>
+                <div className="p-4 text-center text-gray-500">
+                    No news articles available at this time.
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="news-list-widget" data-widget-id={widgetId}>
-            <div className="p-4 text-center text-gray-500">
-                News list will be rendered here
+            <div className="news-items-container">
+                {newsItems.map((item) => {
+                    const featuredImage = config.showFeaturedImage ? getFeaturedImage(item) : null;
+                    const pinned = isPinned(item);
+
+                    return (
+                        <article
+                            key={item.id}
+                            className={`news-item ${pinned ? 'pinned' : ''}`}
+                            data-object-id={item.id}
+                        >
+                            {featuredImage && (
+                                <div className="news-featured-image">
+                                    <img
+                                        src={featuredImage}
+                                        alt={item.title}
+                                        loading="lazy"
+                                    />
+                                </div>
+                            )}
+
+                            <div className="news-content">
+                                <div className="news-meta">
+                                    <span className="news-type">
+                                        {item.object_type?.label || item.object_type?.name}
+                                    </span>
+                                    {pinned && (
+                                        <span className="pinned-badge">
+                                            <Pin size={12} />
+                                            Pinned
+                                        </span>
+                                    )}
+                                    {config.showPublishDate && item.publish_date && (
+                                        <time className="news-date" dateTime={item.publish_date}>
+                                            <Calendar size={14} className="inline mr-1" />
+                                            {formatDate(item.publish_date)}
+                                        </time>
+                                    )}
+                                </div>
+
+                                <h3 className="news-title">
+                                    <a href={`/${item.object_type?.name}/${item.slug}/`}>
+                                        {item.title}
+                                    </a>
+                                </h3>
+
+                                {config.showExcerpts && (
+                                    <div className="news-excerpt">
+                                        {getExcerpt(item)}
+                                    </div>
+                                )}
+
+                                <div className="news-footer">
+                                    <a
+                                        href={`/${item.object_type?.name}/${item.slug}/`}
+                                        className="read-more"
+                                    >
+                                        Read more <ArrowRight size={14} className="inline ml-1" />
+                                    </a>
+                                </div>
+                            </div>
+                        </article>
+                    );
+                })}
             </div>
         </div>
     );
@@ -49,15 +215,16 @@ const eceeeNewsListWidget = ({
 eceeeNewsListWidget.displayName = 'News List';
 eceeeNewsListWidget.widgetType = 'eceee_widgets.NewsListWidget';
 
-// Default configuration matching backend Pydantic model
+// Default configuration matching backend Pydantic model (camelCase)
 eceeeNewsListWidget.defaultConfig = {
-    object_types: ['news'],
+    objectTypes: [],
     limit: 10,
-    hide_on_detail_view: false,
-    show_excerpts: true,
-    excerpt_length: 150,
-    show_featured_image: true,
-    show_publish_date: true
+    sortOrder: '-publish_date',
+    hideOnDetailView: false,
+    showExcerpts: true,
+    excerptLength: 150,
+    showFeaturedImage: true,
+    showPublishDate: true
 };
 
 // Display metadata
