@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { ChevronLeft, ChevronRight, Trash2, Save, AlertCircle } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import { ChevronLeft, ChevronRight, Trash2, Save, AlertCircle, X } from 'lucide-react'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import { useUnifiedData } from '../contexts/unified-data'
 import VersionSelector from './VersionSelector'
@@ -24,7 +24,8 @@ const StatusBar = ({
         notifications,
         currentNotificationIndex,
         clearNotifications,
-        navigateNotifications
+        navigateNotifications,
+        goToNotification
     } = useGlobalNotifications()
 
     // Get global app status from UnifiedDataContext
@@ -34,15 +35,128 @@ const StatusBar = ({
     const [errors, setErrors] = useState([]);
     const [warnings, setWarnings] = useState([]);
 
+    // History dropdown state
+    const [showHistory, setShowHistory] = useState(false);
+    const historyRef = useRef(null);
+
     useExternalChanges(componentId, state => {
         setIsDirty(state.metadata.isDirty);
         setErrors(state.metadata.errors);
         setWarnings(state.metadata.warnings);
     });
 
+    // Handle click outside to close history dropdown
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (historyRef.current && !historyRef.current.contains(event.target)) {
+                setShowHistory(false);
+            }
+        };
+
+        if (showHistory) {
+            document.addEventListener('mousedown', handleClickOutside);
+            return () => {
+                document.removeEventListener('mousedown', handleClickOutside);
+            };
+        }
+    }, [showHistory]);
+
+    // Helper function to get notification type color
+    const getNotificationColor = (type) => {
+        switch (type) {
+            case 'success': return 'bg-green-500';
+            case 'error': return 'bg-red-500';
+            case 'warning': return 'bg-yellow-500';
+            default: return 'bg-blue-500';
+        }
+    };
+
+    // Helper function to extract message text
+    const getMessageText = (notification) => {
+        if (typeof notification?.message === 'string') {
+            return notification.message;
+        } else if (typeof notification?.message === 'object') {
+            return notification?.message?.message || 'Notification';
+        }
+        return 'Notification';
+    };
 
     return (
-        <div className={`bg-white border-t border-gray-200 px-4 py-2 ${className}`}>
+        <div className={`bg-white border-t border-gray-200 px-4 py-2 ${className} relative`}>
+            {/* Notification History Dropdown */}
+            {showHistory && notifications.length > 0 && (
+                <div
+                    ref={historyRef}
+                    className="absolute bottom-full left-4 right-4 mb-2 bg-white border border-gray-300 rounded-lg shadow-2xl z-50 max-h-96 overflow-hidden flex flex-col"
+                >
+                    {/* Header */}
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50">
+                        <h3 className="font-semibold text-gray-900">Notification History</h3>
+                        <button
+                            onClick={() => setShowHistory(false)}
+                            className="p-1 rounded hover:bg-gray-200 text-gray-600 transition-colors"
+                            title="Close"
+                        >
+                            <X className="w-4 h-4" />
+                        </button>
+                    </div>
+
+                    {/* Scrollable notification list */}
+                    <div className="overflow-y-auto flex-1">
+                        {notifications.map((notification, index) => (
+                            <div
+                                key={notification.id}
+                                className={`px-4 py-3 border-b border-gray-100 hover:bg-gray-50 transition-colors ${index === currentNotificationIndex ? 'bg-blue-50' : ''
+                                    }`}
+                                onClick={() => {
+                                    goToNotification(index);
+                                    setShowHistory(false);
+                                }}
+                                role="button"
+                                tabIndex={0}
+                                style={{ cursor: 'pointer' }}
+                            >
+                                <div className="flex items-start space-x-3">
+                                    {/* Type indicator */}
+                                    <span className={`inline-block w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${getNotificationColor(notification.type)}`} />
+
+                                    {/* Message content */}
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm text-gray-900 break-words">
+                                            {getMessageText(notification)}
+                                        </p>
+
+                                        {/* Metadata row */}
+                                        <div className="flex items-center gap-3 mt-1">
+                                            <span className="text-xs text-gray-500">
+                                                {notification.timestamp.toLocaleTimeString()}
+                                            </span>
+                                            <span className={`text-xs font-medium ${notification.type === 'success' ? 'text-green-600' :
+                                                notification.type === 'error' ? 'text-red-600' :
+                                                    notification.type === 'warning' ? 'text-yellow-600' :
+                                                        'text-gray-600'
+                                                }`}>
+                                                {notification.type}
+                                            </span>
+                                            {notification.category && (
+                                                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                                                    {notification.category}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Footer with count */}
+                    <div className="px-4 py-2 border-t border-gray-200 bg-gray-50 text-xs text-gray-600">
+                        {notifications.length} notification{notifications.length !== 1 ? 's' : ''} in history
+                    </div>
+                </div>
+            )}
+
             <div className="flex items-center justify-between text-sm">
                 {/* Notification area */}
                 <div className="flex items-center space-x-2 flex-1 min-w-0">
@@ -58,19 +172,15 @@ const StatusBar = ({
                                 <ChevronLeft className="w-4 h-4 text-gray-600" />
                             </button>
 
-                            {/* Current notification */}
-                            <div className="flex items-center space-x-2 flex-1 min-w-0">
-                                <span className={`inline-block w-2 h-2 rounded-full ${notifications[currentNotificationIndex]?.type === 'success' ? 'bg-green-500' :
-                                    notifications[currentNotificationIndex]?.type === 'error' ? 'bg-red-500' :
-                                        notifications[currentNotificationIndex]?.type === 'warning' ? 'bg-yellow-500' :
-                                            'bg-blue-500'
-                                    }`} />
+                            {/* Current notification - clickable to show history */}
+                            <div
+                                className="flex items-center space-x-2 flex-1 min-w-0 cursor-pointer hover:bg-gray-50 rounded px-2 py-1 -mx-2 -my-1 transition-colors"
+                                onClick={() => setShowHistory(!showHistory)}
+                                title="Click to view notification history"
+                            >
+                                <span className={`inline-block w-2 h-2 rounded-full ${getNotificationColor(notifications[currentNotificationIndex]?.type)}`} />
                                 <span className="text-gray-700 truncate">
-                                    {typeof notifications[currentNotificationIndex]?.message === 'string'
-                                        ? notifications[currentNotificationIndex]?.message
-                                        : typeof notifications[currentNotificationIndex]?.message === 'object'
-                                            ? notifications[currentNotificationIndex]?.message?.message || 'Notification'
-                                            : 'Notification'}
+                                    {getMessageText(notifications[currentNotificationIndex])}
                                 </span>
                                 <span className="text-xs text-gray-500 flex-shrink-0">
                                     {notifications[currentNotificationIndex]?.timestamp.toLocaleTimeString()}

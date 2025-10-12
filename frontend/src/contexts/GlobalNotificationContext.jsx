@@ -69,13 +69,22 @@ export const GlobalNotificationProvider = ({ children }) => {
         })
     }, [])
 
+    const goToNotification = useCallback((index) => {
+        setNotifications(current => {
+            if (current.length === 0 || index < 0 || index >= current.length) return current
+            setCurrentNotificationIndex(index)
+            return current
+        })
+    }, [])
+
     const value = useMemo(() => ({
         notifications,
         currentNotificationIndex,
         addNotification,
         clearNotifications,
-        navigateNotifications
-    }), [notifications, currentNotificationIndex, addNotification, clearNotifications, navigateNotifications])
+        navigateNotifications,
+        goToNotification
+    }), [notifications, currentNotificationIndex, addNotification, clearNotifications, navigateNotifications, goToNotification])
 
     return (
         <GlobalNotificationContext.Provider value={value}>
