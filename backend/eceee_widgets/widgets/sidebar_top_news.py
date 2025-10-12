@@ -22,7 +22,7 @@ class SidebarTopNewsConfig(BaseModel):
         default=["news"],
         description="Select ObjectType(s) to display",
         json_schema_extra={
-            "component": "MultiSelect",
+            "component": "MultiSelectInput",
             "placeholder": "Select object types...",
         },
     )
@@ -265,7 +265,7 @@ class SidebarTopNewsWidget(BaseWidget):
     def _get_sidebar_news_items(self, config: SidebarTopNewsConfig):
         """Query and return sidebar news items"""
         from object_storage.models import ObjectInstance
-        
+
         try:
             # Build queryset
             queryset = ObjectInstance.objects.filter(

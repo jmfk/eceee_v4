@@ -30,7 +30,7 @@ class NewsDetailConfig(BaseModel):
         default=["news"],
         description="Select ObjectType(s) this widget should handle",
         json_schema_extra={
-            "component": "MultiSelect",
+            "component": "MultiSelectInput",
             "placeholder": "Select object types...",
             "helpText": "This widget only renders if the slug matches one of these ObjectTypes",
         },
@@ -316,7 +316,7 @@ class NewsDetailWidget(BaseWidget):
     def _get_news_object(self, slug: str, object_types: List[str]):
         """Get news object by slug and object types"""
         from object_storage.models import ObjectInstance
-        
+
         try:
             obj = (
                 ObjectInstance.objects.filter(
