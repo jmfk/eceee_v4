@@ -514,15 +514,13 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
         current_version = instance.get_current_published_version()
 
         if not current_version:
-            return Response(
-                {"message": "No published version found"},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+            # Return 200 with null data instead of 404
+            return Response({"data": None})
 
         from .serializers import ObjectVersionSerializer
 
         serializer = ObjectVersionSerializer(current_version)
-        return Response(serializer.data)
+        return Response({"data": serializer.data})
 
     @action(detail=True, methods=["put", "patch"])
     def update_current_version(self, request, pk=None):
@@ -933,6 +931,102 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
 
         serializer = self.get_serializer(published_instances, many=True)
         return Response(serializer.data)
+
+    @action(detail=False, methods=["get"])
+    def news_list(self, request):
+        """
+        Get a mixed list of objects from multiple object types.
+        Query params:
+        - object_types: comma-separated list of object type IDs
+        - limit: maximum number of items (default 10, max 50)
+        - sort_order: field to sort by (default: -publish_date)
+        """
+        from django.db.models import Case, When, Value, BooleanField
+
+        # Parse object_types parameter
+        object_types_param = request.query_params.get("object_types", "")
+        if not object_types_param:
+            return Response(
+                {"error": "object_types parameter is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            object_type_ids = [
+                int(id.strip()) for id in object_types_param.split(",") if id.strip()
+            ]
+        except ValueError:
+            return Response(
+                {
+                    "error": "Invalid object_types format. Expected comma-separated integers."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not object_type_ids:
+            return Response(
+                {"error": "At least one object type is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Parse limit parameter
+        limit = request.query_params.get("limit", "10")
+        try:
+            limit = int(limit)
+            if limit < 1 or limit > 50:
+                limit = 10
+        except ValueError:
+            limit = 10
+
+        # Parse sort_order parameter
+        sort_order = request.query_params.get("sort_order", "-publish_date")
+        valid_sort_fields = [
+            "publish_date",
+            "-publish_date",
+            "created_at",
+            "-created_at",
+            "title",
+            "-title",
+            "updated_at",
+            "-updated_at",
+        ]
+        if sort_order not in valid_sort_fields:
+            sort_order = "-publish_date"
+
+        # Build queryset
+        queryset = self.get_queryset().filter(
+            object_type_id__in=object_type_ids, status="published"
+        )
+
+        # Annotate with pinned/featured status from metadata
+        queryset = queryset.annotate(
+            is_pinned=Case(
+                When(
+                    Q(metadata__pinned=True) | Q(metadata__featured=True),
+                    then=Value(True),
+                ),
+                default=Value(False),
+                output_field=BooleanField(),
+            )
+        )
+
+        # Sort: pinned first, then by requested sort_order
+        queryset = queryset.order_by("-is_pinned", sort_order)
+
+        # Limit results
+        instances = queryset[:limit]
+
+        # Serialize and return
+        serializer = self.get_serializer(instances, many=True)
+        return Response(
+            {
+                "results": serializer.data,
+                "count": len(serializer.data),
+                "limit": limit,
+                "sort_order": sort_order,
+                "object_types": object_type_ids,
+            }
+        )
 
     @action(detail=False, methods=["get"], url_path="by-type/(?P<type_name>[^/.]+)")
     def by_type(self, request, type_name=None):
