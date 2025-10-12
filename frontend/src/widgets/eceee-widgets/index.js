@@ -20,6 +20,10 @@ import eceeeFormsWidget from './eceeeFormsWidget';
 import eceeeTwoColumnsWidget from './eceeeTwoColumnsWidget';
 import eceeeThreeColumnsWidget from './eceeeThreeColumnsWidget';
 import eceeePathDebugWidget from './eceeePathDebugWidget';
+import eceeeNewsListWidget from './eceeeNewsListWidget';
+import eceeeNewsDetailWidget from './eceeeNewsDetailWidget';
+import eceeeTopNewsPlugWidget from './eceeeTopNewsPlugWidget';
+import eceeeSidebarTopNewsWidget from './eceeeSidebarTopNewsWidget';
 
 /**
  * ECEEE Widget Registry
@@ -44,6 +48,10 @@ export const ECEEE_WIDGET_REGISTRY = {
     'eceee_widgets.TwoColumnsWidget': registerWidget(eceeeTwoColumnsWidget, 'eceee_widgets.TwoColumnsWidget'),
     'eceee_widgets.ThreeColumnsWidget': registerWidget(eceeeThreeColumnsWidget, 'eceee_widgets.ThreeColumnsWidget'),
     'eceee_widgets.PathDebugWidget': registerWidget(eceeePathDebugWidget, 'eceee_widgets.PathDebugWidget'),
+    'eceee_widgets.NewsListWidget': registerWidget(eceeeNewsListWidget, 'eceee_widgets.NewsListWidget'),
+    'eceee_widgets.NewsDetailWidget': registerWidget(eceeeNewsDetailWidget, 'eceee_widgets.NewsDetailWidget'),
+    'eceee_widgets.TopNewsPlugWidget': registerWidget(eceeeTopNewsPlugWidget, 'eceee_widgets.TopNewsPlugWidget'),
+    'eceee_widgets.SidebarTopNewsWidget': registerWidget(eceeeSidebarTopNewsWidget, 'eceee_widgets.SidebarTopNewsWidget'),
 };
 
 /**
@@ -100,6 +108,10 @@ export { default as eceeeSidebarWidget } from './eceeeSidebarWidget';
 export { default as eceeeFormsWidget } from './eceeeFormsWidget';
 export { default as eceeeTwoColumnsWidget } from './eceeeTwoColumnsWidget';
 export { default as eceeeThreeColumnsWidget } from './eceeeThreeColumnsWidget';
+export { default as eceeeNewsListWidget } from './eceeeNewsListWidget';
+export { default as eceeeNewsDetailWidget } from './eceeeNewsDetailWidget';
+export { default as eceeeTopNewsPlugWidget } from './eceeeTopNewsPlugWidget';
+export { default as eceeeSidebarTopNewsWidget } from './eceeeSidebarTopNewsWidget';
 
 // Export the registry for direct access
 export default ECEEE_WIDGET_REGISTRY;

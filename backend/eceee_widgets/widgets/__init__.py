@@ -16,6 +16,10 @@ from .forms import FormsWidget
 from .two_columns import TwoColumnsWidget
 from .three_columns import ThreeColumnsWidget
 from .path_debug import PathDebugWidget
+from .news_list import NewsListWidget
+from .news_detail import NewsDetailWidget
+from .top_news_plug import TopNewsPlugWidget
+from .sidebar_top_news import SidebarTopNewsWidget
 
 # Make all widgets available at the package level
 __all__ = [
@@ -30,4 +34,8 @@ __all__ = [
     "TwoColumnsWidget",
     "ThreeColumnsWidget",
     "PathDebugWidget",
+    "NewsListWidget",
+    "NewsDetailWidget",
+    "TopNewsPlugWidget",
+    "SidebarTopNewsWidget",
 ]
