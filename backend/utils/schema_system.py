@@ -510,6 +510,21 @@ class FieldTypeRegistry:
                     "precision": 0,
                 },
             },
+            {
+                "key": "object_type_selector",
+                "label": "Object Type Selector",
+                "json_schema_type": "array",
+                "component": "ObjectTypeSelectorInput",
+                "config_component": "ObjectTypeSelectorConfig",
+                "category": "reference",
+                "description": "Select object type(s) from the system",
+                "validation_rules": {
+                    "items": {"type": "integer"},
+                },
+                "ui_props": {
+                    "multiple": True,
+                },
+            },
         ]
 
         for field_type in core_types:

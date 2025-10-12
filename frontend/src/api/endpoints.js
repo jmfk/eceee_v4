@@ -15,6 +15,7 @@ export const endpoints = {
     webpages: `${BASE_PATH}/webpages`,
     content: `${BASE_PATH}/content`,
     namespaces: `${BASE_PATH}/namespaces`,
+    objects: `${BASE_PATH}/objects`,
 
     // Authentication & System
     auth: {
@@ -154,6 +155,23 @@ export const endpoints = {
         bulkOperations: `${BASE_PATH}/media/bulk-operations/`,
         // Slug validation
         validateSlug: `${BASE_PATH}/media/validate-slug/`
+    },
+
+    // Object Storage endpoints
+    objectTypes: {
+        base: `${BASE_PATH}/objects/api/object-types`,
+        list: `${BASE_PATH}/objects/api/object-types/`,
+        detail: (id) => `${BASE_PATH}/objects/api/object-types/${id}/`,
+        schema: (id) => `${BASE_PATH}/objects/api/object-types/${id}/schema/`,
+        mainBrowserTypes: `${BASE_PATH}/objects/api/object-types/main_browser_types/`
+    },
+
+    objectInstances: {
+        base: `${BASE_PATH}/objects/api/objects`,
+        list: `${BASE_PATH}/objects/api/objects/`,
+        detail: (id) => `${BASE_PATH}/objects/api/objects/${id}/`,
+        publish: (id) => `${BASE_PATH}/objects/api/objects/${id}/publish/`,
+        unpublish: (id) => `${BASE_PATH}/objects/api/objects/${id}/unpublish/`
     }
 }
 

@@ -104,6 +104,12 @@ export function processLoadedVersionData(versionData) {
  * @returns {Object} Analysis of what changed
  */
 export function analyzeChanges(originalWebpageData = {}, currentWebpageData = {}, originalPageVersionData = {}, currentPageVersionData = {}) {
+    // Ensure all parameters are objects (handle null values)
+    originalWebpageData = originalWebpageData || {};
+    currentWebpageData = currentWebpageData || {};
+    originalPageVersionData = originalPageVersionData || {};
+    currentPageVersionData = currentPageVersionData || {};
+
     const changes = {
         pageFields: {},
         versionFields: {},

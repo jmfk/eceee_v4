@@ -58,6 +58,7 @@ export { default as RichTextInput } from './RichTextInput'
 // Reference Components
 export { default as UserSelectorInput } from './UserSelectorInput'
 export { default as ObjectSelectorInput } from './ObjectSelectorInput'
+export { default as ObjectTypeSelectorInput } from './ObjectTypeSelectorInput'
 
 // List Components
 export { default as ItemsListField } from './ItemsListField'
@@ -113,6 +114,7 @@ export const FIELD_COMPONENTS = {
     // Reference Components
     UserSelectorInput: () => import('./UserSelectorInput'),
     ObjectSelectorInput: () => import('./ObjectSelectorInput'),
+    ObjectTypeSelectorInput: () => import('./ObjectTypeSelectorInput'),
     // HTML Source Editor
     HtmlSource: () => import('../fields/HtmlSourceField'),
     // List Components
