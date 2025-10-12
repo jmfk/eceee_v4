@@ -36,6 +36,9 @@ const ObjectInstanceEditPage = () => {
     // Essential fields modal state
     const [showEssentialFieldsModal, setShowEssentialFieldsModal] = useState(false)
 
+    // UDC initialization error state
+    const [udcInitError, setUdcInitError] = useState(null)
+
     // Refs for tab components
     const contentTabRef = useRef(null)
 
@@ -173,6 +176,9 @@ const ObjectInstanceEditPage = () => {
         if (!instanceId || !instance || !versionsResponse?.data) return
 
         try {
+            // Clear any previous error state
+            setUdcInitError(null)
+
             // Determine current version id and version ids list
             const allVersions = Array.isArray(versionsResponse.data) ? versionsResponse.data : []
             const currentVersionEntry = allVersions.find(v => v.versionNumber === instance.version) || allVersions[0]
@@ -196,8 +202,13 @@ const ObjectInstanceEditPage = () => {
             })
         } catch (e) {
             console.error('UDC init (objects) failed', e)
+            setUdcInitError(e)
+            addNotification(
+                'Failed to initialize editor. Some features may not work correctly.',
+                'error'
+            )
         }
-    }, [instanceId, instance, versionsResponse, publishUpdate, componentId])
+    }, [instanceId, instance, versionsResponse, publishUpdate, componentId, addNotification])
 
     // Switch to a different version
     const switchToVersion = async (versionId) => {
@@ -448,6 +459,33 @@ const ObjectInstanceEditPage = () => {
 
             {/* Content Area - Scrollable */}
             <div className="flex-1 min-h-0">
+                {/* Error banner for UDC initialization failures */}
+                {udcInitError && (
+                    <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mx-4 mt-4">
+                        <div className="flex">
+                            <div className="flex-shrink-0">
+                                <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                </svg>
+                            </div>
+                            <div className="ml-3 flex-1">
+                                <p className="text-sm text-yellow-700">
+                                    <strong className="font-medium">Editor initialization warning:</strong> Some features may not work correctly. You can continue editing, but saving may be affected.
+                                </p>
+                                <button
+                                    onClick={() => {
+                                        setUdcInitError(null)
+                                        queryClient.invalidateQueries(['objectInstance', instanceId])
+                                        queryClient.invalidateQueries(['objectInstance', instanceId, 'versions'])
+                                    }}
+                                    className="mt-2 text-sm font-medium text-yellow-700 hover:text-yellow-600 underline"
+                                >
+                                    Retry initialization
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
                 {renderTabContent()}
             </div>
 
