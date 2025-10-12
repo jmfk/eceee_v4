@@ -22,7 +22,7 @@ class TopNewsPlugConfig(BaseModel):
         default=["news"],
         description="Select ObjectType(s) to display",
         json_schema_extra={
-            "component": "MultiSelect",
+            "component": "MultiSelectInput",
             "placeholder": "Select object types...",
         },
     )
@@ -378,7 +378,7 @@ class TopNewsPlugWidget(BaseWidget):
     def _get_top_news_items(self, config: TopNewsPlugConfig, limit: int):
         """Query and return top news items"""
         from object_storage.models import ObjectInstance
-        
+
         try:
             # Build queryset
             queryset = ObjectInstance.objects.filter(

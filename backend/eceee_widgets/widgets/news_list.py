@@ -23,7 +23,7 @@ class NewsListConfig(BaseModel):
         default=["news"],
         description="Select ObjectType(s) to display",
         json_schema_extra={
-            "component": "MultiSelect",
+            "component": "MultiSelectInput",
             "placeholder": "Select object types...",
         },
     )
@@ -283,7 +283,7 @@ class NewsListWidget(BaseWidget):
     def _get_news_items(self, config: NewsListConfig):
         """Query and return news items based on configuration"""
         from object_storage.models import ObjectInstance
-        
+
         try:
             # Build queryset
             queryset = ObjectInstance.objects.filter(
