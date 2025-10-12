@@ -197,6 +197,14 @@ export const objectInstancesApi = {
     },
 
     /**
+     * Get current published version for an object
+     */
+    async getCurrentPublishedVersion(id) {
+        const response = await api.get(`${BASE_URL}/objects/${id}/current_published_version/`)
+        return response
+    },
+
+    /**
      * Get children objects
      */
     async getChildren(id) {
@@ -298,6 +306,20 @@ export const objectInstancesApi = {
             objectIds
         })
         return response
+    },
+
+    /**
+     * Get news list from multiple object types
+     * @param {Array<number>} objectTypes - Array of object type IDs
+     * @param {Object} params - Query parameters (limit, sort_order)
+     */
+    async getNewsList(objectTypes, params = {}) {
+        const allParams = {
+            ...params,
+            object_types: objectTypes.join(',')
+        }
+        const response = await api.get(`${BASE_URL}/objects/news_list/`, { params: allParams })
+        return response
     }
 }
 
@@ -318,6 +340,38 @@ export const objectVersionsApi = {
      */
     async get(id) {
         const response = await api.get(`${BASE_URL}/versions/${id}/`)
+        return response
+    },
+
+    /**
+     * Get versions for a specific object
+     */
+    async getByObject(objectId) {
+        const response = await api.get(`${BASE_URL}/objects/${objectId}/versions/`)
+        return response
+    },
+
+    /**
+     * Publish a version immediately
+     */
+    async publish(versionId) {
+        const response = await api.post(`${BASE_URL}/versions/${versionId}/publish/`)
+        return response
+    },
+
+    /**
+     * Schedule a version for future publication
+     */
+    async schedule(versionId, data) {
+        const response = await api.post(`${BASE_URL}/versions/${versionId}/schedule/`, data)
+        return response
+    },
+
+    /**
+     * Unpublish a version
+     */
+    async unpublish(versionId) {
+        const response = await api.post(`${BASE_URL}/versions/${versionId}/unpublish/`)
         return response
     }
 }
