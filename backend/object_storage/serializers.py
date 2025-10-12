@@ -697,6 +697,7 @@ class ObjectVersionSerializer(serializers.ModelSerializer):
             # New publication fields
             "effective_date",
             "expiry_date",
+            "is_featured",
             "is_published",
             "is_current_published",
             "publication_status",
@@ -759,6 +760,7 @@ class ObjectVersionListSerializer(serializers.ModelSerializer):
             "change_description",
             "effective_date",
             "expiry_date",
+            "is_featured",
             "publication_status",
             "is_current_published",
         ]

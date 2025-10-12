@@ -241,54 +241,6 @@ class ObjectDetailView(DetailView):
         return context
 
 
-class NewsDetailView(ObjectDetailView):
-    """Detail view for News objects"""
-
-    object_type = "news"
-
-    def get_model(self):
-        from content.models import News
-
-        return News
-
-    def get_queryset(self):
-        from content.models import News
-
-        return News.objects.filter(is_published=True)
-
-
-class EventDetailView(ObjectDetailView):
-    """Detail view for Event objects"""
-
-    object_type = "event"
-
-    def get_model(self):
-        from content.models import Event
-
-        return Event
-
-    def get_queryset(self):
-        from content.models import Event
-
-        return Event.objects.filter(is_published=True)
-
-
-class LibraryItemDetailView(ObjectDetailView):
-    """Detail view for LibraryItem objects"""
-
-    object_type = "libraryitem"
-
-    def get_model(self):
-        from content.models import LibraryItem
-
-        return LibraryItem
-
-    def get_queryset(self):
-        from content.models import LibraryItem
-
-        return LibraryItem.objects.filter(is_published=True, access_level="public")
-
-
 class MemberDetailView(ObjectDetailView):
     """Detail view for Member objects"""
 
@@ -427,65 +379,6 @@ def render_widget(request, widget_id):
     """
     # Deprecated after refactor: widgets are stored in PageVersion JSON, not DB
     raise Http404("Widget rendering by numeric ID is no longer supported")
-
-
-# Object List Views
-class NewsListView(ListView):
-    """Public list view for News objects"""
-
-    template_name = "content/news_list.html"
-    context_object_name = "news_articles"
-    paginate_by = 10
-
-    def get_queryset(self):
-        from content.models import News
-
-        return News.objects.filter(is_published=True).order_by(
-            "-priority", "-published_date"
-        )
-
-
-class EventListView(ListView):
-    """Public list view for Event objects"""
-
-    template_name = "content/event_list.html"
-    context_object_name = "events"
-    paginate_by = 10
-
-    def get_queryset(self):
-        from content.models import Event
-
-        return Event.objects.filter(is_published=True).order_by("start_date")
-
-
-class LibraryItemListView(ListView):
-    """Public list view for LibraryItem objects"""
-
-    template_name = "content/library_list.html"
-    context_object_name = "library_items"
-    paginate_by = 20
-
-    def get_queryset(self):
-        from content.models import LibraryItem
-
-        return LibraryItem.objects.filter(
-            is_published=True, access_level="public"
-        ).order_by("-featured", "-published_date")
-
-
-class MemberListView(ListView):
-    """Public list view for Member objects"""
-
-    template_name = "content/member_list.html"
-    context_object_name = "members"
-    paginate_by = 20
-
-    def get_queryset(self):
-        from content.models import Member
-
-        return Member.objects.filter(
-            is_published=True, list_in_directory=True, is_current=True
-        ).order_by("last_name", "first_name")
 
 
 class HostnamePageView(View):

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
-import { Calendar, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
+import { Calendar, Clock, CheckCircle, XCircle, AlertCircle, Star } from 'lucide-react'
 import { objectInstancesApi, objectVersionsApi } from '../../api/objectStorage'
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext'
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
@@ -19,6 +19,7 @@ const ObjectPublishingView = ({ objectType, instance, isNewInstance, onSave, onC
     const [selectedVersion, setSelectedVersion] = useState(null)
     const [effectiveDate, setEffectiveDate] = useState('')
     const [expiryDate, setExpiryDate] = useState('')
+    const [isFeatured, setIsFeatured] = useState(false)
 
     // Load versions when component mounts
     useEffect(() => {
@@ -55,7 +56,7 @@ const ObjectPublishingView = ({ objectType, instance, isNewInstance, onSave, onC
 
     // Publishing mutations
     const publishMutation = useMutation({
-        mutationFn: (versionId) => objectVersionsApi.publish(versionId),
+        mutationFn: ({ versionId, isFeatured }) => objectVersionsApi.publish(versionId, { is_featured: isFeatured }),
         onSuccess: () => {
             addNotification('Version published successfully', 'success')
             loadVersions()
@@ -103,10 +104,11 @@ const ObjectPublishingView = ({ objectType, instance, isNewInstance, onSave, onC
     })
 
     const scheduleMutation = useMutation({
-        mutationFn: ({ versionId, effectiveDate, expiryDate }) =>
+        mutationFn: ({ versionId, effectiveDate, expiryDate, isFeatured }) =>
             objectVersionsApi.schedule(versionId, {
                 effective_date: effectiveDate,
-                expiry_date: expiryDate
+                expiry_date: expiryDate,
+                is_featured: isFeatured
             }),
         onSuccess: () => {
             addNotification('Version scheduled successfully', 'success')
@@ -130,9 +132,27 @@ const ObjectPublishingView = ({ objectType, instance, isNewInstance, onSave, onC
         }
     })
 
+    const toggleFeaturedMutation = useMutation({
+        mutationFn: ({ versionId, isFeatured }) =>
+            objectVersionsApi.update(versionId, { is_featured: isFeatured }),
+        onSuccess: (data, variables) => {
+            const action = variables.isFeatured ? 'marked as featured' : 'unmarked as featured'
+            addNotification(`Version ${action}`, 'success')
+            loadVersions()
+            queryClient.invalidateQueries({ queryKey: ['objectInstance', instance?.id] })
+        },
+        onError: (error) => {
+            console.error('Failed to toggle featured status:', error)
+            addNotification('Failed to update featured status', 'error')
+        }
+    })
+
     // Handler functions
     const handlePublishNow = (version) => {
-        publishMutation.mutate(version.id)
+        publishMutation.mutate({
+            versionId: version.id,
+            isFeatured: version.isFeatured || false
+        })
     }
 
     const handleUnpublish = (version) => {
@@ -143,6 +163,7 @@ const ObjectPublishingView = ({ objectType, instance, isNewInstance, onSave, onC
         setSelectedVersion(version)
         setEffectiveDate(version.effectiveDate || '')
         setExpiryDate(version.expiryDate || '')
+        setIsFeatured(version.isFeatured || false)
         setScheduleModalOpen(true)
     }
 
@@ -151,7 +172,15 @@ const ObjectPublishingView = ({ objectType, instance, isNewInstance, onSave, onC
         scheduleMutation.mutate({
             versionId: selectedVersion.id,
             effectiveDate,
-            expiryDate: expiryDate || null
+            expiryDate: expiryDate || null,
+            isFeatured
+        })
+    }
+
+    const handleToggleFeatured = (version) => {
+        toggleFeaturedMutation.mutate({
+            versionId: version.id,
+            isFeatured: !version.isFeatured
         })
     }
 
@@ -238,6 +267,17 @@ const ObjectPublishingView = ({ objectType, instance, isNewInstance, onSave, onC
                                                                 <StatusIcon className="w-3 h-3" />
                                                                 <span>{statusInfo.label}</span>
                                                             </span>
+                                                            <button
+                                                                onClick={() => handleToggleFeatured(version)}
+                                                                disabled={toggleFeaturedMutation.isPending}
+                                                                className={`p-1 rounded transition-colors ${version.isFeatured
+                                                                        ? 'text-yellow-500 hover:text-yellow-600'
+                                                                        : 'text-gray-300 hover:text-yellow-400'
+                                                                    }`}
+                                                                title={version.isFeatured ? 'Remove featured status' : 'Mark as featured'}
+                                                            >
+                                                                <Star className={`w-5 h-5 ${version.isFeatured ? 'fill-current' : ''}`} />
+                                                            </button>
                                                         </div>
 
                                                         <p className="text-sm text-gray-600 mb-2">
@@ -371,6 +411,25 @@ const ObjectPublishingView = ({ objectType, instance, isNewInstance, onSave, onC
                                 <p className="mt-1 text-xs text-gray-500">
                                     When this version should stop being live
                                 </p>
+                            </div>
+
+                            <div className="flex items-start">
+                                <div className="flex items-center h-5">
+                                    <input
+                                        id="featured-checkbox"
+                                        type="checkbox"
+                                        checked={isFeatured}
+                                        onChange={(e) => setIsFeatured(e.target.checked)}
+                                        className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                    />
+                                </div>
+                                <div className="ml-3 text-sm">
+                                    <label htmlFor="featured-checkbox" className="font-medium text-gray-700 flex items-center">
+                                        <Star className="w-4 h-4 mr-1 text-yellow-500" />
+                                        Mark as Featured
+                                    </label>
+                                    <p className="text-gray-500">Featured items appear first in listings</p>
+                                </div>
                             </div>
                         </div>
 

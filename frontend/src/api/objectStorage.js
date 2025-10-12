@@ -352,10 +352,18 @@ export const objectVersionsApi = {
     },
 
     /**
+     * Update a version (e.g., to change featured status)
+     */
+    async update(versionId, data) {
+        const response = await api.patch(`${BASE_URL}/versions/${versionId}/`, data)
+        return response
+    },
+
+    /**
      * Publish a version immediately
      */
-    async publish(versionId) {
-        const response = await api.post(`${BASE_URL}/versions/${versionId}/publish/`)
+    async publish(versionId, data = {}) {
+        const response = await api.post(`${BASE_URL}/versions/${versionId}/publish/`, data)
         return response
     },
 

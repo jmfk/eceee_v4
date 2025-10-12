@@ -490,10 +490,14 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
         # Set effective_date to now to publish immediately
         effective_date = request.data.get("effective_date", timezone.now())
         expiry_date = request.data.get("expiry_date")
+        is_featured = request.data.get("is_featured", False)
 
         latest_version.effective_date = effective_date
         latest_version.expiry_date = expiry_date
-        latest_version.save(update_fields=["effective_date", "expiry_date"])
+        latest_version.is_featured = is_featured
+        latest_version.save(
+            update_fields=["effective_date", "expiry_date", "is_featured"]
+        )
 
         # Update current_version pointer
         instance.current_version = latest_version
@@ -1160,15 +1164,35 @@ class ObjectVersionViewSet(viewsets.ReadOnlyModelViewSet):
             return ObjectVersionListSerializer
         return ObjectVersionSerializer
 
+    def partial_update(self, request, pk=None):
+        """Allow updating specific version fields (e.g., is_featured)"""
+        version = self.get_object()
+
+        # Only allow updating specific fields
+        allowed_fields = ["is_featured", "change_description"]
+
+        for field, value in request.data.items():
+            if field in allowed_fields:
+                setattr(version, field, value)
+
+        version.save(update_fields=[f for f in allowed_fields if f in request.data])
+
+        serializer = self.get_serializer(version)
+        return Response(serializer.data)
+
     @action(detail=True, methods=["post"])
     def publish(self, request, pk=None):
         """Publish this version immediately"""
         version = self.get_object()
 
+        # Accept is_featured parameter
+        is_featured = request.data.get("is_featured", version.is_featured)
+
         # Set effective_date to now to publish immediately
         version.effective_date = timezone.now()
+        version.is_featured = is_featured
         # Don't change expiry_date - let it remain as is
-        version.save(update_fields=["effective_date"])
+        version.save(update_fields=["effective_date", "is_featured"])
 
         # Update the object's current_version pointer to this version if it's the latest published
         current_published = version.object_instance.get_current_published_version()
@@ -1191,6 +1215,7 @@ class ObjectVersionViewSet(viewsets.ReadOnlyModelViewSet):
 
         effective_date = request.data.get("effective_date")
         expiry_date = request.data.get("expiry_date")
+        is_featured = request.data.get("is_featured", version.is_featured)
 
         if not effective_date:
             return Response(
@@ -1204,7 +1229,8 @@ class ObjectVersionViewSet(viewsets.ReadOnlyModelViewSet):
             version.effective_date = parse(effective_date)
             if expiry_date:
                 version.expiry_date = parse(expiry_date)
-            version.save(update_fields=["effective_date", "expiry_date"])
+            version.is_featured = is_featured
+            version.save(update_fields=["effective_date", "expiry_date", "is_featured"])
         except (ValueError, TypeError) as e:
             return Response(
                 {"error": f"Invalid date format: {str(e)}"},

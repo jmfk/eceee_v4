@@ -14,14 +14,6 @@ from .public_views import (
     page_hierarchy_api,
     page_search_view,
     render_widget,
-    NewsDetailView,
-    NewsListView,
-    EventDetailView,
-    EventListView,
-    LibraryItemDetailView,
-    LibraryItemListView,
-    MemberDetailView,
-    MemberListView,
 )
 
 app_name = "webpages"
@@ -33,18 +25,6 @@ urlpatterns = [
     path("hierarchy.json", page_hierarchy_api, name="hierarchy-api"),
     path("search/", page_search_view, name="page-search"),
     path("widget/<int:widget_id>/", render_widget, name="render-widget"),
-    # Object publishing URLs - canonical URLs for content objects
-    # These are hostname-independent and serve content directly
-    path("news/", NewsListView.as_view(), name="news-list"),
-    path("news/<slug:slug>/", NewsDetailView.as_view(), name="news-detail"),
-    path("events/", EventListView.as_view(), name="event-list"),
-    path("events/<slug:slug>/", EventDetailView.as_view(), name="event-detail"),
-    path("library/", LibraryItemListView.as_view(), name="library-list"),
-    path(
-        "library/<slug:slug>/", LibraryItemDetailView.as_view(), name="library-detail"
-    ),
-    path("members/", MemberListView.as_view(), name="member-list"),
-    path("members/<slug:slug>/", MemberDetailView.as_view(), name="member-detail"),
     # Legacy hierarchical page routing for admin/API access
     path("page/<path:slug_path>/", PageDetailView.as_view(), name="page-detail"),
 ]

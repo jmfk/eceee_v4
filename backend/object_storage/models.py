@@ -849,6 +849,11 @@ class ObjectVersion(models.Model):
         help_text="When this version expires (null means never expires)",
     )
 
+    # Featured status
+    is_featured = models.BooleanField(
+        default=False, help_text="Mark this version as featured/pinned in listings"
+    )
+
     class Meta:
         ordering = ["-version_number"]
         indexes = [
