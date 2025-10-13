@@ -128,6 +128,7 @@ class ObjectListWidget(BaseWidget):
     name = "Object List"
     description = "Display a filtered list of objects from the object storage system"
     template_name = "object_storage/widgets/object_list.html"
+
     @property
     def configuration_model(self) -> Type[BaseModel]:
         return ObjectListConfig
@@ -202,7 +203,16 @@ class ObjectListWidget(BaseWidget):
             queryset = ObjectInstance.objects.filter(object_type=object_type)
 
             # Apply status filter
-            if config.status_filter != "all":
+            if config.status_filter == "published":
+                # Use version-based publishing logic for published objects
+                from django.utils import timezone
+
+                now = timezone.now()
+                queryset = ObjectInstance.published.published_only(now).filter(
+                    object_type=object_type
+                )
+            elif config.status_filter != "all":
+                # For draft/archived, use the status field
                 queryset = queryset.filter(status=config.status_filter)
 
             # Apply ordering
@@ -266,6 +276,7 @@ class ObjectDetailWidget(BaseWidget):
     name = "Object Detail"
     description = "Display a single object with full details and widgets"
     template_name = "object_storage/widgets/object_detail.html"
+
     @property
     def configuration_model(self) -> Type[BaseModel]:
         return ObjectDetailConfig
@@ -310,19 +321,23 @@ class ObjectDetailWidget(BaseWidget):
         try:
             obj = None
 
-            # Get object by ID or slug
+            # Get object by ID or slug (using version-based publishing)
             if config.object_id:
-                obj = ObjectInstance.objects.select_related(
-                    "object_type", "parent"
-                ).get(id=config.object_id, status="published")
+                obj = (
+                    ObjectInstance.published.published_only()
+                    .select_related("object_type", "parent", "current_version")
+                    .filter(id=config.object_id)
+                    .first()
+                )
             elif config.object_slug and config.object_type:
                 object_type = ObjectTypeDefinition.objects.get(
                     name=config.object_type, is_active=True
                 )
-                obj = ObjectInstance.objects.select_related(
-                    "object_type", "parent"
-                ).get(
-                    slug=config.object_slug, object_type=object_type, status="published"
+                obj = (
+                    ObjectInstance.published.published_only()
+                    .select_related("object_type", "parent", "current_version")
+                    .filter(slug=config.object_slug, object_type=object_type)
+                    .first()
                 )
 
             if not obj:
@@ -336,11 +351,18 @@ class ObjectDetailWidget(BaseWidget):
 
             # Add hierarchy information if requested
             if config.show_hierarchy:
+                # Get IDs of published objects to filter hierarchy
+                from django.utils import timezone
+
+                now = timezone.now()
+                published_qs = ObjectInstance.published.published_only(now)
+                published_ids = list(published_qs.values_list("id", flat=True))
+
                 context.update(
                     {
                         "ancestors": obj.get_ancestors(),
-                        "children": obj.get_children().filter(status="published"),
-                        "siblings": obj.get_siblings().filter(status="published"),
+                        "children": obj.get_children().filter(id__in=published_ids),
+                        "siblings": obj.get_siblings().filter(id__in=published_ids),
                     }
                 )
 
@@ -363,6 +385,7 @@ class ObjectChildrenWidget(BaseWidget):
     name = "Object Children"
     description = "Display child objects in a hierarchical structure"
     template_name = "object_storage/widgets/object_children.html"
+
     @property
     def configuration_model(self) -> Type[BaseModel]:
         return ObjectChildrenConfig
@@ -417,10 +440,12 @@ class ObjectChildrenWidget(BaseWidget):
         try:
             parent_obj = None
 
-            # Get parent object
+            # Get parent object (using version-based publishing)
             if config.parent_object_id:
-                parent_obj = ObjectInstance.objects.get(
-                    id=config.parent_object_id, status="published"
+                parent_obj = (
+                    ObjectInstance.published.published_only()
+                    .filter(id=config.parent_object_id)
+                    .first()
                 )
             else:
                 # Try to get from page context (if object detail page)
@@ -433,9 +458,15 @@ class ObjectChildrenWidget(BaseWidget):
                     "config": config,
                 }
 
-            # Get children with hierarchy
+            # Get children with hierarchy (filter to only published)
+            from django.utils import timezone
+
+            now = timezone.now()
+            published_qs = ObjectInstance.published.published_only(now)
+            published_ids = list(published_qs.values_list("id", flat=True))
+
             children = parent_obj.get_descendants().filter(
-                status="published", level__lte=parent_obj.level + config.show_levels
+                id__in=published_ids, level__lte=parent_obj.level + config.show_levels
             )
 
             # Apply object type filter

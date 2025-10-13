@@ -351,6 +351,66 @@ class ObjectTypeDefinition(models.Model):
         }
 
 
+class PublishedObjectManager(models.Manager):
+    """
+    Custom manager for ObjectInstance that provides methods for working with published versions.
+    """
+
+    def with_published_versions(self, now=None):
+        """
+        Annotate queryset with published version data.
+
+        Returns queryset annotated with:
+        - is_featured: boolean from current_version.is_featured
+        """
+        if now is None:
+            now = timezone.now()
+
+        from django.db.models import F, Exists, OuterRef, Subquery
+
+        # Subquery to get published version for each object
+        published_versions = (
+            ObjectVersion.objects.filter(
+                object_instance=OuterRef("pk"), effective_date__lte=now
+            )
+            .filter(models.Q(expiry_date__isnull=True) | models.Q(expiry_date__gt=now))
+            .order_by("-version_number")
+        )
+
+        return self.get_queryset().annotate(
+            is_featured=F("current_version__is_featured"),
+            has_published_version=Exists(published_versions),
+        )
+
+    def published_only(self, now=None):
+        """
+        Filter to only objects with currently published versions.
+
+        Returns queryset containing only objects that have a published version.
+        """
+        if now is None:
+            now = timezone.now()
+
+        from django.db.models import Exists, OuterRef
+
+        # Subquery to check if object has a published version
+        published_versions = ObjectVersion.objects.filter(
+            object_instance=OuterRef("pk"), effective_date__lte=now
+        ).filter(models.Q(expiry_date__isnull=True) | models.Q(expiry_date__gt=now))
+
+        return self.get_queryset().filter(
+            Exists(published_versions), current_version__isnull=False
+        )
+
+    def with_featured_first(self):
+        """
+        Order by featured status (featured first).
+
+        Uses the is_featured field from current_version.
+        """
+        return self.get_queryset().order_by("-current_version__is_featured")
+
+
 class ObjectInstance(MPTTModel):
     """
     Actual instances of objects based on their type definitions.
@@ -428,6 +488,10 @@ class ObjectInstance(MPTTModel):
 
     class MPTTMeta:
         order_insertion_by = ["title"]
+
+    # Custom managers
+    objects = models.Manager()  # Default manager
+    published = PublishedObjectManager()  # Manager for published objects
 
     def __str__(self):
         return f"{self.object_type.label}: {self.title}"
@@ -816,6 +880,93 @@ class ObjectInstance(MPTTModel):
             "metadata": self.metadata,
             "is_published": self.is_published(),
         }
+
+    @classmethod
+    def get_published_objects(
+        cls, object_type_ids=None, limit=None, sort_order="-created_at", now=None
+    ):
+        """
+        Get published objects, optionally filtered by object types.
+
+        Args:
+            object_type_ids: List of object type IDs to filter by (optional)
+            limit: Maximum number of results to return (optional)
+            sort_order: Field to sort by (default: "-created_at")
+            now: Timestamp to use for publication checks (default: timezone.now())
+
+        Returns:
+            QuerySet of ObjectInstance with published versions pre-loaded
+        """
+        if now is None:
+            now = timezone.now()
+
+        # Start with published objects only
+        queryset = cls.published.published_only(now).select_related(
+            "object_type", "current_version"
+        )
+
+        # Filter by object types if specified
+        if object_type_ids:
+            queryset = queryset.filter(object_type_id__in=object_type_ids)
+
+        # Apply sorting
+        queryset = queryset.order_by(sort_order)
+
+        # Apply limit if specified
+        if limit:
+            queryset = queryset[:limit]
+
+        return queryset
+
+    @classmethod
+    def get_news_list(
+        cls, object_type_ids, limit=10, sort_order="-publish_date", now=None
+    ):
+        """
+        Get a list of published objects for news widgets and similar use cases.
+
+        This method:
+        - Filters to only published objects (using version-based logic)
+        - Sorts featured items first, then by the specified sort order
+        - Limits results to the specified number
+
+        Args:
+            object_type_ids: List of object type IDs to include
+            limit: Maximum number of items to return (default: 10)
+            sort_order: Field to sort by after featured sorting (default: "-publish_date")
+            now: Timestamp to use for publication checks (default: timezone.now())
+
+        Returns:
+            QuerySet of ObjectInstance with published versions and featured status
+        """
+        if now is None:
+            now = timezone.now()
+
+        from django.db.models import F, Q
+
+        # Start with published objects only
+        queryset = (
+            cls.published.published_only(now)
+            .filter(object_type_id__in=object_type_ids)
+            .select_related("object_type", "current_version")
+        )
+
+        # Annotate with featured status from current_version
+        queryset = queryset.annotate(is_featured=F("current_version__is_featured"))
+
+        # Map sort_order to actual fields
+        sort_field = sort_order
+        if "publish_date" in sort_order:
+            # Map publish_date to effective_date from current_version
+            sort_field = sort_order.replace(
+                "publish_date", "current_version__effective_date"
+            )
+
+        # Sort: featured first, then by requested sort order
+        queryset = queryset.order_by("-is_featured", sort_field)
+
+        # Limit results
+        return queryset[:limit]
 
 
 class ObjectVersion(models.Model):
