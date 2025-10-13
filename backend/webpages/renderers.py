@@ -33,7 +33,7 @@ class WebPageRenderer:
         from django.template import Context, Template
 
         # Get the appropriate version
-        page_version = version or page.get_latest_published_version()
+        page_version = version or page.get_current_published_version()
         if not page_version:
             raise ValueError(f"No published version found for page: {page.title}")
 
@@ -174,17 +174,18 @@ class WebPageRenderer:
         template_names.append(template_name)
 
         # Render using the widget's template
+        context = {
+            "widget": mock_widget,
+            "config": template_config,
+            "widget_id": widget_data.get("id", "unknown"),
+            "widget_type": widget_type,
+            "widget_data": widget_data,  # Full widget data access
+            **enhanced_context,
+        }
         try:
             widget_html = render_to_string(
                 template_names,
-                {
-                    "widget": mock_widget,
-                    "config": template_config,
-                    "widget_id": widget_data.get("id", "unknown"),
-                    "widget_type": widget_type,
-                    "widget_data": widget_data,  # Full widget data access
-                    **enhanced_context,
-                },
+                {**template_config, **context},
                 request=self.request,
             )
             return widget_html
@@ -409,8 +410,6 @@ class WebPageRenderer:
 
         while current:
             current_version = current.get_current_published_version()
-            if not current_version:
-                current_version = current.get_latest_published_version()
 
             if current_version and current_version.widgets:
                 slot_widgets = current_version.widgets.get(slot_name, [])

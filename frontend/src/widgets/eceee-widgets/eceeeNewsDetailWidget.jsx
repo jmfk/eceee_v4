@@ -53,8 +53,8 @@ eceeeNewsDetailWidget.widgetType = 'eceee_widgets.NewsDetailWidget';
 
 // Default configuration matching backend Pydantic model
 eceeeNewsDetailWidget.defaultConfig = {
-    slug_variable_name: 'slug',
-    object_types: ['news'],
+    slug_variable_name: 'news_slug',
+    object_types: [],
     show_metadata: true,
     show_featured_image: true,
     show_object_type: true,

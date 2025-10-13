@@ -156,44 +156,53 @@ class NewsListWidget(BaseWidget):
         from object_storage.models import ObjectInstance
 
         try:
-            # Use the new model method to get published news items
+            # Use the model method to get published news items
             items = list(
-                ObjectInstance.get_news_list(
+                ObjectInstance.get_published_objects(
                     object_type_ids=config.object_types,
                     limit=config.limit,
                     sort_order=config.sort_order,
+                    prioritize_featured=True,
                 )
             )
 
             # Prepare items with excerpts and featured images
+            prepared_items = []
             for item in items:
+                # Get the published version for each item
+                published_version = item.get_current_published_version()
+                if not published_version:
+                    continue  # Skip items without a published version
+
+                # Add published_version to the item for template access
+                item.published_version = published_version
+
                 if config.show_excerpts:
-                    item.excerpt_text = self._get_excerpt(item, config.excerpt_length)
+                    item.excerpt_text = self._get_excerpt(
+                        published_version.data, config.excerpt_length
+                    )
                 else:
                     item.excerpt_text = None
 
-                # Get featured image from current version data
-                if config.show_featured_image and item.current_version:
-                    item.featured_image_url = item.data.get(
+                # Get featured image from published version data
+                if config.show_featured_image:
+                    item.featured_image_url = published_version.data.get(
                         "featured_image"
-                    ) or item.data.get("featuredImage")
+                    ) or published_version.data.get("featuredImage")
                 else:
                     item.featured_image_url = None
-            print("items", items)
-            return items
+
+                prepared_items.append(item)
+
+            return prepared_items
 
         except Exception as e:
             # Log error in production
             print(f"Error in _get_news_items: {e}")
             return []
 
-    def _get_excerpt(self, obj, max_length: int) -> str:
-        """Extract excerpt from object data"""
-        if not obj.current_version:
-            return ""
-
-        data = obj.data
-
+    def _get_excerpt(self, data: dict, max_length: int) -> str:
+        """Extract excerpt from published version data"""
         # Try to find excerpt field
         excerpt = (
             data.get("excerpt")
