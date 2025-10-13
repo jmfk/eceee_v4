@@ -1,4 +1,5 @@
 import React from 'react'
+import ComponentTypeSelector from '../components/ComponentTypeSelector'
 
 /**
  * Number Property Configuration Component
@@ -63,6 +64,17 @@ export default function NumberPropertyConfig({
             <div className="text-red-500 text-xs mt-1">{errors.title}</div>
           )}
         </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Component Type <span className="text-red-500">*</span>
+        </label>
+        <ComponentTypeSelector
+          value={property.componentType || property.component}
+          onChange={(newType) => handleChange('componentType', newType)}
+          error={errors.componentType}
+        />
       </div>
 
       <div>

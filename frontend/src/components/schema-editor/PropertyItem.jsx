@@ -1,10 +1,11 @@
 import React, { useState } from 'react'
 import { ChevronDown, ChevronRight, AlertCircle } from 'lucide-react'
-import { getPropertyTypeByComponent, getAllPropertyTypes } from './PropertyTypeRegistry'
+import { getPropertyTypeByComponent, getAllPropertyTypes, getAvailableComponentTypes } from './PropertyTypeRegistry'
 import PropertyIcon from './components/PropertyIcon'
 import PropertyActions from './components/PropertyActions'
 import PropertyPreview from './components/PropertyPreview'
 import GenericPropertyConfig from './property-configs/GenericPropertyConfig'
+import { validateComponentType } from '../../utils/schemaValidation'
 
 /**
  * PropertyItem Component
@@ -40,7 +41,14 @@ export default function PropertyItem({
     }, {})
 
   const hasErrors = Object.keys(propertyErrors).length > 0
-  const isValid = property.key && property.title && !hasErrors
+
+  // Check if componentType is valid
+  const componentType = property.componentType || property.component
+  const availableTypes = getAvailableComponentTypes()
+  const componentTypeError = validateComponentType(componentType, availableTypes)
+  const hasComponentTypeError = !!componentTypeError
+
+  const isValid = property.key && property.title && !hasErrors && !hasComponentTypeError
 
   const handlePropertyChange = (updatedProperty) => {
     onChange(updatedProperty)
@@ -93,6 +101,15 @@ export default function PropertyItem({
                 {property.required && (
                   <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
                     Required
+                  </span>
+                )}
+                {hasComponentTypeError && (
+                  <span
+                    className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800"
+                    title={componentTypeError}
+                  >
+                    <AlertCircle className="w-3 h-3 mr-1" />
+                    Invalid Type
                   </span>
                 )}
                 {hasErrors && (

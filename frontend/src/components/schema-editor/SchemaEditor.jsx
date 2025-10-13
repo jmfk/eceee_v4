@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { Edit, Code, Eye, AlertCircle, CheckCircle, Loader } from 'lucide-react'
-import { initializePropertyRegistry, getAllPropertyTypes, isPropertyRegistryInitialized } from './PropertyTypeRegistry'
+import { initializePropertyRegistry, getAllPropertyTypes, isPropertyRegistryInitialized, getAvailableComponentTypes } from './PropertyTypeRegistry'
 import PropertyList from './PropertyList'
 import PropertyTypeSelector from './PropertyTypeSelector'
-import { validateFieldName, validateSchemaShape } from '../../utils/schemaValidation'
+import { validateFieldName, validateSchemaShape, validateComponentType } from '../../utils/schemaValidation'
 
 /**
  * SchemaEditor Component
@@ -146,9 +146,17 @@ export default function SchemaEditor({
         errors[`${keyPrefix}title`] = 'Display label is required'
       }
 
-      // Validate component
-      if (!property.component) {
-        errors[`${keyPrefix}component`] = 'Component type is required'
+      // Validate component type
+      const componentType = property.componentType || property.component
+      if (!componentType) {
+        errors[`${keyPrefix}componentType`] = 'Component type is required'
+      } else {
+        // Validate against available types
+        const availableTypes = getAvailableComponentTypes()
+        const componentTypeError = validateComponentType(componentType, availableTypes)
+        if (componentTypeError) {
+          errors[`${keyPrefix}componentType`] = componentTypeError
+        }
       }
 
       // Type-specific validations
