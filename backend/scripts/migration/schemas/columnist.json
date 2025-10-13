@@ -1,0 +1,61 @@
+{
+  "type": "object",
+  "properties": {
+    "firstName": {
+      "title": "First Name",
+      "componentType": "text",
+      "maxLength": 100
+    },
+    "lastName": {
+      "title": "Last Name",
+      "componentType": "text",
+      "maxLength": 100
+    },
+    "prefix": {
+      "title": "Prefix",
+      "componentType": "text",
+      "maxLength": 50,
+      "helpText": "Title prefix (e.g., Dr., Prof.)"
+    },
+    "affiliation": {
+      "title": "Affiliation",
+      "componentType": "text",
+      "maxLength": 200,
+      "helpText": "Organization or institution"
+    },
+    "homePage": {
+      "title": "Homepage",
+      "componentType": "url",
+      "maxLength": 500,
+      "helpText": "Personal or professional website"
+    },
+    "photoUrl": {
+      "title": "Photo",
+      "componentType": "image_reference",
+      "helpText": "Columnist photo"
+    },
+    "lastColumnDate": {
+      "title": "Last Column Date",
+      "componentType": "datetime",
+      "helpText": "Date of most recent column (auto-updated)"
+    }
+  },
+  "required": [
+    "firstName",
+    "lastName"
+  ],
+  "propertyOrder": [
+    "prefix",
+    "firstName",
+    "lastName",
+    "affiliation",
+    "photoUrl",
+    "homePage",
+    "lastColumnDate"
+  ],
+  "additionalInfo": {
+    "description": "Columnist profile - bio stored in Content Widget",
+    "contentWidgetRequired": true,
+    "note": "Biographical information goes in Content Widget. Columns reference columnists via columnistIds."
+  }
+}

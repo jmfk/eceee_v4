@@ -1,91 +1,52 @@
-<!-- 50e5ef54-dc73-41b4-bfc3-d7e97f2c0a5b bad80692-39f1-48f2-bad4-a5d227856f3b -->
 # ECEEE Database Migration - Product Design Review (PDR)
 
-## Executive Summary
+### Object Storage Migration
 
-This PDR outlines the migration strategy for 102 Django models (21 apps) from a legacy Mezzanine-based multi-tenant CMS to a modern architecture with:
+These content types should be migrated to **ObjectTypeDefinition** instances with appropriate schemas.
 
-- **Object Storage System**: Schema-based content types (news, events, etc.)
-- **WebPage System**: Hierarchical page management
-- **Simple Tag System**: Namespace-based tagging replacing complex category systems
-
-## Current State Analysis
-
-### Legacy System Architecture
-
-- **Framework**: Django + Mezzanine CMS
-- **Total Models**: 102 models across 21 apps
-- **Category System**: Complex GenericCategoriesField with ContentType/GenericForeignKey pattern
-- **Multi-tenancy**: MultiSelectField for site assignment
-- **Publishing**: Basic Mezzanine Displayable/Page patterns
-- **Tagging**: Multiple domain-specific category types per content type
-
-### New System Architecture
-
-- **Object Storage**: ObjectTypeDefinition with JSON schemas for flexible content
-- **Web Pages**: Hierarchical WebPage with PageVersion for version control
-- **Tags**: Simple Tag model with Namespace support and usage tracking
-- **Media**: MediaTag for file management
-- **Publishing**: Date-based publishing with effective_date/expiry_date
-
-## Migration Strategy Overview
-
-### Three-Tier Classification
-
-#### Tier 1: Migrate as ObjectTypeDefinition (Priority Content)
-
-These models represent non-hierarchical content that fits the object storage pattern.
-
-#### Tier 2: Migrate as WebPage (Hierarchical Content)
-
-Page-like content that requires parent/child relationships.
-
-#### Tier 3: Skip/Archive (Deprecated or System Models)
-
-Models that are deprecated, system-internal, or no longer needed.
-
----
-
-## Detailed Migration Plan
-
-### TIER 1: Object Storage Migration
-
-These content types should be migrated to **ObjectTypeDefinition** instances with appropriate schemas:
+**Content Widget Pattern**: All rich text content (descriptions, abstracts, body text, etc.) will be stored in **Content Widgets** rather than in the ObjectInstance schema. The schema should only contain structured metadata fields (dates, numbers, titles, etc.). This provides:
+- Consistent content editing experience across all object types
+- Widget-based rendering system
+- Separation of structured data (schema) from unstructured content (widgets)
 
 #### 1.1 News & Articles (HIGH PRIORITY)
 
 **Source**: `eceeenews.eceeeNews`
 
 - **Migrate To**: ObjectTypeDefinition named "news"
-- **Schema Fields**: title, slug, content (RichText), featured_image, external_url, source_date
+- **Schema Fields**: title, slug, featured_image, external_url, source_date
+- **Content Storage**: Content migrated to Content Widget (not in schema)
 - **Tag Migration**: 
-                                                                                                                                - NewsType → tags (namespace: "news_type")
-                                                                                                                                - NewsCategory → tags (namespace: "news_category")
-                                                                                                                                - NewsSource → tags (namespace: "news_source")
-                                                                                                                                - Keywords → tags (default namespace)
-                                                                                                                                - RelatedNews → related objects via metadata
+  - NewsType → tags (default namespace)
+  - NewsCategory → tags (default namespace)
+  - NewsSource → tags (default namespace)
+  - Keywords → tags (default namespace)
+  - RelatedNews → related objects via metadata
 - **Special Handling**: 
-                                                                                                                                - presentational_publishing_date → ObjectVersion.effective_date
-                                                                                                                                - publish_on_front_page → metadata field
-                                                                                                                                - eceee_sites → namespace mapping
+  - presentational_publishing_date → ObjectVersion.effective_date
+  - publish_on_front_page → is_featured 
+  - eceee_sites → drop
+  - content (RichText) → Content Widget in ObjectVersion.widgets
 
 #### 1.2 Calendar Events (HIGH PRIORITY)
 
 **Source**: `eceeecalendar.EceeeCalenderEvent`
 
 - **Migrate To**: ObjectTypeDefinition named "event"
-- **Schema Fields**: title, content, event_type, venue, organiser, event_start_date, event_end_date, priority, quote
+- **Schema Fields**: title, event_type, venue, organiser, event_start_date, event_end_date, priority, quote
+- **Content Storage**: Content migrated to Content Widget (not in schema)
 - **Tag Migration**:
-                                                                                                                                - event_type → tags (namespace: "event_type")
-                                                                                                                                - event_categories → tags (namespace: "event_category")
-                                                                                                                                - eceeeCategory → tags (namespace: "eceee_category")
+  - event_type → tags (default namespace)
+  - event_categories → tags (default namespace)
+  - eceeeCategory → tags (default namespace)
 
 #### 1.3 Jobs (MEDIUM PRIORITY)
 
 **Source**: `eceeejobs.EceeeJobsItem`
 
 - **Migrate To**: ObjectTypeDefinition named "job"
-- **Schema Fields**: title, description, location, deadline, external_url
+- **Schema Fields**: title, location, deadline, external_url
+- **Content Storage**: Description migrated to Content Widget (not in schema)
 - **Tag Migration**: Generic categories → tags (default namespace)
 
 #### 1.4 Library Items (HIGH PRIORITY)
@@ -93,9 +54,10 @@ These content types should be migrated to **ObjectTypeDefinition** instances wit
 **Source**: `eceeelibrary.EceeeLibraryItem`
 
 - **Migrate To**: ObjectTypeDefinition named "library_item"
-- **Schema Fields**: title, content, derivable_number, derivable_title
+- **Schema Fields**: title, derivable_number, derivable_title
+- **Content Storage**: Content migrated to Content Widget (not in schema)
 - **Related Objects**: EceeeLibraryFileItem → as media attachments
-- **Tag Migration**: LibraryCategory → tags (namespace: "library_category")
+- **Tag Migration**: LibraryCategory → tags (default namespace)
 
 #### 1.5 Proceedings & Papers (HIGH PRIORITY - Special Case)
 
@@ -105,95 +67,69 @@ These content types should be migrated to **ObjectTypeDefinition** instances wit
 - **PanelPage**: ObjectTypeDefinition named "conference_panel" (with parent FK to conference)
 - **ProceedingPage**: ObjectTypeDefinition named "paper" (with parent FK to panel)
 - **Schema Fields**: 
-                                                                                                                                - Conference: title, year, venue, isbn, issn, date, description
-                                                                                                                                - Panel: title, panel_prefix, panel_leaders, additional_information
-                                                                                                                                - Paper: title, authors, abstract, doc_nummer, peer_review
-- **Tag Migration**: ProceedingsKeyword → tags (namespace: "proceedings_keyword")
+  - Conference: title, year, venue, isbn, issn, date
+  - Panel: title, panel_prefix, panel_leaders
+  - Paper: title, authors, doc_nummer, peer_review
+- **Content Storage**: 
+  - Conference description → Content Widget
+  - Panel additional_information → Content Widget
+  - Paper abstract → Content Widget
+- **Tag Migration**: ProceedingsKeyword → tags (default namespace)
 - **Files**: paper/presentation PDFs → media attachments
 
-#### 1.6 Ecodesign Products (MEDIUM PRIORITY)
+#### 1.6 Columnists & Columns (MEDIUM PRIORITY)
 
-**Source**: `ecodesign.EcoDesignProduct`
+**Source**: `eceeecolumnists.EceeeColumnist`, `eceeecolumnists.EceeeColumn`
 
-- **Migrate To**: ObjectTypeDefinition named "ecodesign_product"
-- **Schema Fields**: title, content, product_type, regulation_info
-- **Tag Migration**:
-                                                                                                                                - EcodesignCategory → tags (namespace: "ecodesign_category")
-                                                                                                                                - LotCategory → tags (namespace: "lot_category")
-                                                                                                                                - RegulationCategory → tags (namespace: "regulation_category")
+- **EceeeColumnist**: ObjectTypeDefinition named "columnist"
+  - **Schema Fields**: 
+    - first_name, last_name, prefix
+    - affiliation
+    - home_page
+    - horizontal_photo, vertical_photo, square_photo (choose best available)
+    - last_column_date (date of most recent column)
+  - **Content Storage**: RichText bio migrated to Content Widget (not in schema)
+  - **Tag Migration**: 
+    - categories → tags (default namespace)
+    - eceee_categories → tags (default namespace)
+  
+- **EceeeColumn**: ObjectTypeDefinition named "column"
+  - **Schema Fields**: 
+    - title, slug
+    - presentational_publishing_date
+    - priority (Boolean)
+    - columnist_ids (array of columnist references)
+  - **Content Storage**: RichText content migrated to Content Widget (not in schema)
+  - **Relationships**: 
+    - columnists (M2M) → store columnist IDs in metadata or use parent relationship
+    - related_newsitems → store in metadata['related_news']
+  - **Tag Migration**: 
+    - categories → tags (default namespace)
+    - eceee_categories → tags (default namespace)
+    - keywords_sub → tags (default namespace)
+  - **Special Handling**: 
+    - presentational_publishing_date → ObjectVersion.effective_date
+    - priority → is_featured or metadata
+    - eceee_sites → drop
 
-#### 1.7 Views/Opinion Pieces (LOW PRIORITY)
 
-**Source**: `eceeeviews.EceeeViews`
 
-- **Migrate To**: ObjectTypeDefinition named "opinion"
-- **Schema Fields**: title, content, author_info
-- **Tag Migration**: Generic categories → tags
-
-#### 1.8 Quotes (LOW PRIORITY)
-
-**Source**: `eceeequotes.eceeeQuotes`, `eceeeQuotesCollection`
-
-- **Migrate To**: ObjectTypeDefinition named "quote"
-- **Schema Fields**: quote_text, attribution, collection_name
-- **Collections**: Map to tags or categories
-
-#### 1.9 Member Forum Content (MEDIUM PRIORITY)
-
-**Source**: `eceeememberforum.EceeeMemberOrganization`, `EceeeMemberActivity`
-
-- **MemberOrganization**: ObjectTypeDefinition named "member_org"
-- **MemberActivity**: ObjectTypeDefinition named "member_activity"
-- **Tag Migration**:
-                                                                                                                                - MemberAffiliation → tags (namespace: "member_affiliation")
-                                                                                                                                - MemberCategory → tags (namespace: "member_category")
-                                                                                                                                - ProjectCategory → tags (namespace: "project_category")
-                                                                                                                                - ReportCategory → tags (namespace: "report_category")
-
-#### 1.10 Galleries (LOW PRIORITY)
-
-**Source**: `eceeegalleries.eceeeGallery`, `eceeeGalleryImage`
-
-- **Migrate To**: MediaCollection in file_manager system
-- **Images**: Migrate to MediaFile with appropriate tags
 
 ---
 
-### TIER 2: WebPage Migration
+### TIER 2/3: Skip/Archive/System Models
 
-These models should be migrated to the **WebPage** hierarchical system:
-
-#### 2.1 Core Page Types (HIGH PRIORITY)
+#### 2.1 Core Page Types (SKIP)
 
 **Source**: `eceeebase.WebPage`, `HomePage`, `SubSitePage`, `PlaceholderPage`
 
-- **Migrate To**: WebPage instances with appropriate layouts
-- **Schema**: Use WebPage's built-in fields + custom metadata
-- **Hierarchy**: Preserve parent/child relationships via WebPage.parent
-- **Tag Migration**:
-                                                                                                                                - Categories → tags (namespace: "category")
-                                                                                                                                - eceeeKeywords → tags (namespace: "keyword")
-                                                                                                                                - eceeeCategory → tags (default namespace)
-- **Widgets**: WebPageWidget → PageWidget instances
-- **Images**: WebPageImage → media attachments
-
-#### 2.2 Theme/Project Pages (MEDIUM PRIORITY)
+#### 2.2 Theme/Project Pages (SKIP)
 
 **Source**: `eceeebase.ThemePage`, `ReportPage`, `ProjectPage`
 
-- **Migrate To**: WebPage with specific page types or layouts
-- **Note**: These are marked as deprecated in source, consider consolidating
-
-#### 2.3 Embed Pages (LOW PRIORITY)
+#### 2.3 Embed Pages (SKIP)
 
 **Source**: `eceeebase.EmbedPage`
-
-- **Migrate To**: WebPage with iframe widget
-- **embed_url** → widget configuration
-
----
-
-### TIER 3: Skip/Archive/System Models
 
 #### 3.1 Widget System Models (SKIP - Different Architecture)
 
@@ -225,21 +161,25 @@ These models should be migrated to the **WebPage** hierarchical system:
 - `pageproperties.PageProperty`
 - **Reason**: System models, not content
 
-#### 3.5 Deprecated Content Types (ARCHIVE)
+#### 3.5 Deprecated Content Types (SKIP)
 
 - `eceeebase.NewsSubscription`
 - `eceeebase.EcoDesign` (replaced by ecodesign app)
 - `eceeebase.CalenderEvent` (replaced by eceeecalendar app)
 - **Action**: Export data for reference, don't migrate
 
-#### 3.6 Columnists (LOW PRIORITY - Evaluate)
+#### 3.6 Not Important Content Types (SKIP)
 
-**Source**: `eceeecolumnists` models
+**Sources**: 
+- `ecodesign.EcoDesignProduct`
+- `eceeeviews.EceeeViews`
+- `eceeequotes.eceeeQuotes`, `eceeeQuotesCollection`
+- `eceeememberforum.EceeeMemberOrganization`, `EceeeMemberActivity`
+- `eceeegalleries.eceeeGallery`, `eceeeGalleryImage`
 
-- **Decision**: May not be needed, check with stakeholders
-- If needed: Migrate as ObjectTypeDefinition "columnist"
+**Reason**: Not important for migration, can be archived or excluded
 
-#### 3.7 Theme-Specific Models (EVALUATE PER THEME)
+#### 3.8 Theme-Specific Models (EVALUATE PER THEME)
 
 - `themes/briskee_models.py` - Briskee project
 - `themes/eceee_models.py` - Main ECEEE
@@ -247,7 +187,7 @@ These models should be migrated to the **WebPage** hierarchical system:
 - `themes/energysufficiency_models.py` - Energy Sufficiency
 - **Action**: Evaluate which themes are still active, migrate content accordingly
 
-#### 3.8 Utility Models (SKIP)
+#### 3.9 Utility Models (SKIP)
 
 - `flexibledatefield` models
 - `retinajs` models
@@ -256,7 +196,7 @@ These models should be migrated to the **WebPage** hierarchical system:
 - `catalog` models
 - **Reason**: Django app infrastructure, not content
 
-#### 3.9 User Profiles (MIGRATE SEPARATELY)
+#### 3.10 User Profiles (SKIP)
 
 **Source**: `eceeeaccounts.ProfileModel`
 
@@ -278,75 +218,59 @@ These models should be migrated to the **WebPage** hierarchical system:
 
 **New System**:
 
-- Single Tag model
-- Namespace for organization
+- Single Tag model with default namespace only
 - Simple M2M relationships
 - Usage tracking
 
-### Migration Approach
+### Migration Approach - Simplified (No Namespaces)
 
-#### Phase 1: Namespace Creation
+All tags will be migrated to the **default namespace**. Focus on three critical tag types:
 
-Create namespaces for each category type:
+1. **Normal Tags** (eceee_category, keywords, etc.)
+2. **News Tags** (news_type, news_category, news_source)
+3. **Related News** (relationships between news items)
 
-```python
-namespaces = [
-    "news_type",
-    "news_category", 
-    "news_source",
-    "event_type",
-    "event_category",
-    "library_category",
-    "proceedings_keyword",
-    "ecodesign_category",
-    "lot_category",
-    "regulation_category",
-    "member_affiliation",
-    "member_category",
-    "project_category",
-    "report_category",
-    "eceee_category",  # default namespace
-]
-```
-
-#### Phase 2: Tag Migration Script Structure
+#### Phase 1: Tag Migration Script Structure
 
 ```python
-def migrate_generic_categories(old_model, namespace_name):
+def migrate_tags():
     """
-    Generic migration for any category type
+    Universal tag migration - all categories become simple tags
     
-    1. Get all old category instances (e.g., eceeeNewsType)
-    2. Create Tag for each with appropriate namespace
+    1. Get all category instances from all old models
+    2. Create Tag for each in default namespace (no namespace prefix)
     3. For each Assigned* instance:
        - Find the new object (ObjectInstance or WebPage)
        - Create tag relationship
     4. Track usage_count
+    5. Merge duplicate tag names
     """
     
-def migrate_mezzanine_keywords():
+def migrate_news_tags():
     """
-    Migrate Mezzanine Keyword system
+    Migrate news-specific tags
     
-    1. Get all Keyword instances
-    2. Create Tag with default namespace
-    3. Update AssignedKeyword relationships
+    1. NewsType → tags
+    2. NewsCategory → tags
+    3. NewsSource → tags
+    4. Keywords → tags
+    """
+    
+def migrate_related_news():
+    """
+    Migrate RelatedNews relationships
+    
+    1. Get all RelatedNews relationships
+    2. Store in ObjectInstance metadata or as special tag
+    3. Maintain bidirectional relationships
     """
 ```
 
-#### Phase 3: Data Consolidation
+#### Phase 2: Data Consolidation
 
-- **Merge duplicate tags**: Check for similar names across namespaces
+- **Merge duplicate tags**: Consolidate similar names from different sources
 - **Clean up**: Remove unused/orphaned tags
 - **Validation**: Ensure all content has appropriate tags
-
-#### Phase 4: Multi-site to Namespace
-
-Map `eceee_sites` field to namespace assignment:
-
-- "eceee" → default namespace
-- "eceee_ecodesign" → "ecodesign" namespace
-- "energysufficiency" → "energysufficiency" namespace
 
 ---
 
@@ -358,12 +282,12 @@ Map `eceee_sites` field to namespace assignment:
 backend/scripts/migration/
 ├── __init__.py
 ├── base_migrator.py          # Base class with common functions
-├── migrate_news.py            # News migration
+├── migrate_tags.py            # Tag/category migration (✅ DONE)
+├── migrate_news.py            # News migration with Content Widget
 ├── migrate_events.py          # Calendar events
 ├── migrate_library.py         # Library items
 ├── migrate_proceedings.py     # Papers & conferences
-├── migrate_pages.py           # WebPage migration
-├── migrate_tags.py            # Tag/category migration
+├── migrate_columnists.py      # Columnists & columns
 ├── migrate_media.py           # Images & files
 └── run_full_migration.py      # Orchestrator
 ```
@@ -371,40 +295,37 @@ backend/scripts/migration/
 ### Dependencies & Order
 
 1. **Users & Profiles** (separate, run first)
-2. **Namespaces** (create all namespaces)
-3. **Tags** (migrate all category/tag data)
-4. **Object Type Definitions** (create schemas)
-5. **Media Files** (images, PDFs)
-6. **Object Instances** (content objects)
+2. **Tags** (migrate all category/tag data to default namespace)
+3. **Object Type Definitions** (create schemas - metadata only, no content fields)
+4. **Media Files** (images, PDFs)
+5. **Object Instances** (content objects with structured data)
+6. **Content Widgets** (migrate rich text content to widgets)
 7. **Web Pages** (hierarchical pages)
 8. **Relationships** (related objects, parent/child)
+
+**Note on Content Migration**: Rich text content should be migrated to Content Widgets attached to ObjectVersions, not stored in the schema's data fields. This ensures consistency with the widget-based rendering system.
 
 ### Key Decisions Required
 
 1. **Multi-site Strategy**: 
-
-                                                                                                                                                                                                - Create separate namespaces per site?
-                                                                                                                                                                                                - Use single namespace with site metadata?
+  - Store site information in metadata field
+  - All tags in default namespace
 
 2. **URL Preservation**:
-
-                                                                                                                                                                                                - Maintain old URL patterns?
-                                                                                                                                                                                                - Create redirects?
+  - Maintain old URL patterns?
+  - Create redirects?
 
 3. **Theme Migration**:
-
-                                                                                                                                                                                                - Which themes are actively used?
-                                                                                                                                                                                                - Consolidate to main ECEEE theme?
+  - Which themes are actively used?
+  - Consolidate to main ECEEE theme?
 
 4. **Historical Data**:
-
-                                                                                                                                                                                                - Migrate all historical content?
-                                                                                                                                                                                                - Set cutoff date?
+  - Migrate all historical content?
+  - Set cutoff date?
 
 5. **Widget Migration**:
-
-                                                                                                                                                                                                - Map old widget types to new widgets?
-                                                                                                                                                                                                - Manual review of complex widgets?
+  - Map old widget types to new widgets?
+  - Manual review of complex widgets?
 
 ---
 
@@ -445,60 +366,101 @@ backend/scripts/migration/
 ## Timeline Estimate
 
 1. **Phase 1 - Preparation** (1 week)
+  - Create object type definitions
+  - Set up migration infrastructure
+  - Create tag migration script
 
-                                                                                                                                                                                                - Finalize namespace strategy
-                                                                                                                                                                                                - Create object type definitions
-                                                                                                                                                                                                - Set up migration infrastructure
-
-2. **Phase 2 - Tag Migration** (3 days)
-
-                                                                                                                                                                                                - Migrate all category/tag data
-                                                                                                                                                                                                - Validate namespace assignments
+2. **Phase 2 - Tag Migration** (2 days)
+  - Migrate all category/tag data to default namespace
+  - Merge duplicate tags
+  - Validate tag relationships
 
 3. **Phase 3 - Content Migration** (2 weeks)
-
-                                                                                                                                                                                                - News, Events, Library (Week 1)
-                                                                                                                                                                                                - Pages, Proceedings, Other (Week 2)
+  - News, Events, Library (Week 1)
+  - Proceedings, Columnists, Jobs (Week 2)
 
 4. **Phase 4 - Media Migration** (3 days)
-
-                                                                                                                                                                                                - Images and file attachments
-                                                                                                                                                                                                - Update references
+  - Images and file attachments
+  - Update references
 
 5. **Phase 5 - Validation** (1 week)
-
-                                                                                                                                                                                                - Content review
-                                                                                                                                                                                                - URL testing
-                                                                                                                                                                                                - Performance testing
+  - Content review
+  - URL testing
+  - Performance testing
 
 6. **Phase 6 - Cutover** (2 days)
+  - Final sync
+  - DNS/routing updates
+  - Monitor
 
-                                                                                                                                                                                                - Final sync
-                                                                                                                                                                                                - DNS/routing updates
-                                                                                                                                                                                                - Monitor
-
-**Total**: ~4-5 weeks for full migration
+**Total**: ~4 weeks for full migration
 
 ---
 
 ## Next Steps
 
 1. **Review & Approve** this PDR
-2. **Answer key decisions** (multi-site, themes, etc.)
+2. **Answer key decisions** (themes, URLs, etc.)
 3. **Create detailed schemas** for each ObjectTypeDefinition
-4. **Build migration scripts** starting with base infrastructure
+4. **Build migration scripts** starting with tag migration
 5. **Test on sample data** before full migration
 6. **Plan rollback strategy** in case of issues
 
 ### To-dos
 
-- [ ] Review PDR with stakeholders and answer key decisions about multi-site strategy, theme migration, and URL preservation
-- [ ] Create all required namespaces for tag organization
-- [ ] Create detailed JSON schemas for each ObjectTypeDefinition (news, event, library_item, etc.)
-- [ ] Create base migration infrastructure with common utilities
-- [ ] Build and run tag/category migration scripts
-- [ ] Migrate high-priority content: News, Events, Library, Proceedings
-- [ ] Migrate WebPage hierarchy with widgets and images
+- [ ] Review PDR with stakeholders and answer key decisions about theme migration and URL preservation
+- [x] Create detailed JSON schemas for each ObjectTypeDefinition (✅ `backend/scripts/migration/schemas/`)
+- [x] Create base migration infrastructure with common utilities (✅ `backend/scripts/migration/base_migrator.py`)
+- [x] Build tag/category migration scripts (✅ `backend/scripts/migration/migrate_tags.py`)
+- [x] Create script to generate ObjectTypeDefinitions (✅ `backend/scripts/migration/create_object_types.py`)
+- [ ] Run create_object_types.py to create ObjectTypeDefinitions in database
+- [ ] Customize tag migration for legacy schema and run migration
+- [ ] Migrate high-priority content: News, Events, Library, Proceedings, Columnists (structured data only)
+- [ ] Migrate rich text content to Content Widgets for all objects
 - [ ] Migrate all media files (images, PDFs) with proper tagging
 - [ ] Validate all migrated content for integrity and completeness
 - [ ] Generate URL redirect mapping for old URLs
+
+### Migration Scripts Created
+
+**Location**: `backend/scripts/migration/`
+
+1. **`base_migrator.py`** - Base class with common utilities:
+   - Namespace management
+   - Tag creation with normalization
+   - Duplicate tag merging
+   - Migration user management
+   - Statistics tracking
+   - Dry-run transaction support
+
+2. **`migrate_tags.py`** - Tag migration template:
+   - Migrates normal tags (categories, keywords)
+   - Migrates news-specific tags
+   - Handles related news relationships
+   - Outputs tag mapping file for content migration
+   - Needs customization for your legacy schema
+
+3. **`migrate_tags_example.py`** - Fully worked examples:
+   - Shows how to connect to legacy models
+   - Examples for all major tag types
+   - Copy patterns into main migration script
+
+4. **`create_object_types.py`** - Create ObjectTypeDefinitions:
+   - Loads JSON schemas from schemas/ directory
+   - Creates ObjectTypeDefinitions in database
+   - Sets up parent-child relationships
+   - Dry-run support for testing
+
+5. **`schemas/`** - JSON schemas for all object types:
+   - 9 schema files (news, event, job, library_item, conference, conference_panel, paper, columnist, column)
+   - README with complete documentation
+   - SCHEMAS_INDEX with quick reference
+   - All follow Content Widget pattern (no content in schemas)
+
+6. **Documentation**:
+   - `README.md` - Tag migration guide
+   - `CONTENT_WIDGET_STRATEGY.md` - Content migration pattern
+   - `COLUMNISTS_MIGRATION_PLAN.md` - Columnists migration guide
+   - `schemas/README.md` - Schema documentation
+   - `QUICKSTART.md` - Getting started guide
+   - `INDEX.md` - Navigation hub 

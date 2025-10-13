@@ -1,0 +1,61 @@
+{
+  "type": "object",
+  "properties": {
+    "eventType": {
+      "title": "Event Type",
+      "componentType": "text",
+      "maxLength": 100,
+      "helpText": "Type of event (conference, workshop, webinar, etc.)"
+    },
+    "venue": {
+      "title": "Venue",
+      "componentType": "text",
+      "maxLength": 200,
+      "helpText": "Event location or venue name"
+    },
+    "organiser": {
+      "title": "Organiser",
+      "componentType": "text",
+      "maxLength": 200,
+      "helpText": "Organization or person organizing the event"
+    },
+    "eventStartDate": {
+      "title": "Event Start Date",
+      "componentType": "datetime",
+      "helpText": "When the event starts"
+    },
+    "eventEndDate": {
+      "title": "Event End Date",
+      "componentType": "datetime",
+      "helpText": "When the event ends"
+    },
+    "priority": {
+      "title": "Priority Event",
+      "componentType": "boolean",
+      "helpText": "Mark as high priority/featured event"
+    },
+    "quote": {
+      "title": "Quote",
+      "componentType": "text",
+      "maxLength": 500,
+      "helpText": "Highlighted quote or tagline for the event"
+    }
+  },
+  "required": [
+    "eventStartDate"
+  ],
+  "propertyOrder": [
+    "eventType",
+    "eventStartDate",
+    "eventEndDate",
+    "venue",
+    "organiser",
+    "priority",
+    "quote"
+  ],
+  "additionalInfo": {
+    "description": "Calendar events - content stored in Content Widget",
+    "contentWidgetRequired": true,
+    "note": "Event description/content goes in Content Widget, not in schema."
+  }
+}

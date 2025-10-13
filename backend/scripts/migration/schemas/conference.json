@@ -1,0 +1,48 @@
+{
+  "type": "object",
+  "properties": {
+    "year": {
+      "title": "Conference Year",
+      "componentType": "number",
+      "helpText": "Year the conference took place"
+    },
+    "venue": {
+      "title": "Venue",
+      "componentType": "text",
+      "maxLength": 200,
+      "helpText": "Conference location and venue"
+    },
+    "date": {
+      "title": "Conference Date",
+      "componentType": "date",
+      "helpText": "Start date of the conference"
+    },
+    "isbn": {
+      "title": "ISBN",
+      "componentType": "text",
+      "maxLength": 50,
+      "helpText": "ISBN for conference proceedings"
+    },
+    "issn": {
+      "title": "ISSN",
+      "componentType": "text",
+      "maxLength": 50,
+      "helpText": "ISSN for conference proceedings"
+    }
+  },
+  "required": [
+    "year"
+  ],
+  "propertyOrder": [
+    "year",
+    "date",
+    "venue",
+    "isbn",
+    "issn"
+  ],
+  "additionalInfo": {
+    "description": "Conference - description stored in Content Widget",
+    "contentWidgetRequired": true,
+    "note": "Conference description goes in Content Widget. Panels are child objects of conferences."
+  }
+}

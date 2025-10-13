@@ -1,0 +1,36 @@
+{
+  "type": "object",
+  "properties": {
+    "presentationalPublishingDate": {
+      "title": "Publishing Date",
+      "componentType": "datetime",
+      "helpText": "Date the column was published"
+    },
+    "priority": {
+      "title": "Priority Column",
+      "componentType": "boolean",
+      "helpText": "Mark as featured/priority column"
+    },
+    "columnistIds": {
+      "title": "Columnists",
+      "componentType": "array",
+      "helpText": "Array of ObjectInstance IDs for columnists who wrote this column",
+      "items": {
+        "type": "number"
+      }
+    }
+  },
+  "required": [
+    "presentationalPublishingDate"
+  ],
+  "propertyOrder": [
+    "presentationalPublishingDate",
+    "columnistIds",
+    "priority"
+  ],
+  "additionalInfo": {
+    "description": "Opinion column - content stored in Content Widget",
+    "contentWidgetRequired": true,
+    "note": "Column content goes in Content Widget. Columnist relationships stored in columnistIds array. Related news stored in metadata."
+  }
+}
