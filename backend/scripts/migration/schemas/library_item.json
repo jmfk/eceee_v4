@@ -1,0 +1,27 @@
+{
+  "type": "object",
+  "properties": {
+    "derivableNumber": {
+      "title": "Document Number",
+      "componentType": "text",
+      "maxLength": 50,
+      "helpText": "Unique document or catalog number"
+    },
+    "derivableTitle": {
+      "title": "Derivable Title",
+      "componentType": "text",
+      "maxLength": 300,
+      "helpText": "Alternative or derived title for the item"
+    }
+  },
+  "required": [],
+  "propertyOrder": [
+    "derivableNumber",
+    "derivableTitle"
+  ],
+  "additionalInfo": {
+    "description": "Library items - description stored in Content Widget, files as media attachments",
+    "contentWidgetRequired": true,
+    "note": "Item description goes in Content Widget. Related files (PDFs, etc.) should be attached as media files."
+  }
+}

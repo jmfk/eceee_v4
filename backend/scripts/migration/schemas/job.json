@@ -1,0 +1,33 @@
+{
+  "type": "object",
+  "properties": {
+    "location": {
+      "title": "Location",
+      "componentType": "text",
+      "maxLength": 200,
+      "helpText": "Job location (city, country, or 'Remote')"
+    },
+    "deadline": {
+      "title": "Application Deadline",
+      "componentType": "date",
+      "helpText": "Deadline for job applications"
+    },
+    "externalUrl": {
+      "title": "Application URL",
+      "componentType": "url",
+      "maxLength": 500,
+      "helpText": "Link to apply or get more information"
+    }
+  },
+  "required": [],
+  "propertyOrder": [
+    "location",
+    "deadline",
+    "externalUrl"
+  ],
+  "additionalInfo": {
+    "description": "Job postings - job description stored in Content Widget",
+    "contentWidgetRequired": true,
+    "note": "Job description/details go in Content Widget, not in schema."
+  }
+}

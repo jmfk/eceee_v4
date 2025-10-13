@@ -1,0 +1,42 @@
+{
+  "type": "object",
+  "properties": {
+    "authors": {
+      "title": "Authors",
+      "componentType": "text",
+      "maxLength": 500,
+      "helpText": "Paper authors (comma-separated or formatted list)"
+    },
+    "docNummer": {
+      "title": "Document Number",
+      "componentType": "text",
+      "maxLength": 50,
+      "helpText": "Unique paper/document identifier"
+    },
+    "peerReview": {
+      "title": "Peer Reviewed",
+      "componentType": "boolean",
+      "helpText": "Whether this paper was peer-reviewed"
+    },
+    "panelId": {
+      "title": "Panel",
+      "componentType": "object_reference",
+      "helpText": "Panel this paper was presented in",
+      "referenceType": "conference_panel"
+    }
+  },
+  "required": [
+    "authors"
+  ],
+  "propertyOrder": [
+    "docNummer",
+    "authors",
+    "peerReview",
+    "panelId"
+  ],
+  "additionalInfo": {
+    "description": "Conference paper - abstract stored in Content Widget, PDF as media attachment",
+    "contentWidgetRequired": true,
+    "note": "Paper abstract goes in Content Widget. PDF and presentation files should be attached as media files. Use parent relationship for panel linkage."
+  }
+}

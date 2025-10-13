@@ -1,0 +1,36 @@
+{
+  "type": "object",
+  "properties": {
+    "panelPrefix": {
+      "title": "Panel Prefix",
+      "componentType": "text",
+      "maxLength": 50,
+      "helpText": "Panel identifier or number (e.g., 'Panel 1', 'Track A')"
+    },
+    "panelLeaders": {
+      "title": "Panel Leaders",
+      "componentType": "text",
+      "maxLength": 500,
+      "helpText": "Names of panel chairs or leaders"
+    },
+    "conferenceId": {
+      "title": "Conference",
+      "componentType": "object_reference",
+      "helpText": "Parent conference this panel belongs to",
+      "referenceType": "conference"
+    }
+  },
+  "required": [
+    "conferenceId"
+  ],
+  "propertyOrder": [
+    "panelPrefix",
+    "panelLeaders",
+    "conferenceId"
+  ],
+  "additionalInfo": {
+    "description": "Conference panel/track - additional info stored in Content Widget",
+    "contentWidgetRequired": false,
+    "note": "Additional information goes in Content Widget. Papers are child objects of panels. Use parent relationship for conference linkage."
+  }
+}

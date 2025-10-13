@@ -1,0 +1,32 @@
+{
+  "type": "object",
+  "properties": {
+    "sourceDate": {
+      "title": "Source Date",
+      "componentType": "date",
+      "helpText": "Original publication date from external source"
+    },
+    "externalUrl": {
+      "title": "External URL",
+      "componentType": "url",
+      "maxLength": 500,
+      "helpText": "Link to original article if from external source"
+    },
+    "featuredImage": {
+      "title": "Featured Image",
+      "componentType": "image_reference",
+      "helpText": "Main image for the news article"
+    }
+  },
+  "required": [],
+  "propertyOrder": [
+    "featuredImage",
+    "sourceDate",
+    "externalUrl"
+  ],
+  "additionalInfo": {
+    "description": "News articles - content stored in Content Widget",
+    "contentWidgetRequired": true,
+    "note": "Article content, title, and slug are managed at ObjectInstance level. Rich text content goes in Content Widget."
+  }
+}
