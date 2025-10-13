@@ -1,9 +1,11 @@
+{% load security_filters %}
+
 <div class="three-columns-widget" data-widget-type="three-columns">
     <div class="column-slot left" data-slot="left">
         {% if rendered_slots.left %}
             {% for widget in rendered_slots.left %}
                 <div class="widget-wrapper">
-                    {{ widget.html|safe }}
+                    {{ widget.html|sanitize_html }}
                 </div>
             {% endfor %}
         {% else %}
@@ -15,7 +17,7 @@
         {% if rendered_slots.center %}
             {% for widget in rendered_slots.center %}
                 <div class="widget-wrapper">
-                    {{ widget.html|safe }}
+                    {{ widget.html|sanitize_html }}
                 </div>
             {% endfor %}
         {% else %}
@@ -27,7 +29,7 @@
         {% if rendered_slots.right %}
             {% for widget in rendered_slots.right %}
                 <div class="widget-wrapper">
-                    {{ widget.html|safe }}
+                    {{ widget.html|sanitize_html }}
                 </div>
             {% endfor %}
         {% else %}
