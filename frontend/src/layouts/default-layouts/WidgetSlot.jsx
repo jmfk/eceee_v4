@@ -217,6 +217,10 @@ const WidgetSlot = ({
                         allowedWidgetTypes: allowedTypes,
                         maxWidgets: finalMaxWidgets
                     }}
+                    // Path variables for dynamic content
+                    pathVariables={pageContext.pathVariables}
+                    simulatedPath={pageContext.simulatedPath}
+                    onSimulatedPathChange={pageContext.onSimulatedPathChange}
                 />
             </div>
         );

@@ -56,7 +56,11 @@ const PageWidgetFactory = ({
     isInherited = false,
     // Widget modal for replace functionality
     onShowWidgetModal,
-    slotMetadata = null
+    slotMetadata = null,
+    // Path variables for dynamic content
+    pathVariables = {},
+    simulatedPath,
+    onSimulatedPathChange
 }) => {
     // Use passed props or extract from widget
     const actualWidgetId = widgetId || widget?.id
@@ -286,7 +290,10 @@ const PageWidgetFactory = ({
                             versionId,
                             webpageData,
                             pageVersionData,
-                            widgetPath
+                            widgetPath,
+                            pathVariables: pageContext?.pathVariables || {},
+                            simulatedPath: pageContext?.simulatedPath,
+                            onSimulatedPathChange: pageContext?.onSimulatedPathChange
                         }}
                     />
                 </div>
@@ -348,7 +355,10 @@ const PageWidgetFactory = ({
                             versionId,
                             webpageData,
                             pageVersionData,
-                            widgetPath
+                            widgetPath,
+                            pathVariables: pathVariables || {},
+                            simulatedPath: simulatedPath,
+                            onSimulatedPathChange: onSimulatedPathChange
                         }}
                     />
                 </div>
@@ -459,7 +469,10 @@ const PageWidgetFactory = ({
                     versionId,
                     webpageData,
                     pageVersionData,
-                    widgetPath
+                    widgetPath,
+                    pathVariables: pathVariables || {},
+                    simulatedPath: simulatedPath,
+                    onSimulatedPathChange: onSimulatedPathChange
                 }}
             />
         </div>
