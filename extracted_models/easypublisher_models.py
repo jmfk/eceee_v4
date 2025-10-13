@@ -1,0 +1,14 @@
+from django.utils.translation import gettext_lazy as _
+from mezzanine.conf import settings
+from mezzanine.core.fields import FileField, RichTextField
+from mezzanine.core.models import Displayable, Orderable, RichText
+from mezzanine.generic.fields import CommentsField
+from mezzanine.pages.models import Link, Page
+from mezzanine.utils.importing import import_dotted_path
+from mezzanine.utils.models import AdminThumbMixin, upload_to
+
+
+class AcquisitionMixin(object):
+    pass
+
+
