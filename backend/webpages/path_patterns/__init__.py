@@ -18,11 +18,11 @@ class NewsSlugPattern(BasePathPattern):
         "Captures a single news article slug from the URL. "
         "Use this for news detail pages that display a specific article."
     )
-    regex_pattern = r"^(?P<slug>[\w-]+)/$"
+    regex_pattern = r"^(?P<news_slug>[\w-]+)/$"
     example_url = "my-article/"
     extracted_variables = [
         {
-            "name": "slug",
+            "name": "news_slug",
             "type": "string",
             "description": "The URL-friendly slug of the news article",
             "example": "my-article",
@@ -40,11 +40,11 @@ class EventSlugPattern(BasePathPattern):
         "Captures a single event slug from the URL. "
         "Use this for event detail pages that display a specific event."
     )
-    regex_pattern = r"^(?P<slug>[\w-]+)/$"
+    regex_pattern = r"^(?P<event_slug>[\w-]+)/$"
     example_url = "summer-conference-2025/"
     extracted_variables = [
         {
-            "name": "slug",
+            "name": "event_slug",
             "type": "string",
             "description": "The URL-friendly slug of the event",
             "example": "summer-conference-2025",
@@ -62,11 +62,11 @@ class LibraryItemSlugPattern(BasePathPattern):
         "Captures a single library item slug from the URL. "
         "Use this for library detail pages that display a specific publication or resource."
     )
-    regex_pattern = r"^(?P<slug>[\w-]+)/$"
+    regex_pattern = r"^(?P<library_slug>[\w-]+)/$"
     example_url = "energy-efficiency-report-2025/"
     extracted_variables = [
         {
-            "name": "slug",
+            "name": "library_slug",
             "type": "string",
             "description": "The URL-friendly slug of the library item",
             "example": "energy-efficiency-report-2025",
@@ -84,11 +84,11 @@ class MemberSlugPattern(BasePathPattern):
         "Captures a single member slug from the URL. "
         "Use this for member profile pages that display a specific member's information."
     )
-    regex_pattern = r"^(?P<slug>[\w-]+)/$"
+    regex_pattern = r"^(?P<member_slug>[\w-]+)/$"
     example_url = "john-doe/"
     extracted_variables = [
         {
-            "name": "slug",
+            "name": "member_slug",
             "type": "string",
             "description": "The URL-friendly slug of the member",
             "example": "john-doe",
@@ -101,12 +101,12 @@ class DateSlugPattern(BasePathPattern):
     """Pattern for capturing date-based article URLs"""
 
     key = "date_slug"
-    name = "Date-based Article (YYYY/MM/slug)"
+    name = "Date-based Article (YYYY/MM/date_slug)"
     description = (
         "Captures a date-based URL with year, month, and article slug. "
         "Common for blogs and news archives organized by publication date."
     )
-    regex_pattern = r"^(?P<year>\d{4})/(?P<month>\d{2})/(?P<slug>[\w-]+)/$"
+    regex_pattern = r"^(?P<year>\d{4})/(?P<month>\d{2})/(?P<date_slug>[\w-]+)/$"
     example_url = "2025/10/my-article/"
     extracted_variables = [
         {
@@ -122,7 +122,7 @@ class DateSlugPattern(BasePathPattern):
             "example": "10",
         },
         {
-            "name": "slug",
+            "name": "date_slug",
             "type": "string",
             "description": "The URL-friendly slug of the article",
             "example": "my-article",
@@ -135,7 +135,7 @@ class YearSlugPattern(BasePathPattern):
     """Pattern for capturing year-based article URLs"""
 
     key = "year_slug"
-    name = "Year-based Article (YYYY/slug)"
+    name = "Year-based Article (YYYY/year_slug)"
     description = (
         "Captures a year-based URL with year and article slug. "
         "Useful for annual reports, yearly conferences, etc."
@@ -150,7 +150,7 @@ class YearSlugPattern(BasePathPattern):
             "example": "2025",
         },
         {
-            "name": "slug",
+            "name": "year_slug",
             "type": "string",
             "description": "The URL-friendly slug of the item",
             "example": "annual-report",
@@ -190,7 +190,7 @@ class CategorySlugPattern(BasePathPattern):
         "Captures a category and item slug from the URL. "
         "Useful for items organized by category (e.g., /technology/my-article/)."
     )
-    regex_pattern = r"^(?P<category>[\w-]+)/(?P<slug>[\w-]+)/$"
+    regex_pattern = r"^(?P<category>[\w-]+)/(?P<category_slug>[\w-]+)/$"
     example_url = "technology/energy-efficiency/"
     extracted_variables = [
         {
@@ -200,7 +200,7 @@ class CategorySlugPattern(BasePathPattern):
             "example": "technology",
         },
         {
-            "name": "slug",
+            "name": "category_slug",
             "type": "string",
             "description": "The item slug within the category",
             "example": "energy-efficiency",

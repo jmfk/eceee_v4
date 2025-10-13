@@ -18,21 +18,20 @@ class NewsDetailConfig(BaseModel):
     )
 
     slug_variable_name: str = Field(
-        default="slug",
+        default="news_slug",
         description="Name of the context variable holding the slug",
         json_schema_extra={
             "component": "TextInput",
-            "placeholder": "slug",
+            "placeholder": "news_slug",
         },
     )
 
-    object_types: List[str] = Field(
-        default=["news"],
-        description="Select ObjectType(s) this widget should handle",
+    object_types: List[int] = Field(
+        default=[],
+        description="Select ObjectType(s) to display",
         json_schema_extra={
-            "component": "MultiSelectInput",
-            "placeholder": "Select object types...",
-            "helpText": "This widget only renders if the slug matches one of these ObjectTypes",
+            "component": "ObjectTypeSelectorInput",
+            "multiple": True,
         },
     )
 
@@ -247,7 +246,7 @@ class NewsDetailWidget(BaseWidget):
         # Get slug from path variables
         path_variables = context.get("path_variables", {})
         slug = path_variables.get(news_config.slug_variable_name)
-
+        print("slug", slug)
         if not slug:
             # No slug in path variables - don't render
             return {
@@ -257,7 +256,7 @@ class NewsDetailWidget(BaseWidget):
 
         # Try to find the object in configured ObjectTypes
         news_object = self._get_news_object(slug, news_config.object_types)
-
+        print("news_object", news_object)
         if not news_object:
             # Slug exists but doesn't match any of this widget's configured ObjectTypes
             # This is normal - another detail widget might handle it
