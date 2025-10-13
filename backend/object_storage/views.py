@@ -994,12 +994,13 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
         if sort_order not in valid_sort_fields:
             sort_order = "-publish_date"
 
-        # Use the new model method to get published news items
+        # Use the model method to get published news items
         # This handles version-based publishing and featured status from ObjectVersion.is_featured
-        instances = ObjectInstance.get_news_list(
+        instances = ObjectInstance.get_published_objects(
             object_type_ids=object_type_ids,
             limit=limit,
             sort_order=sort_order,
+            prioritize_featured=True,
         )
 
         # Serialize and return

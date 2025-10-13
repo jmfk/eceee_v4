@@ -416,6 +416,107 @@ class ObjectInstance(MPTTModel):
     Actual instances of objects based on their type definitions.
     Contains dynamic data according to the object type's schema.
     Uses MPTT for efficient tree structure management.
+
+    RENDERING PATTERN FOR PUBLISHED OBJECTS:
+    ========================================
+
+    This system uses DATE-BASED PUBLISHING with version control. When rendering objects
+    (e.g., in widgets, templates, views), ALWAYS use this pattern:
+
+    Step 1: Query for the ObjectInstance
+    ------------------------------------
+    obj = (
+        ObjectInstance.objects
+        .filter(slug='my-news')
+        .select_related('object_type')
+        .first()
+    )
+    if not obj:
+        return None
+
+    Step 2: Get the currently published version
+    -------------------------------------------
+    published_version = obj.get_current_published_version()
+    if not published_version:
+        # Object exists but has no published version (draft, scheduled, or expired)
+        return None
+
+    Step 3: Access fields from the correct model
+    --------------------------------------------
+    # Object metadata (from ObjectInstance):
+    title = obj.title
+    slug = obj.slug
+    object_type = obj.object_type
+    created_at = obj.created_at
+
+    # Version-specific content (from ObjectVersion):
+    content = published_version.data.get('content')
+    featured_image = published_version.data.get('featured_image')
+    widgets = published_version.widgets
+    publish_date = published_version.effective_date
+    is_featured = published_version.is_featured
+
+    COMPLETE EXAMPLE - Widget Rendering:
+    ====================================
+
+    def _get_news_object(self, slug, object_type_ids):
+        from object_storage.models import ObjectInstance
+
+        # Step 1: Get the object
+        obj = (
+            ObjectInstance.objects
+            .filter(slug=slug, object_type_id__in=object_type_ids)
+            .select_related('object_type')
+            .first()
+        )
+        if not obj:
+            return None, None
+
+        # Step 2: Get published version
+        published_version = obj.get_current_published_version()
+        if not published_version:
+            return None, None
+
+        # Step 3: Return both for rendering
+        return obj, published_version
+
+    # Then in template context:
+    obj, published_version = self._get_news_object(slug, types)
+    if obj and published_version:
+        context = {
+            'title': obj.title,
+            'slug': obj.slug,
+            'content': published_version.data.get('content'),
+            'publish_date': published_version.effective_date,
+            'is_featured': published_version.is_featured,
+        }
+
+    CRITICAL - What NOT to do:
+    ==========================
+
+    ❌ DO NOT use obj.current_version for rendering
+       Reason: It may point to a draft or scheduled version
+
+    ❌ DO NOT filter by status="published"
+       Reason: Status field is not date-aware, use get_current_published_version()
+
+    ❌ DO NOT use obj.data or obj.widgets directly for rendering published content
+       Reason: These are convenience properties that return current_version data,
+       which may be a draft. Use published_version.data and published_version.widgets
+
+    ✅ DO use get_current_published_version() - it checks effective_date and expiry_date
+    ✅ DO return both obj and published_version (not merged data)
+    ✅ DO use select_related('object_type') for performance
+
+    WHY THIS PATTERN:
+    =================
+
+    - Date-based publishing: Versions have effective_date and expiry_date
+    - Multiple versions: An object can have draft, scheduled, and expired versions
+    - Separation of concerns: Object metadata vs version content
+    - Performance: Explicit queries, no hidden N+1 problems
+    - Type safety: Work with models, not dictionaries
+    - Consistency: Same pattern used in API (see object_storage/views.py)
     """
 
     STATUS_CHOICES = [
@@ -712,24 +813,29 @@ class ObjectInstance(MPTTModel):
 
     def get_current_published_version(self, now=None):
         """
-        Get the currently published version of this object using date-based logic.
+        Get the currently published version using date-based logic.
 
-        Returns the latest version by version_number that:
-        - Has effective_date <= now
-        - Has no expiry_date OR expiry_date > now
+        THIS IS THE PRIMARY METHOD for getting published content for rendering.
+
+        Returns the latest version (by version_number) that meets ALL criteria:
+        - effective_date <= now (already published)
+        - expiry_date is None OR expiry_date > now (not expired)
+
+        Args:
+            now: Timestamp for publication check (default: timezone.now())
+
+        Returns:
+            ObjectVersion instance if a version is currently published
+            None if no version meets the publication criteria
+
+        Example:
+            obj = ObjectInstance.objects.get(slug='my-article')
+            published = obj.get_current_published_version()
+            if published:
+                content = published.data.get('content')
+                widgets = published.widgets
+                publish_date = published.effective_date
         """
-        if now is None:
-            now = timezone.now()
-
-        return (
-            self.versions.filter(effective_date__lte=now)
-            .filter(models.Q(expiry_date__isnull=True) | models.Q(expiry_date__gt=now))
-            .order_by("-version_number")
-            .first()
-        )
-
-    def get_latest_published_version(self, now=None):
-        """Get the latest published version by version number"""
         if now is None:
             now = timezone.now()
 
@@ -883,22 +989,31 @@ class ObjectInstance(MPTTModel):
 
     @classmethod
     def get_published_objects(
-        cls, object_type_ids=None, limit=None, sort_order="-created_at", now=None
+        cls,
+        object_type_ids=None,
+        limit=None,
+        sort_order="-created_at",
+        now=None,
+        prioritize_featured=False,
     ):
         """
-        Get published objects, optionally filtered by object types.
+        Get published objects with flexible filtering and sorting.
 
         Args:
             object_type_ids: List of object type IDs to filter by (optional)
             limit: Maximum number of results to return (optional)
             sort_order: Field to sort by (default: "-created_at")
+                       Note: "publish_date" will be mapped to "current_version__effective_date"
             now: Timestamp to use for publication checks (default: timezone.now())
+            prioritize_featured: If True, sort featured items first (default: False)
 
         Returns:
             QuerySet of ObjectInstance with published versions pre-loaded
         """
         if now is None:
             now = timezone.now()
+
+        from django.db.models import F
 
         # Start with published objects only
         queryset = cls.published.published_only(now).select_related(
@@ -909,64 +1024,28 @@ class ObjectInstance(MPTTModel):
         if object_type_ids:
             queryset = queryset.filter(object_type_id__in=object_type_ids)
 
+        # Annotate with featured status if needed
+        if prioritize_featured:
+            queryset = queryset.annotate(is_featured=F("current_version__is_featured"))
+
+        # Map publish_date to actual field
+        sort_field = sort_order
+        if "publish_date" in sort_order:
+            sort_field = sort_order.replace(
+                "publish_date", "current_version__effective_date"
+            )
+
         # Apply sorting
-        queryset = queryset.order_by(sort_order)
+        if prioritize_featured:
+            queryset = queryset.order_by("-is_featured", sort_field)
+        else:
+            queryset = queryset.order_by(sort_field)
 
         # Apply limit if specified
         if limit:
             queryset = queryset[:limit]
 
         return queryset
-
-    @classmethod
-    def get_news_list(
-        cls, object_type_ids, limit=10, sort_order="-publish_date", now=None
-    ):
-        """
-        Get a list of published objects for news widgets and similar use cases.
-
-        This method:
-        - Filters to only published objects (using version-based logic)
-        - Sorts featured items first, then by the specified sort order
-        - Limits results to the specified number
-
-        Args:
-            object_type_ids: List of object type IDs to include
-            limit: Maximum number of items to return (default: 10)
-            sort_order: Field to sort by after featured sorting (default: "-publish_date")
-            now: Timestamp to use for publication checks (default: timezone.now())
-
-        Returns:
-            QuerySet of ObjectInstance with published versions and featured status
-        """
-        if now is None:
-            now = timezone.now()
-
-        from django.db.models import F, Q
-
-        # Start with published objects only
-        queryset = (
-            cls.published.published_only(now)
-            .filter(object_type_id__in=object_type_ids)
-            .select_related("object_type", "current_version")
-        )
-
-        # Annotate with featured status from current_version
-        queryset = queryset.annotate(is_featured=F("current_version__is_featured"))
-
-        # Map sort_order to actual fields
-        sort_field = sort_order
-        if "publish_date" in sort_order:
-            # Map publish_date to effective_date from current_version
-            sort_field = sort_order.replace(
-                "publish_date", "current_version__effective_date"
-            )
-
-        # Sort: featured first, then by requested sort order
-        queryset = queryset.order_by("-is_featured", sort_field)
-
-        # Limit results
-        return queryset[:limit]
 
 
 class ObjectVersion(models.Model):

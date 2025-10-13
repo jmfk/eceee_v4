@@ -83,146 +83,6 @@ class NewsDetailWidget(BaseWidget):
     )
     template_name = "eceee_widgets/widgets/news_detail.html"
 
-    widget_css = """
-    .news-detail-widget {
-        font-family: var(--body-font, inherit);
-        max-width: 800px;
-        margin: 0 auto;
-    }
-    
-    .news-detail-widget .news-header {
-        margin-bottom: 2rem;
-    }
-    
-    .news-detail-widget .news-type-badge {
-        display: inline-block;
-        padding: 0.375rem 0.875rem;
-        background: #3b82f6;
-        color: white;
-        font-size: 0.875rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        border-radius: 0.25rem;
-        margin-bottom: 1rem;
-    }
-    
-    .news-detail-widget .news-title {
-        font-size: 2.5rem;
-        font-weight: 800;
-        color: #1f2937;
-        margin: 0 0 1rem 0;
-        line-height: 1.2;
-    }
-    
-    .news-detail-widget .news-metadata {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 1.5rem;
-        padding: 1rem 0;
-        border-top: 1px solid #e5e7eb;
-        border-bottom: 1px solid #e5e7eb;
-        font-size: 0.875rem;
-        color: #6b7280;
-        margin-bottom: 2rem;
-    }
-    
-    .news-detail-widget .news-metadata-item {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-    }
-    
-    .news-detail-widget .news-metadata-label {
-        font-weight: 600;
-        color: #4b5563;
-    }
-    
-    .news-detail-widget .news-featured-image {
-        width: 100%;
-        margin-bottom: 2rem;
-        border-radius: 0.5rem;
-        overflow: hidden;
-    }
-    
-    .news-detail-widget .news-featured-image img {
-        width: 100%;
-        height: auto;
-        display: block;
-    }
-    
-    .news-detail-widget .news-content {
-        font-size: 1.125rem;
-        line-height: 1.75;
-        color: #374151;
-    }
-    
-    .news-detail-widget .news-content h1,
-    .news-detail-widget .news-content h2,
-    .news-detail-widget .news-content h3 {
-        margin-top: 2rem;
-        margin-bottom: 1rem;
-        font-weight: 700;
-        color: #1f2937;
-    }
-    
-    .news-detail-widget .news-content h1 { font-size: 2rem; }
-    .news-detail-widget .news-content h2 { font-size: 1.75rem; }
-    .news-detail-widget .news-content h3 { font-size: 1.5rem; }
-    
-    .news-detail-widget .news-content p {
-        margin-bottom: 1.25rem;
-    }
-    
-    .news-detail-widget .news-content ul,
-    .news-detail-widget .news-content ol {
-        margin-bottom: 1.25rem;
-        padding-left: 2rem;
-    }
-    
-    .news-detail-widget .news-content li {
-        margin-bottom: 0.5rem;
-    }
-    
-    .news-detail-widget .news-content blockquote {
-        border-left: 4px solid #3b82f6;
-        padding-left: 1.5rem;
-        margin: 1.5rem 0;
-        font-style: italic;
-        color: #4b5563;
-    }
-    
-    .news-detail-widget .news-object-widgets {
-        margin-top: 3rem;
-        padding-top: 3rem;
-        border-top: 2px solid #e5e7eb;
-    }
-    
-    .news-detail-widget .not-found-message {
-        padding: 3rem 1.5rem;
-        text-align: center;
-        background: #f9fafb;
-        border-radius: 0.5rem;
-        border: 2px dashed #e5e7eb;
-        color: #6b7280;
-    }
-    
-    /* Mobile responsiveness */
-    @media (max-width: 768px) {
-        .news-detail-widget .news-title {
-            font-size: 1.875rem;
-        }
-        
-        .news-detail-widget .news-content {
-            font-size: 1rem;
-        }
-        
-        .news-detail-widget .news-metadata {
-            flex-direction: column;
-            gap: 0.75rem;
-        }
-    }
-    """
-
     css_scope = "widget"
 
     @property
@@ -246,7 +106,7 @@ class NewsDetailWidget(BaseWidget):
         # Get slug from path variables
         path_variables = context.get("path_variables", {})
         slug = path_variables.get(news_config.slug_variable_name)
-        print("slug", slug)
+
         if not slug:
             # No slug in path variables - don't render
             return {
@@ -255,9 +115,8 @@ class NewsDetailWidget(BaseWidget):
             }
 
         # Try to find the object in configured ObjectTypes
-        news_object = self._get_news_object(slug, news_config.object_types)
-        print("news_object", news_object)
-        if not news_object:
+        obj, published_version = self._get_news_object(slug, news_config.object_types)
+        if not obj or not published_version:
             # Slug exists but doesn't match any of this widget's configured ObjectTypes
             # This is normal - another detail widget might handle it
             return {
@@ -267,40 +126,40 @@ class NewsDetailWidget(BaseWidget):
 
         # Prepare object data
         featured_image = None
-        if news_config.show_featured_image and news_object.current_version:
-            featured_image = news_object.data.get(
+        if news_config.show_featured_image:
+            featured_image = published_version.data.get(
                 "featured_image"
-            ) or news_object.data.get("featuredImage")
+            ) or published_version.data.get("featuredImage")
 
-        # Get content
-        content_html = ""
-        if news_object.current_version:
-            content_html = (
-                news_object.data.get("content")
-                or news_object.data.get("body")
-                or news_object.data.get("text")
-                or ""
-            )
+        # Get content from published version
+        content_html = (
+            published_version.data.get("content")
+            or published_version.data.get("body")
+            or published_version.data.get("text")
+            or ""
+        )
 
         # Get metadata
         metadata = {}
-        if news_config.show_metadata and news_object.current_version:
-            data = news_object.data
+        if news_config.show_metadata:
             metadata = {
-                "author": data.get("author"),
-                "publish_date": news_object.publish_date,
-                "created_at": news_object.created_at,
-                "updated_at": news_object.updated_at,
+                "author": published_version.data.get("author"),
+                "publish_date": published_version.effective_date,
+                "created_at": obj.created_at,
+                "updated_at": obj.updated_at,
             }
 
         # Render object widgets if enabled
         rendered_widgets = None
-        if news_config.render_object_widgets and news_object.widgets:
-            rendered_widgets = self._render_object_widgets(news_object, context)
+        if news_config.render_object_widgets and published_version.widgets:
+            rendered_widgets = self._render_object_widgets_from_version(
+                published_version, context
+            )
 
         template_config.update(
             {
-                "news_object": news_object,
+                "news_object": obj,  # Pass the ObjectInstance
+                "published_version": published_version,  # Pass the published version
                 "should_render": True,
                 "config": news_config,
                 "featured_image": featured_image,
@@ -312,33 +171,45 @@ class NewsDetailWidget(BaseWidget):
 
         return template_config
 
-    def _get_news_object(self, slug: str, object_types: List[str]):
-        """Get news object by slug and object types"""
+    def _get_news_object(self, slug: str, object_type_ids: List[int]):
+        """Get published news object by slug and object types using date-based logic"""
         from object_storage.models import ObjectInstance
 
         try:
+            # Step 1: Get the object - don't filter by status, use date-based publishing
             obj = (
                 ObjectInstance.objects.filter(
-                    slug=slug, object_type__name__in=object_types, status="published"
+                    slug=slug, object_type_id__in=object_type_ids
                 )
-                .select_related("object_type", "current_version")
+                .select_related("object_type")
                 .first()
             )
+            if not obj:
+                return None, None
 
-            return obj
+            # Step 2: Get the published version
+            published_version = obj.get_current_published_version()
+            if not published_version:
+                return None, None
+
+            # Step 3: Return both for rendering
+            return obj, published_version
+
         except Exception:
-            return None
+            return None, None
 
-    def _render_object_widgets(self, obj, context: dict) -> dict:
-        """Render widgets from the object's widget configuration"""
-        if not obj.widgets or not context.get("renderer"):
+    def _render_object_widgets_from_version(
+        self, published_version, context: dict
+    ) -> dict:
+        """Render widgets from the published version's widget configuration"""
+        if not published_version.widgets or not context.get("renderer"):
             return {}
 
         rendered_slots = {}
         renderer = context["renderer"]
 
-        # obj.widgets is a dict like: {"main": [...], "sidebar": [...]}
-        for slot_name, widgets in obj.widgets.items():
+        # published_version.widgets is a dict like: {"main": [...], "sidebar": [...]}
+        for slot_name, widgets in published_version.widgets.items():
             rendered_widgets = []
             for widget_data in widgets:
                 try:

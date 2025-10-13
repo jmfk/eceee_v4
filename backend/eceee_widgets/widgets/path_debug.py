@@ -19,13 +19,6 @@ class PathDebugConfig(BaseModel):
         populate_by_name=True,
     )
 
-    show_full_context: bool = Field(
-        default=False, description="Show full context object (for advanced debugging)"
-    )
-    title: str = Field(
-        default="Path Debug", description="Title to display above debug info"
-    )
-
 
 class PathDebugWidget(BaseWidget):
     """

@@ -100,8 +100,6 @@ class PageDetailView(PublishedPageMixin, DetailView):
 
         # Render widgets organized by slot using new PageVersion JSON + renderer
         current_version = getattr(page, "get_current_published_version", lambda: None)()
-        if not current_version:
-            current_version = page.get_latest_published_version()
 
         # Ensure we have a valid version
         if not current_version:
@@ -447,7 +445,7 @@ class HostnamePageView(View):
                     raise Http404(f"Path does not match pattern: {remaining_path}")
 
         # Get the published version
-        content = current_page.get_latest_published_version()
+        content = current_page.get_current_published_version()
 
         # Handle case where no published version exists
         if not content:
@@ -661,9 +659,7 @@ class HostnamePageView(View):
 
         # Use renderer + PageVersion JSON to build rendered widgets
         renderer = WebPageRenderer(request=self.request)
-        current_version = (
-            page.get_current_published_version() or page.get_latest_published_version()
-        )
+        current_version = page.get_current_published_version()
         if not current_version:
             return {}
         base_context = renderer._build_base_context(page, current_version, {})

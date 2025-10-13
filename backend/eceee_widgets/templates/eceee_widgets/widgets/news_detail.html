@@ -1,7 +1,9 @@
 {% load static %}
 
-{% if should_render and news_object %}
+
+{% if should_render and config.news_object %}
 <article class="news-detail-widget" data-widget-type="news-detail" data-object-id="{{ news_object.id }}">
+    
     <header class="news-header">
         {% if config.show_object_type %}
             <div class="news-type-badge">
