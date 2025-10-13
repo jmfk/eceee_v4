@@ -1,0 +1,14 @@
+{
+  "name": "eceee-backend-static",
+  "version": "1.0.0",
+  "description": "Static asset compilation for ECEEE v4 Backend",
+  "scripts": {
+    "build:css": "tailwindcss -i ./static/css/tailwind.input.css -o ./static/css/tailwind.output.css --minify",
+    "watch:css": "tailwindcss -i ./static/css/tailwind.input.css -o ./static/css/tailwind.output.css --watch",
+    "build": "npm run build:css"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.0"
+  }
+}
+

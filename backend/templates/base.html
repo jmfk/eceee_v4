@@ -1,3 +1,4 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6,7 +7,7 @@
     <title>{% block title %}ECEEE v4 - AI-Integrated CMS{% endblock %}</title>
     
     <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="{% static 'css/tailwind.output.css' %}" rel="stylesheet">
     
     <!-- HTMX -->
     <script src="https://unpkg.com/htmx.org@2.0.1" 
@@ -14,29 +15,11 @@
             crossorigin="anonymous"></script>
     
     <!-- HTMX Extensions -->
-    <script src="https://unpkg.com/htmx.org@2.0.1/dist/ext/json-enc.js"></script>
-    <script src="https://unpkg.com/htmx.org@2.0.1/dist/ext/response-targets.js"></script>
+    <script src="{% static 'js/htmx-ext-json-enc.js' %}"></script>
+    <script src="{% static 'js/htmx-ext-response-targets.js' %}"></script>
     
     <!-- Alpine.js for additional interactivity -->
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-
-    <!-- Custom styles -->
-    <style>
-        .htmx-indicator {
-            opacity: 0;
-            transition: opacity 0.3s ease-in-out;
-        }
-        .htmx-request .htmx-indicator {
-            opacity: 1;
-        }
-        .fade-in {
-            animation: fadeIn 0.3s ease-in-out;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-    </style>    
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>    
 </head>
 <body>
     {% block content %}{% endblock %}

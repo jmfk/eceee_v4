@@ -10,7 +10,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # Set work directory
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies including Node.js for static asset building
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         postgresql-client \
@@ -22,6 +22,8 @@ RUN apt-get update \
         tesseract-ocr-eng \
         libmagic1 \
         libmagic-dev \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
@@ -33,6 +35,9 @@ COPY . .
 
 # Create necessary directories
 RUN mkdir -p /app/logs /app/static /app/media /app/staticfiles
+
+# Install Node.js dependencies and build static assets
+RUN npm install && npm run build:css
 
 # Collect static files (will be overridden in development)
 RUN python manage.py collectstatic --noinput --clear || true

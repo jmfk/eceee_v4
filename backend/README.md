@@ -114,6 +114,26 @@ docker-compose exec backend python manage.py create_sample_content
 docker-compose exec backend python manage.py shell_plus
 ```
 
+### Static Assets Build
+
+The backend uses Tailwind CSS for styling and local htmx extensions. These need to be built before deployment:
+
+```bash
+# Install Node.js dependencies
+cd backend && npm install
+
+# Build Tailwind CSS (production-ready, minified)
+npm run build:css
+
+# Or watch for changes during development
+npm run watch:css
+
+# Collect all static files (including built CSS and JS)
+python manage.py collectstatic --noinput
+```
+
+**Note**: The Tailwind CSS build scans all Django templates across the backend to generate only the styles that are actually used, resulting in a small, optimized CSS file.
+
 ### API Development
 
 ```bash
