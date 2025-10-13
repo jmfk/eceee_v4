@@ -7,14 +7,14 @@
         <div class="error-message">
             {{ error }}
         </div>
-    {% elif news_items %}
+    {% elif config.news_items %}
         <!-- Future HTMX filtering placeholder -->
         <div class="news-filters" data-htmx-filter-target style="display: none;">
             <!-- Filtering UI will be added here in future -->
         </div>
 
         <div class="news-items-container">
-            {% for item in news_items %}
+            {% for item in config.news_items %}
                 <article class="news-item{% if item.is_pinned %} pinned{% endif %}" data-object-id="{{ item.id }}">
                     {% if config.show_featured_image and item.featured_image_url %}
                         <div class="news-featured-image">

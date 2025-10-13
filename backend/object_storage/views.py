@@ -862,16 +862,22 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
             except ValueError:
                 pass
 
-        # Filter by published status
+        # Filter by published status (using version-based logic)
         published_only = (
             request.query_params.get("published_only", "").lower() == "true"
         )
         if published_only:
             now = timezone.now()
+            # Use version-based publishing logic
+            from django.db.models import Exists, OuterRef
+            from .models import ObjectVersion
+
+            published_versions = ObjectVersion.objects.filter(
+                object_instance=OuterRef("pk"), effective_date__lte=now
+            ).filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
+
             instances = instances.filter(
-                Q(status="published")
-                & (Q(publish_date__isnull=True) | Q(publish_date__lte=now))
-                & (Q(unpublish_date__isnull=True) | Q(unpublish_date__gt=now))
+                Exists(published_versions), current_version__isnull=False
             )
 
         # Order results by relevance
@@ -921,17 +927,10 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
         """Get only published objects using version-based logic"""
         now = timezone.now()
 
-        # Get objects that have at least one published version
-        from .models import ObjectVersion
-
-        published_object_ids = (
-            ObjectVersion.objects.filter(effective_date__lte=now)
-            .filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
-            .values_list("object_instance_id", flat=True)
-            .distinct()
-        )
-
-        published_instances = self.get_queryset().filter(id__in=published_object_ids)
+        # Use the published manager to get objects with published versions
+        published_instances = ObjectInstance.published.published_only(
+            now
+        ).select_related("object_type", "current_version", "created_by")
 
         serializer = self.get_serializer(published_instances, many=True)
         return Response(serializer.data)
@@ -945,8 +944,6 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
         - limit: maximum number of items (default 10, max 50)
         - sort_order: field to sort by (default: -publish_date)
         """
-        from django.db.models import Case, When, Value, BooleanField
-
         # Parse object_types parameter
         object_types_param = request.query_params.get("object_types", "")
         if not object_types_param:
@@ -997,28 +994,13 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
         if sort_order not in valid_sort_fields:
             sort_order = "-publish_date"
 
-        # Build queryset
-        queryset = self.get_queryset().filter(
-            object_type_id__in=object_type_ids, status="published"
+        # Use the new model method to get published news items
+        # This handles version-based publishing and featured status from ObjectVersion.is_featured
+        instances = ObjectInstance.get_news_list(
+            object_type_ids=object_type_ids,
+            limit=limit,
+            sort_order=sort_order,
         )
-
-        # Annotate with pinned/featured status from metadata
-        queryset = queryset.annotate(
-            is_pinned=Case(
-                When(
-                    Q(metadata__pinned=True) | Q(metadata__featured=True),
-                    then=Value(True),
-                ),
-                default=Value(False),
-                output_field=BooleanField(),
-            )
-        )
-
-        # Sort: pinned first, then by requested sort_order
-        queryset = queryset.order_by("-is_pinned", sort_order)
-
-        # Limit results
-        instances = queryset[:limit]
 
         # Serialize and return
         serializer = self.get_serializer(instances, many=True)

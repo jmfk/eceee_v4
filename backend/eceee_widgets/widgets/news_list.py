@@ -5,8 +5,6 @@ News List Widget - Display a list of news from selected ObjectTypes
 from typing import Type, List
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 from pydantic.alias_generators import to_camel
-from django.db.models import Q, F, Value, Case, When, BooleanField
-from django.db.models.functions import Coalesce
 
 from webpages.widget_registry import BaseWidget, register_widget_type
 
@@ -157,25 +155,17 @@ class NewsListWidget(BaseWidget):
         """Query and return news items based on configuration"""
         from object_storage.models import ObjectInstance
 
-        print("_get_news_items", config)
         try:
-            # Build queryset - only include objects with current_version
-            queryset = ObjectInstance.objects.filter(
-                object_type_id__in=config.object_types, current_version__isnull=False
-            ).select_related("object_type", "current_version")
-            print("queryset", queryset.all())
+            # Use the new model method to get published news items
+            items = list(
+                ObjectInstance.get_news_list(
+                    object_type_ids=config.object_types,
+                    limit=config.limit,
+                    sort_order=config.sort_order,
+                )
+            )
 
-            # Annotate with featured status from current_version
-            queryset = queryset.annotate(is_featured=F("current_version__is_featured"))
-
-            # Sort: featured first, then by configured sort_order
-            # Featured items always appear first, then normal sorting applies
-            queryset = queryset.order_by("-is_featured", config.sort_order)
-
-            # Limit results
-            items = list(queryset[: config.limit])
-
-            # Prepare items with excerpts
+            # Prepare items with excerpts and featured images
             for item in items:
                 if config.show_excerpts:
                     item.excerpt_text = self._get_excerpt(item, config.excerpt_length)
@@ -189,11 +179,12 @@ class NewsListWidget(BaseWidget):
                     ) or item.data.get("featuredImage")
                 else:
                     item.featured_image_url = None
-
+            print("items", items)
             return items
 
         except Exception as e:
             # Log error in production
+            print(f"Error in _get_news_items: {e}")
             return []
 
     def _get_excerpt(self, obj, max_length: int) -> str:
