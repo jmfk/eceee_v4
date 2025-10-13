@@ -14,7 +14,9 @@
     },
     "featuredImage": {
       "title": "Featured Image",
-      "componentType": "image_reference",
+      "componentType": "image",
+      "mediaTypes": ["image"],
+      "maxFileSize": 5242880,
       "helpText": "Main image for the news article"
     }
   },

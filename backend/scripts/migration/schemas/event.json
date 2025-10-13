@@ -3,9 +3,10 @@
   "properties": {
     "eventType": {
       "title": "Event Type",
-      "componentType": "text",
-      "maxLength": 100,
-      "helpText": "Type of event (conference, workshop, webinar, etc.)"
+      "componentType": "choice",
+      "enum": ["conference", "workshop", "webinar", "meeting", "seminar", "other"],
+      "enumLabels": ["Conference", "Workshop", "Webinar", "Meeting", "Seminar", "Other"],
+      "helpText": "Type of event"
     },
     "venue": {
       "title": "Venue",
@@ -32,6 +33,7 @@
     "priority": {
       "title": "Priority Event",
       "componentType": "boolean",
+      "default": false,
       "helpText": "Mark as high priority/featured event"
     },
     "quote": {

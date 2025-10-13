@@ -1,6 +1,6 @@
 # Makefile for eceee_v4_test_1
 
-.PHONY: help install backend frontend playwright-service migrate createsuperuser sample-content sample-pages sample-data sample-clean migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only test lint docker-up docker-down restart clean playwright-test playwright-down playwright-logs sync-from sync-to clear-layout-cache clear-layout-cache-all
+.PHONY: help install backend frontend playwright-service migrate createsuperuser sample-content sample-pages sample-data sample-clean migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only import-schemas import-schemas-dry import-schemas-force import-schema test lint docker-up docker-down restart clean playwright-test playwright-down playwright-logs sync-from sync-to clear-layout-cache clear-layout-cache-all
 
 # Default target - show help
 .DEFAULT_GOAL := help
@@ -37,6 +37,12 @@ help: ## Show this help message
 	@echo "  migrate-schemas-only      Migrate schemas only"
 	@echo "  migrate-pagedata-only     Migrate page data only"
 	@echo "  migrate-widgets-only      Migrate widgets only"
+	@echo ""
+	@echo "Object Type Schemas:"
+	@echo "  import-schemas            Import all JSON schemas to ObjectTypes"
+	@echo "  import-schemas-dry        Preview schema import (dry run)"
+	@echo "  import-schemas-force      Import/update schemas without prompts"
+	@echo "  import-schema FILE=x NAME=y  Import single schema file"
 	@echo ""
 	@echo "Testing & Quality:"
 	@echo "  backend-test      Run backend tests"
@@ -127,6 +133,26 @@ migrate-pagedata-only:
 
 migrate-widgets-only:
 	docker-compose exec backend python manage.py migrate_to_camelcase --widgets-only --backup
+
+# Object Type Schema Management
+import-schemas: ## Import all JSON schemas to ObjectTypeDefinitions
+	docker-compose exec backend python manage.py import_schemas
+
+import-schemas-dry: ## Preview schema import without saving (dry run)
+	docker-compose exec backend python manage.py import_schemas --dry-run
+
+import-schemas-force: ## Import/update all schemas without confirmation prompts
+	docker-compose exec backend python manage.py import_schemas --force
+
+import-schema: ## Import single schema file (use: make import-schema FILE=news.json NAME=news)
+	@if [ -z "$(FILE)" ] || [ -z "$(NAME)" ]; then \
+		echo "Error: Both FILE and NAME are required"; \
+		echo "Usage: make import-schema FILE=news.json NAME=news"; \
+		exit 1; \
+	fi
+	docker-compose exec backend python manage.py import_schemas \
+		--file scripts/migration/schemas/$(FILE) \
+		--name $(NAME)
 
 shell:
 	docker-compose exec backend bash

@@ -2,6 +2,8 @@
 
 This directory contains JSON schemas for all ObjectTypeDefinitions to be created during the ECEEE data migration.
 
+📚 **NEW TO SCHEMAS?** See **[HOW_TO_CREATE_SCHEMAS.md](HOW_TO_CREATE_SCHEMAS.md)** for a complete guide with examples and all component type options.
+
 ## Important Principles
 
 ### Content Widget Pattern
@@ -32,9 +34,9 @@ Content in widgets provides:
 **Purpose**: News articles and announcements
 
 **Schema Fields**:
-- `source_date` - Original publication date
-- `external_url` - Link to source
-- `featured_image` - Main image
+- `sourceDate` - Original publication date
+- `externalUrl` - Link to source
+- `featuredImage` - Main image
 
 **Content Widget**: Article body/content
 
@@ -48,12 +50,12 @@ Content in widgets provides:
 **Purpose**: Calendar events, conferences, workshops
 
 **Schema Fields**:
-- `event_type` - Type of event
+- `eventType` - Type of event (choice field)
 - `venue` - Location
 - `organiser` - Organizing entity
-- `event_start_date` - Start date/time
-- `event_end_date` - End date/time
-- `priority` - High priority flag
+- `eventStartDate` - Start date/time
+- `eventEndDate` - End date/time
+- `priority` - High priority flag (default: false)
 - `quote` - Highlight quote
 
 **Content Widget**: Event description
@@ -80,8 +82,8 @@ Content in widgets provides:
 **Purpose**: Library documents and resources
 
 **Schema Fields**:
-- `derivable_number` - Document number
-- `derivable_title` - Alternative title
+- `derivableNumber` - Document number
+- `derivableTitle` - Alternative title
 
 **Content Widget**: Item description
 
@@ -113,9 +115,9 @@ Content in widgets provides:
 **Purpose**: Panels/tracks within conferences
 
 **Schema Fields**:
-- `panel_prefix` - Panel identifier
-- `panel_leaders` - Panel chairs
-- `conference_id` - Parent conference reference
+- `panelPrefix` - Panel identifier
+- `panelLeaders` - Panel chairs
+- `conferenceId` - Parent conference reference
 
 **Content Widget**: Additional information (optional)
 
@@ -130,9 +132,9 @@ Content in widgets provides:
 
 **Schema Fields**:
 - `authors` - Paper authors
-- `doc_nummer` - Document identifier
-- `peer_review` - Peer-reviewed flag
-- `panel_id` - Parent panel reference
+- `docNummer` - Document identifier
+- `peerReview` - Peer-reviewed flag (default: false)
+- `panelId` - Parent panel reference
 
 **Content Widget**: Paper abstract
 
@@ -148,13 +150,13 @@ Content in widgets provides:
 **Purpose**: Opinion columnists/authors
 
 **Schema Fields**:
-- `first_name` - First name
-- `last_name` - Last name
+- `firstName` - First name
+- `lastName` - Last name
 - `prefix` - Title (Dr., Prof.)
 - `affiliation` - Organization
-- `home_page` - Personal website
-- `photo_url` - Profile photo
-- `last_column_date` - Most recent column date
+- `homePage` - Personal website
+- `photoUrl` - Profile photo
+- `lastColumnDate` - Most recent column date
 
 **Content Widget**: Biographical information
 
@@ -168,9 +170,9 @@ Content in widgets provides:
 **Purpose**: Opinion columns/articles
 
 **Schema Fields**:
-- `presentational_publishing_date` - Publication date
-- `priority` - Featured flag
-- `columnist_ids` - Array of columnist IDs
+- `presentationalPublishingDate` - Publication date
+- `priority` - Featured flag (default: false)
+- `columnistIds` - Array of columnist IDs (default: [])
 
 **Content Widget**: Column content/article
 
@@ -226,7 +228,7 @@ Available `componentType` values:
 - `date` - Date picker
 - `datetime` - Date and time picker
 - `url` - URL field with validation
-- `image_reference` - Reference to media file
+- `image` - Image upload/selector (with mediaTypes, maxFileSize options)
 - `object_reference` - Reference to another object
 - `user_reference` - Reference to user
 - `choice` - Select from predefined choices
@@ -234,7 +236,21 @@ Available `componentType` values:
 
 ## Usage in Migration
 
-### Creating ObjectTypeDefinition
+### Using Management Command (Recommended)
+
+```bash
+# Import all schemas
+python manage.py import_schemas
+
+# Import single schema
+python manage.py import_schemas \
+  --file backend/scripts/migration/schemas/news.json \
+  --name news
+```
+
+**See:** [IMPORT_SCHEMAS_COMMAND.md](IMPORT_SCHEMAS_COMMAND.md) for full documentation
+
+### Creating ObjectTypeDefinition (Python)
 
 ```python
 from object_storage.models import ObjectTypeDefinition
@@ -270,13 +286,13 @@ news_obj = ObjectInstance.objects.create(
     created_by=migration_user
 )
 
-# Create version with schema data
+# Create version with schema data (using camelCase!)
 version = ObjectVersion.objects.create(
     object_instance=news_obj,
     data={
-        'source_date': '2025-01-15',
-        'external_url': 'https://example.com/article',
-        'featured_image': '/media/image.jpg'
+        'sourceDate': '2025-01-15',
+        'externalUrl': 'https://example.com/article',
+        'featuredImage': '/media/image.jpg'
     },
     created_by=migration_user
 )

@@ -9,15 +9,17 @@
     "priority": {
       "title": "Priority Column",
       "componentType": "boolean",
+      "default": false,
       "helpText": "Mark as featured/priority column"
     },
     "columnistIds": {
       "title": "Columnists",
       "componentType": "array",
-      "helpText": "Array of ObjectInstance IDs for columnists who wrote this column",
       "items": {
         "type": "number"
-      }
+      },
+      "default": [],
+      "helpText": "Array of ObjectInstance IDs for columnists who wrote this column"
     }
   },
   "required": [

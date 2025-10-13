@@ -4,6 +4,9 @@
     "year": {
       "title": "Conference Year",
       "componentType": "number",
+      "type": "integer",
+      "minimum": 1990,
+      "maximum": 2100,
       "helpText": "Year the conference took place"
     },
     "venue": {
