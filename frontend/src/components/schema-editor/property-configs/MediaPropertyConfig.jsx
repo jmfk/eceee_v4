@@ -7,12 +7,14 @@
 
 import React, { useCallback } from 'react'
 import { validateFieldName } from '../../../utils/schemaValidation'
+import ComponentTypeSelector from '../components/ComponentTypeSelector'
 
 const MediaPropertyConfig = ({
     property,
     onChange,
     onValidate,
-    allProperties = []
+    allProperties = [],
+    errors = {}
 }) => {
     // Handle field changes
     const handleChange = useCallback((field, value) => {
@@ -84,6 +86,17 @@ const MediaPropertyConfig = ({
                         required
                     />
                 </div>
+            </div>
+
+            <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Component Type <span className="text-red-500">*</span>
+                </label>
+                <ComponentTypeSelector
+                    value={property.componentType || property.component}
+                    onChange={(newType) => handleChange('componentType', newType)}
+                    error={errors.componentType}
+                />
             </div>
 
             {/* Description */}

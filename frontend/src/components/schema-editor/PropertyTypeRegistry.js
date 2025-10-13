@@ -117,6 +117,16 @@ class PropertyTypeRegistry {
     return this.propertyConfigComponents.get(key)
   }
 
+  getAvailableComponentTypes() {
+    return Array.from(this.propertyConfigComponents.values()).map(prop => ({
+      key: prop.key,
+      label: prop.label,
+      description: prop.description,
+      category: prop.category,
+      component: prop.fieldComponent
+    }))
+  }
+
   isInitialized() {
     return this.initialized
   }
@@ -129,6 +139,7 @@ export const propertyTypeRegistry = new PropertyTypeRegistry()
 export const getPropertyType = (key) => propertyTypeRegistry.getPropertyType(key)
 export const getAllPropertyTypes = () => propertyTypeRegistry.getAllPropertyTypes()
 export const getPropertyTypeByComponent = (component) => propertyTypeRegistry.getPropertyTypeByComponent(component)
+export const getAvailableComponentTypes = () => propertyTypeRegistry.getAvailableComponentTypes()
 export const initializePropertyRegistry = () => propertyTypeRegistry.initialize()
 export const isPropertyRegistryInitialized = () => propertyTypeRegistry.isInitialized()
 

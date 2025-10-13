@@ -80,4 +80,70 @@ export function validateSchemaShape(schema) {
     return { valid: true }
 }
 
+/**
+ * Validate that a componentType is valid
+ * 
+ * @param {string} componentType - The componentType to validate
+ * @param {Array} availableTypes - Array of available field types from registry
+ * @returns {string|null} - Error message or null if valid
+ */
+export function validateComponentType(componentType, availableTypes = []) {
+    if (!componentType) {
+        return 'Component type is required'
+    }
+
+    // If no available types provided, can't validate (registry might not be loaded)
+    if (!availableTypes || availableTypes.length === 0) {
+        return null
+    }
+
+    // Check if componentType exists in available types
+    const isValid = availableTypes.some(ft => ft.key === componentType)
+
+    if (!isValid) {
+        const typeList = availableTypes.slice(0, 5).map(ft => ft.key).join(', ')
+        return `Invalid component type "${componentType}". Must be one of: ${typeList}...`
+    }
+
+    return null
+}
+
+/**
+ * Validate a property object in a schema
+ * 
+ * @param {object} property - The property object to validate
+ * @param {Array} availableTypes - Array of available field types
+ * @returns {object} - Object with validation errors (empty if valid)
+ */
+export function validateProperty(property, availableTypes = []) {
+    const errors = {}
+
+    // Validate key format
+    if (!property.key) {
+        errors.key = 'Property key is required'
+    } else if (!validateFieldName(property.key)) {
+        errors.key = 'Invalid key format. Use camelCase (e.g., firstName)'
+    }
+
+    // Validate display label
+    if (!property.title) {
+        errors.title = 'Display label is required'
+    }
+
+    // Validate component type
+    if (!property.componentType && !property.component) {
+        errors.componentType = 'Component type is required'
+    } else {
+        const componentTypeError = validateComponentType(
+            property.componentType || property.component,
+            availableTypes
+        )
+        if (componentTypeError) {
+            errors.componentType = componentTypeError
+        }
+    }
+
+    return errors
+}
+
 
