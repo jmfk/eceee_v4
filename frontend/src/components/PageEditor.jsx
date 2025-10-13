@@ -41,6 +41,7 @@ import { getWidgetDisplayName } from '../hooks/useWidgets'
 import { useWidgetInheritance } from '../hooks/useWidgetInheritance'
 
 import { logValidationSync } from '../utils/stateVerification'
+import { buildPathVariablesContext, getDefaultSimulatedPath } from '../utils/pathParser'
 
 // Helpers: error parsing and merging for To-Do items
 function mergeTodoItems(existing, incoming) {
@@ -192,6 +193,10 @@ const PageEditor = () => {
     // Local widget state for fast UI operations
     const [localWidgets, setLocalWidgets] = useState({})
 
+    // Path pattern state for dynamic URL path simulation
+    const [simulatedPath, setSimulatedPath] = useState('')
+    const [pathVariables, setPathVariables] = useState({})
+
     // Shared componentId for entire page editing group (includes versionId for proper isolation)
     const versionId = pageVersionData?.versionId || pageVersionData?.id || 'current'
     const componentId = `page-editor-${pageId}-${versionId}`;
@@ -220,6 +225,38 @@ const PageEditor = () => {
             setLocalWidgets(pageVersionData.widgets);
         }
     }, [pageVersionData?.widgets]);
+
+    // Initialize simulated path when path pattern changes
+    useEffect(() => {
+        const pathPatternKey = webpageData?.pathPatternKey || webpageData?.path_pattern_key;
+
+        if (pathPatternKey && !simulatedPath) {
+            // Load default example path for the pattern
+            getDefaultSimulatedPath(pathPatternKey).then(defaultPath => {
+                if (defaultPath) {
+                    setSimulatedPath(defaultPath);
+                }
+            });
+        } else if (!pathPatternKey) {
+            // Clear simulated path if no pattern is set
+            setSimulatedPath('');
+            setPathVariables({});
+        }
+    }, [webpageData?.pathPatternKey, webpageData?.path_pattern_key]);
+
+    // Parse path and extract variables whenever simulatedPath or pathPatternKey changes
+    useEffect(() => {
+        const parsePathVariables = async () => {
+            if (webpageData && simulatedPath) {
+                const variables = await buildPathVariablesContext(webpageData, simulatedPath);
+                setPathVariables(variables);
+            } else {
+                setPathVariables({});
+            }
+        };
+
+        parsePathVariables();
+    }, [webpageData, simulatedPath]);
 
     // Fast local widget update function
     const updateLocalWidgets = useCallback((updatedWidgets, options = {}) => {
@@ -1530,6 +1567,10 @@ const PageEditor = () => {
                                                     slotInheritanceRules={slotInheritanceRules}
                                                     hasInheritedContent={hasInheritedContent}
                                                     refetchInheritance={refetchInheritance}
+                                                    // Path variables for dynamic content
+                                                    pathVariables={pathVariables}
+                                                    simulatedPath={simulatedPath}
+                                                    onSimulatedPathChange={setSimulatedPath}
                                                     // Editor context
                                                     context={{
                                                         pageId: webpageData?.id,
@@ -1553,6 +1594,10 @@ const PageEditor = () => {
                                     contextType: 'page'
                                 }}
                                 isNewPage={isNewPage}
+                                // Path preview props
+                                simulatedPath={simulatedPath}
+                                onSimulatedPathChange={setSimulatedPath}
+                                pathVariables={pathVariables}
                             />
                         )}
                         {activeTab === 'publishing' && !isNewPage && (

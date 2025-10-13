@@ -32,7 +32,11 @@ const ReactLayoutRenderer = forwardRef(({
     inheritedWidgets = {},
     slotInheritanceRules = {},
     hasInheritedContent = false,
-    refetchInheritance
+    refetchInheritance,
+    // Path variables for dynamic content
+    pathVariables = {},
+    simulatedPath,
+    onSimulatedPathChange
 }, ref) => {
 
     // Get UDC context (but use shared componentId from PageEditor)
@@ -93,8 +97,12 @@ const ReactLayoutRenderer = forwardRef(({
         webpageData: webpageData,
         pageVersionData: pageVersionData,
         // Pass onOpenWidgetEditor for nested widgets
-        onOpenWidgetEditor
-    }), [versionId, isPublished, onVersionChange, componentId, context?.pageId, webpageData, pageVersionData, onOpenWidgetEditor]);
+        onOpenWidgetEditor,
+        // Path variables for dynamic content (matching backend behavior)
+        pathVariables: pathVariables,
+        simulatedPath: simulatedPath,
+        onSimulatedPathChange: onSimulatedPathChange
+    }), [versionId, isPublished, onVersionChange, componentId, context?.pageId, webpageData, pageVersionData, onOpenWidgetEditor, pathVariables, simulatedPath, onSimulatedPathChange]);
 
     // Handle widget actions
     const handleWidgetAction = useCallback(async (action, slotName, widget, ...args) => {

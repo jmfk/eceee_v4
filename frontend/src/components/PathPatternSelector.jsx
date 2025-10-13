@@ -8,7 +8,7 @@
 import React, { useState, useEffect } from 'react';
 import { fetchPathPatterns } from '../api/pathPatterns';
 
-const PathPatternSelector = ({ value, onChange, disabled = false, className = '', pageId = null }) => {
+const PathPatternSelector = ({ value, onChange, disabled = false, className = '', pageId }) => {
     const [patterns, setPatterns] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);

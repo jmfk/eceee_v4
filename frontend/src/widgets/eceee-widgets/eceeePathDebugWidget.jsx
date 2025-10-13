@@ -8,11 +8,15 @@
 import React from 'react';
 import { Bug } from 'lucide-react';
 
-const eceeePathDebugWidget = ({ config = {}, mode = 'display', onConfigChange }) => {
+const eceeePathDebugWidget = ({ config = {}, mode = 'display', onConfigChange, context = {} }) => {
     const {
         showFullContext = false,
         title = 'Path Debug',
     } = config;
+
+    // Extract path variables from context (same as backend provides)
+    const pathVariables = context.pathVariables || {};
+    const simulatedPath = context.simulatedPath || '';
 
     // In edit mode, show configuration options
     if (mode === 'edit') {
@@ -61,7 +65,10 @@ const eceeePathDebugWidget = ({ config = {}, mode = 'display', onConfigChange })
         );
     }
 
-    // In display mode, show placeholder (actual rendering happens on backend)
+    // In display mode, show path variables from context
+    const hasPathVariables = Object.keys(pathVariables).length > 0;
+    const hasPattern = context.webpageData?.pathPatternKey || context.webpageData?.path_pattern_key;
+
     return (
         <div className="border-2 border-purple-500 bg-purple-50 rounded-lg p-6">
             <div className="flex items-center gap-2 mb-3">
@@ -69,19 +76,73 @@ const eceeePathDebugWidget = ({ config = {}, mode = 'display', onConfigChange })
                 <h3 className="text-lg font-bold text-purple-900">{title}</h3>
             </div>
 
-            <div className="bg-white rounded p-4 border border-purple-200">
-                <div className="text-sm text-gray-600 italic">
-                    Path debug information will be displayed when viewing the published page.
+            {/* Path Pattern Status */}
+            <div className="bg-white rounded p-4 border border-purple-200 mb-3">
+                <div className="text-sm font-medium text-gray-700 mb-2">
+                    Path Pattern Status:
                 </div>
-                <div className="mt-2 text-xs text-gray-500">
-                    Visit the page with different URL paths to see captured variables.
-                </div>
+                {hasPattern ? (
+                    <div className="flex items-center gap-2 text-green-700">
+                        <span className="text-lg">✓</span>
+                        <span>Pattern: <code className="bg-green-100 px-2 py-0.5 rounded text-sm">{hasPattern}</code></span>
+                    </div>
+                ) : (
+                    <div className="flex items-center gap-2 text-orange-600">
+                        <span className="text-lg">⚠</span>
+                        <span className="text-sm">No path pattern set (go to Settings tab)</span>
+                    </div>
+                )}
             </div>
+
+            {/* Simulated Path (in editor) */}
+            {simulatedPath && (
+                <div className="bg-blue-50 rounded p-3 border border-blue-200 mb-3">
+                    <div className="text-xs font-medium text-blue-900 mb-1">Simulated Path:</div>
+                    <code className="text-sm text-blue-800 bg-blue-100 px-2 py-1 rounded block">
+                        {simulatedPath}
+                    </code>
+                </div>
+            )}
+
+            {/* Path Variables */}
+            <div className="bg-white rounded p-4 border border-purple-200">
+                <div className="text-sm font-medium text-gray-700 mb-2">
+                    Extracted Path Variables:
+                </div>
+                {hasPathVariables ? (
+                    <div className="space-y-2">
+                        {Object.entries(pathVariables).map(([key, value]) => (
+                            <div key={key} className="flex items-center justify-between bg-gray-50 rounded p-2">
+                                <code className="text-sm font-mono text-purple-700">{key}</code>
+                                <code className="text-sm font-mono text-gray-800 bg-gray-200 px-2 py-1 rounded">
+                                    {value}
+                                </code>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="text-sm text-gray-500 italic">
+                        {hasPattern
+                            ? "No variables extracted yet. Set a simulated path in Settings tab."
+                            : "Set a path pattern in Settings tab to capture variables."}
+                    </div>
+                )}
+            </div>
+
+            {/* Full Context (if enabled) */}
+            {showFullContext && (
+                <div className="mt-3 bg-gray-800 rounded p-3 overflow-auto max-h-96">
+                    <div className="text-xs font-medium text-gray-300 mb-2">Full Context (Advanced):</div>
+                    <pre className="text-xs text-green-400 font-mono">
+                        {JSON.stringify(context, null, 2)}
+                    </pre>
+                </div>
+            )}
 
             <div className="mt-3 bg-purple-100 rounded p-3">
                 <div className="text-xs text-purple-800">
-                    <strong>💡 Tip:</strong> Set a path pattern in Settings tab (e.g., <code className="bg-purple-200 px-1 rounded">^(?P&lt;slug&gt;[\w-]+)/$</code>),
-                    then visit URLs like <code className="bg-purple-200 px-1 rounded">/news/my-article/</code> to see variables.
+                    <strong>💡 Usage:</strong> In the Settings tab, select a path pattern (e.g., "news_slug"),
+                    then enter a path like <code className="bg-purple-200 px-1 rounded">my-article/</code> to see extracted variables.
                 </div>
             </div>
         </div>

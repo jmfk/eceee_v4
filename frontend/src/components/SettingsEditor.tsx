@@ -2,6 +2,7 @@ import React, { forwardRef, useImperativeHandle, useState, useEffect, useCallbac
 import LayoutSelector from './LayoutSelector'
 import PageTagWidget from './PageTagWidget'
 import PathPatternSelector from './PathPatternSelector'
+import PathPreviewInput from './PathPreviewInput'
 import { useUnifiedData } from '../contexts/unified-data/context/UnifiedDataContext'
 import { OperationTypes } from '../contexts/unified-data/types/operations'
 
@@ -13,6 +14,10 @@ type SettingsEditorProps = {
         contextType: string
     }
     isNewPage?: boolean
+    // Path preview props
+    simulatedPath?: string
+    onSimulatedPathChange?: (path: string) => void
+    pathVariables?: Record<string, any>
 }
 
 export type SettingsEditorHandle = {
@@ -20,7 +25,14 @@ export type SettingsEditorHandle = {
 }
 
 // Settings & SEO Editor Tab - UDC-integrated with self-controlled fields
-const SettingsEditor = forwardRef<SettingsEditorHandle, SettingsEditorProps>(({ componentId, context, isNewPage }, ref) => {
+const SettingsEditor = forwardRef<SettingsEditorHandle, SettingsEditorProps>(({
+    componentId,
+    context,
+    isNewPage,
+    simulatedPath = '',
+    onSimulatedPathChange,
+    pathVariables = {}
+}, ref) => {
     // UDC Integration
     const { getState, publishUpdate, useExternalChanges } = useUnifiedData()
 
@@ -163,9 +175,21 @@ const SettingsEditor = forwardRef<SettingsEditorHandle, SettingsEditorProps>(({ 
                             <PathPatternSelector
                                 value={localValues.pathPatternKey}
                                 onChange={(value) => handlePageFieldChange('pathPatternKey', value)}
-                                pageId={context.pageId}
+                                pageId={String(context.pageId)}
                             />
                         </div>
+
+                        {/* Path Preview - Show when a pattern is selected */}
+                        {localValues.pathPatternKey && (
+                            <div>
+                                <PathPreviewInput
+                                    pathPatternKey={localValues.pathPatternKey}
+                                    value={simulatedPath}
+                                    onChange={onSimulatedPathChange || (() => { })}
+                                    disabled={isNewPage}
+                                />
+                            </div>
+                        )}
 
                         {/* Page Layout Selection */}
                         <div>

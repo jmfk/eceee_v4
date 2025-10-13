@@ -32,6 +32,10 @@ const PageContentEditor = forwardRef(({
     slotInheritanceRules,
     hasInheritedContent,
     refetchInheritance,
+    // Path variables for dynamic content
+    pathVariables,
+    simulatedPath,
+    onSimulatedPathChange,
     ...otherProps
 }, ref) => {
     // State for default layout fetched from backend
@@ -87,6 +91,10 @@ const PageContentEditor = forwardRef(({
             slotInheritanceRules={slotInheritanceRules}
             hasInheritedContent={hasInheritedContent}
             refetchInheritance={refetchInheritance}
+            // Path variables for dynamic content
+            pathVariables={pathVariables}
+            simulatedPath={simulatedPath}
+            onSimulatedPathChange={onSimulatedPathChange}
             {...otherProps}
         />
     );
