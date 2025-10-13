@@ -16,13 +16,14 @@
     "peerReview": {
       "title": "Peer Reviewed",
       "componentType": "boolean",
+      "default": false,
       "helpText": "Whether this paper was peer-reviewed"
     },
     "panelId": {
       "title": "Panel",
       "componentType": "object_reference",
-      "helpText": "Panel this paper was presented in",
-      "referenceType": "conference_panel"
+      "referenceType": "conference_panel",
+      "helpText": "Panel this paper was presented in"
     }
   },
   "required": [

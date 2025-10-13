@@ -2,6 +2,8 @@
 
 Quick reference for all object type schemas created for ECEEE migration.
 
+📚 **Creating Your Own Schema?** See **[HOW_TO_CREATE_SCHEMAS.md](HOW_TO_CREATE_SCHEMAS.md)** for complete guide with all component types and options.
+
 **⚠️ Important**: All property names use **camelCase** (e.g., `firstName`, `externalUrl`) to comply with frontend validation. See `FIELD_NAME_MAPPING.md` for snake_case → camelCase conversions.
 
 ## Schema Files Overview
@@ -21,59 +23,59 @@ Quick reference for all object type schemas created for ECEEE migration.
 ## Field Summary
 
 ### News
-- source_date (date)
-- external_url (url)
-- featured_image (image_reference)
+- sourceDate (date)
+- externalUrl (url)
+- featuredImage (image) - with mediaTypes and maxFileSize
 
 ### Event
-- event_type (text)
+- eventType (choice) - conference, workshop, webinar, meeting, seminar, other
 - venue (text)
 - organiser (text)
-- event_start_date (datetime) ⭐ required
-- event_end_date (datetime)
-- priority (boolean)
+- eventStartDate (datetime) ⭐ required
+- eventEndDate (datetime)
+- priority (boolean) - default: false
 - quote (text)
 
 ### Job
 - location (text)
 - deadline (date)
-- external_url (url)
+- externalUrl (url)
 
 ### Library Item
-- derivable_number (text)
-- derivable_title (text)
+- derivableNumber (text)
+- derivableTitle (text)
 
 ### Conference
-- year (number) ⭐ required
+- year (integer) ⭐ required - min: 1990, max: 2100
 - venue (text)
 - date (date)
 - isbn (text)
 - issn (text)
 
 ### Conference Panel
-- panel_prefix (text)
-- panel_leaders (text)
-- conference_id (object_reference) ⭐ required
+- panelPrefix (text)
+- panelLeaders (text)
+- conferenceId (object_reference → conference) ⭐ required
 
 ### Paper
 - authors (text) ⭐ required
-- doc_nummer (text)
-- peer_review (boolean)
-- panel_id (object_reference)
+- docNummer (text)
+- peerReview (boolean) - default: false
+- panelId (object_reference → conference_panel)
 
 ### Columnist
-- first_name (text) ⭐ required
-- last_name (text) ⭐ required
+- firstName (text) ⭐ required
+- lastName (text) ⭐ required
 - prefix (text)
 - affiliation (text)
-- home_page (url)
-- photo_url (image_reference)
-- last_column_date (datetime)
+- homePage (url)
+- photoUrl (image) - with mediaTypes and maxFileSize
+- lastColumnDate (datetime)
 
 ### Column
-- presentational_publishing_date (datetime) ⭐ required
-- priority (boolean)
-- columnist_ids (array of numbers)
+- presentationalPublishingDate (datetime) ⭐ required
+- priority (boolean) - default: false
+- columnistIds (array of numbers) - default: []
 
 ## Migration Priority
 
@@ -116,6 +118,23 @@ Columnist
 | Column | categories, eceee_categories, keywords |
 
 ## Creating All Schemas
+
+### Using Management Command (Recommended)
+
+```bash
+# Import all schemas from directory
+python manage.py import_schemas
+
+# Dry run to preview
+python manage.py import_schemas --dry-run
+
+# Force update without prompts
+python manage.py import_schemas --force
+```
+
+**See:** [IMPORT_SCHEMAS_COMMAND.md](IMPORT_SCHEMAS_COMMAND.md) for full documentation
+
+### Using Python Script (Alternative)
 
 ```python
 import json

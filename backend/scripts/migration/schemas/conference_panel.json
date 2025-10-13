@@ -16,8 +16,8 @@
     "conferenceId": {
       "title": "Conference",
       "componentType": "object_reference",
-      "helpText": "Parent conference this panel belongs to",
-      "referenceType": "conference"
+      "referenceType": "conference",
+      "helpText": "Parent conference this panel belongs to"
     }
   },
   "required": [

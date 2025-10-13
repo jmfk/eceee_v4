@@ -4,12 +4,14 @@
     "firstName": {
       "title": "First Name",
       "componentType": "text",
-      "maxLength": 100
+      "maxLength": 100,
+      "helpText": "Columnist's first name"
     },
     "lastName": {
       "title": "Last Name",
       "componentType": "text",
-      "maxLength": 100
+      "maxLength": 100,
+      "helpText": "Columnist's last name"
     },
     "prefix": {
       "title": "Prefix",
@@ -31,7 +33,9 @@
     },
     "photoUrl": {
       "title": "Photo",
-      "componentType": "image_reference",
+      "componentType": "image",
+      "mediaTypes": ["image"],
+      "maxFileSize": 5242880,
       "helpText": "Columnist photo"
     },
     "lastColumnDate": {
