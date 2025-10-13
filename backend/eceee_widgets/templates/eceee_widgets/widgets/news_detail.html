@@ -1,4 +1,5 @@
 {% load static %}
+{% load security_filters %}
 
 
 {% if should_render and config.news_object %}
@@ -50,7 +51,7 @@
     {% endif %}
 
     <div class="news-content">
-        {{ content_html|safe }}
+        {{ content_html|sanitize_html }}
     </div>
 
     {% if config.render_object_widgets and rendered_widgets %}
@@ -58,7 +59,7 @@
             {% for slot_name, widgets in rendered_widgets.items %}
                 <div class="news-widget-slot news-widget-slot-{{ slot_name }}" data-slot="{{ slot_name }}">
                     {% for widget_html in widgets %}
-                        {{ widget_html|safe }}
+                        {{ widget_html|sanitize_html }}
                     {% endfor %}
                 </div>
             {% endfor %}

@@ -1,4 +1,5 @@
 {% load static %}
+{% load security_filters %}
 
 
 DEFAULT    
@@ -14,7 +15,7 @@ DEFAULT
     {% endif %}
     
     <div class="header-content">
-        {{ config.content|safe }}
+        {{ config.content|sanitize_html }}
     </div>
     
     {% if config.custom_css %}

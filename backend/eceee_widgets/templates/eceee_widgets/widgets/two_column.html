@@ -1,11 +1,12 @@
 {% load static %}
+{% load security_filters %}
 
 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 w-full mb-4">
     <div class="column-slot left min-h-[50px]">
         {% if config.rendered_slots.left %}
             {% for widget in config.rendered_slots.left %}
                 <div class="mb-3 last:mb-0">
-                    {{ widget.html|safe }}
+                    {{ widget.html|sanitize_html }}
                 </div>
             {% endfor %}
         {% else %}
@@ -19,7 +20,7 @@
         {% if config.rendered_slots.right %}
             {% for widget in config.rendered_slots.right %}
                 <div class="mb-3 last:mb-0">
-                    {{ widget.html|safe }}
+                    {{ widget.html|sanitize_html }}
                 </div>
             {% endfor %}
         {% else %}

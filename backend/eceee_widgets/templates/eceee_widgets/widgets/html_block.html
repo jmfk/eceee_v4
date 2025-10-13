@@ -1,13 +1,11 @@
+{% load security_filters %}
+
 <div class="html-block-widget">
-    {% if config.allow_scripts %}
-        {{ config.html_content|safe }}
-    {% else %}
-        {{ config.html_content|striptags|safe }}
-    {% endif %}
+    {{ config.html_content|sanitize_html:config.allow_scripts }}
 </div>
 
 <style>
 .html-block-widget {
     margin: 1rem 0;
 }
-</style> 
+</style>
