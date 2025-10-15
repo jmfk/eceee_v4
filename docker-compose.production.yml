@@ -14,8 +14,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_HOST_AUTH_METHOD: md5
     volumes:
-      # Use Linode block storage for production
-      - /dev/disk/by-id/scsi-0Linode_Volume_eceee-v4-pgdata:/var/lib/postgresql/data
+      # Use Docker volume for postgres data
+      - postgres_data:/var/lib/postgresql/data
       - ./docker/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
     # Don't expose ports externally in production
     expose:
@@ -39,7 +39,7 @@ services:
       redis:
         condition: service_started
       imgproxy:
-        condition: service_healthy
+        condition: service_started
     environment:
       # Production settings
       - DEBUG=0
@@ -198,6 +198,7 @@ services:
       retries: 3
 
 volumes:
+  postgres_data:
   backend_static:
   backend_media:
   redis_data:
