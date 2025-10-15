@@ -525,6 +525,53 @@ class FieldTypeRegistry:
                     "multiple": True,
                 },
             },
+            {
+                "key": "object_reference",
+                "label": "Object Reference",
+                "json_schema_type": "array",  # array for multiple, integer for single
+                "component": "ObjectReferenceInput",
+                "config_component": "ObjectReferenceConfig",
+                "category": "reference",
+                "description": "Reference to other object instances with configurable constraints",
+                "validation_rules": {
+                    "multiple": {"type": "boolean"},
+                    "max_items": {"type": "integer", "minimum": 1},
+                    "allowed_object_types": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                    },
+                    "relationship_type": {"type": "string"},
+                },
+                "ui_props": {
+                    "multiple": False,
+                    "max_items": None,
+                    "allowed_object_types": [],
+                    "show_search": True,
+                    "allow_direct_pk": True,
+                },
+            },
+            {
+                "key": "reverse_object_reference",
+                "label": "Reverse Object Reference",
+                "json_schema_type": "array",
+                "component": "ReverseObjectReferenceDisplay",
+                "config_component": "ReverseObjectReferenceConfig",
+                "category": "reference",
+                "description": "Read-only display of reverse relationships from other objects",
+                "read_only": True,
+                "validation_rules": {
+                    "reverse_relationship_type": {"type": "string"},
+                    "reverse_object_types": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                    },
+                },
+                "ui_props": {
+                    "reverse_object_types": [],
+                    "show_count": True,
+                    "link_to_objects": True,
+                },
+            },
         ]
 
         for field_type in core_types:
@@ -779,3 +826,85 @@ def get_all_field_types() -> Dict[str, Dict[str, Any]]:
 def get_field_types_for_django_choices() -> List[Tuple[str, str]]:
     """Get field types formatted for Django model choices"""
     return field_registry.get_field_types_choices()
+
+
+def validate_object_reference(value: Any, field_config: Dict[str, Any]) -> None:
+    """
+    Validate object_reference field values.
+
+    Args:
+        value: The field value (int for single, list of ints for multiple)
+        field_config: Field configuration from schema
+
+    Raises:
+        ValidationError: If validation fails
+    """
+    from object_storage.models import ObjectInstance, ObjectTypeDefinition
+
+    # Get configuration
+    multiple = field_config.get("multiple", False)
+    max_items = field_config.get("max_items")
+    allowed_types = field_config.get("allowed_object_types", [])
+
+    # Handle None/empty values
+    if value is None or value == [] or value == "":
+        if field_config.get("required", False):
+            raise ValidationError("This field is required")
+        return
+
+    # Normalize to list
+    if not multiple:
+        if not isinstance(value, (int, str)):
+            raise ValidationError("Single reference must be an integer ID")
+        value = [int(value)]
+    else:
+        if not isinstance(value, list):
+            raise ValidationError("Multiple references must be a list of IDs")
+        value = [int(v) if isinstance(v, str) else v for v in value]
+
+    # Validate max_items
+    if max_items and len(value) > max_items:
+        raise ValidationError(
+            f"Cannot have more than {max_items} references (got {len(value)})"
+        )
+
+    # Validate each reference
+    for ref_id in value:
+        if not isinstance(ref_id, int):
+            raise ValidationError(f"Reference ID must be integer, got {type(ref_id)}")
+
+        # Check object exists
+        try:
+            obj = ObjectInstance.objects.get(id=ref_id)
+        except ObjectInstance.DoesNotExist:
+            raise ValidationError(f"Referenced object with ID {ref_id} does not exist")
+
+        # Check allowed types
+        if allowed_types:
+            if obj.object_type.name not in allowed_types:
+                raise ValidationError(
+                    f"Object type '{obj.object_type.name}' is not allowed. "
+                    f"Allowed types: {', '.join(allowed_types)}"
+                )
+
+
+def validate_reverse_object_reference(value: Any, field_config: Dict[str, Any]) -> None:
+    """
+    Validate reverse_object_reference field values.
+
+    This field is read-only and computed, so validation is minimal.
+
+    Args:
+        value: The field value (ignored, as it's computed)
+        field_config: Field configuration from schema
+
+    Raises:
+        ValidationError: If trying to set value on read-only field
+    """
+    # Reverse references are read-only and computed
+    # They should not be validated or set by users
+    # If value is present and not None, it means someone tried to set it
+    if value is not None and value != []:
+        raise ValidationError(
+            "Reverse object reference fields are read-only and cannot be set directly"
+        )

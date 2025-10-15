@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import toast from 'react-hot-toast'
 import { Plus, Trash2, Settings, Hash, Type, Calendar, ToggleLeft, Check, Users, CheckCircle, XCircle, FolderOpen } from 'lucide-react'
 import { objectTypesApi } from '../api/objectStorage'
 import { namespacesApi } from '../api'
@@ -12,6 +13,7 @@ import {
     getWidgetCategory,
     getWidgetDescription
 } from '../widgets'
+import DynamicWidgetConfigForm from './widget-configs/DynamicWidgetConfigForm'
 
 // Get field types from the registry
 const FIELD_TYPES = getAllFieldTypes().map(fieldType => ({
@@ -97,8 +99,15 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
                 namespaceId: objectType.namespace?.id || null,
                 metadata: objectType.metadata || {}
             })
-            setOriginalSchema(JSON.parse(JSON.stringify(schema))) // Deep copy
+            const originalSchemaCopy = JSON.parse(JSON.stringify(schema))
+            console.log('[ObjectTypeForm] Setting originalSchema on mount', {
+                objectTypeId: objectType.id,
+                schema,
+                originalSchemaCopy
+            })
+            setOriginalSchema(originalSchemaCopy) // Deep copy
             setHasUnsavedSchemaChanges(false)
+            console.log('[ObjectTypeForm] Initialized with hasUnsavedSchemaChanges = false')
 
             // Track original basic info
             const basicInfo = {
@@ -304,11 +313,87 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
         }
     }
 
+    // Helper function to normalize schema for comparison
+    const normalizeSchema = (schema) => {
+        if (!schema) return { type: 'object', properties: {}, required: [], propertyOrder: [] }
+
+        // Normalize the schema structure
+        const normalized = {
+            type: schema.type || 'object',
+            properties: {},
+            required: schema.required || [],
+            propertyOrder: schema.propertyOrder || []
+        }
+
+        // Normalize each property (ensure they have required fields)
+        Object.keys(schema.properties || {}).forEach(key => {
+            const prop = { ...schema.properties[key] }
+
+            // Handle both field_type (from backend) and componentType (frontend internal)
+            const fieldTypeKey = prop.field_type || prop.componentType
+
+            // Ensure each property has a type field (may be missing in old schemas)
+            if (!prop.type && fieldTypeKey) {
+                // This should match the mapping in SchemaEditor
+                const typeMapping = {
+                    'text': 'string',
+                    'textarea': 'string',
+                    'rich_text': 'string',
+                    'number': 'number',
+                    'integer': 'integer',
+                    'date': 'string',
+                    'datetime': 'string',
+                    'time': 'string',
+                    'boolean': 'boolean',
+                    'image': 'string',
+                    'file': 'string',
+                    'url': 'string',
+                    'email': 'string',
+                    'choice': 'string',
+                    'multi_choice': 'array',
+                    'user_reference': 'array', // Always array for consistency
+                    'object_reference': 'array', // Always array for consistency
+                    'reverse_object_reference': 'array',
+                    'tag': 'array',
+                    'date_range': 'object',
+                    'object_type_selector': 'string',
+                }
+                prop.type = typeMapping[fieldTypeKey] || 'string'
+            }
+
+            // Normalize field_type vs componentType for comparison
+            // Use field_type as the canonical form (what backend expects)
+            if (prop.componentType && !prop.field_type) {
+                prop.field_type = prop.componentType
+                delete prop.componentType
+            }
+
+            normalized.properties[key] = prop
+        })
+
+        return normalized
+    }
+
     const handleSchemaChange = (newSchema) => {
+        console.log('[ObjectTypeForm] handleSchemaChange called', {
+            newSchema,
+            originalSchema,
+            hasChanges: JSON.stringify(newSchema) !== JSON.stringify(originalSchema)
+        })
+
         setFormData(prev => ({ ...prev, schema: newSchema }))
 
+        // Normalize schemas before comparison to handle edge cases
+        const normalizedNew = normalizeSchema(newSchema)
+        const normalizedOriginal = normalizeSchema(originalSchema)
+
         // Check if schema has changed from original
-        const hasChanges = JSON.stringify(newSchema) !== JSON.stringify(originalSchema)
+        const hasChanges = JSON.stringify(normalizedNew) !== JSON.stringify(normalizedOriginal)
+        console.log('[ObjectTypeForm] Schema change detection:', {
+            hasChanges,
+            newSchemaString: JSON.stringify(normalizedNew),
+            originalSchemaString: JSON.stringify(normalizedOriginal)
+        })
         setHasUnsavedSchemaChanges(hasChanges)
 
         // Clear any existing schema errors when user makes changes
@@ -396,57 +481,187 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
     }
 
     const handleSaveSchema = async () => {
-        if (!objectType || !hasUnsavedSchemaChanges || isSavingSchema) return
+        console.log('[ObjectTypeForm] handleSaveSchema called', {
+            objectType: objectType?.id,
+            hasUnsavedSchemaChanges,
+            isSavingSchema,
+            schemaValidationErrors,
+            formDataSchema: formData.schema
+        })
 
-        // Client-side validation before sending to backend
-        const validationError = validateSchema(formData.schema)
-        if (validationError) {
-            setSchemaError(`Schema validation error: ${validationError}`)
+        // Early return checks with logging
+        if (!objectType) {
+            console.error('[ObjectTypeForm] Cannot save schema: objectType is null/undefined')
+            const errorMsg = 'Cannot save schema: Object type not loaded'
+            setSchemaError(errorMsg)
+            toast.error(errorMsg, {
+                duration: 5000,
+                icon: '❌',
+            })
             return
         }
+
+        if (!hasUnsavedSchemaChanges) {
+            console.log('[ObjectTypeForm] No unsaved changes detected, skipping save')
+            return
+        }
+
+        if (isSavingSchema) {
+            console.log('[ObjectTypeForm] Already saving, skipping duplicate save')
+            return
+        }
+
+        // Client-side validation before sending to backend
+        console.log('[ObjectTypeForm] Validating schema...')
+        const validationError = validateSchema(formData.schema)
+        if (validationError) {
+            console.error('[ObjectTypeForm] Schema validation failed:', validationError)
+            const errorMsg = `Schema validation error: ${validationError}`
+            setSchemaError(errorMsg)
+            toast.error(errorMsg, {
+                duration: 5000,
+                icon: '⚠️',
+            })
+            return
+        }
+        console.log('[ObjectTypeForm] Schema validation passed')
 
         // Clear any previous errors
         setSchemaError(null)
         setIsSavingSchema(true)
 
         try {
+            // Detailed logging to debug the property not found issue
+            console.log('[ObjectTypeForm] Calling API to update schema...')
+            console.log('[ObjectTypeForm] Object Type ID:', objectType.id)
+            console.log('[ObjectTypeForm] Schema structure:', {
+                type: formData.schema.type,
+                propertyCount: Object.keys(formData.schema.properties || {}).length,
+                propertyKeys: Object.keys(formData.schema.properties || {}),
+                required: formData.schema.required,
+                propertyOrder: formData.schema.propertyOrder
+            })
+
+            // Log each property in detail
+            console.log('[ObjectTypeForm] Properties in detail:')
+            Object.entries(formData.schema.properties || {}).forEach(([key, prop]) => {
+                console.log(`  - ${key}:`, {
+                    hasType: !!prop.type,
+                    type: prop.type,
+                    hasFieldType: !!prop.field_type,
+                    field_type: prop.field_type,
+                    hasComponentType: !!prop.componentType,
+                    componentType: prop.componentType,
+                    title: prop.title
+                })
+            })
+
+            // Log the full schema as JSON
+            console.log('[ObjectTypeForm] Full schema as JSON:')
+            console.log(JSON.stringify(formData.schema, null, 2))
+
+            // Validate that required properties exist in properties
+            const missingRequired = (formData.schema.required || []).filter(
+                key => !(key in (formData.schema.properties || {}))
+            )
+            if (missingRequired.length > 0) {
+                console.error('[ObjectTypeForm] CLIENT-SIDE CHECK: Required properties missing from properties:', missingRequired)
+                console.error('[ObjectTypeForm] Available property keys:', Object.keys(formData.schema.properties || {}))
+            }
+
             // Use the dedicated schema update endpoint
             const response = await objectTypesApi.updateSchema(objectType.id, formData.schema)
+
+            console.log('[ObjectTypeForm] Schema saved successfully:', response)
 
             // Update the original schema to reflect the save
             setOriginalSchema(JSON.parse(JSON.stringify(formData.schema)))
             setHasUnsavedSchemaChanges(false)
 
-            // Schema saved successfully
-
-            // TODO: Add success notification using global notification system
-            // addNotification('Schema saved successfully', 'success')
+            // Schema saved successfully - Show success message
+            toast.success('Schema saved successfully!', {
+                duration: 3000,
+                icon: '✅',
+            })
 
         } catch (error) {
             // Failed to save schema
+            console.error('[ObjectTypeForm] Failed to save schema:', {
+                error,
+                response: error.response,
+                data: error.response?.data,
+                status: error.response?.status
+            })
+
             let errorMessage = 'Failed to save schema'
+            let detailedError = null
 
+            // Extract the REAL backend error message - don't hide it!
             if (error.response?.data?.error) {
-                const backendError = error.response.data.error
+                detailedError = error.response.data.error
+                errorMessage = `Backend error: ${detailedError}`
+            } else if (error.response?.data?.schema) {
+                // Django REST Framework validation error format
+                const schemaErrors = error.response.data.schema
 
-                // Handle specific validation errors with user-friendly messages
-                if (backendError.includes('Invalid schema format')) {
-                    errorMessage = 'Invalid schema format. Please ensure your schema has a valid properties array.'
-                } else if (backendError.includes('properties')) {
-                    errorMessage = 'Schema validation failed. Please check that all properties are properly configured.'
-                } else {
-                    errorMessage = backendError
+                // Extract the actual error message from ErrorDetail objects
+                if (Array.isArray(schemaErrors)) {
+                    detailedError = schemaErrors.map(err => {
+                        // If it's an ErrorDetail object, extract the string
+                        if (typeof err === 'object' && err.toString) {
+                            const errStr = err.toString()
+                            // Extract JSON array from ErrorDetail string format
+                            const match = errStr.match(/string='(\[.*?\])'/)
+                            if (match) {
+                                try {
+                                    const parsed = JSON.parse(match[1])
+                                    return Array.isArray(parsed) ? parsed.join('; ') : parsed
+                                } catch (e) {
+                                    return match[1]
+                                }
+                            }
+                            return errStr
+                        }
+                        return err
+                    }).join('; ')
+                } else if (typeof schemaErrors === 'string') {
+                    detailedError = schemaErrors
+                } else if (schemaErrors[0]) {
+                    // Single ErrorDetail object
+                    const errStr = schemaErrors[0].toString()
+                    const match = errStr.match(/string='(\[.*?\])'/)
+                    if (match) {
+                        try {
+                            const parsed = JSON.parse(match[1])
+                            detailedError = Array.isArray(parsed) ? parsed.join('; ') : parsed
+                        } catch (e) {
+                            detailedError = match[1]
+                        }
+                    } else {
+                        detailedError = errStr
+                    }
                 }
+
+                errorMessage = `Schema validation error: ${detailedError}`
+            } else if (error.message) {
+                errorMessage = `Failed to save schema: ${error.message}`
             }
 
-            // TODO: Add error notification using global notification system  
-            // addNotification(errorMessage, 'error')
+            console.error('[ObjectTypeForm] Detailed backend error:', detailedError)
+            console.error('[ObjectTypeForm] Final error message:', errorMessage)
+
+            // Show the REAL error message - no hiding!
+            toast.error(errorMessage, {
+                duration: 8000, // Longer duration for detailed errors
+                icon: '❌',
+            })
 
             // Set the error in state for display
             setSchemaError(errorMessage)
 
         } finally {
             setIsSavingSchema(false)
+            console.log('[ObjectTypeForm] Save operation completed')
         }
     }
 
@@ -1630,125 +1845,19 @@ const WidgetControlManager = ({ widgetControls = [], availableWidgets = [], load
                                     </div>
                                 </div>
 
-                                {/* Default Configuration */}
+                                {/* Default Configuration - Dynamic Form */}
                                 {selectedWidget && (
                                     <div className="md:col-span-2">
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
                                             Default Configuration
                                         </label>
-                                        <div className="bg-white border border-gray-200 rounded-md p-3 space-y-3">
-                                            {/* Common configuration fields */}
-                                            {selectedWidget.slug === 'text-block' && (
-                                                <>
-                                                    <div>
-                                                        <label className="block text-xs font-medium text-gray-600 mb-1">
-                                                            Default Title
-                                                        </label>
-                                                        <input
-                                                            type="text"
-                                                            value={control.defaultConfig?.title || ''}
-                                                            onChange={(e) => updateDefaultConfig(index, 'title', e.target.value)}
-                                                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
-                                                            placeholder="Enter default title..."
-                                                        />
-                                                    </div>
-                                                    <div>
-                                                        <label className="block text-xs font-medium text-gray-600 mb-1">
-                                                            Default Content
-                                                        </label>
-                                                        <textarea
-                                                            value={control.defaultConfig?.content || ''}
-                                                            onChange={(e) => updateDefaultConfig(index, 'content', e.target.value)}
-                                                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
-                                                            rows={3}
-                                                            placeholder="Enter default content..."
-                                                        />
-                                                    </div>
-                                                </>
-                                            )}
-
-                                            {selectedWidget.slug === 'image' && (
-                                                <>
-                                                    <div>
-                                                        <label className="block text-xs font-medium text-gray-600 mb-1">
-                                                            Default Alt Text
-                                                        </label>
-                                                        <input
-                                                            type="text"
-                                                            value={control.defaultConfig?.alt || ''}
-                                                            onChange={(e) => updateDefaultConfig(index, 'alt', e.target.value)}
-                                                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
-                                                            placeholder="Enter default alt text..."
-                                                        />
-                                                    </div>
-                                                    <div>
-                                                        <label className="block text-xs font-medium text-gray-600 mb-1">
-                                                            Default Caption
-                                                        </label>
-                                                        <input
-                                                            type="text"
-                                                            value={control.defaultConfig?.caption || ''}
-                                                            onChange={(e) => updateDefaultConfig(index, 'caption', e.target.value)}
-                                                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
-                                                            placeholder="Enter default caption..."
-                                                        />
-                                                    </div>
-                                                </>
-                                            )}
-
-                                            {selectedWidget.slug === 'button' && (
-                                                <>
-                                                    <div>
-                                                        <label className="block text-xs font-medium text-gray-600 mb-1">
-                                                            Default Button Text
-                                                        </label>
-                                                        <input
-                                                            type="text"
-                                                            value={control.defaultConfig?.text || ''}
-                                                            onChange={(e) => updateDefaultConfig(index, 'text', e.target.value)}
-                                                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
-                                                            placeholder="Enter default button text..."
-                                                        />
-                                                    </div>
-                                                    <div>
-                                                        <label className="block text-xs font-medium text-gray-600 mb-1">
-                                                            Default Button Style
-                                                        </label>
-                                                        <select
-                                                            value={control.defaultConfig?.style || 'primary'}
-                                                            onChange={(e) => updateDefaultConfig(index, 'style', e.target.value)}
-                                                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
-                                                        >
-                                                            <option value="primary">Primary</option>
-                                                            <option value="secondary">Secondary</option>
-                                                            <option value="outline">Outline</option>
-                                                        </select>
-                                                    </div>
-                                                </>
-                                            )}
-
-                                            {/* Generic JSON editor for other widget types */}
-                                            {!['text-block', 'image', 'button'].includes(selectedWidget.slug) && (
-                                                <div>
-                                                    <label className="block text-xs font-medium text-gray-600 mb-1">
-                                                        Default Configuration (JSON)
-                                                    </label>
-                                                    <textarea
-                                                        value={JSON.stringify(control.defaultConfig || {}, null, 2)}
-                                                        onChange={(e) => {
-                                                            try {
-                                                                const config = JSON.parse(e.target.value)
-                                                                updateWidgetControl(index, 'defaultConfig', config)
-                                                            } catch (err) {
-                                                                // Invalid JSON, ignore for now
-                                                            }
-                                                        }}
-                                                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded font-mono"
-                                                        rows={4}
-                                                        placeholder='{"key": "value"}'
-                                                    />
-                                                </div>
-                                            )}
+                                        <div className="bg-white border border-gray-200 rounded-md p-3">
+                                            <DynamicWidgetConfigForm
+                                                widgetType={control.widgetType}
+                                                config={control.defaultConfig || {}}
+                                                onChange={(newConfig) => updateWidgetControl(index, 'defaultConfig', newConfig)}
+                                                showJsonToggle={true}
+                                            />
                                         </div>
                                     </div>
                                 )}

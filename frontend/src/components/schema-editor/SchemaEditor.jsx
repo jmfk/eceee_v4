@@ -54,12 +54,20 @@ export default function SchemaEditor({
   }, []) // Only run once on mount
 
   // Update properties when schema prop changes (but not during initialization)
+  // Note: convertSchemaToProperties and validateProperties are useCallback functions
+  // that are stable across renders, so we don't need them in dependencies
   useEffect(() => {
     if (!isLoading && !initError) {
+      console.log('[SchemaEditor] Schema prop changed, updating properties', {
+        schema,
+        isLoading,
+        initError
+      })
       const internalProperties = convertSchemaToProperties(schema)
       setProperties(internalProperties)
       validateProperties(internalProperties)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [schema, isLoading, initError])
 
   /**
@@ -76,8 +84,16 @@ export default function SchemaEditor({
 
     return propertyOrder.map((key, index) => {
       if (schemaProps[key]) {
+        const prop = { ...schemaProps[key] }
+
+        // Backend uses 'field_type', frontend uses 'componentType'
+        // Convert field_type to componentType for internal use
+        if (prop.field_type && !prop.componentType) {
+          prop.componentType = prop.field_type
+        }
+
         return {
-          ...schemaProps[key],
+          ...prop,
           key,
           required: required.includes(key),
           _id: `prop-${index}` // Stable ID for React keys based on position only
@@ -88,11 +104,45 @@ export default function SchemaEditor({
   }, [])
 
   /**
+   * Get JSON Schema type for a given componentType
+   */
+  const getJsonSchemaType = (componentType, isMultiple = false) => {
+    // Map componentTypes to JSON Schema types based on backend field registry
+    const typeMapping = {
+      'text': 'string',
+      'textarea': 'string',
+      'rich_text': 'string',
+      'number': 'number',
+      'integer': 'integer',
+      'date': 'string',
+      'datetime': 'string',
+      'time': 'string',
+      'boolean': 'boolean',
+      'image': 'string',
+      'file': 'string',
+      'url': 'string',
+      'email': 'string',
+      'choice': 'string',
+      'multi_choice': 'array',
+      'user_reference': 'array', // Always array for consistency
+      'object_reference': 'array', // Always array for consistency
+      'reverse_object_reference': 'array',
+      'tag': 'array',
+      'date_range': 'object',
+      'object_type_selector': 'string',
+    }
+
+    return typeMapping[componentType] || 'string'
+  }
+
+  /**
    * Convert internal properties format to JSON schema
    * Note: We preserve all properties, even those with validation errors,
    * to prevent data loss during editing. Validation errors will prevent saving.
    */
   const convertPropertiesToSchema = useCallback((propertiesList) => {
+    console.log('[SchemaEditor] convertPropertiesToSchema called with', propertiesList.length, 'properties')
+
     const newSchema = {
       type: 'object',
       properties: {},
@@ -100,12 +150,34 @@ export default function SchemaEditor({
       propertyOrder: []
     }
 
-    propertiesList.forEach(prop => {
+    propertiesList.forEach((prop, index) => {
       const { key, required, _id, ...schemaProp } = prop
+
+      console.log(`[SchemaEditor] Processing property ${index}:`, {
+        key,
+        required,
+        hasType: !!schemaProp.type,
+        hasComponentType: !!schemaProp.componentType,
+        componentType: schemaProp.componentType
+      })
 
       // Preserve all properties with keys, even invalid ones
       // This prevents fields from being deleted when editing
       if (key) {
+        // Ensure the property has a 'type' field (required by backend validation)
+        if (!schemaProp.type && schemaProp.componentType) {
+          schemaProp.type = getJsonSchemaType(schemaProp.componentType, schemaProp.multiple)
+          console.log(`[SchemaEditor] Added type '${schemaProp.type}' for ${key}`)
+        }
+
+        // Backend expects 'field_type' not 'componentType'
+        // Keep BOTH for internal editing, backend will convert field_type during save
+        if (schemaProp.componentType) {
+          schemaProp.field_type = schemaProp.componentType
+          // DON'T delete componentType - we need it for the UI
+          console.log(`[SchemaEditor] Set field_type from componentType for ${key}`)
+        }
+
         // Add to properties object
         newSchema.properties[key] = schemaProp
         newSchema.propertyOrder.push(key)
@@ -114,7 +186,18 @@ export default function SchemaEditor({
         if (required) {
           newSchema.required.push(key)
         }
+
+        console.log(`[SchemaEditor] Added property '${key}' to schema. Required: ${required}`)
+      } else {
+        console.warn(`[SchemaEditor] Skipping property at index ${index} - no key`)
       }
+    })
+
+    console.log('[SchemaEditor] Final schema:', {
+      propertyCount: Object.keys(newSchema.properties).length,
+      propertyKeys: Object.keys(newSchema.properties),
+      required: newSchema.required,
+      propertyOrder: newSchema.propertyOrder
     })
 
     return newSchema
@@ -180,6 +263,11 @@ export default function SchemaEditor({
    * Handle properties change and update schema
    */
   const handlePropertiesChange = useCallback((newProperties) => {
+    console.log('[SchemaEditor] handlePropertiesChange called', {
+      newProperties,
+      propertiesCount: newProperties.length
+    })
+
     setProperties(newProperties)
 
     // Validate properties
@@ -187,6 +275,11 @@ export default function SchemaEditor({
 
     // Convert to schema format and notify parent
     const newSchema = convertPropertiesToSchema(newProperties)
+    console.log('[SchemaEditor] Calling onChange with new schema', {
+      newSchema,
+      isValid,
+      note: 'Always calling onChange to keep parent in sync'
+    })
     onChange(newSchema)
   }, [onChange, validateProperties, convertPropertiesToSchema])
 
