@@ -10,9 +10,61 @@ from django.urls import reverse
 from django.utils.safestring import mark_safe
 from django.db import models
 from django.forms import ModelChoiceField
+from django.forms.widgets import Widget
 import json
 
 from .models import ObjectTypeDefinition, ObjectInstance, ObjectVersion
+
+
+class ObjectReferenceWidget(Widget):
+    """
+    Custom widget for object_reference fields in Django admin.
+    Provides search, autocomplete, and direct PK entry.
+    """
+
+    template_name = "admin/widgets/object_reference.html"
+
+    def __init__(self, field_config=None, attrs=None):
+        super().__init__(attrs)
+        self.field_config = field_config or {}
+
+    def get_context(self, name, value, attrs):
+        context = super().get_context(name, value, attrs)
+
+        # Parse value
+        if isinstance(value, str):
+            try:
+                value = json.loads(value)
+            except (json.JSONDecodeError, TypeError):
+                value = []
+
+        # Ensure value is in correct format
+        if not isinstance(value, list):
+            value = [value] if value else []
+
+        context["widget"].update(
+            {
+                "field_name": name,
+                "value_json": json.dumps(value),
+                "field_config_json": json.dumps(self.field_config),
+                "allowed_types": self.field_config.get("allowed_object_types", []),
+                "max_items": self.field_config.get("max_items"),
+                "multiple": self.field_config.get("multiple", False),
+            }
+        )
+
+        return context
+
+    def value_from_datadict(self, data, files, name):
+        """Extract value from POST data"""
+        value = data.get(name, "")
+        if not value:
+            return [] if self.field_config.get("multiple", False) else None
+
+        try:
+            return json.loads(value)
+        except (json.JSONDecodeError, TypeError):
+            return [] if self.field_config.get("multiple", False) else None
 
 
 @admin.register(ObjectTypeDefinition)
@@ -279,6 +331,8 @@ class ObjectInstanceAdmin(admin.ModelAdmin):
         "is_published_display",
         "current_published_version_info",
         "children_count",
+        "relationships_display",
+        "related_from_display",
     ]
     inlines = [ObjectVersionInline, SubObjectInline]
 
@@ -308,6 +362,13 @@ class ObjectInstanceAdmin(admin.ModelAdmin):
                     "widgets_preview",
                 ),
                 "description": "Current version and content preview - edit content through versions",
+            },
+        ),
+        (
+            "Relationships",
+            {
+                "fields": ("relationships_display", "related_from_display"),
+                "description": "Many-to-many relationships with other objects",
             },
         ),
         (
@@ -425,6 +486,96 @@ class ObjectInstanceAdmin(admin.ModelAdmin):
         return "0"
 
     children_count.short_description = "Children"
+
+    def relationships_display(self, obj):
+        """Display forward relationships grouped by type."""
+        if not obj.relationships:
+            return "No relationships"
+
+        # Group relationships by type
+        by_type = {}
+        for rel in obj.relationships:
+            rel_type = rel.get("type", "unknown")
+            if rel_type not in by_type:
+                by_type[rel_type] = []
+            by_type[rel_type].append(rel.get("object_id"))
+
+        html = "<div style='font-size: 12px;'>"
+        for rel_type, obj_ids in by_type.items():
+            html += f"<div style='margin-bottom: 10px;'>"
+            html += f"<strong>{rel_type}</strong> ({len(obj_ids)}):<br/>"
+
+            # Get the related objects
+            from object_storage.models import ObjectInstance
+
+            related_objs = ObjectInstance.objects.filter(id__in=obj_ids)
+
+            # Create dict for quick lookup
+            obj_dict = {o.id: o for o in related_objs}
+
+            html += "<ul style='margin: 5px 0 0 20px;'>"
+            for obj_id in obj_ids:
+                related_obj = obj_dict.get(obj_id)
+                if related_obj:
+                    url = reverse(
+                        "admin:object_storage_objectinstance_change",
+                        args=[related_obj.pk],
+                    )
+                    html += f"<li><a href='{url}'>{related_obj.title}</a> ({related_obj.object_type.label})</li>"
+                else:
+                    html += f"<li><em>Object #{obj_id} (deleted)</em></li>"
+            html += "</ul>"
+            html += "</div>"
+        html += "</div>"
+
+        return mark_safe(html)
+
+    relationships_display.short_description = "Related Objects (Forward)"
+
+    def related_from_display(self, obj):
+        """Display reverse relationships grouped by type."""
+        if not obj.related_from:
+            return "No reverse relationships"
+
+        # Group relationships by type
+        by_type = {}
+        for rel in obj.related_from:
+            rel_type = rel.get("type", "unknown")
+            if rel_type not in by_type:
+                by_type[rel_type] = []
+            by_type[rel_type].append(rel.get("object_id"))
+
+        html = "<div style='font-size: 12px;'>"
+        for rel_type, obj_ids in by_type.items():
+            html += f"<div style='margin-bottom: 10px;'>"
+            html += f"<strong>{rel_type}</strong> ({len(obj_ids)}):<br/>"
+
+            # Get the related objects
+            from object_storage.models import ObjectInstance
+
+            related_objs = ObjectInstance.objects.filter(id__in=obj_ids)
+
+            # Create dict for quick lookup
+            obj_dict = {o.id: o for o in related_objs}
+
+            html += "<ul style='margin: 5px 0 0 20px;'>"
+            for obj_id in obj_ids:
+                related_obj = obj_dict.get(obj_id)
+                if related_obj:
+                    url = reverse(
+                        "admin:object_storage_objectinstance_change",
+                        args=[related_obj.pk],
+                    )
+                    html += f"<li><a href='{url}'>{related_obj.title}</a> ({related_obj.object_type.label})</li>"
+                else:
+                    html += f"<li><em>Object #{obj_id} (deleted)</em></li>"
+            html += "</ul>"
+            html += "</div>"
+        html += "</div>"
+
+        return mark_safe(html)
+
+    related_from_display.short_description = "Related From (Reverse)"
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         """Customize the parent field to show only valid parents."""

@@ -52,9 +52,9 @@ const TimeInput = ({
         }
     }
 
-    const handleChange = (e) => {
-        const timeValue = e.target.value
-        onChange(timeValue || null)
+    const handleChange = (value) => {
+        // ValidatedInput passes the value directly, not the event
+        onChange(value || null)
     }
 
     return (

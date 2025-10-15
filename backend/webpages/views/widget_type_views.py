@@ -202,6 +202,94 @@ class WidgetTypeViewSet(viewsets.ViewSet):
 
         return Response(widget_type.configuration_model.model_json_schema())
 
+    @action(detail=True, methods=["get"], url_path="config-ui-schema")
+    def config_ui_schema(self, request, pk=None):
+        """
+        Return enhanced configuration schema with UI metadata for building forms.
+        Includes field-level json_schema_extra data for UI component mapping.
+        """
+        from ..widget_registry import widget_type_registry
+
+        # Try flexible lookup: type, name, or slug
+        widget_type = widget_type_registry.get_widget_type_flexible(pk)
+        if not widget_type:
+            return Response(
+                {"error": f"Widget type '{pk}' not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Get the base JSON schema
+        base_schema = widget_type.configuration_model.model_json_schema()
+
+        # Extract field-level metadata from Pydantic model
+        fields_metadata = {}
+        model_fields = widget_type.configuration_model.model_fields
+
+        for field_name, field_info in model_fields.items():
+            field_meta = {
+                "name": field_name,
+                "type": (
+                    field_info.annotation.__name__
+                    if hasattr(field_info.annotation, "__name__")
+                    else str(field_info.annotation)
+                ),
+                "required": field_info.is_required(),
+                "default": (
+                    None
+                    if field_info.default is None or field_info.default == ...
+                    else field_info.default
+                ),
+                "description": field_info.description or "",
+            }
+
+            # Extract json_schema_extra metadata (UI hints)
+            if field_info.json_schema_extra:
+                if isinstance(field_info.json_schema_extra, dict):
+                    field_meta["ui"] = field_info.json_schema_extra
+                elif callable(field_info.json_schema_extra):
+                    # If it's a function, call it with the schema dict
+                    extra_dict = {}
+                    field_info.json_schema_extra(extra_dict, field_info)
+                    field_meta["ui"] = extra_dict
+
+            # Add validation constraints from the schema
+            if "properties" in base_schema and field_name in base_schema["properties"]:
+                prop_schema = base_schema["properties"][field_name]
+                if "minimum" in prop_schema:
+                    field_meta["minimum"] = prop_schema["minimum"]
+                if "maximum" in prop_schema:
+                    field_meta["maximum"] = prop_schema["maximum"]
+                if "minLength" in prop_schema:
+                    field_meta["minLength"] = prop_schema["minLength"]
+                if "maxLength" in prop_schema:
+                    field_meta["maxLength"] = prop_schema["maxLength"]
+                if "pattern" in prop_schema:
+                    field_meta["pattern"] = prop_schema["pattern"]
+                if "enum" in prop_schema:
+                    field_meta["enum"] = prop_schema["enum"]
+                if "minItems" in prop_schema:
+                    field_meta["minItems"] = prop_schema["minItems"]
+                if "maxItems" in prop_schema:
+                    field_meta["maxItems"] = prop_schema["maxItems"]
+                if "items" in prop_schema:
+                    field_meta["items"] = prop_schema["items"]
+
+            fields_metadata[field_name] = field_meta
+
+        # Get default values
+        defaults = widget_type.get_configuration_defaults()
+
+        return Response(
+            {
+                "widget_type": widget_type.type,
+                "widget_name": widget_type.name,
+                "schema": base_schema,
+                "fields": fields_metadata,
+                "defaults": defaults,
+                "required": base_schema.get("required", []),
+            }
+        )
+
 
 def find_pydantic_model(model_name: str):
     """

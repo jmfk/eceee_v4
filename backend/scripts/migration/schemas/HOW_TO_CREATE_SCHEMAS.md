@@ -341,20 +341,79 @@ Every property MUST have:
 
 ### Reference Fields
 
-#### `object_reference` - Reference to Another Object
+#### `object_reference` - Reference to Other Objects (NEW)
 ```json
 {
-  "title": "Conference",
+  "title": "Authors",
   "componentType": "object_reference",
-  "referenceType": "conference",
-  "helpText": "Parent conference this belongs to"
+  "multiple": true,
+  "max_items": 5,
+  "allowed_object_types": ["columnist", "contributor"],
+  "relationship_type": "authors",
+  "default": [],
+  "required": false,
+  "helpText": "Select columnists who authored this column"
 }
 ```
 
-**Use for**: Linking to other objects (parent/child relationships)
+**Use for**: Linking to other ObjectInstances with configurable constraints. Supports single or multiple references with validation.
 
-**Required**:
-- `referenceType` - Object type name to reference
+**Configuration Options**:
+- `multiple` (boolean) - Allow multiple selections (default: false)
+- `max_items` (integer) - Maximum items when multiple=true (optional)
+- `allowed_object_types` (array) - List of allowed object type names (optional, defaults to all)
+- `relationship_type` (string) - Override relationship type name (optional, defaults to field name)
+- `default` - Default value ([] for multiple, null for single)
+
+**Single Reference Example**:
+```json
+{
+  "title": "Primary Author",
+  "componentType": "object_reference",
+  "multiple": false,
+  "allowed_object_types": ["columnist"],
+  "required": true,
+  "helpText": "Select the primary author"
+}
+```
+
+**Features**:
+- Search and autocomplete UI
+- Direct PK entry support
+- Validates referenced objects exist
+- Validates object types match allowed_object_types
+- Auto-syncs to ObjectInstance.relationships
+- Supports drag-and-drop reordering (when multiple)
+
+**Data Storage**: Stored as array of integer IDs: `[123, 456]` or single integer: `123`
+
+#### `reverse_object_reference` - Reverse Relationship Display (NEW)
+```json
+{
+  "title": "Columns Authored",
+  "componentType": "reverse_object_reference",
+  "reverse_relationship_type": "authors",
+  "reverse_object_types": ["column"],
+  "helpText": "Columns where this columnist is listed as an author"
+}
+```
+
+**Use for**: Read-only display of objects that reference this object (reverse relationships)
+
+**Configuration Options**:
+- `reverse_relationship_type` (string) - The relationship type to look for (required)
+- `reverse_object_types` (array) - Filter by source object types (optional)
+
+**Features**:
+- Read-only field (computed dynamically)
+- Shows objects that reference this object
+- Filtered by relationship type
+- Displays with links to referenced objects
+- Count display
+
+**Data Storage**: Not stored - computed from ObjectInstance.related_from
+
+**Note**: This field is automatically populated from the bidirectional relationship system. When object A has an `object_reference` field pointing to object B, object B's `reverse_object_reference` field will show object A.
 
 #### `user_reference` - Reference to User
 ```json
@@ -550,7 +609,8 @@ Every property MUST have:
 | File | `file` | PDF, document |
 | Color | `color` | Theme color |
 | User | `user_reference` | Author, assignee |
-| Link to object | `object_reference` | Parent, related item |
+| Link to object(s) | `object_reference` | Authors, related items, parent (NEW - supports constraints) |
+| Reverse links | `reverse_object_reference` | Columns authored (NEW - read-only, computed) |
 | List of values | `array` | IDs, tags |
 
 ## Component Type Options
@@ -657,10 +717,51 @@ Every property MUST have:
 ```json
 {
   "componentType": "object_reference",
-  "referenceType": "conference",              // Required: object type to reference
-  "helpText": "Select parent conference"
+  "multiple": true,                           // Allow multiple selections (default: false)
+  "max_items": 5,                             // Max items when multiple (optional)
+  "allowed_object_types": ["columnist"],      // Allowed object type names (optional)
+  "relationship_type": "authors",             // Override relationship name (optional, defaults to field name)
+  "default": [],                              // Default value ([] for multiple, null for single)
+  "required": false,                          // Is field required
+  "helpText": "Select authors"
 }
 ```
+
+**Single Reference Options**:
+```json
+{
+  "componentType": "object_reference",
+  "multiple": false,
+  "allowed_object_types": ["columnist"],
+  "required": true
+}
+```
+
+**Features**:
+- Validates referenced objects exist
+- Validates object types
+- Auto-syncs to ObjectInstance.relationships
+- Search and autocomplete UI
+- Direct PK entry support
+- Drag-to-reorder (when multiple)
+
+### Reverse Object Reference Options
+
+```json
+{
+  "componentType": "reverse_object_reference",
+  "reverse_relationship_type": "authors",      // Required: relationship type to look for
+  "reverse_object_types": ["column"],          // Optional: filter by source object types
+  "helpText": "Columns authored"
+}
+```
+
+**Features**:
+- Read-only field (computed automatically)
+- Shows objects that reference this object
+- Filtered by relationship type and object types
+- Displays with links and count
+- Not stored (computed from related_from)
 
 ### Array Component Options
 
@@ -755,8 +856,9 @@ Don't add to `required` array (it's optional).
 
 Mark as required: `"required": ["conferenceId"]`
 
-### Pattern 6: Array of Object IDs
+### Pattern 6: Array of Object IDs (DEPRECATED - Use object_reference)
 
+**Old Way** (still works but not recommended):
 ```json
 {
   "columnistIds": {
@@ -770,6 +872,54 @@ Mark as required: `"required": ["conferenceId"]`
   }
 }
 ```
+
+**New Way** (RECOMMENDED - Use object_reference):
+```json
+{
+  "authors": {
+    "title": "Authors",
+    "componentType": "object_reference",
+    "multiple": true,
+    "max_items": 5,
+    "allowed_object_types": ["columnist"],
+    "relationship_type": "authors",
+    "default": [],
+    "helpText": "Select columnists who authored this column"
+  }
+}
+```
+
+**Benefits of object_reference**:
+- Validates referenced objects exist
+- Validates object types
+- Auto-syncs to relationships infrastructure
+- Better UI (search, autocomplete)
+- Bidirectional relationships
+- Supports reverse lookups
+
+### Pattern 7: Reverse Relationships (NEW)
+
+```json
+{
+  "columns_authored": {
+    "title": "Columns Authored",
+    "componentType": "reverse_object_reference",
+    "reverse_relationship_type": "authors",
+    "reverse_object_types": ["column"],
+    "helpText": "Columns where this columnist is listed as an author"
+  }
+}
+```
+
+**Use case**: Display list of objects that reference this object
+
+**Features**:
+- Read-only (computed automatically)
+- Shows reverse relationships
+- Filtered by type
+- Links to related objects
+
+**Example**: When a column has `authors: [columnist.id]`, the columnist's `columns_authored` field will automatically show `[column.id]`
 
 ## Validation and Best Practices
 

@@ -39,10 +39,13 @@ const StatusBar = ({
     const [showHistory, setShowHistory] = useState(false);
     const historyRef = useRef(null);
 
+    // Defer state updates to avoid render-phase conflicts
     useExternalChanges(componentId, state => {
-        setIsDirty(state.metadata.isDirty);
-        setErrors(state.metadata.errors);
-        setWarnings(state.metadata.warnings);
+        queueMicrotask(() => {
+            setIsDirty(state.metadata.isDirty);
+            setErrors(state.metadata.errors);
+            setWarnings(state.metadata.warnings);
+        });
     });
 
     // Handle click outside to close history dropdown

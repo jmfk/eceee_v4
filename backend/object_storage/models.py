@@ -11,6 +11,7 @@ database-driven object types for content like news, blogs, events, etc.
 """
 
 from django.db import models, transaction
+from django.db.models import Case, When, F
 from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
 from django.contrib.postgres.indexes import GinIndex
@@ -571,6 +572,16 @@ class ObjectInstance(MPTTModel):
     metadata = models.JSONField(
         default=dict, help_text="Additional extensible properties for this object"
     )
+    relationships = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Many-to-many relationships to other objects with relationship types",
+    )
+    related_from = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Reverse relationships (auto-maintained mirror of relationships field)",
+    )
 
     class Meta:
         ordering = ["-created_at"]
@@ -1047,6 +1058,482 @@ class ObjectInstance(MPTTModel):
 
         return queryset
 
+    # ============================================================================
+    # MANY-TO-MANY RELATIONSHIP METHODS
+    # ============================================================================
+
+    def add_relationship(self, relationship_type, object_id):
+        """
+        Add a many-to-many relationship to another ObjectInstance.
+
+        Args:
+            relationship_type: String identifying the relationship type (e.g., 'authors', 'translators')
+            object_id: Primary key of the related ObjectInstance
+
+        Returns:
+            bool: True if relationship was added, False if it already existed
+
+        Raises:
+            ValueError: If trying to relate to self or if target object doesn't exist
+        """
+        # Prevent self-references
+        if object_id == self.id:
+            raise ValueError("Cannot create relationship to self")
+
+        # Check if target object exists
+        if not ObjectInstance.objects.filter(id=object_id).exists():
+            raise ValueError(f"ObjectInstance with id {object_id} does not exist")
+
+        # Initialize relationships if None
+        if self.relationships is None:
+            self.relationships = []
+
+        # Check for duplicate
+        relationship_obj = {"type": relationship_type, "object_id": object_id}
+        if any(
+            r.get("type") == relationship_type and r.get("object_id") == object_id
+            for r in self.relationships
+        ):
+            return False
+
+        # Add relationship
+        self.relationships.append(relationship_obj)
+        self.save(update_fields=["relationships"])
+
+        # Update reverse relationship
+        self._update_reverse_relationship("add", relationship_type, object_id)
+
+        return True
+
+    def remove_relationship(self, relationship_type, object_id):
+        """
+        Remove a specific relationship.
+
+        Args:
+            relationship_type: String identifying the relationship type
+            object_id: Primary key of the related ObjectInstance
+
+        Returns:
+            bool: True if relationship was removed, False if it didn't exist
+        """
+        if not self.relationships:
+            return False
+
+        # Find and remove the relationship
+        original_length = len(self.relationships)
+        self.relationships = [
+            r
+            for r in self.relationships
+            if not (
+                r.get("type") == relationship_type and r.get("object_id") == object_id
+            )
+        ]
+
+        if len(self.relationships) < original_length:
+            self.save(update_fields=["relationships"])
+            # Update reverse relationship
+            self._update_reverse_relationship("remove", relationship_type, object_id)
+            return True
+
+        return False
+
+    def clear_relationships(self, relationship_type=None):
+        """
+        Clear relationships. If relationship_type is specified, only clear that type.
+
+        Args:
+            relationship_type: Optional type to clear. If None, clears all relationships.
+        """
+        if not self.relationships:
+            return
+
+        # Store relationships to clear for reverse update
+        to_clear = []
+
+        if relationship_type:
+            # Clear specific type
+            to_clear = [
+                r for r in self.relationships if r.get("type") == relationship_type
+            ]
+            self.relationships = [
+                r for r in self.relationships if r.get("type") != relationship_type
+            ]
+        else:
+            # Clear all
+            to_clear = list(self.relationships)
+            self.relationships = []
+
+        self.save(update_fields=["relationships"])
+
+        # Update reverse relationships
+        for rel in to_clear:
+            self._update_reverse_relationship(
+                "remove", rel.get("type"), rel.get("object_id")
+            )
+
+    def set_relationships(self, relationship_type, object_ids):
+        """
+        Replace all relationships of a specific type with a new list.
+
+        Args:
+            relationship_type: String identifying the relationship type
+            object_ids: List of object IDs to set as the new relationships
+
+        Raises:
+            ValueError: If any object_id doesn't exist or is self-referential
+        """
+        # Validate all object IDs exist
+        for obj_id in object_ids:
+            if obj_id == self.id:
+                raise ValueError("Cannot create relationship to self")
+            if not ObjectInstance.objects.filter(id=obj_id).exists():
+                raise ValueError(f"ObjectInstance with id {obj_id} does not exist")
+
+        # Get current relationships of this type
+        if self.relationships is None:
+            self.relationships = []
+
+        current = [r for r in self.relationships if r.get("type") == relationship_type]
+        current_ids = {r.get("object_id") for r in current}
+        new_ids = set(object_ids)
+
+        # Find relationships to remove and add
+        to_remove = current_ids - new_ids
+        to_add = new_ids - current_ids
+
+        # Remove old relationships
+        self.relationships = [
+            r for r in self.relationships if r.get("type") != relationship_type
+        ]
+
+        # Add new relationships
+        for obj_id in object_ids:
+            self.relationships.append({"type": relationship_type, "object_id": obj_id})
+
+        self.save(update_fields=["relationships"])
+
+        # Update reverse relationships
+        for obj_id in to_remove:
+            self._update_reverse_relationship("remove", relationship_type, obj_id)
+        for obj_id in to_add:
+            self._update_reverse_relationship("add", relationship_type, obj_id)
+
+    def reorder_relationships(self, relationship_type, object_ids_in_order):
+        """
+        Reorder relationships of a specific type.
+
+        Args:
+            relationship_type: String identifying the relationship type
+            object_ids_in_order: List of object IDs in the desired order
+
+        Raises:
+            ValueError: If object_ids don't match existing relationships
+        """
+        if self.relationships is None:
+            self.relationships = []
+
+        # Get current relationships of this type
+        current = [r for r in self.relationships if r.get("type") == relationship_type]
+        current_ids = {r.get("object_id") for r in current}
+
+        # Verify the IDs match
+        if set(object_ids_in_order) != current_ids:
+            raise ValueError(
+                "Provided object IDs must exactly match existing relationships"
+            )
+
+        # Remove old relationships of this type
+        self.relationships = [
+            r for r in self.relationships if r.get("type") != relationship_type
+        ]
+
+        # Add them back in the new order
+        for obj_id in object_ids_in_order:
+            self.relationships.append({"type": relationship_type, "object_id": obj_id})
+
+        self.save(update_fields=["relationships"])
+
+    def get_related_objects(self, relationship_type=None, as_queryset=True):
+        """
+        Get related objects, optionally filtered by relationship type.
+
+        Args:
+            relationship_type: Optional type to filter by
+            as_queryset: If True, return QuerySet; if False, return list of dicts with type info
+
+        Returns:
+            QuerySet of ObjectInstance or list of dicts (depending on as_queryset)
+        """
+        if not self.relationships:
+            return ObjectInstance.objects.none() if as_queryset else []
+
+        # Filter by type if specified
+        if relationship_type:
+            rels = [r for r in self.relationships if r.get("type") == relationship_type]
+        else:
+            rels = self.relationships
+
+        if not rels:
+            return ObjectInstance.objects.none() if as_queryset else []
+
+        if as_queryset:
+            # Return queryset preserving order
+            object_ids = [r.get("object_id") for r in rels]
+            # Use Django's preserve order with case
+            preserved = Case(
+                *[When(pk=pk, then=pos) for pos, pk in enumerate(object_ids)]
+            )
+            return ObjectInstance.objects.filter(id__in=object_ids).order_by(preserved)
+        else:
+            # Return list with relationship type info
+            return [
+                {
+                    "type": r.get("type"),
+                    "object_id": r.get("object_id"),
+                    "object": ObjectInstance.objects.filter(
+                        id=r.get("object_id")
+                    ).first(),
+                }
+                for r in rels
+            ]
+
+    def get_related_from_objects(self, relationship_type=None, as_queryset=True):
+        """
+        Get objects that have relationships TO this object (reverse relationships).
+
+        Args:
+            relationship_type: Optional type to filter by
+            as_queryset: If True, return QuerySet; if False, return list of dicts with type info
+
+        Returns:
+            QuerySet of ObjectInstance or list of dicts (depending on as_queryset)
+        """
+        if not self.related_from:
+            return ObjectInstance.objects.none() if as_queryset else []
+
+        # Filter by type if specified
+        if relationship_type:
+            rels = [r for r in self.related_from if r.get("type") == relationship_type]
+        else:
+            rels = self.related_from
+
+        if not rels:
+            return ObjectInstance.objects.none() if as_queryset else []
+
+        if as_queryset:
+            # Return queryset preserving order
+            object_ids = [r.get("object_id") for r in rels]
+            preserved = Case(
+                *[When(pk=pk, then=pos) for pos, pk in enumerate(object_ids)]
+            )
+            return ObjectInstance.objects.filter(id__in=object_ids).order_by(preserved)
+        else:
+            # Return list with relationship type info
+            return [
+                {
+                    "type": r.get("type"),
+                    "object_id": r.get("object_id"),
+                    "object": ObjectInstance.objects.filter(
+                        id=r.get("object_id")
+                    ).first(),
+                }
+                for r in rels
+            ]
+
+    def has_relationship(self, relationship_type, object_id):
+        """
+        Check if a specific relationship exists.
+
+        Args:
+            relationship_type: String identifying the relationship type
+            object_id: Primary key of the related ObjectInstance
+
+        Returns:
+            bool: True if relationship exists
+        """
+        if not self.relationships:
+            return False
+        return any(
+            r.get("type") == relationship_type and r.get("object_id") == object_id
+            for r in self.relationships
+        )
+
+    def get_relationship_types(self):
+        """
+        Get all unique relationship types used by this object.
+
+        Returns:
+            set: Set of relationship type strings
+        """
+        if not self.relationships:
+            return set()
+        return {r.get("type") for r in self.relationships if r.get("type")}
+
+    def count_relationships(self, relationship_type=None):
+        """
+        Count relationships, optionally filtered by type.
+
+        Args:
+            relationship_type: Optional type to filter by
+
+        Returns:
+            int: Number of relationships
+        """
+        if not self.relationships:
+            return 0
+
+        if relationship_type:
+            return sum(
+                1 for r in self.relationships if r.get("type") == relationship_type
+            )
+        return len(self.relationships)
+
+    def _update_reverse_relationship(self, action, relationship_type, object_id):
+        """
+        Internal method to maintain bidirectional sync of relationships.
+        Updates the related_from field on the target object.
+
+        Args:
+            action: 'add' or 'remove'
+            relationship_type: String identifying the relationship type
+            object_id: Primary key of the related ObjectInstance
+        """
+        try:
+            target = ObjectInstance.objects.get(id=object_id)
+        except ObjectInstance.DoesNotExist:
+            return
+
+        if target.related_from is None:
+            target.related_from = []
+
+        reverse_rel = {"type": relationship_type, "object_id": self.id}
+
+        if action == "add":
+            # Add reverse relationship if not already present
+            if not any(
+                r.get("type") == relationship_type and r.get("object_id") == self.id
+                for r in target.related_from
+            ):
+                target.related_from.append(reverse_rel)
+                target.save(update_fields=["related_from"])
+        elif action == "remove":
+            # Remove reverse relationship
+            original_length = len(target.related_from)
+            target.related_from = [
+                r
+                for r in target.related_from
+                if not (
+                    r.get("type") == relationship_type and r.get("object_id") == self.id
+                )
+            ]
+            if len(target.related_from) < original_length:
+                target.save(update_fields=["related_from"])
+
+    def rebuild_related_from(self):
+        """
+        Rebuild this instance's related_from field by scanning all other objects.
+        Useful for repairing broken reverse relationships.
+
+        Returns:
+            int: Number of reverse relationships found and restored
+        """
+        # Find all objects that reference this object in their relationships
+        self.related_from = []
+
+        # Query all objects that might have relationships to this object
+        all_objects = ObjectInstance.objects.exclude(id=self.id).exclude(
+            relationships=[]
+        )
+
+        for obj in all_objects:
+            if obj.relationships:
+                for rel in obj.relationships:
+                    if rel.get("object_id") == self.id:
+                        reverse_rel = {"type": rel.get("type"), "object_id": obj.id}
+                        if reverse_rel not in self.related_from:
+                            self.related_from.append(reverse_rel)
+
+        self.save(update_fields=["related_from"])
+        return len(self.related_from)
+
+    @classmethod
+    def rebuild_all_related_from(cls):
+        """
+        Rebuild related_from fields for all ObjectInstance objects.
+        Useful for bulk repair of broken reverse relationships.
+
+        Returns:
+            dict: Statistics about the rebuild operation
+        """
+        total_objects = cls.objects.count()
+        total_relationships = 0
+
+        # Clear all related_from fields first
+        cls.objects.update(related_from=[])
+
+        # Process each object and rebuild its reverse relationships
+        for obj in cls.objects.exclude(relationships=[]):
+            if obj.relationships:
+                for rel in obj.relationships:
+                    target_id = rel.get("object_id")
+                    rel_type = rel.get("type")
+
+                    if target_id and rel_type:
+                        try:
+                            target = cls.objects.get(id=target_id)
+                            if target.related_from is None:
+                                target.related_from = []
+
+                            reverse_rel = {"type": rel_type, "object_id": obj.id}
+                            if reverse_rel not in target.related_from:
+                                target.related_from.append(reverse_rel)
+                                target.save(update_fields=["related_from"])
+                                total_relationships += 1
+                        except cls.DoesNotExist:
+                            pass  # Skip if target doesn't exist
+
+        return {
+            "total_objects": total_objects,
+            "total_relationships_restored": total_relationships,
+        }
+
+    def delete(self, *args, **kwargs):
+        """
+        Override delete to clean up bidirectional relationships.
+        """
+        # Clean up forward relationships (remove from related_from of targets)
+        if self.relationships:
+            for rel in self.relationships:
+                try:
+                    target = ObjectInstance.objects.get(id=rel.get("object_id"))
+                    if target.related_from:
+                        target.related_from = [
+                            r
+                            for r in target.related_from
+                            if r.get("object_id") != self.id
+                        ]
+                        target.save(update_fields=["related_from"])
+                except ObjectInstance.DoesNotExist:
+                    pass
+
+        # Clean up reverse relationships (remove from relationships of sources)
+        if self.related_from:
+            for rel in self.related_from:
+                try:
+                    source = ObjectInstance.objects.get(id=rel.get("object_id"))
+                    if source.relationships:
+                        source.relationships = [
+                            r
+                            for r in source.relationships
+                            if r.get("object_id") != self.id
+                        ]
+                        source.save(update_fields=["relationships"])
+                except ObjectInstance.DoesNotExist:
+                    pass
+
+        # Call parent delete
+        return super().delete(*args, **kwargs)
+
 
 class ObjectVersion(models.Model):
     """
@@ -1166,6 +1653,122 @@ class ObjectVersion(models.Model):
             return "expired"
 
         return "published"
+
+    def sync_relationships_from_data(self):
+        """
+        Sync object_reference fields in data to ObjectInstance.relationships.
+        Called automatically on save.
+
+        This method:
+        1. Finds all object_reference fields in the schema
+        2. Extracts values from self.data
+        3. Updates ObjectInstance.relationships accordingly
+        """
+        from utils.schema_system import field_registry
+
+        # Get schema fields
+        schema_fields = self.object_instance.object_type.get_schema_fields()
+
+        # Find object_reference fields
+        for field_def in schema_fields:
+            field_name = field_def.get("name")
+            field_type = field_def.get("type")
+
+            if field_type == "object_reference":
+                # Get the value from data
+                value = self.data.get(field_name)
+
+                # Determine relationship type
+                relationship_type = field_def.get("relationship_type", field_name)
+
+                # Normalize value to list
+                if value is None or value == "":
+                    value = []
+                elif not isinstance(value, list):
+                    value = [value]
+
+                # Filter out any non-integer values
+                value = [int(v) for v in value if v]
+
+                # Update the relationship
+                try:
+                    self.object_instance.set_relationships(relationship_type, value)
+                except ValueError as e:
+                    # Log error but don't fail - validation should have caught this
+                    import logging
+
+                    logger = logging.getLogger(__name__)
+                    logger.warning(
+                        f"Failed to sync relationship {relationship_type} for "
+                        f"object {self.object_instance.id}: {str(e)}"
+                    )
+
+    def populate_reverse_references(self):
+        """
+        Populate reverse_object_reference fields in data from related_from.
+        Called when serializing for display.
+
+        This method:
+        1. Finds all reverse_object_reference fields in the schema
+        2. Queries related_from
+        3. Populates self.data with computed values (does not save)
+
+        Note: This modifies self.data temporarily for display purposes only.
+              The changes are not persisted to the database.
+        """
+        # Get schema fields
+        schema_fields = self.object_instance.object_type.get_schema_fields()
+
+        # Find reverse_object_reference fields
+        for field_def in schema_fields:
+            field_name = field_def.get("name")
+            field_type = field_def.get("type")
+
+            if field_type == "reverse_object_reference":
+                # Get configuration
+                reverse_relationship_type = field_def.get("reverse_relationship_type")
+                reverse_object_types = field_def.get("reverse_object_types", [])
+
+                if not reverse_relationship_type:
+                    # Skip if not configured
+                    continue
+
+                # Query related_from
+                if not self.object_instance.related_from:
+                    self.data[field_name] = []
+                    continue
+
+                # Filter by relationship type and object types
+                related_ids = []
+                for rel in self.object_instance.related_from:
+                    if rel.get("type") == reverse_relationship_type:
+                        obj_id = rel.get("object_id")
+
+                        # Filter by object types if specified
+                        if reverse_object_types:
+                            try:
+                                from object_storage.models import ObjectInstance
+
+                                obj = ObjectInstance.objects.get(id=obj_id)
+                                if obj.object_type.name in reverse_object_types:
+                                    related_ids.append(obj_id)
+                            except ObjectInstance.DoesNotExist:
+                                pass
+                        else:
+                            related_ids.append(obj_id)
+
+                # Populate the field
+                self.data[field_name] = related_ids
+
+    def save(self, *args, **kwargs):
+        """
+        Override save to sync relationships from data.
+        """
+        # Call parent save first
+        super().save(*args, **kwargs)
+
+        # Sync relationships after save
+        self.sync_relationships_from_data()
 
     def to_dict(self):
         """Convert to dictionary for API serialization."""
