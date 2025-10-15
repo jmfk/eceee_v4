@@ -71,6 +71,7 @@ export default function PropertyList({
             onMoveDown={() => handleMoveProperty(index, 'down')}
             onDuplicate={(duplicated) => handleDuplicateProperty(index, duplicated)}
             errors={errors}
+            disabled={disabled}
           />
         ))}
       </div>

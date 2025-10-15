@@ -384,9 +384,104 @@ export const objectVersionsApi = {
     }
 }
 
+/**
+ * Object Relationships API
+ */
+export const objectRelationshipsApi = {
+    /**
+     * Search for objects to reference (for object_reference fields)
+     */
+    async searchForReferences(params = {}) {
+        const response = await api.get(`${BASE_URL}/objects/search_for_references/`, { params })
+        return response
+    },
+
+    /**
+     * Get object details by IDs (minimal info for chips/display)
+     */
+    async getObjectDetails(objectIds) {
+        if (!objectIds || objectIds.length === 0) {
+            return { data: [] }
+        }
+        // Query multiple objects by ID
+        const ids = Array.isArray(objectIds) ? objectIds.join(',') : objectIds
+        const response = await api.get(`${BASE_URL}/objects/`, {
+            params: { id__in: ids }
+        })
+        return response
+    },
+
+    /**
+     * Add a relationship
+     */
+    async addRelationship(objectId, relationshipType, relatedObjectId) {
+        const response = await api.post(
+            `${BASE_URL}/objects/${objectId}/add_relationship/`,
+            {
+                relationship_type: relationshipType,
+                object_id: relatedObjectId
+            }
+        )
+        return response
+    },
+
+    /**
+     * Remove a relationship
+     */
+    async removeRelationship(objectId, relationshipType, relatedObjectId) {
+        const response = await api.post(
+            `${BASE_URL}/objects/${objectId}/remove_relationship/`,
+            {
+                relationship_type: relationshipType,
+                object_id: relatedObjectId
+            }
+        )
+        return response
+    },
+
+    /**
+     * Set all relationships of a type
+     */
+    async setRelationships(objectId, relationshipType, objectIds) {
+        const response = await api.put(
+            `${BASE_URL}/objects/${objectId}/set_relationships/`,
+            {
+                relationship_type: relationshipType,
+                object_ids: objectIds
+            }
+        )
+        return response
+    },
+
+    /**
+     * Get related objects
+     */
+    async getRelatedObjects(objectId, relationshipType = null) {
+        const params = relationshipType ? { relationship_type: relationshipType } : {}
+        const response = await api.get(
+            `${BASE_URL}/objects/${objectId}/related_objects/`,
+            { params }
+        )
+        return response
+    },
+
+    /**
+     * Get reverse relationships (related_from)
+     */
+    async getRelatedFromObjects(objectId, relationshipType = null) {
+        const params = relationshipType ? { relationship_type: relationshipType } : {}
+        const response = await api.get(
+            `${BASE_URL}/objects/${objectId}/related_from_objects/`,
+            { params }
+        )
+        return response
+    }
+}
+
 // Export all APIs
 export default {
     objectTypes: objectTypesApi,
     objectInstances: objectInstancesApi,
-    objectVersions: objectVersionsApi
+    objectVersions: objectVersionsApi,
+    objectRelationships: objectRelationshipsApi
 }

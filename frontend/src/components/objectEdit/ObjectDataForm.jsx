@@ -141,6 +141,59 @@ const ObjectDataForm = forwardRef(({
         };
     }, [])
 
+    // Helper function to map componentType to React component name
+    const mapComponentTypeToComponent = (componentType) => {
+        const mapping = {
+            // Basic types
+            'text': 'TextInput',
+            'textarea': 'TextareaInput',
+            'number': 'NumberInput',
+            'boolean': 'BooleanInput',
+            'password': 'PasswordInput',
+            'email': 'EmailInput',
+            'url': 'URLInput',
+
+            // Date/Time
+            'date': 'DateInput',
+            'datetime': 'DateTimeInput',
+            'time': 'TimeInput',
+            'date_range': 'DateRangeInput',
+
+            // Selection
+            'select': 'SelectInput',
+            'multi_select': 'MultiSelectInput',
+            'radio': 'RadioInput',
+            'checkbox': 'CheckboxInput',
+            'tags': 'TagInput',
+
+            // Advanced
+            'color': 'ColorInput',
+            'slider': 'SliderInput',
+
+            // Media
+            'image': 'ImageInput',
+            'file': 'FileInput',
+            'document': 'DocumentInput',
+            'video': 'VideoInput',
+            'audio': 'AudioInput',
+
+            // Rich Text
+            'rich_text': 'RichTextInput',
+
+            // References
+            'user_selector': 'UserSelectorInput',
+            'object_selector': 'ObjectSelectorInput',
+            'object_type_selector': 'ObjectTypeSelectorInput',
+            'object_reference': 'ObjectReferenceInput',
+
+            // List/Complex
+            'items_list': 'ItemsListField',
+            'conditional_group': 'ConditionalGroupField',
+        }
+
+        return mapping[componentType] || 'TextInput' // Default fallback
+    }
+
     // Helper function to convert object type schema to ObjectSchemaForm format
     const getSchemaFromObjectType = useCallback((objectType) => {
         if (!objectType?.schema?.properties) {
@@ -162,13 +215,41 @@ const ObjectDataForm = forwardRef(({
 
             if (properties[propName]) {
                 const property = properties[propName]
-                return {
+
+                // Filter out schema-specific properties that shouldn't be passed to form components
+                const {
+                    componentType,
+                    helpText,
+                    propertyOrder,
+                    relationshipType,
+                    allowedObjectTypes,
+                    maxItems,
+                    type,
+                    properties: nestedProps,
+                    items,
+                    ...componentRelevantProps
+                } = property
+
+                const field = {
                     name: propName,
                     required: required.includes(propName),
-                    ...property,
+                    ...componentRelevantProps,
                     // Map title to label for ObjectSchemaForm compatibility
-                    label: property.title || property.label || propName
+                    label: property.title || property.label || propName,
+                    // Use helpText for description if available
+                    description: property.helpText || property.description,
+                    // Map componentType to component name
+                    component: componentType ? mapComponentTypeToComponent(componentType) : undefined
                 }
+
+                // Add special props for object_reference fields (snake_case for component)
+                if (componentType === 'object_reference') {
+                    if (relationshipType) field.relationship_type = relationshipType
+                    if (allowedObjectTypes) field.allowed_object_types = allowedObjectTypes
+                    if (maxItems !== undefined) field.max_items = maxItems
+                }
+
+                return field
             }
             return null
         }).filter(Boolean)

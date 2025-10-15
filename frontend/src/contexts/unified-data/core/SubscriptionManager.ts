@@ -75,52 +75,63 @@ export class SubscriptionManager {
 
     /**
      * Notify subscribers of state updates
+     * 
+     * Defers callbacks to next microtask to avoid React render-phase conflicts
+     * when one component's update triggers another component's subscription.
      */
     notifyStateUpdate(state: AppState, operation: Operation): void {
         for (const subscription of this.stateSubscriptions.values()) {
-            try {
-                let newValue = state;
-                if (subscription.selector) {
-                    newValue = subscription.selector(state);
-                }
-                
-                // Skip if value hasn't changed according to equality function
-                if (
-                    subscription.lastValue !== undefined &&
-                    subscription.options.equalityFn?.(subscription.lastValue, newValue)
-                ) {
-                    continue;
-                }
+            // Defer callback execution to avoid render-phase conflicts
+            queueMicrotask(() => {
+                try {
+                    let newValue = state;
+                    if (subscription.selector) {
+                        newValue = subscription.selector(state);
+                    }
+                    
+                    // Skip if value hasn't changed according to equality function
+                    if (
+                        subscription.lastValue !== undefined &&
+                        subscription.options.equalityFn?.(subscription.lastValue, newValue)
+                    ) {
+                        return;
+                    }
 
-                const prevValue = subscription.lastValue;
-                subscription.lastValue = newValue;
-                subscription.callback(newValue, operation);
-            } catch (error) {
-                console.error('❌ Error in subscription callback:', error);
-                subscription.options?.onError?.(error as Error);
-            }
+                    const prevValue = subscription.lastValue;
+                    subscription.lastValue = newValue;
+                    subscription.callback(newValue, operation);
+                } catch (error) {
+                    console.error('❌ Error in subscription callback:', error);
+                    subscription.options?.onError?.(error as Error);
+                }
+            });
         }
     }
 
     /**
      * Notify subscribers of operations
+     * 
+     * Defers callbacks to next microtask to avoid React render-phase conflicts.
      */
     notifyOperation(operation: Operation): void {
         for (const subscription of this.operationSubscriptions.values()) {
-            try {
-                // Check if subscription cares about this operation type
-                if (
-                    subscription.operationType &&
-                    !subscription.operationType.includes(operation.type)
-                ) {
-                    continue;
-                }
+            // Defer callback execution to avoid render-phase conflicts
+            queueMicrotask(() => {
+                try {
+                    // Check if subscription cares about this operation type
+                    if (
+                        subscription.operationType &&
+                        !subscription.operationType.includes(operation.type)
+                    ) {
+                        return;
+                    }
 
-                subscription.callback(operation);
-            } catch (error) {
-                console.error('Error in operation subscription callback:', error);
-                subscription.options?.onError?.(error as Error);
-            }
+                    subscription.callback(operation);
+                } catch (error) {
+                    console.error('Error in operation subscription callback:', error);
+                    subscription.options?.onError?.(error as Error);
+                }
+            });
         }
     }
 

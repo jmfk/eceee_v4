@@ -796,6 +796,348 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
                 {"error": f"Move failed: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST
             )
 
+    # ============================================================================
+    # RELATIONSHIP MANAGEMENT ACTIONS
+    # ============================================================================
+
+    @action(detail=True, methods=["get"])
+    def relationships(self, request, pk=None):
+        """
+        Get all relationships for this object.
+
+        Returns relationships grouped by type with related object details.
+        """
+        instance = self.get_object()
+
+        # Get relationships with full object details
+        from .serializers import RelatedObjectSerializer
+
+        relationships_data = instance.get_related_objects(as_queryset=False)
+        serializer = RelatedObjectSerializer(relationships_data, many=True)
+
+        return Response(
+            {"relationships": serializer.data, "count": len(relationships_data)}
+        )
+
+    @action(detail=True, methods=["post"])
+    def add_relationship(self, request, pk=None):
+        """
+        Add a single relationship.
+
+        Request body:
+        {
+            "relationship_type": "authors",
+            "object_id": 123
+        }
+        """
+        instance = self.get_object()
+        relationship_type = request.data.get("relationship_type")
+        object_id = request.data.get("object_id")
+
+        if not relationship_type or not object_id:
+            return Response(
+                {"error": "Both relationship_type and object_id are required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            added = instance.add_relationship(relationship_type, object_id)
+            if added:
+                return Response(
+                    {
+                        "message": "Relationship added successfully",
+                        "relationship": {
+                            "type": relationship_type,
+                            "object_id": object_id,
+                        },
+                    }
+                )
+            else:
+                return Response(
+                    {"message": "Relationship already exists"},
+                    status=status.HTTP_200_OK,
+                )
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=["post"])
+    def remove_relationship(self, request, pk=None):
+        """
+        Remove a specific relationship.
+
+        Request body:
+        {
+            "relationship_type": "authors",
+            "object_id": 123
+        }
+        """
+        instance = self.get_object()
+        relationship_type = request.data.get("relationship_type")
+        object_id = request.data.get("object_id")
+
+        if not relationship_type or not object_id:
+            return Response(
+                {"error": "Both relationship_type and object_id are required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        removed = instance.remove_relationship(relationship_type, object_id)
+        if removed:
+            return Response({"message": "Relationship removed successfully"})
+        else:
+            return Response(
+                {"message": "Relationship not found"}, status=status.HTTP_404_NOT_FOUND
+            )
+
+    @action(detail=True, methods=["put"])
+    def set_relationships(self, request, pk=None):
+        """
+        Replace all relationships of a specific type.
+
+        Request body:
+        {
+            "relationship_type": "authors",
+            "object_ids": [123, 456, 789]
+        }
+        """
+        instance = self.get_object()
+        relationship_type = request.data.get("relationship_type")
+        object_ids = request.data.get("object_ids", [])
+
+        if not relationship_type:
+            return Response(
+                {"error": "relationship_type is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not isinstance(object_ids, list):
+            return Response(
+                {"error": "object_ids must be a list"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            instance.set_relationships(relationship_type, object_ids)
+            return Response(
+                {
+                    "message": f"Relationships of type '{relationship_type}' updated successfully",
+                    "count": len(object_ids),
+                }
+            )
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=["post"])
+    def reorder_relationships(self, request, pk=None):
+        """
+        Reorder relationships of a specific type.
+
+        Request body:
+        {
+            "relationship_type": "authors",
+            "object_ids": [456, 123, 789]  # In desired order
+        }
+        """
+        instance = self.get_object()
+        relationship_type = request.data.get("relationship_type")
+        object_ids = request.data.get("object_ids", [])
+
+        if not relationship_type:
+            return Response(
+                {"error": "relationship_type is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not isinstance(object_ids, list):
+            return Response(
+                {"error": "object_ids must be a list"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            instance.reorder_relationships(relationship_type, object_ids)
+            return Response(
+                {
+                    "message": f"Relationships of type '{relationship_type}' reordered successfully"
+                }
+            )
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=["post"])
+    def clear_relationships(self, request, pk=None):
+        """
+        Clear all relationships or relationships of a specific type.
+
+        Request body (optional):
+        {
+            "relationship_type": "authors"  # If omitted, clears all relationships
+        }
+        """
+        instance = self.get_object()
+        relationship_type = request.data.get("relationship_type")
+
+        instance.clear_relationships(relationship_type)
+
+        if relationship_type:
+            return Response(
+                {
+                    "message": f"Relationships of type '{relationship_type}' cleared successfully"
+                }
+            )
+        else:
+            return Response({"message": "All relationships cleared successfully"})
+
+    @action(detail=True, methods=["get"])
+    def related_objects(self, request, pk=None):
+        """
+        Get related objects with full details.
+
+        Query parameters:
+        - relationship_type: Filter by relationship type (optional)
+        """
+        instance = self.get_object()
+        relationship_type = request.query_params.get("relationship_type")
+
+        # Get related objects
+        related_objs = instance.get_related_objects(
+            relationship_type=relationship_type, as_queryset=False
+        )
+
+        from .serializers import RelatedObjectSerializer
+
+        serializer = RelatedObjectSerializer(related_objs, many=True)
+
+        return Response(
+            {"related_objects": serializer.data, "count": len(related_objs)}
+        )
+
+    @action(detail=True, methods=["get"])
+    def related_from_objects(self, request, pk=None):
+        """
+        Get objects that have relationships TO this object (reverse relationships).
+
+        Query parameters:
+        - relationship_type: Filter by relationship type (optional)
+        """
+        instance = self.get_object()
+        relationship_type = request.query_params.get("relationship_type")
+
+        # Get reverse related objects
+        related_objs = instance.get_related_from_objects(
+            relationship_type=relationship_type, as_queryset=False
+        )
+
+        from .serializers import RelatedObjectSerializer
+
+        serializer = RelatedObjectSerializer(related_objs, many=True)
+
+        return Response(
+            {"related_from_objects": serializer.data, "count": len(related_objs)}
+        )
+
+    @action(detail=True, methods=["post"])
+    def rebuild_related_from(self, request, pk=None):
+        """
+        Rebuild the related_from field by scanning all other objects.
+        Useful for repairing broken reverse relationships.
+        """
+        instance = self.get_object()
+        count = instance.rebuild_related_from()
+
+        return Response(
+            {
+                "message": "Related-from relationships rebuilt successfully",
+                "count": count,
+            }
+        )
+
+    @action(detail=False, methods=["post"])
+    def rebuild_all_related_from(self, request):
+        """
+        Rebuild related_from fields for ALL ObjectInstance objects.
+        Admin/maintenance endpoint for bulk repair.
+        """
+        stats = ObjectInstance.rebuild_all_related_from()
+
+        return Response(
+            {
+                "message": "All related-from relationships rebuilt successfully",
+                "statistics": stats,
+            }
+        )
+
+    @action(detail=False, methods=["get"])
+    def search_for_references(self, request):
+        """
+        Search for objects to reference in object_reference fields.
+
+        Query params:
+        - q: search term (searches title and slug)
+        - object_types: comma-separated type names to filter
+        - page: page number (default: 1)
+        - page_size: results per page (default: 20, max: 100)
+
+        Returns minimal object info for selection UI.
+        """
+        from django.db.models import Q
+        from django.core.paginator import Paginator
+
+        search_term = request.query_params.get("q", "").strip()
+        object_types = request.query_params.get("object_types", "").strip()
+        page = int(request.query_params.get("page", 1))
+        page_size = min(int(request.query_params.get("page_size", 20)), 100)
+
+        # Start with all objects
+        queryset = ObjectInstance.objects.select_related("object_type")
+
+        # Filter by object types if specified
+        if object_types:
+            type_names = [t.strip() for t in object_types.split(",") if t.strip()]
+            if type_names:
+                queryset = queryset.filter(object_type__name__in=type_names)
+
+        # Search by term
+        if search_term:
+            queryset = queryset.filter(
+                Q(title__icontains=search_term) | Q(slug__icontains=search_term)
+            )
+
+        # Order by relevance (title match first) and recency
+        queryset = queryset.order_by("-created_at")
+
+        # Paginate
+        paginator = Paginator(queryset, page_size)
+        page_obj = paginator.get_page(page)
+
+        # Serialize minimal data
+        results = [
+            {
+                "id": obj.id,
+                "title": obj.title,
+                "slug": obj.slug,
+                "object_type": {
+                    "id": obj.object_type.id,
+                    "name": obj.object_type.name,
+                    "label": obj.object_type.label,
+                },
+                "created_at": obj.created_at,
+            }
+            for obj in page_obj
+        ]
+
+        return Response(
+            {
+                "results": results,
+                "count": paginator.count,
+                "page": page,
+                "page_size": page_size,
+                "total_pages": paginator.num_pages,
+                "has_next": page_obj.has_next(),
+                "has_previous": page_obj.has_previous(),
+            }
+        )
+
     @action(detail=False, methods=["get"])
     def roots(self, request):
         """Get all root objects (objects without parents)"""

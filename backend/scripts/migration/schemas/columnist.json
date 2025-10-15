@@ -42,6 +42,13 @@
       "title": "Last Column Date",
       "componentType": "datetime",
       "helpText": "Date of most recent column (auto-updated)"
+    },
+    "columns_authored": {
+      "title": "Columns Authored",
+      "componentType": "reverse_object_reference",
+      "reverse_relationship_type": "authors",
+      "reverse_object_types": ["column"],
+      "helpText": "Columns where this columnist is listed as an author"
     }
   },
   "required": [
@@ -55,11 +62,12 @@
     "affiliation",
     "photoUrl",
     "homePage",
-    "lastColumnDate"
+    "lastColumnDate",
+    "columns_authored"
   ],
   "additionalInfo": {
     "description": "Columnist profile - bio stored in Content Widget",
     "contentWidgetRequired": true,
-    "note": "Biographical information goes in Content Widget. Columns reference columnists via columnistIds."
+    "note": "Biographical information goes in Content Widget. Columns reference columnists via authors field (object_reference). Reverse relationship shown in columns_authored."
   }
 }

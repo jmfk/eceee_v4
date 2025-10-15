@@ -59,6 +59,8 @@ export { default as RichTextInput } from './RichTextInput'
 export { default as UserSelectorInput } from './UserSelectorInput'
 export { default as ObjectSelectorInput } from './ObjectSelectorInput'
 export { default as ObjectTypeSelectorInput } from './ObjectTypeSelectorInput'
+export { default as ObjectReferenceInput } from './ObjectReferenceInput'
+export { default as ReverseObjectReferenceDisplay } from './ReverseObjectReferenceDisplay'
 
 // List Components
 export { default as ItemsListField } from './ItemsListField'
@@ -115,6 +117,8 @@ export const FIELD_COMPONENTS = {
     UserSelectorInput: () => import('./UserSelectorInput'),
     ObjectSelectorInput: () => import('./ObjectSelectorInput'),
     ObjectTypeSelectorInput: () => import('./ObjectTypeSelectorInput'),
+    ObjectReferenceInput: () => import('./ObjectReferenceInput'),
+    ReverseObjectReferenceDisplay: () => import('./ReverseObjectReferenceDisplay'),
     // HTML Source Editor
     HtmlSource: () => import('../fields/HtmlSourceField'),
     // List Components

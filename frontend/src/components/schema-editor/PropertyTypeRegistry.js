@@ -22,6 +22,12 @@ import EmailPropertyConfig from './property-configs/EmailPropertyConfig'
 import URLPropertyConfig from './property-configs/URLPropertyConfig'
 import ColorPropertyConfig from './property-configs/ColorPropertyConfig'
 import SliderPropertyConfig from './property-configs/SliderPropertyConfig'
+import ObjectReferencePropertyConfig from './property-configs/ObjectReferencePropertyConfig'
+import ReverseObjectReferencePropertyConfig from './property-configs/ReverseObjectReferencePropertyConfig'
+import ObjectTypeSelectorPropertyConfig from './property-configs/ObjectTypeSelectorPropertyConfig'
+import UserSelectorPropertyConfig from './property-configs/UserSelectorPropertyConfig'
+import TagPropertyConfig from './property-configs/TagPropertyConfig'
+import DateRangePropertyConfig from './property-configs/DateRangePropertyConfig'
 import GenericPropertyConfig from './property-configs/GenericPropertyConfig'
 
 class PropertyTypeRegistry {
@@ -90,6 +96,15 @@ class PropertyTypeRegistry {
       'PasswordInput': TextPropertyConfig, // Use same config as text
       'ColorInput': ColorPropertyConfig,
       'SliderInput': SliderPropertyConfig,
+      // Reference type components
+      'ObjectReferenceInput': ObjectReferencePropertyConfig,
+      'ReverseObjectReferenceDisplay': ReverseObjectReferencePropertyConfig,
+      'ObjectTypeSelectorInput': ObjectTypeSelectorPropertyConfig,
+      'UserSelectorInput': UserSelectorPropertyConfig,
+      'ObjectSelectorInput': ObjectReferencePropertyConfig, // Use same as ObjectReferenceInput
+      // Advanced input type components
+      'TagInput': TagPropertyConfig,
+      'DateRangeInput': DateRangePropertyConfig,
       // Add more mappings as property config components are created
     }
 

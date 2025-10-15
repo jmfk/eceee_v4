@@ -44,9 +44,9 @@ const DateInput = ({
         }
     }
 
-    const handleChange = (e) => {
-        const dateValue = e.target.value
-        onChange(dateValue || null)
+    const handleChange = (value) => {
+        // ValidatedInput passes the value directly, not the event
+        onChange(value || null)
     }
 
     return (

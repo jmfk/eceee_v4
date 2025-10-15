@@ -12,14 +12,15 @@
       "default": false,
       "helpText": "Mark as featured/priority column"
     },
-    "columnistIds": {
-      "title": "Columnists",
-      "componentType": "array",
-      "items": {
-        "type": "number"
-      },
+    "authors": {
+      "title": "Authors",
+      "componentType": "object_reference",
+      "multiple": true,
+      "max_items": 5,
+      "allowed_object_types": ["columnist"],
+      "relationship_type": "authors",
       "default": [],
-      "helpText": "Array of ObjectInstance IDs for columnists who wrote this column"
+      "helpText": "Select columnists who authored this column"
     }
   },
   "required": [
@@ -27,12 +28,12 @@
   ],
   "propertyOrder": [
     "presentationalPublishingDate",
-    "columnistIds",
+    "authors",
     "priority"
   ],
   "additionalInfo": {
     "description": "Opinion column - content stored in Content Widget",
     "contentWidgetRequired": true,
-    "note": "Column content goes in Content Widget. Columnist relationships stored in columnistIds array. Related news stored in metadata."
+    "note": "Column content goes in Content Widget. Columnists linked via authors field using object_reference. Related news stored in metadata."
   }
 }

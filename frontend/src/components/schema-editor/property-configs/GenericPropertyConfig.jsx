@@ -34,7 +34,7 @@ export default function GenericPropertyConfig({
         <AlertTriangle className="w-4 h-4 text-amber-600 mr-2 mt-0.5" />
         <div className="text-sm text-amber-800">
           <div className="font-medium">Generic Configuration</div>
-          <div>No specific configuration component found for "{property.component}". Using generic settings.</div>
+          <div>No specific configuration component found for "{property.componentType || property.component || 'undefined'}". Using generic settings.</div>
         </div>
       </div>
 
