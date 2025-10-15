@@ -206,7 +206,7 @@ class CodeLayoutViewSet(viewsets.ViewSet):
         response = self._add_rate_limiting_headers(response, request, "list")
         return response
 
-    @action(detail=False, methods=["get"])
+    @action(detail=False, methods=["get"], permission_classes=[permissions.AllowAny])
     def default(self, request):
         """Get the default layout to use when no layout is specified"""
         from ..layout_registry import layout_registry
@@ -215,11 +215,11 @@ class CodeLayoutViewSet(viewsets.ViewSet):
         self._log_metrics(request, "default")
 
         default_layout = layout_registry.get_default_layout()
-        
+
         if not default_layout:
             error_data = {
                 "error": "No default layout available",
-                "message": "No active layouts are registered"
+                "message": "No active layouts are registered",
             }
             return self._create_formatted_response(
                 error_data, request, status.HTTP_404_NOT_FOUND
