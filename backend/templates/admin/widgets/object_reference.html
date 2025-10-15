@@ -1,0 +1,322 @@
+{% load static %}
+
+<div class="object-reference-widget" data-field-name="{{ field_name }}" data-field-config="{{ field_config_json }}">
+    <!-- Hidden Input -->
+    <input type="hidden" name="{{ name }}" id="{{ id }}" value="{{ value_json }}">
+    
+    <!-- Selected Items Display -->
+    <div id="{{ id }}_selected" class="selected-items" style="margin-bottom: 10px;">
+        <!-- Populated by JavaScript -->
+    </div>
+    
+    <!-- Search Input -->
+    <div style="position: relative; margin-bottom: 10px;">
+        <input 
+            type="text" 
+            id="{{ id }}_search" 
+            placeholder="Search for objects to add..."
+            style="width: 100%; padding: 8px 35px 8px 12px; border: 1px solid #ccc; border-radius: 4px;"
+        >
+        <span style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%);">
+            🔍
+        </span>
+    </div>
+    
+    <!-- Search Results -->
+    <div id="{{ id }}_results" class="search-results" style="display: none; border: 1px solid #ccc; border-radius: 4px; max-height: 300px; overflow-y: auto; background: white;">
+        <!-- Populated by JavaScript -->
+    </div>
+    
+    <!-- Direct PK Entry -->
+    <div style="margin-top: 10px; padding: 10px; background: #f8f9fa; border-radius: 4px;">
+        <label style="font-size: 12px; color: #666; margin-bottom: 5px; display: block;">
+            Or add by ID:
+        </label>
+        <div style="display: flex; gap: 5px;">
+            <input 
+                type="number" 
+                id="{{ id }}_pk_input" 
+                placeholder="Enter object ID"
+                style="flex: 1; padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px;"
+            >
+            <button 
+                type="button" 
+                id="{{ id }}_add_pk"
+                style="padding: 6px 12px; background: #417690; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px;"
+            >
+                Add
+            </button>
+        </div>
+    </div>
+    
+    <!-- Info Text -->
+    <div style="margin-top: 10px; font-size: 12px; color: #666;">
+        {% if allowed_types %}
+            <p>Allowed types: {{ allowed_types|join:", " }}</p>
+        {% endif %}
+        {% if max_items %}
+            <p>Maximum {{ max_items }} item{{ max_items|pluralize }}</p>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+    .object-reference-widget .selected-items {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    
+    .object-reference-widget .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 10px;
+        background: #e3f2fd;
+        color: #1976d2;
+        border-radius: 16px;
+        font-size: 13px;
+    }
+    
+    .object-reference-widget .chip button {
+        background: none;
+        border: none;
+        color: #1976d2;
+        cursor: pointer;
+        padding: 0;
+        font-size: 16px;
+        line-height: 1;
+    }
+    
+    .object-reference-widget .chip button:hover {
+        color: #0d47a1;
+    }
+    
+    .object-reference-widget .search-results div {
+        padding: 8px 12px;
+        cursor: pointer;
+        border-bottom: 1px solid #eee;
+    }
+    
+    .object-reference-widget .search-results div:hover {
+        background: #f5f5f5;
+    }
+    
+    .object-reference-widget .search-results .result-title {
+        font-size: 13px;
+        font-weight: 500;
+        color: #333;
+    }
+    
+    .object-reference-widget .search-results .result-meta {
+        font-size: 11px;
+        color: #666;
+        margin-top: 2px;
+    }
+</style>
+
+<script>
+(function() {
+    const widgetId = '{{ id }}';
+    const fieldName = '{{ field_name }}';
+    const fieldConfig = JSON.parse('{{ field_config_json|escapejs }}');
+    const apiBaseUrl = '/api/v1/objects/api';
+    
+    let selectedIds = [];
+    let selectedObjects = {};
+    
+    // Initialize from hidden input
+    try {
+        const initialValue = document.getElementById(widgetId).value;
+        if (initialValue) {
+            const parsed = JSON.parse(initialValue);
+            selectedIds = Array.isArray(parsed) ? parsed : (parsed ? [parsed] : []);
+        }
+    } catch (e) {
+        console.error('Error parsing initial value:', e);
+    }
+    
+    // Fetch object details for selected IDs
+    async function fetchObjectDetails(ids) {
+        if (!ids || ids.length === 0) return;
+        
+        try {
+            const idsParam = ids.join(',');
+            const response = await fetch(`${apiBaseUrl}/objects/?id__in=${idsParam}`, {
+                credentials: 'include'
+            });
+            const data = await response.json();
+            const objects = data.results || data;
+            
+            objects.forEach(obj => {
+                selectedObjects[obj.id] = obj;
+            });
+            
+            renderSelected();
+        } catch (error) {
+            console.error('Error fetching object details:', error);
+        }
+    }
+    
+    // Render selected items
+    function renderSelected() {
+        const container = document.getElementById(widgetId + '_selected');
+        if (!container) return;
+        
+        if (selectedIds.length === 0) {
+            container.innerHTML = '<p style="color: #999; font-size: 13px; font-style: italic;">No objects selected</p>';
+            return;
+        }
+        
+        container.innerHTML = selectedIds.map(id => {
+            const obj = selectedObjects[id];
+            const title = obj ? obj.title : `ID: ${id}`;
+            const objType = obj ? (obj.object_type?.label || obj.objectType?.label || '') : '';
+            
+            return `
+                <div class="chip" data-id="${id}">
+                    <span>${title}${objType ? ` <small>(${objType})</small>` : ''}</span>
+                    <button type="button" onclick="removeObject(${id})" title="Remove">×</button>
+                </div>
+            `;
+        }).join('');
+        
+        updateHiddenInput();
+    }
+    
+    // Update hidden input
+    function updateHiddenInput() {
+        const input = document.getElementById(widgetId);
+        if (fieldConfig.multiple) {
+            input.value = JSON.stringify(selectedIds);
+        } else {
+            input.value = selectedIds.length > 0 ? selectedIds[0] : '';
+        }
+    }
+    
+    // Add object
+    window.addObject = function(objectId) {
+        if (!fieldConfig.multiple) {
+            selectedIds = [objectId];
+        } else {
+            if (selectedIds.includes(objectId)) return;
+            if (fieldConfig.max_items && selectedIds.length >= fieldConfig.max_items) {
+                alert(`Maximum of ${fieldConfig.max_items} items allowed`);
+                return;
+            }
+            selectedIds.push(objectId);
+        }
+        
+        fetchObjectDetails([objectId]);
+    };
+    
+    // Remove object
+    window.removeObject = function(objectId) {
+        selectedIds = selectedIds.filter(id => id !== objectId);
+        renderSelected();
+    };
+    
+    // Search objects
+    let searchTimeout;
+    const searchInput = document.getElementById(widgetId + '_search');
+    const resultsContainer = document.getElementById(widgetId + '_results');
+    
+    searchInput.addEventListener('input', function() {
+        clearTimeout(searchTimeout);
+        const searchTerm = this.value.trim();
+        
+        if (!searchTerm) {
+            resultsContainer.style.display = 'none';
+            return;
+        }
+        
+        searchTimeout = setTimeout(() => {
+            performSearch(searchTerm);
+        }, 300); // Debounce
+    });
+    
+    async function performSearch(searchTerm) {
+        const allowedTypes = fieldConfig.allowed_object_types || [];
+        const typesParam = allowedTypes.join(',');
+        
+        try {
+            const params = new URLSearchParams({
+                q: searchTerm,
+                page_size: 20
+            });
+            
+            if (typesParam) {
+                params.append('object_types', typesParam);
+            }
+            
+            const response = await fetch(
+                `${apiBaseUrl}/objects/search_for_references/?${params}`,
+                { credentials: 'include' }
+            );
+            const data = await response.json();
+            
+            renderSearchResults(data.results || []);
+        } catch (error) {
+            console.error('Search error:', error);
+            resultsContainer.innerHTML = '<div style="padding: 10px; color: #d32f2f;">Search failed</div>';
+        }
+    }
+    
+    function renderSearchResults(results) {
+        if (results.length === 0) {
+            resultsContainer.innerHTML = '<div style="padding: 10px; color: #999;">No results found</div>';
+            resultsContainer.style.display = 'block';
+            return;
+        }
+        
+        resultsContainer.innerHTML = results.map(obj => {
+            const isSelected = selectedIds.includes(obj.id);
+            return `
+                <div onclick="selectFromSearch(${obj.id}, ${JSON.stringify(obj).replace(/"/g, '&quot;')})" 
+                     style="${isSelected ? 'opacity: 0.5; cursor: not-allowed;' : ''}" 
+                     ${isSelected ? 'title="Already selected"' : ''}>
+                    <div class="result-title">${obj.title}</div>
+                    <div class="result-meta">
+                        ${obj.object_type?.label || obj.objectType?.label} • ID: ${obj.id}
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+        resultsContainer.style.display = 'block';
+    }
+    
+    window.selectFromSearch = function(objectId, objectData) {
+        if (selectedIds.includes(objectId)) return;
+        
+        selectedObjects[objectId] = objectData;
+        addObject(objectId);
+        
+        // Clear search
+        searchInput.value = '';
+        resultsContainer.style.display = 'none';
+    };
+    
+    // Direct PK add
+    document.getElementById(widgetId + '_add_pk').addEventListener('click', function() {
+        const pkInput = document.getElementById(widgetId + '_pk_input');
+        const pk = parseInt(pkInput.value, 10);
+        
+        if (!isNaN(pk) && pk > 0) {
+            addObject(pk);
+            pkInput.value = '';
+        }
+    });
+    
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!searchInput.contains(e.target) && !resultsContainer.contains(e.target)) {
+            resultsContainer.style.display = 'none';
+        }
+    });
+    
+    // Initial render
+    fetchObjectDetails(selectedIds);
+})();
+</script>
+
