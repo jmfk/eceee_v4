@@ -60,7 +60,9 @@ const ObjectPublishingView = ({ objectType, instance, isNewInstance, onSave, onC
         onSuccess: () => {
             addNotification('Version published successfully', 'success')
             loadVersions()
+            // Invalidate both the single object and the list
             queryClient.invalidateQueries({ queryKey: ['objectInstance', instance?.id] })
+            queryClient.invalidateQueries({ queryKey: ['objectInstances'] })
 
             // Notify UDC that publishing state changed
             if (instance?.id) {
@@ -84,7 +86,9 @@ const ObjectPublishingView = ({ objectType, instance, isNewInstance, onSave, onC
         onSuccess: () => {
             addNotification('Version unpublished successfully', 'success')
             loadVersions()
+            // Invalidate both the single object and the list
             queryClient.invalidateQueries({ queryKey: ['objectInstance', instance?.id] })
+            queryClient.invalidateQueries({ queryKey: ['objectInstances'] })
 
             // Notify UDC that publishing state changed
             if (instance?.id) {
@@ -114,7 +118,9 @@ const ObjectPublishingView = ({ objectType, instance, isNewInstance, onSave, onC
             addNotification('Version scheduled successfully', 'success')
             setScheduleModalOpen(false)
             loadVersions()
+            // Invalidate both the single object and the list
             queryClient.invalidateQueries({ queryKey: ['objectInstance', instance?.id] })
+            queryClient.invalidateQueries({ queryKey: ['objectInstances'] })
 
             // Notify UDC that publishing state changed
             if (instance?.id) {
@@ -139,7 +145,9 @@ const ObjectPublishingView = ({ objectType, instance, isNewInstance, onSave, onC
             const action = variables.isFeatured ? 'marked as featured' : 'unmarked as featured'
             addNotification(`Version ${action}`, 'success')
             loadVersions()
+            // Invalidate both the single object and the list
             queryClient.invalidateQueries({ queryKey: ['objectInstance', instance?.id] })
+            queryClient.invalidateQueries({ queryKey: ['objectInstances'] })
         },
         onError: (error) => {
             console.error('Failed to toggle featured status:', error)
@@ -271,8 +279,8 @@ const ObjectPublishingView = ({ objectType, instance, isNewInstance, onSave, onC
                                                                 onClick={() => handleToggleFeatured(version)}
                                                                 disabled={toggleFeaturedMutation.isPending}
                                                                 className={`p-1 rounded transition-colors ${version.isFeatured
-                                                                        ? 'text-yellow-500 hover:text-yellow-600'
-                                                                        : 'text-gray-300 hover:text-yellow-400'
+                                                                    ? 'text-yellow-500 hover:text-yellow-600'
+                                                                    : 'text-gray-300 hover:text-yellow-400'
                                                                     }`}
                                                                 title={version.isFeatured ? 'Remove featured status' : 'Mark as featured'}
                                                             >

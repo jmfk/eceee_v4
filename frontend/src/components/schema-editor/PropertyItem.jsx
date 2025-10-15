@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { ChevronDown, ChevronRight, AlertCircle } from 'lucide-react'
-import { getPropertyTypeByComponent, getAllPropertyTypes, getAvailableComponentTypes } from './PropertyTypeRegistry'
+import { getPropertyTypeByComponent, getPropertyType, getAllPropertyTypes, getAvailableComponentTypes } from './PropertyTypeRegistry'
 import PropertyIcon from './components/PropertyIcon'
 import PropertyActions from './components/PropertyActions'
 import PropertyPreview from './components/PropertyPreview'
@@ -22,13 +22,17 @@ export default function PropertyItem({
   onMoveUp,
   onMoveDown,
   onDuplicate,
-  errors = {}
+  errors = {},
+  disabled = false
 }) {
   const [isExpanded, setIsExpanded] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
 
   // Get the appropriate config component for this property type
-  const propertyType = getPropertyTypeByComponent(property.component)
+  // property.componentType contains the field type KEY (e.g., "object_reference")
+  // We look up by the field type key to get the PropertyConfig component
+  const fieldTypeKey = property.componentType
+  const propertyType = fieldTypeKey ? getPropertyType(fieldTypeKey) : null
   const ConfigComponent = propertyType?.component || GenericPropertyConfig
 
   // Validation errors for this property
@@ -153,7 +157,7 @@ export default function PropertyItem({
 
       {/* Expanded Configuration */}
       {isExpanded && (
-        <div className="px-4 py-4 bg-gray-50">
+        <div className="px-4 py-4 bg-white border-t border-gray-200">
           {/* Error Display */}
           {hasErrors && (
             <div className="mb-4 bg-red-50 border border-red-200 rounded-md p-3">
@@ -176,6 +180,7 @@ export default function PropertyItem({
             property={property}
             onChange={handlePropertyChange}
             errors={propertyErrors}
+            disabled={disabled}
             onValidate={(isValid) => {
               // TODO: Handle validation feedback
             }}

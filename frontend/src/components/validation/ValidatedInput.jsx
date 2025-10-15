@@ -26,6 +26,7 @@ export default function ValidatedInput({
     context,
     formData,
     fieldName,
+    fieldType, // Filter out fieldType - not a valid HTML attribute
     children,
     ...props
 }) {

@@ -32,6 +32,79 @@ class NamespaceSerializer(serializers.ModelSerializer):
         read_only_fields = ["id"]
 
 
+class RelationshipSerializer(serializers.Serializer):
+    """Serializer for individual relationship objects in the relationships field"""
+
+    type = serializers.CharField(
+        max_length=100,
+        help_text="Relationship type (e.g., 'authors', 'translators', 'related_articles')",
+    )
+    object_id = serializers.IntegerField(
+        help_text="Primary key of the related ObjectInstance"
+    )
+
+    def validate_object_id(self, value):
+        """Validate that the referenced object exists"""
+        if not ObjectInstance.objects.filter(id=value).exists():
+            raise serializers.ValidationError(
+                f"ObjectInstance with id {value} does not exist"
+            )
+        return value
+
+
+class RelatedObjectSerializer(serializers.Serializer):
+    """Serializer for displaying related objects with full details"""
+
+    type = serializers.CharField()
+    object_id = serializers.IntegerField()
+    object = serializers.SerializerMethodField()
+
+    def get_object(self, obj):
+        """Get the related object details"""
+        from .models import ObjectInstance
+
+        instance = ObjectInstance.objects.filter(id=obj.get("object_id")).first()
+        if instance:
+            return {
+                "id": instance.id,
+                "title": instance.title,
+                "slug": instance.slug,
+                "object_type": {
+                    "id": instance.object_type.id,
+                    "name": instance.object_type.name,
+                    "label": instance.object_type.label,
+                },
+            }
+        return None
+
+
+class ObjectReferenceFieldSerializer(serializers.Serializer):
+    """
+    Serializer for validating object_reference field values.
+
+    This can be used standalone or as part of larger serializers.
+    Validates that referenced objects exist and match allowed types.
+    """
+
+    value = serializers.JSONField()
+    field_config = serializers.JSONField()
+
+    def validate(self, attrs):
+        """Validate the object reference field value"""
+        from utils.schema_system import validate_object_reference
+        from django.core.exceptions import ValidationError as DjangoValidationError
+
+        value = attrs.get("value")
+        field_config = attrs.get("field_config", {})
+
+        try:
+            validate_object_reference(value, field_config)
+        except DjangoValidationError as e:
+            raise serializers.ValidationError({"value": str(e)})
+
+        return attrs
+
+
 class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
     """Serializer for Object Type Definitions"""
 
@@ -101,6 +174,16 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
         """Return count of object instances of this type"""
         return obj.objectinstance_set.count()
 
+    def to_representation(self, instance):
+        """Convert representation to camelCase for frontend"""
+        data = super().to_representation(instance)
+
+        # Convert schema keys from snake_case to camelCase for frontend
+        if "schema" in data and data["schema"]:
+            data["schema"] = self._convert_schema_keys_to_camel(data["schema"])
+
+        return data
+
     def get_allowed_child_types(self, obj):
         """Return full object data for allowed child types"""
         child_types = obj.allowed_child_types.filter(is_active=True)
@@ -119,6 +202,77 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
         """Return slot configuration as-is (snake_case)"""
         return obj.slot_configuration or {}
 
+    def _camel_to_snake(self, name: str) -> str:
+        """Convert camelCase to snake_case"""
+        import re
+
+        return re.sub(r"(?<!^)(?=[A-Z])", "_", name).lower()
+
+    def _snake_to_camel(self, name: str) -> str:
+        """Convert snake_case to camelCase"""
+        components = name.split("_")
+        return components[0] + "".join(x.title() for x in components[1:])
+
+    def _convert_schema_keys_to_snake(self, schema: dict) -> dict:
+        """Convert schema property keys and references to snake_case for backend storage"""
+        if not isinstance(schema, dict):
+            return schema
+
+        converted = {**schema}
+
+        # Convert properties object keys
+        if "properties" in converted and isinstance(converted["properties"], dict):
+            old_props = converted["properties"]
+            converted["properties"] = {
+                self._camel_to_snake(key): value for key, value in old_props.items()
+            }
+
+        # Convert required array items
+        if "required" in converted and isinstance(converted["required"], list):
+            converted["required"] = [
+                self._camel_to_snake(key) for key in converted["required"]
+            ]
+
+        # Convert propertyOrder array items
+        if "propertyOrder" in converted and isinstance(
+            converted["propertyOrder"], list
+        ):
+            converted["propertyOrder"] = [
+                self._camel_to_snake(key) for key in converted["propertyOrder"]
+            ]
+
+        return converted
+
+    def _convert_schema_keys_to_camel(self, schema: dict) -> dict:
+        """Convert schema property keys and references to camelCase for frontend"""
+        if not isinstance(schema, dict):
+            return schema
+
+        converted = {**schema}
+
+        # Convert properties object keys
+        if "properties" in converted and isinstance(converted["properties"], dict):
+            old_props = converted["properties"]
+            converted["properties"] = {
+                self._snake_to_camel(key): value for key, value in old_props.items()
+            }
+
+        # Convert required array items
+        if "required" in converted and isinstance(converted["required"], list):
+            converted["required"] = [
+                self._snake_to_camel(key) for key in converted["required"]
+            ]
+
+        # Convert propertyOrder array items
+        if "propertyOrder" in converted and isinstance(
+            converted["propertyOrder"], list
+        ):
+            converted["propertyOrder"] = [
+                self._snake_to_camel(key) for key in converted["propertyOrder"]
+            ]
+
+        return converted
+
     def validate_name(self, value):
         """Validate object type name"""
         if not value.islower():
@@ -131,6 +285,9 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
 
     def validate_schema(self, value):
         """Validate schema structure using the general schema system"""
+        # Convert camelCase keys to snake_case for backend storage
+        value = self._convert_schema_keys_to_snake(value)
+
         try:
             validate_schema(value, "object_type")
         except ValidationError as e:
@@ -429,6 +586,9 @@ class ObjectInstanceSerializer(serializers.ModelSerializer):
     parent = serializers.PrimaryKeyRelatedField(
         queryset=ObjectInstance.objects.all(), required=False, allow_null=True
     )
+    status = (
+        serializers.SerializerMethodField()
+    )  # Computed status based on version publication
     is_published = serializers.SerializerMethodField()
     children_count = serializers.SerializerMethodField()
     version_count = serializers.SerializerMethodField()
@@ -462,6 +622,8 @@ class ObjectInstanceSerializer(serializers.ModelSerializer):
             "is_published",
             "children_count",
             "version_count",
+            "relationships",
+            "related_from",
         ]
         read_only_fields = [
             "id",
@@ -471,11 +633,32 @@ class ObjectInstanceSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
             "created_by",
+            "related_from",
         ]
 
     def get_object_id(self, obj):
-        """Return publication status"""
+        """Return object ID"""
         return obj.id
+
+    def get_status(self, obj):
+        """Return computed publication status based on current published version"""
+        # Check if object has a currently published version
+        current_version = obj.get_current_published_version()
+
+        if current_version:
+            # Has a published version
+            return "published"
+
+        # Check if there's a version scheduled for future
+        latest_version = obj.get_latest_version()
+        if latest_version and latest_version.effective_date:
+            from django.utils import timezone
+
+            if latest_version.effective_date > timezone.now():
+                return "scheduled"
+
+        # Default to draft
+        return "draft"
 
     def get_is_published(self, obj):
         """Return publication status"""
@@ -521,6 +704,38 @@ class ObjectInstanceSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Widgets must be a JSON object")
         return value
 
+    def validate_relationships(self, value):
+        """Validate relationships field"""
+        if not isinstance(value, list):
+            raise serializers.ValidationError("Relationships must be a list")
+
+        # Validate each relationship object
+        for idx, rel in enumerate(value):
+            if not isinstance(rel, dict):
+                raise serializers.ValidationError(
+                    f"Relationship at index {idx} must be an object"
+                )
+
+            # Check required fields
+            if "type" not in rel:
+                raise serializers.ValidationError(
+                    f"Relationship at index {idx} missing 'type' field"
+                )
+            if "object_id" not in rel:
+                raise serializers.ValidationError(
+                    f"Relationship at index {idx} missing 'object_id' field"
+                )
+
+            # Validate object exists
+            if not ObjectInstance.objects.filter(id=rel["object_id"]).exists():
+                raise serializers.ValidationError(
+                    f"ObjectInstance with id {rel['object_id']} does not exist"
+                )
+
+            # Prevent self-reference (will be checked in validate() with instance context)
+
+        return value
+
     def validate(self, attrs):
         """Cross-field validation"""
         # Validate parent-child relationship
@@ -544,6 +759,14 @@ class ObjectInstanceSerializer(serializers.ModelSerializer):
         if attrs.get("object_type_id") and attrs.get("widgets"):
             object_type = ObjectTypeDefinition.objects.get(id=attrs["object_type_id"])
             self._validate_widgets_against_slots(attrs["widgets"], object_type)
+
+        # Validate relationships don't reference self
+        if attrs.get("relationships") and self.instance:
+            for rel in attrs["relationships"]:
+                if rel.get("object_id") == self.instance.id:
+                    raise serializers.ValidationError(
+                        {"relationships": "Cannot create relationship to self"}
+                    )
 
         return attrs
 
@@ -736,6 +959,64 @@ class ObjectVersionSerializer(serializers.ModelSerializer):
     def get_publication_status(self, obj):
         """Get human-readable publication status based on dates"""
         return obj.get_publication_status()
+
+    def validate_data(self, value):
+        """Validate data field including object_reference fields"""
+        if not isinstance(value, dict):
+            raise serializers.ValidationError("Data must be a JSON object")
+
+        # Get the object instance from context or instance
+        object_instance = self.instance.object_instance if self.instance else None
+
+        # If we don't have an object instance yet, we can't validate object_reference fields
+        if not object_instance:
+            return value
+
+        # Get schema fields
+        schema_fields = object_instance.object_type.get_schema_fields()
+
+        # Validate object_reference fields
+        from utils.schema_system import (
+            validate_object_reference,
+            validate_reverse_object_reference,
+        )
+
+        for field_def in schema_fields:
+            field_name = field_def.get("name")
+            field_type = field_def.get("type")
+
+            if field_type == "object_reference":
+                field_value = value.get(field_name)
+                try:
+                    validate_object_reference(field_value, field_def)
+                except ValidationError as e:
+                    raise serializers.ValidationError({field_name: str(e)})
+
+            elif field_type == "reverse_object_reference":
+                field_value = value.get(field_name)
+                # Only validate if the field is present in the data
+                if field_name in value:
+                    try:
+                        validate_reverse_object_reference(field_value, field_def)
+                    except ValidationError as e:
+                        raise serializers.ValidationError({field_name: str(e)})
+
+        return value
+
+    def to_representation(self, instance):
+        """
+        Add reverse reference fields to representation.
+        Populates reverse_object_reference fields dynamically.
+        """
+        data = super().to_representation(instance)
+
+        # Populate reverse references
+        instance.populate_reverse_references()
+
+        # Update data field with populated values
+        data["data"] = instance.data
+
+        return data
 
 
 class ObjectVersionListSerializer(serializers.ModelSerializer):
