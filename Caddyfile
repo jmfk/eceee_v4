@@ -11,20 +11,23 @@
     # Enable compression
     encode gzip
     
-    # Django admin and API
+    # Static files (must come first, no trailing slash handling)
+    handle_path /static/* {
+        reverse_proxy backend:8000
+    }
+    
+    # Media files (must come first, no trailing slash handling)
+    handle_path /media/* {
+        reverse_proxy backend:8000
+    }
+    
+    # Django admin
     handle /admin* {
         reverse_proxy backend:8000
     }
     
+    # API
     handle /api/* {
-        reverse_proxy backend:8000
-    }
-    
-    handle /static/* {
-        reverse_proxy backend:8000
-    }
-    
-    handle /media/* {
         reverse_proxy backend:8000
     }
     
