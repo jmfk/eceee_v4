@@ -254,6 +254,11 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# Whitenoise configuration for production static file serving
+WHITENOISE_AUTOREFRESH = DEBUG  # Only auto-refresh in development
+WHITENOISE_USE_FINDERS = DEBUG
+WHITENOISE_MANIFEST_STRICT = False  # Don't fail on missing files
 STATICFILES_DIRS = [
     BASE_DIR / "static",
 ]
@@ -446,7 +451,7 @@ if not DEBUG:
     # Proxy/Reverse proxy settings (for Caddy)
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     USE_X_FORWARDED_HOST = True
-    
+
     # Security headers
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
