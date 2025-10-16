@@ -491,6 +491,17 @@ AWS_S3_ENDPOINT_URL = config("AWS_S3_ENDPOINT_URL", default="http://minio:9000")
 AWS_S3_REGION_NAME = config("AWS_S3_REGION_NAME", default="us-east-1")
 AWS_S3_USE_SSL = config("AWS_S3_USE_SSL", default=False, cast=bool)
 
+# S3 Client Configuration (for Linode Object Storage compatibility)
+AWS_S3_SIGNATURE_VERSION = config("AWS_S3_SIGNATURE_VERSION", default="s3v4")
+AWS_S3_ADDRESSING_STYLE = config("AWS_S3_ADDRESSING_STYLE", default="path")
+AWS_S3_FILE_OVERWRITE = False
+AWS_S3_OBJECT_PARAMETERS = {
+    "CacheControl": "max-age=86400",
+}
+
+# Use S3 for media storage
+DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
+
 # Media File Handling Configuration
 MEDIA_FILE_MAX_SIZE = 100 * 1024 * 1024  # 100MB
 MEDIA_ALLOWED_TYPES = [
