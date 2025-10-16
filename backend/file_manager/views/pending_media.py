@@ -27,6 +27,16 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
 
     permission_classes = [permissions.IsAuthenticated]
 
+    def get_permissions(self):
+        """
+        Override permissions for preview action.
+        
+        Preview needs to be public since <img> tags can't send auth headers.
+        """
+        if self.action == 'preview':
+            return [permissions.AllowAny()]
+        return super().get_permissions()
+
     def get_queryset(self):
         """Filter pending files by user and namespace access."""
         # For approval/rejection actions, allow access to all statuses
