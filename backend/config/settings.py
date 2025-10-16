@@ -177,6 +177,7 @@ MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "webpages.middleware.DynamicHostValidationMiddleware",  # Must be before SecurityMiddleware
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",  # Serve static files (must be after SecurityMiddleware)
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
