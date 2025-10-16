@@ -64,18 +64,23 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
         return PendingMediaFileDetailSerializer
 
     @action(
-        detail=True, methods=["get"], permission_classes=[permissions.IsAuthenticated]
+        detail=True, methods=["get"], permission_classes=[permissions.AllowAny]
     )
     def preview(self, request, pk=None):
-        """Get preview/thumbnail of pending media file."""
+        """
+        Get preview/thumbnail of pending media file.
+        
+        Public endpoint since <img> tags can't send auth headers.
+        File access is secured by UUID (hard to guess).
+        """
         try:
             pending_file = self.get_object()
 
-            # Check if user has access to this file
-            if not request.user.is_staff and pending_file.uploaded_by != request.user:
-                return Response(
-                    {"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN
-                )
+            # Optional: Could check user if authenticated, but allow anonymous for img tags
+            # if not request.user.is_staff and pending_file.uploaded_by != request.user:
+            #     return Response(
+            #         {"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN
+            #     )
 
             # For images, serve the actual file
             if pending_file.file_type == "image":
