@@ -499,10 +499,18 @@ AWS_S3_OBJECT_PARAMETERS = {
     "CacheControl": "max-age=86400",
 }
 
-# Disable AWS SDK checksums (Linode Object Storage doesn't support CRC32/SHA256 trailing checksums)
-# See: https://github.com/boto/botocore/issues/2746
-import os
-os.environ["AWS_CHECKSUM_ALGORITHM"] = "NONE"
+# Disable flexible checksums that Linode Object Storage doesn't support
+# This prevents boto3 from using aws-chunked encoding and CRC32 checksums
+from botocore.config import Config
+AWS_S3_CLIENT_CONFIG = Config(
+    s3={
+        "use_accelerate_endpoint": False,
+        "addressing_style": "path",
+    },
+    signature_version="s3v4",
+    # Disable flexible checksums completely
+    disable_request_compression=True,
+)
 
 # Use S3 for media storage  
 DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
