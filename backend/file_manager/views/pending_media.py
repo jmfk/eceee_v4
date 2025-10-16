@@ -30,10 +30,10 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
     def get_permissions(self):
         """
         Override permissions for preview action.
-        
+
         Preview needs to be public since <img> tags can't send auth headers.
         """
-        if self.action == 'preview':
+        if self.action == "preview":
             return [permissions.AllowAny()]
         return super().get_permissions()
 
@@ -61,8 +61,12 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
                 # If namespace slug doesn't exist, return empty queryset
                 queryset = queryset.none()
 
+        # For preview action, don't filter by user (anonymous access allowed)
+        if self.action == "preview":
+            return queryset.order_by("-created_at")
+
         # Users can only see their own pending files unless they're staff
-        if not self.request.user.is_staff:
+        if not self.request.user.is_staff and self.request.user.is_authenticated:
             queryset = queryset.filter(uploaded_by=self.request.user)
 
         return queryset.order_by("-created_at")
@@ -77,7 +81,7 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
     def preview(self, request, pk=None):
         """
         Get preview/thumbnail of pending media file.
-        
+
         Public endpoint since <img> tags can't send auth headers.
         File access is secured by UUID (hard to guess).
         """
