@@ -497,7 +497,10 @@ AWS_S3_ADDRESSING_STYLE = config("AWS_S3_ADDRESSING_STYLE", default="path")
 AWS_S3_FILE_OVERWRITE = False
 AWS_S3_OBJECT_PARAMETERS = {
     "CacheControl": "max-age=86400",
+    "ACL": "public-read",  # Make uploaded files publicly accessible
 }
+AWS_DEFAULT_ACL = "public-read"  # Default ACL for all uploads
+AWS_QUERYSTRING_AUTH = False  # Don't use signed URLs since files are public
 
 # boto3 1.26.137 doesn't have flexible checksums (added in 1.28+)
 # So we don't need to disable them
