@@ -5,6 +5,7 @@ Configured for boto3 1.26.137 (before flexible checksums) with public-read ACL.
 """
 
 from storages.backends.s3boto3 import S3Boto3Storage
+from django.conf import settings
 
 
 class LinodeObjectStorage(S3Boto3Storage):
@@ -13,11 +14,14 @@ class LinodeObjectStorage(S3Boto3Storage):
     
     - Works with boto3 1.26.137 (before flexible checksums that broke Linode compatibility)
     - Uploads files with public-read ACL for direct access
-    - Uses imgproxy-compatible URLs (s3:// protocol)
+    - Returns s3:// protocol URLs for imgproxy
     """
     
     # Force public-read ACL on all uploads
     default_acl = 'public-read'
+    
+    # Don't sign URLs - use direct s3:// protocol for imgproxy
+    querystring_auth = False
     
     # File settings
     file_overwrite = False
@@ -28,12 +32,24 @@ class LinodeObjectStorage(S3Boto3Storage):
         'ACL': 'public-read',
     }
     
+    # Custom domain uses s3:// protocol for imgproxy
+    custom_domain = None
+    
+    def __init__(self, **settings_dict):
+        super().__init__(**settings_dict)
+        # Disable URL signing globally
+        self.querystring_auth = False
+    
     def url(self, name, parameters=None, expire=None, http_method=None):
         """
-        Return S3 protocol URL for imgproxy compatibility.
+        Return S3 protocol URL for imgproxy.
         
-        Returns s3://bucket/path instead of HTTPS URL so imgproxy can process it.
+        imgproxy connects to S3 using its own credentials, so we return
+        s3://bucket/path format instead of HTTPS URLs.
         """
-        from django.conf import settings
-        # Return S3 protocol URL that imgproxy understands
-        return f"s3://{settings.AWS_STORAGE_BUCKET_NAME}/{name}"
+        # Clean the name (remove any leading slashes)
+        name = name.lstrip('/')
+        
+        # Return S3 protocol URL
+        bucket = settings.AWS_STORAGE_BUCKET_NAME
+        return f"s3://{bucket}/{name}"
