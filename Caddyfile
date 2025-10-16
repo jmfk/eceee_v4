@@ -3,7 +3,7 @@
 
 {
     # Global options
-    email {$EMAIL:noreply@localhost}
+    email {$EMAIL:noreply@eceee.fred.nu}
 }
 
 # Public Content Site - Django backend serving public pages
