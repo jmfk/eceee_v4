@@ -7,3 +7,4 @@ gunicorn>=21.2.0
 # Production monitoring (optional)
 # sentry-sdk>=1.39.0
 
+
