@@ -63,11 +63,12 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
                 queryset = queryset.none()
 
         # For preview action, don't filter by user (anonymous access allowed)
+        # Just return the base queryset without user filtering
         if self.action == "preview":
-            return queryset.order_by("-created_at")
+            return queryset
 
         # Users can only see their own pending files unless they're staff
-        if not self.request.user.is_staff and self.request.user.is_authenticated:
+        if self.request.user.is_authenticated and not self.request.user.is_staff:
             queryset = queryset.filter(uploaded_by=self.request.user)
 
         return queryset.order_by("-created_at")
