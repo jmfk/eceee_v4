@@ -82,18 +82,15 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
     def preview(self, request, pk=None):
         """
         Get preview/thumbnail of pending media file.
-
+        
         Public endpoint since <img> tags can't send auth headers.
         File access is secured by UUID (hard to guess).
         """
         try:
+            logger.info(f"Preview request for pk={pk}, user={request.user}, authenticated={request.user.is_authenticated}")
+            
             pending_file = self.get_object()
-
-            # Optional: Could check user if authenticated, but allow anonymous for img tags
-            # if not request.user.is_staff and pending_file.uploaded_by != request.user:
-            #     return Response(
-            #         {"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN
-            #     )
+            logger.info(f"Got pending file: {pending_file.id}, status={pending_file.status}")
 
             # For images, serve the actual file
             if pending_file.file_type == "image":
@@ -107,10 +104,11 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
                     response["Content-Disposition"] = (
                         f'inline; filename="{pending_file.original_filename}"'
                     )
+                    logger.info(f"Successfully served preview for {pending_file.original_filename}")
                     return response
 
                 except Exception as e:
-                    logger.error(f"Error serving pending file preview: {str(e)}")
+                    logger.error(f"Error serving pending file preview: {str(e)}", exc_info=True)
                     return Response(
                         {"error": "File not found"}, status=status.HTTP_404_NOT_FOUND
                     )
@@ -121,7 +119,7 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
                 )
 
         except Exception as e:
-            logger.error(f"Error in preview action: {str(e)}")
+            logger.error(f"Error in preview action: {str(e)}", exc_info=True)
             return Response(
                 {"error": "Internal server error"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
