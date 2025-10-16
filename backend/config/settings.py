@@ -500,7 +500,9 @@ AWS_S3_OBJECT_PARAMETERS = {
     "ACL": "public-read",  # Make uploaded files publicly accessible
 }
 AWS_DEFAULT_ACL = "public-read"  # Default ACL for all uploads
-AWS_QUERYSTRING_AUTH = False  # Don't use signed URLs since files are public
+AWS_QUERYSTRING_AUTH = False  # Don't use signed URLs
+AWS_S3_CUSTOM_DOMAIN = None  # Don't use custom domain, use s3:// URLs for imgproxy
+AWS_S3_URL_PROTOCOL = "s3:"  # Use s3:// protocol for imgproxy compatibility
 
 # boto3 1.26.137 doesn't have flexible checksums (added in 1.28+)
 # So we don't need to disable them
