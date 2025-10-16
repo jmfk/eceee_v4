@@ -4,12 +4,6 @@
 {
     # Global options
     email {$EMAIL:noreply@localhost}
-    # Enable HTTP/3
-    servers {
-        protocol {
-            experimental_http3
-        }
-    }
 }
 
 # Main site
