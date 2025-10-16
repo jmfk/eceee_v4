@@ -1,4 +1,4 @@
-# Caddyfile for ECEEE v4 Production
+# Caddyfile for ECEEE v4 Production - Three Site Architecture
 # Caddy automatically handles HTTPS/TLS certificates via Let's Encrypt
 
 {
@@ -6,32 +6,64 @@
     email {$EMAIL:noreply@localhost}
 }
 
-# Main site
-{$DOMAIN:localhost} {
-    # Enable compression
+# Public Content Site - Django backend serving public pages
+eceee.fred.nu {
     encode gzip
     
-    # Static files (use handle, not handle_path, to preserve the full path)
+    # Block admin access on public site (redirect to admin subdomain)
+    handle /admin* {
+        redir https://admin.eceee.fred.nu{uri} permanent
+    }
+    
+    # Serve static files
     handle /static/* {
         reverse_proxy backend:8000
     }
     
-    # Media files (use handle, not handle_path, to preserve the full path)
+    # Serve media files
     handle /media/* {
         reverse_proxy backend:8000
     }
     
-    # Django admin
-    handle /admin* {
-        reverse_proxy backend:8000
-    }
-    
-    # API
+    # API endpoints
     handle /api/* {
         reverse_proxy backend:8000
     }
     
-    # Frontend (default)
+    # All other requests go to Django backend
+    handle /* {
+        reverse_proxy backend:8000
+    }
+}
+
+# Django Admin Site - Admin panel only
+admin.eceee.fred.nu {
+    encode gzip
+    
+    # All requests go to Django admin
+    reverse_proxy backend:8000
+}
+
+# React CMS Editor - Frontend application for content editing
+app.eceee.fred.nu {
+    encode gzip
+    
+    # API calls go to backend
+    handle /api/* {
+        reverse_proxy backend:8000
+    }
+    
+    # Static files from backend
+    handle /static/* {
+        reverse_proxy backend:8000
+    }
+    
+    # Media files from backend
+    handle /media/* {
+        reverse_proxy backend:8000
+    }
+    
+    # Everything else goes to React app
     handle /* {
         reverse_proxy frontend:80
     }

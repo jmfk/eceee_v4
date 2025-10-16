@@ -49,8 +49,8 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_HOST=db
       - POSTGRES_PORT=5432
-      - ALLOWED_HOSTS=${DOMAIN:-localhost},www.${DOMAIN:-localhost},localhost,backend,127.0.0.1
-      - CORS_ALLOWED_ORIGINS=https://${DOMAIN:-localhost}
+      - ALLOWED_HOSTS=eceee.fred.nu,admin.eceee.fred.nu,app.eceee.fred.nu,localhost,backend,127.0.0.1
+      - CORS_ALLOWED_ORIGINS=https://eceee.fred.nu,https://admin.eceee.fred.nu,https://app.eceee.fred.nu
       - SECRET_KEY=${DJANGO_SECRET_KEY}
       
       # Proxy settings for Caddy reverse proxy
