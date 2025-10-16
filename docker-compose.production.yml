@@ -53,6 +53,10 @@ services:
       - CORS_ALLOWED_ORIGINS=https://${DOMAIN:-localhost}
       - SECRET_KEY=${DJANGO_SECRET_KEY}
       
+      # Proxy settings for Caddy reverse proxy
+      - SECURE_PROXY_SSL_HEADER=HTTP_X_FORWARDED_PROTO,https
+      - USE_X_FORWARDED_HOST=True
+      
       # Use Linode Object Storage in production
       - AWS_ACCESS_KEY_ID=${LINODE_OBJECT_STORAGE_ACCESS_KEY}
       - AWS_SECRET_ACCESS_KEY=${LINODE_OBJECT_STORAGE_SECRET_KEY}
