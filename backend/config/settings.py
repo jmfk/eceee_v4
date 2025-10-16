@@ -499,18 +499,8 @@ AWS_S3_OBJECT_PARAMETERS = {
     "CacheControl": "max-age=86400",
 }
 
-# Disable flexible checksums that Linode Object Storage doesn't support
-# This prevents boto3 from using aws-chunked encoding and CRC32 checksums
-from botocore.config import Config
-AWS_S3_CLIENT_CONFIG = Config(
-    s3={
-        "use_accelerate_endpoint": False,
-        "addressing_style": "path",
-    },
-    signature_version="s3v4",
-    # Disable flexible checksums completely
-    disable_request_compression=True,
-)
+# boto3 1.26.137 doesn't have flexible checksums (added in 1.28+)
+# So we don't need to disable them
 
 # Use custom Linode Object Storage backend (disables checksums)
 DEFAULT_FILE_STORAGE = "file_manager.linode_storage.LinodeObjectStorage"
