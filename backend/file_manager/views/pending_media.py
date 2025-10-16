@@ -73,9 +73,7 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
             return PendingMediaFileListSerializer
         return PendingMediaFileDetailSerializer
 
-    @action(
-        detail=True, methods=["get"], permission_classes=[permissions.AllowAny]
-    )
+    @action(detail=True, methods=["get"])
     def preview(self, request, pk=None):
         """
         Get preview/thumbnail of pending media file.
