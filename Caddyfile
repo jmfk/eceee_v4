@@ -8,85 +8,29 @@
 
 # Main site
 {$DOMAIN:localhost} {
-    # Enable gzip compression
-    encode gzip zstd
-
-    # Security headers
-    header {
-        # Enable HSTS
-        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
-        # Prevent clickjacking
-        X-Frame-Options "SAMEORIGIN"
-        # Prevent MIME sniffing
-        X-Content-Type-Options "nosniff"
-        # Enable XSS protection
-        X-XSS-Protection "1; mode=block"
-        # Referrer policy
-        Referrer-Policy "strict-origin-when-cross-origin"
-        # Permissions policy
-        Permissions-Policy "geolocation=(), microphone=(), camera=()"
-    }
-
-    # Health check endpoint
-    handle /health {
-        respond "OK" 200
-    }
-
-    # Static files from Django
-    handle /static/* {
-        reverse_proxy backend:8000
-    }
-
-    # Media files from Django
-    handle /media/* {
-        reverse_proxy backend:8000
-    }
-
-    # Django admin
+    # Enable compression
+    encode gzip
+    
+    # Django admin and API
     handle /admin* {
         reverse_proxy backend:8000
     }
-
-    # API endpoints
+    
     handle /api/* {
-        reverse_proxy backend:8000 {
-            # API timeout settings
-            timeout 300s
-            
-            # Pass real IP
-            header_up X-Real-IP {remote_host}
-            header_up X-Forwarded-For {remote_host}
-            header_up X-Forwarded-Proto {scheme}
-        }
-    }
-
-    # GraphQL endpoint (if using)
-    handle /graphql* {
         reverse_proxy backend:8000
     }
-
-    # Frontend (React/Vite)
+    
+    handle /static/* {
+        reverse_proxy backend:8000
+    }
+    
+    handle /media/* {
+        reverse_proxy backend:8000
+    }
+    
+    # Frontend (default)
     handle /* {
-        reverse_proxy frontend:80 {
-            # SPA fallback
-            header_up X-Real-IP {remote_host}
-            header_up X-Forwarded-For {remote_host}
-            header_up X-Forwarded-Proto {scheme}
-        }
+        reverse_proxy frontend:80
     }
-
-    # Logging
-    log {
-        output file /data/access.log {
-            roll_size 100mb
-            roll_keep 5
-        }
-        format json
-    }
-}
-
-# Redirect www to non-www (if needed)
-www.{$DOMAIN:localhost} {
-    redir https://{$DOMAIN:localhost}{uri} permanent
 }
 
