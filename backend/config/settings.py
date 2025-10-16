@@ -512,8 +512,8 @@ AWS_S3_CLIENT_CONFIG = Config(
     disable_request_compression=True,
 )
 
-# Use S3 for media storage  
-DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
+# Use custom Linode Object Storage backend (disables checksums)
+DEFAULT_FILE_STORAGE = "file_manager.linode_storage.LinodeObjectStorage"
 
 # Media File Handling Configuration
 MEDIA_FILE_MAX_SIZE = 100 * 1024 * 1024  # 100MB
