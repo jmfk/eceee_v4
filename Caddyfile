@@ -11,13 +11,13 @@
     # Enable compression
     encode gzip
     
-    # Static files (must come first, no trailing slash handling)
-    handle_path /static/* {
+    # Static files (use handle, not handle_path, to preserve the full path)
+    handle /static/* {
         reverse_proxy backend:8000
     }
     
-    # Media files (must come first, no trailing slash handling)
-    handle_path /media/* {
+    # Media files (use handle, not handle_path, to preserve the full path)
+    handle /media/* {
         reverse_proxy backend:8000
     }
     
