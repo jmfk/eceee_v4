@@ -443,6 +443,11 @@ os.makedirs(BASE_DIR / "logs", exist_ok=True)
 
 # Security Settings for Production
 if not DEBUG:
+    # Proxy/Reverse proxy settings (for Caddy)
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    USE_X_FORWARDED_HOST = True
+    
+    # Security headers
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
