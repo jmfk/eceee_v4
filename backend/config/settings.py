@@ -507,8 +507,15 @@ AWS_S3_URL_PROTOCOL = "s3:"  # Use s3:// protocol for imgproxy compatibility
 # boto3 1.26.137 doesn't have flexible checksums (added in 1.28+)
 # So we don't need to disable them
 
-# Use custom Linode Object Storage backend (disables checksums)
-DEFAULT_FILE_STORAGE = "file_manager.linode_storage.LinodeObjectStorage"
+# Django 4.2+ STORAGES configuration
+STORAGES = {
+    "default": {
+        "BACKEND": "file_manager.linode_storage.LinodeObjectStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
 
 # Media File Handling Configuration
 MEDIA_FILE_MAX_SIZE = 100 * 1024 * 1024  # 100MB
