@@ -322,6 +322,7 @@ PERFORMANCE_MONITORING = {
 
 # Security headers middleware
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+USE_X_FORWARDED_HOST = True  # Trust X-Forwarded-Host header from Caddy proxy
 USE_TZ = True
 
 # Additional security settings
