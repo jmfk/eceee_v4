@@ -40,7 +40,8 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         """Filter pending files by user and namespace access."""
         # For approval/rejection actions, allow access to all statuses
-        if self.action in ["approve", "reject"]:
+        if self.action in ["approve", "reject", "preview"]:
+            # Allow accessing all statuses for these actions
             queryset = PendingMediaFile.objects.all()
         else:
             # For list/retrieve actions, only show pending files
