@@ -30,12 +30,27 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
     def get_permissions(self):
         """
         Override permissions for preview action.
-
+        
         Preview needs to be public since <img> tags can't send auth headers.
         """
         if self.action == "preview":
             return [permissions.AllowAny()]
         return super().get_permissions()
+
+    def get_object(self):
+        """
+        Override get_object for preview action to bypass user filtering.
+        
+        For preview, we need to allow anonymous access, so we can't filter
+        by user which would cause errors with AnonymousUser objects.
+        """
+        if self.action == "preview":
+            # Get object directly without user filtering
+            lookup_url_kwarg = self.lookup_url_kwarg or self.lookup_field
+            filter_kwargs = {self.lookup_field: self.kwargs[lookup_url_kwarg]}
+            obj = PendingMediaFile.objects.get(**filter_kwargs)
+            return obj
+        return super().get_object()
 
     def get_queryset(self):
         """Filter pending files by user and namespace access."""
