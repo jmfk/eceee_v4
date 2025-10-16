@@ -499,7 +499,12 @@ AWS_S3_OBJECT_PARAMETERS = {
     "CacheControl": "max-age=86400",
 }
 
-# Use S3 for media storage
+# Disable AWS SDK checksums (Linode Object Storage doesn't support CRC32/SHA256 trailing checksums)
+# See: https://github.com/boto/botocore/issues/2746
+import os
+os.environ["AWS_CHECKSUM_ALGORITHM"] = "NONE"
+
+# Use S3 for media storage  
 DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
 
 # Media File Handling Configuration
