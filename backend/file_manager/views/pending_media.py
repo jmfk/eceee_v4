@@ -30,7 +30,7 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
     def get_permissions(self):
         """
         Override permissions for preview action.
-        
+
         Preview needs to be public since <img> tags can't send auth headers.
         """
         if self.action == "preview":
@@ -40,7 +40,7 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
     def get_object(self):
         """
         Override get_object for preview action to bypass user filtering.
-        
+
         For preview, we need to allow anonymous access, so we can't filter
         by user which would cause errors with AnonymousUser objects.
         """
@@ -98,15 +98,19 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
     def preview(self, request, pk=None):
         """
         Get preview/thumbnail of pending media file.
-        
+
         Public endpoint since <img> tags can't send auth headers.
         File access is secured by UUID (hard to guess).
         """
         try:
-            logger.info(f"Preview request for pk={pk}, user={request.user}, authenticated={request.user.is_authenticated}")
-            
+            logger.info(
+                f"Preview request for pk={pk}, user={request.user}, authenticated={request.user.is_authenticated}"
+            )
+
             pending_file = self.get_object()
-            logger.info(f"Got pending file: {pending_file.id}, status={pending_file.status}")
+            logger.info(
+                f"Got pending file: {pending_file.id}, status={pending_file.status}"
+            )
 
             # For images, serve the actual file
             if pending_file.file_type == "image":
@@ -120,11 +124,15 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
                     response["Content-Disposition"] = (
                         f'inline; filename="{pending_file.original_filename}"'
                     )
-                    logger.info(f"Successfully served preview for {pending_file.original_filename}")
+                    logger.info(
+                        f"Successfully served preview for {pending_file.original_filename}"
+                    )
                     return response
 
                 except Exception as e:
-                    logger.error(f"Error serving pending file preview: {str(e)}", exc_info=True)
+                    logger.error(
+                        f"Error serving pending file preview: {str(e)}", exc_info=True
+                    )
                     return Response(
                         {"error": "File not found"}, status=status.HTTP_404_NOT_FOUND
                     )
