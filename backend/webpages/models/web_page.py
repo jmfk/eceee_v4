@@ -1,246 +1,14 @@
 """
-Web Page Publishing System Models
+WebPage Model
 
-This module defines the core models for the hierarchical web page management system:
-- WebPage: Core page entity with hierarchy support and code-based layouts
-- PageVersion: Version control for pages
-- PageTheme: Theme configurations for styling
-- Widget types are now code-based (see widgets.py)
-- PageWidget: Widget instances on pages
-
-Note: Layout templates are now defined as code-based classes, not database models.
+Core page entity supporting hierarchical organization and inheritance.
 """
 
 from django.db import models, transaction
 from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
 from django.contrib.postgres.indexes import GinIndex
-from django.utils import timezone
-from django.urls import reverse
 from django.core.exceptions import ValidationError
-import json
-
-
-# PageLayout model removed - now using code-based layouts only
-
-
-class PageTheme(models.Model):
-    """
-    Theme configurations for page styling including colors, fonts, and CSS.
-    Themes can be inherited through the page hierarchy.
-    Supports HTML element-specific styling and can be applied to pages, layouts, and object types.
-    """
-
-    name = models.CharField(max_length=255, unique=True)
-    description = models.TextField(blank=True)
-    css_variables = models.JSONField(
-        default=dict, help_text="JSON object with CSS custom properties"
-    )
-    html_elements = models.JSONField(
-        default=dict,
-        help_text="JSON object defining styles for HTML elements (h1-h6, p, ul, ol, li, a, blockquote, code, pre, etc.)",
-    )
-    image_styles = models.JSONField(
-        default=dict,
-        help_text="JSON object defining named image styles for widgets (alignment, columns, spacing, etc.)",
-    )
-    custom_css = models.TextField(
-        blank=True, help_text="Additional custom CSS for this theme"
-    )
-    image = models.ImageField(
-        upload_to="theme_images/",
-        blank=True,
-        null=True,
-        help_text="Theme preview image for listings and selection",
-    )
-    is_active = models.BooleanField(default=True)
-    is_default = models.BooleanField(
-        default=False,
-        help_text="Whether this is the default theme for object content editors",
-    )
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    created_by = models.ForeignKey(User, on_delete=models.PROTECT)
-
-    class Meta:
-        ordering = ["created_at"]  # Oldest first
-
-    def __str__(self):
-        return self.name
-
-    def to_dict(self):
-        """Convert theme to dictionary representation"""
-        return {
-            "id": self.id,
-            "name": self.name,
-            "description": self.description,
-            "css_variables": self.css_variables,
-            "html_elements": self.html_elements,
-            "image_styles": self.image_styles,
-            "custom_css": self.custom_css,
-            "image": self.image.url if self.image else None,
-            "is_active": self.is_active,
-            "is_default": self.is_default,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
-            "created_by": self.created_by.username if self.created_by else None,
-        }
-
-    def save(self, *args, **kwargs):
-        """Override save to ensure only one default theme exists"""
-        if self.is_default:
-            # Clear any existing default themes
-            PageTheme.objects.filter(is_default=True).exclude(id=self.id).update(
-                is_default=False
-            )
-        super().save(*args, **kwargs)
-
-    @classmethod
-    def get_default_theme(cls):
-        """Get the default theme for object content editors"""
-        try:
-            return cls.objects.get(is_default=True, is_active=True)
-        except cls.DoesNotExist:
-            # No default theme exists, try to create one
-            return cls._ensure_default_theme_exists()
-        except cls.MultipleObjectsReturned:
-            # If somehow multiple defaults exist, return the first one and fix the data
-            default_theme = cls.objects.filter(is_default=True, is_active=True).first()
-            cls.objects.filter(is_default=True).exclude(id=default_theme.id).update(
-                is_default=False
-            )
-            return default_theme
-
-    @classmethod
-    def _ensure_default_theme_exists(cls):
-        """Ensure a default theme exists, create one if necessary"""
-        from django.contrib.auth.models import User
-
-        # Check if any active themes exist
-        active_themes = cls.objects.filter(is_active=True)
-
-        if active_themes.exists():
-            # Set the first active theme as default
-            first_theme = active_themes.first()
-            first_theme.is_default = True
-            first_theme.save()
-            return first_theme
-        else:
-            # Create a basic default theme
-            admin_user = User.objects.filter(is_superuser=True).first()
-            if not admin_user:
-                admin_user = User.objects.filter(is_staff=True).first()
-            if not admin_user:
-                # Create a system user if no admin exists
-                admin_user = User.objects.create_user(
-                    username="system", is_staff=True, is_superuser=True
-                )
-
-            default_theme = cls.objects.create(
-                name="System Default",
-                description="Automatically created default theme for object content editors",
-                css_variables={
-                    "primary": "#3b82f6",
-                    "secondary": "#64748b",
-                    "text": "#1f2937",
-                    "background": "#ffffff",
-                    "border": "#e5e7eb",
-                },
-                html_elements={
-                    "h1": {
-                        "color": "var(--primary)",
-                        "font-size": "2rem",
-                        "font-weight": "700",
-                        "margin-bottom": "1rem",
-                    },
-                    "h2": {
-                        "color": "var(--primary)",
-                        "font-size": "1.5rem",
-                        "font-weight": "600",
-                        "margin-bottom": "0.75rem",
-                    },
-                    "p": {
-                        "color": "var(--text)",
-                        "line-height": "1.6",
-                        "margin-bottom": "1rem",
-                    },
-                    "a": {"color": "var(--primary)", "text-decoration": "underline"},
-                },
-                is_active=True,
-                is_default=True,
-                created_by=admin_user,
-            )
-            return default_theme
-
-    def generate_css(self, scope=".theme-content"):
-        """Generate complete CSS for this theme including variables, HTML elements, and custom CSS"""
-        css_parts = []
-
-        # CSS Variables
-        if self.css_variables:
-            variables_css = f"{scope} {{\n"
-            for var_name, var_value in self.css_variables.items():
-                variables_css += f"  --{var_name}: {var_value};\n"
-            variables_css += "}"
-            css_parts.append(variables_css)
-
-        # HTML Elements styling
-        if self.html_elements:
-            element_css = self._generate_element_css(scope)
-            if element_css:
-                css_parts.append(element_css)
-
-        # Custom CSS (scoped)
-        if self.custom_css:
-            scoped_custom_css = self._scope_custom_css(self.custom_css, scope)
-            css_parts.append(scoped_custom_css)
-
-        return "\n\n".join(css_parts)
-
-    def _generate_element_css(self, scope):
-        """Generate CSS for HTML elements defined in html_elements"""
-        css_parts = []
-
-        for element, styles in self.html_elements.items():
-            if not styles:
-                continue
-
-            # Build CSS rule for this element
-            selector = f"{scope} {element}"
-            css_rule = f"{selector} {{\n"
-
-            for property_name, property_value in styles.items():
-                css_rule += f"  {property_name}: {property_value};\n"
-
-            css_rule += "}"
-            css_parts.append(css_rule)
-
-        return "\n\n".join(css_parts)
-
-    def _scope_custom_css(self, custom_css, scope):
-        """Scope custom CSS to the given scope selector"""
-        if not custom_css.strip():
-            return ""
-
-        # Simple scoping - prepend scope to each rule
-        # This is a basic implementation; for production, consider using a CSS parser
-        lines = custom_css.split("\n")
-        scoped_lines = []
-
-        for line in lines:
-            stripped = line.strip()
-            if (
-                stripped
-                and not stripped.startswith("/*")
-                and not stripped.startswith("*/")
-                and "{" in stripped
-            ):
-                # This is a CSS rule, scope it
-                if not stripped.startswith(scope):
-                    line = line.replace(stripped, f"{scope} {stripped}")
-            scoped_lines.append(line)
-
-        return "\n".join(scoped_lines)
 
 
 class WebPage(models.Model):
@@ -654,7 +422,7 @@ class WebPage(models.Model):
             BaseLayout instance for code layouts, or None
         """
         # Import here to avoid circular imports
-        from .layout_registry import layout_registry
+        from ..layout_registry import layout_registry
 
         # Check for code-based layout from current version
         current_version = self.get_current_published_version()
@@ -713,7 +481,7 @@ class WebPage(models.Model):
             current_version = self.get_latest_version()
 
         if current_version and current_version.code_layout:
-            from .layout_registry import layout_registry
+            from ..layout_registry import layout_registry
 
             if layout_registry.is_registered(current_version.code_layout):
                 return "code"
@@ -723,6 +491,9 @@ class WebPage(models.Model):
 
     def get_effective_theme(self):
         """Get the theme for this page, inheriting from parent if needed"""
+        # Avoid circular import
+        from .page_theme import PageTheme
+
         # Check current published version theme
         current_version = self.get_current_published_version()
         if current_version and current_version.theme:
@@ -832,7 +603,7 @@ class WebPage(models.Model):
 
         # Validate path_pattern_key against registry
         if self.path_pattern_key:
-            from .path_pattern_registry import path_pattern_registry
+            from ..path_pattern_registry import path_pattern_registry
 
             if not path_pattern_registry.is_registered(self.path_pattern_key):
                 raise ValidationError(
@@ -866,7 +637,7 @@ class WebPage(models.Model):
 
     def get_layout_inheritance_info(self):
         """Get detailed information about code-based layout inheritance"""
-        from .layout_registry import layout_registry
+        from ..layout_registry import layout_registry
 
         inheritance_info = {
             "effective_layout": None,
@@ -932,6 +703,8 @@ class WebPage(models.Model):
 
     def get_theme_inheritance_info(self):
         """Get detailed information about theme inheritance"""
+        from .page_theme import PageTheme
+
         inheritance_info = {
             "effective_theme": None,
             "inherited_from": None,
@@ -1200,7 +973,7 @@ class WebPage(models.Model):
 
             # MERGE MODE: Combine widgets based on inheritance behavior
             if inheritance_info[slot_name]["merge_mode"]:
-                from .json_models import WidgetInheritanceBehavior
+                from ..json_models import WidgetInheritanceBehavior
 
                 # Categorize local widgets by inheritance behavior
                 before_widgets = []
@@ -1298,7 +1071,7 @@ class WebPage(models.Model):
 
     def _widget_inheritable_at_depth(self, widget, depth):
         """Check if widget should be inherited at the given depth"""
-        from .json_models import WidgetInheritanceBehavior
+        from ..json_models import WidgetInheritanceBehavior
 
         # Get inheritance behavior (with backward compatibility)
         inheritance_behavior = widget.get("inheritance_behavior")
@@ -1399,7 +1172,6 @@ class WebPage(models.Model):
     def create_version(self, user, version_title=""):
         """Create a new version snapshot of the current page state"""
         from django.utils import timezone
-        from django.db import transaction
 
         # Use atomic transaction to prevent race conditions
         with transaction.atomic():
@@ -1437,6 +1209,9 @@ class WebPage(models.Model):
             # If still no widgets found, use empty dict (not list - the model should use dict as default)
             if not widgets_data:
                 widgets_data = {}
+
+            # Import PageVersion here to avoid circular import
+            from .page_version import PageVersion
 
             # Create new version (no legacy status fields)
             version = PageVersion.objects.create(
@@ -1602,7 +1377,7 @@ class WebPage(models.Model):
         Returns:
             Dictionary with widget CSS data organized by slot and widget
         """
-        from .css_validation import css_injection_manager
+        from ..css_validation import css_injection_manager
 
         widgets_css = {}
         css_dependencies = []
@@ -1658,7 +1433,7 @@ class WebPage(models.Model):
         Returns:
             Tuple of (is_valid, errors, warnings)
         """
-        from .css_validation import css_injection_manager
+        from ..css_validation import css_injection_manager
 
         all_errors = []
         all_warnings = []
@@ -1710,7 +1485,7 @@ class WebPage(models.Model):
         Returns:
             Complete CSS string for injection
         """
-        from .css_validation import css_injection_manager
+        from ..css_validation import css_injection_manager
 
         css_parts = []
         css_data = self.get_effective_css_data()
@@ -1923,7 +1698,7 @@ class WebPage(models.Model):
 
             # Also try to import and use the middleware method if available
             try:
-                from .middleware import DynamicHostValidationMiddleware
+                from ..middleware import DynamicHostValidationMiddleware
 
                 DynamicHostValidationMiddleware.clear_hostname_cache()
             except ImportError:
@@ -1932,558 +1707,3 @@ class WebPage(models.Model):
         except Exception:
             # Don't fail if cache is not available
             pass
-
-
-class PageVersion(models.Model):
-    """
-    Version control system for pages. Stores complete page state snapshots.
-    Enables rollback, comparison, and change tracking with draft/published workflow.
-    """
-
-    page = models.ForeignKey(WebPage, on_delete=models.CASCADE, related_name="versions")
-    version_number = models.PositiveIntegerField()
-    version_title = models.TextField(
-        blank=True, help_text="Description of changes in this version"
-    )
-
-    change_summary = models.JSONField(
-        default=dict,
-        blank=True,
-        help_text="Summary of specific changes made in this version",
-    )
-
-    meta_title = models.TextField(blank=True, help_text="Meta Title")
-    meta_description = models.TextField(
-        blank=True, default="", help_text="Meta Description"
-    )
-    code_layout = models.CharField(
-        max_length=255,
-        blank=True,
-        help_text="Name of code-based layout class. Leave blank to inherit from parent",
-    )
-
-    # Snapshot of page data at this version
-    page_data = models.JSONField(help_text="Serialized page data (excluding widgets)")
-
-    # Widget data for this version
-    widgets = models.JSONField(
-        default=dict,
-        help_text="Widget configuration data for this version (slot_name -> widgets array)",
-    )
-
-    theme = models.ForeignKey(
-        PageTheme,
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL,
-        help_text="Leave blank to inherit from parent",
-    )
-
-    # Enhanced CSS injection system
-    page_css_variables = models.JSONField(
-        default=dict,
-        blank=True,
-        help_text="Page-specific CSS variables that override theme variables",
-    )
-    page_custom_css = models.TextField(
-        blank=True, help_text="Page-specific custom CSS injected after theme CSS"
-    )
-    enable_css_injection = models.BooleanField(
-        default=True, help_text="Whether to enable dynamic CSS injection for this page"
-    )
-
-    # Publishing dates (new date-based system)
-    effective_date = models.DateTimeField(
-        null=True,
-        blank=True,
-        help_text="When this version becomes live/published",
-        db_index=True,
-    )
-    expiry_date = models.DateTimeField(
-        null=True,
-        blank=True,
-        help_text="When this version should no longer be live",
-        db_index=True,
-    )
-
-    # Tags for content organization
-    tags = ArrayField(
-        models.CharField(max_length=50),
-        default=list,
-        blank=True,
-        help_text="List of tag names for organizing and categorizing page versions",
-    )
-
-    # Timestamps and ownership
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    created_by = models.ForeignKey(User, on_delete=models.PROTECT)
-
-    class Meta:
-        ordering = ["-version_number"]
-        unique_together = ["page", "version_number"]
-
-    def __str__(self):
-        return f"{self.version_title} v{self.version_number}"
-
-    def extract_widget_content(self):
-        """
-        Extract all HTML content from widgets in this version.
-
-        Returns:
-            str: Combined HTML content from all widgets
-        """
-        html_content = []
-
-        for slot_widgets in self.widgets.values():
-            for widget in slot_widgets:
-                # Extract content from widget data based on widget type
-                if widget.get("type") == "Content":
-                    if "content" in widget.get("data", {}):
-                        html_content.append(widget["data"]["content"])
-                # Add other widget types that may contain HTML content here
-
-        return "\n".join(html_content)
-
-    def update_media_references(self):
-        """
-        Update media references for this version's content.
-        Should be called whenever widget content changes.
-        """
-        from file_manager.utils import update_media_references
-
-        # Get old content before save
-        if self.pk:
-            old_version = PageVersion.objects.get(pk=self.pk)
-            old_content = old_version.extract_widget_content()
-        else:
-            old_content = ""
-
-        new_content = self.extract_widget_content()
-
-        # Update references
-        update_media_references(
-            content_type="webpage",
-            content_id=str(self.page.id),
-            old_content=old_content,
-            new_content=new_content,
-        )
-
-    def save(self, *args, **kwargs):
-        """Override save to handle media references"""
-        # First do the actual save
-        super().save(*args, **kwargs)
-
-        # Then update media references
-        self.update_media_references()
-
-    def clean(self):
-        """Validate the version data"""
-        super().clean()
-
-        # Validate effective and expiry dates
-        if (
-            self.effective_date
-            and self.expiry_date
-            and self.effective_date >= self.expiry_date
-        ):
-            from django.core.exceptions import ValidationError
-
-            raise ValidationError("Effective date must be before expiry date.")
-
-    # New date-based publishing methods
-    def is_published(self, now=None):
-        """
-        Check if this version is currently published based on dates.
-
-        A version is published if:
-        - It has an effective_date that has passed
-        - It either has no expiry_date or the expiry_date hasn't passed
-        """
-        if now is None:
-            from django.utils import timezone
-
-            now = timezone.now()
-
-        # Must have an effective date that has passed
-        if not self.effective_date or self.effective_date > now:
-            return False
-
-        # Must not be expired
-        if self.expiry_date and self.expiry_date <= now:
-            return False
-
-        return True
-
-    def is_current_published(self, now=None):
-        """
-        Check if this is the current published version for its page.
-
-        The current published version is the latest published version by effective_date.
-        """
-        if not self.is_published(now):
-            return False
-
-        current_version = self.page.get_current_published_version(now)
-        return current_version == self
-
-    def get_publication_status(self, now=None):
-        """
-        Get a human-readable publication status based on dates.
-
-        Returns: 'draft', 'scheduled', 'published', 'expired'
-        """
-        if now is None:
-            from django.utils import timezone
-
-            now = timezone.now()
-
-        if not self.effective_date:
-            return "draft"
-
-        if self.effective_date > now:
-            return "scheduled"
-
-        if self.expiry_date and self.expiry_date <= now:
-            return "expired"
-
-        return "published"
-
-    def publish(self, user):
-        """Publish this version by setting effective_date to now"""
-        from django.utils import timezone
-
-        # Set effective_date to now to make this version live
-        self.effective_date = timezone.now()
-        # Clear expiry_date to make it indefinite (unless already set)
-        # Don't override existing expiry_date as it might be intentional
-        self.save(update_fields=["effective_date"])
-
-        # Apply the stored page data to the page
-        self._apply_version_data()
-        if user:  # Only set last_modified_by if user is provided
-            self.page.last_modified_by = user
-        self.page.save()
-
-        return self
-
-    def _apply_version_data(self):
-        """Apply the stored page data to the actual page instance"""
-        page_data = self.page_data.copy()
-
-        # Apply page fields
-        for field, value in page_data.items():
-            if hasattr(self.page, field) and field not in [
-                "id",
-                "created_at",
-                "updated_at",
-            ]:
-                if field in ["effective_date", "expiry_date"] and value:
-                    from django.utils.dateparse import parse_datetime
-
-                    value = parse_datetime(value)
-                setattr(self.page, field, value)
-
-        # Note: Widgets are no longer stored as separate model objects
-        # They exist only in PageVersion.widgets as JSON data
-
-    def restore(self, user):
-        """Restore this version as the current version of the page"""
-        # Create a new version from current state first
-        self.page.create_version(
-            user, "Restored from version {}".format(self.version_number)
-        )
-
-        # Apply the stored page data
-        self._apply_version_data()
-        self.page.last_modified_by = user
-        self.page.save()
-
-    def compare_with(self, other_version):
-        """Compare this version with another version"""
-        if not isinstance(other_version, PageVersion):
-            return None
-
-        changes = {
-            "fields_changed": [],
-            "widgets_added": [],
-            "widgets_removed": [],
-            "widgets_modified": [],
-        }
-
-        # Compare page fields
-        for field, value in self.page_data.items():
-            if field == "widgets":
-                continue
-            other_value = other_version.page_data.get(field)
-            if value != other_value:
-                changes["fields_changed"].append(
-                    {"field": field, "old_value": other_value, "new_value": value}
-                )
-
-        # Compare widgets
-        self_widgets = {(w["slot_name"], w["sort_order"]): w for w in self.widgets}
-        other_widgets = {
-            (w["slot_name"], w["sort_order"]): w for w in other_version.widgets
-        }
-
-        # Find added widgets
-        for key, widget in self_widgets.items():
-            if key not in other_widgets:
-                changes["widgets_added"].append(widget)
-            elif widget != other_widgets[key]:
-                changes["widgets_modified"].append(
-                    {"old": other_widgets[key], "new": widget}
-                )
-
-        # Find removed widgets
-        for key, widget in other_widgets.items():
-            if key not in self_widgets:
-                changes["widgets_removed"].append(widget)
-
-        return changes
-
-    def create_draft_from_published(self, user, version_title=""):
-        """Create a new draft version based on this published version"""
-        if not self.is_published():
-            raise ValueError("Can only create drafts from published versions")
-
-        # Get next version number
-        latest_version = self.page.versions.order_by("-version_number").first()
-        version_number = (latest_version.version_number + 1) if latest_version else 1
-
-        # Create new draft version (no effective_date = draft)
-        draft = PageVersion.objects.create(
-            page=self.page,
-            version_number=version_number,
-            version_title=version_title
-            or f"Draft based on version {self.version_number}",
-            page_data=self.page_data.copy(),
-            widgets=self.widgets.copy() if self.widgets else {},
-            created_by=user,
-        )
-
-        return draft
-
-
-class PageDataSchema(models.Model):
-    """
-    Stores JSON Schema definitions for validating and driving page_data forms.
-
-    Two types:
-    - system: Single base schema applied to all pages (singleton, no name needed)
-    - layout: Additional schema fields for specific layouts (extends system schema)
-    """
-
-    SCOPE_SYSTEM = "system"
-    SCOPE_LAYOUT = "layout"
-    SCOPE_CHOICES = (
-        (SCOPE_SYSTEM, "System"),
-        (SCOPE_LAYOUT, "Layout"),
-    )
-
-    # name is only used for layout schemas, system schema doesn't need a name
-    name = models.CharField(max_length=255, blank=True)
-    description = models.TextField(blank=True)
-    scope = models.CharField(max_length=20, choices=SCOPE_CHOICES, default=SCOPE_SYSTEM)
-    layout_name = models.CharField(
-        max_length=255,
-        blank=True,
-        help_text="Name of the code-based layout this schema applies to (scope=layout)",
-    )
-    schema = models.JSONField(help_text="JSON Schema draft-07+ definition")
-    is_active = models.BooleanField(default=True)
-
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    created_by = models.ForeignKey(User, on_delete=models.PROTECT)
-
-    class Meta:
-        indexes = [
-            models.Index(
-                fields=["scope", "layout_name", "is_active"],
-                name="pds_scope_layout_active_idx",
-            ),
-            models.Index(fields=["is_active"], name="pds_active_idx"),
-        ]
-        ordering = ["-updated_at", "name"]
-        constraints = [
-            # Only one active system schema allowed
-            models.UniqueConstraint(
-                fields=["scope"],
-                condition=models.Q(scope="system", is_active=True),
-                name="unique_active_system_schema",
-            ),
-            # Only one active layout schema per layout
-            models.UniqueConstraint(
-                fields=["scope", "layout_name"],
-                condition=models.Q(scope="layout", is_active=True),
-                name="unique_active_layout_schema",
-            ),
-        ]
-
-    def clean(self):
-        super().clean()
-        if self.scope == self.SCOPE_SYSTEM:
-            # System schema doesn't need name or layout_name
-            self.name = ""
-            self.layout_name = ""
-        elif self.scope == self.SCOPE_LAYOUT:
-            # Layout schema requires layout_name
-            if not self.layout_name:
-                raise ValidationError("Layout schema must specify a layout_name")
-            if not self.name:
-                self.name = f"{self.layout_name} Schema"
-
-    def __str__(self):
-        if self.scope == self.SCOPE_LAYOUT:
-            return f"{self.layout_name} Layout Schema"
-        return "System Schema"
-
-    @classmethod
-    def get_effective_schema_for_layout(cls, layout_name: str | None):
-        """
-        Get schemas organized as groups without merging.
-
-        Returns a grouped schema structure:
-        {
-            "type": "object",
-            "groups": {
-                "system": {
-                    "title": "System Fields",
-                    "properties": {...},
-                    "required": [...],
-                    "property_order": [...]
-                },
-                "layout": {
-                    "title": "Layout Fields",
-                    "properties": {...},
-                    "required": [...],
-                    "property_order": [...]
-                }
-            }
-        }
-        """
-        from django.db.models import Q
-
-        # Get the single active system schema
-        system_schema_obj = cls.objects.filter(
-            scope=cls.SCOPE_SYSTEM, is_active=True
-        ).first()
-
-        layout_schema_obj = None
-        if layout_name:
-            layout_schema_obj = cls.objects.filter(
-                scope=cls.SCOPE_LAYOUT, layout_name=layout_name, is_active=True
-            ).first()
-
-        # Build grouped schema without merging
-        grouped_schema = {"type": "object", "groups": {}}
-
-        # Add system schema as a group if it exists
-        if system_schema_obj:
-            system_schema = cls._normalize_schema_case(system_schema_obj.schema)
-            if system_schema.get("properties"):
-                grouped_schema["groups"]["system"] = {
-                    "title": "System Fields",
-                    "properties": system_schema["properties"],
-                }
-                if system_schema.get("required"):
-                    grouped_schema["groups"]["system"]["required"] = system_schema[
-                        "required"
-                    ]
-                if system_schema.get("property_order"):
-                    grouped_schema["groups"]["system"]["property_order"] = (
-                        system_schema["property_order"]
-                    )
-
-        # Add layout schema as a group if it exists
-        if layout_schema_obj:
-            layout_schema = cls._normalize_schema_case(layout_schema_obj.schema)
-            if layout_schema.get("properties"):
-                grouped_schema["groups"]["layout"] = {
-                    "title": "Layout Fields",
-                    "properties": layout_schema["properties"],
-                }
-                if layout_schema.get("required"):
-                    grouped_schema["groups"]["layout"]["required"] = layout_schema[
-                        "required"
-                    ]
-                if layout_schema.get("property_order"):
-                    grouped_schema["groups"]["layout"]["property_order"] = (
-                        layout_schema["property_order"]
-                    )
-
-        # Return None if no groups were added
-        if not grouped_schema["groups"]:
-            return None
-
-        return grouped_schema
-
-    @classmethod
-    def _normalize_schema_case(cls, schema):
-        """
-        Convert schema properties from snake_case to camelCase for frontend compatibility.
-        This ensures all schema constraints use camelCase (maxLength, minLength, etc.)
-        """
-        if not isinstance(schema, dict):
-            return schema
-
-        def snake_to_camel(snake_str):
-            """Convert snake_case to camelCase"""
-            components = snake_str.split("_")
-            return components[0] + "".join(word.capitalize() for word in components[1:])
-
-        def convert_schema_keys(obj):
-            """Recursively convert schema keys to camelCase"""
-            if isinstance(obj, dict):
-                converted = {}
-                for key, value in obj.items():
-                    # Convert constraint keys to camelCase
-                    if key in [
-                        "max_length",
-                        "min_length",
-                        "max_items",
-                        "min_items",
-                        "exclusive_minimum",
-                        "exclusive_maximum",
-                        "multiple_of",
-                        "unique_items",
-                        "additional_properties",
-                        "property_order",
-                    ]:
-                        new_key = snake_to_camel(key)
-                        converted[new_key] = convert_schema_keys(value)
-                    else:
-                        converted[key] = convert_schema_keys(value)
-                return converted
-            elif isinstance(obj, list):
-                return [convert_schema_keys(item) for item in obj]
-            else:
-                return obj
-
-        return convert_schema_keys(schema)
-
-    @classmethod
-    def _camel_to_snake(cls, name):
-        """Convert camelCase to snake_case"""
-        import re
-
-        # Handle the case where name is already snake_case
-        if "_" in name and name.islower():
-            return name
-        s1 = re.sub("(.)([A-Z][a-z]+)", r"\1_\2", name)
-        return re.sub("([a-z0-9])([A-Z])", r"\1_\2", s1).lower()
-
-    @classmethod
-    def _snake_to_camel(cls, name):
-        """Convert snake_case to camelCase"""
-        if "_" not in name:
-            return name
-        components = name.split("_")
-        return components[0] + "".join(word.capitalize() for word in components[1:])
-
-    @classmethod
-    def _convert_camel_to_snake_keys(cls, obj):
-        """Keep pageData in camelCase - no conversion needed"""
-        return obj

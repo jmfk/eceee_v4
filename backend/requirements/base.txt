@@ -43,9 +43,8 @@ channels-redis>=4.1.0
 
 # Image handling and S3 storage
 Pillow>=10.0.0
-boto3==1.26.137  # Pin to version before flexible checksums (boto3 1.28+ has checksum issues with Linode)
+boto3>=1.34.0  # Production deployment pins to 1.26.137 for Linode compatibility
 django-storages>=1.14.0
-urllib3<2.0.0  # Pin urllib3 1.x for Linode Object Storage compatibility
 python-magic>=0.4.27
 opencv-python-headless>=4.8.0
 pytesseract>=0.3.10
