@@ -497,25 +497,9 @@ AWS_S3_ADDRESSING_STYLE = config("AWS_S3_ADDRESSING_STYLE", default="path")
 AWS_S3_FILE_OVERWRITE = False
 AWS_S3_OBJECT_PARAMETERS = {
     "CacheControl": "max-age=86400",
-    "ACL": "public-read",  # Make uploaded files publicly accessible
 }
-AWS_DEFAULT_ACL = "public-read"  # Default ACL for all uploads
-AWS_QUERYSTRING_AUTH = False  # Don't use signed URLs
-AWS_S3_CUSTOM_DOMAIN = None  # Don't use custom domain, use s3:// URLs for imgproxy
-AWS_S3_URL_PROTOCOL = "s3:"  # Use s3:// protocol for imgproxy compatibility
-
-# boto3 1.26.137 doesn't have flexible checksums (added in 1.28+)
-# So we don't need to disable them
-
-# Django 4.2+ STORAGES configuration
-STORAGES = {
-    "default": {
-        "BACKEND": "file_manager.linode_storage.LinodeObjectStorage",
-    },
-    "staticfiles": {
-        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
-    },
-}
+# Note: Production deployment adds Linode-specific settings via settings_production_override.py
+# including STORAGES configuration, public-read ACL, and s3:// URL protocol
 
 # Media File Handling Configuration
 MEDIA_FILE_MAX_SIZE = 100 * 1024 * 1024  # 100MB

@@ -38,6 +38,9 @@ COPY . .
 
 # Set build environment variables
 ENV GENERATE_SOURCEMAP=false
+ARG VITE_IMGPROXY_URL
+ARG VITE_IMGPROXY_KEY
+ARG VITE_IMGPROXY_SALT
 
 # Build the application
 RUN npm run build
