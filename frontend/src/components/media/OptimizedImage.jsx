@@ -12,7 +12,6 @@ const OptimizedImage = ({
     height,
     className = '',
     style = {},
-    preset,
     quality = 85,
     format,
     resizeType = 'fit',
@@ -32,11 +31,10 @@ const OptimizedImage = ({
     const [imageError, setImageError] = useState(false);
     const [showPlaceholder, setShowPlaceholder] = useState(placeholder);
 
-    // Generate optimized image URL
+    // Generate optimized image URL with actual dimensions
     const optimizedSrc = src ? generateImgproxyUrl(src, {
         width,
         height,
-        preset,
         quality,
         format,
         resizeType,

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Layout } from 'lucide-react'
-import { getImgproxyUrlFromImage, IMGPROXY_PRESETS } from '../../utils/imgproxySecure'
+import { getImgproxyUrlFromImage } from '../../utils/imgproxySecure'
 
 /**
  * Header Widget Component
@@ -36,8 +36,13 @@ const HeaderWidget = ({ config = {}, mode = 'preview' }) => {
         if (image && mode === 'editor') {
             setImageLoading(true)
 
-            // Get signed imgproxy URL from backend
-            getImgproxyUrlFromImage(image, IMGPROXY_PRESETS.header)
+            // Get signed imgproxy URL from backend with explicit dimensions
+            getImgproxyUrlFromImage(image, {
+                width: 1280,
+                height: 132,
+                resizeType: 'fill',
+                gravity: 'sm'
+            })
                 .then(url => {
                     setOptimizedImageUrl(url)
                     setImageLoading(false)

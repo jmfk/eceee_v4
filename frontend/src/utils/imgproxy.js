@@ -60,35 +60,29 @@ export function generateImgproxyUrl(sourceUrl, options = {}) {
         gravity = 'sm',
         quality,
         format,
-        preset,
         ...additionalOptions
     } = options;
     try {
-        // Build processing options
+        // Build processing options with actual dimensions
         const processingOptions = [];
 
-        // Use preset if provided
-        if (preset) {
-            processingOptions.push(`preset:${preset}`);
-        } else {
-            // Manual processing options
-            if (resizeType && (width || height)) {
-                const w = width || 0;
-                const h = height || 0;
-                processingOptions.push(`resize:${resizeType}:${w}:${h}`);
-            }
+        // Always use actual dimensions instead of presets
+        if (resizeType && (width || height)) {
+            const w = width || 0;
+            const h = height || 0;
+            processingOptions.push(`resize:${resizeType}:${w}:${h}`);
+        }
 
-            if (gravity && gravity !== 'sm') {
-                processingOptions.push(`gravity:${gravity}`);
-            }
+        if (gravity && gravity !== 'sm') {
+            processingOptions.push(`gravity:${gravity}`);
+        }
 
-            if (quality) {
-                processingOptions.push(`quality:${quality}`);
-            }
+        if (quality) {
+            processingOptions.push(`quality:${quality}`);
+        }
 
-            if (format) {
-                processingOptions.push(`format:${format}`);
-            }
+        if (format) {
+            processingOptions.push(`format:${format}`);
         }
 
         // Add additional options
@@ -227,16 +221,6 @@ export function generateOptimizedUrl(sourceUrl, options = {}) {
 }
 
 /**
- * Generate preset URL
- * @param {string} sourceUrl - Source image URL
- * @param {string} preset - Preset name
- * @returns {string} Preset URL
- */
-export function generatePresetUrl(sourceUrl, preset) {
-    return generateImgproxyUrl(sourceUrl, { preset });
-}
-
-/**
  * Get srcSet string for responsive images
  * @param {string} sourceUrl - Source image URL
  * @param {Array} widths - Array of widths for srcSet
@@ -271,27 +255,6 @@ export async function checkImgproxyHealth() {
 }
 
 /**
- * Preset configurations
- */
-export const PRESET_CONFIGS = {
-    thumbnail: { width: 150, height: 150, resizeType: 'fill' },
-    small: { width: 300, height: 300, resizeType: 'fit' },
-    medium: { width: 600, height: 600, resizeType: 'fit' },
-    large: { width: 1200, height: 1200, resizeType: 'fit' },
-    hero: { width: 1920, height: 1080, resizeType: 'fill' },
-    avatar: { width: 128, height: 128, resizeType: 'fill', format: 'webp' },
-};
-
-/**
- * Get configuration for a preset
- * @param {string} presetName - Name of the preset
- * @returns {Object} Preset configuration
- */
-export function getPresetConfig(presetName) {
-    return PRESET_CONFIGS[presetName] || {};
-}
-
-/**
  * React hook for imgproxy URLs
  * @param {string} sourceUrl - Source image URL
  * @param {Object} options - Processing options
@@ -322,11 +285,8 @@ export default {
     generateAvatarUrl,
     generateHeroUrl,
     generateOptimizedUrl,
-    generatePresetUrl,
     generateSrcSet,
     checkImgproxyHealth,
     useImgproxyUrl,
     useResponsiveUrls,
-    PRESET_CONFIGS,
-    getPresetConfig,
 };

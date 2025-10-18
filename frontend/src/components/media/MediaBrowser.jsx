@@ -396,7 +396,6 @@ const MediaBrowser = ({
                     alt={file.title || file.original_filename || 'Media file'}
                     width={size}
                     height={size}
-                    preset="thumbnail"
                     className="w-full h-full object-cover rounded"
                     placeholder={true}
                     placeholderSize={32}

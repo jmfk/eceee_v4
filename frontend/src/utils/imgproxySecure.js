@@ -225,43 +225,6 @@ export function clearImgproxyCache() {
     urlCache.clear();
 }
 
-/**
- * Common preset configurations
- */
-export const IMGPROXY_PRESETS = {
-    thumbnail: { width: 150, height: 150, resizeType: 'fill', gravity: 'sm' },
-    small: { width: 300, height: 300, resizeType: 'fit' },
-    medium: { width: 600, height: 600, resizeType: 'fit' },
-    large: { width: 1200, height: 1200, resizeType: 'fit' },
-    hero: { width: 1920, height: 1080, resizeType: 'fill', gravity: 'sm' },
-    avatar: { width: 128, height: 128, resizeType: 'fill', gravity: 'face', format: 'webp' },
-    header: { width: 1280, height: 132, resizeType: 'fill', gravity: 'sm' },
-};
-
-/**
- * Get imgproxy URL using a preset configuration
- * 
- * @param {string} sourceUrl - Source image URL
- * @param {string} presetName - Preset name from IMGPROXY_PRESETS
- * @param {Object} overrides - Optional overrides for preset options
- * @returns {Promise<string>} Signed imgproxy URL
- * 
- * @example
- * const heroUrl = await getImgproxyUrlWithPreset(
- *   image.imgproxy_base_url,
- *   'hero'
- * );
- */
-export async function getImgproxyUrlWithPreset(sourceUrl, presetName, overrides = {}) {
-    const preset = IMGPROXY_PRESETS[presetName];
-    if (!preset) {
-        console.warn(`Unknown preset: ${presetName}`);
-        return getImgproxyUrl(sourceUrl);
-    }
-
-    return getImgproxyUrl(sourceUrl, { ...preset, ...overrides });
-}
-
 // Default export
 export default {
     getImgproxyUrl,
@@ -270,7 +233,5 @@ export default {
     useImgproxyUrl,
     preloadImgproxyUrls,
     clearImgproxyCache,
-    getImgproxyUrlWithPreset,
-    IMGPROXY_PRESETS,
 };
 
