@@ -307,6 +307,9 @@ const PageTreeNode = memo(({
             child.sortOrder = index * 10
         })
 
+        console.log("handleChildMoveUp")
+        console.log("childrenRef.current", childrenRef.current)
+        console.log("newChildren", newChildren)
         childrenRef.current = newChildren
 
         try {
@@ -346,6 +349,9 @@ const PageTreeNode = memo(({
         newChildren.forEach((child, index) => {
             child.sortOrder = index * 10
         })
+        console.log("handleChildMoveDown")
+        console.log("childrenRef.current", childrenRef.current)
+        console.log("newChildren", newChildren)
 
         childrenRef.current = newChildren
 

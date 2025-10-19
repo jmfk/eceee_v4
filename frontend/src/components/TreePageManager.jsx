@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
@@ -43,7 +43,8 @@ const TreePageManager = () => {
     const navigate = useNavigate()
 
     // State management
-    const [pages, setPages] = useState([])
+    const pagesRef = useRef([])
+    const [, forceUpdate] = useState({})
     const [searchTerm, setSearchTerm] = useState('')
     const [showFilters, setShowFilters] = useState(false)
     const [statusFilter, setStatusFilter] = useState('all')
@@ -237,25 +238,6 @@ const TreePageManager = () => {
         return pageTreeUtils.formatPageForTree(pageData)
     }, [])
 
-    // Helper function to optimistically update tree structure
-    const updatePageInTree = useCallback((pages, pageId, updater) => {
-        const updateRecursive = (pageList) => {
-            return pageList.map(page => {
-                if (page.id === pageId) {
-                    return updater(page)
-                }
-                if (page.children && page.children.length > 0) {
-                    return {
-                        ...page,
-                        children: updateRecursive(page.children)
-                    }
-                }
-                return page
-            }).filter(Boolean) // Remove null/undefined pages
-        }
-        return updateRecursive(pages)
-    }, [])
-
     // Update pages when data changes
     useEffect(() => {
         if (rootPagesData?.results) {
@@ -267,7 +249,8 @@ const TreePageManager = () => {
                 return formatted
             })
 
-            setPages(formattedPages)
+            pagesRef.current = formattedPages
+            forceUpdate({})
         }
     }, [rootPagesData, formatPage])
 
@@ -282,205 +265,85 @@ const TreePageManager = () => {
         }
     }, [searchData, debouncedSearchTerm])
 
-    // Note: Child loading and data updates are now handled by each PageTreeNode independently
-    // This significantly improves performance by preventing full tree re-renders
+    // Handle move up - simple swap like in PageTreeNode
+    const handleMoveUp = useCallback(async (pageId) => {
+        const pageIndex = pagesRef.current.findIndex(p => p.id === pageId)
 
-    // Find siblings and parent of a page with full context
-    const findPageContext = useCallback((pageId) => {
-        let siblings = []
-        let currentPage = null
-        let parentPage = null
-        let grandParentPage = null
+        // Boundary check
+        if (pageIndex <= 0) return
 
-        const searchTree = (pageList, parent = null, grandParent = null) => {
-            for (const page of pageList) {
-                if (page.id === pageId) {
-                    currentPage = page
-                    parentPage = parent
-                    grandParentPage = grandParent
-                    siblings = parent ? parent.children : pages
-                    return true
-                }
-                if (page.children && page.children.length > 0) {
-                    if (searchTree(page.children, page, parent)) {
-                        return true
-                    }
-                }
-            }
-            return false
-        }
+        const currentPage = pagesRef.current[pageIndex]
+        const previousPage = pagesRef.current[pageIndex - 1]
 
-        searchTree(pages)
-        return { siblings, currentPage, parentPage, grandParentPage }
-    }, [pages])
+        // Swap in local array
+        const newPages = [...pagesRef.current]
+        newPages[pageIndex] = previousPage
+        newPages[pageIndex - 1] = currentPage
 
-    // Move page up mutation
-    const movePageUpMutation = useMutation({
-        mutationFn: async ({ pageId, action }) => {
-            const { moveType, targetParentId, newSortOrder } = action
+        // Update sortOrder for all pages
+        newPages.forEach((page, index) => {
+            page.sortOrder = index * 10
+        })
 
-            const updateData = { sortOrder: newSortOrder }
+        pagesRef.current = newPages
 
-            // If changing parent (promoting to parent's level)
-            if (moveType === 'promote') {
-                updateData.parentId = targetParentId
-            }
-
-            return await pagesApi.update(pageId, updateData)
-        },
-        onMutate: () => {
+        // Update server
+        try {
             addNotification('Moving page up...', 'info', 'page-move-up')
-        },
-        onSuccess: async () => {
-            // Invalidate and refetch - expansion state will be preserved
-            await queryClient.invalidateQueries(['pages', 'root'])
-            await queryClient.invalidateQueries(['page-children'])
+            const updatePromises = newPages.map(page =>
+                pagesApi.update(page.id, { sortOrder: page.sortOrder })
+            )
+            await Promise.all(updatePromises)
+            forceUpdate({})
             addNotification('Page moved up', 'success', 'page-move-up')
-        },
-        onError: (error) => {
+        } catch (error) {
             console.error('Failed to move page up:', error)
             showError(error, 'error')
             addNotification('Failed to move page up', 'error', 'page-move-up')
+            // Reload on error
+            refetch()
         }
-    })
+    }, [addNotification, showError, refetch])
 
-    // Move page down mutation
-    const movePageDownMutation = useMutation({
-        mutationFn: async ({ pageId, action }) => {
-            const { moveType, targetParentId, newSortOrder } = action
+    // Handle move down - simple swap like in PageTreeNode
+    const handleMoveDown = useCallback(async (pageId) => {
+        const pageIndex = pagesRef.current.findIndex(p => p.id === pageId)
 
-            const updateData = { sortOrder: newSortOrder }
+        // Boundary check
+        if (pageIndex < 0 || pageIndex >= pagesRef.current.length - 1) return
 
-            // If changing parent (promoting to parent's level)
-            if (moveType === 'promote') {
-                updateData.parentId = targetParentId
-            }
+        const currentPage = pagesRef.current[pageIndex]
+        const nextPage = pagesRef.current[pageIndex + 1]
 
-            return await pagesApi.update(pageId, updateData)
-        },
-        onMutate: () => {
+        // Swap in local array
+        const newPages = [...pagesRef.current]
+        newPages[pageIndex] = nextPage
+        newPages[pageIndex + 1] = currentPage
+
+        // Update sortOrder for all pages
+        newPages.forEach((page, index) => {
+            page.sortOrder = index * 10
+        })
+
+        pagesRef.current = newPages
+
+        // Update server
+        try {
             addNotification('Moving page down...', 'info', 'page-move-down')
-        },
-        onSuccess: async () => {
-            // Invalidate and refetch - expansion state will be preserved
-            await queryClient.invalidateQueries(['pages', 'root'])
-            await queryClient.invalidateQueries(['page-children'])
+            const updatePromises = newPages.map(page =>
+                pagesApi.update(page.id, { sortOrder: page.sortOrder })
+            )
+            await Promise.all(updatePromises)
+            forceUpdate({})
             addNotification('Page moved down', 'success', 'page-move-down')
-        },
-        onError: (error) => {
+        } catch (error) {
             console.error('Failed to move page down:', error)
             showError(error, 'error')
             addNotification('Failed to move page down', 'error', 'page-move-down')
+            // Reload on error
+            refetch()
         }
-    })
-
-    // Handle move up
-    const handleMoveUp = useCallback((pageId) => {
-        const { siblings, currentPage, parentPage, grandParentPage } = findPageContext(pageId)
-        if (!siblings || siblings.length === 0) return
-
-        const currentIndex = siblings.findIndex(p => p.id === pageId)
-        if (currentIndex < 0) return
-
-        let action
-
-        if (currentIndex === 0) {
-            // First in list - promote to parent's level (before parent)
-            if (!parentPage) {
-                // Already at root level and first - can't move up
-                addNotification('Cannot move up - already at top', 'warning', 'page-move-limit')
-                return
-            }
-
-            // Move to parent's level, positioned before parent
-            const grandParentId = grandParentPage?.id || null
-            const parentSortOrder = parentPage.sortOrder || 0
-
-            action = {
-                moveType: 'promote',
-                targetParentId: grandParentId,
-                newSortOrder: parentSortOrder - 5 // Position before parent
-            }
-        } else {
-            // Swap with previous sibling - place BEFORE the previous sibling
-            const previousPage = siblings[currentIndex - 1]
-            const previousSortOrder = previousPage.sortOrder || 0
-
-            // Calculate position before previous sibling
-            let newSortOrder
-            if (currentIndex === 1) {
-                // Moving to first position - use previous sortOrder - 10
-                newSortOrder = previousSortOrder - 10
-            } else {
-                // Moving between siblings - average of sibling before previous and previous
-                const beforePrevious = siblings[currentIndex - 2]
-                const beforePreviousSortOrder = beforePrevious?.sortOrder || 0
-                newSortOrder = Math.floor((beforePreviousSortOrder + previousSortOrder) / 2)
-            }
-
-            action = {
-                moveType: 'swap',
-                targetParentId: null,
-                newSortOrder: newSortOrder
-            }
-        }
-
-        movePageUpMutation.mutate({ pageId, action })
-    }, [findPageContext, movePageUpMutation, addNotification])
-
-    // Handle move down
-    const handleMoveDown = useCallback((pageId) => {
-        const { siblings, currentPage, parentPage, grandParentPage } = findPageContext(pageId)
-        if (!siblings || siblings.length === 0) return
-
-        const currentIndex = siblings.findIndex(p => p.id === pageId)
-        if (currentIndex < 0) return
-
-        let action
-
-        if (currentIndex === siblings.length - 1) {
-            // Last in list - promote to parent's level (after parent)
-            if (!parentPage) {
-                // Already at root level and last - can't move down
-                addNotification('Cannot move down - already at bottom', 'warning', 'page-move-limit')
-                return
-            }
-
-            // Move to parent's level, positioned after parent
-            const grandParentId = grandParentPage?.id || null
-            const parentSortOrder = parentPage.sortOrder || 0
-
-            action = {
-                moveType: 'promote',
-                targetParentId: grandParentId,
-                newSortOrder: parentSortOrder + 5 // Position after parent
-            }
-        } else {
-            // Swap with next sibling - place AFTER the next sibling
-            const nextPage = siblings[currentIndex + 1]
-            const nextSortOrder = nextPage.sortOrder || 0
-
-            // Calculate position after next sibling
-            let newSortOrder
-            if (currentIndex === siblings.length - 2) {
-                // Moving to last position - use next sortOrder + 10
-                newSortOrder = nextSortOrder + 10
-            } else {
-                // Moving between siblings - average of next and sibling after next
-                const afterNext = siblings[currentIndex + 2]
-                const afterNextSortOrder = afterNext?.sortOrder || (nextSortOrder + 20)
-                newSortOrder = Math.floor((nextSortOrder + afterNextSortOrder) / 2)
-            }
-
-            action = {
-                moveType: 'swap',
-                targetParentId: null,
-                newSortOrder: newSortOrder
-            }
-        }
-
-        movePageDownMutation.mutate({ pageId, action })
-    }, [findPageContext, movePageDownMutation, addNotification])
+    }, [addNotification, showError, refetch])
 
     // Note: loadChildren is now handled by each PageTreeNode independently
     // No need for central loading or expand/collapse tracking
@@ -506,7 +369,7 @@ const TreePageManager = () => {
                 newParentId = null
                 newSortOrder = pasteMode === 'top' ? -1 : 999999
             } else if (pasteMode === 'above' || pasteMode === 'below') {
-                const targetPage = pages.find(p => p.id === targetPageId)
+                const targetPage = pagesRef.current.find(p => p.id === targetPageId)
                 newParentId = targetPage?.parent?.id || null
                 newSortOrder = pasteMode === 'above' ?
                     pageTreeUtils.calculateSortOrderAbove([], targetPage) :
@@ -525,7 +388,7 @@ const TreePageManager = () => {
             console.error('Failed to move page')
             showError(error, 'error')
         }
-    }, [cutPageId, pages, movePageMutation, showError])
+    }, [cutPageId, movePageMutation, showError])
 
     // Delete handler
     const handleDelete = useCallback(async (pageId) => {
@@ -712,7 +575,7 @@ const TreePageManager = () => {
                             {searchLoading ? 'Searching pages...' : 'Loading pages...'}
                         </span>
                     </div>
-                ) : pages.length === 0 ? (
+                ) : pagesRef.current.length === 0 ? (
                     <div className="text-center p-8 text-gray-500">
                         <Tooltip text="No pages found" position="top">
                             <div className="cursor-help inline-block">
@@ -763,7 +626,7 @@ const TreePageManager = () => {
                                 </div>
                             </div>
                         )}
-                        {pages.map((page, index) => (
+                        {pagesRef.current.map((page, index) => (
                             <PageTreeNode
                                 key={page.id}
                                 page={page}
@@ -780,7 +643,7 @@ const TreePageManager = () => {
                                 onMoveUp={handleMoveUp}
                                 onMoveDown={handleMoveDown}
                                 canMoveUp={index > 0}
-                                canMoveDown={index < pages.length - 1}
+                                canMoveDown={index < pagesRef.current.length - 1}
                             />
                         ))}
                     </div>
@@ -791,7 +654,7 @@ const TreePageManager = () => {
             <div className="border-t border-gray-200 p-4 bg-gray-50">
                 <div className="flex items-center justify-between text-sm text-gray-600">
                     <span>
-                        {pages.length} root page{pages.length !== 1 ? 's' : ''}
+                        {pagesRef.current.length} root page{pagesRef.current.length !== 1 ? 's' : ''}
                         {searchTerm && ' (filtered)'}
                     </span>
                     <div className="flex items-center gap-4">
