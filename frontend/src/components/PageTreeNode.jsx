@@ -1,8 +1,9 @@
-import { useState, useCallback, useEffect, memo } from 'react'
+import { useState, useCallback, useEffect, memo, useMemo } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
     ChevronRight,
     ChevronDown,
+    ChevronUp,
     FileText,
     Folder,
     FolderOpen,
@@ -82,23 +83,27 @@ const PublicationStatusIcon = memo(({
 PublicationStatusIcon.displayName = 'PublicationStatusIcon'
 
 const PageTreeNode = memo(({
-    page,
+    page: initialPage,
     level = 0,
-    onExpand,
-    onCollapse,
-    onLoadChildren,
     onEdit,
     onCut,
     onPaste,
     onDelete,
     onAddPageBelow,
     cutPageId,
-    onRefreshChildren,
     isSearchMode = false,
     searchTerm = '',
-    onUpdatePageData
+    rowHeight = 'compact',
+    onMoveUp,
+    onMoveDown,
+    canMoveUp = true,
+    canMoveDown = true
 }) => {
-    const [isExpanded, setIsExpanded] = useState(page.isExpanded || false)
+    // Each node manages its own state independently
+    const [page, setPage] = useState(initialPage)
+    const [children, setChildren] = useState(initialPage.children || [])
+    const [isExpanded, setIsExpanded] = useState(initialPage.isExpanded || false)
+    const [childrenLoaded, setChildrenLoaded] = useState(initialPage.childrenLoaded || false)
     const [isLoading, setIsLoading] = useState(false)
     const [showHostnameModal, setShowHostnameModal] = useState(false)
     const [isEditingTitle, setIsEditingTitle] = useState(false)
@@ -109,6 +114,11 @@ const PageTreeNode = memo(({
     const queryClient = useQueryClient()
     const { showError, showConfirm } = useNotificationContext()
 
+    // Update local state when prop changes (for updates from parent)
+    useEffect(() => {
+        setPage(initialPage)
+    }, [initialPage.id, initialPage.title, initialPage.slug, initialPage.publicationStatus])
+
     // Sync local expansion state with page prop changes
     useEffect(() => {
         if (page.isExpanded !== undefined) {
@@ -116,11 +126,11 @@ const PageTreeNode = memo(({
         }
     }, [page.isExpanded])
 
-    // Check if page has children
-    const hasChildren = pageTreeUtils.hasChildren(page)
+    // Check if page has children (memoized)
+    const hasChildren = useMemo(() => pageTreeUtils.hasChildren(page), [page])
 
-    // Check if page is cut
-    const isCut = cutPageId === page.id
+    // Check if page is cut (memoized)
+    const isCut = useMemo(() => cutPageId === page.id, [cutPageId, page.id])
 
     // Animation state for page movement
     const [isAnimating, setIsAnimating] = useState(false)
@@ -149,29 +159,53 @@ const PageTreeNode = memo(({
         )
     }
 
+    // Load children for this node
+    const loadChildren = useCallback(async () => {
+        if (childrenLoaded || isLoading) return
+
+        setIsLoading(true)
+        try {
+            const childrenData = await pagesApi.getPageChildren(page.id)
+            const loadedChildren = childrenData.results.map(child =>
+                pageTreeUtils.formatPageForTree(child)
+            )
+            setChildren(loadedChildren)
+            setChildrenLoaded(true)
+
+            // Cache the children data in React Query for invalidation
+            queryClient.setQueryData(['page-children', page.id], childrenData)
+        } catch (error) {
+            console.error('Error loading children:', error)
+            showError(error, 'error')
+        } finally {
+            setIsLoading(false)
+        }
+    }, [page.id, childrenLoaded, isLoading, queryClient, showError])
+
+    // Auto-load children if this node starts expanded and has children
+    useEffect(() => {
+        if (isExpanded && hasChildren && !childrenLoaded && !isLoading) {
+            console.log(`Auto-loading children for page "${page.title}" (id: ${page.id})`, {
+                isExpanded,
+                hasChildren,
+                childrenLoaded,
+                isLoading,
+                childrenCount: page.childrenCount
+            })
+            loadChildren()
+        }
+    }, [isExpanded, hasChildren, childrenLoaded, isLoading, loadChildren, page.title, page.id, page.childrenCount])
+
     // Expand/collapse toggle
     const handleToggleExpand = async () => {
         if (!hasChildren) return
 
-        if (!isExpanded && !page.childrenLoaded) {
-            setIsLoading(true)
-            try {
-                await onLoadChildren(page.id)
-            } catch (error) {
-                console.error('Error loading children:', error)
-                showError(error, 'error')
-            } finally {
-                setIsLoading(false)
-            }
-        }
-
         const newExpanded = !isExpanded
         setIsExpanded(newExpanded)
 
-        if (newExpanded) {
-            onExpand?.(page.id)
-        } else {
-            onCollapse?.(page.id)
+        // Load children when expanding if not already loaded
+        if (newExpanded && !childrenLoaded) {
+            await loadChildren()
         }
     }
 
@@ -199,6 +233,56 @@ const PageTreeNode = memo(({
 
     const handleAddPageBelow = () => {
         onAddPageBelow?.(page)
+    }
+
+    const handleMoveUp = async () => {
+        if (!canMoveUp) return
+
+        // Animate immediately (optimistic)
+        setAnimationDirection('up')
+        setIsAnimating(true)
+
+        // Clear animation after it completes
+        setTimeout(() => {
+            setIsAnimating(false)
+            setAnimationDirection('')
+        }, 500)
+
+        // Trigger the actual move
+        try {
+            await onMoveUp?.(page.id)
+            // Invalidate React Query cache to refresh
+            queryClient.invalidateQueries(['pages', 'root'])
+            queryClient.invalidateQueries(['page-children'])
+        } catch (error) {
+            console.error('Failed to move page up:', error)
+            showError(error, 'error')
+        }
+    }
+
+    const handleMoveDown = async () => {
+        if (!canMoveDown) return
+
+        // Animate immediately (optimistic)
+        setAnimationDirection('down')
+        setIsAnimating(true)
+
+        // Clear animation after it completes
+        setTimeout(() => {
+            setIsAnimating(false)
+            setAnimationDirection('')
+        }, 500)
+
+        // Trigger the actual move
+        try {
+            await onMoveDown?.(page.id)
+            // Invalidate React Query cache to refresh
+            queryClient.invalidateQueries(['pages', 'root'])
+            queryClient.invalidateQueries(['page-children'])
+        } catch (error) {
+            console.error('Failed to move page down:', error)
+            showError(error, 'error')
+        }
     }
 
     const handleHostnameClick = () => {
@@ -316,9 +400,8 @@ const PageTreeNode = memo(({
         },
         onSuccess: (updatedPage) => {
             setShowHostnameModal(false)
-
-            // Update the specific page in the tree with optimistic update
-            onUpdatePageData(page.id, { hostnames: updatedPage.hostnames })
+            // Update local state
+            setPage(prev => ({ ...prev, hostnames: updatedPage.hostnames }))
         },
         onError: (error) => {
             console.error('Failed to update hostnames:', error.response?.data?.detail || error.message)
@@ -333,9 +416,8 @@ const PageTreeNode = memo(({
         },
         onSuccess: (updatedPage) => {
             setIsEditingTitle(false)
-
-            // Update the specific page in the tree with optimistic update
-            onUpdatePageData(page.id, { title: updatedPage.title })
+            // Update local state
+            setPage(prev => ({ ...prev, title: updatedPage.title }))
         },
         onError: (error) => {
             console.error('Failed to update title:', error.response?.data?.detail || error.message)
@@ -351,9 +433,8 @@ const PageTreeNode = memo(({
         },
         onSuccess: (updatedPage) => {
             setIsEditingSlug(false)
-
-            // Update the specific page in the tree with optimistic update
-            onUpdatePageData(page.id, { slug: updatedPage.slug })
+            // Update local state
+            setPage(prev => ({ ...prev, slug: updatedPage.slug }))
         },
         onError: (error) => {
             console.error('Failed to update slug:', error.response?.data?.detail || error.message)
@@ -369,9 +450,8 @@ const PageTreeNode = memo(({
         },
         onSuccess: (updatedPage) => {
             setIsTogglingPublication(false)
-
-            // Update the specific page in the tree with optimistic update
-            onUpdatePageData(page.id, { publicationStatus: updatedPage.publicationStatus || 'published' })
+            // Update local state
+            setPage(prev => ({ ...prev, publicationStatus: updatedPage.publicationStatus || 'published' }))
         },
         onError: (error) => {
             console.error('Failed to publish page:', error.response?.data?.detail || error.message)
@@ -387,9 +467,8 @@ const PageTreeNode = memo(({
         },
         onSuccess: (updatedPage) => {
             setIsTogglingPublication(false)
-
-            // Update the specific page in the tree with optimistic update
-            onUpdatePageData(page.id, { publicationStatus: updatedPage.publicationStatus || 'unpublished' })
+            // Update local state
+            setPage(prev => ({ ...prev, publicationStatus: updatedPage.publicationStatus || 'unpublished' }))
         },
         onError: (error) => {
             console.error('Failed to unpublish page:', error.response?.data?.detail || error.message)
@@ -413,7 +492,7 @@ const PageTreeNode = memo(({
             {/* Main node */}
             <div
                 className={`
-                    flex items-center px-2 py-1 hover:bg-gray-50 group relative
+                    flex items-center px-2 ${rowHeight === 'spacious' ? 'py-4' : 'py-2.5'} hover:bg-gray-50 group relative
                     ${isCut ? 'opacity-60 bg-orange-50' : ''}
                     ${page.isSearchResult ? 'bg-blue-50 border-l-4 border-blue-400' : ''}
                     ${page.highlightSearch ? 'bg-yellow-50 border-l-4 border-yellow-400' : ''}
@@ -430,21 +509,18 @@ const PageTreeNode = memo(({
                 <button
                     onClick={handleToggleExpand}
                     className={`
-                            mr-1 p-1 rounded transition-all duration-200 hover:shadow-sm
-                            ${!hasChildren ? 'invisible' : ''}
-                            hover:bg-gray-200
+                            mr-1 p-1.5 rounded transition-all duration-200 hover:shadow-sm
+                            ${!hasChildren ? 'opacity-30 cursor-default' : 'hover:bg-gray-200'}
                         `}
-                    disabled={isLoading}
+                    disabled={isLoading || !hasChildren}
                 >
                     {isLoading ? (
-                        <Loader2 className="w-3 h-3 animate-spin text-gray-400" />
-                    ) : hasChildren ? (
-                        isExpanded ? (
-                            <ChevronDown className="w-3 h-3 text-gray-600" />
-                        ) : (
-                            <ChevronRight className="w-3 h-3 text-gray-600" />
-                        )
-                    ) : null}
+                        <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+                    ) : isExpanded ? (
+                        <ChevronDown className="w-4 h-4 text-gray-600" />
+                    ) : (
+                        <ChevronRight className="w-4 h-4 text-gray-600" />
+                    )}
                 </button>
 
                 {/* Page content area */}
@@ -480,7 +556,7 @@ const PageTreeNode = memo(({
                                     className="p-0.5 rounded hover:bg-green-100 text-green-600 transition-colors disabled:opacity-50"
                                     title="Save (Enter)"
                                 >
-                                    <Save className="w-3 h-3" />
+                                    <Save className="w-4 h-4" />
                                 </button>
                                 <button
                                     onClick={handleTitleCancel}
@@ -488,7 +564,7 @@ const PageTreeNode = memo(({
                                     className="p-0.5 rounded hover:bg-red-100 text-red-600 transition-colors disabled:opacity-50"
                                     title="Cancel (Escape)"
                                 >
-                                    <X className="w-3 h-3" />
+                                    <X className="w-4 h-4" />
                                 </button>
                             </div>
                         ) : (
@@ -526,7 +602,7 @@ const PageTreeNode = memo(({
                                     className="p-0.5 rounded hover:bg-green-100 text-green-600 transition-colors disabled:opacity-50"
                                     title="Save slug (Enter)"
                                 >
-                                    <Save className="w-3 h-3" />
+                                    <Save className="w-4 h-4" />
                                 </button>
                                 <button
                                     onClick={handleSlugCancel}
@@ -534,7 +610,7 @@ const PageTreeNode = memo(({
                                     className="p-0.5 rounded hover:bg-red-100 text-red-600 transition-colors disabled:opacity-50"
                                     title="Cancel (Escape)"
                                 >
-                                    <X className="w-3 h-3" />
+                                    <X className="w-4 h-4" />
                                 </button>
                             </div>
                         ) : (
@@ -558,7 +634,7 @@ const PageTreeNode = memo(({
                         {needsHostnameWarning && (
                             <Tooltip text="Missing hostname - This top-level page needs at least one hostname" position="top">
                                 <div className="cursor-help ml-1">
-                                    <AlertTriangle className="w-3 h-3 text-amber-500" />
+                                    <AlertTriangle className="w-4 h-4 text-amber-500" />
                                 </div>
                             </Tooltip>
                         )}
@@ -577,27 +653,47 @@ const PageTreeNode = memo(({
                     <Tooltip text="Edit" position="top">
                         <button
                             onClick={handleEdit}
-                            className="p-1 rounded hover:bg-gray-200 text-gray-500 hover:text-blue-600 transition-colors"
+                            className="p-1.5 rounded hover:bg-gray-200 text-gray-500 hover:text-blue-600 transition-colors"
                         >
-                            <Edit className="w-3 h-3" />
+                            <Edit className="w-4 h-4" />
+                        </button>
+                    </Tooltip>
+
+                    <Tooltip text="Move up" position="top">
+                        <button
+                            onClick={handleMoveUp}
+                            disabled={!canMoveUp}
+                            className="p-1.5 rounded hover:bg-blue-100 text-gray-500 hover:text-blue-600 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                        >
+                            <ChevronUp className="w-4 h-4" />
+                        </button>
+                    </Tooltip>
+
+                    <Tooltip text="Move down" position="top">
+                        <button
+                            onClick={handleMoveDown}
+                            disabled={!canMoveDown}
+                            className="p-1.5 rounded hover:bg-blue-100 text-gray-500 hover:text-blue-600 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                        >
+                            <ChevronDown className="w-4 h-4" />
                         </button>
                     </Tooltip>
 
                     <Tooltip text="Cut" position="top">
                         <button
                             onClick={handleCut}
-                            className="p-1 rounded hover:bg-gray-200 text-gray-500 hover:text-orange-600 transition-colors"
+                            className="p-1.5 rounded hover:bg-gray-200 text-gray-500 hover:text-orange-600 transition-colors"
                         >
-                            <Scissors className="w-3 h-3" />
+                            <Scissors className="w-4 h-4" />
                         </button>
                     </Tooltip>
 
                     <Tooltip text="Add child page" position="top">
                         <button
                             onClick={handleAddPageBelow}
-                            className="p-1 rounded hover:bg-green-100 text-gray-500 hover:text-green-600 transition-colors"
+                            className="p-1.5 rounded hover:bg-green-100 text-gray-500 hover:text-green-600 transition-colors"
                         >
-                            <Plus className="w-3 h-3" />
+                            <Plus className="w-4 h-4" />
                         </button>
                     </Tooltip>
 
@@ -606,7 +702,7 @@ const PageTreeNode = memo(({
                             <Tooltip text="Paste above" position="top">
                                 <button
                                     onClick={() => onPaste?.(page.id, 'above')}
-                                    className="p-1 rounded hover:bg-green-100 text-gray-500 hover:text-green-700 transition-colors"
+                                    className="p-1.5 rounded hover:bg-green-100 text-gray-500 hover:text-green-700 transition-colors"
                                 >
                                     <span className="text-xs font-semibold">📋↑</span>
                                 </button>
@@ -614,7 +710,7 @@ const PageTreeNode = memo(({
                             <Tooltip text="Paste below" position="top">
                                 <button
                                     onClick={() => onPaste?.(page.id, 'below')}
-                                    className="p-1 rounded hover:bg-green-100 text-gray-500 hover:text-green-700 transition-colors"
+                                    className="p-1.5 rounded hover:bg-green-100 text-gray-500 hover:text-green-700 transition-colors"
                                 >
                                     <span className="text-xs font-semibold">📋↓</span>
                                 </button>
@@ -622,7 +718,7 @@ const PageTreeNode = memo(({
                             <Tooltip text="Paste as child" position="top">
                                 <button
                                     onClick={() => onPaste?.(page.id, 'child')}
-                                    className="p-1 rounded hover:bg-green-100 text-gray-500 hover:text-green-700 transition-colors"
+                                    className="p-1.5 rounded hover:bg-green-100 text-gray-500 hover:text-green-700 transition-colors"
                                 >
                                     <span className="text-xs font-semibold">📋→</span>
                                 </button>
@@ -633,35 +729,79 @@ const PageTreeNode = memo(({
                     <Tooltip text="Delete" position="top">
                         <button
                             onClick={handleDelete}
-                            className="p-1 rounded hover:bg-red-100 text-gray-500 hover:text-red-700 transition-colors"
+                            className="p-1.5 rounded hover:bg-red-100 text-gray-500 hover:text-red-700 transition-colors"
                         >
-                            <Trash2 className="w-3 h-3" />
+                            <Trash2 className="w-4 h-4" />
                         </button>
                     </Tooltip>
                 </div>
             </div>
 
             {/* Children */}
-            {isExpanded && page.children && page.children.length > 0 && (
+            {isExpanded && children && children.length > 0 && (
                 <div className="ml-4">
-                    {page.children.map((child) => (
+                    {children.map((child, index) => (
                         <PageTreeNode
                             key={child.id}
                             page={child}
                             level={level + 1}
-                            onExpand={onExpand}
-                            onCollapse={onCollapse}
-                            onLoadChildren={onLoadChildren}
                             onEdit={onEdit}
                             onCut={onCut}
                             onPaste={onPaste}
                             onDelete={onDelete}
                             onAddPageBelow={onAddPageBelow}
                             cutPageId={cutPageId}
-                            onRefreshChildren={onRefreshChildren}
                             isSearchMode={isSearchMode}
                             searchTerm={searchTerm}
-                            onUpdatePageData={onUpdatePageData}
+                            rowHeight={rowHeight}
+                            onMoveUp={async (childId) => {
+                                // Handle move up for this node's children
+                                const childIndex = children.findIndex(c => c.id === childId)
+                                if (childIndex <= 0) return
+
+                                const currentChild = children[childIndex]
+                                const previousChild = children[childIndex - 1]
+
+                                // Calculate new sort order (place before previous sibling)
+                                let newSortOrder
+                                if (childIndex === 1) {
+                                    newSortOrder = previousChild.sortOrder - 10
+                                } else {
+                                    const beforePrevious = children[childIndex - 2]
+                                    newSortOrder = Math.floor((beforePrevious.sortOrder + previousChild.sortOrder) / 2)
+                                }
+
+                                // Update via API
+                                await pagesApi.update(childId, { sortOrder: newSortOrder })
+
+                                // Reload this node's children
+                                await loadChildren()
+                            }}
+                            onMoveDown={async (childId) => {
+                                // Handle move down for this node's children
+                                const childIndex = children.findIndex(c => c.id === childId)
+                                if (childIndex < 0 || childIndex >= children.length - 1) return
+
+                                const currentChild = children[childIndex]
+                                const nextChild = children[childIndex + 1]
+
+                                // Calculate new sort order (place after next sibling)
+                                let newSortOrder
+                                if (childIndex === children.length - 2) {
+                                    newSortOrder = nextChild.sortOrder + 10
+                                } else {
+                                    const afterNext = children[childIndex + 2]
+                                    newSortOrder = Math.floor((nextChild.sortOrder + afterNext.sortOrder) / 2)
+                                }
+
+                                // Update via API
+                                await pagesApi.update(childId, { sortOrder: newSortOrder })
+
+                                // Reload this node's children
+                                await loadChildren()
+                            }}
+                            canMoveUp={index > 0}
+                            canMoveDown={index < children.length - 1}
                         />
                     ))}
                 </div>
@@ -679,6 +819,19 @@ const PageTreeNode = memo(({
                 />
             )}
         </div>
+    )
+}, (prevProps, nextProps) => {
+    // Custom comparison function for React.memo
+    // Only re-render if these specific props change
+    // Since each node is now independent, we only care about the page ID and basic props
+    return (
+        prevProps.page.id === nextProps.page.id &&
+        prevProps.cutPageId === nextProps.cutPageId &&
+        prevProps.rowHeight === nextProps.rowHeight &&
+        prevProps.canMoveUp === nextProps.canMoveUp &&
+        prevProps.canMoveDown === nextProps.canMoveDown &&
+        prevProps.searchTerm === nextProps.searchTerm &&
+        prevProps.level === nextProps.level
     )
 })
 

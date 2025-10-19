@@ -9,7 +9,6 @@ const Navbar = () => {
   const { logout } = useAuth()
 
   const navigation = [
-    { name: 'Home', href: '/', icon: Code },
     { name: 'Pages', href: '/pages', icon: Grid3X3 },
     { name: 'Objects', href: '/objects', icon: Database },
     { name: 'Media', href: '/media', icon: FolderOpen },
@@ -52,7 +51,6 @@ const Navbar = () => {
     if (path.startsWith('/pages')) return 'Pages'
     if (path.startsWith('/objects')) return 'Objects'
     if (path.startsWith('/media')) return 'Media'
-    if (path === '/') return 'Home'
     return ''
   }
 
@@ -62,7 +60,7 @@ const Navbar = () => {
         <div className="flex justify-between h-16">
           {/* Logo and brand */}
           <div className="flex items-center">
-            <Link to="/" className="flex items-center space-x-2">
+            <Link to="/pages" className="flex items-center space-x-2">
               <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center">
                 <Code className="w-5 h-5 text-white" />
               </div>

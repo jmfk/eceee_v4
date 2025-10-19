@@ -45,13 +45,33 @@ export const getCsrfToken = async () => {
     return null
 }
 
-// Request interceptor to add JWT token
+// Request interceptor to add JWT token and CSRF token
 apiClient.interceptors.request.use(
     async (config) => {
         // Add JWT token to requests
         const accessToken = localStorage.getItem('access_token');
         if (accessToken) {
             config.headers['Authorization'] = `Bearer ${accessToken}`;
+        }
+
+        // Add CSRF token for non-GET requests
+        if (config.method && config.method.toLowerCase() !== 'get') {
+            // Try to get CSRF token from cookie
+            const cookieValue = document.cookie
+                .split('; ')
+                .find(row => row.startsWith('csrftoken='))
+                ?.split('=')[1]
+
+            if (cookieValue) {
+                config.headers['X-CSRFToken'] = cookieValue
+            } else if (!csrfToken) {
+                // If we don't have a token cached, try to get it
+                await getCsrfToken()
+            }
+
+            if (csrfToken) {
+                config.headers['X-CSRFToken'] = csrfToken
+            }
         }
 
         // Note: Case conversion is handled by djangorestframework-camel-case on the backend
