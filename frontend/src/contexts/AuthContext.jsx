@@ -22,7 +22,22 @@ export const AuthProvider = ({ children }) => {
 
     const checkAuthStatus = async () => {
         try {
-            // Check if we have tokens
+            // STEP 1: Try dev auto-login (session-based auth with no tokens)
+            // This allows the DevAutoLoginMiddleware to work in development
+            const devAuthResponse = await fetch('/api/v1/webpages/pages/', {
+                credentials: 'include', // Include cookies for session auth
+            });
+
+            if (devAuthResponse.ok) {
+                // Dev auto-login is working! No tokens needed
+                console.log('[Auth] Using dev auto-login (session-based)');
+                setIsAuthenticated(true);
+                setUser({ username: 'dev_auto_user' }); // Mark as dev user
+                setIsLoading(false);
+                return;
+            }
+
+            // STEP 2: Dev auth didn't work, check for JWT tokens
             const accessToken = localStorage.getItem('access_token');
             const refreshToken = localStorage.getItem('refresh_token');
 
@@ -33,8 +48,9 @@ export const AuthProvider = ({ children }) => {
                 return;
             }
 
-            // Try to make an authenticated request to check status
+            // STEP 3: Try JWT authentication
             const response = await fetch('/api/v1/webpages/pages/', {
+                credentials: 'include',
                 headers: {
                     'Authorization': `Bearer ${accessToken}`
                 }
