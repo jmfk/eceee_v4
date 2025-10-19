@@ -162,6 +162,7 @@ const PageTreeNode = memo(({
     // Load children for this node
     const loadChildren = useCallback(async () => {
         if (childrenLoaded || isLoading) return
+        console.log("loadChildren")
 
         setIsLoading(true)
         try {
@@ -237,7 +238,7 @@ const PageTreeNode = memo(({
 
     const handleMoveUp = async () => {
         if (!canMoveUp) return
-
+        console.log("handleMoveUp")
         // Animate immediately (optimistic)
         setAnimationDirection('up')
         setIsAnimating(true)
@@ -252,8 +253,8 @@ const PageTreeNode = memo(({
         try {
             await onMoveUp?.(page.id)
             // Invalidate React Query cache to refresh
-            queryClient.invalidateQueries(['pages', 'root'])
-            queryClient.invalidateQueries(['page-children'])
+            //queryClient.invalidateQueries(['pages', 'root'])
+            //queryClient.invalidateQueries(['page-children'])
         } catch (error) {
             console.error('Failed to move page up:', error)
             showError(error, 'error')
@@ -262,7 +263,7 @@ const PageTreeNode = memo(({
 
     const handleMoveDown = async () => {
         if (!canMoveDown) return
-
+        console.log("handleMoveDown")
         // Animate immediately (optimistic)
         setAnimationDirection('down')
         setIsAnimating(true)
@@ -277,8 +278,8 @@ const PageTreeNode = memo(({
         try {
             await onMoveDown?.(page.id)
             // Invalidate React Query cache to refresh
-            queryClient.invalidateQueries(['pages', 'root'])
-            queryClient.invalidateQueries(['page-children'])
+            //queryClient.invalidateQueries(['pages', 'root'])
+            //queryClient.invalidateQueries(['page-children'])
         } catch (error) {
             console.error('Failed to move page down:', error)
             showError(error, 'error')
@@ -288,6 +289,98 @@ const PageTreeNode = memo(({
     const handleHostnameClick = () => {
         if (isRootPageCheck) {
             setShowHostnameModal(true)
+        }
+    }
+
+    // Child move handlers
+    const handleChildMoveUp = async (childId) => {
+        console.log("handleChildMoveUp", childId)
+
+        // Boundary check: Hitta child i arrayen
+        const childIndex = children.findIndex(c => c.id === childId)
+
+        // Boundary check: Kan inte flytta upp om:
+        // - childIndex är -1 (inte hittad)
+        // - childIndex är 0 (redan först)
+        if (childIndex <= 0) return
+
+        console.log("childIndex", childIndex)
+
+        // Safe access: childIndex är nu garanterat >= 1
+        const currentChild = children[childIndex]
+        const previousChild = children[childIndex - 1]  // Safe: childIndex >= 1
+
+        // 1. FÖRST: Uppdatera lokalt (byt plats i arrayen)
+        const newChildren = [...children]
+        newChildren[childIndex] = previousChild
+        newChildren[childIndex - 1] = currentChild
+
+        // Uppdatera sortOrder för alla children med 10-intervaller
+        newChildren.forEach((child, index) => {
+            child.sortOrder = index * 10
+        })
+
+        setChildren(newChildren)
+
+        // 2. SEN: Skicka alla uppdaterade sortOrder till backend
+        try {
+            // Update via API - skicka alla ändringar
+            //const updatePromises = newChildren.map(child =>
+            //    pagesApi.update(child.id, { sortOrder: child.sortOrder })
+            //)
+            //await Promise.all(updatePromises)
+        } catch (error) {
+            // Om det misslyckas, återställ till original ordning
+            console.error('Failed to update sort order:', error)
+            await loadChildren()
+            throw error
+        }
+    }
+
+    const handleChildMoveDown = async (childId) => {
+        console.log("handleChildMoveDown", childId)
+
+        // Boundary check: Hitta child i arrayen
+        const childIndex = children.findIndex(c => c.id === childId)
+
+        // Boundary check: Kan inte flytta ner om:
+        // - childIndex är -1 (inte hittad)
+        // - childIndex är children.length - 1 (redan sist)
+        if (childIndex < 0 || childIndex >= children.length - 1) return
+
+        console.log("childIndex", childIndex)
+
+        // Safe access: childIndex är nu garanterat 0 <= childIndex < children.length - 1
+        const currentChild = children[childIndex]
+        const nextChild = children[childIndex + 1]  // Safe: childIndex < children.length - 1
+
+        console.log("children", children)
+
+        // 1. FÖRST: Uppdatera lokalt (byt plats i arrayen)
+        const newChildren = [...children]
+        newChildren[childIndex] = nextChild
+        newChildren[childIndex + 1] = currentChild
+
+        // Uppdatera sortOrder för alla children med 10-intervaller
+        newChildren.forEach((child, index) => {
+            child.sortOrder = index * 10
+        })
+
+        setChildren(newChildren)
+        console.log("newChildren", newChildren)
+
+        // 2. SEN: Skicka alla uppdaterade sortOrder till backend
+        try {
+            // Update via API - skicka alla ändringar
+            // const updatePromises = newChildren.map(child =>
+            //     pagesApi.update(child.id, { sortOrder: child.sortOrder })
+            // )
+            // await Promise.all(updatePromises)
+        } catch (error) {
+            // Om det misslyckas, återställ till original ordning
+            console.error('Failed to update sort order:', error)
+            await loadChildren()
+            throw error
         }
     }
 
@@ -754,52 +847,8 @@ const PageTreeNode = memo(({
                             isSearchMode={isSearchMode}
                             searchTerm={searchTerm}
                             rowHeight={rowHeight}
-                            onMoveUp={async (childId) => {
-                                // Handle move up for this node's children
-                                const childIndex = children.findIndex(c => c.id === childId)
-                                if (childIndex <= 0) return
-
-                                const currentChild = children[childIndex]
-                                const previousChild = children[childIndex - 1]
-
-                                // Calculate new sort order (place before previous sibling)
-                                let newSortOrder
-                                if (childIndex === 1) {
-                                    newSortOrder = previousChild.sortOrder - 10
-                                } else {
-                                    const beforePrevious = children[childIndex - 2]
-                                    newSortOrder = Math.floor((beforePrevious.sortOrder + previousChild.sortOrder) / 2)
-                                }
-
-                                // Update via API
-                                await pagesApi.update(childId, { sortOrder: newSortOrder })
-
-                                // Reload this node's children
-                                await loadChildren()
-                            }}
-                            onMoveDown={async (childId) => {
-                                // Handle move down for this node's children
-                                const childIndex = children.findIndex(c => c.id === childId)
-                                if (childIndex < 0 || childIndex >= children.length - 1) return
-
-                                const currentChild = children[childIndex]
-                                const nextChild = children[childIndex + 1]
-
-                                // Calculate new sort order (place after next sibling)
-                                let newSortOrder
-                                if (childIndex === children.length - 2) {
-                                    newSortOrder = nextChild.sortOrder + 10
-                                } else {
-                                    const afterNext = children[childIndex + 2]
-                                    newSortOrder = Math.floor((nextChild.sortOrder + afterNext.sortOrder) / 2)
-                                }
-
-                                // Update via API
-                                await pagesApi.update(childId, { sortOrder: newSortOrder })
-
-                                // Reload this node's children
-                                await loadChildren()
-                            }}
+                            onMoveUp={handleChildMoveUp}
+                            onMoveDown={handleChildMoveDown}
                             canMoveUp={index > 0}
                             canMoveDown={index < children.length - 1}
                         />
