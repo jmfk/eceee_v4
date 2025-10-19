@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, memo, useMemo } from 'react'
+import { useState, useCallback, useEffect, memo, useMemo, useRef } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
     ChevronRight,
@@ -101,9 +101,10 @@ const PageTreeNode = memo(({
 }) => {
     // Each node manages its own state independently
     const [page, setPage] = useState(initialPage)
-    const [children, setChildren] = useState(initialPage.children || [])
+    const childrenRef = useRef([])
+    const [, forceUpdate] = useState({})
     const [isExpanded, setIsExpanded] = useState(initialPage.isExpanded || false)
-    const [childrenLoaded, setChildrenLoaded] = useState(initialPage.childrenLoaded || false)
+    const [childrenLoaded, setChildrenLoaded] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
     const [showHostnameModal, setShowHostnameModal] = useState(false)
     const [isEditingTitle, setIsEditingTitle] = useState(false)
@@ -162,7 +163,6 @@ const PageTreeNode = memo(({
     // Load children for this node
     const loadChildren = useCallback(async () => {
         if (childrenLoaded || isLoading) return
-        console.log("loadChildren")
 
         setIsLoading(true)
         try {
@@ -170,7 +170,7 @@ const PageTreeNode = memo(({
             const loadedChildren = childrenData.results.map(child =>
                 pageTreeUtils.formatPageForTree(child)
             )
-            setChildren(loadedChildren)
+            childrenRef.current = loadedChildren
             setChildrenLoaded(true)
 
             // Cache the children data in React Query for invalidation
@@ -186,13 +186,6 @@ const PageTreeNode = memo(({
     // Auto-load children if this node starts expanded and has children
     useEffect(() => {
         if (isExpanded && hasChildren && !childrenLoaded && !isLoading) {
-            console.log(`Auto-loading children for page "${page.title}" (id: ${page.id})`, {
-                isExpanded,
-                hasChildren,
-                childrenLoaded,
-                isLoading,
-                childrenCount: page.childrenCount
-            })
             loadChildren()
         }
     }, [isExpanded, hasChildren, childrenLoaded, isLoading, loadChildren, page.title, page.id, page.childrenCount])
@@ -238,7 +231,6 @@ const PageTreeNode = memo(({
 
     const handleMoveUp = async () => {
         if (!canMoveUp) return
-        console.log("handleMoveUp")
         // Animate immediately (optimistic)
         setAnimationDirection('up')
         setIsAnimating(true)
@@ -263,7 +255,6 @@ const PageTreeNode = memo(({
 
     const handleMoveDown = async () => {
         if (!canMoveDown) return
-        console.log("handleMoveDown")
         // Animate immediately (optimistic)
         setAnimationDirection('down')
         setIsAnimating(true)
@@ -279,7 +270,7 @@ const PageTreeNode = memo(({
             await onMoveDown?.(page.id)
             // Invalidate React Query cache to refresh
             //queryClient.invalidateQueries(['pages', 'root'])
-            //queryClient.invalidateQueries(['page-children'])
+            //queryClient.invalidateQueries(['page'])
         } catch (error) {
             console.error('Failed to move page down:', error)
             showError(error, 'error')
@@ -294,24 +285,20 @@ const PageTreeNode = memo(({
 
     // Child move handlers
     const handleChildMoveUp = async (childId) => {
-        console.log("handleChildMoveUp", childId)
-
         // Boundary check: Hitta child i arrayen
-        const childIndex = children.findIndex(c => c.id === childId)
+        const childIndex = childrenRef.current.findIndex(c => c.id === childId)
 
         // Boundary check: Kan inte flytta upp om:
         // - childIndex är -1 (inte hittad)
         // - childIndex är 0 (redan först)
         if (childIndex <= 0) return
 
-        console.log("childIndex", childIndex)
-
         // Safe access: childIndex är nu garanterat >= 1
-        const currentChild = children[childIndex]
-        const previousChild = children[childIndex - 1]  // Safe: childIndex >= 1
+        const currentChild = childrenRef.current[childIndex]
+        const previousChild = childrenRef.current[childIndex - 1]  // Safe: childIndex >= 1
 
         // 1. FÖRST: Uppdatera lokalt (byt plats i arrayen)
-        const newChildren = [...children]
+        const newChildren = [...childrenRef.current]
         newChildren[childIndex] = previousChild
         newChildren[childIndex - 1] = currentChild
 
@@ -320,15 +307,15 @@ const PageTreeNode = memo(({
             child.sortOrder = index * 10
         })
 
-        setChildren(newChildren)
+        childrenRef.current = newChildren
 
-        // 2. SEN: Skicka alla uppdaterade sortOrder till backend
         try {
             // Update via API - skicka alla ändringar
-            //const updatePromises = newChildren.map(child =>
-            //    pagesApi.update(child.id, { sortOrder: child.sortOrder })
-            //)
-            //await Promise.all(updatePromises)
+            const updatePromises = newChildren.map(child =>
+                pagesApi.update(child.id, { sortOrder: child.sortOrder })
+            )
+            await Promise.all(updatePromises)
+            forceUpdate({});
         } catch (error) {
             // Om det misslyckas, återställ till original ordning
             console.error('Failed to update sort order:', error)
@@ -338,26 +325,20 @@ const PageTreeNode = memo(({
     }
 
     const handleChildMoveDown = async (childId) => {
-        console.log("handleChildMoveDown", childId)
-
         // Boundary check: Hitta child i arrayen
-        const childIndex = children.findIndex(c => c.id === childId)
+        const childIndex = childrenRef.current.findIndex(c => c.id === childId)
 
         // Boundary check: Kan inte flytta ner om:
         // - childIndex är -1 (inte hittad)
-        // - childIndex är children.length - 1 (redan sist)
-        if (childIndex < 0 || childIndex >= children.length - 1) return
+        // - childIndex är childrenRef.current.length - 1 (redan sist)
+        if (childIndex < 0 || childIndex >= childrenRef.current.length - 1) return
 
-        console.log("childIndex", childIndex)
-
-        // Safe access: childIndex är nu garanterat 0 <= childIndex < children.length - 1
-        const currentChild = children[childIndex]
-        const nextChild = children[childIndex + 1]  // Safe: childIndex < children.length - 1
-
-        console.log("children", children)
+        // Safe access: childIndex är nu garanterat 0 <= childIndex < childrenRef.current.length - 1
+        const currentChild = childrenRef.current[childIndex]
+        const nextChild = childrenRef.current[childIndex + 1]  // Safe: childIndex < childrenRef.current.length - 1
 
         // 1. FÖRST: Uppdatera lokalt (byt plats i arrayen)
-        const newChildren = [...children]
+        const newChildren = [...childrenRef.current]
         newChildren[childIndex] = nextChild
         newChildren[childIndex + 1] = currentChild
 
@@ -366,16 +347,16 @@ const PageTreeNode = memo(({
             child.sortOrder = index * 10
         })
 
-        setChildren(newChildren)
-        console.log("newChildren", newChildren)
+        childrenRef.current = newChildren
 
         // 2. SEN: Skicka alla uppdaterade sortOrder till backend
         try {
             // Update via API - skicka alla ändringar
-            // const updatePromises = newChildren.map(child =>
-            //     pagesApi.update(child.id, { sortOrder: child.sortOrder })
-            // )
-            // await Promise.all(updatePromises)
+            const updatePromises = newChildren.map(child =>
+                pagesApi.update(child.id, { sortOrder: child.sortOrder })
+            )
+            await Promise.all(updatePromises)
+            forceUpdate({});
         } catch (error) {
             // Om det misslyckas, återställ till original ordning
             console.error('Failed to update sort order:', error)
@@ -831,9 +812,9 @@ const PageTreeNode = memo(({
             </div>
 
             {/* Children */}
-            {isExpanded && children && children.length > 0 && (
+            {isExpanded && childrenRef.current && childrenRef.current.length > 0 && (
                 <div className="ml-4">
-                    {children.map((child, index) => (
+                    {childrenRef.current.map((child, index) => (
                         <PageTreeNode
                             key={child.id}
                             page={child}
@@ -850,7 +831,7 @@ const PageTreeNode = memo(({
                             onMoveUp={handleChildMoveUp}
                             onMoveDown={handleChildMoveDown}
                             canMoveUp={index > 0}
-                            canMoveDown={index < children.length - 1}
+                            canMoveDown={index < childrenRef.current.length - 1}
                         />
                     ))}
                 </div>
