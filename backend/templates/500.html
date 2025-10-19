@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>500 - Oops! Something Broke</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #2d3748;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Animated gears background */
+        .gear {
+            position: absolute;
+            opacity: 0.1;
+            animation: rotate 20s linear infinite;
+        }
+
+        .gear1 {
+            top: 10%;
+            left: 10%;
+            width: 100px;
+            height: 100px;
+        }
+
+        .gear2 {
+            bottom: 15%;
+            right: 15%;
+            width: 80px;
+            height: 80px;
+            animation-direction: reverse;
+            animation-duration: 15s;
+        }
+
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .container {
+            text-align: center;
+            padding: 2rem;
+            max-width: 700px;
+            position: relative;
+            z-index: 2;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .illustration {
+            margin-bottom: 1.5rem;
+        }
+
+        .error-code {
+            font-size: 6rem;
+            font-weight: 800;
+            line-height: 1;
+            margin-bottom: 1rem;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: 0.05em;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            font-weight: 700;
+            color: #2d3748;
+        }
+
+        p {
+            font-size: 1.15rem;
+            margin-bottom: 1.5rem;
+            color: #4a5568;
+            line-height: 1.7;
+            max-width: 500px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .details {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            border-radius: 15px;
+            padding: 1.25rem;
+            margin-bottom: 2rem;
+            border: 2px solid #fbbf24;
+            box-shadow: 0 4px 15px rgba(251, 191, 36, 0.2);
+        }
+
+        .details p {
+            font-size: 0.95rem;
+            margin-bottom: 0.5rem;
+            color: #78350f;
+        }
+
+        .details p:last-child {
+            margin-bottom: 0;
+        }
+
+        .details strong {
+            color: #92400e;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 1rem 2.5rem;
+            font-size: 1rem;
+            font-weight: 600;
+            text-decoration: none;
+            border-radius: 50px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+
+        .btn:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #fff;
+            color: #667eea;
+            border: 2px solid #667eea;
+        }
+
+        .btn-secondary:hover {
+            background: #f7fafc;
+            transform: translateY(-3px);
+            box-shadow: 0 6px 25px rgba(102, 126, 234, 0.2);
+        }
+
+        /* Sparks animation */
+        .spark {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: #fbbf24;
+            border-radius: 50%;
+            animation: spark 2s ease-out infinite;
+        }
+
+        @keyframes spark {
+            0% {
+                opacity: 1;
+                transform: translate(0, 0) scale(1);
+            }
+            100% {
+                opacity: 0;
+                transform: translate(var(--tx), var(--ty)) scale(0);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                margin: 1rem;
+                padding: 1.5rem;
+            }
+
+            .illustration {
+                width: 200px;
+                height: auto;
+            }
+
+            .error-code {
+                font-size: 4rem;
+            }
+
+            h1 {
+                font-size: 1.8rem;
+            }
+
+            p {
+                font-size: 1rem;
+                padding: 0 0.5rem;
+            }
+
+            .btn {
+                padding: 0.85rem 1.8rem;
+                font-size: 0.95rem;
+            }
+
+            .gear {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Animated gears -->
+    <svg class="gear gear1" viewBox="0 0 100 100" fill="white">
+        <path d="M50,10 L55,25 L70,25 L58,35 L63,50 L50,40 L37,50 L42,35 L30,25 L45,25 Z"/>
+        <circle cx="50" cy="50" r="15" fill="white"/>
+    </svg>
+    <svg class="gear gear2" viewBox="0 0 100 100" fill="white">
+        <path d="M50,10 L55,25 L70,25 L58,35 L63,50 L50,40 L37,50 L42,35 L30,25 L45,25 Z"/>
+        <circle cx="50" cy="50" r="15" fill="white"/>
+    </svg>
+    
+    <div class="container">
+        <!-- Broken Robot SVG Illustration -->
+        <svg class="illustration" width="280" height="280" viewBox="0 0 280 280" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <!-- Robot body -->
+            <rect x="90" y="120" width="100" height="110" rx="10" fill="#667eea" stroke="#4c51bf" stroke-width="3"/>
+            
+            <!-- Robot head -->
+            <rect x="100" y="60" width="80" height="70" rx="8" fill="#764ba2" stroke="#5a3a8f" stroke-width="3"/>
+            
+            <!-- Antenna -->
+            <line x1="140" y1="60" x2="140" y2="35" stroke="#4c51bf" stroke-width="3" stroke-linecap="round"/>
+            <circle cx="140" cy="30" r="6" fill="#fbbf24"/>
+            
+            <!-- Eyes (X marks - broken) -->
+            <g id="left-eye">
+                <line x1="115" y1="80" x2="125" y2="90" stroke="white" stroke-width="4" stroke-linecap="round"/>
+                <line x1="125" y1="80" x2="115" y2="90" stroke="white" stroke-width="4" stroke-linecap="round"/>
+            </g>
+            <g id="right-eye">
+                <line x1="155" y1="80" x2="165" y2="90" stroke="white" stroke-width="4" stroke-linecap="round"/>
+                <line x1="165" y1="80" x2="155" y2="90" stroke="white" stroke-width="4" stroke-linecap="round"/>
+            </g>
+            
+            <!-- Sad mouth -->
+            <path d="M120 110 Q140 105 160 110" stroke="white" stroke-width="3" stroke-linecap="round" fill="none"/>
+            
+            <!-- Body details -->
+            <circle cx="120" cy="150" r="5" fill="#fbbf24"/>
+            <circle cx="160" cy="150" r="5" fill="#10b981"/>
+            <circle cx="140" cy="170" r="8" fill="#ef4444"/>
+            <rect x="130" y="190" width="20" height="30" rx="3" fill="#4c51bf"/>
+            
+            <!-- Arms -->
+            <g id="left-arm">
+                <rect x="70" y="140" width="25" height="50" rx="5" fill="#8b5cf6" stroke="#6d28d9" stroke-width="2"/>
+                <circle cx="82.5" cy="195" r="8" fill="#d1d5db"/>
+            </g>
+            <g id="right-arm">
+                <rect x="185" y="140" width="25" height="50" rx="5" fill="#8b5cf6" stroke="#6d28d9" stroke-width="2"/>
+                <circle cx="197.5" cy="195" r="8" fill="#d1d5db"/>
+            </g>
+            
+            <!-- Legs -->
+            <g id="left-leg">
+                <rect x="105" y="230" width="25" height="40" rx="5" fill="#4c51bf" stroke="#3730a3" stroke-width="2"/>
+                <rect x="105" y="265" width="30" height="10" rx="3" fill="#1f2937"/>
+            </g>
+            <g id="right-leg">
+                <rect x="150" y="230" width="25" height="40" rx="5" fill="#4c51bf" stroke="#3730a3" stroke-width="2"/>
+                <rect x="145" y="265" width="30" height="10" rx="3" fill="#1f2937"/>
+            </g>
+            
+            <!-- Smoke/steam from head -->
+            <g opacity="0.6">
+                <circle cx="115" cy="50" r="8" fill="#9ca3af">
+                    <animate attributeName="opacity" values="0.6;0;0.6" dur="2s" repeatCount="indefinite"/>
+                    <animate attributeName="cy" values="50;35;50" dur="2s" repeatCount="indefinite"/>
+                </circle>
+                <circle cx="130" cy="45" r="6" fill="#9ca3af">
+                    <animate attributeName="opacity" values="0.6;0;0.6" dur="2.5s" repeatCount="indefinite"/>
+                    <animate attributeName="cy" values="45;30;45" dur="2.5s" repeatCount="indefinite"/>
+                </circle>
+                <circle cx="165" cy="48" r="7" fill="#9ca3af">
+                    <animate attributeName="opacity" values="0.6;0;0.6" dur="2.2s" repeatCount="indefinite"/>
+                    <animate attributeName="cy" values="48;33;48" dur="2.2s" repeatCount="indefinite"/>
+                </circle>
+            </g>
+            
+            <!-- Wrench and screwdriver tools -->
+            <g transform="translate(30, 90)">
+                <rect x="0" y="0" width="6" height="30" rx="1" fill="#78716c"/>
+                <circle cx="3" cy="-3" r="5" fill="none" stroke="#78716c" stroke-width="2"/>
+            </g>
+            <g transform="translate(240, 110) rotate(15)">
+                <rect x="0" y="0" width="5" height="35" rx="1" fill="#78716c"/>
+                <polygon points="2.5,-5 0,0 5,0" fill="#78716c"/>
+            </g>
+            
+            <!-- Bolts scattered around -->
+            <circle cx="60" cy="200" r="4" fill="#6b7280"/>
+            <circle cx="220" cy="185" r="4" fill="#6b7280"/>
+            <circle cx="75" cy="240" r="3" fill="#6b7280"/>
+        </svg>
+
+        <div class="error-code">500</div>
+        <h1>Oops! Our Robot Broke Down</h1>
+        <p>Something went wrong on our end and our systems need a quick tune-up. Don't worry, our engineers are on it!</p>
+        <div class="details">
+            <p><strong>⚙️ What happened?</strong></p>
+            <p>The server encountered an unexpected error. We've been notified and are working to fix it right away!</p>
+        </div>
+        <div class="button-group">
+            <a href="/" class="btn btn-primary">🏠 Go Home</a>
+            <a href="javascript:location.reload()" class="btn btn-secondary">🔄 Try Again</a>
+        </div>
+    </div>
+
+    <script>
+        // Create sparks around the robot illustration
+        const container = document.querySelector('.container');
+        
+        function createSpark() {
+            const spark = document.createElement('div');
+            spark.className = 'spark';
+            
+            const x = Math.random() * 100 - 50;
+            const y = Math.random() * 100 - 50;
+            
+            spark.style.setProperty('--tx', x + 'px');
+            spark.style.setProperty('--ty', y + 'px');
+            spark.style.left = '50%';
+            spark.style.top = '150px';
+            
+            container.appendChild(spark);
+            
+            setTimeout(() => spark.remove(), 2000);
+        }
+        
+        setInterval(createSpark, 500);
+    </script>
+</body>
+</html>
+
