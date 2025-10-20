@@ -7,11 +7,9 @@
 
 import React from 'react';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE_URL = '';
 const IMGPROXY_SIGN_URL = `${API_BASE_URL}/api/v1/media/imgproxy/sign/`;
 const IMGPROXY_BATCH_SIGN_URL = `${API_BASE_URL}/api/v1/media/imgproxy/sign-batch/`;
-
-console.log("API_BASE_URL", API_BASE_URL)
 
 // In-memory cache for generated URLs (prevents duplicate API calls)
 const urlCache = new Map();
