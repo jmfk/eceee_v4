@@ -19,7 +19,9 @@ class ImgProxyService:
     """
 
     def __init__(self):
-        self.base_url = getattr(settings, "IMGPROXY_URL", "http://localhost:8080")
+        self.base_url = getattr(
+            settings, "IMGPROXY_URL", "https://imgproxy.eceee.fred.nu"
+        )
         self.key = getattr(settings, "IMGPROXY_KEY", "")
         self.salt = getattr(settings, "IMGPROXY_SALT", "")
         self.signature_size = getattr(settings, "IMGPROXY_SIGNATURE_SIZE", 32)
