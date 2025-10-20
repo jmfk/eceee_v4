@@ -23,18 +23,20 @@ export const AuthProvider = ({ children }) => {
     const checkAuthStatus = async () => {
         try {
             // STEP 1: Try dev auto-login (session-based auth with no tokens)
-            // This allows the DevAutoLoginMiddleware to work in development
-            const devAuthResponse = await fetch('/api/v1/webpages/pages/', {
-                credentials: 'include', // Include cookies for session auth
-            });
+            // Only in development mode to avoid 401 errors in production
+            if (import.meta.env.DEV) {
+                const devAuthResponse = await fetch('/api/v1/webpages/pages/', {
+                    credentials: 'include', // Include cookies for session auth
+                });
 
-            if (devAuthResponse.ok) {
-                // Dev auto-login is working! No tokens needed
-                console.log('[Auth] Using dev auto-login (session-based)');
-                setIsAuthenticated(true);
-                setUser({ username: 'dev_auto_user' }); // Mark as dev user
-                setIsLoading(false);
-                return;
+                if (devAuthResponse.ok) {
+                    // Dev auto-login is working! No tokens needed
+                    console.log('[Auth] Using dev auto-login (session-based)');
+                    setIsAuthenticated(true);
+                    setUser({ username: 'dev_auto_user' }); // Mark as dev user
+                    setIsLoading(false);
+                    return;
+                }
             }
 
             // STEP 2: Dev auth didn't work, check for JWT tokens
