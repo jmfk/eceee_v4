@@ -194,9 +194,11 @@ const TreePageManager = () => {
             addNotification('Moving page...', 'info', 'page-move')
         },
         onSuccess: async () => {
-            // Invalidate and refetch - expansion state will be preserved
-            await queryClient.invalidateQueries(['pages', 'root'])
-            await queryClient.invalidateQueries(['page-children'])
+            // Invalidate and refetch all page queries to ensure moved pages are removed from old locations
+            await queryClient.invalidateQueries({ queryKey: ['pages'] })
+            await queryClient.invalidateQueries({ queryKey: ['page-children'] })
+            // Force refetch of root pages to update the tree
+            await queryClient.refetchQueries({ queryKey: ['pages', 'root'] })
             addNotification('Page moved successfully', 'success', 'page-move')
         },
         onError: (error) => {
@@ -353,9 +355,9 @@ const TreePageManager = () => {
         setCutPageId(pageId)
     }, [])
 
-    const handlePaste = useCallback(async (targetPageId, pasteMode = 'child') => {
+    const handlePaste = useCallback(async (targetPage, pasteMode = 'child') => {
         const sourcePageId = cutPageId
-        if (!sourcePageId) return
+        if (!sourcePageId || !targetPage) return
 
         try {
             let newParentId = null
@@ -363,14 +365,14 @@ const TreePageManager = () => {
 
             // Calculate new parent and sort order based on paste mode
             if (pasteMode === 'child') {
-                newParentId = targetPageId
+                newParentId = targetPage.id
                 newSortOrder = 0
             } else if (pasteMode === 'top' || pasteMode === 'bottom') {
                 newParentId = null
                 newSortOrder = pasteMode === 'top' ? -1 : 999999
             } else if (pasteMode === 'above' || pasteMode === 'below') {
-                const targetPage = pagesRef.current.find(p => p.id === targetPageId)
-                newParentId = targetPage?.parent?.id || null
+                // targetPage is now the full page object with parent info
+                newParentId = targetPage.parent?.id || null
                 newSortOrder = pasteMode === 'above' ?
                     pageTreeUtils.calculateSortOrderAbove([], targetPage) :
                     pageTreeUtils.calculateSortOrderBelow([], targetPage)
@@ -378,7 +380,7 @@ const TreePageManager = () => {
 
             // Call the API
             await movePageMutation.mutateAsync({
-                pageId: cutPageId,
+                pageId: sourcePageId,
                 parentId: newParentId,
                 sortOrder: newSortOrder
             })

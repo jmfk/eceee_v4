@@ -781,7 +781,7 @@ const PageTreeNode = memo(({
                         <>
                             <Tooltip text="Paste above" position="top">
                                 <button
-                                    onClick={() => onPaste?.(page.id, 'above')}
+                                    onClick={() => onPaste?.(page, 'above')}
                                     className="p-1.5 rounded hover:bg-green-100 text-gray-500 hover:text-green-700 transition-colors"
                                 >
                                     <span className="text-xs font-semibold">📋↑</span>
@@ -789,7 +789,7 @@ const PageTreeNode = memo(({
                             </Tooltip>
                             <Tooltip text="Paste below" position="top">
                                 <button
-                                    onClick={() => onPaste?.(page.id, 'below')}
+                                    onClick={() => onPaste?.(page, 'below')}
                                     className="p-1.5 rounded hover:bg-green-100 text-gray-500 hover:text-green-700 transition-colors"
                                 >
                                     <span className="text-xs font-semibold">📋↓</span>
@@ -797,7 +797,7 @@ const PageTreeNode = memo(({
                             </Tooltip>
                             <Tooltip text="Paste as child" position="top">
                                 <button
-                                    onClick={() => onPaste?.(page.id, 'child')}
+                                    onClick={() => onPaste?.(page, 'child')}
                                     className="p-1.5 rounded hover:bg-green-100 text-gray-500 hover:text-green-700 transition-colors"
                                 >
                                     <span className="text-xs font-semibold">📋→</span>
