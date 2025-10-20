@@ -101,9 +101,6 @@ services:
       - REACT_APP_API_URL=https://${DOMAIN:-localhost}/api
       - REACT_APP_BACKEND_URL=https://${DOMAIN:-localhost}
       - VITE_IMGPROXY_URL=http://imgproxy:8080
-      - VITE_IMGPROXY_KEY=${IMGPROXY_KEY}
-      - VITE_IMGPROXY_SALT=${IMGPROXY_SALT}
-      - VITE_IMGPROXY_SIGNATURE_SIZE=32
     expose:
       - "80"
 

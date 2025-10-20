@@ -18,7 +18,6 @@ import {
 import { mediaApi, mediaTagsApi } from '../../api';
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext';
 import OptimizedImage from './OptimizedImage';
-import { generateThumbnailUrl } from '../../utils/imgproxy';
 import MediaTagWidget from './MediaTagWidget';
 import MediaReferencesDisplay from './MediaReferencesDisplay';
 

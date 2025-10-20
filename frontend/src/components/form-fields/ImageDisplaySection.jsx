@@ -1,6 +1,5 @@
 import React, { useCallback } from 'react'
 import { X, ChevronDown, ChevronUp, Eye } from 'lucide-react'
-import { generateThumbnailUrl } from '../../utils/imgproxy'
 import { getImageUrl, formatFileSize } from './ImageValidationUtils'
 
 const ImageDisplaySection = ({
