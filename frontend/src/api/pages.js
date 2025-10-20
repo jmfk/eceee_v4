@@ -32,7 +32,7 @@ export const pagesApi = {
      */
     getRootPages: wrapApiCall(async (filters = {}) => {
         const params = {
-            parentIsnull: 'true',
+            parent_isnull: 'true',  // Use snake_case for query params (not converted by DRF camelCase)
             ordering: 'sortOrder,title',
             ...filters
         }

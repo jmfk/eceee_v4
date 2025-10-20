@@ -22,6 +22,11 @@ import { useNotificationContext } from './NotificationManager'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import pageTreeUtils from '../utils/pageTreeUtils'
 
+// Search helper function
+const searchAllPages = async (searchTerm, filters = {}) => {
+    return await pagesApi.list({ search: searchTerm, ...filters })
+}
+
 // Debounce hook for search
 const useDebounce = (value, delay) => {
     const [debouncedValue, setDebouncedValue] = useState(value)
@@ -194,11 +199,19 @@ const TreePageManager = () => {
             addNotification('Moving page...', 'info', 'page-move')
         },
         onSuccess: async () => {
-            // Invalidate and refetch all page queries to ensure moved pages are removed from old locations
-            await queryClient.invalidateQueries({ queryKey: ['pages'] })
-            await queryClient.invalidateQueries({ queryKey: ['page-children'] })
-            // Force refetch of root pages to update the tree
-            await queryClient.refetchQueries({ queryKey: ['pages', 'root'] })
+            // Clear local state to prevent duplication
+            pagesRef.current = []
+            forceUpdate({})
+
+            // Invalidate and refetch all page queries
+            queryClient.invalidateQueries({ queryKey: ['pages'] })
+            queryClient.invalidateQueries({ queryKey: ['page-children'] })
+
+            // Wait a moment for backend transaction to commit, then refetch
+            setTimeout(async () => {
+                await refetch()
+            }, 100)
+
             addNotification('Page moved successfully', 'success', 'page-move')
         },
         onError: (error) => {
