@@ -1,9 +1,11 @@
 /**
  * OptimizedImage component with imgproxy integration
+ * 
+ * Note: This component now uses client-side URL generation for simplicity.
+ * For production, consider using the secure backend API via imgproxySecure.js
  */
 
 import React, { useState, useCallback } from 'react';
-import { generateImgproxyUrl, generateSrcSet, generateThumbnailUrl } from '../../utils/imgproxy';
 
 const OptimizedImage = ({
     src,
@@ -19,7 +21,7 @@ const OptimizedImage = ({
     responsive = false,
     responsiveWidths = [300, 600, 900, 1200],
     sizes = '100vw',
-    placeholder = true,
+    placeholder = false, // Disabled placeholder as it requires imgproxy
     placeholderSize = 50,
     loading = 'lazy',
     onLoad,
@@ -29,26 +31,13 @@ const OptimizedImage = ({
 }) => {
     const [imageLoaded, setImageLoaded] = useState(false);
     const [imageError, setImageError] = useState(false);
-    const [showPlaceholder, setShowPlaceholder] = useState(placeholder);
+    const [showPlaceholder, setShowPlaceholder] = useState(false);
 
-    // Generate optimized image URL with actual dimensions
-    const optimizedSrc = src ? generateImgproxyUrl(src, {
-        width,
-        height,
-        quality,
-        format,
-        resizeType,
-        gravity,
-    }) : '';
-    // Generate placeholder URL
-    const placeholderSrc = src && placeholder ? generateThumbnailUrl(src, placeholderSize) : '';
-    // Generate responsive srcSet
-    const srcSet = src && responsive ? generateSrcSet(src, responsiveWidths, {
-        quality,
-        format,
-        resizeType,
-        gravity,
-    }) : '';
+    // Use source URL directly - imgproxy processing happens server-side
+    // For client-side optimization, use imgproxySecure.js with async URL generation
+    const optimizedSrc = src || '';
+    const placeholderSrc = '';
+    const srcSet = '';
 
     const handleLoad = useCallback((event) => {
         setImageLoaded(true);

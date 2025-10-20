@@ -36,7 +36,6 @@ import BulkOperations from './BulkOperations';
 import OptimizedImage from './OptimizedImage';
 import MediaEditForm from './MediaEditForm';
 import MediaSearchWidget from './MediaSearchWidget';
-import { generateThumbnailUrl, generateImgproxyUrl } from '../../utils/imgproxy';
 import { extractErrorMessage } from '../../utils/errorHandling';
 
 const MediaBrowser = ({
@@ -383,7 +382,7 @@ const MediaBrowser = ({
         return new Date(dateString).toLocaleDateString();
     };
 
-    // Render file thumbnail with imgproxy optimization
+    // Render file thumbnail
     const renderThumbnail = (file, size = 150) => {
         const fileType = file.fileType;
         const originalUrl = file.imgproxyBaseUrl || file.fileUrl;
@@ -397,8 +396,6 @@ const MediaBrowser = ({
                     width={size}
                     height={size}
                     className="w-full h-full object-cover rounded"
-                    placeholder={true}
-                    placeholderSize={32}
                     loading="lazy"
                     fallback={
                         <div className="w-full h-full flex items-center justify-center bg-gray-100 rounded">

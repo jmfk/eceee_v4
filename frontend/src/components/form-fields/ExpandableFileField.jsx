@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { FolderOpen, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react'
 import { mediaApi } from '../../api'
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext'
-import { generateThumbnailUrl } from '../../utils/imgproxy'
 import MediaSearchWidget from '../media/MediaSearchWidget'
 import FileUploadSection from './FileUploadSection'
 import FileDisplaySection from './FileDisplaySection'
@@ -156,16 +155,12 @@ const ExpandableFileField = ({
         }
     }, [])
 
-    // Generate thumbnail URL for images
+    // Get file URL - use source URL directly (no client-side imgproxy transformation)
     const getThumbnailUrl = (file, size = 150) => {
         const fileTypeInfo = getFileTypeInfo(file.file_type || file.fileType)
 
         if (fileTypeInfo.category === 'image') {
-            if (file.thumbnail_url && size <= 150) {
-                return file.thumbnail_url
-            }
-            const sourceUrl = getFileUrl(file)
-            return sourceUrl ? generateThumbnailUrl(sourceUrl, size, size) : null
+            return getFileUrl(file)
         }
 
         return null

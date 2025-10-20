@@ -1,7 +1,6 @@
 import React, { useState } from 'react'
 import { Image, FolderOpen, X, Eye } from 'lucide-react'
 import MediaPicker from '../media/MediaPicker'
-import { generateThumbnailUrl } from '../../utils/imgproxy'
 
 /**
  * MediaField - Form field component for media selection
@@ -126,7 +125,7 @@ const MediaField = ({
                                 <div className="flex-shrink-0">
                                     {file.file_type?.startsWith('image/') ? (
                                         <img
-                                            src={generateThumbnailUrl(file.imgproxy_base_url || file.file_url, 48, 48) || file.file_url}
+                                            src={file.imgproxy_base_url || file.file_url}
                                             alt={file.title}
                                             className="w-12 h-12 object-cover rounded"
                                             onError={(e) => {
