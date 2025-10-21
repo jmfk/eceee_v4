@@ -156,7 +156,7 @@ const ContentWidget = memo(({
                 })
             });
         }
-    }, [componentId, widgetId, slotName, contextType, publishUpdate, onConfigChange])
+    }, [componentId, widgetId, slotName, contextType, publishUpdate, onConfigChange, widgetPath, nestedParentWidgetId, nestedParentSlotName])
 
     if (mode === 'editor') {
         return (

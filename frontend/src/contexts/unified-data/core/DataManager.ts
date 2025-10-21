@@ -848,6 +848,12 @@ export class DataManager {
                                 widgetUpdate.config = payload.config;
                             }
                             updatedWidgets[widgetIndex] = widgetUpdate;
+                            console.log('🔧 DataManager: Setting isDirty=true for widget config update', {
+                                widgetId,
+                                slotName,
+                                versionId: target.versionId,
+                                sourceId: operation.sourceId
+                            });
                             return {
                                 versions: {
                                     ...state.versions,

@@ -205,6 +205,7 @@ const PageEditor = () => {
     // Get current dirty state from global context
     const [isDirty, setIsDirtyState] = useState(false);
     useExternalChanges(componentId, state => {
+        console.log('🔍 PageEditor: UDC state changed, isDirty:', state.metadata.isDirty, 'componentId:', componentId);
         setIsDirtyState(state.metadata.isDirty);
 
         // Update local widgets from external UDC changes (other components/users)

@@ -18,7 +18,9 @@ const StatusBar = ({
     isSaving = false,
     isNewPage = false,
     // Validation state props
-    validationState = { isValid: true, hasErrors: false }
+    validationState = { isValid: true, hasErrors: false },
+    // Dirty state prop (from PageEditor)
+    isDirty = false
 }) => {
     const {
         notifications,
@@ -28,10 +30,9 @@ const StatusBar = ({
         goToNotification
     } = useGlobalNotifications()
 
-    // Get global app status from UnifiedDataContext
+    // Get global app status from UnifiedDataContext (for errors/warnings only)
     const { useExternalChanges } = useUnifiedData()
     const componentId = 'status-bar'
-    const [isDirty, setIsDirty] = useState(false);
     const [errors, setErrors] = useState([]);
     const [warnings, setWarnings] = useState([]);
 
@@ -39,10 +40,9 @@ const StatusBar = ({
     const [showHistory, setShowHistory] = useState(false);
     const historyRef = useRef(null);
 
-    // Defer state updates to avoid render-phase conflicts
+    // Subscribe to errors and warnings from UDC (isDirty comes from PageEditor prop)
     useExternalChanges(componentId, state => {
         queueMicrotask(() => {
-            setIsDirty(state.metadata.isDirty);
             setErrors(state.metadata.errors);
             setWarnings(state.metadata.warnings);
         });
