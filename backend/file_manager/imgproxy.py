@@ -124,68 +124,29 @@ class ImgProxyService:
     def _generate_signature(self, path: str) -> str:
         """Generate HMAC signature for imgproxy URL."""
         try:
-            # Generate HMAC-SHA256 signature
-            # According to imgproxy docs: HMAC(key, salt + path)
+            # Ensure leading slash
+            if not path.startswith("/"):
+                path = "/" + path
+
+            # HMAC(key, salt + path)
             digest = hmac.new(
                 self.key_bytes,
-                msg=self.salt_bytes + path.encode(),
-                digestmod=hashlib.sha256,
+                self.salt_bytes + path.encode("utf-8"),
+                hashlib.sha256,
             ).digest()
 
-            # Encode to URL-safe base64
-            signature = base64.urlsafe_b64encode(digest).decode()
+            # Truncate *digest* if configured
+            if self.signature_size and self.signature_size < len(digest):
+                digest = digest[: self.signature_size]
 
-            # Truncate to specified size if configured
-            if self.signature_size and self.signature_size < len(signature):
-                signature = signature[: self.signature_size]
+            # Encode to URL-safe base64 and strip padding
+            signature = base64.urlsafe_b64encode(digest).rstrip(b"=").decode("utf-8")
 
-            # Remove padding
-            return signature.rstrip("=")
+            return signature
 
         except Exception as e:
             logger.error(f"Failed to generate imgproxy signature: {e}")
             return "unsigned"
-
-    def get_responsive_urls(
-        self,
-        source_url: str,
-        sizes: Optional[Dict[str, Tuple[int, int]]] = None,
-        format: Optional[str] = None,
-        quality: Optional[int] = None,
-    ) -> Dict[str, str]:
-        """
-        Generate multiple responsive image URLs for different screen sizes.
-
-        Args:
-            source_url: Source image URL
-            sizes: Dictionary of size names to (width, height) tuples
-            format: Output format
-            quality: Image quality
-
-        Returns:
-            Dictionary mapping size names to imgproxy URLs
-        """
-        if sizes is None:
-            sizes = {
-                "thumbnail": (150, 150),
-                "small": (300, 300),
-                "medium": (600, 600),
-                "large": (1200, 1200),
-                "xlarge": (1920, 1920),
-            }
-
-        urls = {}
-        for size_name, (width, height) in sizes.items():
-            urls[size_name] = self.generate_url(
-                source_url=source_url,
-                width=width,
-                height=height,
-                resize_type="fit",
-                format=format,
-                quality=quality,
-            )
-
-        return urls
 
     def get_preset_url(self, source_url: str, preset: str) -> str:
         """
@@ -271,20 +232,6 @@ def get_image_url(
     return imgproxy_service.generate_url(
         source_url=source_url, width=width, height=height, **kwargs
     )
-
-
-def get_responsive_images(source_url: str, **kwargs) -> Dict[str, str]:
-    """
-    Convenience function to generate responsive image URLs.
-
-    Args:
-        source_url: Source image URL
-        **kwargs: Additional options
-
-    Returns:
-        Dictionary of responsive image URLs
-    """
-    return imgproxy_service.get_responsive_urls(source_url=source_url, **kwargs)
 
 
 def get_thumbnail_url(source_url: str, size: int = 150) -> str:

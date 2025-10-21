@@ -891,27 +891,6 @@ class MediaFile(models.Model):
             source_url=source_url, width=width, height=height, **kwargs
         )
 
-    def get_responsive_urls(self, **kwargs):
-        """
-        Get responsive image URLs for different screen sizes.
-
-        Args:
-            **kwargs: Additional imgproxy options
-
-        Returns:
-            Dictionary mapping size names to imgproxy URLs
-        """
-        if self.file_type != "image":
-            return {"original": self.get_file_url()}
-
-        from .imgproxy import get_responsive_images
-        from .storage import S3MediaStorage
-
-        storage = S3MediaStorage()
-        source_url = storage.get_public_url(self.file_path)
-
-        return get_responsive_images(source_url=source_url, **kwargs)
-
     def get_imgproxy_thumbnail_url(self, size=150):
         """
         Get thumbnail URL using imgproxy.

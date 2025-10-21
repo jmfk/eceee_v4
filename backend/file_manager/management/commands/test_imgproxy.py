@@ -144,12 +144,6 @@ class Command(BaseCommand):
             preset_url = imgproxy_service.get_preset_url(source_url, preset)
             self.stdout.write(f"  {preset}: {preset_url}")
 
-        # Responsive URLs
-        self.stdout.write(f"\n{self.style.HTTP_INFO('Responsive URLs:')}")
-        responsive_urls = imgproxy_service.get_responsive_urls(source_url)
-        for size_name, url in responsive_urls.items():
-            self.stdout.write(f"  {size_name}: {url}")
-
         # Advanced options
         self.stdout.write(f"\n{self.style.HTTP_INFO('Advanced Processing:')}")
 
