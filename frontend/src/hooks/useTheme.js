@@ -110,8 +110,6 @@ ${Object.entries(cssVariables)
         document.head.appendChild(styleElement)
         injectedStyleRef.current = styleElement
 
-        console.log(`Theme CSS injected for theme "${themeData.name}" with scope "${scope}"`)
-
     }, [generateThemeCSS])
 
     /**

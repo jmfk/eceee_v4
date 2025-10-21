@@ -2170,12 +2170,6 @@ class LayoutRenderer {
  */
   handleWidgetSelection(widgetType, slotName, closeModal) {
     try {
-      console.log('🎯 LayoutRenderer handleWidgetSelection Called:', {
-        widgetType,
-        slotName,
-        timestamp: new Date().toISOString()
-      });
-
       // Find widget definition using sync version for immediate response
       const availableWidgets = this.getAvailableWidgetsSync();
       const widgetDef = availableWidgets.find(w => w.type === widgetType);
@@ -2193,14 +2187,7 @@ class LayoutRenderer {
         slotName // <-- always set slotName
       };
 
-      console.log('🎯 LayoutRenderer Widget Instance Created:', {
-        widgetId: widgetInstance.id,
-        widgetType: widgetInstance.type,
-        slotName: widgetInstance.slotName
-      });
-
       // NEW: Notify parent component to update pageData.widgets instead of directly adding to slot
-      console.log('🎯 LayoutRenderer Executing Widget Data Callback');
       this.executeWidgetDataCallback(WIDGET_ACTIONS.ADD, slotName, widgetInstance);
 
       // Close modal

@@ -205,7 +205,6 @@ const PageEditor = () => {
     // Get current dirty state from global context
     const [isDirty, setIsDirtyState] = useState(false);
     useExternalChanges(componentId, state => {
-        console.log('🔍 PageEditor: UDC state changed, isDirty:', state.metadata.isDirty, 'componentId:', componentId);
         setIsDirtyState(state.metadata.isDirty);
 
         // Update local widgets from external UDC changes (other components/users)
@@ -389,12 +388,10 @@ const PageEditor = () => {
             let newVersion;
             try {
                 newVersion = await versionsApi.create(newPage.id, versionData);
-                console.log('Version created successfully:', newVersion);
             } catch (versionError) {
                 console.error('Failed to create version:', versionError);
                 // Version creation failed, but page was created
                 // The backend will auto-create a version when we navigate to the page
-                console.log('Page created but version failed - backend will auto-create on load');
             }
 
             return { page: newPage, version: newVersion };
@@ -659,7 +656,6 @@ const PageEditor = () => {
 
     // Version management functions
     const loadVersions = useCallback(async () => {
-        console.log('[Version Persistence] 🔍 loadVersions called for page:', webpageData?.id);
         if (!webpageData?.id || isNewPage) {
             return;
         }
@@ -673,19 +669,9 @@ const PageEditor = () => {
             const currentPageId = udcState?.metadata?.currentPageId;
             const currentVersionId = udcState?.metadata?.currentVersionId;
 
-            console.log('[Version Persistence] UDC State Check:', {
-                webpageId: webpageData.id,
-                webpageIdType: typeof webpageData.id,
-                currentPageId,
-                currentPageIdType: typeof currentPageId,
-                currentVersionId,
-                match: String(currentPageId) === String(webpageData.id)
-            });
-
             if (String(currentPageId) === String(webpageData.id) && currentVersionId && versionsData.results) {
                 targetVersion = versionsData.results.find(v => String(v.id) === String(currentVersionId));
                 if (targetVersion) {
-                    console.log(`[Version Persistence] 🔄 Using current version from UDC: ${targetVersion.versionNumber} (tab switch)`);
                     // Don't call SWITCH_VERSION again, it's already the current version
                     setCurrentVersion(targetVersion);
                     const response = await api.get(endpoints.versions.pageVersionDetail(webpageData.id || pageId, targetVersion.id));
@@ -708,15 +694,9 @@ const PageEditor = () => {
             // THIRD PRIORITY: Use last viewed version from UDC (persists across page navigations)
             if (!targetVersion && versionsData.results) {
                 const lastViewedVersionId = udcState?.metadata?.lastViewedVersions?.[webpageData.id];
-                console.log('[Version Persistence] Checking for last viewed version:', {
-                    pageId: webpageData.id,
-                    lastViewedVersionId,
-                    allLastViewed: udcState?.metadata?.lastViewedVersions
-                });
                 if (lastViewedVersionId) {
                     targetVersion = versionsData.results.find(v => v.id.toString() === lastViewedVersionId);
                     if (targetVersion) {
-                        console.log(`[Version Persistence] ✅ Restored version ${targetVersion.versionNumber} for page ${webpageData.id}`);
                         addNotification(`Restored your last viewed version ${targetVersion.versionNumber}`, 'info');
                     }
                 }
@@ -747,12 +727,6 @@ const PageEditor = () => {
                     pageId: webpageData.id,
                     versionId: targetVersion.id
                 });
-                console.log('[Version Persistence] 💾 Saved version to session:', {
-                    pageId: webpageData.id,
-                    versionId: targetVersion.id,
-                    versionNumber: targetVersion.versionNumber
-                });
-
                 setCurrentVersion(targetVersion);
 
                 const changes = analyzeChanges(
@@ -856,11 +830,6 @@ const PageEditor = () => {
             await publishUpdate(versionComponentId, OperationTypes.SWITCH_VERSION, {
                 pageId: webpageData.id,
                 versionId: versionId
-            });
-            console.log('[Version Persistence] 💾 Switched and saved version to session:', {
-                pageId: webpageData.id,
-                versionId: versionId,
-                versionNumber: versionData?.versionNumber
             });
 
             setCurrentVersion(versionData);
@@ -974,7 +943,6 @@ const PageEditor = () => {
     useEffect(() => {
         // Only load versions once per page load
         if (!loadVersionsRef.current && webpageData?.id) {
-            console.log('[Version Persistence] 📥 Initial version load for page:', webpageData.id);
             loadVersionsRef.current = true;
             loadVersions();
         }

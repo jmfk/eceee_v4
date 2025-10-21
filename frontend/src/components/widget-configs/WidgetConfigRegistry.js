@@ -54,7 +54,6 @@ class WidgetConfigRegistry {
             })
 
             await Promise.all(schemaPromises)
-            console.log(`Loaded ${this.schemas.size} widget configuration schemas`)
         } catch (error) {
             console.error('Failed to load widget schemas:', error)
             throw error

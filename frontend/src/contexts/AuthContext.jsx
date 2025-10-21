@@ -31,7 +31,6 @@ export const AuthProvider = ({ children }) => {
 
                 if (devAuthResponse.ok) {
                     // Dev auto-login is working! No tokens needed
-                    console.log('[Auth] Using dev auto-login (session-based)');
                     setIsAuthenticated(true);
                     setUser({ username: 'dev_auto_user' }); // Mark as dev user
                     setIsLoading(false);

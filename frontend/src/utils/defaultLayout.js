@@ -41,7 +41,6 @@ export async function getDefaultLayout() {
 
             // Cache the result
             defaultLayoutCache = layoutName;
-            console.log(`Default layout fetched from backend: ${layoutName}`);
 
             return layoutName;
         } catch (error) {
