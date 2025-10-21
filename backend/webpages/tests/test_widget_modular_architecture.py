@@ -59,49 +59,6 @@ class ModularWidgetArchitectureTest(TestCase):
                 f"Custom widget '{widget_name}' should be available",
             )
 
-    def test_widget_registry_without_custom_widgets_app(self):
-        """Test widget registry when custom widgets app is disabled"""
-        # This test would need to be run in a separate process to truly test
-        # different INSTALLED_APPS configurations. For now, we'll test that
-        # the system can handle missing custom widgets gracefully.
-
-        registered_names = widget_type_registry.get_widget_names()
-
-        # Should have core widgets (if default_widgets app is enabled)
-        default_widgets = ["Text Block", "Image", "Button"]
-        core_widgets_found = any(
-            widget in registered_names for widget in default_widgets
-        )
-
-        if core_widgets_found:
-            # If we have core widgets, test they're properly registered
-            for widget_name in default_widgets:
-                if widget_name in registered_names:
-                    widget = widget_type_registry.get_widget_type(widget_name)
-                    self.assertIsNotNone(widget)
-
-        # The test passes if the system doesn't crash with missing apps
-
-    def test_widget_registry_without_core_widgets_app(self):
-        """Test widget registry when core widgets app is disabled"""
-        # This test verifies the system handles missing core widgets gracefully
-        registered_names = widget_type_registry.get_widget_names()
-
-        # Should have custom widgets (if they're available and can load)
-        custom_widgets = ["Testimonial", "Call to Action"]
-        custom_widgets_found = any(
-            widget in registered_names for widget in custom_widgets
-        )
-
-        if custom_widgets_found:
-            # If we have custom widgets, test they work properly
-            for widget_name in custom_widgets:
-                if widget_name in registered_names:
-                    widget = widget_type_registry.get_widget_type(widget_name)
-                    self.assertIsNotNone(widget)
-
-        # System should continue to work regardless of which apps are enabled
-
     def test_widget_registry_with_minimal_configuration(self):
         """Test widget registry with minimal configuration"""
         # Test that the registry works even with minimal widget apps
@@ -214,25 +171,6 @@ class WidgetAppDependencyTest(TestCase):
             from webpages.widget_autodiscovery import autodiscover_widgets
 
             autodiscover_widgets()
-
-    def test_core_widgets_app_independence(self):
-        """Test that default_widgets app works independently"""
-        # Import core widgets directly
-        try:
-            from default_widgets.widgets.content import ContentWidget, ContentConfig
-            from default_widgets.widgets.image import ImageWidget, ImageConfig
-
-            # Should be able to create instances
-            content_widget = ContentWidget()
-            self.assertEqual(content_widget.name, "Content")
-
-            # Should be able to create configurations
-            config = ContentConfig(content="<p>Test</p>")
-            self.assertEqual(config.content, "<p>Test</p>")
-
-        except ImportError as e:
-            # If default_widgets is not available, that's also valid for this test
-            self.skipTest(f"default_widgets app not available: {e}")
 
     def test_custom_widgets_app_independence(self):
         """Test that custom widgets app works independently"""

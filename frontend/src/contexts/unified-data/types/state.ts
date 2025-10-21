@@ -152,6 +152,9 @@ export interface AppState {
     currentObjectId?: string;
     currentObjectVersionId?: string;
     
+    // Session-wide version tracking per page (persists across tab switches)
+    lastViewedVersions?: Record<string, string>; // pageId -> versionId
+    
     // Track last operation for update source filtering
     lastOperation?: {
       type: string;

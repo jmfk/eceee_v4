@@ -38,7 +38,8 @@ export class DataManager {
                 widgetStates: {
                     errors: {},
                     activeEditors: []
-                }
+                },
+                lastViewedVersions: {} // Track last viewed version per page
             },
             ...initialState
         };
@@ -1247,7 +1248,12 @@ export class DataManager {
                                 ...state.metadata,
                                 currentPageId: pageId,
                                 currentVersionId: versionId,
-                                isDirty: false  // Reset dirty state when switching versions
+                                isDirty: false,  // Reset dirty state when switching versions
+                                // Track this version as the last viewed for this page (persists across tab switches)
+                                lastViewedVersions: {
+                                    ...state.metadata.lastViewedVersions,
+                                    [pageId]: versionId
+                                }
                             }
                         };
                     });

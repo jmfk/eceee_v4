@@ -54,6 +54,7 @@ const PublishingEditor = ({ webpageData, pageVersionData, pageId, currentVersion
         onSuccess: () => {
             addNotification('Version published successfully', 'success')
             loadVersions()
+            // Invalidate to update the current version if needed
             queryClient.invalidateQueries({ queryKey: ['pageVersion', pageId] })
         },
         onError: (error) => {
@@ -67,7 +68,9 @@ const PublishingEditor = ({ webpageData, pageVersionData, pageId, currentVersion
         onSuccess: () => {
             addNotification('Version unpublished successfully', 'success')
             loadVersions()
-            queryClient.invalidateQueries({ queryKey: ['pageVersion', pageId] })
+            // Don't invalidate the pageVersion query to prevent switching to a different version
+            // The user is likely still editing the version they just unpublished
+            // queryClient.invalidateQueries({ queryKey: ['pageVersion', pageId] })
         },
         onError: (error) => {
             console.error('Failed to unpublish version:', error)
@@ -82,6 +85,7 @@ const PublishingEditor = ({ webpageData, pageVersionData, pageId, currentVersion
             addNotification('Version scheduled successfully', 'success')
             setScheduleModalOpen(false)
             loadVersions()
+            // Invalidate to update the current version if the schedule makes this version current
             queryClient.invalidateQueries({ queryKey: ['pageVersion', pageId] })
         },
         onError: (error) => {

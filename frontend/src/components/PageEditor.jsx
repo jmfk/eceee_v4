@@ -155,7 +155,7 @@ const PageEditor = () => {
     const location = useLocation()
 
     // Use global isDirty from UnifiedDataContext
-    const { useExternalChanges, setIsDirty, publishUpdate, saveCurrentVersion } = useUnifiedData()
+    const { useExternalChanges, setIsDirty, publishUpdate, saveCurrentVersion, getState } = useUnifiedData()
 
     // Extract version from URL search parameters
     const urlParams = new URLSearchParams(location.search)
@@ -263,10 +263,11 @@ const PageEditor = () => {
         // 1. Immediate local state update (fast UI)
         setLocalWidgets(updatedWidgets);
 
-        // 2. Update pageVersionData for persistence layer
+        // 2. Update pageVersionData for persistence layer (including any additional fields like codeLayout)
         setPageVersionData(prev => ({
             ...prev,
-            widgets: updatedWidgets
+            widgets: updatedWidgets,
+            ...(options.codeLayout && { codeLayout: options.codeLayout })
         }));
 
         // 3. Mark as dirty for save indication
@@ -425,7 +426,10 @@ const PageEditor = () => {
             const result = await pagesApi.get(pageId)
             return result
         },
-        enabled: !isNewPage
+        enabled: !isNewPage,
+        staleTime: 30000, // Consider data fresh for 30 seconds
+        refetchOnMount: false, // Don't refetch on mount if data exists
+        refetchOnWindowFocus: false // Don't refetch on window focus
     })
 
     // Fetch page version data (PageVersion model data)
@@ -435,7 +439,10 @@ const PageEditor = () => {
             const result = await pagesApi.versionCurrent(pageId)
             return result
         },
-        enabled: !isNewPage
+        enabled: !isNewPage,
+        staleTime: 30000, // Consider data fresh for 30 seconds
+        refetchOnMount: false, // Don't refetch on mount if data exists
+        refetchOnWindowFocus: false // Don't refetch on window focus
     })
 
     // Fetch widget inheritance data
@@ -488,12 +495,14 @@ const PageEditor = () => {
             setOriginalWebpageData(webpage); // Track original for smart saving
 
             // Publish webpage data to UDC
-            publishUpdate(componentId, OperationTypes.INIT_PAGE, {
+            // Note: Using a stable componentId to avoid dependency cycles
+            const webpageComponentId = `page-editor-${webpage.id}-webpage`;
+            publishUpdate(webpageComponentId, OperationTypes.INIT_PAGE, {
                 id: webpage.id,
                 data: webpage
             });
         }
-    }, [webpage, isNewPage, publishUpdate, componentId])
+    }, [webpage, isNewPage, publishUpdate])
 
     // Process page version data (PageVersion model fields)
     useEffect(() => {
@@ -503,12 +512,14 @@ const PageEditor = () => {
             setOriginalPageVersionData(processedVersionData); // Track original for smart saving
 
             // Publish version data to UDC
-            publishUpdate(componentId, OperationTypes.INIT_PAGE, {
+            // Note: Using pageVersion.id here instead of componentId to avoid dependency cycle
+            const versionComponentId = `page-editor-${pageId}-${pageVersion.versionId || pageVersion.id || 'current'}`;
+            publishUpdate(versionComponentId, OperationTypes.INIT_PAGE, {
                 id: processedVersionData.id,
                 data: processedVersionData
             });
         }
-    }, [pageVersion, isNewPage, publishUpdate, componentId])
+    }, [pageVersion, isNewPage, publishUpdate, pageId])
 
     // Fetch layout data when page has a codeLayout, with fallback support
     useEffect(() => {
@@ -646,6 +657,7 @@ const PageEditor = () => {
 
     // Version management functions
     const loadVersions = useCallback(async () => {
+        console.log('[Version Persistence] 🔍 loadVersions called for page:', webpageData?.id);
         if (!webpageData?.id || isNewPage) {
             return;
         }
@@ -653,8 +665,36 @@ const PageEditor = () => {
             const versionsData = await versionsApi.getPageVersionsList(webpageData.id || pageId);
             setAvailableVersions(versionsData.results || []);
             let targetVersion = null;
-            // First priority: Use version from URL if specified and valid
-            if (versionFromUrl && versionsData.results) {
+
+            // FIRST PRIORITY: Check if we already have a current version in UDC for this page (tab switching)
+            const udcState = getState();
+            const currentPageId = udcState?.metadata?.currentPageId;
+            const currentVersionId = udcState?.metadata?.currentVersionId;
+
+            console.log('[Version Persistence] UDC State Check:', {
+                webpageId: webpageData.id,
+                webpageIdType: typeof webpageData.id,
+                currentPageId,
+                currentPageIdType: typeof currentPageId,
+                currentVersionId,
+                match: String(currentPageId) === String(webpageData.id)
+            });
+
+            if (String(currentPageId) === String(webpageData.id) && currentVersionId && versionsData.results) {
+                targetVersion = versionsData.results.find(v => String(v.id) === String(currentVersionId));
+                if (targetVersion) {
+                    console.log(`[Version Persistence] 🔄 Using current version from UDC: ${targetVersion.versionNumber} (tab switch)`);
+                    // Don't call SWITCH_VERSION again, it's already the current version
+                    setCurrentVersion(targetVersion);
+                    const response = await api.get(endpoints.versions.pageVersionDetail(webpageData.id || pageId, targetVersion.id));
+                    const newPage = response.data || response;
+                    setPageVersionData(processLoadedVersionData(newPage));
+                    return; // Early return, we're done
+                }
+            }
+
+            // SECOND PRIORITY: Use version from URL if specified and valid
+            if (!targetVersion && versionFromUrl && versionsData.results) {
                 targetVersion = versionsData.results.find(v => v.id.toString() === versionFromUrl);
                 if (!targetVersion) {
                     // Version ID from URL is invalid, remove it from URL
@@ -662,21 +702,53 @@ const PageEditor = () => {
                     navigate(currentPath, { replace: true, state: { previousView } });
                 }
             }
-            // Second priority: Use highest version number (last saved) if no URL version or URL version is invalid
+
+            // THIRD PRIORITY: Use last viewed version from UDC (persists across page navigations)
+            if (!targetVersion && versionsData.results) {
+                const lastViewedVersionId = udcState?.metadata?.lastViewedVersions?.[webpageData.id];
+                console.log('[Version Persistence] Checking for last viewed version:', {
+                    pageId: webpageData.id,
+                    lastViewedVersionId,
+                    allLastViewed: udcState?.metadata?.lastViewedVersions
+                });
+                if (lastViewedVersionId) {
+                    targetVersion = versionsData.results.find(v => v.id.toString() === lastViewedVersionId);
+                    if (targetVersion) {
+                        console.log(`[Version Persistence] ✅ Restored version ${targetVersion.versionNumber} for page ${webpageData.id}`);
+                        addNotification(`Restored your last viewed version ${targetVersion.versionNumber}`, 'info');
+                    }
+                }
+            }
+
+            // FOURTH PRIORITY: Use highest version number (last saved) as fallback
             if (!targetVersion && versionsData.results && versionsData.results.length > 0) {
                 targetVersion = versionsData.results.reduce((latest, current) => {
                     return (current.versionNumber > latest.versionNumber) ? current : latest;
                 });
             }
             if (targetVersion) {
+                // Use a stable component ID for initialization (not dependent on versionId)
+                const initComponentId = `page-editor-${webpageData.id}-init`;
+
                 // First initialize the version data in UnifiedDataContext
-                await publishUpdate(componentId, OperationTypes.INIT_PAGE, {
+                await publishUpdate(initComponentId, OperationTypes.INIT_PAGE, {
                     id: webpageData.id,
                     data: webpageData
                 });
-                await publishUpdate(componentId, OperationTypes.INIT_VERSION, {
+                await publishUpdate(initComponentId, OperationTypes.INIT_VERSION, {
                     id: targetVersion.id,
                     data: targetVersion
+                });
+
+                // Call SWITCH_VERSION to save it to lastViewedVersions (for tab switching persistence)
+                await publishUpdate(initComponentId, OperationTypes.SWITCH_VERSION, {
+                    pageId: webpageData.id,
+                    versionId: targetVersion.id
+                });
+                console.log('[Version Persistence] 💾 Saved version to session:', {
+                    pageId: webpageData.id,
+                    versionId: targetVersion.id,
+                    versionNumber: targetVersion.versionNumber
                 });
 
                 setCurrentVersion(targetVersion);
@@ -697,7 +769,7 @@ const PageEditor = () => {
             console.error('PageEditor: Error loading versions', error);
             showError('Failed to load page versions');
         }
-    }, [webpageData?.id, isNewPage, versionFromUrl, location.pathname, previousView, showError, publishUpdate, componentId]);
+    }, [webpageData?.id, isNewPage, versionFromUrl, location.pathname, previousView, showError, publishUpdate, getState, pageId]);
 
     // Load versions but preserve current version selection
     const loadVersionsPreserveCurrent = useCallback(async () => {
@@ -753,16 +825,43 @@ const PageEditor = () => {
             const versionPageData = response.data || response;
             const versionData = availableVersions.find(version => version.id === versionId);
 
+            // Process the version data
+            const processedVersionData = processLoadedVersionData(versionPageData);
+
+            // First, ensure the page exists in DataManager state
+            if (webpageData) {
+                const webpageComponentId = `page-editor-${webpageData.id}-webpage`;
+                await publishUpdate(webpageComponentId, OperationTypes.INIT_PAGE, {
+                    id: webpageData.id,
+                    data: webpageData
+                });
+            }
+
+            // Then initialize the version in DataManager state (required before SWITCH_VERSION)
+            const versionComponentId = `page-editor-${pageId}-${versionId}`;
+            await publishUpdate(versionComponentId, OperationTypes.INIT_VERSION, {
+                id: versionId,
+                data: {
+                    ...processedVersionData,
+                    // Ensure required fields for INIT_VERSION
+                    pageId: processedVersionData.pageId || webpageData.id,
+                    versionNumber: processedVersionData.versionNumber || versionData?.versionNumber,
+                    id: versionId
+                }
+            });
+
             // Then switch to the version
-            await publishUpdate(componentId, OperationTypes.SWITCH_VERSION, {
+            await publishUpdate(versionComponentId, OperationTypes.SWITCH_VERSION, {
                 pageId: webpageData.id,
                 versionId: versionId
             });
+            console.log('[Version Persistence] 💾 Switched and saved version to session:', {
+                pageId: webpageData.id,
+                versionId: versionId,
+                versionNumber: versionData?.versionNumber
+            });
 
             setCurrentVersion(versionData);
-
-            // Set pageVersionData with processed data (meta fields flattened)
-            const processedVersionData = processLoadedVersionData(versionPageData);
             setPageVersionData(processedVersionData);
             setOriginalPageVersionData(processedVersionData);
 
@@ -775,19 +874,19 @@ const PageEditor = () => {
             if (!versionPageData.codeLayout) {
                 addNotification({
                     type: 'warning',
-                    message: `Version ${versionData.versionNumber} has no layout. Using fallback layout for preview.`
+                    message: `Version ${versionData?.versionNumber || versionId} has no layout. Using fallback layout for preview.`
                 });
             }
 
             addNotification({
                 type: 'info',
-                message: `Switched to version ${versionData.versionNumber}`
+                message: `Switched to version ${versionData?.versionNumber || versionId}`
             });
         } catch (error) {
             console.error('PageEditor: Error switching to version', error);
             showError(`Failed to load version: ${error.message}`);
         }
-    }, [webpageData, availableVersions, showError, addNotification, location.pathname, buildUrlWithVersion, previousView, publishUpdate, componentId]);
+    }, [webpageData, availableVersions, showError, addNotification, location.pathname, buildUrlWithVersion, previousView, publishUpdate, pageId]);
 
     // Handle page data updates - route to appropriate data structure
     const updatePageData = useCallback(async (updates) => {
@@ -868,10 +967,21 @@ const PageEditor = () => {
     }, [publishUpdate, componentId, pageVersionData?.id, pageVersionData?.pageData])
 
 
-    // Load versions when page data is available
+    // Load versions when page data is available (only once per page)
+    const loadVersionsRef = useRef(false);
     useEffect(() => {
-        loadVersions();
-    }, [loadVersions]);
+        // Only load versions once per page load
+        if (!loadVersionsRef.current && webpageData?.id) {
+            console.log('[Version Persistence] 📥 Initial version load for page:', webpageData.id);
+            loadVersionsRef.current = true;
+            loadVersions();
+        }
+    }, [loadVersions, webpageData?.id]);
+
+    // Reset the ref when page changes
+    useEffect(() => {
+        loadVersionsRef.current = false;
+    }, [pageId]);
 
 
     // SMART SAVE: Intelligent save logic that only saves what changed

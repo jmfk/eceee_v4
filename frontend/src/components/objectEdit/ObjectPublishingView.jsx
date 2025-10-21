@@ -86,9 +86,10 @@ const ObjectPublishingView = ({ objectType, instance, isNewInstance, onSave, onC
         onSuccess: () => {
             addNotification('Version unpublished successfully', 'success')
             loadVersions()
-            // Invalidate both the single object and the list
-            queryClient.invalidateQueries({ queryKey: ['objectInstance', instance?.id] })
-            queryClient.invalidateQueries({ queryKey: ['objectInstances'] })
+            // Don't invalidate queries to prevent switching to a different version
+            // The user is likely still editing the version they just unpublished
+            // queryClient.invalidateQueries({ queryKey: ['objectInstance', instance?.id] })
+            // queryClient.invalidateQueries({ queryKey: ['objectInstances'] })
 
             // Notify UDC that publishing state changed
             if (instance?.id) {
