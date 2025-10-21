@@ -16,7 +16,8 @@ import {
     ChevronRight,
     Trash2,
     Calendar,
-    Save
+    Save,
+    Globe
 } from 'lucide-react'
 import { pagesApi, layoutsApi, versionsApi, themesApi, namespacesApi } from '../api'
 import { api } from '../api/client'
@@ -1522,9 +1523,17 @@ const PageEditor = () => {
                                 <h1 className="text-lg font-semibold text-gray-900 truncate">
                                     {isNewPage ? 'New Page' : (webpageData?.title || 'Untitled Page')}
                                 </h1>
-                                <p className="text-sm text-gray-500">
-                                    /{isNewPage ? 'new-page-slug' : (webpageData?.slug || 'page-slug')}
-                                </p>
+                                {/* Show hostnames for root pages, otherwise show path */}
+                                {!isNewPage && !webpageData?.parent && webpageData?.hostnames && webpageData.hostnames.length > 0 ? (
+                                    <div className="flex items-center text-sm text-gray-500">
+                                        <Globe className="w-3.5 h-3.5 mr-1.5" />
+                                        <span>{webpageData.hostnames.join(', ')}</span>
+                                    </div>
+                                ) : (
+                                    <p className="text-sm text-gray-500">
+                                        /{isNewPage ? 'new-page-slug' : (webpageData?.slug || 'page-slug')}
+                                    </p>
+                                )}
                             </div>
                         </div>
 
