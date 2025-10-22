@@ -21,6 +21,7 @@ from .views import (
 )
 from .views.path_pattern_views import PathPatternViewSet
 from .views.widget_type_views import pydantic_model_schema
+from .views.preview_views import PreviewSizeViewSet, render_version_preview
 from .views.simplified_layout_views import (
     simplified_layout_json,
     simplified_layouts_list,
@@ -57,6 +58,8 @@ router.register(r"themes", PageThemeViewSet, basename="pagetheme")
 router.register(r"page-data-schemas", PageDataSchemaViewSet, basename="pagedataschema")
 # Path patterns registry
 router.register(r"path-patterns", PathPatternViewSet, basename="path-pattern")
+# Preview sizes for page editor
+router.register(r"preview-sizes", PreviewSizeViewSet, basename="preview-size")
 
 # Custom widget-types patterns that allow dots in widget type names
 widget_type_patterns = [
@@ -151,6 +154,12 @@ urlpatterns = [
         name="page-version-render",
     ),
     path("pages/preview/", render_page_preview, name="page-preview"),
+    # Preview rendering for page editor
+    path(
+        "pages/<int:page_id>/versions/<int:version_id>/preview/",
+        render_version_preview,
+        name="page-version-preview",
+    ),
     # Page structure query endpoints
     path("pages/<int:page_id>/metadata/", page_metadata_view, name="page-metadata"),
     path("pages/by-path/", page_by_path_view, name="page-by-path"),

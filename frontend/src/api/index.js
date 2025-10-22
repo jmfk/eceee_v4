@@ -28,6 +28,7 @@ export { themesApi } from './themes.js'
 export { contentApi } from './content.js'
 export { publishingApi } from './publishing.js'
 export { pageDataSchemasApi } from './pageDataSchemas.js'
+export { previewSizesApi } from './previewSizes.js'
 export { mediaApi, mediaTagsApi, mediaCollectionsApi } from './media.js'
 export { objectTypesApi, objectInstancesApi, objectVersionsApi } from './objectStorage.js'
 
@@ -44,6 +45,7 @@ import { themesApi } from './themes.js'
 import { contentApi } from './content.js'
 import { publishingApi } from './publishing.js'
 import { pageDataSchemasApi } from './pageDataSchemas.js'
+import { previewSizesApi } from './previewSizes.js'
 import { mediaApi, mediaTagsApi, mediaCollectionsApi } from './media.js'
 import { objectTypesApi, objectInstancesApi, objectVersionsApi } from './objectStorage.js'
 
@@ -57,6 +59,7 @@ export default {
     content: contentApi,
     publishing: publishingApi,
     pageDataSchemas: pageDataSchemasApi,
+    previewSizes: previewSizesApi,
     media: mediaApi,
     mediaTags: mediaTagsApi,
     mediaCollections: mediaCollectionsApi,

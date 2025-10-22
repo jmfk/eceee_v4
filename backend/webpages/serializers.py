@@ -12,6 +12,7 @@ from .models import (
     PageVersion,
     PageTheme,
     PageDataSchema,
+    PreviewSize,
 )
 from django.utils import timezone
 from content.models import Tag
@@ -25,6 +26,36 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = ["id", "username", "first_name", "last_name", "email"]
         read_only_fields = ["id"]
+
+
+class PreviewSizeSerializer(serializers.ModelSerializer):
+    """Serializer for preview size configurations"""
+
+    class Meta:
+        model = PreviewSize
+        fields = [
+            "id",
+            "name",
+            "width",
+            "height",
+            "sort_order",
+            "is_default",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+    def validate_width(self, value):
+        """Validate width is positive"""
+        if value <= 0:
+            raise serializers.ValidationError("Width must be greater than 0")
+        return value
+
+    def validate_height(self, value):
+        """Validate height is positive if provided"""
+        if value is not None and value <= 0:
+            raise serializers.ValidationError("Height must be greater than 0")
+        return value
 
 
 # PageLayoutSerializer removed - now using code-based layouts only

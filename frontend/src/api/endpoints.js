@@ -107,6 +107,18 @@ export const endpoints = {
         detail: (id) => `${BASE_PATH}/webpages/themes/${id}/`,
     },
 
+    // Preview sizes endpoints
+    previewSizes: {
+        base: `${BASE_PATH}/webpages/preview-sizes`,
+        list: `${BASE_PATH}/webpages/preview-sizes/`,
+        detail: (id) => `${BASE_PATH}/webpages/preview-sizes/${id}/`,
+        create: `${BASE_PATH}/webpages/preview-sizes/`,
+        update: (id) => `${BASE_PATH}/webpages/preview-sizes/${id}/`,
+        delete: (id) => `${BASE_PATH}/webpages/preview-sizes/${id}/`,
+        // Preview rendering endpoint
+        preview: (pageId, versionId) => `${BASE_PATH}/webpages/pages/${pageId}/versions/${versionId}/preview/`
+    },
+
     // Namespaces endpoints
     namespaces: {
         base: `${BASE_PATH}/namespaces`,

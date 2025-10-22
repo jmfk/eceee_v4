@@ -63,7 +63,7 @@ class WebPageRenderer:
         page_css = self._collect_page_css(page, effective_layout, widgets_by_slot)
 
         # Generate meta tags
-        meta_tags = self._generate_meta_tags(page)
+        meta_tags = self._generate_meta_tags(page, page_version)
 
         return {
             "html": page_html,
@@ -470,12 +470,10 @@ class WebPageRenderer:
 
     def _get_layout_template_name(self, layout):
         """Get the Django template name for the layout."""
-        if hasattr(layout, "template_name"):
-            # Layout has explicit template name
-            template_name = layout.template_name
-            if not template_name.startswith("webpages/layouts/"):
-                template_name = f"webpages/layouts/{template_name}"
-            return template_name
+        if hasattr(layout, "template_name") and layout.template_name:
+            # Layout has explicit template name - use it as-is
+            # (it should already be a full template path)
+            return layout.template_name
         else:
             # Use layout name to construct template path
             layout_name = getattr(layout, "name", "default")
@@ -552,31 +550,54 @@ class WebPageRenderer:
 
         return "\n\n".join(css_parts)
 
-    def _generate_meta_tags(self, page):
+    def _generate_meta_tags(self, page, page_version=None):
         """Generate HTML meta tags for the page."""
         meta_tags = []
 
-        # Title
-        title = page.meta_title or page.title
+        # Title - prefer version's meta_title, fallback to page title
+        if (
+            page_version
+            and hasattr(page_version, "meta_title")
+            and page_version.meta_title
+        ):
+            title = page_version.meta_title
+        else:
+            title = page.title
         meta_tags.append(f"<title>{title}</title>")
 
-        # Description
-        if page.meta_description:
+        # Description - prefer version's meta_description
+        if (
+            page_version
+            and hasattr(page_version, "meta_description")
+            and page_version.meta_description
+        ):
             meta_tags.append(
-                f'<meta name="description" content="{page.meta_description}">'
+                f'<meta name="description" content="{page_version.meta_description}">'
             )
         elif page.description:
             meta_tags.append(f'<meta name="description" content="{page.description}">')
 
-        # Keywords
-        if page.meta_keywords:
+        # Keywords (if they exist on page)
+        if hasattr(page, "meta_keywords") and page.meta_keywords:
             meta_tags.append(f'<meta name="keywords" content="{page.meta_keywords}">')
 
         # Open Graph tags
         meta_tags.append(f'<meta property="og:title" content="{title}">')
-        if page.meta_description:
+
+        # Use version's meta_description for OG tags
+        og_description = None
+        if (
+            page_version
+            and hasattr(page_version, "meta_description")
+            and page_version.meta_description
+        ):
+            og_description = page_version.meta_description
+        elif page.description:
+            og_description = page.description
+
+        if og_description:
             meta_tags.append(
-                f'<meta property="og:description" content="{page.meta_description}">'
+                f'<meta property="og:description" content="{og_description}">'
             )
 
         return "\n".join(meta_tags)

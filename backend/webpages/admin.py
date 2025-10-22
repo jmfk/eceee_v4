@@ -10,7 +10,7 @@ from django import forms
 from django.utils.html import format_html
 from django.urls import reverse
 from django.utils.safestring import mark_safe
-from .models import WebPage, PageVersion, PageTheme, PageDataSchema
+from .models import WebPage, PageVersion, PageTheme, PageDataSchema, PreviewSize
 import json
 
 
@@ -752,6 +752,54 @@ class PageDataSchemaAdmin(admin.ModelAdmin):
         self.message_user(request, f"Deactivated {updated} schema(s)")
 
     deactivate_selected.short_description = "Deactivate selected"
+
+
+@admin.register(PreviewSize)
+class PreviewSizeAdmin(admin.ModelAdmin):
+    """Admin interface for preview size configurations"""
+
+    list_display = [
+        "name",
+        "width",
+        "height",
+        "sort_order",
+        "is_default",
+        "created_at",
+    ]
+    list_editable = ["sort_order"]
+    list_filter = ["is_default"]
+    search_fields = ["name"]
+    ordering = ["sort_order", "id"]
+    readonly_fields = ["created_at", "updated_at"]
+
+    fieldsets = [
+        (
+            "Preview Size Information",
+            {
+                "fields": [
+                    "name",
+                    "width",
+                    "height",
+                ]
+            },
+        ),
+        (
+            "Display Options",
+            {
+                "fields": [
+                    "sort_order",
+                    "is_default",
+                ]
+            },
+        ),
+        (
+            "Metadata",
+            {
+                "fields": ["created_at", "updated_at"],
+                "classes": ["collapse"],
+            },
+        ),
+    ]
 
 
 # Customize admin site headers
