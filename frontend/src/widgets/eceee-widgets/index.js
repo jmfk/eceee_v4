@@ -14,6 +14,7 @@ import eceeeContentWidget from './eceeeContentWidget';
 import eceeeImageWidget from './eceeeImageWidget';
 import eceeeTableWidget from './eceeeTableWidget';
 import eceeeHeaderWidget from './eceeeHeaderWidget';
+import eceeeNavbarWidget from './eceeeNavbarWidget';
 import eceeeNavigationWidget from './eceeeNavigationWidget';
 import eceeeSidebarWidget from './eceeeSidebarWidget';
 import eceeeFormsWidget from './eceeeFormsWidget';
@@ -38,6 +39,7 @@ export const ECEEE_WIDGET_REGISTRY = {
     'eceee_widgets.ImageWidget': registerWidget(eceeeImageWidget, 'eceee_widgets.ImageWidget'),
     'eceee_widgets.TableWidget': registerWidget(eceeeTableWidget, 'eceee_widgets.TableWidget'),
     'eceee_widgets.HeaderWidget': registerWidget(eceeeHeaderWidget, 'eceee_widgets.HeaderWidget'),
+    'eceee_widgets.NavbarWidget': registerWidget(eceeeNavbarWidget, 'eceee_widgets.NavbarWidget'),
     'eceee_widgets.NavigationWidget': registerWidget(eceeeNavigationWidget, 'eceee_widgets.NavigationWidget'),
     'eceee_widgets.SidebarWidget': registerWidget(eceeeSidebarWidget, 'eceee_widgets.SidebarWidget'),
     'eceee_widgets.FormsWidget': registerWidget(eceeeFormsWidget, 'eceee_widgets.FormsWidget'),
@@ -99,6 +101,7 @@ export { default as eceeeContentWidget } from './eceeeContentWidget';
 export { default as eceeeImageWidget } from './eceeeImageWidget';
 export { default as eceeeTableWidget } from './eceeeTableWidget';
 export { default as eceeeHeaderWidget } from './eceeeHeaderWidget';
+export { default as eceeeNavbarWidget } from './eceeeNavbarWidget';
 export { default as eceeeNavigationWidget } from './eceeeNavigationWidget';
 export { default as eceeeSidebarWidget } from './eceeeSidebarWidget';
 export { default as eceeeFormsWidget } from './eceeeFormsWidget';

@@ -1,0 +1,25 @@
+<!-- templates/eceee_layouts/layouts/landing_page.html -->
+{% extends "base.html" %}
+{% load webpages_tags %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-400 flex flex-col">
+  <div class="w-full max-w-[1280px] mx-auto flex-1 flex flex-col">
+    
+    <header class="bg-black h-[132px]">
+      {% render_slot "header" %}
+    </header>
+
+    {% render_slot "navbar" %}
+
+    <main class="bg-white p-8 min-h-[310px]">
+      {% render_slot "main" %}
+    </main>
+
+    <footer class="bg-gray-800 shadow-sm p-8 min-h-[300px]">
+      {% render_slot "footer" %}
+    </footer>
+        
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,18 @@
+{% load static %}
+
+<nav class="bg-blue-500 shadow-sm h-[28px]">
+    <ul class="flex gap-6 list-none m-0 p-0 pl-[20px] items-center h-full">
+        {% for item in config.menu_items %}
+            <li>
+                <a 
+                    href="{{ item.url }}"
+                    {% if item.target_blank %}target="_blank" rel="noopener noreferrer"{% endif %}
+                    class="text-white text-sm font-medium no-underline hover:opacity-80 transition-opacity"
+                >
+                    {{ item.label }}
+                </a>
+            </li>
+        {% endfor %}
+    </ul>
+</nav>
+

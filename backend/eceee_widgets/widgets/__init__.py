@@ -10,6 +10,7 @@ from .image import ImageWidget
 from .table import TableWidget
 from .footer import FooterWidget
 from .header import HeaderWidget
+from .navbar import NavbarWidget
 from .navigation import NavigationWidget
 from .sidebar import SidebarWidget
 from .forms import FormsWidget
@@ -28,6 +29,7 @@ __all__ = [
     "TableWidget",
     "FooterWidget",
     "HeaderWidget",
+    "NavbarWidget",
     "NavigationWidget",
     "SidebarWidget",
     "FormsWidget",
