@@ -98,25 +98,48 @@ const cleanHTML = (html) => {
 
     // Clean up whitespace in block elements
     const cleanBlockElement = (element) => {
+        const inlineTags = ['strong', 'b', 'em', 'i', 'a', 'br'];
+
         // First clean up text nodes
         Array.from(element.childNodes).forEach(node => {
             if (node.nodeType === Node.TEXT_NODE) {
-                // Collapse multiple spaces to single space and trim
-                node.textContent = node.textContent.replace(/\s+/g, ' ').trim();
+                // Check if this text node is adjacent to inline elements
+                const prevIsInline = node.previousSibling &&
+                    node.previousSibling.nodeType === Node.ELEMENT_NODE &&
+                    inlineTags.includes(node.previousSibling.tagName.toLowerCase());
+                const nextIsInline = node.nextSibling &&
+                    node.nextSibling.nodeType === Node.ELEMENT_NODE &&
+                    inlineTags.includes(node.nextSibling.tagName.toLowerCase());
+
+                // Only collapse excessive whitespace (3+ spaces), preserve single/double spaces
+                let text = node.textContent.replace(/\s{3,}/g, ' ');
+
+                // Only trim if not adjacent to inline elements
+                if (!prevIsInline && !nextIsInline) {
+                    text = text.trim();
+                }
+
+                node.textContent = text;
             } else if (node.nodeType === Node.ELEMENT_NODE) {
                 cleanBlockElement(node);
             }
         });
 
-        // Remove empty text nodes at the start and end
+        // Remove empty text nodes at the start and end only if they're truly empty (no inline siblings)
         while (element.firstChild &&
             element.firstChild.nodeType === Node.TEXT_NODE &&
-            !element.firstChild.textContent.trim()) {
+            !element.firstChild.textContent.trim() &&
+            !(element.firstChild.nextSibling &&
+                element.firstChild.nextSibling.nodeType === Node.ELEMENT_NODE &&
+                inlineTags.includes(element.firstChild.nextSibling.tagName.toLowerCase()))) {
             element.removeChild(element.firstChild);
         }
         while (element.lastChild &&
             element.lastChild.nodeType === Node.TEXT_NODE &&
-            !element.lastChild.textContent.trim()) {
+            !element.lastChild.textContent.trim() &&
+            !(element.lastChild.previousSibling &&
+                element.lastChild.previousSibling.nodeType === Node.ELEMENT_NODE &&
+                inlineTags.includes(element.lastChild.previousSibling.tagName.toLowerCase()))) {
             element.removeChild(element.lastChild);
         }
     };
@@ -130,7 +153,8 @@ const cleanHTML = (html) => {
     // Process all direct children of the container
     Array.from(tempDiv.childNodes).forEach(node => {
         if (node.nodeType === Node.TEXT_NODE) {
-            const text = node.textContent.trim()
+            // Only collapse excessive whitespace, preserve meaningful spaces
+            const text = node.textContent.replace(/\s{3,}/g, ' ').trim()
             if (text) {
                 // Create a new paragraph and replace the text node
                 const p = document.createElement('p')

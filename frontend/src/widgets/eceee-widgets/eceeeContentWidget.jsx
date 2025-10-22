@@ -55,6 +55,7 @@ const cleanHTML = (html) => {
 const ContentWidgetEditor = memo(({ content, onChange, className }) => {
     const containerRef = useRef(null)
     const rendererRef = useRef(null)
+    const lastExternalContentRef = useRef(content)
 
     useEffect(() => {
         if (containerRef.current && !rendererRef.current) {
@@ -65,18 +66,29 @@ const ContentWidgetEditor = memo(({ content, onChange, className }) => {
                 className
             })
             rendererRef.current.render()
+            lastExternalContentRef.current = content
         }
     }, [])
 
+    // Separate effect for content updates - only update if content is externally changed
+    useEffect(() => {
+        if (rendererRef.current && content !== lastExternalContentRef.current) {
+            const currentEditorContent = rendererRef.current.content
+            // Only update if the new content differs from what the editor currently has
+            // This prevents the editor from updating itself when it's the source of the change
+            if (content !== currentEditorContent) {
+                rendererRef.current.updateConfig({ content })
+                lastExternalContentRef.current = content
+            }
+        }
+    }, [content])
+
+    // Separate effect for onChange and className updates
     useEffect(() => {
         if (rendererRef.current) {
-            rendererRef.current.updateConfig({
-                content,
-                onChange,
-                className
-            })
+            rendererRef.current.updateConfig({ onChange, className })
         }
-    }, [content, onChange, className])
+    }, [onChange, className])
 
     useEffect(() => {
         return () => {
