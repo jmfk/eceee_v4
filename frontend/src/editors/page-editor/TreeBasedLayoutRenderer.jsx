@@ -12,7 +12,6 @@ import { useInheritanceTree } from '../../hooks/useInheritanceTree'
 import PageWidgetSelectionModal from './PageWidgetSelectionModal'
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
 import { OperationTypes } from '../../contexts/unified-data/types/operations'
-import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext'
 
 
 const TreeBasedLayoutRenderer = forwardRef(({
@@ -35,11 +34,6 @@ const TreeBasedLayoutRenderer = forwardRef(({
 
     // Get UDC context
     const { publishUpdate } = useUnifiedData()
-    const { addNotification } = useGlobalNotifications()
-
-    // Layout selector state - MUST be at top level (Rules of Hooks)
-    const [selectedLayout, setSelectedLayout] = useState(Object.keys(LAYOUT_REGISTRY)[0] || 'main_layout');
-    const [isSavingLayout, setIsSavingLayout] = useState(false);
 
     // Component state
     const [widgetModalOpen, setWidgetModalOpen] = useState(false)
@@ -163,28 +157,6 @@ const TreeBasedLayoutRenderer = forwardRef(({
     // Get layout component
     const LayoutComponent = getLayoutComponent(layoutName)
 
-    // Handle layout save (defined here so it's available for the error UI)
-    const handleSaveLayout = async () => {
-        if (!selectedLayout) return;
-
-        setIsSavingLayout(true);
-        try {
-            // Update the page version data with the new layout
-            // onWidgetChange expects (widgets, data) where data can contain page metadata
-            if (onWidgetChange) {
-                // Pass current widgets and include codeLayout in the data parameter
-                await onWidgetChange(widgets, { codeLayout: selectedLayout });
-                addNotification(`Layout changed to "${selectedLayout.replace(/_/g, ' ')}". Save the page to persist this change.`, 'success');
-            }
-            // The parent will re-render with the new layout
-        } catch (error) {
-            console.error('Failed to save layout:', error);
-            addNotification('Failed to apply layout. Please try again.', 'error');
-        } finally {
-            setIsSavingLayout(false);
-        }
-    };
-
     if (!LayoutComponent) {
         const availableLayouts = Object.keys(LAYOUT_REGISTRY);
 
@@ -193,32 +165,6 @@ const TreeBasedLayoutRenderer = forwardRef(({
                 <Layout className="h-12 w-12 mx-auto mb-4 text-red-400" />
                 <h3 className="text-lg font-medium text-red-800 mb-2">Layout Not Found</h3>
                 <p className="text-red-600 mb-6">Layout "{layoutName}" is not available</p>
-
-                <div className="bg-white rounded-lg p-6 border border-red-200">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Choose a layout to continue:
-                    </label>
-                    <select
-                        value={selectedLayout}
-                        onChange={(e) => setSelectedLayout(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        disabled={isSavingLayout}
-                    >
-                        {availableLayouts.map(layout => (
-                            <option key={layout} value={layout}>
-                                {layout.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                            </option>
-                        ))}
-                    </select>
-
-                    <button
-                        onClick={handleSaveLayout}
-                        disabled={isSavingLayout || !selectedLayout}
-                        className="mt-4 w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                        {isSavingLayout ? 'Saving...' : 'Save and Apply Layout'}
-                    </button>
-                </div>
 
                 <div className="mt-4 text-sm text-gray-600">
                     <p className="font-medium mb-1">Available layouts:</p>

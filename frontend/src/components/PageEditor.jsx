@@ -567,13 +567,8 @@ const PageEditor = () => {
             } catch (error) {
                 console.error('Failed to load layout:', error)
 
-                if (isUsingFallback) {
-                    addNotification(`Failed to load fallback layout: ${layoutToLoad}`, 'error', 'layout-load')
-                } else {
-                    addNotification(`Failed to load layout: ${layoutToLoad}`, 'error', 'layout-load')
-                }
-
-                showError(error, 'Failed to load layout data')
+                // Don't show notification popup - the layout renderer will show a clear "Layout Not Found" view
+                // showError(error, 'Failed to load layout data') - also removed to avoid redundant popup
                 setLayoutData(null)
             } finally {
                 setIsLoadingLayout(false)
