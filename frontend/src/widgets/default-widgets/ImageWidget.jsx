@@ -260,8 +260,8 @@ const ImageWidget = ({
             )
         }
 
-        // Use thumbnail ONLY in editor mode for performance, full image in preview/published
-        const displayUrl = mode === 'editor' ? (item.thumbnailUrl || item.url) : item.url
+        // Always use full image URL for page editor preview
+        const displayUrl = item.url
 
         return (
             <img

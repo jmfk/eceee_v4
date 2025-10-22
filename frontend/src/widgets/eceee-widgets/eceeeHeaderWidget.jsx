@@ -19,15 +19,7 @@ const eceeeHeaderWidget = ({ config = {}, mode = 'preview' }) => {
     // Load optimized image URL from backend API
     useEffect(() => {
         if (image) {
-            // In editor mode, use thumbnail for faster preview
-            if (mode === 'editor') {
-                const thumbnailUrl = image.thumbnailUrl || image.thumbnail_url || image.imgproxyBaseUrl || image.fileUrl
-                setOptimizedImageUrl(thumbnailUrl)
-                setImageLoading(false)
-                return
-            }
-
-            // In preview mode, get full-size optimized image
+            // Always get full-size optimized image for page editor preview
             setImageLoading(true)
             getImgproxyUrlFromImage(image, {
                 width: 1280,
@@ -41,12 +33,12 @@ const eceeeHeaderWidget = ({ config = {}, mode = 'preview' }) => {
                 })
                 .catch(error => {
                     console.error('Failed to load optimized header image:', error)
-                    // Fallback to thumbnail or original URL
-                    setOptimizedImageUrl(image.thumbnailUrl || image.thumbnail_url || image.imgproxyBaseUrl || image.fileUrl || '')
+                    // Fallback to original URL (not thumbnail)
+                    setOptimizedImageUrl(image.imgproxyBaseUrl || image.fileUrl || '')
                     setImageLoading(false)
                 })
         }
-    }, [image, mode])
+    }, [image])
 
     // Map alignment to object-position
     const objectPositionMap = {

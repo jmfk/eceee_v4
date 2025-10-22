@@ -58,7 +58,6 @@ help: ## Show this help message
 	@echo "  clean             Clean Python, Node, and Docker artifacts"
 	@echo ""
 	@echo "ECEEE Components Sync:"
-	@echo "  sync-from         Sync components FROM eceee-components TO eceee_v4"
 	@echo "  sync-to           Sync components FROM eceee_v4 TO eceee-components"
 	@echo ""
 	@echo "Cache Management:"
@@ -198,9 +197,9 @@ clean:
 	cd playwright-service && docker-compose down -v
 
 # ECEEE Components Sync Commands
-sync-from: ## Sync components FROM eceee-components TO eceee_v4
-	@echo "🔄 Syncing components FROM eceee-components TO eceee_v4..."
-	@./sync-from-eceee-components.sh
+#sync-from: ## Sync components FROM eceee-components TO eceee_v4
+#	@echo "🔄 Syncing components FROM eceee-components TO eceee_v4..."
+#	@./sync-from-eceee-components.sh
 
 sync-to: ## Sync components FROM eceee_v4 TO eceee-components
 	@echo "🔄 Syncing components FROM eceee_v4 TO eceee-components..."
