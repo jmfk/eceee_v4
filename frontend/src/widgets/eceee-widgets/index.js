@@ -30,14 +30,10 @@ import eceeeSidebarTopNewsWidget from './eceeeSidebarTopNewsWidget';
  * 
  * These are ECEEE-specific widgets with their own namespace (eceee_widgets.*)
  * They are separate from default widgets and don't override them.
- * 
- * Note: eceeeFooterWidget is registered with 'default_widgets.FooterWidget' to override it.
  */
 export const ECEEE_WIDGET_REGISTRY = {
-    // Override the default FooterWidget with ECEEE-specific implementation
-    'default_widgets.FooterWidget': registerWidget(eceeeFooterWidget, 'default_widgets.FooterWidget'),
-
     // ECEEE-specific widgets (new widgets, not overrides)
+    'eceee_widgets.FooterWidget': registerWidget(eceeeFooterWidget, 'eceee_widgets.FooterWidget'),
     'eceee_widgets.ContentWidget': registerWidget(eceeeContentWidget, 'eceee_widgets.ContentWidget'),
     'eceee_widgets.ImageWidget': registerWidget(eceeeImageWidget, 'eceee_widgets.ImageWidget'),
     'eceee_widgets.TableWidget': registerWidget(eceeeTableWidget, 'eceee_widgets.TableWidget'),

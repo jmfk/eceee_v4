@@ -1,250 +1,162 @@
+import React from 'react'
+import { Hash } from 'lucide-react'
+
 /**
- * Custom Footer Widget - ECEEE-specific override of the default FooterWidget
- * 
- * This widget demonstrates how to override a default widget with an ECEEE-specific implementation.
- * It uses the same widget type 'default_widgets.FooterWidget' to replace the default FooterWidget.
+ * ECEEE Footer Widget Component
+ * Footer widget with background styling, content, social links, and copyright
+ * Matches backend eceee_widgets.FooterWidget schema
  */
-
-import React from 'react';
-import { Heart, Globe, Mail, Phone } from 'lucide-react';
-
-const eceeeFooterWidget = ({
-    config = {},
-    editable = false,
-    onConfigChange,
-    onAction,
-    pageContext = {}
-}) => {
+const eceeeFooterWidget = ({ config = {}, mode = 'preview' }) => {
     const {
-        companyName = 'ECEEE',
-        tagline = 'European Council for an Energy Efficient Economy',
-        showSocialLinks = true,
-        showContactInfo = true,
+        content = '<p>Footer content will appear here...</p>',
         backgroundColor = '#1f2937',
+        backgroundImage = null,
+        backgroundSize = 'cover',
+        backgroundPosition = 'center',
         textColor = '#f9fafb',
-        accentColor = '#3b82f6'
-    } = config;
+        padding = '2rem 1rem',
+        margin = null,
+        textAlign = 'center',
+        cssClass = '',
+        customCss = '',
+        showCopyright = true,
+        copyrightText = '',
+        socialLinks = []
+    } = config
 
-    const handleConfigUpdate = (updates) => {
-        if (onConfigChange) {
-            onConfigChange({ ...config, ...updates });
-        }
-    };
+    const currentYear = new Date().getFullYear()
+    const displayCopyright = copyrightText || `© ${currentYear} All rights reserved.`
 
-    if (editable) {
-        return (
-            <div className="p-6 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
-                <div className="mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                        ECEEE Custom Footer Widget
-                    </h3>
-                    <p className="text-sm text-gray-600">
-                        This is a custom ECEEE footer that overrides the default footer widget.
-                    </p>
-                </div>
-
-                <div className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Company Name
-                        </label>
-                        <input
-                            type="text"
-                            value={companyName}
-                            onChange={(e) => handleConfigUpdate({ companyName: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Tagline
-                        </label>
-                        <input
-                            type="text"
-                            value={tagline}
-                            onChange={(e) => handleConfigUpdate({ tagline: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                    </div>
-
-                    <div className="flex items-center space-x-4">
-                        <label className="flex items-center">
-                            <input
-                                type="checkbox"
-                                checked={showSocialLinks}
-                                onChange={(e) => handleConfigUpdate({ showSocialLinks: e.target.checked })}
-                                className="mr-2"
-                            />
-                            Show Social Links
-                        </label>
-
-                        <label className="flex items-center">
-                            <input
-                                type="checkbox"
-                                checked={showContactInfo}
-                                onChange={(e) => handleConfigUpdate({ showContactInfo: e.target.checked })}
-                                className="mr-2"
-                            />
-                            Show Contact Info
-                        </label>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Background Color
-                            </label>
-                            <input
-                                type="color"
-                                value={backgroundColor}
-                                onChange={(e) => handleConfigUpdate({ backgroundColor: e.target.value })}
-                                className="w-full h-10 border border-gray-300 rounded-md"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Text Color
-                            </label>
-                            <input
-                                type="color"
-                                value={textColor}
-                                onChange={(e) => handleConfigUpdate({ textColor: e.target.value })}
-                                className="w-full h-10 border border-gray-300 rounded-md"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Accent Color
-                            </label>
-                            <input
-                                type="color"
-                                value={accentColor}
-                                onChange={(e) => handleConfigUpdate({ accentColor: e.target.value })}
-                                className="w-full h-10 border border-gray-300 rounded-md"
-                            />
-                        </div>
-                    </div>
-                </div>
-            </div>
-        );
+    // Build footer styles
+    const footerStyle = {
+        backgroundColor: backgroundColor,
+        backgroundImage: backgroundImage ? `url(${backgroundImage})` : 'none',
+        backgroundSize: backgroundSize,
+        backgroundPosition: backgroundPosition,
+        backgroundRepeat: 'no-repeat',
+        color: textColor,
+        padding: padding,
+        textAlign: textAlign
     }
 
+    if (margin) {
+        footerStyle.margin = margin
+    }
+
+    // Editor mode: show simple preview with configured styles
+    if (mode === 'editor') {
+        return (
+            <div className="footer-widget-editor p-4">
+                <footer
+                    className={`footer-widget rounded ${cssClass}`}
+                    style={footerStyle}
+                >
+                    <div className="footer-content max-w-6xl mx-auto">
+                        <div dangerouslySetInnerHTML={{ __html: content }} />
+
+                        {socialLinks.length > 0 && (
+                            <div className="footer-social-links mt-4 flex justify-center space-x-4">
+                                {socialLinks.map((link, index) => (
+                                    <a
+                                        key={index}
+                                        href={link.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-blue-400 hover:text-blue-300 transition-colors"
+                                        title={link.name}
+                                    >
+                                        {link.icon && <i className={link.icon}></i>}
+                                        {!link.icon && <span>{link.name}</span>}
+                                    </a>
+                                ))}
+                            </div>
+                        )}
+
+                        {showCopyright && (
+                            <div className="footer-copyright mt-4 text-sm opacity-80">
+                                {displayCopyright}
+                            </div>
+                        )}
+                    </div>
+
+                    {customCss && (
+                        <style dangerouslySetInnerHTML={{ __html: customCss }} />
+                    )}
+                </footer>
+            </div>
+        )
+    }
+
+    // Preview/production mode: full rendering with all config applied
     return (
         <footer
-            className="py-12 px-6"
-            style={{ backgroundColor, color: textColor }}
+            className={`footer-widget ${cssClass}`}
+            style={footerStyle}
         >
-            <div className="max-w-6xl mx-auto">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                    {/* Company Info */}
-                    <div className="space-y-4">
-                        <div>
-                            <h3 className="text-2xl font-bold mb-2" style={{ color: accentColor }}>
-                                {companyName}
-                            </h3>
-                            <p className="text-sm opacity-90">
-                                {tagline}
-                            </p>
-                        </div>
+            <div className="footer-content max-w-6xl mx-auto">
+                <div dangerouslySetInnerHTML={{ __html: content }} />
 
-                        <div className="flex items-center space-x-2 text-sm">
-                            <Heart className="h-4 w-4" style={{ color: accentColor }} />
-                            <span>Promoting energy efficiency across Europe</span>
-                        </div>
+                {socialLinks.length > 0 && (
+                    <div className="footer-social-links mt-4 flex justify-center space-x-4">
+                        {socialLinks.map((link, index) => (
+                            <a
+                                key={index}
+                                href={link.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="hover:opacity-80 transition-opacity"
+                                title={link.name}
+                            >
+                                {link.icon && <i className={link.icon}></i>}
+                                {!link.icon && <span>{link.name}</span>}
+                            </a>
+                        ))}
                     </div>
+                )}
 
-                    {/* Contact Info */}
-                    {showContactInfo && (
-                        <div className="space-y-4">
-                            <h4 className="text-lg font-semibold" style={{ color: accentColor }}>
-                                Contact Us
-                            </h4>
-                            <div className="space-y-2 text-sm">
-                                <div className="flex items-center space-x-2">
-                                    <Mail className="h-4 w-4" />
-                                    <span>info@eceee.org</span>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                    <Phone className="h-4 w-4" />
-                                    <span>+46 8 753 24 50</span>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                    <Globe className="h-4 w-4" />
-                                    <span>Stockholm, Sweden</span>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Social Links */}
-                    {showSocialLinks && (
-                        <div className="space-y-4">
-                            <h4 className="text-lg font-semibold" style={{ color: accentColor }}>
-                                Follow Us
-                            </h4>
-                            <div className="flex space-x-4">
-                                <a
-                                    href="#"
-                                    className="hover:opacity-75 transition-opacity"
-                                    style={{ color: accentColor }}
-                                >
-                                    LinkedIn
-                                </a>
-                                <a
-                                    href="#"
-                                    className="hover:opacity-75 transition-opacity"
-                                    style={{ color: accentColor }}
-                                >
-                                    Twitter
-                                </a>
-                                <a
-                                    href="#"
-                                    className="hover:opacity-75 transition-opacity"
-                                    style={{ color: accentColor }}
-                                >
-                                    Newsletter
-                                </a>
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                {/* Copyright */}
-                <div className="mt-8 pt-8 border-t border-opacity-20" style={{ borderColor: textColor }}>
-                    <div className="flex flex-col md:flex-row justify-between items-center text-sm opacity-75">
-                        <p>© 2024 {companyName}. All rights reserved.</p>
-                        <p>Custom ECEEE Footer Widget Override</p>
+                {showCopyright && (
+                    <div className="footer-copyright mt-4 text-sm opacity-80">
+                        {displayCopyright}
                     </div>
-                </div>
+                )}
             </div>
+
+            {customCss && (
+                <style dangerouslySetInnerHTML={{ __html: customCss }} />
+            )}
         </footer>
-    );
-};
+    )
+}
 
-// Widget metadata
-eceeeFooterWidget.displayName = 'FooterWidget';
-eceeeFooterWidget.widgetType = 'eceee_widgets.FooterWidget'; // Same type as default to override it
+// === COLOCATED METADATA ===
+eceeeFooterWidget.displayName = 'FooterWidget'
+eceeeFooterWidget.widgetType = 'eceee_widgets.FooterWidget'
 
+// Default configuration matching backend schema
 eceeeFooterWidget.defaultConfig = {
-    companyName: 'ECEEE',
-    tagline: 'European Council for an Energy Efficient Economy',
-    showSocialLinks: true,
-    showContactInfo: true,
+    content: '<p>Footer content</p>',
     backgroundColor: '#1f2937',
+    backgroundImage: null,
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
     textColor: '#f9fafb',
-    accentColor: '#3b82f6'
-};
+    padding: '2rem 1rem',
+    margin: null,
+    textAlign: 'center',
+    cssClass: '',
+    customCss: '',
+    showCopyright: true,
+    copyrightText: '',
+    socialLinks: []
+}
 
+// Display metadata
 eceeeFooterWidget.metadata = {
     name: 'ECEEE Footer',
-    description: 'Custom ECEEE footer with company branding and contact information',
+    description: 'Footer with background styling, content, social links, and copyright',
     category: 'layout',
-    icon: null,
-    tags: ['footer', 'eceee', 'contact', 'branding'],
-    menuItems: []
-};
+    icon: Hash,
+    tags: ['eceee', 'footer', 'layout', 'copyright', 'social']
+}
 
-export default eceeeFooterWidget;
+export default eceeeFooterWidget
