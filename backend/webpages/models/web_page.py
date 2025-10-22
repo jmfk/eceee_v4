@@ -611,6 +611,32 @@ class WebPage(models.Model):
                     f"Must be one of: {', '.join(path_pattern_registry.list_pattern_keys())}"
                 )
 
+        # Validate HTTP error code slugs (400-599)
+        if self.slug and self.slug.isdigit():
+            error_code = int(self.slug)
+            if 400 <= error_code <= 599:
+                # This is an error page
+                if self.parent is None:
+                    raise ValidationError(
+                        "Error pages must be under a root page (not at root level). "
+                        f"Slug '{self.slug}' is reserved for HTTP error pages."
+                    )
+                if self.parent.parent is not None:
+                    raise ValidationError(
+                        "Error pages must be direct children of root pages. "
+                        f"Slug '{self.slug}' is reserved for HTTP error pages."
+                    )
+
+                # Ensure uniqueness of error code within the same parent (site)
+                conflicting_error_pages = WebPage.objects.filter(
+                    parent=self.parent, slug=self.slug, is_deleted=False
+                ).exclude(pk=self.pk)
+
+                if conflicting_error_pages.exists():
+                    raise ValidationError(
+                        f"An error page with code '{self.slug}' already exists for this site."
+                    )
+
         # Check for hostname conflicts with other root pages
         if self.hostnames and self.parent is None:
             for hostname in self.hostnames:

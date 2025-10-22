@@ -704,6 +704,22 @@ const PageTreeNode = memo(({
                             onToggle={handlePublicationToggle}
                         />
 
+                        {/* Error page badge */}
+                        {(() => {
+                            const slug = page.slug || '';
+                            const isErrorCode = /^[45]\d{2}$/.test(slug);
+                            if (isErrorCode) {
+                                return (
+                                    <Tooltip text={`HTTP ${slug} Error Page`} position="top">
+                                        <span className="ml-1 px-1.5 py-0.5 text-xs font-medium bg-red-100 text-red-700 rounded border border-red-300">
+                                            {slug}
+                                        </span>
+                                    </Tooltip>
+                                );
+                            }
+                            return null;
+                        })()}
+
                         {/* Hostname warning for top-level pages */}
                         {needsHostnameWarning && (
                             <Tooltip text="Missing hostname - This top-level page needs at least one hostname" position="top">

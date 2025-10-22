@@ -169,6 +169,36 @@ const SettingsEditor = forwardRef<SettingsEditorHandle, SettingsEditorProps>(({
                                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 placeholder="page-url-slug"
                             />
+                            {(() => {
+                                // Check if slug is an HTTP error code (400-599)
+                                const slug = localValues.slug || '';
+                                const isErrorCode = /^[45]\d{2}$/.test(slug);
+                                if (isErrorCode) {
+                                    const errorCode = parseInt(slug);
+                                    const errorNames = {
+                                        400: 'Bad Request',
+                                        401: 'Unauthorized',
+                                        403: 'Forbidden',
+                                        404: 'Not Found',
+                                        500: 'Internal Server Error',
+                                        502: 'Bad Gateway',
+                                        503: 'Service Unavailable',
+                                        504: 'Gateway Timeout'
+                                    };
+                                    const errorName = errorNames[errorCode] || 'Error';
+                                    return (
+                                        <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                                            <p className="text-sm text-blue-800">
+                                                <strong>Error Page Detected:</strong> This slug ({slug}) will create a custom error page for HTTP {errorCode} ({errorName}) responses on this site.
+                                            </p>
+                                            <p className="text-xs text-blue-600 mt-1">
+                                                Consider using an error layout (error_404, error_500, etc.) for the best user experience.
+                                            </p>
+                                        </div>
+                                    );
+                                }
+                                return null;
+                            })()}
                         </div>
 
                         <div>
@@ -199,6 +229,25 @@ const SettingsEditor = forwardRef<SettingsEditorHandle, SettingsEditorProps>(({
                                 label="Page Layout"
                                 description="Choose the layout template for this page"
                             />
+                            {(() => {
+                                // Suggest error layouts for error page slugs
+                                const slug = localValues.slug || '';
+                                const isErrorCode = /^[45]\d{2}$/.test(slug);
+                                const currentLayout = localValues.codeLayout || '';
+                                const suggestedLayout = `error_${slug}`;
+
+                                // Show suggestion if it's an error page but not using an error layout
+                                if (isErrorCode && !currentLayout.startsWith('error_')) {
+                                    return (
+                                        <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-md">
+                                            <p className="text-xs text-yellow-800">
+                                                <strong>Tip:</strong> Consider using the <code className="px-1 bg-yellow-100 rounded">{suggestedLayout}</code> layout for this error page.
+                                            </p>
+                                        </div>
+                                    );
+                                }
+                                return null;
+                            })()}
                         </div>
 
                         {/* Page Tags */}

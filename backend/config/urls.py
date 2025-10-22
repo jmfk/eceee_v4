@@ -91,3 +91,8 @@ if settings.DEBUG:
 admin.site.site_header = "ECEEE v4 Administration"
 admin.site.site_title = "ECEEE v4 Admin"
 admin.site.index_title = "Welcome to ECEEE v4 Administration"
+
+# Custom error handlers for site-specific error pages
+handler404 = "webpages.public_views.custom_404_handler"
+handler500 = "webpages.public_views.custom_500_handler"
+handler403 = "webpages.public_views.custom_403_handler"

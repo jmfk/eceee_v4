@@ -10,6 +10,7 @@ eceee_v4 is a Django-based CMS with a React frontend featuring:
 - Version control for page changes
 - Theme and layout inheritance system
 - Dynamic widget configuration with JSON schemas
+- Custom error pages (404, 500, etc.) per site with proper HTTP status codes
 
 ## Commands and Development
 

@@ -390,6 +390,94 @@ class HostnamePageView(View):
     template_name = "webpages/page_detail.html"
     context_object_name = "page"
 
+    def _get_error_page(self, root_page, error_code):
+        """
+        Get custom error page for the given error code under root page.
+
+        Args:
+            root_page: The root page for the current site
+            error_code: HTTP error code (e.g., 404, 500)
+
+        Returns:
+            WebPage or None if no custom error page exists
+        """
+        try:
+            error_page = WebPage.objects.get(
+                parent=root_page, slug=str(error_code), is_deleted=False
+            )
+            if error_page.is_published():
+                return error_page
+        except WebPage.DoesNotExist:
+            pass
+        return None
+
+    def _render_error_page(self, error_page, status_code):
+        """
+        Render a custom error page with the appropriate HTTP status code.
+
+        Args:
+            error_page: The WebPage to render
+            status_code: HTTP status code to return
+
+        Returns:
+            HttpResponse with the rendered error page
+        """
+        from django.shortcuts import render
+        from .renderers import WebPageRenderer
+
+        # Get the published version
+        content = error_page.get_current_published_version()
+
+        if not content:
+            # If error page has no published content, fall back to default error
+            return None
+
+        effective_layout = error_page.get_effective_layout()
+
+        template_name = (
+            effective_layout.template_name
+            if effective_layout
+            else "webpages/page_detail.html"
+        )
+
+        # Build context for error page
+        context = {
+            "root_page": error_page.parent,  # Parent is the root page
+            "current_page": error_page,
+            "widgets": content.widgets,
+            "layout": effective_layout,
+            "theme": error_page.get_effective_theme(),
+            "parent": error_page.parent,
+            "slug_parts": [str(status_code)],
+            "request": self.request,
+            "page_data": content.page_data,
+            "version_number": content.version_number,
+            "status": content.get_publication_status(),
+            "is_current": content.is_current_published(),
+            "published_at": content.effective_date,
+            "published_by": content.created_by,
+            "effective_layout": effective_layout,
+            "effective_theme": error_page.get_effective_theme(),
+            "path_variables": {},
+            "error_code": status_code,  # Add error code to context
+        }
+
+        # Build widgets_by_slot via renderer
+        renderer = WebPageRenderer(request=self.request)
+        base_context = renderer._build_base_context(error_page, content, {})
+        context["widgets_by_slot"] = renderer._render_widgets_by_slot(
+            error_page, content, base_context
+        )
+
+        if effective_layout:
+            context["slots"] = effective_layout.slot_configuration["slots"]
+        else:
+            context["slots"] = []
+
+        response = render(self.request, template_name, context)
+        response.status_code = status_code
+        return response
+
     def get(self, request, *args, **kwargs):
         """
         Resolve page based on hostname and path with pattern matching support.
@@ -421,88 +509,100 @@ class HostnamePageView(View):
         if not root_page:
             raise Http404(f"No site configured for hostname: {hostname}")
 
-        # Initialize path_variables (will be populated if pattern matching occurs)
-        path_variables = {}
+        # Wrap main logic in try-except to handle 404 errors with custom error pages
+        try:
+            # Initialize path_variables (will be populated if pattern matching occurs)
+            path_variables = {}
 
-        # If no path specified, return the root page
-        if not slug_parts:
-            current_page = root_page
-            remaining_path = ""
-        else:
-            # NEW: Smart path resolution - find longest matching page path
-            current_page, remaining_path = self._resolve_page_with_pattern(
-                root_page, slug_parts
-            )
-
-            # If we have a remaining path and the page has a path_pattern_key, extract variables
-            if remaining_path and current_page.path_pattern_key:
-                path_variables = self._extract_path_variables(
-                    current_page.path_pattern_key, remaining_path
+            # If no path specified, return the root page
+            if not slug_parts:
+                current_page = root_page
+                remaining_path = ""
+            else:
+                # NEW: Smart path resolution - find longest matching page path
+                current_page, remaining_path = self._resolve_page_with_pattern(
+                    root_page, slug_parts
                 )
 
-                # If pattern doesn't match, it's a 404
-                if path_variables is None:
-                    raise Http404(f"Path does not match pattern: {remaining_path}")
+                # If we have a remaining path and the page has a path_pattern_key, extract variables
+                if remaining_path and current_page.path_pattern_key:
+                    path_variables = self._extract_path_variables(
+                        current_page.path_pattern_key, remaining_path
+                    )
 
-        # Get the published version
-        content = current_page.get_current_published_version()
+                    # If pattern doesn't match, it's a 404
+                    if path_variables is None:
+                        raise Http404(f"Path does not match pattern: {remaining_path}")
 
-        # Handle case where no published version exists
-        if not content:
-            raise Http404(f"No published content available for this page")
+            # Get the published version
+            content = current_page.get_current_published_version()
 
-        # Check if page is published and effective
-        if not self._is_page_accessible(current_page):
-            raise Http404("Page not available")
+            # Handle case where no published version exists
+            if not content:
+                raise Http404(f"No published content available for this page")
 
-        effective_layout = current_page.get_effective_layout()
+            # Check if page is published and effective
+            if not self._is_page_accessible(current_page):
+                raise Http404("Page not available")
 
-        template_name = (
-            effective_layout.template_name
-            if effective_layout
-            else "webpages/page_detail.html"
-        )
+            effective_layout = current_page.get_effective_layout()
 
-        # Build context with path_variables
-        widgets = content.widgets
-        page_data = content.page_data
+            template_name = (
+                effective_layout.template_name
+                if effective_layout
+                else "webpages/page_detail.html"
+            )
 
-        context = {
-            "root_page": root_page,
-            "current_page": current_page,
-            "widgets": widgets,
-            "layout": effective_layout,
-            "theme": current_page.get_effective_theme(),
-            "parent": current_page.parent,
-            "slug_parts": slug_parts,
-            "request": request,
-            "page_data": page_data,
-            "version_number": content.version_number,
-            "status": content.get_publication_status(),
-            "is_current": content.is_current_published(),
-            "published_at": content.effective_date,
-            "published_by": content.created_by,
-            "effective_layout": effective_layout,
-            "effective_theme": current_page.get_effective_theme(),
-            "path_variables": path_variables,  # NEW: Add path variables to context
-        }
+            # Build context with path_variables
+            widgets = content.widgets
+            page_data = content.page_data
 
-        # Build widgets_by_slot via renderer (new system)
-        renderer = WebPageRenderer(request=request)
-        # Pass path_variables in the extra context
-        base_context = renderer._build_base_context(
-            current_page, content, {"path_variables": path_variables}
-        )
-        context["widgets_by_slot"] = renderer._render_widgets_by_slot(
-            current_page, content, base_context
-        )
+            context = {
+                "root_page": root_page,
+                "current_page": current_page,
+                "widgets": widgets,
+                "layout": effective_layout,
+                "theme": current_page.get_effective_theme(),
+                "parent": current_page.parent,
+                "slug_parts": slug_parts,
+                "request": request,
+                "page_data": page_data,
+                "version_number": content.version_number,
+                "status": content.get_publication_status(),
+                "is_current": content.is_current_published(),
+                "published_at": content.effective_date,
+                "published_by": content.created_by,
+                "effective_layout": effective_layout,
+                "effective_theme": current_page.get_effective_theme(),
+                "path_variables": path_variables,  # NEW: Add path variables to context
+            }
 
-        if effective_layout:
-            context["slots"] = effective_layout.slot_configuration["slots"]
-        else:
-            context["slots"] = []
+            # Build widgets_by_slot via renderer (new system)
+            renderer = WebPageRenderer(request=request)
+            # Pass path_variables in the extra context
+            base_context = renderer._build_base_context(
+                current_page, content, {"path_variables": path_variables}
+            )
+            context["widgets_by_slot"] = renderer._render_widgets_by_slot(
+                current_page, content, base_context
+            )
 
-        return render(request, template_name, context)
+            if effective_layout:
+                context["slots"] = effective_layout.slot_configuration["slots"]
+            else:
+                context["slots"] = []
+
+            return render(request, template_name, context)
+
+        except Http404:
+            # Try to render custom 404 error page for this site
+            error_page = self._get_error_page(root_page, 404)
+            if error_page:
+                error_response = self._render_error_page(error_page, 404)
+                if error_response:
+                    return error_response
+            # Re-raise if no custom error page or rendering failed
+            raise
 
     def _is_page_accessible(self, page):
         """Check if page is published and currently accessible using date-based logic"""
@@ -700,6 +800,169 @@ class HostnamePageView(View):
         template_names.append("webpages/page_detail.html")
 
         return template_names
+
+
+# Custom Error Handlers for Django
+def custom_404_handler(request, exception=None):
+    """
+    Custom 404 error handler that renders site-specific error pages.
+
+    This handler is called by Django when a 404 occurs outside of the
+    normal view processing (e.g., no URL pattern matches).
+    """
+    import re
+
+    # Get hostname from request
+    hostname = request.get_host().lower()
+
+    # Validate hostname format
+    if not re.match(r"^[a-z0-9.-]+(?::[0-9]+)?$", hostname) or ".." in hostname:
+        # Invalid hostname, use default 404
+        from django.views.defaults import page_not_found
+
+        return page_not_found(request, exception)
+
+    # Find the root page for this hostname
+    try:
+        root_page = WebPage.get_root_page_for_hostname(hostname)
+        if root_page:
+            # Try to find custom 404 page
+            try:
+                error_page = WebPage.objects.get(
+                    parent=root_page, slug="404", is_deleted=False
+                )
+                if error_page.is_published():
+                    # Render custom 404 page
+                    view = HostnamePageView()
+                    view.request = request
+                    error_response = view._render_error_page(error_page, 404)
+                    if error_response:
+                        return error_response
+            except WebPage.DoesNotExist:
+                pass
+    except Exception:
+        pass
+
+    # Fall back to Django's default 404
+    from django.views.defaults import page_not_found
+
+    return page_not_found(request, exception)
+
+
+def custom_500_handler(request):
+    """
+    Custom 500 error handler that renders site-specific error pages.
+
+    This handler is called by Django when an unhandled exception occurs.
+    """
+    import re
+
+    # Get hostname from request
+    try:
+        hostname = request.get_host().lower()
+
+        # Validate hostname format
+        if re.match(r"^[a-z0-9.-]+(?::[0-9]+)?$", hostname) and ".." not in hostname:
+            # Find the root page for this hostname
+            root_page = WebPage.get_root_page_for_hostname(hostname)
+            if root_page:
+                # Try to find custom 500 page
+                error_page = WebPage.objects.get(
+                    parent=root_page, slug="500", is_deleted=False
+                )
+                if error_page.is_published():
+                    # Render custom 500 page
+                    view = HostnamePageView()
+                    view.request = request
+                    error_response = view._render_error_page(error_page, 500)
+                    if error_response:
+                        return error_response
+    except Exception:
+        # If anything goes wrong, fall back to default handler
+        pass
+
+    # Fall back to Django's default 500
+    from django.views.defaults import server_error
+
+    return server_error(request)
+
+
+def custom_403_handler(request, exception=None):
+    """
+    Custom 403 error handler that renders site-specific error pages.
+
+    This handler is called by Django when permission is denied.
+    """
+    import re
+
+    # Get hostname from request
+    try:
+        hostname = request.get_host().lower()
+
+        # Validate hostname format
+        if re.match(r"^[a-z0-9.-]+(?::[0-9]+)?$", hostname) and ".." not in hostname:
+            # Find the root page for this hostname
+            root_page = WebPage.get_root_page_for_hostname(hostname)
+            if root_page:
+                # Try to find custom 403 page
+                error_page = WebPage.objects.get(
+                    parent=root_page, slug="403", is_deleted=False
+                )
+                if error_page.is_published():
+                    # Render custom 403 page
+                    view = HostnamePageView()
+                    view.request = request
+                    error_response = view._render_error_page(error_page, 403)
+                    if error_response:
+                        return error_response
+    except Exception:
+        pass
+
+    # Fall back to Django's default 403
+    from django.views.defaults import permission_denied
+
+    return permission_denied(request, exception)
+
+
+def custom_503_handler(request, exception=None):
+    """
+    Custom 503 error handler that renders site-specific error pages.
+
+    Note: This is not a standard Django error handler, but can be used
+    in custom middleware or views when the service is unavailable.
+    """
+    import re
+
+    # Get hostname from request
+    try:
+        hostname = request.get_host().lower()
+
+        # Validate hostname format
+        if re.match(r"^[a-z0-9.-]+(?::[0-9]+)?$", hostname) and ".." not in hostname:
+            # Find the root page for this hostname
+            root_page = WebPage.get_root_page_for_hostname(hostname)
+            if root_page:
+                # Try to find custom 503 page
+                error_page = WebPage.objects.get(
+                    parent=root_page, slug="503", is_deleted=False
+                )
+                if error_page.is_published():
+                    # Render custom 503 page
+                    view = HostnamePageView()
+                    view.request = request
+                    error_response = view._render_error_page(error_page, 503)
+                    if error_response:
+                        return error_response
+    except Exception:
+        pass
+
+    # Fall back to a simple 503 response
+    from django.http import HttpResponse
+
+    return HttpResponse(
+        "<h1>503 Service Unavailable</h1><p>The service is temporarily unavailable. Please try again later.</p>",
+        status=503,
+    )
 
 
 # class HostnameRootView(HostnamePageView):

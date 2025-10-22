@@ -1,0 +1,24 @@
+{% extends "webpages/base_page.html" %}
+{% load widget_tags %}
+
+{% block page_content %}
+<div class="error-page error-500 min-h-screen flex flex-col items-center justify-center bg-gray-50 px-4">
+    <div class="max-w-4xl w-full">
+        <!-- Branding Slot -->
+        <div class="slot-branding mb-8 text-center">
+            {% render_slot "branding" %}
+        </div>
+
+        <!-- Error Message Slot -->
+        <div class="slot-error-message mb-12 text-center">
+            {% render_slot "error_message" %}
+        </div>
+
+        <!-- Helpful Content Slot -->
+        <div class="slot-helpful-content max-w-2xl mx-auto">
+            {% render_slot "helpful_content" %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
