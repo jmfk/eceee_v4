@@ -17,13 +17,18 @@ const eceeeHeaderWidget = ({ config = {}, mode = 'preview' }) => {
     const [imageLoading, setImageLoading] = useState(false)
 
     // Load optimized image URL from backend API
-    // Using desktop dimensions - CSS will handle responsive sizing
     useEffect(() => {
         if (image) {
-            setImageLoading(true)
+            // In editor mode, use thumbnail for faster preview
+            if (mode === 'editor') {
+                const thumbnailUrl = image.thumbnailUrl || image.thumbnail_url || image.imgproxyBaseUrl || image.fileUrl
+                setOptimizedImageUrl(thumbnailUrl)
+                setImageLoading(false)
+                return
+            }
 
-            // Get signed imgproxy URL from backend
-            // Desktop dimensions - responsive behavior handled by CSS
+            // In preview mode, get full-size optimized image
+            setImageLoading(true)
             getImgproxyUrlFromImage(image, {
                 width: 1280,
                 height: 132,
@@ -36,8 +41,8 @@ const eceeeHeaderWidget = ({ config = {}, mode = 'preview' }) => {
                 })
                 .catch(error => {
                     console.error('Failed to load optimized header image:', error)
-                    // Fallback to original URL
-                    setOptimizedImageUrl(image.imgproxyBaseUrl || image.fileUrl || '')
+                    // Fallback to thumbnail or original URL
+                    setOptimizedImageUrl(image.thumbnailUrl || image.thumbnail_url || image.imgproxyBaseUrl || image.fileUrl || '')
                     setImageLoading(false)
                 })
         }

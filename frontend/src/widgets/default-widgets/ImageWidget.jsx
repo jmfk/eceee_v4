@@ -138,7 +138,7 @@ const ImageWidget = ({
                         source: image.source || '',
                         width: image.width,
                         height: image.height,
-                        thumbnailUrl: image.imgproxyBaseUrl || image.fileUrl
+                        thumbnailUrl: image.thumbnailUrl || image.thumbnail_url || image.imgproxyBaseUrl || image.fileUrl
                     }))
 
                     // Apply collection configuration
@@ -260,14 +260,17 @@ const ImageWidget = ({
             )
         }
 
+        // Use thumbnail ONLY in editor mode for performance, full image in preview/published
+        const displayUrl = mode === 'editor' ? (item.thumbnailUrl || item.url) : item.url
+
         return (
             <img
                 key={index}
-                src={item.url}
+                src={displayUrl}
                 alt={item.altText || 'Image'}
                 className="max-w-full h-auto rounded shadow-sm cursor-pointer hover:opacity-90 transition-opacity"
                 onClick={(localConfig.enableLightbox !== false) ? () => {
-                    // Lightbox functionality would be implemented here
+                    // Lightbox functionality would be implemented here with full-size image (item.url)
                     // TODO: Implement lightbox modal
                 } : undefined}
             />

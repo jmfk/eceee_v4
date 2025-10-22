@@ -123,9 +123,9 @@ const MediaField = ({
                             <div key={file.id} className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg bg-gray-50">
                                 {/* Media Preview */}
                                 <div className="flex-shrink-0">
-                                    {file.file_type?.startsWith('image/') ? (
+                                    {file.fileType?.startsWith('image/') ? (
                                         <img
-                                            src={file.imgproxy_base_url || file.file_url}
+                                            src={file.thumbnailUrl || file.imgproxyBaseUrl || file.fileUrl}
                                             alt={file.title}
                                             className="w-12 h-12 object-cover rounded"
                                             onError={(e) => {
@@ -145,7 +145,7 @@ const MediaField = ({
                                         {file.title}
                                     </div>
                                     <div className="text-xs text-gray-500 truncate">
-                                        {file.file_type} • {file.file_size_display || 'Unknown size'}
+                                        {file.fileType} • {file.fileSizeDisplay || 'Unknown size'}
                                     </div>
                                     {file.description && (
                                         <div className="text-xs text-gray-600 truncate mt-1">
@@ -156,9 +156,9 @@ const MediaField = ({
 
                                 {/* Actions */}
                                 <div className="flex items-center space-x-1">
-                                    {file.file_url && (
+                                    {file.fileUrl && (
                                         <a
-                                            href={file.file_url}
+                                            href={file.fileUrl}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="p-1 text-gray-400 hover:text-blue-600"

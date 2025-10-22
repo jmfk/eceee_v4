@@ -233,9 +233,10 @@ export const formatFileSize = (bytes) => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
 }
 
-// Generate file URL for display
+// Generate FULL file URL for display (NOT thumbnails)
 export const getFileUrl = (file) => {
-    return file.imgproxyBaseUrl || file.fileUrl || file.file_url || file.url
+    // Check full file fields (NOT thumbnails - those are handled separately)
+    return file.imgproxyBaseUrl || file.imgproxy_base_url || file.fileUrl || file.file_url || file.url
 }
 
 // Generate accept attribute for file input

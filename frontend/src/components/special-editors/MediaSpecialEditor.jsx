@@ -942,9 +942,9 @@ const MediaSpecialEditor = ({
                         <div className="grid grid-cols-4 gap-2">
                             {collectionImages.map((image, index) => (
                                 <div key={image.id || index} className="relative aspect-square bg-gray-100 rounded overflow-hidden border">
-                                    {image.imgproxyBaseUrl || image.fileUrl ? (
+                                    {image.thumbnailUrl || image.thumbnail_url || image.imgproxyBaseUrl || image.fileUrl ? (
                                         <img
-                                            src={image.imgproxyBaseUrl || image.fileUrl}
+                                            src={image.thumbnailUrl || image.thumbnail_url || image.imgproxyBaseUrl || image.fileUrl}
                                             alt={image.title}
                                             className="w-full h-full object-cover"
                                         />
@@ -1238,7 +1238,7 @@ const MediaSpecialEditor = ({
                             <div key={image.id} className="relative flex-shrink-0">
                                 <div className="w-16 h-16 bg-gray-100 rounded overflow-hidden border-2 border-blue-300">
                                     <img
-                                        src={image.imgproxyBaseUrl || image.fileUrl}
+                                        src={image.thumbnailUrl || image.thumbnail_url || image.imgproxyBaseUrl || image.fileUrl}
                                         alt={image.title}
                                         className="w-full h-full object-cover"
                                     />
@@ -1319,9 +1319,9 @@ const MediaSpecialEditor = ({
                                     className={`relative cursor-pointer bg-gray-100 rounded overflow-hidden aspect-square hover:shadow-md transition-shadow border-2 ${isSelected ? 'border-blue-500' : 'border-gray-200'
                                         }`}
                                 >
-                                    {image.imgproxyBaseUrl || image.fileUrl ? (
+                                    {image.thumbnailUrl || image.thumbnail_url || image.imgproxyBaseUrl || image.fileUrl ? (
                                         <img
-                                            src={image.imgproxyBaseUrl || image.fileUrl}
+                                            src={image.thumbnailUrl || image.thumbnail_url || image.imgproxyBaseUrl || image.fileUrl}
                                             alt={image.title}
                                             className="w-full h-full object-cover"
                                             onError={(e) => {
@@ -1590,9 +1590,9 @@ const MediaSpecialEditor = ({
                                 key={image.id || index}
                                 className="relative bg-gray-100 rounded overflow-hidden aspect-square border"
                             >
-                                {image.imgproxyBaseUrl || image.fileUrl ? (
+                                {image.thumbnailUrl || image.thumbnail_url || image.imgproxyBaseUrl || image.fileUrl ? (
                                     <img
-                                        src={image.imgproxyBaseUrl || image.fileUrl}
+                                        src={image.thumbnailUrl || image.thumbnail_url || image.imgproxyBaseUrl || image.fileUrl}
                                         alt={image.title}
                                         className="w-full h-full object-cover"
                                     />
@@ -1748,7 +1748,7 @@ const MediaSpecialEditor = ({
                         <div className="space-y-4">
                             <div className="aspect-video bg-gray-100 rounded overflow-hidden">
                                 <img
-                                    src={showDeleteConfirm.imgproxyBaseUrl || showDeleteConfirm.fileUrl}
+                                    src={showDeleteConfirm.thumbnailUrl || showDeleteConfirm.thumbnail_url || showDeleteConfirm.imgproxyBaseUrl || showDeleteConfirm.fileUrl}
                                     alt={showDeleteConfirm.title || 'Image'}
                                     className="w-full h-full object-cover"
                                 />

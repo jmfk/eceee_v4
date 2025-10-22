@@ -24,7 +24,9 @@ const ImageDisplaySection = ({
                     <div className="flex items-center gap-3">
                         <div className="flex -space-x-2">
                             {displayImages.slice(0, 3).map((image, index) => {
-                                const thumbnailUrl = getThumbnailUrl ? getThumbnailUrl(image, 40) : getImageUrl(image)
+                                const thumbnailUrl = getThumbnailUrl
+                                    ? getThumbnailUrl(image, 40)
+                                    : (image.thumbnailUrl || getImageUrl(image))
                                 return (
                                     <div
                                         key={image.id || index}
@@ -33,7 +35,7 @@ const ImageDisplaySection = ({
                                         {thumbnailUrl && (
                                             <img
                                                 src={thumbnailUrl}
-                                                alt={image.title || image.original_filename || 'Image'}
+                                                alt={image.title || image.originalFilename || 'Image'}
                                                 className="w-full h-full object-cover"
                                             />
                                         )}
@@ -77,14 +79,16 @@ const ImageDisplaySection = ({
                     <div className="p-4">
                         <div className="grid grid-cols-4 gap-3">
                             {displayImages.map((image, index) => {
-                                const thumbnailUrl = getThumbnailUrl ? getThumbnailUrl(image, 150) : getImageUrl(image)
+                                const thumbnailUrl = getThumbnailUrl
+                                    ? getThumbnailUrl(image, 150)
+                                    : (image.thumbnailUrl || getImageUrl(image))
                                 return (
                                     <div key={image.id || index} className="relative group">
                                         <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
                                             {thumbnailUrl && (
                                                 <img
                                                     src={thumbnailUrl}
-                                                    alt={image.title || image.original_filename || 'Image'}
+                                                    alt={image.title || image.originalFilename || 'Image'}
                                                     className="w-full h-full object-cover"
                                                 />
                                             )}
@@ -101,8 +105,8 @@ const ImageDisplaySection = ({
 
                                         {/* Image info */}
                                         <div className="mt-2 text-xs text-gray-500">
-                                            <div className="truncate" title={image.title || image.original_filename}>
-                                                {image.title || image.original_filename || 'Untitled'}
+                                            <div className="truncate" title={image.title || image.originalFilename}>
+                                                {image.title || image.originalFilename || 'Untitled'}
                                             </div>
                                             {image.file_size && (
                                                 <div>{formatFileSize(image.file_size)}</div>
@@ -120,7 +124,9 @@ const ImageDisplaySection = ({
 
     // Single image or single image in multiple mode
     const image = displayImages[0]
-    const thumbnailUrl = getThumbnailUrl ? getThumbnailUrl(image, 150) : getImageUrl(image)
+    const thumbnailUrl = getThumbnailUrl
+        ? getThumbnailUrl(image, 150)
+        : (image.thumbnailUrl || getImageUrl(image))
 
     return (
         <div className="bg-white rounded-lg">
@@ -130,7 +136,7 @@ const ImageDisplaySection = ({
                         {thumbnailUrl && (
                             <img
                                 src={thumbnailUrl}
-                                alt={image.title || image.original_filename || 'Image'}
+                                alt={image.title || image.originalFilename || 'Image'}
                                 className="w-full h-full object-cover"
                             />
                         )}
@@ -138,7 +144,7 @@ const ImageDisplaySection = ({
 
                     <div>
                         <div className="text-sm font-medium text-gray-900">
-                            {image.title || image.original_filename || 'Untitled Image'}
+                            {image.title || image.originalFilename || 'Untitled Image'}
                         </div>
                         <div className="text-xs text-gray-500">
                             {image.file_size && formatFileSize(image.file_size)}

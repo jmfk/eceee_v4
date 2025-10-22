@@ -283,6 +283,7 @@ class MediaFileListSerializer(serializers.ModelSerializer):
     file_size_human = serializers.CharField(read_only=True)
     dimensions = serializers.CharField(read_only=True)
     imgproxy_base_url = serializers.SerializerMethodField()
+    thumbnail_url = serializers.SerializerMethodField()
     # SEO-friendly URLs
     absolute_url = serializers.SerializerMethodField()
     uuid_url = serializers.SerializerMethodField()
@@ -305,6 +306,7 @@ class MediaFileListSerializer(serializers.ModelSerializer):
             "namespace",
             "tags",
             "imgproxy_base_url",
+            "thumbnail_url",
             "absolute_url",
             "uuid_url",
             "download_url",
@@ -317,6 +319,12 @@ class MediaFileListSerializer(serializers.ModelSerializer):
         """Get imgproxy base URL for dynamic resizing."""
         if obj.is_image:
             return obj.get_file_url()
+        return None
+
+    def get_thumbnail_url(self, obj):
+        """Get pre-generated thumbnail URL (150x150)."""
+        if obj.is_image:
+            return obj.get_imgproxy_thumbnail_url(size=150)
         return None
 
     def get_absolute_url(self, obj):
@@ -376,6 +384,7 @@ class MediaFileDetailSerializer(serializers.ModelSerializer):
 
     # imgproxy base URL for dynamic resizing
     imgproxy_base_url = serializers.SerializerMethodField()
+    thumbnail_url = serializers.SerializerMethodField()
 
     class Meta:
         model = MediaFile
@@ -409,6 +418,7 @@ class MediaFileDetailSerializer(serializers.ModelSerializer):
             "collection_ids",
             "file_url",
             "imgproxy_base_url",
+            "thumbnail_url",
             "created_at",
             "updated_at",
             "created_by",
@@ -489,6 +499,12 @@ class MediaFileDetailSerializer(serializers.ModelSerializer):
         """Get imgproxy base URL for dynamic resizing."""
         if obj.is_image:
             return obj.get_file_url()
+        return None
+
+    def get_thumbnail_url(self, obj):
+        """Get pre-generated thumbnail URL (150x150)."""
+        if obj.is_image:
+            return obj.get_imgproxy_thumbnail_url(size=150)
         return None
 
 

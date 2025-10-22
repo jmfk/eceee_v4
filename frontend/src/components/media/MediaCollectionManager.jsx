@@ -407,9 +407,9 @@ const CollectionFilesView = ({ collection, namespace, onBack }) => {
 
                 {/* File Preview */}
                 <div className="aspect-square bg-gray-50 flex items-center justify-center relative">
-                    {file.fileType === 'image' && file.imgproxyBaseUrl ? (
+                    {file.fileType === 'image' && (file.thumbnailUrl || file.thumbnail_url || file.imgproxyBaseUrl) ? (
                         <img
-                            src={file.imgproxyBaseUrl}
+                            src={file.thumbnailUrl || file.thumbnail_url || file.imgproxyBaseUrl}
                             alt={file.originalFilename}
                             className="w-full h-full object-cover"
                             onError={(e) => {
@@ -421,7 +421,7 @@ const CollectionFilesView = ({ collection, namespace, onBack }) => {
                     ) : null}
                     <FileIcon
                         className="w-8 h-8 text-gray-400"
-                        style={{ display: file.fileType === 'image' && file.imgproxyBaseUrl ? 'none' : 'block' }}
+                        style={{ display: file.fileType === 'image' && (file.thumbnailUrl || file.thumbnail_url || file.imgproxyBaseUrl) ? 'none' : 'block' }}
                     />
                 </div>
 
@@ -449,9 +449,9 @@ const CollectionFilesView = ({ collection, namespace, onBack }) => {
                 className="flex items-center gap-2 p-2 bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-colors group"
             >
                 <div className="w-8 h-8 bg-gray-50 rounded-lg flex items-center justify-center flex-shrink-0 relative overflow-hidden">
-                    {file.fileType === 'image' && file.imgproxyBaseUrl ? (
+                    {file.fileType === 'image' && (file.thumbnailUrl || file.thumbnail_url || file.imgproxyBaseUrl) ? (
                         <img
-                            src={file.imgproxyBaseUrl}
+                            src={file.thumbnailUrl || file.thumbnail_url || file.imgproxyBaseUrl}
                             alt={file.originalFilename}
                             className="w-full h-full object-cover"
                             onError={(e) => {
@@ -510,9 +510,9 @@ const CollectionFilesView = ({ collection, namespace, onBack }) => {
 
                 {/* File Preview */}
                 <div className="aspect-square bg-gray-50 flex items-center justify-center relative">
-                    {file.fileType === 'image' && file.imgproxyBaseUrl ? (
+                    {file.fileType === 'image' && (file.thumbnailUrl || file.thumbnail_url || file.imgproxyBaseUrl) ? (
                         <img
-                            src={file.imgproxyBaseUrl}
+                            src={file.thumbnailUrl || file.thumbnail_url || file.imgproxyBaseUrl}
                             alt={file.originalFilename}
                             className="w-full h-full object-cover"
                             onError={(e) => {
@@ -524,7 +524,7 @@ const CollectionFilesView = ({ collection, namespace, onBack }) => {
                     ) : null}
                     <FileIcon
                         className="w-8 h-8 text-gray-400"
-                        style={{ display: file.fileType === 'image' && file.imgproxyBaseUrl ? 'none' : 'block' }}
+                        style={{ display: file.fileType === 'image' && (file.thumbnailUrl || file.thumbnail_url || file.imgproxyBaseUrl) ? 'none' : 'block' }}
                     />
                 </div>
 
@@ -552,9 +552,9 @@ const CollectionFilesView = ({ collection, namespace, onBack }) => {
                 className="flex items-center gap-2 p-2 bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-colors group"
             >
                 <div className="w-8 h-8 bg-gray-50 rounded-lg flex items-center justify-center flex-shrink-0 relative overflow-hidden">
-                    {file.fileType === 'image' && file.imgproxyBaseUrl ? (
+                    {file.fileType === 'image' && (file.thumbnailUrl || file.thumbnail_url || file.imgproxyBaseUrl) ? (
                         <img
-                            src={file.imgproxyBaseUrl}
+                            src={file.thumbnailUrl || file.thumbnail_url || file.imgproxyBaseUrl}
                             alt={file.originalFilename}
                             className="w-full h-full object-cover"
                             onError={(e) => {
@@ -1389,7 +1389,7 @@ const MediaCollectionManager = ({ namespace, onCollectionSelect }) => {
                     {filledImages.map((file, index) => (
                         <div key={`${file.id}-${index}`} className="relative overflow-hidden bg-gray-200">
                             <img
-                                src={file.imgproxyBaseUrl}
+                                src={file.thumbnailUrl || file.thumbnail_url || file.imgproxyBaseUrl}
                                 alt=""
                                 className="w-full h-full object-cover"
                                 style={{ display: 'block' }}

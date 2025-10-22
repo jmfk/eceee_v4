@@ -33,10 +33,17 @@ const HeaderWidget = ({ config = {}, mode = 'preview' }) => {
 
     // Load optimized image URL from backend
     useEffect(() => {
-        if (image && mode === 'editor') {
-            setImageLoading(true)
+        if (image) {
+            // In editor mode, use thumbnail for faster preview
+            if (mode === 'editor') {
+                const thumbnailUrl = image.thumbnailUrl || image.thumbnail_url || image.imgproxy_base_url || image.file_url
+                setOptimizedImageUrl(thumbnailUrl)
+                setImageLoading(false)
+                return
+            }
 
-            // Get signed imgproxy URL from backend with explicit dimensions
+            // In preview mode, get full-size optimized image
+            setImageLoading(true)
             getImgproxyUrlFromImage(image, {
                 width: 1280,
                 height: 132,
@@ -49,8 +56,8 @@ const HeaderWidget = ({ config = {}, mode = 'preview' }) => {
                 })
                 .catch(error => {
                     console.error('Failed to load optimized image:', error)
-                    // Fallback to original URL
-                    setOptimizedImageUrl(image.imgproxy_base_url || image.file_url || '')
+                    // Fallback to thumbnail or original URL
+                    setOptimizedImageUrl(image.thumbnailUrl || image.thumbnail_url || image.imgproxy_base_url || image.file_url || '')
                     setImageLoading(false)
                 })
         }

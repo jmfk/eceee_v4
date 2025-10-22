@@ -95,9 +95,14 @@ export const formatFileSize = (bytes) => {
 }
 
 /**
- * Get image URL for display
+ * Get FULL image URL for display (NOT thumbnails)
+ * Use getThumbnailUrl() if you need thumbnails specifically
  */
 export const getImageUrl = (image) => {
+    // Check full image fields (NOT thumbnails - those are handled separately)
+    if (image.imgproxyBaseUrl) return image.imgproxyBaseUrl
+    if (image.imgproxy_base_url) return image.imgproxy_base_url
+    if (image.fileUrl) return image.fileUrl
     if (image.file_url) return image.file_url
     if (image.url) return image.url
     if (image.file) return image.file

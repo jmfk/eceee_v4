@@ -213,8 +213,13 @@ const ExpandableImageField = ({
         }
     }, [])
 
-    // Get image URL - use source URL directly (no client-side imgproxy transformation)
+    // Get image URL - use backend-provided thumbnail for optimal performance
     const getThumbnailUrl = (image, size = 150) => {
+        // Use backend-provided thumbnail if available (pre-generated 150x150)
+        if (image.thumbnail_url || image.thumbnailUrl) {
+            return image.thumbnail_url || image.thumbnailUrl
+        }
+        // Fallback to full URL
         return getImageUrl(image)
     }
 
