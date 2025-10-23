@@ -5,6 +5,10 @@
  * Provides visual table editing with cell selection, merging, formatting, and styling.
  */
 
+import { FloatingToolbar } from './FloatingToolbar'
+import { LinkModal } from './LinkModal'
+import { TableContextMenu } from './TableContextMenu'
+
 export class TableEditorCore {
     constructor(initialData, options = {}) {
         this.data = this.normalizeData(initialData)
@@ -26,6 +30,20 @@ export class TableEditorCore {
         this.isSelecting = false
         this.history = []
         this.historyIndex = -1
+
+        // Text selection and floating toolbar
+        this.textSelection = null
+        this.floatingToolbar = null
+        this.linkModal = null
+        this.contextMenu = null
+
+        // Edit mode tracking
+        this.editingCell = null // Currently editing cell
+        this.isEditMode = false
+
+        // Bound handlers for event listeners
+        this.handleSelectionChangeBound = this.handleSelectionChange.bind(this)
+        this.handleClickOutsideBound = this.handleClickOutside.bind(this)
     }
 
     /**
@@ -73,6 +91,7 @@ export class TableEditorCore {
                 rowspan: cell.rowspan || 1,
                 fontStyle: cell.fontStyle || 'normal',
                 alignment: cell.alignment || 'left',
+                verticalAlignment: cell.verticalAlignment || 'top',
                 borders: cell.borders || null,
                 backgroundColor: cell.backgroundColor || null,
                 textColor: cell.textColor || null,
@@ -125,6 +144,24 @@ export class TableEditorCore {
         this.container.appendChild(wrapper)
 
         this.tableElement = table
+
+        // Initialize floating toolbar and context menu
+        if (!this.floatingToolbar) {
+            this.floatingToolbar = new FloatingToolbar(wrapper, {
+                onBold: () => this.applyFormatting('bold'),
+                onItalic: () => this.applyFormatting('italic'),
+                onLink: () => this.showLinkModal()
+            })
+        }
+
+        if (!this.linkModal) {
+            this.linkModal = new LinkModal()
+        }
+
+        if (!this.contextMenu) {
+            this.contextMenu = new TableContextMenu(this)
+        }
+
         this.attachEventListeners()
 
         return this.container
@@ -171,9 +208,15 @@ export class TableEditorCore {
         if (cell.fontStyle === 'quote') td.classList.add('table-cell-quote')
         if (cell.fontStyle === 'caption') td.classList.add('table-cell-caption')
 
-        // Apply alignment class
+        // Apply horizontal alignment class
         if (cell.alignment === 'center') td.classList.add('cell-center')
         if (cell.alignment === 'right') td.classList.add('cell-right')
+        if (cell.alignment === 'left') td.classList.add('cell-left')
+
+        // Apply vertical alignment class
+        if (cell.verticalAlignment === 'middle') td.classList.add('cell-v-middle')
+        if (cell.verticalAlignment === 'bottom') td.classList.add('cell-v-bottom')
+        if (cell.verticalAlignment === 'top') td.classList.add('cell-v-top')
 
         // Apply inline styles
         if (cell.backgroundColor) td.style.backgroundColor = cell.backgroundColor
@@ -194,7 +237,8 @@ export class TableEditorCore {
             img.style.height = 'auto'
             td.appendChild(img)
         } else {
-            td.contentEditable = 'true'
+            // Cell starts as non-editable - requires double-click to edit
+            td.contentEditable = 'false'
             td.innerHTML = cell.content || ''
         }
 
@@ -205,20 +249,32 @@ export class TableEditorCore {
      * Apply border styles to element
      */
     applyBordersToElement(element, borders) {
-        const getBorderCSS = (borderStyle) => {
-            if (!borderStyle) return null
+        const getBorderCSS = (borderConfig) => {
+            if (!borderConfig) return null
 
+            // New format: { width: '1px', style: 'solid', color: '#000000' }
+            if (borderConfig.width) {
+                const width = borderConfig.width || '1px'
+                const style = borderConfig.style || 'solid'
+                const color = borderConfig.color || '#000000'
+                return `${width} ${style} ${color}`
+            }
+
+            // Legacy format compatibility: { style: 'plain', color: '#d1d5db' }
             let width = '1px'
             let style = 'solid'
 
-            if (borderStyle.style === 'thick') {
+            if (borderConfig.style === 'thick') {
                 width = '3px'
-            } else if (borderStyle.style === 'double') {
+            } else if (borderConfig.style === 'double') {
                 width = '1px'
                 style = 'double'
+            } else if (borderConfig.style === 'plain') {
+                width = '1px'
+                style = 'solid'
             }
 
-            const color = borderStyle.color || '#d1d5db'
+            const color = borderConfig.color || '#d1d5db'
             return `${width} ${style} ${color}`
         }
 
@@ -237,9 +293,21 @@ export class TableEditorCore {
         this.tableElement.addEventListener('mouseover', this.handleMouseOver.bind(this))
         document.addEventListener('mouseup', this.handleMouseUp.bind(this))
 
+        // Double-click to edit
+        this.tableElement.addEventListener('dblclick', this.handleDoubleClick.bind(this))
+
         // Content editing
         this.tableElement.addEventListener('input', this.handleCellInput.bind(this))
         this.tableElement.addEventListener('blur', this.handleCellBlur.bind(this), true)
+
+        // Text selection for floating toolbar
+        document.addEventListener('selectionchange', this.handleSelectionChangeBound)
+
+        // Context menu
+        this.tableElement.addEventListener('contextmenu', this.handleContextMenu.bind(this))
+
+        // Click outside to exit edit mode
+        document.addEventListener('mousedown', this.handleClickOutsideBound)
     }
 
     /**
@@ -249,16 +317,28 @@ export class TableEditorCore {
         const cell = e.target.closest('td')
         if (!cell) return
 
-        // If shift key is held, extend selection
-        if (e.shiftKey && this.selection.startCell) {
-            this.updateSelection(cell)
-            e.preventDefault()
+        // If in edit mode and clicking the editing cell, allow interaction
+        if (this.isEditMode && this.editingCell === cell) {
             return
         }
 
+        // Exit edit mode if clicking different cell
+        if (this.isEditMode && this.editingCell !== cell) {
+            this.exitEditMode()
+        }
+
+        // Prevent default to avoid text selection during cell selection
+        e.preventDefault()
+
+        // If shift key is held, extend selection
+        if (e.shiftKey && this.selection.startCell) {
+            this.updateSelection(cell)
+            return
+        }
+
+        // Start cell selection
         this.isSelecting = true
         this.startSelection(cell)
-        e.preventDefault()
     }
 
     /**
@@ -281,6 +361,84 @@ export class TableEditorCore {
 
         this.isSelecting = false
         this.endSelection()
+    }
+
+    /**
+     * Handle double-click - enter edit mode
+     */
+    handleDoubleClick(e) {
+        const cell = e.target.closest('td')
+        if (!cell || cell.classList.contains('cell-image')) return
+
+        e.preventDefault()
+        e.stopPropagation()
+
+        this.enterEditMode(cell)
+    }
+
+    /**
+     * Enter edit mode for a cell
+     */
+    enterEditMode(cell) {
+        // Exit any existing edit mode
+        if (this.editingCell) {
+            this.exitEditMode()
+        }
+
+        // Make cell editable
+        cell.contentEditable = 'true'
+        cell.classList.add('editing')
+
+        // Focus and select all content
+        cell.focus()
+
+        // Select all text in the cell
+        const range = document.createRange()
+        range.selectNodeContents(cell)
+        const selection = window.getSelection()
+        selection.removeAllRanges()
+        selection.addRange(range)
+
+        // Track editing state
+        this.isEditMode = true
+        this.editingCell = cell
+    }
+
+    /**
+     * Exit edit mode
+     */
+    exitEditMode() {
+        if (!this.editingCell) return
+
+        // Save content
+        const rowIndex = parseInt(this.editingCell.dataset.rowIndex)
+        const cellIndex = parseInt(this.editingCell.dataset.cellIndex)
+        this.data.rows[rowIndex].cells[cellIndex].content = this.editingCell.innerHTML
+
+        // Make cell non-editable
+        this.editingCell.contentEditable = 'false'
+        this.editingCell.classList.remove('editing')
+
+        // Clear selection
+        window.getSelection().removeAllRanges()
+
+        // Reset state
+        this.isEditMode = false
+        this.editingCell = null
+
+        this.notifyChange()
+    }
+
+    /**
+     * Handle clicks outside the table
+     */
+    handleClickOutside(e) {
+        if (!this.isEditMode) return
+
+        // Check if click is outside the table
+        if (!this.tableElement.contains(e.target)) {
+            this.exitEditMode()
+        }
     }
 
     /**
@@ -418,7 +576,8 @@ export class TableEditorCore {
                 colspan: 1,
                 rowspan: 1,
                 fontStyle: 'normal',
-                alignment: 'left'
+                alignment: 'left',
+                verticalAlignment: 'top'
             })),
             height: null
         }
@@ -460,7 +619,8 @@ export class TableEditorCore {
                 colspan: 1,
                 rowspan: 1,
                 fontStyle: 'normal',
-                alignment: 'left'
+                alignment: 'left',
+                verticalAlignment: 'top'
             }
 
             if (position === 'end') {
@@ -635,16 +795,57 @@ export class TableEditorCore {
         if (!selection.rangeCount) return
 
         document.execCommand(type, false, null)
+
+        // Update cell content in data model
+        const cell = this.getActiveCellFromSelection(selection)
+        if (cell) {
+            const rowIndex = parseInt(cell.dataset.rowIndex)
+            const cellIndex = parseInt(cell.dataset.cellIndex)
+            this.data.rows[rowIndex].cells[cellIndex].content = cell.innerHTML
+            this.notifyChange()
+        }
     }
 
     /**
      * Insert link at current selection
      */
-    insertLink(url) {
+    insertLink(url, text, range, openInNewTab = false) {
         const selection = window.getSelection()
-        if (!selection.rangeCount) return
+        selection.removeAllRanges()
+        selection.addRange(range)
+
+        if (text && text !== selection.toString()) {
+            const startContainer = range.startContainer
+            const startOffset = range.startOffset
+
+            document.execCommand('insertText', false, text)
+
+            const newRange = document.createRange()
+            newRange.setStart(startContainer, startOffset)
+            newRange.setEnd(startContainer, startOffset + text.length)
+
+            selection.removeAllRanges()
+            selection.addRange(newRange)
+        }
 
         document.execCommand('createLink', false, url)
+
+        if (openInNewTab) {
+            const newLink = this.findLinkAtSelection()
+            if (newLink) {
+                newLink.setAttribute('target', '_blank')
+                newLink.setAttribute('rel', 'noopener noreferrer')
+            }
+        }
+
+        // Update cell content in data model
+        const cell = this.getActiveCellFromSelection(selection)
+        if (cell) {
+            const rowIndex = parseInt(cell.dataset.rowIndex)
+            const cellIndex = parseInt(cell.dataset.cellIndex)
+            this.data.rows[rowIndex].cells[cellIndex].content = cell.innerHTML
+            this.notifyChange()
+        }
     }
 
     /**
@@ -707,6 +908,9 @@ export class TableEditorCore {
 
     /**
      * Set borders for cells
+     * @param {Array} cells - Selected cells
+     * @param {Object} sides - Object with sides as keys and boolean values (true=add, false=remove)
+     * @param {Object} borderStyle - { width: '1px', style: 'solid', color: '#000000' }
      */
     setBorders(cells, sides, borderStyle) {
         cells.forEach(cell => {
@@ -718,8 +922,20 @@ export class TableEditorCore {
                 cellData.borders = {}
             }
 
-            sides.forEach(side => {
-                cellData.borders[side] = borderStyle
+            // Apply border changes for each side
+            Object.keys(sides).forEach(side => {
+                if (sides[side] === true) {
+                    // Add border
+                    cellData.borders[side] = {
+                        width: borderStyle.width,
+                        style: borderStyle.style,
+                        color: borderStyle.color
+                    }
+                } else if (sides[side] === false) {
+                    // Remove border
+                    delete cellData.borders[side]
+                }
+                // If null (mixed), don't change
             })
         })
 
@@ -745,6 +961,36 @@ export class TableEditorCore {
             } else if (colorType === 'hoverText') {
                 cellData.hoverTextColor = value
             }
+        })
+
+        this.rerender()
+        this.notifyChange()
+    }
+
+    /**
+     * Set horizontal alignment for cells
+     */
+    setAlignment(cells, alignment) {
+        cells.forEach(cell => {
+            const rowIndex = parseInt(cell.dataset.rowIndex)
+            const cellIndex = parseInt(cell.dataset.cellIndex)
+
+            this.data.rows[rowIndex].cells[cellIndex].alignment = alignment
+        })
+
+        this.rerender()
+        this.notifyChange()
+    }
+
+    /**
+     * Set vertical alignment for cells
+     */
+    setVerticalAlignment(cells, verticalAlignment) {
+        cells.forEach(cell => {
+            const rowIndex = parseInt(cell.dataset.rowIndex)
+            const cellIndex = parseInt(cell.dataset.cellIndex)
+
+            this.data.rows[rowIndex].cells[cellIndex].verticalAlignment = verticalAlignment
         })
 
         this.rerender()
@@ -810,6 +1056,128 @@ export class TableEditorCore {
     }
 
     /**
+     * Validate table structure
+     * Returns { isValid: boolean, issues: string[], expectedColumns: number }
+     */
+    validateTableStructure() {
+        const issues = []
+
+        // Calculate expected number of columns from columnWidths
+        const expectedColumns = this.data.columnWidths.length
+
+        // Check each row
+        this.data.rows.forEach((row, rowIndex) => {
+            // Count actual columns including colspan
+            let columnCount = 0
+            row.cells.forEach(cell => {
+                if (!cell._merged) {
+                    columnCount += (cell.colspan || 1)
+                }
+            })
+
+            if (columnCount !== expectedColumns) {
+                issues.push(`Row ${rowIndex + 1}: has ${columnCount} columns, expected ${expectedColumns}`)
+            }
+
+            // Check for orphaned _merged cells
+            const mergedCells = row.cells.filter(c => c._merged)
+            if (mergedCells.length > 0) {
+                const visibleCells = row.cells.filter(c => !c._merged)
+                if (visibleCells.length === 0) {
+                    issues.push(`Row ${rowIndex + 1}: all cells marked as merged (orphaned)`)
+                }
+            }
+        })
+
+        // Check for inconsistent number of cells in rows (even counting _merged)
+        const cellCounts = this.data.rows.map(row => row.cells.length)
+        const uniqueCounts = [...new Set(cellCounts)]
+        if (uniqueCounts.length > 1) {
+            issues.push(`Inconsistent cell counts: rows have ${uniqueCounts.join(', ')} cells`)
+        }
+
+        return {
+            isValid: issues.length === 0,
+            issues,
+            expectedColumns
+        }
+    }
+
+    /**
+     * Fix table structure to ensure consistent grid
+     */
+    fixTableStructure() {
+        // First pass: Remove all _merged markers and reset merges
+        this.data.rows.forEach(row => {
+            row.cells = row.cells.filter(cell => !cell._merged)
+            row.cells.forEach(cell => {
+                delete cell._merged
+                // Reset all spans to 1
+                cell.colspan = 1
+                cell.rowspan = 1
+            })
+        })
+
+        // Calculate target number of columns as the maximum from all rows
+        let targetColumns = 0
+        this.data.rows.forEach(row => {
+            const rowColumns = row.cells.length
+            targetColumns = Math.max(targetColumns, rowColumns)
+        })
+
+        // If no rows or all empty, use minimum of 2 columns
+        if (targetColumns === 0) {
+            targetColumns = 2
+        }
+
+        // Second pass: Ensure each row has exactly targetColumns cells
+        this.data.rows.forEach(row => {
+            if (row.cells.length < targetColumns) {
+                // Add missing cells
+                const missing = targetColumns - row.cells.length
+                for (let i = 0; i < missing; i++) {
+                    row.cells.push({
+                        contentType: 'text',
+                        content: '',
+                        colspan: 1,
+                        rowspan: 1,
+                        fontStyle: 'normal',
+                        alignment: 'left',
+                        verticalAlignment: 'top'
+                    })
+                }
+            } else if (row.cells.length > targetColumns) {
+                // Remove excess cells (prefer removing empty cells from end)
+                while (row.cells.length > targetColumns) {
+                    // Try to find an empty cell to remove
+                    let removedEmpty = false
+                    for (let i = row.cells.length - 1; i >= 0; i--) {
+                        const cell = row.cells[i]
+                        if (!cell.content || cell.content.trim() === '') {
+                            row.cells.splice(i, 1)
+                            removedEmpty = true
+                            break
+                        }
+                    }
+
+                    // If no empty cells, remove from end
+                    if (!removedEmpty) {
+                        row.cells.pop()
+                    }
+                }
+            }
+        })
+
+        // Update columnWidths to match
+        this.data.columnWidths = Array(targetColumns).fill('auto')
+
+        this.rerender()
+        this.notifyChange()
+
+        return this.validateTableStructure()
+    }
+
+    /**
      * Export table data to JSON
      */
     toJSON() {
@@ -852,14 +1220,204 @@ export class TableEditorCore {
     }
 
     /**
+     * Handle selection change - show/hide floating toolbar
+     */
+    handleSelectionChange() {
+        // Only show floating toolbar when in edit mode
+        if (!this.isEditMode) {
+            this.floatingToolbar.hide()
+            return
+        }
+
+        const textSel = this.getTextSelection()
+
+        if (textSel && textSel.text.trim() && this.isSelectionInTable(textSel.selection)) {
+            this.floatingToolbar.show(textSel.rect)
+            this.floatingToolbar.updateButtonStates(textSel.selection)
+        } else {
+            this.floatingToolbar.hide()
+        }
+    }
+
+    /**
+     * Check if selection is within this table
+     */
+    isSelectionInTable(selection) {
+        if (!selection || !selection.rangeCount) return false
+
+        let node = selection.getRangeAt(0).startContainer
+
+        while (node && node !== document.body) {
+            if (node === this.tableElement) return true
+            node = node.parentNode
+        }
+
+        return false
+    }
+
+    /**
+     * Get text selection information
+     */
+    getTextSelection() {
+        const selection = window.getSelection()
+        if (!selection || selection.isCollapsed) return null
+
+        const text = selection.toString()
+        if (!text || !text.trim()) return null
+
+        try {
+            const range = selection.getRangeAt(0)
+            const rect = range.getBoundingClientRect()
+
+            return {
+                selection,
+                range,
+                text,
+                rect
+            }
+        } catch (err) {
+            return null
+        }
+    }
+
+    /**
+     * Check if has text selection
+     */
+    hasTextSelection() {
+        const selection = window.getSelection()
+        return selection && !selection.isCollapsed && selection.toString().trim().length > 0
+    }
+
+    /**
+     * Handle context menu
+     */
+    handleContextMenu(e) {
+        e.preventDefault()
+
+        const cell = e.target.closest('td')
+        const context = {
+            selectedCells: this.getSelectedCells(),
+            textSelection: this.getTextSelection(),
+            clickedCell: cell
+        }
+
+        this.contextMenu.show(e, context)
+    }
+
+    /**
+     * Show link modal
+     */
+    async showLinkModal() {
+        const textSel = this.getTextSelection()
+        if (!textSel) return
+
+        // Check if selection contains existing link
+        const linkElement = this.findLinkAtSelection(textSel.selection)
+
+        const linkData = {
+            url: linkElement?.getAttribute('href') || '',
+            text: textSel.text,
+            openInNewTab: linkElement?.getAttribute('target') === '_blank',
+            linkElement,
+            range: textSel.range
+        }
+
+        try {
+            const result = await this.linkModal.show(linkData)
+
+            if (result.action === 'remove') {
+                this.removeLink(linkElement)
+            } else if (result.action === 'insert') {
+                this.insertLink(result.url, result.text, textSel.range, result.openInNewTab)
+            }
+        } catch (err) {
+            // User cancelled
+        }
+    }
+
+    /**
+     * Find link element at selection
+     */
+    findLinkAtSelection(selection) {
+        if (!selection) selection = window.getSelection()
+        if (!selection || !selection.rangeCount) return null
+
+        let node = selection.getRangeAt(0).startContainer
+
+        // Traverse up to find link element
+        while (node && node !== this.tableElement) {
+            if (node.nodeName === 'A') return node
+            node = node.parentNode
+        }
+
+        return null
+    }
+
+    /**
+     * Remove a link element
+     */
+    removeLink(linkElement) {
+        if (!linkElement) return
+
+        const parent = linkElement.parentNode
+        while (linkElement.firstChild) {
+            parent.insertBefore(linkElement.firstChild, linkElement)
+        }
+        parent.removeChild(linkElement)
+
+        // Update cell content in data model
+        const cell = parent.closest('td')
+        if (cell) {
+            const rowIndex = parseInt(cell.dataset.rowIndex)
+            const cellIndex = parseInt(cell.dataset.cellIndex)
+            this.data.rows[rowIndex].cells[cellIndex].content = cell.innerHTML
+            this.notifyChange()
+        }
+    }
+
+    /**
+     * Get active cell from selection
+     */
+    getActiveCellFromSelection(selection) {
+        if (!selection || !selection.rangeCount) return null
+
+        let node = selection.getRangeAt(0).startContainer
+
+        while (node && node !== this.tableElement) {
+            if (node.nodeName === 'TD') return node
+            node = node.parentNode
+        }
+
+        return null
+    }
+
+    /**
      * Destroy the editor and clean up
      */
     destroy() {
+        // Exit edit mode if active
+        if (this.isEditMode) {
+            this.exitEditMode()
+        }
+
+        // Clean up event listeners
+        document.removeEventListener('selectionchange', this.handleSelectionChangeBound)
+        document.removeEventListener('mousedown', this.handleClickOutsideBound)
+
+        // Destroy components
+        if (this.floatingToolbar) {
+            this.floatingToolbar.destroy()
+            this.floatingToolbar = null
+        }
+
+        if (this.contextMenu) {
+            this.contextMenu.destroy()
+            this.contextMenu = null
+        }
+
         if (this.container) {
             this.container.innerHTML = ''
         }
-
-        document.removeEventListener('mouseup', this.handleMouseUp.bind(this))
     }
 }
 

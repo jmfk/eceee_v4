@@ -6,42 +6,73 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import {
-    Plus, Minus, Grid3X3, Split, Type, Image as ImageIcon, Palette,
-    Square, AlignLeft, AlignCenter, AlignRight, Save, X, RotateCcw,
-    ChevronDown
+    Plus, Minus, Grid3X3, Split, Type, Palette, Square
 } from 'lucide-react'
 import { TableEditorCore } from './TableEditorCore'
-import MediaPicker from '../media/MediaPicker'
 import '../../styles/table-editor.css'
 
 const TableSpecialEditor = ({
     widgetData,
     isAnimating = false,
     isClosing = false,
-    onConfigChange,
-    namespace: providedNamespace = null
+    onConfigChange
 }) => {
-    const editorRef = useRef(null)
     const containerRef = useRef(null)
     const coreRef = useRef(null)
+    const borderPickerRef = useRef(null)
+    const colorPickerRef = useRef(null)
+    const toolbarRef = useRef(null)
 
     const [selectedCells, setSelectedCells] = useState([])
-    const [showMediaPicker, setShowMediaPicker] = useState(false)
-    const [showColorPicker, setShowColorPicker] = useState(null) // 'background', 'text', 'hoverBg', 'hoverText'
+    const [showColorPicker, setShowColorPicker] = useState(false)
     const [showBorderPicker, setShowBorderPicker] = useState(false)
-    const [currentColor, setCurrentColor] = useState('#000000')
+
+    // Color state for each type
+    const [backgroundColor, setBackgroundColor] = useState('#ffffff')
+    const [textColor, setTextColor] = useState('#000000')
+    const [hoverBackgroundColor, setHoverBackgroundColor] = useState('#f3f4f6')
+    const [hoverTextColor, setHoverTextColor] = useState('#000000')
 
     // Border configuration state
+    // States: null (mixed/grey), false (no border), true (has border)
     const [borderSides, setBorderSides] = useState({
-        top: false,
-        bottom: false,
-        left: false,
-        right: false
+        top: null,
+        bottom: null,
+        left: null,
+        right: null
     })
-    const [borderStyle, setBorderStyle] = useState('plain')
-    const [borderColor, setBorderColor] = useState('#d1d5db')
+    const [borderWidth, setBorderWidth] = useState('1px')
+    const [borderStyle, setBorderStyle] = useState('solid')
+    const [borderColor, setBorderColor] = useState('#000000')
 
     const config = widgetData?.config || {}
+
+    /**
+     * Close pickers when clicking on toolbar but outside the pickers
+     */
+    useEffect(() => {
+        const handleClickOnToolbar = (event) => {
+            // Only close if clicking within the toolbar area
+            if (!toolbarRef.current || !toolbarRef.current.contains(event.target)) {
+                return
+            }
+
+            // Close border picker if clicking outside of it (but on toolbar)
+            if (borderPickerRef.current && !borderPickerRef.current.contains(event.target)) {
+                setShowBorderPicker(false)
+            }
+
+            // Close color picker if clicking outside of it (but on toolbar)
+            if (colorPickerRef.current && !colorPickerRef.current.contains(event.target)) {
+                setShowColorPicker(false)
+            }
+        }
+
+        document.addEventListener('mousedown', handleClickOnToolbar)
+        return () => {
+            document.removeEventListener('mousedown', handleClickOnToolbar)
+        }
+    }, [])
 
     /**
      * Initialize table editor
@@ -68,7 +99,7 @@ const TableSpecialEditor = ({
                 coreRef.current.destroy()
             }
         }
-    }, [])
+    }, [config, onConfigChange])
 
     /**
      * Update editor when config changes externally
@@ -132,29 +163,7 @@ const TableSpecialEditor = ({
             return
         }
 
-        if (type === 'image') {
-            setShowMediaPicker(true)
-        } else {
-            coreRef.current?.setCellType(selectedCells, type)
-        }
-    }
-
-    const handleMediaSelect = (selectedMedia) => {
-        if (selectedMedia.length === 0) return
-
-        const media = selectedMedia[0]
-        const imageData = {
-            mediaId: media.id,
-            url: media.file,
-            alt: media.alt_text || media.title || ''
-        }
-
-        // Apply image to all selected cells
-        selectedCells.forEach(cell => {
-            coreRef.current?.setCellImage(cell, imageData)
-        })
-
-        setShowMediaPicker(false)
+        coreRef.current?.setCellType(selectedCells, type)
     }
 
     /**
@@ -182,72 +191,156 @@ const TableSpecialEditor = ({
         coreRef.current?.applyFontStyle(selectedCells, fontStyle)
     }
 
-    const handleApplyBorders = () => {
-        if (selectedCells.length === 0) {
-            alert('Please select cells first')
-            return
-        }
 
-        const sides = Object.keys(borderSides).filter(side => borderSides[side])
-        if (sides.length === 0) {
-            alert('Please select at least one border side')
-            return
-        }
+    /**
+     * Apply borders immediately when any border setting changes
+     */
+    const applyBordersImmediately = useCallback(() => {
+        if (selectedCells.length === 0) return
+
+        // Get sides that should be changed (not null/mixed)
+        const sidesToChange = {}
+        Object.keys(borderSides).forEach(side => {
+            if (borderSides[side] !== null) {
+                sidesToChange[side] = borderSides[side]
+            }
+        })
+
+        if (Object.keys(sidesToChange).length === 0) return
 
         const borderStyleConfig = {
+            width: borderWidth,
             style: borderStyle,
             color: borderColor
         }
 
-        coreRef.current?.setBorders(selectedCells, sides, borderStyleConfig)
-        setShowBorderPicker(false)
-    }
+        coreRef.current?.setBorders(selectedCells, sidesToChange, borderStyleConfig)
+    }, [selectedCells, borderSides, borderWidth, borderStyle, borderColor])
 
-    const handleSetColor = (colorType) => {
-        if (selectedCells.length === 0) {
-            alert('Please select cells first')
-            return
+    /**
+     * Apply borders when settings change (but not on initial render)
+     */
+    useEffect(() => {
+        if (selectedCells.length > 0) {
+            applyBordersImmediately()
         }
+    }, [borderSides, borderWidth, borderStyle, borderColor, applyBordersImmediately])
 
-        coreRef.current?.setColors(selectedCells, colorType, currentColor)
-        setShowColorPicker(null)
+    /**
+     * Handle tri-state border checkbox click
+     */
+    const handleBorderSideToggle = (side) => {
+        setBorderSides(prev => {
+            const current = prev[side]
+            // Cycle: null -> false -> true -> false -> ...
+            let next
+            if (current === null) {
+                next = false // First click on mixed: set to no border
+            } else if (current === false) {
+                next = true // Second click: set to has border
+            } else {
+                next = false // Third click: back to no border
+            }
+            return { ...prev, [side]: next }
+        })
     }
 
     /**
-     * Dimension operations
+     * Update border picker state based on selected cells
      */
-    const handleSetColumnWidth = () => {
-        if (selectedCells.length === 0) {
-            alert('Please select a cell in the column')
+    const updateBorderStateFromSelection = useCallback(() => {
+        if (!coreRef.current || selectedCells.length === 0) {
+            // No cells selected - reset to mixed
+            setBorderSides({ top: null, bottom: null, left: null, right: null })
             return
         }
 
-        const colIndex = parseInt(selectedCells[0].dataset.cellIndex)
-        const width = prompt('Enter column width (e.g., auto, 200px, 30%):', 'auto')
+        // Analyze selected cells to determine border states
+        const sides = ['top', 'bottom', 'left', 'right']
+        const newBorderSides = {}
+        let firstBorder = null
 
-        if (width !== null) {
-            coreRef.current?.setColumnWidth(colIndex, width)
+        sides.forEach(side => {
+            let hasCount = 0
+            let noCount = 0
+
+            selectedCells.forEach(cell => {
+                const rowIndex = parseInt(cell.dataset.rowIndex)
+                const cellIndex = parseInt(cell.dataset.cellIndex)
+                const cellData = coreRef.current.data.rows[rowIndex].cells[cellIndex]
+
+                if (cellData.borders && cellData.borders[side]) {
+                    hasCount++
+                    // Store first border we find to get width/style/color
+                    if (!firstBorder) {
+                        firstBorder = cellData.borders[side]
+                    }
+                } else {
+                    noCount++
+                }
+            })
+
+            // Determine state for this side
+            if (hasCount === selectedCells.length) {
+                newBorderSides[side] = true // All have border
+            } else if (noCount === selectedCells.length) {
+                newBorderSides[side] = false // None have border
+            } else {
+                newBorderSides[side] = null // Mixed state
+            }
+        })
+
+        setBorderSides(newBorderSides)
+
+        // Update border width, style, and color from first found border
+        if (firstBorder) {
+            if (firstBorder.width) setBorderWidth(firstBorder.width)
+            if (firstBorder.style) setBorderStyle(firstBorder.style)
+            if (firstBorder.color) setBorderColor(firstBorder.color)
         }
+    }, [selectedCells])
+
+    /**
+     * Update border state when selection changes or border picker opens
+     */
+    useEffect(() => {
+        if (showBorderPicker) {
+            updateBorderStateFromSelection()
+        }
+    }, [showBorderPicker, selectedCells, updateBorderStateFromSelection])
+
+    /**
+     * Apply color immediately when changed
+     */
+    const applyColor = useCallback((colorType, color) => {
+        if (selectedCells.length === 0) return
+        coreRef.current?.setColors(selectedCells, colorType, color)
+    }, [selectedCells])
+
+    const handleBackgroundColorChange = (color) => {
+        setBackgroundColor(color)
+        applyColor('background', color)
     }
 
-    const handleSetRowHeight = () => {
-        if (selectedCells.length === 0) {
-            alert('Please select a cell in the row')
-            return
-        }
+    const handleTextColorChange = (color) => {
+        setTextColor(color)
+        applyColor('text', color)
+    }
 
-        const rowIndex = parseInt(selectedCells[0].dataset.rowIndex)
-        const height = prompt('Enter row height (e.g., auto, 50px, 3rem):', 'auto')
+    const handleHoverBackgroundColorChange = (color) => {
+        setHoverBackgroundColor(color)
+        applyColor('hoverBackground', color)
+    }
 
-        if (height !== null) {
-            coreRef.current?.setRowHeight(rowIndex, height)
-        }
+    const handleHoverTextColorChange = (color) => {
+        setHoverTextColor(color)
+        applyColor('hoverText', color)
     }
 
     return (
         <div className="table-special-editor h-full flex flex-col bg-white">
             {/* Toolbar */}
-            <div className="border-b bg-gray-50 px-4 py-3">
+            <div ref={toolbarRef} className="border-b bg-gray-50 px-4 py-3">
                 <div className="flex flex-wrap gap-2">
                     {/* Structure Section */}
                     <div className="flex items-center gap-1 border-r pr-2">
@@ -313,39 +406,6 @@ const TableSpecialEditor = ({
                         >
                             <Type size={16} />
                         </button>
-                        <button
-                            onClick={() => handleSetCellType('image')}
-                            className="p-2 hover:bg-gray-200 rounded"
-                            title="Image Cell"
-                            disabled={selectedCells.length === 0}
-                        >
-                            <ImageIcon size={16} />
-                        </button>
-                    </div>
-
-                    {/* Formatting */}
-                    <div className="flex items-center gap-1 border-r pr-2">
-                        <button
-                            onClick={() => handleApplyFormatting('bold')}
-                            className="p-2 hover:bg-gray-200 rounded font-bold text-sm"
-                            title="Bold"
-                        >
-                            B
-                        </button>
-                        <button
-                            onClick={() => handleApplyFormatting('italic')}
-                            className="p-2 hover:bg-gray-200 rounded italic text-sm"
-                            title="Italic"
-                        >
-                            I
-                        </button>
-                        <button
-                            onClick={handleInsertLink}
-                            className="p-2 hover:bg-gray-200 rounded text-sm"
-                            title="Insert Link"
-                        >
-                            Link
-                        </button>
                     </div>
 
                     {/* Font Style */}
@@ -366,7 +426,11 @@ const TableSpecialEditor = ({
                     {/* Styling */}
                     <div className="flex items-center gap-1 border-r pr-2 relative">
                         <button
-                            onClick={() => setShowBorderPicker(!showBorderPicker)}
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                setShowBorderPicker(!showBorderPicker)
+                                if (!showBorderPicker) setShowColorPicker(false)
+                            }}
                             className="p-2 hover:bg-gray-200 rounded"
                             title="Borders"
                             disabled={selectedCells.length === 0}
@@ -375,27 +439,65 @@ const TableSpecialEditor = ({
                         </button>
 
                         {showBorderPicker && (
-                            <div className="absolute top-full left-0 mt-1 bg-white border rounded-lg shadow-lg p-4 z-10 w-64">
+                            <div ref={borderPickerRef} className="absolute top-full left-0 mt-1 bg-white border border-gray-300 shadow-lg p-3 z-10 w-72">
                                 <h4 className="font-medium mb-2">Border Configuration</h4>
 
-                                {/* Border side selector */}
+                                {/* Selection info */}
+                                {selectedCells.length > 0 && (
+                                    <div className="mb-2 text-xs bg-gray-50 text-gray-600 px-2 py-1">
+                                        {selectedCells.length} cell{selectedCells.length !== 1 ? 's' : ''} selected
+                                    </div>
+                                )}
+
+                                {/* Border side selector with tri-state checkboxes */}
                                 <div className="mb-3">
-                                    <p className="text-sm text-gray-600 mb-1">Sides:</p>
+                                    <p className="text-sm text-gray-600 mb-1">
+                                        Sides:
+                                        <span className="text-xs ml-2">(Grey=Mixed, Empty=Remove, Filled=Add)</span>
+                                    </p>
                                     <div className="grid grid-cols-2 gap-2">
                                         {['top', 'bottom', 'left', 'right'].map(side => (
-                                            <label key={side} className="flex items-center gap-2">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={borderSides[side]}
-                                                    onChange={(e) => setBorderSides({
-                                                        ...borderSides,
-                                                        [side]: e.target.checked
-                                                    })}
-                                                />
-                                                <span className="text-sm capitalize">{side}</span>
+                                            <label
+                                                key={side}
+                                                className="flex items-center gap-2 cursor-pointer"
+                                                onClick={(e) => {
+                                                    e.preventDefault()
+                                                    handleBorderSideToggle(side)
+                                                }}
+                                            >
+                                                <div className={`
+                                                    w-4 h-4 border-2 flex items-center justify-center
+                                                    ${borderSides[side] === null ? 'bg-gray-300 border-gray-400' :
+                                                        borderSides[side] ? 'bg-black border-black' :
+                                                            'bg-white border-gray-400'}
+                                                `}>
+                                                    {borderSides[side] === true && (
+                                                        <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                                        </svg>
+                                                    )}
+                                                    {borderSides[side] === null && (
+                                                        <div className="w-2 h-0.5 bg-gray-600"></div>
+                                                    )}
+                                                </div>
+                                                <span className="text-sm capitalize select-none">{side}</span>
                                             </label>
                                         ))}
                                     </div>
+                                </div>
+
+                                {/* Border width */}
+                                <div className="mb-3">
+                                    <p className="text-sm text-gray-600 mb-1">Width:</p>
+                                    <select
+                                        value={borderWidth}
+                                        onChange={(e) => setBorderWidth(e.target.value)}
+                                        className="w-full p-2 border text-sm"
+                                    >
+                                        <option value="1px">1px</option>
+                                        <option value="2px">2px</option>
+                                        <option value="3px">3px</option>
+                                    </select>
                                 </div>
 
                                 {/* Border style */}
@@ -404,10 +506,9 @@ const TableSpecialEditor = ({
                                     <select
                                         value={borderStyle}
                                         onChange={(e) => setBorderStyle(e.target.value)}
-                                        className="w-full p-2 border rounded"
+                                        className="w-full p-2 border text-sm"
                                     >
-                                        <option value="plain">Plain (1px)</option>
-                                        <option value="thick">Thick (3px)</option>
+                                        <option value="solid">Solid</option>
                                         <option value="double">Double</option>
                                     </select>
                                 </div>
@@ -419,23 +520,8 @@ const TableSpecialEditor = ({
                                         type="color"
                                         value={borderColor}
                                         onChange={(e) => setBorderColor(e.target.value)}
-                                        className="w-full h-10 border rounded"
+                                        className="w-full h-10 border cursor-pointer"
                                     />
-                                </div>
-
-                                <div className="flex gap-2">
-                                    <button
-                                        onClick={handleApplyBorders}
-                                        className="flex-1 bg-blue-600 text-white px-3 py-2 rounded hover:bg-blue-700"
-                                    >
-                                        Apply
-                                    </button>
-                                    <button
-                                        onClick={() => setShowBorderPicker(false)}
-                                        className="px-3 py-2 border rounded hover:bg-gray-100"
-                                    >
-                                        Cancel
-                                    </button>
                                 </div>
                             </div>
                         )}
@@ -443,7 +529,11 @@ const TableSpecialEditor = ({
                         {/* Color pickers */}
                         <div className="relative">
                             <button
-                                onClick={() => setShowColorPicker(showColorPicker ? null : 'menu')}
+                                onClick={(e) => {
+                                    e.stopPropagation()
+                                    setShowColorPicker(!showColorPicker)
+                                    if (!showColorPicker) setShowBorderPicker(false)
+                                }}
                                 className="p-2 hover:bg-gray-200 rounded"
                                 title="Colors"
                                 disabled={selectedCells.length === 0}
@@ -451,92 +541,58 @@ const TableSpecialEditor = ({
                                 <Palette size={16} />
                             </button>
 
-                            {showColorPicker === 'menu' && (
-                                <div className="absolute top-full left-0 mt-1 bg-white border rounded-lg shadow-lg p-2 z-10">
-                                    <button
-                                        onClick={() => setShowColorPicker('background')}
-                                        className="block w-full text-left px-3 py-2 hover:bg-gray-100 rounded text-sm"
-                                    >
-                                        Background Color
-                                    </button>
-                                    <button
-                                        onClick={() => setShowColorPicker('text')}
-                                        className="block w-full text-left px-3 py-2 hover:bg-gray-100 rounded text-sm"
-                                    >
-                                        Text Color
-                                    </button>
-                                    <button
-                                        onClick={() => setShowColorPicker('hoverBackground')}
-                                        className="block w-full text-left px-3 py-2 hover:bg-gray-100 rounded text-sm"
-                                    >
-                                        Hover Background
-                                    </button>
-                                    <button
-                                        onClick={() => setShowColorPicker('hoverText')}
-                                        className="block w-full text-left px-3 py-2 hover:bg-gray-100 rounded text-sm"
-                                    >
-                                        Hover Text
-                                    </button>
-                                </div>
-                            )}
+                            {showColorPicker && (
+                                <div ref={colorPickerRef} className="absolute top-full left-0 mt-1 bg-white border border-gray-300 shadow-lg p-3 z-10 w-64">
+                                    <h4 className="font-medium mb-3 text-sm">Cell Colors</h4>
 
-                            {showColorPicker && showColorPicker !== 'menu' && (
-                                <div className="absolute top-full left-0 mt-1 bg-white border rounded-lg shadow-lg p-4 z-10 w-64">
-                                    <h4 className="font-medium mb-2 capitalize">
-                                        {showColorPicker.replace(/([A-Z])/g, ' $1')} Color
-                                    </h4>
-                                    <input
-                                        type="color"
-                                        value={currentColor}
-                                        onChange={(e) => setCurrentColor(e.target.value)}
-                                        className="w-full h-10 border rounded mb-3"
-                                    />
-                                    <div className="flex gap-2">
-                                        <button
-                                            onClick={() => handleSetColor(showColorPicker)}
-                                            className="flex-1 bg-blue-600 text-white px-3 py-2 rounded hover:bg-blue-700"
-                                        >
-                                            Apply
-                                        </button>
-                                        <button
-                                            onClick={() => setShowColorPicker(null)}
-                                            className="px-3 py-2 border rounded hover:bg-gray-100"
-                                        >
-                                            Cancel
-                                        </button>
+                                    {/* Background Color */}
+                                    <div className="mb-3">
+                                        <label className="block text-xs text-gray-600 mb-1">Background</label>
+                                        <input
+                                            type="color"
+                                            value={backgroundColor}
+                                            onChange={(e) => handleBackgroundColorChange(e.target.value)}
+                                            className="w-full h-8 border cursor-pointer"
+                                        />
+                                    </div>
+
+                                    {/* Text Color */}
+                                    <div className="mb-3">
+                                        <label className="block text-xs text-gray-600 mb-1">Text</label>
+                                        <input
+                                            type="color"
+                                            value={textColor}
+                                            onChange={(e) => handleTextColorChange(e.target.value)}
+                                            className="w-full h-8 border cursor-pointer"
+                                        />
+                                    </div>
+
+                                    {/* Hover Background Color */}
+                                    <div className="mb-3">
+                                        <label className="block text-xs text-gray-600 mb-1">Hover Background</label>
+                                        <input
+                                            type="color"
+                                            value={hoverBackgroundColor}
+                                            onChange={(e) => handleHoverBackgroundColorChange(e.target.value)}
+                                            className="w-full h-8 border cursor-pointer"
+                                        />
+                                    </div>
+
+                                    {/* Hover Text Color */}
+                                    <div className="mb-0">
+                                        <label className="block text-xs text-gray-600 mb-1">Hover Text</label>
+                                        <input
+                                            type="color"
+                                            value={hoverTextColor}
+                                            onChange={(e) => handleHoverTextColorChange(e.target.value)}
+                                            className="w-full h-8 border cursor-pointer"
+                                        />
                                     </div>
                                 </div>
                             )}
                         </div>
                     </div>
-
-                    {/* Dimensions */}
-                    <div className="flex items-center gap-1">
-                        <button
-                            onClick={handleSetColumnWidth}
-                            className="p-2 hover:bg-gray-200 rounded text-xs"
-                            title="Column Width"
-                            disabled={selectedCells.length === 0}
-                        >
-                            Col Width
-                        </button>
-                        <button
-                            onClick={handleSetRowHeight}
-                            className="p-2 hover:bg-gray-200 rounded text-xs"
-                            title="Row Height"
-                            disabled={selectedCells.length === 0}
-                        >
-                            Row Height
-                        </button>
-                    </div>
                 </div>
-
-                {/* Selection info */}
-                {selectedCells.length > 0 && (
-                    <div className="mt-2 text-sm text-gray-600">
-                        {selectedCells.length} cell{selectedCells.length !== 1 ? 's' : ''} selected
-                    </div>
-                )}
             </div>
 
             {/* Table Editor Container */}
@@ -544,18 +600,6 @@ const TableSpecialEditor = ({
                 ref={containerRef}
                 className="flex-1 overflow-auto p-4"
             />
-
-            {/* Media Picker Modal */}
-            {showMediaPicker && (
-                <MediaPicker
-                    isOpen={showMediaPicker}
-                    onClose={() => setShowMediaPicker(false)}
-                    onSelect={handleMediaSelect}
-                    namespace={providedNamespace}
-                    multiple={false}
-                    mediaTypes={['image']}
-                />
-            )}
         </div>
     )
 }
