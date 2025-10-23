@@ -9,6 +9,48 @@ from pydantic.alias_generators import to_camel
 from webpages.widget_registry import BaseWidget, register_widget_type
 
 
+class BorderStyle(BaseModel):
+    """Border style configuration"""
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
+
+    style: Literal["plain", "thick", "double"] = Field(
+        "plain",
+        description="Border style: plain (1px), thick (3px), double (1px double)",
+    )
+    color: Optional[str] = Field(None, description="Border color (hex or CSS color)")
+
+
+class BorderConfig(BaseModel):
+    """Per-side border configuration"""
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
+
+    top: Optional[BorderStyle] = Field(None, description="Top border")
+    bottom: Optional[BorderStyle] = Field(None, description="Bottom border")
+    left: Optional[BorderStyle] = Field(None, description="Left border")
+    right: Optional[BorderStyle] = Field(None, description="Right border")
+
+
+class CellImageData(BaseModel):
+    """Image data for image cells"""
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
+
+    media_id: int = Field(..., description="Media library item ID")
+    url: str = Field(..., description="Image URL")
+    alt: Optional[str] = Field(None, description="Alt text for accessibility")
+
+
 class TableCell(BaseModel):
     """Individual table cell configuration"""
 
@@ -17,20 +59,34 @@ class TableCell(BaseModel):
         populate_by_name=True,
     )
 
-    content: str = Field("", description="Cell content")
+    content_type: Literal["text", "image"] = Field(
+        "text", description="Cell content type"
+    )
+    content: str = Field("", description="Cell content (HTML for text cells)")
+    image_data: Optional[CellImageData] = Field(
+        None, description="Image data if cell type is image"
+    )
     colspan: int = Field(1, ge=1, description="Number of columns to span")
     rowspan: int = Field(1, ge=1, description="Number of rows to span")
+    font_style: Literal["normal", "quote", "caption"] = Field(
+        "normal", description="Font style preset"
+    )
     alignment: Literal["left", "center", "right"] = Field(
         "left", description="Text alignment"
+    )
+    borders: Optional[BorderConfig] = Field(
+        None, description="Per-side border configuration"
     )
     background_color: Optional[str] = Field(
         None, description="Background color (hex or CSS color)"
     )
     text_color: Optional[str] = Field(None, description="Text color (hex or CSS color)")
-    font_weight: Literal["normal", "bold"] = Field("normal", description="Font weight")
-    font_style: Literal["normal", "italic"] = Field("normal", description="Font style")
-    padding: Optional[str] = Field(None, description="Cell padding (CSS value)")
-    border: Optional[str] = Field(None, description="Cell border (CSS value)")
+    hover_bg_color: Optional[str] = Field(
+        None, description="Hover background color (hex or CSS color)"
+    )
+    hover_text_color: Optional[str] = Field(
+        None, description="Hover text color (hex or CSS color)"
+    )
     css_class: Optional[str] = Field(None, description="Additional CSS class")
 
 
@@ -42,16 +98,10 @@ class TableRow(BaseModel):
         populate_by_name=True,
     )
 
-    anchor: str = Field(
-        "",
-        description="Anchor Title",
-        json_schema_extra={
-            "component": "TextInput",
-            "placeholder": "section-name",
-        },
-    )
-
     cells: List[TableCell] = Field(..., description="List of cells in this row")
+    height: Optional[str] = Field(
+        None, description="Row height (CSS value: auto, 50px, 3rem)"
+    )
     is_header: bool = Field(False, description="Whether this is a header row")
     background_color: Optional[str] = Field(None, description="Row background color")
     css_class: Optional[str] = Field(None, description="Additional CSS class")
@@ -66,9 +116,12 @@ class TableConfig(BaseModel):
     )
 
     rows: List[TableRow] = Field(..., min_items=1, description="Table rows")
+    column_widths: List[str] = Field(
+        default_factory=list, description="Column widths (CSS values: auto, 200px, 30%)"
+    )
     caption: Optional[str] = Field(None, description="Table caption")
     show_borders: bool = Field(True, description="Show table borders")
-    striped_rows: bool = Field(True, description="Alternate row colors")
+    striped_rows: bool = Field(False, description="Alternate row colors")
     hover_effect: bool = Field(True, description="Highlight rows on hover")
     responsive: bool = Field(True, description="Make table responsive on mobile")
     table_width: Literal["auto", "full"] = Field("full", description="Table width")
@@ -80,8 +133,9 @@ class TableWidget(BaseWidget):
     """Table widget with configurable columns and rows"""
 
     name = "Table"
-    description = "Table widget with configurable columns and rows, cell styling, and spanning capabilities"
-    template_name = "default_widgets/widgets/table.html"
+    description = "Advanced table widget with cell merging, images, styling, and responsive design"
+    template_name = "eceee_widgets/widgets/table.html"
+    special_editor = "TableSpecialEditor"
 
     widget_css = """
     .table-widget {
@@ -96,32 +150,41 @@ class TableWidget(BaseWidget):
         background-color: var(--table-bg, transparent);
     }
     
-    .table-widget th {
-        background-color: var(--header-bg, #f3f4f6);
-        color: var(--header-color, #1f2937);
-        font-weight: var(--header-font-weight, 600);
-        text-align: var(--header-alignment, left);
-        padding: var(--header-padding, 0.75rem);
-        border: var(--header-border, 1px solid #d1d5db);
-    }
-    
+    .table-widget th,
     .table-widget td {
         padding: var(--cell-padding, 0.75rem);
         border: var(--cell-border, 1px solid #d1d5db);
         text-align: var(--cell-alignment, left);
         vertical-align: var(--cell-vertical-alignment, top);
+        transition: background-color 0.2s ease, color 0.2s ease;
+    }
+    
+    .table-widget th {
+        background-color: var(--header-bg, #f3f4f6);
+        color: var(--header-color, #1f2937);
+        font-weight: var(--header-font-weight, 600);
+    }
+    
+    .table-widget td {
         background-color: var(--cell-bg, transparent);
         color: var(--cell-color, inherit);
     }
     
-    .table-widget tr:nth-child(even) td {
-        background-color: var(--row-even-bg, #f9fafb);
+    /* Font style presets */
+    .table-cell-quote {
+        font-style: italic;
+        padding-left: 1.5rem;
+        border-left: 3px solid var(--quote-border-color, #d1d5db);
+        color: var(--quote-color, #6b7280);
     }
     
-    .table-widget tr:hover td {
-        background-color: var(--row-hover-bg, #f3f4f6);
+    .table-cell-caption {
+        font-size: 0.875rem;
+        color: var(--caption-color, #6b7280);
+        font-weight: 400;
     }
     
+    /* Alignment classes */
     .table-widget .cell-center {
         text-align: center;
     }
@@ -130,40 +193,39 @@ class TableWidget(BaseWidget):
         text-align: right;
     }
     
-    .table-widget .cell-bold {
-        font-weight: bold;
+    .table-widget .cell-left {
+        text-align: left;
     }
     
-    .table-widget .cell-italic {
-        font-style: italic;
+    /* Image cells */
+    .table-widget .cell-image {
+        padding: 0.25rem;
     }
     
-    .table-widget .cell-highlight {
-        background-color: var(--cell-highlight-bg, #fef3c7) !important;
+    .table-widget .cell-image img {
+        max-width: 100%;
+        height: auto;
+        display: block;
     }
     
-    .table-widget .cell-success {
-        background-color: var(--cell-success-bg, #dcfce7) !important;
-        color: var(--cell-success-color, #166534);
+    /* Striped rows */
+    .table-widget.table-striped tr:nth-child(even) td {
+        background-color: var(--row-even-bg, #f9fafb);
     }
     
-    .table-widget .cell-warning {
-        background-color: var(--cell-warning-bg, #fef3c7) !important;
-        color: var(--cell-warning-color, #92400e);
+    /* Hover effect */
+    .table-widget.table-hover tr:hover td {
+        background-color: var(--row-hover-bg, #f3f4f6);
     }
     
-    .table-widget .cell-error {
-        background-color: var(--cell-error-bg, #fee2e2) !important;
-        color: var(--cell-error-color, #991b1b);
-    }
-    
+    /* Responsive table */
     @media (max-width: 768px) {
-        .table-widget {
+        .table-widget.table-responsive {
             font-size: var(--mobile-font-size, 0.875rem);
         }
         
-        .table-widget th,
-        .table-widget td {
+        .table-widget.table-responsive th,
+        .table-widget.table-responsive td {
             padding: var(--mobile-cell-padding, 0.5rem);
         }
     }
@@ -176,9 +238,6 @@ class TableWidget(BaseWidget):
         "header-bg": "#f3f4f6",
         "header-color": "#1f2937",
         "header-font-weight": "600",
-        "header-alignment": "left",
-        "header-padding": "0.75rem",
-        "header-border": "1px solid #d1d5db",
         "cell-padding": "0.75rem",
         "cell-border": "1px solid #d1d5db",
         "cell-alignment": "left",
@@ -187,13 +246,9 @@ class TableWidget(BaseWidget):
         "cell-color": "inherit",
         "row-even-bg": "#f9fafb",
         "row-hover-bg": "#f3f4f6",
-        "cell-highlight-bg": "#fef3c7",
-        "cell-success-bg": "#dcfce7",
-        "cell-success-color": "#166534",
-        "cell-warning-bg": "#fef3c7",
-        "cell-warning-color": "#92400e",
-        "cell-error-bg": "#fee2e2",
-        "cell-error-color": "#991b1b",
+        "quote-border-color": "#d1d5db",
+        "quote-color": "#6b7280",
+        "caption-color": "#6b7280",
         "mobile-font-size": "0.875rem",
         "mobile-cell-padding": "0.5rem",
     }
@@ -203,3 +258,32 @@ class TableWidget(BaseWidget):
     @property
     def configuration_model(self) -> Type[BaseModel]:
         return TableConfig
+
+    @staticmethod
+    def get_default_config():
+        """Return default configuration for a new table"""
+        return {
+            "rows": [
+                {
+                    "cells": [
+                        {"contentType": "text", "content": ""},
+                        {"contentType": "text", "content": ""},
+                    ],
+                    "height": None,
+                },
+                {
+                    "cells": [
+                        {"contentType": "text", "content": ""},
+                        {"contentType": "text", "content": ""},
+                    ],
+                    "height": None,
+                },
+            ],
+            "columnWidths": ["auto", "auto"],
+            "caption": None,
+            "showBorders": True,
+            "stripedRows": False,
+            "hoverEffect": True,
+            "responsive": True,
+            "tableWidth": "full",
+        }

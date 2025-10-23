@@ -1,0 +1,867 @@
+/**
+ * TableEditorCore - Vanilla JS Table Editor
+ * 
+ * High-performance table editor using vanilla JavaScript to avoid React re-renders.
+ * Provides visual table editing with cell selection, merging, formatting, and styling.
+ */
+
+export class TableEditorCore {
+    constructor(initialData, options = {}) {
+        this.data = this.normalizeData(initialData)
+        this.options = {
+            onChange: options.onChange || (() => { }),
+            onSelectionChange: options.onSelectionChange || (() => { }),
+            ...options
+        }
+
+        this.container = null
+        this.tableElement = null
+        this.selection = {
+            active: false,
+            startCell: null,
+            endCell: null,
+            cells: []
+        }
+
+        this.isSelecting = false
+        this.history = []
+        this.historyIndex = -1
+    }
+
+    /**
+     * Normalize incoming data to ensure consistent structure
+     */
+    normalizeData(data) {
+        if (!data || !data.rows || data.rows.length === 0) {
+            // Create default 2x2 table
+            return {
+                rows: [
+                    {
+                        cells: [
+                            { contentType: 'text', content: '' },
+                            { contentType: 'text', content: '' }
+                        ],
+                        height: null
+                    },
+                    {
+                        cells: [
+                            { contentType: 'text', content: '' },
+                            { contentType: 'text', content: '' }
+                        ],
+                        height: null
+                    }
+                ],
+                columnWidths: ['auto', 'auto'],
+                caption: null,
+                showBorders: true,
+                stripedRows: false,
+                hoverEffect: true,
+                responsive: true,
+                tableWidth: 'full'
+            }
+        }
+
+        // Ensure all cells have required fields
+        const normalized = { ...data }
+        normalized.rows = data.rows.map(row => ({
+            ...row,
+            cells: row.cells.map(cell => ({
+                contentType: cell.contentType || 'text',
+                content: cell.content || '',
+                imageData: cell.imageData || null,
+                colspan: cell.colspan || 1,
+                rowspan: cell.rowspan || 1,
+                fontStyle: cell.fontStyle || 'normal',
+                alignment: cell.alignment || 'left',
+                borders: cell.borders || null,
+                backgroundColor: cell.backgroundColor || null,
+                textColor: cell.textColor || null,
+                hoverBgColor: cell.hoverBgColor || null,
+                hoverTextColor: cell.hoverTextColor || null,
+                cssClass: cell.cssClass || null
+            }))
+        }))
+
+        // Ensure columnWidths array exists
+        if (!normalized.columnWidths) {
+            const maxCols = Math.max(...normalized.rows.map(r => r.cells.length))
+            normalized.columnWidths = Array(maxCols).fill('auto')
+        }
+
+        return normalized
+    }
+
+    /**
+     * Render the table into the container
+     */
+    render(container) {
+        this.container = container
+        this.container.innerHTML = ''
+
+        const wrapper = document.createElement('div')
+        wrapper.className = 'table-editor-wrapper'
+
+        const table = document.createElement('table')
+        table.className = 'table-editor-table'
+
+        // Create colgroup for column widths
+        const colgroup = document.createElement('colgroup')
+        this.data.columnWidths.forEach(width => {
+            const col = document.createElement('col')
+            col.style.width = width
+            colgroup.appendChild(col)
+        })
+        table.appendChild(colgroup)
+
+        const tbody = document.createElement('tbody')
+
+        this.data.rows.forEach((row, rowIndex) => {
+            const tr = this.createRowElement(row, rowIndex)
+            tbody.appendChild(tr)
+        })
+
+        table.appendChild(tbody)
+        wrapper.appendChild(table)
+        this.container.appendChild(wrapper)
+
+        this.tableElement = table
+        this.attachEventListeners()
+
+        return this.container
+    }
+
+    /**
+     * Create a table row element
+     */
+    createRowElement(row, rowIndex) {
+        const tr = document.createElement('tr')
+        tr.dataset.rowIndex = rowIndex
+
+        if (row.height) {
+            tr.style.height = row.height
+        }
+
+        row.cells.forEach((cell, cellIndex) => {
+            // Skip cells that are part of a merged cell
+            if (cell._merged) {
+                return
+            }
+
+            const td = this.createCellElement(cell, rowIndex, cellIndex)
+            tr.appendChild(td)
+        })
+
+        return tr
+    }
+
+    /**
+     * Create a table cell element
+     */
+    createCellElement(cell, rowIndex, cellIndex) {
+        const td = document.createElement('td')
+        td.dataset.rowIndex = rowIndex
+        td.dataset.cellIndex = cellIndex
+        td.className = 'table-editor-cell'
+
+        // Set colspan and rowspan
+        if (cell.colspan > 1) td.colSpan = cell.colspan
+        if (cell.rowspan > 1) td.rowSpan = cell.rowspan
+
+        // Apply font style class
+        if (cell.fontStyle === 'quote') td.classList.add('table-cell-quote')
+        if (cell.fontStyle === 'caption') td.classList.add('table-cell-caption')
+
+        // Apply alignment class
+        if (cell.alignment === 'center') td.classList.add('cell-center')
+        if (cell.alignment === 'right') td.classList.add('cell-right')
+
+        // Apply inline styles
+        if (cell.backgroundColor) td.style.backgroundColor = cell.backgroundColor
+        if (cell.textColor) td.style.color = cell.textColor
+
+        // Apply borders
+        if (cell.borders) {
+            this.applyBordersToElement(td, cell.borders)
+        }
+
+        // Render content based on type
+        if (cell.contentType === 'image' && cell.imageData) {
+            td.classList.add('cell-image')
+            const img = document.createElement('img')
+            img.src = cell.imageData.url
+            img.alt = cell.imageData.alt || ''
+            img.style.maxWidth = '100%'
+            img.style.height = 'auto'
+            td.appendChild(img)
+        } else {
+            td.contentEditable = 'true'
+            td.innerHTML = cell.content || ''
+        }
+
+        return td
+    }
+
+    /**
+     * Apply border styles to element
+     */
+    applyBordersToElement(element, borders) {
+        const getBorderCSS = (borderStyle) => {
+            if (!borderStyle) return null
+
+            let width = '1px'
+            let style = 'solid'
+
+            if (borderStyle.style === 'thick') {
+                width = '3px'
+            } else if (borderStyle.style === 'double') {
+                width = '1px'
+                style = 'double'
+            }
+
+            const color = borderStyle.color || '#d1d5db'
+            return `${width} ${style} ${color}`
+        }
+
+        if (borders.top) element.style.borderTop = getBorderCSS(borders.top)
+        if (borders.bottom) element.style.borderBottom = getBorderCSS(borders.bottom)
+        if (borders.left) element.style.borderLeft = getBorderCSS(borders.left)
+        if (borders.right) element.style.borderRight = getBorderCSS(borders.right)
+    }
+
+    /**
+     * Attach event listeners for selection and editing
+     */
+    attachEventListeners() {
+        // Cell selection
+        this.tableElement.addEventListener('mousedown', this.handleMouseDown.bind(this))
+        this.tableElement.addEventListener('mouseover', this.handleMouseOver.bind(this))
+        document.addEventListener('mouseup', this.handleMouseUp.bind(this))
+
+        // Content editing
+        this.tableElement.addEventListener('input', this.handleCellInput.bind(this))
+        this.tableElement.addEventListener('blur', this.handleCellBlur.bind(this), true)
+    }
+
+    /**
+     * Handle mouse down - start selection
+     */
+    handleMouseDown(e) {
+        const cell = e.target.closest('td')
+        if (!cell) return
+
+        // If shift key is held, extend selection
+        if (e.shiftKey && this.selection.startCell) {
+            this.updateSelection(cell)
+            e.preventDefault()
+            return
+        }
+
+        this.isSelecting = true
+        this.startSelection(cell)
+        e.preventDefault()
+    }
+
+    /**
+     * Handle mouse over - update selection while dragging
+     */
+    handleMouseOver(e) {
+        if (!this.isSelecting) return
+
+        const cell = e.target.closest('td')
+        if (!cell) return
+
+        this.updateSelection(cell)
+    }
+
+    /**
+     * Handle mouse up - end selection
+     */
+    handleMouseUp(e) {
+        if (!this.isSelecting) return
+
+        this.isSelecting = false
+        this.endSelection()
+    }
+
+    /**
+     * Handle cell content input
+     */
+    handleCellInput(e) {
+        const cell = e.target.closest('td')
+        if (!cell || cell.classList.contains('cell-image')) return
+
+        const rowIndex = parseInt(cell.dataset.rowIndex)
+        const cellIndex = parseInt(cell.dataset.cellIndex)
+
+        this.data.rows[rowIndex].cells[cellIndex].content = cell.innerHTML
+        this.notifyChange()
+    }
+
+    /**
+     * Handle cell blur - save content
+     */
+    handleCellBlur(e) {
+        const cell = e.target.closest('td')
+        if (!cell || cell.classList.contains('cell-image')) return
+
+        const rowIndex = parseInt(cell.dataset.rowIndex)
+        const cellIndex = parseInt(cell.dataset.cellIndex)
+
+        this.data.rows[rowIndex].cells[cellIndex].content = cell.innerHTML
+        this.notifyChange()
+    }
+
+    /**
+     * Start selection at a cell
+     */
+    startSelection(cell) {
+        this.clearSelection()
+
+        this.selection.active = true
+        this.selection.startCell = cell
+        this.selection.endCell = cell
+        this.selection.cells = [cell]
+
+        cell.classList.add('selected')
+        this.notifySelectionChange()
+    }
+
+    /**
+     * Update selection to include cell
+     */
+    updateSelection(cell) {
+        if (!this.selection.active) return
+
+        this.selection.endCell = cell
+
+        // Calculate rectangular region
+        const cells = this.getSelectionRectangle(this.selection.startCell, cell)
+
+        // Clear previous selection highlighting
+        this.selection.cells.forEach(c => c.classList.remove('selected'))
+
+        // Apply new selection
+        this.selection.cells = cells
+        cells.forEach(c => c.classList.add('selected'))
+
+        this.notifySelectionChange()
+    }
+
+    /**
+     * End selection
+     */
+    endSelection() {
+        // Selection remains active until explicitly cleared
+    }
+
+    /**
+     * Get rectangular selection between two cells
+     */
+    getSelectionRectangle(startCell, endCell) {
+        const startRow = parseInt(startCell.dataset.rowIndex)
+        const startCol = parseInt(startCell.dataset.cellIndex)
+        const endRow = parseInt(endCell.dataset.rowIndex)
+        const endCol = parseInt(endCell.dataset.cellIndex)
+
+        const minRow = Math.min(startRow, endRow)
+        const maxRow = Math.max(startRow, endRow)
+        const minCol = Math.min(startCol, endCol)
+        const maxCol = Math.max(startCol, endCol)
+
+        const cells = []
+        const rows = this.tableElement.querySelectorAll('tr')
+
+        for (let r = minRow; r <= maxRow; r++) {
+            const row = rows[r]
+            if (!row) continue
+
+            const rowCells = row.querySelectorAll('td')
+            for (let c = minCol; c <= maxCol; c++) {
+                const cell = rowCells[c]
+                if (cell) cells.push(cell)
+            }
+        }
+
+        return cells
+    }
+
+    /**
+     * Clear current selection
+     */
+    clearSelection() {
+        this.selection.cells.forEach(cell => cell.classList.remove('selected'))
+        this.selection = {
+            active: false,
+            startCell: null,
+            endCell: null,
+            cells: []
+        }
+        this.notifySelectionChange()
+    }
+
+    /**
+     * Get currently selected cells
+     */
+    getSelectedCells() {
+        return this.selection.cells
+    }
+
+    /**
+     * Add a row at the specified position
+     */
+    addRow(position = 'end') {
+        const numCols = this.data.columnWidths.length
+        const newRow = {
+            cells: Array(numCols).fill(null).map(() => ({
+                contentType: 'text',
+                content: '',
+                colspan: 1,
+                rowspan: 1,
+                fontStyle: 'normal',
+                alignment: 'left'
+            })),
+            height: null
+        }
+
+        if (position === 'end') {
+            this.data.rows.push(newRow)
+        } else if (position === 'start') {
+            this.data.rows.unshift(newRow)
+        } else if (typeof position === 'number') {
+            this.data.rows.splice(position, 0, newRow)
+        }
+
+        this.rerender()
+        this.notifyChange()
+    }
+
+    /**
+     * Remove a row at the specified index
+     */
+    removeRow(rowIndex) {
+        if (this.data.rows.length <= 1) {
+            alert('Cannot remove the last row')
+            return
+        }
+
+        this.data.rows.splice(rowIndex, 1)
+        this.rerender()
+        this.notifyChange()
+    }
+
+    /**
+     * Add a column at the specified position
+     */
+    addColumn(position = 'end') {
+        this.data.rows.forEach(row => {
+            const newCell = {
+                contentType: 'text',
+                content: '',
+                colspan: 1,
+                rowspan: 1,
+                fontStyle: 'normal',
+                alignment: 'left'
+            }
+
+            if (position === 'end') {
+                row.cells.push(newCell)
+            } else if (position === 'start') {
+                row.cells.unshift(newCell)
+            } else if (typeof position === 'number') {
+                row.cells.splice(position, 0, newCell)
+            }
+        })
+
+        // Update column widths
+        if (position === 'end') {
+            this.data.columnWidths.push('auto')
+        } else if (position === 'start') {
+            this.data.columnWidths.unshift('auto')
+        } else if (typeof position === 'number') {
+            this.data.columnWidths.splice(position, 0, 'auto')
+        }
+
+        this.rerender()
+        this.notifyChange()
+    }
+
+    /**
+     * Remove a column at the specified index
+     */
+    removeColumn(colIndex) {
+        const numCols = this.data.columnWidths.length
+        if (numCols <= 1) {
+            alert('Cannot remove the last column')
+            return
+        }
+
+        this.data.rows.forEach(row => {
+            row.cells.splice(colIndex, 1)
+        })
+
+        this.data.columnWidths.splice(colIndex, 1)
+        this.rerender()
+        this.notifyChange()
+    }
+
+    /**
+     * Check if selected cells can be merged
+     */
+    canMerge(cells = null) {
+        const selectedCells = cells || this.getSelectedCells()
+        if (selectedCells.length <= 1) return false
+
+        // Check if cells form a valid rectangle
+        const positions = selectedCells.map(cell => ({
+            row: parseInt(cell.dataset.rowIndex),
+            col: parseInt(cell.dataset.cellIndex)
+        }))
+
+        const rows = [...new Set(positions.map(p => p.row))].sort((a, b) => a - b)
+        const cols = [...new Set(positions.map(p => p.col))].sort((a, b) => a - b)
+
+        // Check if it's a contiguous rectangle
+        for (let r = rows[0]; r <= rows[rows.length - 1]; r++) {
+            for (let c = cols[0]; c <= cols[cols.length - 1]; c++) {
+                if (!positions.some(p => p.row === r && p.col === c)) {
+                    return false
+                }
+            }
+        }
+
+        return true
+    }
+
+    /**
+     * Merge selected cells
+     */
+    mergeCells(cells = null) {
+        const selectedCells = cells || this.getSelectedCells()
+
+        if (!this.canMerge(selectedCells)) {
+            alert('Cannot merge: cells must form a rectangular region')
+            return
+        }
+
+        if (selectedCells.length <= 1) return
+
+        // Get merge dimensions
+        const positions = selectedCells.map(cell => ({
+            row: parseInt(cell.dataset.rowIndex),
+            col: parseInt(cell.dataset.cellIndex),
+            cell
+        }))
+
+        const rows = [...new Set(positions.map(p => p.row))].sort((a, b) => a - b)
+        const cols = [...new Set(positions.map(p => p.col))].sort((a, b) => a - b)
+
+        const topRow = rows[0]
+        const leftCol = cols[0]
+        const rowspan = rows.length
+        const colspan = cols.length
+
+        // Merge content (concatenate)
+        const mergedContent = selectedCells
+            .map(cell => cell.textContent.trim())
+            .filter(text => text.length > 0)
+            .join(' ')
+
+        // Update data model
+        const targetCell = this.data.rows[topRow].cells[leftCol]
+        targetCell.colspan = colspan
+        targetCell.rowspan = rowspan
+        targetCell.content = mergedContent
+
+        // Mark other cells as merged (set colspan/rowspan to 0 or remove them)
+        positions.forEach(({ row, col }) => {
+            if (row !== topRow || col !== leftCol) {
+                // Mark cell as part of merge (will be skipped in rendering)
+                this.data.rows[row].cells[col]._merged = true
+            }
+        })
+
+        this.rerender()
+        this.notifyChange()
+    }
+
+    /**
+     * Check if a cell can be split
+     */
+    canSplit(cell) {
+        const rowIndex = parseInt(cell.dataset.rowIndex)
+        const cellIndex = parseInt(cell.dataset.cellIndex)
+        const cellData = this.data.rows[rowIndex].cells[cellIndex]
+
+        return cellData.colspan > 1 || cellData.rowspan > 1
+    }
+
+    /**
+     * Split a merged cell
+     */
+    splitCell(cell) {
+        const rowIndex = parseInt(cell.dataset.rowIndex)
+        const cellIndex = parseInt(cell.dataset.cellIndex)
+        const cellData = this.data.rows[rowIndex].cells[cellIndex]
+
+        if (!this.canSplit(cell)) return
+
+        const { colspan, rowspan } = cellData
+
+        // Reset target cell
+        cellData.colspan = 1
+        cellData.rowspan = 1
+
+        // Restore merged cells
+        for (let r = rowIndex; r < rowIndex + rowspan; r++) {
+            for (let c = cellIndex; c < cellIndex + colspan; c++) {
+                if (r === rowIndex && c === cellIndex) continue
+
+                const cell = this.data.rows[r].cells[c]
+                if (cell._merged) {
+                    delete cell._merged
+                }
+            }
+        }
+
+        this.rerender()
+        this.notifyChange()
+    }
+
+    /**
+     * Apply formatting to text (bold, italic, link)
+     */
+    applyFormatting(type) {
+        const selection = window.getSelection()
+        if (!selection.rangeCount) return
+
+        document.execCommand(type, false, null)
+    }
+
+    /**
+     * Insert link at current selection
+     */
+    insertLink(url) {
+        const selection = window.getSelection()
+        if (!selection.rangeCount) return
+
+        document.execCommand('createLink', false, url)
+    }
+
+    /**
+     * Set cell type (text or image)
+     */
+    setCellType(cells, type) {
+        cells.forEach(cell => {
+            const rowIndex = parseInt(cell.dataset.rowIndex)
+            const cellIndex = parseInt(cell.dataset.cellIndex)
+            const cellData = this.data.rows[rowIndex].cells[cellIndex]
+
+            if (type === 'text') {
+                cellData.contentType = 'text'
+                cellData.imageData = null
+            } else if (type === 'image') {
+                if (cellData.content && cellData.content.trim()) {
+                    if (!confirm('Switching to image will replace the current text content. Continue?')) {
+                        return
+                    }
+                }
+                cellData.contentType = 'image'
+                cellData.content = ''
+            }
+        })
+
+        this.rerender()
+        this.notifyChange()
+    }
+
+    /**
+     * Set image for a cell
+     */
+    setCellImage(cell, imageData) {
+        const rowIndex = parseInt(cell.dataset.rowIndex)
+        const cellIndex = parseInt(cell.dataset.cellIndex)
+        const cellData = this.data.rows[rowIndex].cells[cellIndex]
+
+        cellData.contentType = 'image'
+        cellData.imageData = imageData
+        cellData.content = ''
+
+        this.rerender()
+        this.notifyChange()
+    }
+
+    /**
+     * Apply font style to cells
+     */
+    applyFontStyle(cells, fontStyle) {
+        cells.forEach(cell => {
+            const rowIndex = parseInt(cell.dataset.rowIndex)
+            const cellIndex = parseInt(cell.dataset.cellIndex)
+
+            this.data.rows[rowIndex].cells[cellIndex].fontStyle = fontStyle
+        })
+
+        this.rerender()
+        this.notifyChange()
+    }
+
+    /**
+     * Set borders for cells
+     */
+    setBorders(cells, sides, borderStyle) {
+        cells.forEach(cell => {
+            const rowIndex = parseInt(cell.dataset.rowIndex)
+            const cellIndex = parseInt(cell.dataset.cellIndex)
+            const cellData = this.data.rows[rowIndex].cells[cellIndex]
+
+            if (!cellData.borders) {
+                cellData.borders = {}
+            }
+
+            sides.forEach(side => {
+                cellData.borders[side] = borderStyle
+            })
+        })
+
+        this.rerender()
+        this.notifyChange()
+    }
+
+    /**
+     * Set colors for cells
+     */
+    setColors(cells, colorType, value) {
+        cells.forEach(cell => {
+            const rowIndex = parseInt(cell.dataset.rowIndex)
+            const cellIndex = parseInt(cell.dataset.cellIndex)
+            const cellData = this.data.rows[rowIndex].cells[cellIndex]
+
+            if (colorType === 'background') {
+                cellData.backgroundColor = value
+            } else if (colorType === 'text') {
+                cellData.textColor = value
+            } else if (colorType === 'hoverBackground') {
+                cellData.hoverBgColor = value
+            } else if (colorType === 'hoverText') {
+                cellData.hoverTextColor = value
+            }
+        })
+
+        this.rerender()
+        this.notifyChange()
+    }
+
+    /**
+     * Set column width
+     */
+    setColumnWidth(colIndex, width) {
+        this.data.columnWidths[colIndex] = width
+
+        const colgroup = this.tableElement.querySelector('colgroup')
+        const cols = colgroup.querySelectorAll('col')
+        if (cols[colIndex]) {
+            cols[colIndex].style.width = width
+        }
+
+        this.notifyChange()
+    }
+
+    /**
+     * Set row height
+     */
+    setRowHeight(rowIndex, height) {
+        this.data.rows[rowIndex].height = height
+
+        const rows = this.tableElement.querySelectorAll('tr')
+        if (rows[rowIndex]) {
+            rows[rowIndex].style.height = height
+        }
+
+        this.notifyChange()
+    }
+
+    /**
+     * Re-render the table
+     */
+    rerender() {
+        const currentSelection = this.selection.cells.map(cell => ({
+            row: parseInt(cell.dataset.rowIndex),
+            col: parseInt(cell.dataset.cellIndex)
+        }))
+
+        this.render(this.container)
+
+        // Restore selection if possible
+        if (currentSelection.length > 0) {
+            const cells = []
+            currentSelection.forEach(({ row, col }) => {
+                const cell = this.tableElement.querySelector(
+                    `td[data-row-index="${row}"][data-cell-index="${col}"]`
+                )
+                if (cell) cells.push(cell)
+            })
+
+            if (cells.length > 0) {
+                this.selection.cells = cells
+                this.selection.active = true
+                cells.forEach(c => c.classList.add('selected'))
+            }
+        }
+    }
+
+    /**
+     * Export table data to JSON
+     */
+    toJSON() {
+        // Filter out merged cells
+        const cleanedData = {
+            ...this.data,
+            rows: this.data.rows.map(row => ({
+                ...row,
+                cells: row.cells.filter(cell => !cell._merged)
+            }))
+        }
+
+        return cleanedData
+    }
+
+    /**
+     * Update table with new data
+     */
+    updateTable(newData) {
+        this.data = this.normalizeData(newData)
+        this.rerender()
+    }
+
+    /**
+     * Notify change listeners
+     */
+    notifyChange() {
+        if (this.options.onChange) {
+            this.options.onChange(this.toJSON())
+        }
+    }
+
+    /**
+     * Notify selection change listeners
+     */
+    notifySelectionChange() {
+        if (this.options.onSelectionChange) {
+            this.options.onSelectionChange(this.selection.cells)
+        }
+    }
+
+    /**
+     * Destroy the editor and clean up
+     */
+    destroy() {
+        if (this.container) {
+            this.container.innerHTML = ''
+        }
+
+        document.removeEventListener('mouseup', this.handleMouseUp.bind(this))
+    }
+}
+
+export default TableEditorCore
+

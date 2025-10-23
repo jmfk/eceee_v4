@@ -6,6 +6,7 @@
  */
 import React, { useCallback, useEffect, useMemo } from 'react'
 import MediaSpecialEditor from './MediaSpecialEditor'
+import TableSpecialEditor from './TableSpecialEditor'
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
 import { OperationTypes } from '../../contexts/unified-data/types/operations'
 import { useEditorContext } from '../../contexts/unified-data/hooks'
@@ -15,6 +16,7 @@ import { getWidgetMetadata } from '../../widgets'
 // Map of special editor names to components
 const SPECIAL_EDITOR_COMPONENTS = {
     'MediaSpecialEditor': MediaSpecialEditor,
+    'TableSpecialEditor': TableSpecialEditor,
 }
 
 // Legacy registry for backward compatibility (deprecated - use widget metadata instead)
