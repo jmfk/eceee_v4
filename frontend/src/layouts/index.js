@@ -1,31 +1,19 @@
 /**
  * Layouts Main Export
  * 
- * Re-exports from default-layouts package and combines with eceee-layouts.
+ * Uses eceee-layouts only. The default-layouts have been removed from the system.
  */
 
-// Export everything from default layouts
-export * from './default-layouts';
+// Export everything from eceee layouts
 export * from './eceee-layouts';
 
-// Import registries
-import { LAYOUT_REGISTRY as DEFAULT_REGISTRY } from './default-layouts';
+// Import eceee layout registry
 import { ECEEE_LAYOUT_REGISTRY } from './eceee-layouts';
 
-// Configuration: Set which layout apps are enabled (should match backend INSTALLED_APPS)
-const ENABLE_DEFAULT_LAYOUTS = false; // Set to false when default_layouts is disabled in backend
-const ENABLE_ECEEE_LAYOUTS = true;
+// Use ECEEE layouts as the main registry
+export const LAYOUT_REGISTRY = ECEEE_LAYOUT_REGISTRY;
 
-// Create combined registry based on configuration
-export const COMBINED_LAYOUT_REGISTRY = {
-    ...(ENABLE_DEFAULT_LAYOUTS ? DEFAULT_REGISTRY : {}),
-    ...(ENABLE_ECEEE_LAYOUTS ? ECEEE_LAYOUT_REGISTRY : {})
-};
-
-// Export the combined registry as the main one
-export const LAYOUT_REGISTRY = COMBINED_LAYOUT_REGISTRY;
-
-// Combined utility functions that work with the combined registry
+// Utility functions that work with the layout registry
 export const getLayoutComponent = (layoutName) => {
     const layout = LAYOUT_REGISTRY[layoutName];
     return layout ? layout.component : null;
@@ -43,14 +31,9 @@ export const layoutExists = (layoutName) => {
     return layoutName in LAYOUT_REGISTRY;
 };
 
-// For backward compatibility and easy access
-export {
-    SingleColumnLayout,
-    SidebarLayout,
-    WidgetSlot
-} from './default-layouts';
-
+// Export eceee layout components for easy access
 export {
     MainLayout,
-    LandingPage
+    LandingPage,
+    WidgetSlot
 } from './eceee-layouts';

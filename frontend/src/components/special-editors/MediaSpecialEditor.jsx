@@ -14,7 +14,7 @@ import { namespacesApi, mediaApi, mediaCollectionsApi, mediaTagsApi } from '../.
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext'
 import MediaTagWidget from '../media/MediaTagWidget'
 import MediaSearchWidget from '../media/MediaSearchWidget'
-import ImageWidget from '../../widgets/default-widgets/ImageWidget'
+import { ImageWidget } from '../../widgets'
 import { useTheme } from '../../hooks/useTheme'
 import FloatingMessage from '../common/FloatingMessage'
 

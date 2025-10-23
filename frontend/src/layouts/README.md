@@ -6,22 +6,21 @@ This directory contains the **layout system** that provides different page layou
 
 ```
 layouts/
-├── default-layouts/        # Default layout implementations
-│   ├── LayoutRegistry.jsx  # Layout definitions and registry
+├── eceee-layouts/         # ECEEE layout implementations
+│   ├── LayoutRegistry.jsx # Layout definitions and registry
 │   ├── WidgetSlot.jsx     # Shared slot component
+│   ├── MainLayout.jsx     # Main layout component
+│   ├── LandingPage.jsx    # Landing page layout
 │   └── index.js           # Package exports
 └── index.js               # Main layout exports
 ```
 
-## Default Layouts Package
+## ECEEE Layouts Package
 
 ### Available Layouts
 
-- `SingleColumnLayout` - Simple single column for articles
-- `SidebarLayout` - Main content with sidebar
-- `ThreeColumnLayout` - Header, main content, and two sidebars
-- `TwoColumnLayout` - Two equal columns
-- `HeaderFooterLayout` - Header, main content, and footer
+- `MainLayout` - Main application layout with header, navigation, content, and footer areas
+- `LandingPage` - Landing page layout with hero, features, and call-to-action sections
 
 ### Layout Structure
 
@@ -41,9 +40,10 @@ const MyLayout = ({
             <WidgetSlot
                 name="main"
                 label="Main Content"
-                widgets={widgets.main || []}
+                widgets={widgets}
                 onWidgetAction={onWidgetAction}
                 editable={editable}
+                pageContext={pageContext}
                 // ... other props
             />
         </div>
@@ -56,11 +56,11 @@ const MyLayout = ({
 Layouts are registered in `LayoutRegistry.jsx`:
 
 ```jsx
-export const LAYOUT_REGISTRY = {
-    'single_column': {
-        component: SingleColumnLayout,
-        displayName: 'Single Column',
-        description: 'Simple single column layout',
+export const ECEEE_LAYOUT_REGISTRY = {
+    'eceee_layouts.MainLayout': {
+        component: MainLayout,
+        displayName: 'Main Layout',
+        description: 'Main application layout with header, navigation, and footer',
         // ... metadata
     },
     // ... other layouts
@@ -72,13 +72,13 @@ export const LAYOUT_REGISTRY = {
 ### Import from Main Package
 
 ```jsx
-import { SingleColumnLayout, LAYOUT_REGISTRY } from '../../layouts'
+import { MainLayout, LAYOUT_REGISTRY } from '../../layouts'
 ```
 
 ### Import from Specific Package
 
 ```jsx
-import { SingleColumnLayout } from '../../layouts/default-layouts'
+import { MainLayout } from '../../layouts/eceee-layouts'
 ```
 
 ### Registry Usage
@@ -86,8 +86,40 @@ import { SingleColumnLayout } from '../../layouts/default-layouts'
 ```jsx
 import { getLayoutComponent, layoutExists } from '../../layouts'
 
-const LayoutComponent = getLayoutComponent('single_column')
-const exists = layoutExists('single_column')
+const LayoutComponent = getLayoutComponent('eceee_layouts.MainLayout')
+const exists = layoutExists('eceee_layouts.MainLayout')
+```
+
+## WidgetSlot Component
+
+The `WidgetSlot` component is the core component for rendering widget areas within layouts. It provides:
+
+- Widget rendering with factory pattern
+- Editable and preview modes
+- Widget inheritance support
+- Slot-level controls (add, clear, preview)
+- Empty slot states with "add widget" prompts
+
+### WidgetSlot Props
+
+```jsx
+<WidgetSlot
+    name="main"                    // Slot identifier
+    label="Main Content"           // Display label
+    description="Main content area" // Description
+    widgets={widgets}              // Widget data object
+    onWidgetAction={handleAction}  // Widget action handler
+    editable={true}                // Enable editing
+    pageContext={context}          // Page context
+    onShowWidgetModal={showModal}  // Widget selection modal
+    onClearSlot={clearSlot}        // Clear slot handler
+    allowedWidgetTypes={['*']}     // Allowed widget types
+    maxWidgets={20}                // Max widgets in slot
+    slotType="content"             // 'content' or 'inherited'
+    widgetPath={[]}                // Path for nested widgets
+    inheritedWidgets={{}}          // Inherited widgets from parent
+    slotInheritanceRules={{}}      // Inheritance rules
+/>
 ```
 
 ## Future Extension
@@ -96,14 +128,13 @@ This structure allows for future layout packages:
 
 ```
 layouts/
-├── default-layouts/     # Core defaults
-├── eceee-layouts/      # ECEEE-specific layouts
+├── eceee-layouts/      # ECEEE-specific layouts (current)
 ├── custom-layouts/     # Custom layout packages  
 └── third-party-layouts/ # Third-party packages
 ```
 
-Each package can extend or replace the defaults, similar to the backend layout system.
+Each package can extend or replace existing layouts through the registry system.
 
 ## Migration Notes
 
-The layouts have been moved from `editors/page-editor/layouts/` to `layouts/default-layouts/` to create a modular structure that matches the backend. All imports have been updated to maintain compatibility.
+The default-layouts package has been removed from the system. All layout functionality is now provided by eceee-layouts, which includes the WidgetSlot component and layout implementations.

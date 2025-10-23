@@ -111,6 +111,13 @@ export { default as eceeeNewsListWidget } from './eceeeNewsListWidget';
 export { default as eceeeNewsDetailWidget } from './eceeeNewsDetailWidget';
 export { default as eceeeTopNewsPlugWidget } from './eceeeTopNewsPlugWidget';
 export { default as eceeeSidebarTopNewsWidget } from './eceeeSidebarTopNewsWidget';
+export { default as eceeePathDebugWidget } from './eceeePathDebugWidget';
+
+// Export utility components
+export { default as ContentWidgetEditorRenderer } from './ContentWidgetEditorRenderer';
+
+// Export the registerWidget utility for custom widgets
+export { registerWidget } from './registry';
 
 // Export the registry for direct access
 export default ECEEE_WIDGET_REGISTRY;

@@ -7,15 +7,15 @@ This directory contains the **widget system** that can be used by any editor fra
 ```
 frontend/src/
 ├── widgets/                    # 🔗 WIDGET SYSTEM
-│   ├── default-widgets/       # Default widget implementations
-│   │   ├── ContentWidget.jsx
-│   │   ├── ImageWidget.jsx
+│   ├── eceee-widgets/         # ECEEE widget implementations
+│   │   ├── eceeeContentWidget.jsx
+│   │   ├── eceeeImageWidget.jsx
 │   │   ├── registry.js        # Widget registry
-│   │   ├── validation.js      # Widget validation
 │   │   └── index.js           # Package exports
+│   ├── WidgetRegistryManager.js # Central registry manager
 │   └── index.js               # Main widget exports
 ├── layouts/                    # 🎨 LAYOUT SYSTEM  
-│   ├── default-layouts/       # Default layout implementations
+│   ├── eceee-layouts/         # ECEEE layout implementations
 │   │   ├── LayoutRegistry.jsx
 │   │   ├── WidgetSlot.jsx
 │   │   └── index.js           # Package exports
@@ -23,7 +23,7 @@ frontend/src/
 ├── editors/                    # 📝 EDITOR FRAMEWORKS
 │   ├── page-editor/           # PageEditor-specific framework
 │   └── object-editor/         # ObjectEditor-specific framework
-└── components/                 # 🏗️ LEGACY (being migrated)
+└── components/                 # 🏗️ SHARED COMPONENTS
 ```
 
 ## Key Benefits
@@ -34,7 +34,7 @@ frontend/src/
 ✅ **Better Stability** - Package changes don't affect other packages
 ✅ **Easier Maintenance** - Widget fixes benefit all editors
 
-## Default Widgets Package
+## ECEEE Widgets Package
 
 ### Available Widgets
 
@@ -44,8 +44,13 @@ frontend/src/
 - `HeaderWidget` - Page headers with navigation
 - `FooterWidget` - Page footers with links and copyright
 - `NavigationWidget` - Navigation menus and breadcrumbs
+- `NavbarWidget` - Top navigation bar
 - `SidebarWidget` - Sidebar content areas
 - `FormsWidget` - Form inputs and validation
+- `NewsListWidget` - News article listings
+- `NewsDetailWidget` - Individual news article display
+- `TwoColumnsWidget` - Two-column container layout
+- `ThreeColumnsWidget` - Three-column container layout
 
 ### Widget Structure
 
@@ -59,10 +64,9 @@ const MyWidget = ({ config, mode, onConfigChange, ...props }) => {
 
 // Metadata for registry
 MyWidget.displayName = 'MyWidget'
-MyWidget.widgetType = 'default_widgets.MyWidget'
+MyWidget.widgetType = 'eceee_widgets.MyWidget'
 MyWidget.defaultConfig = { /* defaults */ }
 MyWidget.metadata = { /* display info */ }
-MyWidget.actionHandlers = { /* framework overrides */ }
 ```
 
 ## Usage
@@ -76,67 +80,92 @@ import { ContentWidget, ImageWidget } from '../../widgets'
 ### Import from Specific Package
 
 ```jsx
-import { ContentWidget } from '../../widgets/default-widgets'
+import { ContentWidget } from '../../widgets/eceee-widgets'
 ```
 
 ### Registry Usage
 
 ```jsx
 import { 
-    getCoreWidgetComponent,
-    getCoreWidgetDisplayName,
-    isCoreWidgetTypeSupported 
+    getWidgetComponent,
+    getWidgetDisplayName,
+    isWidgetTypeSupported 
 } from '../../widgets'
 
-const WidgetComponent = getCoreWidgetComponent('default_widgets.ContentWidget')
+const WidgetComponent = getWidgetComponent('eceee_widgets.ContentWidget')
 ```
 
-## Widget Override System
+## Widget Registry System
 
-The widget system now supports **priority-based widget overrides**! Third-party packages like `eceee-widgets` can override default widgets with custom implementations.
+The widget system uses a **priority-based registry** for managing widgets. Third-party packages can be added with different priority levels.
 
 ### How It Works
 
 ```
 Priority Levels:
-├── DEFAULT (100)      # default-widgets
-├── ECEEE (200)        # eceee-widgets (overrides default)
-├── THIRD_PARTY (300)  # third-party widgets
-└── CUSTOM (400)       # custom/user widgets
+├── DEFAULT (100)      # Reserved for base widgets
+├── THIRD_PARTY (200)  # eceee-widgets (current level)
+├── EXTENDED (300)     # Extended third-party widgets
+└── CUSTOM (400)       # Custom/user widgets
 ```
-
-### Example Override
-
-```jsx
-// eceee-widgets/CustomFooterWidget.jsx
-const CustomFooterWidget = ({ config, editable, onConfigChange }) => {
-    return <footer>Custom ECEEE Footer</footer>;
-};
-
-// Use SAME widget type to override default
-CustomFooterWidget.widgetType = 'core_widgets.FooterWidget';
-
-// Register in eceee-widgets registry
-export const ECEEE_WIDGET_REGISTRY = {
-    'core_widgets.FooterWidget': registerWidget(CustomFooterWidget, 'core_widgets.FooterWidget'),
-};
-```
-
-Now anywhere `FooterWidget` is used, the ECEEE version will be rendered automatically!
 
 ### Current Packages
 
 ```
 widgets/
 ├── WidgetRegistryManager.js    # Central registry manager
-├── default-widgets/            # Core widget implementations (priority 100)
-├── eceee-widgets/             # ECEEE-specific widgets (priority 200)
-│   └── CustomFooterWidget.jsx # Example override
-└── WIDGET_OVERRIDE_SYSTEM.md  # Complete documentation
+├── eceee-widgets/             # ECEEE widget implementations (priority 200)
+│   ├── eceeeContentWidget.jsx
+│   ├── eceeeImageWidget.jsx
+│   ├── eceeeTableWidget.jsx
+│   └── registry.js
+└── index.js                   # Main exports
 ```
 
-📖 **[Read the complete Widget Override System documentation](./WIDGET_OVERRIDE_SYSTEM.md)**
+## Adding Custom Widgets
+
+To add custom widgets to the system:
+
+1. Create a new widget component
+2. Add metadata (widgetType, displayName, defaultConfig, metadata)
+3. Register in a custom registry
+4. Use `registerWidgetRegistry()` to add to the system
+
+Example:
+
+```jsx
+// MyCustomWidget.jsx
+const MyCustomWidget = ({ config }) => {
+    return <div>My Custom Widget</div>
+}
+
+MyCustomWidget.widgetType = 'custom.MyCustomWidget'
+MyCustomWidget.displayName = 'MyCustomWidget'
+MyCustomWidget.defaultConfig = {}
+MyCustomWidget.metadata = {
+    name: 'My Custom Widget',
+    description: 'A custom widget',
+    category: 'custom',
+    icon: MyIcon
+}
+
+export default MyCustomWidget
+
+// registry.js
+import { registerWidget } from '../WidgetRegistryManager'
+import MyCustomWidget from './MyCustomWidget'
+
+export const CUSTOM_WIDGET_REGISTRY = {
+    'custom.MyCustomWidget': registerWidget(MyCustomWidget, 'custom.MyCustomWidget')
+}
+
+// In your app initialization
+import { registerWidgetRegistry } from './widgets'
+import { CUSTOM_WIDGET_REGISTRY } from './my-custom-widgets/registry'
+
+registerWidgetRegistry(CUSTOM_WIDGET_REGISTRY, 'my-custom-widgets', 400)
+```
 
 ## Migration Notes
 
-The widgets have been moved from `widgets/core/` to `widgets/default-widgets/` to match the backend structure. All imports have been updated to maintain compatibility.
+The default-widgets and default-layouts packages have been removed from the system. All functionality is now provided by eceee-widgets and eceee-layouts.

@@ -10,7 +10,7 @@
  */
 
 import React from 'react';
-import WidgetSlot from '../default-layouts/WidgetSlot';
+import WidgetSlot from './WidgetSlot';
 
 export const LandingPage = ({
     widgets,

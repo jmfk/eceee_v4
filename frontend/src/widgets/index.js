@@ -1,21 +1,19 @@
 /**
  * Widgets Main Export
  * 
- * Unified widget system with override support.
- * ECEEE widgets and other third-party widgets can override default widgets.
+ * Unified widget system using eceee-widgets.
+ * The default-widgets have been removed from the system.
  */
 
 import widgetRegistryManager from './WidgetRegistryManager';
-import { CORE_WIDGET_REGISTRY } from './default-widgets/registry';
 import { ECEEE_WIDGET_REGISTRY } from './eceee-widgets';
 
-// Register all widget registries with priority levels
-// Higher priority numbers override lower priority numbers
-widgetRegistryManager.registerRegistry(CORE_WIDGET_REGISTRY, widgetRegistryManager.priorities.DEFAULT, 'default-widgets');
-widgetRegistryManager.registerRegistry(ECEEE_WIDGET_REGISTRY, widgetRegistryManager.priorities.THIRD_PARTY, 'eceee-widgets');
-
-// Export everything from default widgets for backward compatibility
-export * from './default-widgets';
+// Register eceee widgets registry
+widgetRegistryManager.registerRegistry(
+    ECEEE_WIDGET_REGISTRY,
+    widgetRegistryManager.priorities.THIRD_PARTY,
+    'eceee-widgets'
+);
 
 // Export eceee widgets
 export * from './eceee-widgets';
@@ -61,6 +59,11 @@ export const getAvailableCategories = () => {
     return widgetRegistryManager.getAvailableCategories();
 };
 
+// Backward compatibility aliases (for code still using "Core" prefix from default-widgets era)
+export const searchCoreWidgets = searchWidgets;
+export const filterCoreWidgetsByCategory = filterWidgetsByCategory;
+export const getAvailableCoreCategories = getAvailableCategories;
+
 // Helper functions that extract from metadata
 export const getWidgetIcon = (widgetType) => {
     const metadata = widgetRegistryManager.getWidgetMetadata(widgetType);
@@ -85,21 +88,28 @@ export const getWidgetTags = (widgetType) => {
 // Export the registry manager for advanced usage
 export { widgetRegistryManager };
 
-// Export individual widget components for backward compatibility
+// Export individual widget components from eceee-widgets
+// Using aliases to maintain backward compatibility
 export {
-    ContentWidget,
-    ImageWidget,
-    TableWidget,
-    HeaderWidget,
-    FooterWidget,
-    NavigationWidget,
-    SidebarWidget,
-    FormsWidget,
-    ContentWidgetEditorRenderer,
+    eceeeContentWidget as ContentWidget,
+    eceeeImageWidget as ImageWidget,
+    eceeeTableWidget as TableWidget,
+    eceeeHeaderWidget as HeaderWidget,
+    eceeeFooterWidget as FooterWidget,
+    eceeeNavigationWidget as NavigationWidget,
+    eceeeNavbarWidget as NavbarWidget,
+    eceeeSidebarWidget as SidebarWidget,
+    eceeeFormsWidget as FormsWidget,
+    eceeeNewsListWidget as NewsListWidget,
+    eceeeNewsDetailWidget as NewsDetailWidget,
+    eceeePathDebugWidget as PathDebugWidget,
+    eceeeSidebarTopNewsWidget as SidebarTopNewsWidget,
+    eceeeTopNewsPlugWidget as TopNewsPlugWidget,
     // Container widgets
-    TwoColumnsWidget,
+    eceeeTwoColumnsWidget as TwoColumnsWidget,
+    eceeeThreeColumnsWidget as ThreeColumnsWidget,
     registerWidget  // Export utility for custom widget packages
-} from './default-widgets';
+} from './eceee-widgets';
 
 /**
  * Register a third-party widget registry

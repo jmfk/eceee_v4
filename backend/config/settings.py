@@ -161,10 +161,8 @@ LOCAL_APPS = [
     "htmx",
     "webpages",  # Core CMS system (required)
     "content",
-    # "default_layouts",  # Default layout definitions (optional)
-    # "default_widgets",  # Default widget definitions (optional)
-    "eceee_layouts",
-    "eceee_widgets",  # Default widget definitions (optional)
+    "eceee_layouts",  # ECEEE layout definitions
+    "eceee_widgets",  # ECEEE widget definitions
     "file_manager",  # Comprehensive media file management system
     "object_storage",  # Non-hierarchical object storage system
     "utils",  # Utility features like value lists and schema system
