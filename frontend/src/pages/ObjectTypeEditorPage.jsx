@@ -1,17 +1,22 @@
 import React from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft } from 'lucide-react'
 import { objectTypesApi } from '../api/objectStorage'
 import ObjectTypeForm from '../components/ObjectTypeForm'
+import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 
 const ObjectTypeEditorPage = () => {
     const { id, tab = 'basic' } = useParams()
     const navigate = useNavigate()
     const location = useLocation()
+    const queryClient = useQueryClient()
+    const { addNotification } = useGlobalNotifications()
 
     // Determine if we're creating or editing
-    const isCreating = id === 'new'
+    // id will be undefined when route is /settings/object-types/new/:tab
+    // id will be 'new' if someone navigates directly with id param
+    const isCreating = !id || id === 'new'
     const objectTypeId = isCreating ? null : id
 
     // Fetch object type data if editing
@@ -23,14 +28,102 @@ const ObjectTypeEditorPage = () => {
 
     const objectType = objectTypeResponse?.data
 
+    // Create object type mutation
+    const createMutation = useMutation({
+        mutationFn: async (formData) => {
+            const response = await objectTypesApi.create(formData)
+            return response
+        },
+        onSuccess: (response) => {
+            const newObjectType = response?.data
+            addNotification('Object type created successfully', 'success')
+            queryClient.invalidateQueries(['objectTypes'])
+
+            // Navigate to the newly created object type's edit page
+            if (newObjectType?.id) {
+                navigate(`/settings/object-types/${newObjectType.id}/basic`)
+            } else {
+                // Fallback: navigate back to list if ID is missing
+                navigate('/settings/object-types')
+            }
+        },
+        onError: (error) => {
+            console.error('Failed to create object type:', error)
+
+            let errorMessage = 'Failed to create object type'
+            const errorData = error.response?.data
+
+            // Handle Django REST Framework validation errors
+            if (errorData) {
+                // Collect all field-level errors
+                const fieldErrors = []
+
+                // Check for field-specific errors (name, label, pluralLabel, etc.)
+                Object.keys(errorData).forEach(fieldName => {
+                    if (fieldName === 'error' || fieldName === 'detail') {
+                        // Skip generic error fields, handle them separately
+                        return
+                    }
+
+                    const fieldError = errorData[fieldName]
+                    let errorText = ''
+
+                    // Handle different error formats
+                    if (Array.isArray(fieldError)) {
+                        errorText = fieldError.map(err => {
+                            // Handle DRF ErrorDetail objects
+                            if (typeof err === 'object' && err.toString) {
+                                return err.toString()
+                            }
+                            return err
+                        }).join(', ')
+                    } else if (typeof fieldError === 'string') {
+                        errorText = fieldError
+                    } else if (typeof fieldError === 'object' && fieldError.toString) {
+                        errorText = fieldError.toString()
+                    }
+
+                    if (errorText) {
+                        // Capitalize field name for display
+                        const displayFieldName = fieldName
+                            .replace(/_/g, ' ')
+                            .replace(/\b\w/g, l => l.toUpperCase())
+                        fieldErrors.push(`${displayFieldName}: ${errorText}`)
+                    }
+                })
+
+                // Use field errors if available
+                if (fieldErrors.length > 0) {
+                    errorMessage = fieldErrors.join('; ')
+                } else if (errorData.error) {
+                    // Generic error message
+                    errorMessage = errorData.error
+                } else if (errorData.detail) {
+                    // Django REST Framework detail error
+                    errorMessage = errorData.detail
+                }
+            } else if (error.message) {
+                errorMessage = `Failed to create object type: ${error.message}`
+            }
+
+            addNotification(errorMessage, 'error')
+        }
+    })
+
     const handleTabChange = (newTab) => {
         const basePath = isCreating ? '/settings/object-types/new' : `/settings/object-types/${id}`
         navigate(`${basePath}/${newTab}`)
     }
 
-    const handleSave = (savedObjectType) => {
-        // Navigate back to object types list
-        navigate('/settings/object-types')
+    const handleSave = (formData) => {
+        if (isCreating) {
+            // Create new object type
+            createMutation.mutate(formData)
+        } else {
+            // For editing existing object types, navigate back
+            // (individual tabs have their own save buttons)
+            navigate('/settings/object-types')
+        }
     }
 
     const handleCancel = () => {
@@ -82,6 +175,7 @@ const ObjectTypeEditorPage = () => {
                         onCancel={handleCancel}
                         activeTab={tab}
                         onTabChange={handleTabChange}
+                        isSubmitting={createMutation.isPending}
                     />
                 </div>
             </div>

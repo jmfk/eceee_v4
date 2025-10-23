@@ -10,6 +10,7 @@ import ConfirmDialog from './ConfirmDialog'
 const ObjectTypeManager = () => {
     const [searchTerm, setSearchTerm] = useState('')
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(null)
+    const [forceDeleteConfirmed, setForceDeleteConfirmed] = useState(false)
 
     const navigate = useNavigate()
     const queryClient = useQueryClient()
@@ -31,18 +32,57 @@ const ObjectTypeManager = () => {
 
     // Delete object type mutation
     const deleteTypeMutation = useMutation({
-        mutationFn: objectTypesApi.delete,
-        onSuccess: () => {
+        mutationFn: ({ id, forceDelete }) => objectTypesApi.delete(id, forceDelete),
+        onSuccess: (response) => {
             queryClient.invalidateQueries(['objectTypes'])
             setShowDeleteConfirm(null)
-            addNotification('Object type deleted successfully', 'success')
+            setForceDeleteConfirmed(false)
+
+            const instancesDeleted = response?.data?.instances_deleted || 0
+            if (instancesDeleted > 0) {
+                addNotification(
+                    `Object type and ${instancesDeleted} instance${instancesDeleted === 1 ? '' : 's'} deleted successfully`,
+                    'success'
+                )
+            } else {
+                addNotification('Object type deleted successfully', 'success')
+            }
         },
         onError: (error) => {
             console.error('Failed to delete object type:', error)
-            const errorMessage = error?.response?.status === 400
-                ? 'Cannot delete object type: it has existing instances'
-                : 'Failed to delete object type'
-            addNotification(errorMessage, 'error')
+
+            // Handle specific error cases
+            const status = error.response?.status
+
+            if (status === 401) {
+                addNotification('Authentication failed. Please log in again.', 'error')
+                setShowDeleteConfirm(null)
+                setForceDeleteConfirmed(false)
+                return
+            }
+
+            if (status === 404) {
+                addNotification('Object type not found. It may have already been deleted.', 'error')
+                setShowDeleteConfirm(null)
+                setForceDeleteConfirmed(false)
+                // Refresh the list
+                queryClient.invalidateQueries(['objectTypes'])
+                return
+            }
+
+            // Check if it requires force delete
+            if (error.response?.data?.force_delete_required) {
+                // Keep dialog open and show warning
+                addNotification(
+                    `Cannot delete: ${error.response.data.instance_count} instance(s) exist. Enable "Delete all instances" to proceed.`,
+                    'warning'
+                )
+            } else {
+                const errorMessage = error.response?.data?.error || 'Failed to delete object type'
+                addNotification(errorMessage, 'error')
+                setShowDeleteConfirm(null)
+                setForceDeleteConfirmed(false)
+            }
         }
     })
 
@@ -50,8 +90,17 @@ const ObjectTypeManager = () => {
 
     const handleDeleteType = () => {
         if (showDeleteConfirm) {
-            deleteTypeMutation.mutate(showDeleteConfirm.id)
+            const hasInstances = (showDeleteConfirm.instanceCount || 0) > 0
+            deleteTypeMutation.mutate({
+                id: showDeleteConfirm.id,
+                forceDelete: hasInstances && forceDeleteConfirmed
+            })
         }
+    }
+
+    const handleCancelDelete = () => {
+        setShowDeleteConfirm(null)
+        setForceDeleteConfirmed(false)
     }
 
     const handleEditType = (objectType) => {
@@ -127,7 +176,7 @@ const ObjectTypeManager = () => {
 
                 {/* Object Types Grid */}
                 {!isLoading && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch">
                         {filteredTypes.map((objectType) => (
                             <ObjectTypeCard
                                 key={objectType.id}
@@ -173,16 +222,88 @@ const ObjectTypeManager = () => {
 
             {/* Delete Confirmation */}
             {showDeleteConfirm && (
-                <ConfirmDialog
-                    title="Delete Object Type"
-                    message={`Are you sure you want to delete "${showDeleteConfirm.label}"? This action cannot be undone.`}
+                <DeleteConfirmDialog
+                    objectType={showDeleteConfirm}
                     onConfirm={handleDeleteType}
-                    onCancel={() => setShowDeleteConfirm(null)}
+                    onCancel={handleCancelDelete}
                     isLoading={deleteTypeMutation.isPending}
-                    confirmText="Delete"
-                    confirmButtonClass="bg-red-600 hover:bg-red-700"
+                    forceDeleteConfirmed={forceDeleteConfirmed}
+                    onForceDeleteChange={setForceDeleteConfirmed}
                 />
             )}
+        </div>
+    )
+}
+
+// Delete Confirmation Dialog Component
+const DeleteConfirmDialog = ({ objectType, onConfirm, onCancel, isLoading, forceDeleteConfirmed, onForceDeleteChange }) => {
+    const hasInstances = (objectType.instanceCount || 0) > 0
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+                <div className="p-6">
+                    <h2 className="text-xl font-semibold text-gray-900 mb-4">
+                        Delete Object Type
+                    </h2>
+
+                    <p className="text-gray-600 mb-4">
+                        Are you sure you want to delete <strong>"{objectType.label}"</strong>?
+                    </p>
+
+                    {hasInstances && (
+                        <div className="bg-orange-50 border-2 border-orange-400 rounded-md p-4 mb-4">
+                            <div className="flex items-start">
+                                <AlertCircle className="h-5 w-5 text-orange-600 mt-0.5 mr-2 flex-shrink-0" />
+                                <div className="flex-1">
+                                    <p className="text-sm font-medium text-orange-800 mb-2">
+                                        Warning: This object type has {objectType.instanceCount} existing instance{objectType.instanceCount === 1 ? '' : 's'}
+                                    </p>
+                                    <label className="flex items-start cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={forceDeleteConfirmed}
+                                            onChange={(e) => onForceDeleteChange(e.target.checked)}
+                                            className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded mt-0.5 mr-2"
+                                        />
+                                        <span className="text-sm text-orange-800">
+                                            <strong>Delete all {objectType.instanceCount} instance{objectType.instanceCount === 1 ? '' : 's'}</strong> along with the object type. This action cannot be undone.
+                                        </span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    <p className="text-sm text-gray-500 mb-6">
+                        This action cannot be undone.
+                    </p>
+
+                    <div className="flex space-x-3">
+                        <button
+                            onClick={onCancel}
+                            disabled={isLoading}
+                            className="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md transition-colors disabled:opacity-50"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={onConfirm}
+                            disabled={isLoading || (hasInstances && !forceDeleteConfirmed)}
+                            className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {isLoading ? (
+                                <>
+                                    <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                    Deleting...
+                                </>
+                            ) : (
+                                'Delete'
+                            )}
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
     )
 }
@@ -192,47 +313,50 @@ const ObjectTypeCard = ({ objectType, onEdit, onDelete }) => {
     const statusColor = objectType.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
     const statusText = objectType.isActive ? 'Active' : 'Inactive'
     const hasInstances = (objectType.instanceCount || 0) > 0
-    const canDelete = !hasInstances
 
     return (
-        <div className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-md transition-shadow">
-            <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center">
-                    {objectType.iconImage ? (
-                        <img
-                            src={objectType.iconImage}
-                            alt={objectType.label}
-                            className="h-8 w-8 rounded mr-3"
-                        />
-                    ) : (
-                        <div className="h-8 w-8 bg-blue-100 rounded flex items-center justify-center mr-3">
-                            <Hash className="h-4 w-4 text-blue-600" />
+        <div className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-md transition-shadow flex flex-col h-full">
+            {/* Card content - grows to fill space */}
+            <div className="flex-grow">
+                <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center">
+                        {objectType.iconImage ? (
+                            <img
+                                src={objectType.iconImage}
+                                alt={objectType.label}
+                                className="h-8 w-8 rounded mr-3"
+                            />
+                        ) : (
+                            <div className="h-8 w-8 bg-blue-100 rounded flex items-center justify-center mr-3">
+                                <Hash className="h-4 w-4 text-blue-600" />
+                            </div>
+                        )}
+                        <div>
+                            <h3 className="text-lg font-semibold text-gray-900">{objectType.label}</h3>
+                            <p className="text-sm text-gray-500">{objectType.name}</p>
                         </div>
-                    )}
-                    <div>
-                        <h3 className="text-lg font-semibold text-gray-900">{objectType.label}</h3>
-                        <p className="text-sm text-gray-500">{objectType.name}</p>
                     </div>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColor}`}>
+                        {statusText}
+                    </span>
                 </div>
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColor}`}>
-                    {statusText}
-                </span>
+
+                {objectType.description && (
+                    <p className="text-gray-600 text-sm mb-4 line-clamp-2">
+                        {objectType.description}
+                    </p>
+                )}
+
+                <div className="flex items-center justify-between text-sm mb-4">
+                    <span className="text-gray-500">{objectType.schemaFieldsCount || 0} fields</span>
+                    <span className="text-gray-500">{objectType.slotsCount || 0} slots</span>
+                    <span className={hasInstances ? 'text-orange-600 font-medium' : 'text-gray-500'}>
+                        {objectType.instanceCount || 0} instances
+                    </span>
+                </div>
             </div>
 
-            {objectType.description && (
-                <p className="text-gray-600 text-sm mb-4 line-clamp-2">
-                    {objectType.description}
-                </p>
-            )}
-
-            <div className="flex items-center justify-between text-sm mb-4">
-                <span className="text-gray-500">{objectType.schemaFieldsCount || 0} fields</span>
-                <span className="text-gray-500">{objectType.slotsCount || 0} slots</span>
-                <span className={hasInstances ? 'text-orange-600 font-medium' : 'text-gray-500'}>
-                    {objectType.instanceCount || 0} instances
-                </span>
-            </div>
-
+            {/* Buttons - always at bottom */}
             <div className="flex space-x-2">
                 <button
                     onClick={() => onEdit(objectType)}
@@ -244,16 +368,10 @@ const ObjectTypeCard = ({ objectType, onEdit, onDelete }) => {
                 <button
                     onClick={(e) => {
                         e.stopPropagation()
-                        if (canDelete) {
-                            onDelete(objectType)
-                        }
+                        onDelete(objectType)
                     }}
-                    disabled={!canDelete}
-                    className={`px-3 py-2 rounded-md text-sm flex items-center justify-center transition-colors ${canDelete
-                        ? 'bg-red-100 hover:bg-red-200 text-red-700 cursor-pointer'
-                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                        }`}
-                    title={hasInstances ? `Cannot delete: ${objectType.instanceCount} instance${objectType.instanceCount === 1 ? '' : 's'} exist` : 'Delete object type'}
+                    className="px-3 py-2 rounded-md text-sm flex items-center justify-center transition-colors bg-red-100 hover:bg-red-200 text-red-700 cursor-pointer"
+                    title={hasInstances ? `Delete object type (${objectType.instanceCount} instance${objectType.instanceCount === 1 ? '' : 's'} exist)` : 'Delete object type'}
                 >
                     <Trash2 className="h-4 w-4" />
                 </button>

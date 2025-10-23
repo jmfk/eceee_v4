@@ -58,6 +58,44 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
         """Set the created_by field when creating"""
         serializer.save(created_by=self.request.user)
 
+    def destroy(self, request, *args, **kwargs):
+        """
+        Delete an object type.
+        Supports force_delete query parameter to delete even when instances exist.
+        """
+        instance = self.get_object()
+        force_delete = (
+            request.query_params.get("force_delete", "false").lower() == "true"
+        )
+
+        # Check for existing instances
+        instance_count = ObjectInstance.objects.filter(object_type=instance).count()
+
+        if instance_count > 0 and not force_delete:
+            return Response(
+                {
+                    "error": f"Cannot delete object type: {instance_count} instance(s) exist",
+                    "instance_count": instance_count,
+                    "force_delete_required": True,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # If force_delete, delete all instances first
+        if force_delete and instance_count > 0:
+            ObjectInstance.objects.filter(object_type=instance).delete()
+
+        # Delete the object type
+        instance.delete()
+
+        return Response(
+            {
+                "message": "Object type deleted successfully",
+                "instances_deleted": instance_count if force_delete else 0,
+            },
+            status=status.HTTP_200_OK,
+        )
+
     @action(detail=False, methods=["get"])
     def main_browser_types(self, request):
         """Get object types that should appear in the main browser grid"""

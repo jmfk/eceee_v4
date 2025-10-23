@@ -29,7 +29,12 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
         pluralLabel: '',
         description: '',
         isActive: true,
-        schema: { fields: [] },
+        schema: {
+            type: 'object',
+            properties: {},
+            required: [],
+            propertyOrder: []
+        },
         slotConfiguration: { slots: [] },
         allowedChildTypes: [],
         hierarchyLevel: 'both', // 'top_level_only', 'sub_object_only', 'both'
@@ -100,14 +105,8 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
                 metadata: objectType.metadata || {}
             })
             const originalSchemaCopy = JSON.parse(JSON.stringify(schema))
-            console.log('[ObjectTypeForm] Setting originalSchema on mount', {
-                objectTypeId: objectType.id,
-                schema,
-                originalSchemaCopy
-            })
             setOriginalSchema(originalSchemaCopy) // Deep copy
             setHasUnsavedSchemaChanges(false)
-            console.log('[ObjectTypeForm] Initialized with hasUnsavedSchemaChanges = false')
 
             // Track original basic info
             const basicInfo = {
@@ -136,7 +135,12 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
             setHasUnsavedRelationshipsChanges(false)
         } else {
             // For new object types
-            const emptySchema = { fields: [] }
+            const emptySchema = {
+                type: 'object',
+                properties: {},
+                required: [],
+                propertyOrder: []
+            }
             setOriginalSchema(JSON.parse(JSON.stringify(emptySchema)))
             setHasUnsavedSchemaChanges(false)
 
@@ -182,6 +186,24 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
     }, [objectType?.id, previousObjectTypeId])
 
     const handleInputChange = (field, value) => {
+        // Special handling for name field - auto-format as slug
+        if (field === 'name') {
+            // Auto-format as slug
+            const slugValue = value
+                .toLowerCase()
+                .replace(/[^a-z0-9_]/g, '_')
+                .replace(/_+/g, '_')
+                .replace(/^_|_$/g, '')
+
+            setFormData(prev => ({ ...prev, [field]: slugValue }))
+
+            // Clear error for this field
+            if (errors[field]) {
+                setErrors(prev => ({ ...prev, [field]: null }))
+            }
+            return
+        }
+
         setFormData(prev => ({ ...prev, [field]: value }))
 
         // Clear field error when user starts typing
@@ -375,12 +397,6 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
     }
 
     const handleSchemaChange = (newSchema) => {
-        console.log('[ObjectTypeForm] handleSchemaChange called', {
-            newSchema,
-            originalSchema,
-            hasChanges: JSON.stringify(newSchema) !== JSON.stringify(originalSchema)
-        })
-
         setFormData(prev => ({ ...prev, schema: newSchema }))
 
         // Normalize schemas before comparison to handle edge cases
@@ -389,11 +405,6 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
 
         // Check if schema has changed from original
         const hasChanges = JSON.stringify(normalizedNew) !== JSON.stringify(normalizedOriginal)
-        console.log('[ObjectTypeForm] Schema change detection:', {
-            hasChanges,
-            newSchemaString: JSON.stringify(normalizedNew),
-            originalSchemaString: JSON.stringify(normalizedOriginal)
-        })
         setHasUnsavedSchemaChanges(hasChanges)
 
         // Clear any existing schema errors when user makes changes
@@ -481,17 +492,8 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
     }
 
     const handleSaveSchema = async () => {
-        console.log('[ObjectTypeForm] handleSaveSchema called', {
-            objectType: objectType?.id,
-            hasUnsavedSchemaChanges,
-            isSavingSchema,
-            schemaValidationErrors,
-            formDataSchema: formData.schema
-        })
-
-        // Early return checks with logging
+        // Early return checks
         if (!objectType) {
-            console.error('[ObjectTypeForm] Cannot save schema: objectType is null/undefined')
             const errorMsg = 'Cannot save schema: Object type not loaded'
             setSchemaError(errorMsg)
             toast.error(errorMsg, {
@@ -502,20 +504,16 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
         }
 
         if (!hasUnsavedSchemaChanges) {
-            console.log('[ObjectTypeForm] No unsaved changes detected, skipping save')
             return
         }
 
         if (isSavingSchema) {
-            console.log('[ObjectTypeForm] Already saving, skipping duplicate save')
             return
         }
 
         // Client-side validation before sending to backend
-        console.log('[ObjectTypeForm] Validating schema...')
         const validationError = validateSchema(formData.schema)
         if (validationError) {
-            console.error('[ObjectTypeForm] Schema validation failed:', validationError)
             const errorMsg = `Schema validation error: ${validationError}`
             setSchemaError(errorMsg)
             toast.error(errorMsg, {
@@ -524,55 +522,14 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
             })
             return
         }
-        console.log('[ObjectTypeForm] Schema validation passed')
 
         // Clear any previous errors
         setSchemaError(null)
         setIsSavingSchema(true)
 
         try {
-            // Detailed logging to debug the property not found issue
-            console.log('[ObjectTypeForm] Calling API to update schema...')
-            console.log('[ObjectTypeForm] Object Type ID:', objectType.id)
-            console.log('[ObjectTypeForm] Schema structure:', {
-                type: formData.schema.type,
-                propertyCount: Object.keys(formData.schema.properties || {}).length,
-                propertyKeys: Object.keys(formData.schema.properties || {}),
-                required: formData.schema.required,
-                propertyOrder: formData.schema.propertyOrder
-            })
-
-            // Log each property in detail
-            console.log('[ObjectTypeForm] Properties in detail:')
-            Object.entries(formData.schema.properties || {}).forEach(([key, prop]) => {
-                console.log(`  - ${key}:`, {
-                    hasType: !!prop.type,
-                    type: prop.type,
-                    hasFieldType: !!prop.field_type,
-                    field_type: prop.field_type,
-                    hasComponentType: !!prop.componentType,
-                    componentType: prop.componentType,
-                    title: prop.title
-                })
-            })
-
-            // Log the full schema as JSON
-            console.log('[ObjectTypeForm] Full schema as JSON:')
-            console.log(JSON.stringify(formData.schema, null, 2))
-
-            // Validate that required properties exist in properties
-            const missingRequired = (formData.schema.required || []).filter(
-                key => !(key in (formData.schema.properties || {}))
-            )
-            if (missingRequired.length > 0) {
-                console.error('[ObjectTypeForm] CLIENT-SIDE CHECK: Required properties missing from properties:', missingRequired)
-                console.error('[ObjectTypeForm] Available property keys:', Object.keys(formData.schema.properties || {}))
-            }
-
             // Use the dedicated schema update endpoint
             const response = await objectTypesApi.updateSchema(objectType.id, formData.schema)
-
-            console.log('[ObjectTypeForm] Schema saved successfully:', response)
 
             // Update the original schema to reflect the save
             setOriginalSchema(JSON.parse(JSON.stringify(formData.schema)))
@@ -586,17 +543,12 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
 
         } catch (error) {
             // Failed to save schema
-            console.error('[ObjectTypeForm] Failed to save schema:', {
-                error,
-                response: error.response,
-                data: error.response?.data,
-                status: error.response?.status
-            })
+            console.error('Failed to save schema:', error)
 
             let errorMessage = 'Failed to save schema'
             let detailedError = null
 
-            // Extract the REAL backend error message - don't hide it!
+            // Extract the backend error message
             if (error.response?.data?.error) {
                 detailedError = error.response.data.error
                 errorMessage = `Backend error: ${detailedError}`
@@ -647,10 +599,7 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
                 errorMessage = `Failed to save schema: ${error.message}`
             }
 
-            console.error('[ObjectTypeForm] Detailed backend error:', detailedError)
-            console.error('[ObjectTypeForm] Final error message:', errorMessage)
-
-            // Show the REAL error message - no hiding!
+            // Show the error message
             toast.error(errorMessage, {
                 duration: 8000, // Longer duration for detailed errors
                 icon: '❌',
@@ -661,7 +610,6 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
 
         } finally {
             setIsSavingSchema(false)
-            console.log('[ObjectTypeForm] Save operation completed')
         }
     }
 
@@ -966,12 +914,12 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
                                 onChange={(e) => handleInputChange('name', e.target.value)}
                                 className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.name ? 'border-red-300' : 'border-gray-300'
                                     }`}
-                                placeholder="e.g., news, blog, event"
+                                placeholder="e.g., blog_post, news_article, event"
                                 disabled={!!objectType} // Don't allow editing name for existing types
                             />
                             {errors.name && <p className="text-red-600 text-sm mt-1">{errors.name}</p>}
                             <p className="text-gray-500 text-xs mt-1">
-                                Unique identifier (lowercase, underscores allowed)
+                                Automatically formatted as slug (lowercase, underscores only)
                             </p>
                         </div>
 
