@@ -19,7 +19,7 @@ const ObjectContentEditor = ({ objectType, widgets = {}, mode = 'object', onWidg
 
     // Stable component identifier for UDC source tracking
     const instanceId = context.instanceId
-    const componentId = useMemo(() => `object-instance-editor-${instanceId || 'new'}`, [instanceId])
+    const componentId = useMemo(() => `object-content-editor-${instanceId || 'new'}`, [instanceId])
 
     // Widget editor panel state
     const [widgetEditorOpen, setWidgetEditorOpen] = useState(false)

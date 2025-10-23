@@ -34,10 +34,14 @@ export function UnifiedDataProvider({
     }, [onError]);
 
     const useExternalChanges = useCallback(<T,>(componentId: string, callback: StateChangeCallback<T>): void => {
-        const stableCallback = React.useMemo(
-            () => (state: any, metadata?: any) => callback(state, metadata),
-            [callback, componentId]
-        );
+        // Use ref to keep latest callback without causing subscription recreation
+        const callbackRef = React.useRef(callback);
+
+        // Update ref when callback changes, but don't trigger effect
+        React.useEffect(() => {
+            callbackRef.current = callback;
+        }, [callback]);
+
         useEffect(() => {
             const unsubscribe = manager.subscribe(
                 () => manager.getState(),
@@ -54,7 +58,8 @@ export function UnifiedDataProvider({
                             type: operation.type,
                             timestamp: Date.now()
                         };
-                        stableCallback(manager.getState(), metadata);
+                        // Use current callback from ref
+                        callbackRef.current(manager.getState(), metadata);
                     }
                 },
                 { equalityFn: defaultEqualityFn, componentId }
@@ -64,7 +69,7 @@ export function UnifiedDataProvider({
                     unsubscribe();
                 }
             };
-        }, [manager, stableCallback, componentId]);
+        }, [manager, componentId]); // Removed stableCallback dependency!
     }, [manager]);
 
 

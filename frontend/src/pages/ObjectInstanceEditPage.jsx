@@ -45,9 +45,12 @@ const ObjectInstanceEditPage = () => {
     const componentId = useMemo(() => `object-instance-editor-${instanceId}`, [instanceId])
 
     // Subscribe to UDC's dirty state (like PageEditor does)
-    useExternalChanges(componentId, state => {
+    // IMPORTANT: Use useCallback to keep subscription stable
+    const handleStateChange = useCallback((state) => {
         setHasUnsavedChanges(state.metadata.isDirty);
-    });
+    }, []);
+    
+    useExternalChanges(componentId, handleStateChange);
 
     // Create object mutation (for new objects before editing)
     const createNewObjectMutation = useMutation({

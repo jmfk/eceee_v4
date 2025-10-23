@@ -110,14 +110,14 @@ export default function ValidatedInput({
     const renderInput = () => {
         // Filter out custom props that shouldn't be passed to DOM elements
         const customProps = [
-            'allowCreate', 'searchDebounce', 'onValidationChange', 
+            'allowCreate', 'searchDebounce', 'onValidationChange',
             'showValidation', 'validationPosition', 'validationRules',
             'autoValidate', 'debounceMs', 'minItems', 'maxItems',
             'minWidth', 'minHeight', 'mediaTypes', 'allowedMimeTypes',
             'autoTags', 'defaultCollection', 'allowedExtensions',
             'allowedFileTypes', 'fileTypeLabel'
         ]
-        
+
         // Filter props to only include valid HTML attributes
         const filteredProps = Object.keys(props).reduce((acc, key) => {
             if (!customProps.includes(key)) {
@@ -125,7 +125,7 @@ export default function ValidatedInput({
             }
             return acc
         }, {})
-        
+
         // Build props based on controlled vs uncontrolled mode
         const commonProps = {
             ref: inputRef,
