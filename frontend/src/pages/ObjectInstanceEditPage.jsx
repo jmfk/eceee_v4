@@ -281,16 +281,16 @@ const ObjectInstanceEditPage = () => {
         setIsSaving(true);
         try {
             await saveCurrentVersion(); // This dispatches SET_OBJECT_DIRTY(false) internally
-            addNotification({
-                type: 'success',
-                message: 'Current version saved'
-            });
+            addNotification(
+                'Current version saved',
+                'success'
+            );
         } catch (error) {
             console.error('Save failed:', error);
-            addNotification({
-                type: 'error',
-                message: `Save failed: ${error?.message || 'Unknown error'}`
-            });
+            addNotification(
+                `Save failed: ${error?.message || 'Unknown error'}`,
+                'error'
+            );
         } finally {
             setIsSaving(false);
         }

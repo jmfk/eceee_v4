@@ -1,5 +1,4 @@
 import { createContext, useContext, useState, useCallback, useMemo } from 'react'
-import toast from 'react-hot-toast'
 
 const GlobalNotificationContext = createContext()
 
@@ -18,30 +17,24 @@ export const GlobalNotificationProvider = ({ children }) => {
 
     // Notification management functions (memoized to prevent render loops)
     const addNotification = useCallback((message, type = 'info', category = null) => {
+        // Handle if an object with {type, message} was passed instead of separate params
+        // This provides backward compatibility for legacy code
+        let actualMessage = message
+        let actualType = type
+        if (typeof message === 'object' && message !== null && message.message) {
+            actualMessage = message.message
+            actualType = message.type || type
+        }
+
         const notification = {
             id: Date.now(),
-            message,
-            type, // 'success', 'error', 'warning', 'info'
+            message: actualMessage,
+            type: actualType, // 'success', 'error', 'warning', 'info'
             category, // Used for replacing related notifications
             timestamp: new Date()
         }
 
-        // Trigger react-hot-toast notification
-        switch (type) {
-            case 'success':
-                toast.success(message)
-                break
-            case 'error':
-                toast.error(message)
-                break
-            case 'warning':
-                toast(message, { icon: '⚠️' })
-                break
-            case 'info':
-            default:
-                toast(message)
-                break
-        }
+        // Note: Toast notifications disabled - using status bar notifications only
 
         setNotifications(prev => {
             let updated = [...prev]

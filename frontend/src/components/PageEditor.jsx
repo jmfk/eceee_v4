@@ -837,16 +837,16 @@ const PageEditor = () => {
 
             // Handle layout fallback for versions without valid layouts
             if (!versionPageData.codeLayout) {
-                addNotification({
-                    type: 'warning',
-                    message: `Version ${versionData?.versionNumber || versionId} has no layout. Using fallback layout for preview.`
-                });
+                addNotification(
+                    `Version ${versionData?.versionNumber || versionId} has no layout. Using fallback layout for preview.`,
+                    'warning'
+                );
             }
 
-            addNotification({
-                type: 'info',
-                message: `Switched to version ${versionData?.versionNumber || versionId}`
-            });
+            addNotification(
+                `Switched to version ${versionData?.versionNumber || versionId}`,
+                'info'
+            );
         } catch (error) {
             console.error('PageEditor: Error switching to version', error);
             showError(`Failed to load version: ${error.message}`);
@@ -1051,10 +1051,10 @@ const PageEditor = () => {
                     saveResult.strategy === 'both' ? 'Page and version updated' :
                         'No changes';
 
-            addNotification({
-                type: 'success',
-                message: `${actionDescription}! ${saveResult.summary}${saveOptions.description ? ` - "${saveOptions.description}"` : ''}`
-            });
+            addNotification(
+                `${actionDescription}! ${saveResult.summary}${saveOptions.description ? ` - "${saveOptions.description}"` : ''}`,
+                'success'
+            );
 
             // Reload versions if a version was created/updated
             if (saveResult.versionResult) {
@@ -1067,10 +1067,10 @@ const PageEditor = () => {
 
         } catch (error) {
             console.error('❌ SMART SAVE: Save failed', error);
-            addNotification({
-                type: 'error',
-                message: `Save failed: ${error.message}`
-            });
+            addNotification(
+                `Save failed: ${error.message}`,
+                'error'
+            );
             showError(`Save failed: ${error.message}`);
 
             // Parse backend validation error and populate To-Do list
@@ -1088,10 +1088,10 @@ const PageEditor = () => {
     const handleSaveFromStatusBar = useCallback(async () => {
         const unresolved = errorTodoItems.filter(i => !i.checked).length
         if (unresolved > 0) {
-            addNotification({
-                type: 'error',
-                message: `Cannot save: resolve ${unresolved} issue${unresolved === 1 ? '' : 's'} in the To-Do sidebar`
-            })
+            addNotification(
+                `Cannot save: resolve ${unresolved} issue${unresolved === 1 ? '' : 's'} in the To-Do sidebar`,
+                'error'
+            )
             return
         }
 
@@ -1101,10 +1101,10 @@ const PageEditor = () => {
                 result && result.severity === 'error' && result.errors && result.errors.length > 0
             );
         if (hasCriticalErrors) {
-            addNotification({
-                type: 'error',
-                message: 'Cannot save: please fix critical validation errors in the page data'
-            })
+            addNotification(
+                'Cannot save: please fix critical validation errors in the page data',
+                'error'
+            )
             return
         }
 
@@ -1179,10 +1179,10 @@ const PageEditor = () => {
                 await handleActualSave({ description: 'Page attributes updated' });
             } else if (strategy.strategy === 'none') {
                 // No changes - just show notification
-                addNotification({
-                    type: 'info',
-                    message: 'No changes detected'
-                });
+                addNotification(
+                    'No changes detected',
+                    'info'
+                );
                 setIsDirty(false); // Reset dirty state since no changes
             } else {
                 // Version changes detected - save as new version directly
@@ -1191,10 +1191,10 @@ const PageEditor = () => {
 
         } catch (error) {
             console.error('❌ Save analysis failed:', error);
-            addNotification({
-                type: 'error',
-                message: `Save analysis failed: ${error.message}`
-            });
+            addNotification(
+                `Save analysis failed: ${error.message}`,
+                'error'
+            );
         }
     }, [errorTodoItems, schemaValidationState, addNotification, webpageData, pageVersionData, originalWebpageData, originalPageVersionData, contentEditorRef, settingsEditorRef, handleActualSave, publishUpdate, componentId, setIsDirty]);
 
@@ -1214,16 +1214,16 @@ const PageEditor = () => {
         try {
             await saveCurrentVersion();
             setIsDirty(false);
-            addNotification({
-                type: 'success',
-                message: 'Current version saved'
-            });
+            addNotification(
+                'Current version saved',
+                'success'
+            );
         } catch (error) {
             console.error('Save failed:', error);
-            addNotification({
-                type: 'error',
-                message: `Save failed: ${error?.message || 'Unknown error'}`
-            });
+            addNotification(
+                `Save failed: ${error?.message || 'Unknown error'}`,
+                'error'
+            );
         } finally {
             setIsSaving(false);
         }
@@ -1280,10 +1280,10 @@ const PageEditor = () => {
             renderer.updateSlot(updatedWidget.slotName, renderer.getSlotWidgetData(updatedWidget.slotName))
         }
 
-        addNotification({
-            type: 'success',
-            message: `Widget "${updatedWidget.name}" saved successfully`
-        })
+        addNotification(
+            `Widget "${updatedWidget.name}" saved successfully`,
+            'success'
+        )
 
         // Reset dirty state and close editor
         setIsDirty(false)
@@ -1347,10 +1347,10 @@ const PageEditor = () => {
 
         // Handler for error events
         const handleWidgetError = (payload) => {
-            addNotification({
-                type: 'error',
-                message: `Widget error: ${payload.error}`
-            })
+            addNotification(
+                `Widget error: ${payload.error}`,
+                'error'
+            )
         }
 
         // Widget events now handled through UnifiedDataContext - no subscriptions needed
@@ -1402,10 +1402,10 @@ const PageEditor = () => {
 
             // Block navigation if validating
             if (isValidating) {
-                addNotification({
-                    type: 'warning',
-                    message: 'Please wait for validation to complete before navigating'
-                })
+                addNotification(
+                    'Please wait for validation to complete before navigating',
+                    'warning'
+                )
                 return
             }
 
@@ -1424,10 +1424,10 @@ const PageEditor = () => {
                     if (confirmed) {
                         // Check if widget is valid before saving
                         if (!isValid) {
-                            addNotification({
-                                type: 'error',
-                                message: 'Cannot save: Please fix validation errors first'
-                            })
+                            addNotification(
+                                'Cannot save: Please fix validation errors first',
+                                'error'
+                            )
                             return
                         }
 
