@@ -80,6 +80,28 @@ export function validateSchemaShape(schema) {
     return { valid: true }
 }
 
+// Component name to field type key mapping for better error messages
+const COMPONENT_NAME_SUGGESTIONS = {
+    'TextInput': 'text',
+    'TextareaInput': 'textarea',
+    'NumberInput': 'number',
+    'ImageInput': 'image',
+    'FileInput': 'file',
+    'ComboboxInput': 'combobox',
+    'RichTextInput': 'rich_text',
+    'DateInput': 'date',
+    'DateTimeInput': 'datetime',
+    'SelectInput': 'choice',
+    'MultiSelectInput': 'multi_choice',
+    'BooleanInput': 'boolean',
+    'ColorInput': 'color',
+    'URLInput': 'url',
+    'EmailInput': 'email',
+    'TagInput': 'tag',
+    'ObjectReferenceInput': 'object_reference',
+    'UserSelectorInput': 'user_reference',
+}
+
 /**
  * Validate that a componentType is valid
  * 
@@ -101,6 +123,12 @@ export function validateComponentType(componentType, availableTypes = []) {
     const isValid = availableTypes.some(ft => ft.key === componentType)
 
     if (!isValid) {
+        // Check if this might be a component name instead of a field type key
+        const suggestedKey = COMPONENT_NAME_SUGGESTIONS[componentType]
+        if (suggestedKey) {
+            return `Invalid component type "${componentType}". Did you mean "${suggestedKey}"? (Use the Fix Schema button above to convert automatically)`
+        }
+
         const typeList = availableTypes.slice(0, 5).map(ft => ft.key).join(', ')
         return `Invalid component type "${componentType}". Must be one of: ${typeList}...`
     }

@@ -62,7 +62,7 @@ class PropertyTypeRegistry {
             type: fieldType.jsonSchemaType,
             title: fieldType.label,
             description: "",
-            component: fieldType.component,
+            componentType: fieldType.key, // Use field type key (e.g., "text") not component name (e.g., "TextInput")
             ...fieldType.defaultProps,
             ...fieldType.uiProps
           }

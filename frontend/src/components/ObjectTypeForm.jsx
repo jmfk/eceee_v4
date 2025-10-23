@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { Plus, Trash2, Settings, Hash, Type, Calendar, ToggleLeft, Check, Users, CheckCircle, XCircle, FolderOpen } from 'lucide-react'
+import { Plus, Trash2, Settings, Hash, Type, Calendar, ToggleLeft, Check, Users, CheckCircle, XCircle, FolderOpen, AlertTriangle, Wrench } from 'lucide-react'
 import { objectTypesApi } from '../api/objectStorage'
 import { namespacesApi } from '../api'
 import { SchemaEditor } from './schema-editor'
@@ -14,6 +14,7 @@ import {
     getWidgetDescription
 } from '../widgets'
 import DynamicWidgetConfigForm from './widget-configs/DynamicWidgetConfigForm'
+import { detectSchemaIssue, fixSchema, getFixDescription } from '../utils/schemaFieldTypeFixer'
 
 // Get field types from the registry
 const FIELD_TYPES = getAllFieldTypes().map(fieldType => ({
@@ -48,6 +49,10 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
     const [isSavingSchema, setIsSavingSchema] = useState(false)
     const [schemaError, setSchemaError] = useState(null)
     const [schemaValidationErrors, setSchemaValidationErrors] = useState({})
+
+    // Schema field type fixer state
+    const [needsSchemaFix, setNeedsSchemaFix] = useState(false)
+    const [schemaFixInfo, setSchemaFixInfo] = useState(null)
 
     const [hasUnsavedBasicChanges, setHasUnsavedBasicChanges] = useState(false)
     const [originalBasicInfo, setOriginalBasicInfo] = useState(null)
@@ -184,6 +189,19 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
 
         setPreviousObjectTypeId(currentObjectTypeId)
     }, [objectType?.id, previousObjectTypeId])
+
+    // Detect if schema needs fixing (component names instead of field type keys)
+    useEffect(() => {
+        if (formData.schema) {
+            const detection = detectSchemaIssue(formData.schema)
+            setNeedsSchemaFix(detection.needsFix)
+            setSchemaFixInfo(detection)
+
+            if (detection.needsFix) {
+                console.log('[ObjectTypeForm] Schema needs fixing:', detection)
+            }
+        }
+    }, [formData.schema])
 
     const handleInputChange = (field, value) => {
         // Special handling for name field - auto-format as slug
@@ -489,6 +507,40 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
         }
 
         return null // No errors
+    }
+
+    // Handle fixing schema field type issues
+    const handleFixSchema = () => {
+        if (!schemaFixInfo || !schemaFixInfo.needsFix) {
+            console.log('[ObjectTypeForm] No schema issues to fix')
+            return
+        }
+
+        console.log('[ObjectTypeForm] Fixing schema...', {
+            affectedProperties: schemaFixInfo.affectedProperties
+        })
+
+        // Convert the schema
+        const fixedSchema = fixSchema(formData.schema)
+
+        // Update form data with fixed schema
+        setFormData(prev => ({ ...prev, schema: fixedSchema }))
+
+        // Mark as having unsaved changes so user can save
+        setHasUnsavedSchemaChanges(true)
+
+        // Clear the fix state
+        setNeedsSchemaFix(false)
+        setSchemaFixInfo(null)
+
+        // Show success message
+        const description = getFixDescription(schemaFixInfo.affectedProperties)
+        toast.success(`Schema fixed! ${description}`, {
+            duration: 8000,
+            icon: '✅',
+        })
+
+        console.log('[ObjectTypeForm] Schema fixed successfully')
     }
 
     const handleSaveSchema = async () => {
@@ -1043,6 +1095,39 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
                     <p className="text-gray-600 mb-6">
                         Define the data fields that instances of this object type will have.
                     </p>
+
+                    {/* Schema Fix Warning Banner */}
+                    {needsSchemaFix && schemaFixInfo && (
+                        <div className="mb-6 bg-amber-50 border-2 border-amber-400 rounded-lg p-4">
+                            <div className="flex items-start">
+                                <div className="flex-shrink-0">
+                                    <AlertTriangle className="h-6 w-6 text-amber-600" />
+                                </div>
+                                <div className="ml-3 flex-1">
+                                    <h3 className="text-sm font-medium text-amber-800">
+                                        Schema Issue Detected
+                                    </h3>
+                                    <div className="mt-2 text-sm text-amber-700">
+                                        <p className="mb-2">
+                                            This schema uses React component names instead of field type keys.
+                                            This may cause validation errors.
+                                        </p>
+                                        <p className="mb-3 font-medium">
+                                            {getFixDescription(schemaFixInfo.affectedProperties)}
+                                        </p>
+                                        <button
+                                            type="button"
+                                            onClick={handleFixSchema}
+                                            className="inline-flex items-center px-4 py-2 bg-amber-600 text-white rounded-md hover:bg-amber-700 transition-colors font-medium"
+                                        >
+                                            <Wrench className="w-4 h-4 mr-2" />
+                                            Fix Schema Now
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Schema Error Display */}
                     {schemaError && (
