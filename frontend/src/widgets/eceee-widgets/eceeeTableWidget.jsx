@@ -137,7 +137,7 @@ const eceeeTableWidget = ({ config = {}, mode = 'preview' }) => {
 }
 
 // === COLOCATED METADATA ===
-eceeeTableWidget.displayName = 'TableWidget'
+eceeeTableWidget.displayName = 'eceee TableWidget'
 eceeeTableWidget.widgetType = 'eceee_widgets.TableWidget'
 
 // Default configuration
@@ -174,7 +174,8 @@ eceeeTableWidget.metadata = {
     description: 'Configurable data tables with advanced styling, cell spanning, and responsive design',
     category: 'data',
     icon: Table,
-    tags: ['eceee', 'table', 'data', 'grid', 'spreadsheet', 'rows', 'columns']
+    tags: ['eceee', 'table', 'data', 'grid', 'spreadsheet', 'rows', 'columns'],
+    specialEditor: 'TableSpecialEditor'
 }
 
 export default eceeeTableWidget

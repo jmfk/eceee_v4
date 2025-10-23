@@ -7,15 +7,16 @@
 import { api } from './client.js'
 
 /**
- * Get JSON schema for a specific widget type
+ * Get JSON schema for a specific widget type with UI metadata
  * @param {string} widgetType - The widget type name
- * @returns {Promise<Object>} The JSON schema for the widget configuration
+ * @returns {Promise<Object>} The JSON schema for the widget configuration with UI hints
  */
 export const getWidgetSchema = async (widgetType) => {
     try {
         // Properly encode the widget type to handle dots and spaces
         const encodedWidgetType = encodeURIComponent(widgetType)
-        const response = await api.get(`/api/v1/webpages/widget-types/${encodedWidgetType}/schema/`)
+        // Use config-ui-schema endpoint which includes hideFormFields and other UI metadata
+        const response = await api.get(`/api/v1/webpages/widget-types/${encodedWidgetType}/config-ui-schema/`)
         return response.data
     } catch (error) {
         console.error(`Failed to fetch schema for widget type "${widgetType}":`, error)

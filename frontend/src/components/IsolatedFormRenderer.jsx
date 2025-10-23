@@ -198,7 +198,16 @@ const IsolatedFormRenderer = React.memo(({
 
     const activeSchema = schemaRef.current || schema
 
-    if (!activeSchema?.properties) {
+    // Check if form fields should be hidden (widget uses special editor exclusively)
+    // The schema might be the full response object from config-ui-schema endpoint
+    if (activeSchema?.hideFormFields) {
+        return null // Special editor handles all configuration
+    }
+
+    // Extract the actual schema if we received the full config-ui-schema response
+    const schemaProperties = activeSchema?.schema?.properties || activeSchema?.properties
+
+    if (!schemaProperties) {
         return (
             <div className="text-center text-gray-500 py-8 p-4">
                 <p>No configuration options available for this widget.</p>
@@ -206,15 +215,18 @@ const IsolatedFormRenderer = React.memo(({
         )
     }
     // Render isolated fields - each field manages its own state and rerenders
+    // Get the required fields array from the correct location
+    const requiredFields = activeSchema?.schema?.required || activeSchema?.required || []
+
     return (
         <div className="space-y-4 p-4">
-            {Object.entries(activeSchema.properties)
+            {Object.entries(schemaProperties)
                 .filter(([fieldName, fieldSchema]) => {
                     // Filter out hidden fields
                     return !fieldSchema.hidden
                 })
                 .map(([fieldName, fieldSchema]) => {
-                    const isRequired = activeSchema?.required?.includes(fieldName) || false
+                    const isRequired = requiredFields.includes(fieldName) || false
 
                     return (
                         <IsolatedFieldWrapper
@@ -227,7 +239,7 @@ const IsolatedFormRenderer = React.memo(({
                             onFieldChange={handleFieldChange}
                             namespace={namespace}
                             context={context}
-                            fullSchema={activeSchema}
+                            fullSchema={activeSchema?.schema || activeSchema}
                         />
                     )
                 })}

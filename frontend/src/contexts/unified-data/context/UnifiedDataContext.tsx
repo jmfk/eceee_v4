@@ -50,7 +50,7 @@ export function UnifiedDataProvider({
                     // 1. Operation has no sourceId (system operations like SET_DIRTY)
                     // 2. Operation sourceId is different from this component's ID
                     const shouldTrigger = !operation?.sourceId || operation.sourceId !== componentId;
-                    
+
                     if (operation && shouldTrigger) {
                         // Pass metadata including sourceId to callback
                         const metadata = {

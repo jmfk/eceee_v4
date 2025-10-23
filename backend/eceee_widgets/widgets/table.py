@@ -136,6 +136,7 @@ class TableWidget(BaseWidget):
     description = "Advanced table widget with cell merging, images, styling, and responsive design"
     template_name = "eceee_widgets/widgets/table.html"
     special_editor = "TableSpecialEditor"
+    hide_config_form_fields = True  # Use special editor exclusively
 
     widget_css = """
     .table-widget {

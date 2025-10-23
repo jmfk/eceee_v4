@@ -36,6 +36,11 @@ class BaseWidget(ABC):
     )
     default_is_published: bool = True  # Default: published
 
+    # Special editor configuration
+    hide_config_form_fields: bool = (
+        False  # Hide all form fields when special editor is active
+    )
+
     # Enhanced CSS injection system
     widget_css: str = ""  # Widget-specific CSS
     css_variables: Dict[str, str] = {}  # Widget-specific CSS variables

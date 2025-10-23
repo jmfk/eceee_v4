@@ -49,7 +49,7 @@ const ObjectInstanceEditPage = () => {
     const handleStateChange = useCallback((state) => {
         setHasUnsavedChanges(state.metadata.isDirty);
     }, []);
-    
+
     useExternalChanges(componentId, handleStateChange);
 
     // Create object mutation (for new objects before editing)

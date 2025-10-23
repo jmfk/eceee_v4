@@ -84,6 +84,11 @@ widget_type_patterns = [
         name="widgettype-schema",
     ),
     re_path(
+        r"^widget-types/(?P<pk>[^/]+)/config-ui-schema/$",
+        WidgetTypeViewSet.as_view({"get": "config_ui_schema"}),
+        name="widgettype-config-ui-schema",
+    ),
+    re_path(
         r"^widget-types/(?P<pk>[^/]+)/configuration-defaults/$",
         WidgetTypeViewSet.as_view({"get": "configuration_defaults"}),
         name="widgettype-configuration-defaults",

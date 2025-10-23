@@ -80,7 +80,6 @@ export class SubscriptionManager {
      * when one component's update triggers another component's subscription.
      */
     notifyStateUpdate(state: AppState, operation: Operation): void {
-        console.log('[SubscriptionManager] Notifying', this.stateSubscriptions.size, 'state subscribers for operation:', operation.type);
         for (const subscription of this.stateSubscriptions.values()) {
             // Defer callback execution to avoid render-phase conflicts
             queueMicrotask(() => {
@@ -95,13 +94,11 @@ export class SubscriptionManager {
                         subscription.lastValue !== undefined &&
                         subscription.options.equalityFn?.(subscription.lastValue, newValue)
                     ) {
-                        console.log('[SubscriptionManager] Skipping notification - value unchanged for subscription', subscription.id);
                         return;
                     }
 
                     const prevValue = subscription.lastValue;
                     subscription.lastValue = newValue;
-                    console.log('[SubscriptionManager] Calling subscription callback for id:', subscription.id);
                     subscription.callback(newValue, operation);
                 } catch (error) {
                     console.error('❌ Error in subscription callback:', error);
