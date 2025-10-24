@@ -131,8 +131,8 @@ const ImageDisplaySection = ({
     return (
         <div className="bg-white rounded-lg">
             <div className="flex items-center justify-between p-4 border-b border-gray-200">
-                <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <div className="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden border border-gray-200 flex-shrink-0">
                         {thumbnailUrl && (
                             <img
                                 src={thumbnailUrl}
@@ -153,7 +153,7 @@ const ImageDisplaySection = ({
                     </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-shrink-0">
                     {/* Preview button */}
                     {thumbnailUrl && (
                         <button
