@@ -2,8 +2,6 @@
 module.exports = {
     content: [
         './templates/**/*.html',
-        './default_layouts/templates/**/*.html',
-        './default_widgets/templates/**/*.html',
         './eceee_layouts/templates/**/*.html',
         './eceee_widgets/templates/**/*.html',
         './file_manager/templates/**/*.html',
@@ -14,6 +12,15 @@ module.exports = {
     theme: {
         extend: {},
     },
-    plugins: [],
+    plugins: [
+        function ({ addBase }) {
+            addBase({
+                'img, video': {
+                    'max-width': 'unset',
+                    'height': 'unset', // Override Tailwind's default 'auto' to allow height utilities
+                }
+            })
+        }
+    ],
 }
 

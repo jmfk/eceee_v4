@@ -254,9 +254,15 @@ export class TableEditorCore {
 
             // New format: { width: '1px', style: 'solid', color: '#000000' }
             if (borderConfig.width) {
-                const width = borderConfig.width || '1px'
-                const style = borderConfig.style || 'solid'
+                let width = borderConfig.width || '1px'
+                let style = borderConfig.style || 'solid'
                 const color = borderConfig.color || '#000000'
+
+                // Convert legacy 'plain' to 'solid'
+                if (style === 'plain') {
+                    style = 'solid'
+                }
+
                 return `${width} ${style} ${color}`
             }
 
@@ -278,10 +284,15 @@ export class TableEditorCore {
             return `${width} ${style} ${color}`
         }
 
-        if (borders.top) element.style.borderTop = getBorderCSS(borders.top)
-        if (borders.bottom) element.style.borderBottom = getBorderCSS(borders.bottom)
-        if (borders.left) element.style.borderLeft = getBorderCSS(borders.left)
-        if (borders.right) element.style.borderRight = getBorderCSS(borders.right)
+        const topCSS = getBorderCSS(borders.top)
+        const bottomCSS = getBorderCSS(borders.bottom)
+        const leftCSS = getBorderCSS(borders.left)
+        const rightCSS = getBorderCSS(borders.right)
+
+        if (borders.top) element.style.borderTop = topCSS
+        if (borders.bottom) element.style.borderBottom = bottomCSS
+        if (borders.left) element.style.borderLeft = leftCSS
+        if (borders.right) element.style.borderRight = rightCSS
     }
 
     /**
@@ -907,6 +918,89 @@ export class TableEditorCore {
     }
 
     /**
+     * Get the opposite side for adjacent cell borders
+     * @param {string} side - 'top', 'bottom', 'left', 'right'
+     * @returns {string} Opposite side
+     */
+    getOppositeSide(side) {
+        const opposites = {
+            top: 'bottom',
+            bottom: 'top',
+            left: 'right',
+            right: 'left'
+        }
+        return opposites[side]
+    }
+
+    /**
+     * Find cells adjacent to a given side of a cell (considering merges)
+     * @param {number} rowIndex - Row index of the source cell
+     * @param {number} cellIndex - Cell index of the source cell
+     * @param {string} side - 'top', 'bottom', 'left', 'right'
+     * @returns {Array} Array of {rowIndex, cellIndex} objects for adjacent cells
+     */
+    findAdjacentCells(rowIndex, cellIndex, side) {
+        const cellData = this.data.rows[rowIndex].cells[cellIndex]
+        const colspan = cellData.colspan || 1
+        const rowspan = cellData.rowspan || 1
+        const adjacentCells = []
+
+        if (side === 'bottom') {
+            // Cells below: row (rowIndex + rowspan), columns [cellIndex ... cellIndex + colspan - 1]
+            const targetRow = rowIndex + rowspan
+            if (targetRow < this.data.rows.length) {
+                for (let c = cellIndex; c < cellIndex + colspan; c++) {
+                    if (c < this.data.rows[targetRow].cells.length) {
+                        const targetCell = this.data.rows[targetRow].cells[c]
+                        if (!targetCell._merged) {
+                            adjacentCells.push({ rowIndex: targetRow, cellIndex: c })
+                        }
+                    }
+                }
+            }
+        } else if (side === 'top') {
+            // Cells above: row (rowIndex - 1), columns [cellIndex ... cellIndex + colspan - 1]
+            const targetRow = rowIndex - 1
+            if (targetRow >= 0) {
+                for (let c = cellIndex; c < cellIndex + colspan; c++) {
+                    if (c < this.data.rows[targetRow].cells.length) {
+                        const targetCell = this.data.rows[targetRow].cells[c]
+                        if (!targetCell._merged) {
+                            adjacentCells.push({ rowIndex: targetRow, cellIndex: c })
+                        }
+                    }
+                }
+            }
+        } else if (side === 'right') {
+            // Cells to the right: column (cellIndex + colspan), rows [rowIndex ... rowIndex + rowspan - 1]
+            const targetCol = cellIndex + colspan
+            for (let r = rowIndex; r < rowIndex + rowspan; r++) {
+                if (r < this.data.rows.length && targetCol < this.data.rows[r].cells.length) {
+                    const targetCell = this.data.rows[r].cells[targetCol]
+                    if (!targetCell._merged) {
+                        adjacentCells.push({ rowIndex: r, cellIndex: targetCol })
+                    }
+                }
+            }
+        } else if (side === 'left') {
+            // Cells to the left: column (cellIndex - 1), rows [rowIndex ... rowIndex + rowspan - 1]
+            const targetCol = cellIndex - 1
+            if (targetCol >= 0) {
+                for (let r = rowIndex; r < rowIndex + rowspan; r++) {
+                    if (r < this.data.rows.length && targetCol < this.data.rows[r].cells.length) {
+                        const targetCell = this.data.rows[r].cells[targetCol]
+                        if (!targetCell._merged) {
+                            adjacentCells.push({ rowIndex: r, cellIndex: targetCol })
+                        }
+                    }
+                }
+            }
+        }
+
+        return adjacentCells
+    }
+
+    /**
      * Set borders for cells
      * @param {Array} cells - Selected cells
      * @param {Object} sides - Object with sides as keys and boolean values (true=add, false=remove)
@@ -924,16 +1018,42 @@ export class TableEditorCore {
 
             // Apply border changes for each side
             Object.keys(sides).forEach(side => {
-                if (sides[side] === true) {
-                    // Add border
-                    cellData.borders[side] = {
-                        width: borderStyle.width,
-                        style: borderStyle.style,
-                        color: borderStyle.color
+                const shouldAdd = sides[side] === true
+                const shouldRemove = sides[side] === false
+
+                if (shouldAdd || shouldRemove) {
+                    // Apply to current cell
+                    if (shouldAdd) {
+                        cellData.borders[side] = {
+                            width: borderStyle.width,
+                            style: borderStyle.style,
+                            color: borderStyle.color
+                        }
+                    } else {
+                        delete cellData.borders[side]
                     }
-                } else if (sides[side] === false) {
-                    // Remove border
-                    delete cellData.borders[side]
+
+                    // Apply to adjacent cells on opposite side
+                    const adjacentCells = this.findAdjacentCells(rowIndex, cellIndex, side)
+                    const oppositeSide = this.getOppositeSide(side)
+
+                    adjacentCells.forEach(({ rowIndex: adjRow, cellIndex: adjCol }) => {
+                        const adjCellData = this.data.rows[adjRow].cells[adjCol]
+
+                        if (!adjCellData.borders) {
+                            adjCellData.borders = {}
+                        }
+
+                        if (shouldAdd) {
+                            adjCellData.borders[oppositeSide] = {
+                                width: borderStyle.width,
+                                style: borderStyle.style,
+                                color: borderStyle.color
+                            }
+                        } else {
+                            delete adjCellData.borders[oppositeSide]
+                        }
+                    })
                 }
                 // If null (mixed), don't change
             })

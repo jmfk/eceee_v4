@@ -13,8 +13,7 @@
 
 /* Table Base Styles */
 .table-editor-table {
-    border-collapse: separate;
-    border-spacing: 0;
+    border-collapse: collapse;
     width: 100%;
     min-width: 400px;
     background: white;

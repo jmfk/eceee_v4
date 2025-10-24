@@ -196,7 +196,9 @@ const TableSpecialEditor = ({
      * Apply borders immediately when any border setting changes
      */
     const applyBordersImmediately = useCallback(() => {
-        if (selectedCells.length === 0) return
+        if (selectedCells.length === 0) {
+            return
+        }
 
         // Get sides that should be changed (not null/mixed)
         const sidesToChange = {}
@@ -206,7 +208,9 @@ const TableSpecialEditor = ({
             }
         })
 
-        if (Object.keys(sidesToChange).length === 0) return
+        if (Object.keys(sidesToChange).length === 0) {
+            return
+        }
 
         const borderStyleConfig = {
             width: borderWidth,
@@ -218,13 +222,30 @@ const TableSpecialEditor = ({
     }, [selectedCells, borderSides, borderWidth, borderStyle, borderColor])
 
     /**
-     * Apply borders when settings change (but not on initial render)
+     * Track if we should apply borders automatically
+     * This prevents the infinite loop when reading border state from cells
+     */
+    const isReadingBorderState = useRef(false)
+
+    /**
+     * Apply borders when settings change (but NOT when cells change)
      */
     useEffect(() => {
-        if (selectedCells.length > 0) {
+        // Don't apply when cells change - that should only READ the state
+        // Only apply when border settings themselves change
+        if (selectedCells.length > 0 && showBorderPicker && !isReadingBorderState.current) {
             applyBordersImmediately()
         }
-    }, [borderSides, borderWidth, borderStyle, borderColor, applyBordersImmediately])
+    }, [borderSides, borderWidth, borderStyle, borderColor, applyBordersImmediately, showBorderPicker])
+    // Note: selectedCells.length is NOT in dependencies - we don't want to apply when selection changes!
+
+    /**
+     * Get opposite side (mirrors the one in TableEditorCore)
+     */
+    const getOppositeSide = (side) => {
+        const opposites = { top: 'bottom', bottom: 'top', left: 'right', right: 'left' }
+        return opposites[side]
+    }
 
     /**
      * Handle tri-state border checkbox click
@@ -247,11 +268,16 @@ const TableSpecialEditor = ({
 
     /**
      * Update border picker state based on selected cells
+     * Now considers both the cell's own borders AND adjacent cells' opposite borders
      */
     const updateBorderStateFromSelection = useCallback(() => {
+        // Set flag to prevent automatic border application while reading
+        isReadingBorderState.current = true
+
         if (!coreRef.current || selectedCells.length === 0) {
             // No cells selected - reset to mixed
             setBorderSides({ top: null, bottom: null, left: null, right: null })
+            isReadingBorderState.current = false
             return
         }
 
@@ -267,13 +293,42 @@ const TableSpecialEditor = ({
             selectedCells.forEach(cell => {
                 const rowIndex = parseInt(cell.dataset.rowIndex)
                 const cellIndex = parseInt(cell.dataset.cellIndex)
-                const cellData = coreRef.current.data.rows[rowIndex].cells[cellIndex]
 
-                if (cellData.borders && cellData.borders[side]) {
+                let cellData
+                try {
+                    cellData = coreRef.current.data.rows[rowIndex].cells[cellIndex]
+                } catch (error) {
+                    return
+                }
+
+                // Check current cell's border on this side
+                const hasBorderOnCell = cellData.borders?.[side]
+
+                // Check adjacent cell's opposite border (borders between cells!)
+                let adjacentCells = []
+                let oppositeSide = getOppositeSide(side)
+
+                try {
+                    if (coreRef.current && typeof coreRef.current.findAdjacentCells === 'function') {
+                        adjacentCells = coreRef.current.findAdjacentCells(rowIndex, cellIndex, side)
+                    }
+                } catch (error) {
+                    // Error finding adjacent cells
+                }
+
+                const adjacentBorders = adjacentCells.map(({ rowIndex: r, cellIndex: c }) => {
+                    const border = coreRef.current.data.rows[r].cells[c].borders?.[oppositeSide]
+                    return border
+                }).filter(b => b) // Remove nulls
+
+                // Border exists if EITHER the cell has it OR an adjacent cell has the opposite
+                const borderExists = hasBorderOnCell || adjacentBorders.length > 0
+
+                if (borderExists) {
                     hasCount++
-                    // Store first border we find to get width/style/color
+                    // Use the border config from current cell, or first adjacent if current is null
                     if (!firstBorder) {
-                        firstBorder = cellData.borders[side]
+                        firstBorder = hasBorderOnCell || adjacentBorders[0]
                     }
                 } else {
                     noCount++
@@ -290,6 +345,7 @@ const TableSpecialEditor = ({
             }
         })
 
+        // Batch all state updates together
         setBorderSides(newBorderSides)
 
         // Update border width, style, and color from first found border
@@ -298,6 +354,12 @@ const TableSpecialEditor = ({
             if (firstBorder.style) setBorderStyle(firstBorder.style)
             if (firstBorder.color) setBorderColor(firstBorder.color)
         }
+
+        // Clear flag after React has definitely processed all state updates
+        // Use a longer timeout to ensure all effects have run
+        setTimeout(() => {
+            isReadingBorderState.current = false
+        }, 50) // Small delay to ensure React batching is complete
     }, [selectedCells])
 
     /**

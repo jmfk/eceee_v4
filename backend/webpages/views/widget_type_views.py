@@ -13,6 +13,7 @@ from rest_framework.decorators import (
 )
 from rest_framework.response import Response
 from pydantic import ValidationError, BaseModel
+from pydantic.fields import PydanticUndefined
 
 
 def format_pydantic_errors(pydantic_errors):
@@ -240,7 +241,9 @@ class WidgetTypeViewSet(viewsets.ViewSet):
                     "required": field_info.is_required(),
                     "default": (
                         None
-                        if field_info.default is None or field_info.default == ...
+                        if field_info.default is None
+                        or field_info.default == ...
+                        or field_info.default is PydanticUndefined
                         else field_info.default
                     ),
                     "description": field_info.description or "",

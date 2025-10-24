@@ -6,10 +6,7 @@
 <div class="min-h-screen bg-gray-400 flex flex-col">
   <div class="w-full max-w-[1280px] mx-auto flex-1 flex flex-col">
     
-    <header class="bg-black h-[132px]">
-      {% render_slot "header" %}
-    </header>
-
+    {% render_slot "header" %}
     {% render_slot "navbar" %}
 
     <main class="bg-white p-8 min-h-[310px]">

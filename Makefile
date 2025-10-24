@@ -1,6 +1,6 @@
 # Makefile for eceee_v4_test_1
 
-.PHONY: help install backend frontend playwright-service migrate createsuperuser sample-content sample-pages sample-data sample-clean migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only import-schemas import-schemas-dry import-schemas-force import-schema test lint docker-up docker-down restart clean playwright-test playwright-down playwright-logs sync-from sync-to clear-layout-cache clear-layout-cache-all
+.PHONY: help install backend frontend playwright-service migrate createsuperuser sample-content sample-pages sample-data sample-clean migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only import-schemas import-schemas-dry import-schemas-force import-schema test lint docker-up docker-down restart clean playwright-test playwright-down playwright-logs sync-from sync-to clear-layout-cache clear-layout-cache-all tailwind-build tailwind-watch
 
 # Default target - show help
 .DEFAULT_GOAL := help
@@ -15,6 +15,8 @@ help: ## Show this help message
 	@echo "  frontend          Start React frontend dev server"
 	@echo "  playwright-service Start Playwright website rendering service"
 	@echo "  shell             Open bash shell in backend container"
+	@echo "  tailwind-build    Build Tailwind CSS for backend templates"
+	@echo "  tailwind-watch    Watch and rebuild Tailwind CSS on changes"
 	@echo ""
 	@echo "Database Management:"
 	@echo "  migrations        Create Django migrations"
@@ -212,3 +214,12 @@ clear-layout-cache: ## Clear layout-related caches to force refresh
 clear-layout-cache-all: ## Clear all caches (nuclear option)
 	@echo "🧹 Clearing ALL caches..."
 	docker-compose exec backend python manage.py clear_layout_cache --all
+
+# Tailwind CSS build commands
+tailwind-build: ## Build Tailwind CSS for backend templates
+	@echo "🎨 Building Tailwind CSS..."
+	cd backend && npx tailwindcss -i ./static/css/tailwind.input.css -o ./static/css/tailwind.output.css --minify
+
+tailwind-watch: ## Watch and rebuild Tailwind CSS on changes
+	@echo "👀 Watching Tailwind CSS for changes..."
+	cd backend && npx tailwindcss -i ./static/css/tailwind.input.css -o ./static/css/tailwind.output.css --watch
